@@ -123,6 +123,7 @@ pub enum IrregularVerificationError {
     DroppedSlotManifestInvalid,
     InvalidTaskContract,
     InvalidOracleSchedule,
+    InvalidLatentValue { index: usize },
     TimeNotStrictlyIncreasing { index: usize },
     OraclePointMismatch { index: usize },
     NoiseBoundExceeded { index: usize },
@@ -138,6 +139,9 @@ impl fmt::Display for IrregularVerificationError {
             Self::DroppedSlotManifestInvalid => write!(f, "dropped-slot manifest is invalid"),
             Self::InvalidTaskContract => write!(f, "irregular task timing or missingness contract is invalid"),
             Self::InvalidOracleSchedule => write!(f, "irregular oracle schedule is outside the generator bounds"),
+            Self::InvalidLatentValue { index } => {
+                write!(f, "irregular latent value at point {index} disagrees with its period and phase")
+            }
             Self::TimeNotStrictlyIncreasing { index } => {
                 write!(f, "observation timestamps are not strictly increasing at index {index}")
             }
@@ -393,6 +397,14 @@ pub fn verify_irregular_trace(
         if observation.time_us != point.time_us || observed != point.observed {
             return Err(IrregularVerificationError::OraclePointMismatch { index });
         }
+        let expected_latent = [
+            triangle_wave(point.time_us, oracle.periods_us[0], oracle.phases_us[0]),
+            triangle_wave(point.time_us, oracle.periods_us[1], oracle.phases_us[1]),
+            triangle_wave(point.time_us, oracle.periods_us[2], oracle.phases_us[2]),
+        ];
+        if point.latent != expected_latent {
+            return Err(IrregularVerificationError::InvalidLatentValue { index });
+        }
         for (observed_value, latent_value) in observed.into_iter().zip(point.latent) {
             if (i32::from(observed_value) - i32::from(latent_value)).abs()
                 > i32::from(MAX_NOISE)
@@ -559,6 +571,18 @@ mod tests {
         assert_eq!(
             verify_irregular_trace(&task, &oracle),
             Err(IrregularVerificationError::PublicDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn verifier_rejects_recommitted_oracle_with_wrong_latent_wave() {
+        let config = IrregularConfig::reference(27);
+        let (task, mut oracle) = generate_irregular_task(config).unwrap();
+        oracle.points[0].latent[0] = oracle.points[0].latent[0].saturating_add(1);
+        oracle.content_sha256 = irregular_oracle_digest(&oracle);
+        assert_eq!(
+            verify_irregular_trace(&task, &oracle),
+            Err(IrregularVerificationError::InvalidLatentValue { index: 0 })
         );
     }
 
