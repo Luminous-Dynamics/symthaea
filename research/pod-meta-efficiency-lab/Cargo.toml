@@ -9,6 +9,9 @@ description = "Deterministic benchmark for verified proof progress per unit comp
 
 [workspace]
 
+[dependencies]
+pod-meta-lab = { path = "../pod-meta-lab" }
+
 [[bin]]
 name = "pod-meta-efficiency"
 path = "src/main.rs"
