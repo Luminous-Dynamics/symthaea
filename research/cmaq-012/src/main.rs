@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fmt::Write as _;
 use std::fs;
@@ -220,10 +220,14 @@ fn parse_and_pair(input: &str) -> Result<Vec<(ResultKey, Vec<BTreeMap<Arm, Row>>
     let header = lines.next().ok_or_else(|| "input is empty".to_string())?;
     if header != HEADER { return Err(format!("header mismatch; required exact header: {HEADER}")); }
     let mut episodes: BTreeMap<EpisodeKey, BTreeMap<Arm, Row>> = BTreeMap::new();
+    let mut profiling_receipts = BTreeSet::new();
     for (index, line) in lines.enumerate() {
         let line_number = index + 2;
         if line.is_empty() { return Err(format!("line {line_number}: blank rows are not allowed")); }
         let row = Row::parse(line, line_number)?;
+        if !profiling_receipts.insert(row.profiling_receipt_sha256.clone()) {
+            return Err(format!("line {line_number}: profiling receipt digest is reused"));
+        }
         let key = (row.task.clone(), row.capability.clone(), row.split.clone(), row.seed);
         let arms = episodes.entry(key).or_default();
         if arms.insert(row.arm, row).is_some() {
@@ -240,6 +244,22 @@ fn parse_and_pair(input: &str) -> Result<Vec<(ResultKey, Vec<BTreeMap<Arm, Row>>
         }
         validate_pair(&arms, &task, &capability, &split, seed)?;
         grouped.entry((task, capability, split)).or_default().push(arms);
+    }
+    for ((task, capability, split), paired_episodes) in grouped.iter() {
+        let reference = &paired_episodes[0][&Arm::D0];
+        for (episode_index, episode) in paired_episodes.iter().enumerate() {
+            for arm in ARMS {
+                let row = &episode[&arm];
+                if row.resource_profile_sha256 != reference.resource_profile_sha256
+                    || row.resource_measurement_method != reference.resource_measurement_method
+                {
+                    return Err(format!(
+                        "resource profile/method drift within {task}/{capability}/{split} at paired episode {episode_index}, arm {}",
+                        arm.name()
+                    ));
+                }
+            }
+        }
     }
     Ok(grouped.into_iter().collect())
 }
@@ -340,7 +360,6 @@ fn relative_delta(left: f64, right: f64) -> Option<f64> {
 }
 
 fn compare_resource_arms(
-    rows: &[BTreeMap<Arm, Row>],
     left: Arm,
     right: Arm,
     arm_metrics: &BTreeMap<Arm, ArmMetrics>,
@@ -420,8 +439,8 @@ fn evaluate_resource_match(
             })
         });
 
-    let d1_vs_w1 = compare_resource_arms(episodes, Arm::D1, Arm::W1, arm_metrics);
-    let w1_vs_w2 = compare_resource_arms(episodes, Arm::W1, Arm::W2, arm_metrics);
+    let d1_vs_w1 = compare_resource_arms(Arm::D1, Arm::W1, arm_metrics);
+    let w1_vs_w2 = compare_resource_arms(Arm::W1, Arm::W2, arm_metrics);
     let energy_complete = [Arm::D1, Arm::W1, Arm::W2].iter().all(|arm| {
         episodes.iter().all(|episode| episode[arm].energy_millijoules.is_some())
     });
@@ -444,6 +463,7 @@ fn evaluate_resource_match(
     } else if !d1_role_valid || !learned_model_role_valid || !w2_workload_match_valid
         || !pair_is_within_tolerance(&d1_vs_w1)
         || !pair_is_within_tolerance(&w1_vs_w2)
+        || energy_status == "measured_but_outside_10_percent"
     {
         reasons.push("D1/W1 or W1/W2 differs beyond the preregistered resource tolerance");
         "budget_unmatched"
@@ -664,7 +684,7 @@ fn render_report(report: &Report) -> String {
                 "\"resource_metrics\": {{\"mean_compute_work_units\": {}, \"p50_compute_work_units\": {}, \"p95_compute_work_units\": {}, ",
                 "\"p95_peak_memory_bytes\": {}, \"mean_energy_millijoules\": {}, \"energy_measured_episode_count\": {}, ",
                 "\"mean_direct_value_calls\": {}, \"mean_world_model_forward_calls\": {}, \"mean_world_model_transition_calls\": {}, ",
-                "\"mean_oracle_transition_calls\": {}, \"mean_environment_transition_calls\": {}, \"mean_optimizer_iterations\": {}}}}}{}"),
+                "\"mean_oracle_transition_calls\": {}, \"mean_environment_transition_calls\": {}, \"mean_optimizer_iterations\": {}}}}{}"),
                 arm.name(), number(m.mean_return), number(m.success_rate), m.success_count,
                 m.failed_count, m.timed_out_count, number(m.mean_latency_ms),
                 number(m.p50_latency_ms), number(m.p95_latency_ms),
@@ -839,6 +859,28 @@ mod tests {
         lines.join("\n") + "\n"
     }
 
+    fn alter_all_rows_field(input: &str, field_index: usize, value: &str) -> String {
+        let mut lines: Vec<String> = input.lines().map(str::to_string).collect();
+        for line in lines.iter_mut().skip(1) {
+            let mut fields: Vec<String> = line.split('\t').map(str::to_string).collect();
+            fields[field_index] = value.to_string();
+            *line = fields.join("\t");
+        }
+        lines.join("\n") + "\n"
+    }
+
+    fn alter_arm_rows_field(input: &str, arm_name: &str, field_index: usize, value: &str) -> String {
+        let mut lines: Vec<String> = input.lines().map(str::to_string).collect();
+        for line in lines.iter_mut().skip(1) {
+            let mut fields: Vec<String> = line.split('\t').map(str::to_string).collect();
+            if fields[4] == arm_name {
+                fields[field_index] = value.to_string();
+                *line = fields.join("\t");
+            }
+        }
+        lines.join("\n") + "\n"
+    }
+
     #[test]
     fn sha256_known_answer() {
         assert_eq!(sha256_hex(b"abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
@@ -918,7 +960,7 @@ mod tests {
     #[test]
     fn resource_work_outside_tolerance_is_budget_unmatched() {
         let input = synthetic_tsv(20,1.0,2.0,4.0,2.0,5.0);
-        let modified = alter_row_field(&input,3,22,"200000");
+        let modified = alter_arm_rows_field(&input,"W1",22,"200000");
         let report = build_report(&modified,500,11).unwrap();
         assert_eq!(report.groups[0].resource_match.status, "budget_unmatched");
         assert_eq!(report.groups[0].eligibility, "budget_unmatched");
@@ -936,8 +978,7 @@ mod tests {
     #[test]
     fn static_estimates_are_reported_but_never_qualify_compute_match() {
         let input = synthetic_tsv(20,1.0,2.0,4.0,2.0,5.0);
-        let mut modified = input.clone();
-        modified = alter_row_field(&modified,1,21,"static_estimate");
+        let modified = alter_all_rows_field(&input,21,"static_estimate");
         let report = build_report(&modified,500,11).unwrap();
         assert_eq!(report.groups[0].resource_match.status, "resource_unmeasured");
         assert_eq!(report.groups[0].eligibility, "resource_unmeasured");
@@ -946,7 +987,10 @@ mod tests {
     #[test]
     fn missing_resource_counters_fail_closed_as_unmeasured() {
         let input = synthetic_tsv(20,1.0,2.0,4.0,2.0,5.0);
-        let modified = alter_row_field(&input,1,22,"null");
+        let modified = alter_all_rows_field(&input,21,"unavailable");
+        let modified = alter_all_rows_field(&modified,22,"null");
+        let modified = alter_all_rows_field(&modified,23,"null");
+        let modified = alter_all_rows_field(&modified,24,"null");
         let report = build_report(&modified,500,11).unwrap();
         assert_eq!(report.groups[0].resource_match.status, "resource_unmeasured");
     }
