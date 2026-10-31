@@ -20,6 +20,7 @@ pub mod direction_board_benchmark;
 pub mod event_tape;
 pub mod matched_campaign;
 pub mod coral_baseline;
+pub mod coral_execution;
 pub mod resource_pareto;
 
 const MATRIX_SCHEMA: &str = "symthaea.architecture-engineering.candidate-matrix";
