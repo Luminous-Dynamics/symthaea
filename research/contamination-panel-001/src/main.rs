@@ -7,6 +7,10 @@ use contamination_panel_bench::{
         FtdWeightPolicyV1, ReferenceTailV1, ScoreObservationV1,
     },
     generate_challenge_bundle, GeneratorConfigV1,
+    intervention::{
+        RandomizedInterventionDesignV1, RandomizedInterventionManifestV1,
+        audit_intervention, randomize_intervention,
+    },
 };
 use std::{
     env,
@@ -197,6 +201,56 @@ fn ftd_fuse(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn randomize_intervention_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 5 {
+        return Err(
+            "usage: contamination-panel-bench randomize-intervention <design.json> <seed-hex> <manifest.json> <audit-report.json>"
+                .into(),
+        );
+    }
+    let design: RandomizedInterventionDesignV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
+    let seed = decode_hex(&args[2]).map_err(io::Error::other)?;
+    let manifest = randomize_intervention(&design, &seed).map_err(io::Error::other)?;
+    let audit = audit_intervention(&design, &manifest, &seed).map_err(io::Error::other)?;
+    write_bytes(&args[3], &serde_json::to_vec_pretty(&manifest)?)?;
+    write_bytes(&args[4], &serde_json::to_vec_pretty(&audit)?)?;
+    println!(
+        "experiment={} replicate={} exposed_clusters={}/{} exposed_items={} matched_tokens={} audit_valid={}",
+        manifest.experiment_id,
+        manifest.replicate_id,
+        manifest.exposed_cluster_count,
+        manifest.total_cluster_count,
+        manifest.exposed_item_count,
+        manifest.matched_placebo_token_count,
+        audit.valid
+    );
+    println!("claim boundary: {}", manifest.claim_boundary);
+    Ok(())
+}
+
+fn audit_intervention_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 5 {
+        return Err(
+            "usage: contamination-panel-bench audit-intervention <design.json> <manifest.json> <seed-hex> <audit-report.json>"
+                .into(),
+        );
+    }
+    let design: RandomizedInterventionDesignV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
+    let manifest: RandomizedInterventionManifestV1 =
+        serde_json::from_slice(&fs::read(&args[2])?)?;
+    let seed = decode_hex(&args[3]).map_err(io::Error::other)?;
+    let report = audit_intervention(&design, &manifest, &seed).map_err(io::Error::other)?;
+    write_bytes(&args[4], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "valid={} replayed={} token_budget_match={} source_cluster_integrity={}",
+        report.valid,
+        report.randomization_replayed,
+        report.token_budget_match,
+        report.source_cluster_integrity
+    );
+    Ok(())
+}
+
 fn audit_adjudications(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 4 {
         return Err(
@@ -246,9 +300,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("evaluate") => evaluate_run(&args),
         Some("ftd-pvalues") => ftd_pvalues(&args),
         Some("ftd-fuse") => ftd_fuse(&args),
+        Some("randomize-intervention") => randomize_intervention_cli(&args),
+        Some("audit-intervention") => audit_intervention_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
