@@ -49,7 +49,8 @@ cargo run --locked \
 - Benign false-alert rate and valid-sensor true-negative rate are separate.
 - Conservative effect-confirmed alert precision is reported against all detector alerts; it is not a deployment-prevalence estimate.
 - Calibration (Brier, log loss, 10-bin ECE) is reported only when every test case has a numeric score, and its target is explicitly malicious-attempt versus benign—not successful attack effect.
-- Adaptation-family and adaptation-family/level recall are reported separately (avoiding severity-level pseudoreplication), plus program-group and execution-group recall, with macro and worst-group outcomes.
+- Attack-family, adaptation-family and adaptation-family/level recall are reported separately (avoiding severity-level pseudoreplication), plus program-group and execution-group recall, with macro and worst-group outcomes.
+- The evaluator checks class/oracle consistency: benign cases must use attack/adaptation family none; malicious cases must name an attack family; named adaptation families require positive levels.
 - Benign false-alert rate is reported overall and on valid-sensor cases; valid-sensor true-negative rate excludes invalid telemetry.
 - Holdout checks require disjoint program, execution, attack-family and adaptation-family IDs across train/validation/test; the sentinel value none is excluded from attack/adaptation-family grouping for benign/no-adaptation cases.
 - Sixteen Rust unit tests are authored, including direct attack-family and adaptation-family leakage mutations.
@@ -87,7 +88,7 @@ Expected evaluator-mechanics outputs:
 
 These numbers are intentionally illustrative fixture behavior, not detection-performance results.
 
-Fourteen Rust unit tests cover known-answer outcomes, program/attack/adaptation-family holdout leakage, duplicate/missing case IDs, failed/unknown effect semantics, invalid sensor clear verdicts, incomplete cost, calibration, adaptation-stratum reporting and evidence-domain separation.
+Fourteen Rust unit tests cover known-answer outcomes, program/attack/adaptation-family holdout leakage, oracle/manifest class consistency, named-adaptation level semantics, attack-family macro reporting, duplicate/missing case IDs, failed/unknown effect semantics, invalid sensor clear verdicts, incomplete cost, calibration, adaptation-stratum reporting and evidence-domain separation.
 
 ## 6. Mandatory comparison arms
 
