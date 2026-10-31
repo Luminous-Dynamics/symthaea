@@ -137,3 +137,22 @@ The current AR-5B5 Pareto primitive now provides three separate indicators: exac
 Still outstanding: EventTape resource-to-objective adaptation, artifact-byte resolution, R2/attainment analysis, uncertainty-aware dominance, and inference across independent multi-objective instances.
 
 The first executable benchmark functions are now present as deterministic generators: ZDT1 for two-objective minimization and DTLZ2 for three objectives, each with an analytic reference-front sampler. A cross-module integration test feeds the ZDT1 front through Pareto analysis and the digest-bound IGD+/epsilon receipt. This is a fixture/integration check only; it does not implement NSGA-II/NSGA-III/MOEA/D/SMS-EMOA/RVEA, WFG, constrained DTLZ or a comparative performance result.
+
+## New AR-5B5 execution and verifier controls — 2026-10-31
+
+The EventTape-to-Pareto adapter now turns strict, fully metered action tapes into candidate-level objective vectors. It preserves failed retries in candidate costs, reports direction-proposal overhead separately, reconciles both to whole-campaign resource totals, and can deterministically reconstruct a report from the source tape and frozen metric mapping. Reported uncertainty can itself be an objective; missing uncertainty on any verified repeat fails closed when that metric is selected.
+
+The semantic-alias benchmark now keeps policy-visible proposal surface forms separate from evaluator-only semantic identity and utility. It measures pairwise duplicate precision/recall, false merges, false splits, false-new admissions, false novelty rejections, and synthetic downstream discovery regret under a fixed canonical-slot budget. Its evaluator-only adjudication digest is included in the final receipt. The initial fixture is deliberately synthetic and small: it validates the control logic, not natural-language semantic understanding or real verifier accuracy.
+
+### PlatEMO industry comparison
+
+The July 2026 PlatEMO 4.16 release notes list 360 algorithms and 630 problems, including constrained, large-scale, expensive and multimodal multi-objective methods. This is a reminder not to make unsupported “state of the art” claims from two analytic functions and a hand-picked baseline. Pin the exact PlatEMO version, algorithm identifiers, problem identifiers, parameter files and termination budgets. For a Rust-first research stack, port or reimplement selected baselines with reference cross-checks; keep a separate pinned MATLAB/PlatEMO reference export only as an external reproducibility oracle rather than a production dependency.
+
+Sources:
+- PlatEMO 4.16 release notes (July 2026): https://github.com/BIMK/PlatEMO/blob/master/Doc/releasenote.md
+- COCO biobjective target-attainment protocol: https://numbbo.github.io/coco-doc/bbob-biobj/perf-assessment/
+- Reliability study showing HV/IGD+/epsilon disagreement and HV reference sensitivity: https://scholars.cityu.edu.hk/en/publications/reliability-of-indicator-based-comparison-results-of-evolutionary/
+- 2024 constrained multi-objective optimization under uncertainty, including adaptive Pareto dominance and Pareto-optimality probability: https://onlinelibrary.wiley.com/doi/10.1002/nme.7403
+- September 2026 robust multi-objective optimality under data uncertainty: https://link.springer.com/article/10.1007/s10479-026-07410-8
+
+This expands the immediate benchmark plan: go beyond deterministic front convergence to (1) expensive/limited evaluation budgets, (2) noisy or epistemically uncertain objective estimates, (3) constrained feasibility, (4) multimodal decision-space fronts, and (5) semantic alias/verifier failure injection. Report the applicable problem class, not one pooled score.
