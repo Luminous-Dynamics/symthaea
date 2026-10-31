@@ -201,6 +201,8 @@ pub enum CampaignEventPayload {
         parent_candidate_sha256: String,
         semantic_delta_sha256: String,
         direction_id: String,
+        parent_score: Option<f64>,
+        inspired_by_scores: Vec<f64>,
         disposition: CandidateDisposition,
         score: Option<f64>,
     },
@@ -219,6 +221,11 @@ pub enum CampaignEventPayload {
         semantic_delta_sha256: String,
         proposal_sha256: String,
         descriptor_sha256: String,
+        parent_score: Option<f64>,
+        inspired_by_scores: Vec<f64>,
+        /// Evaluator snapshot before any outcome from the admitting batch was visible.
+        opening_evaluation_count: Option<u64>,
+        opening_global_best: Option<f64>,
         disposition: DirectionProposalDisposition,
         score: Option<f64>,
     },
@@ -397,6 +404,8 @@ impl CampaignTape {
         let mut previous_round = 0_u64;
         let mut known_directions: BTreeSet<String> =
             self.config.initial_direction_ids.iter().cloned().collect();
+        let mut scored_evaluation_count = 0_u64;
+        let mut global_best_score: Option<f64> = None;
         let mut index = 0usize;
 
         while index < self.events.len() {
@@ -418,6 +427,9 @@ impl CampaignTape {
                     "round contains more actions than configured workers",
                 ));
             }
+            let round_opening_evaluation_count = scored_evaluation_count;
+            let round_opening_global_best = global_best_score;
+            let mut round_scored_scores = Vec::new();
             let visibility_cutoff = round[0].policy_visible_through_sequence;
             if visibility_cutoff != round[0].sequence_number - 1 {
                 return Err(CampaignTapeError::new(
@@ -516,6 +528,8 @@ impl CampaignTape {
                             parent_candidate_sha256,
                             semantic_delta_sha256,
                             direction_id: payload_direction,
+                            parent_score,
+                            inspired_by_scores,
                             disposition,
                             score,
                         },
@@ -533,8 +547,18 @@ impl CampaignTape {
                         validate_sha256("candidate_sha256", candidate_sha256)?;
                         validate_sha256("parent_candidate_sha256", parent_candidate_sha256)?;
                         validate_sha256("semantic_delta_sha256", semantic_delta_sha256)?;
+                        if parent_score.is_some_and(|value| !value.is_finite())
+                            || inspired_by_scores.iter().any(|value| !value.is_finite())
+                        {
+                            return Err(CampaignTapeError::new(
+                                format!("events[{event_index}].parent_or_inspired_score"),
+                                "parent and inspiration scores must be finite when present",
+                            ));
+                        }
                         match (disposition, score) {
-                            (CandidateDisposition::Verified, Some(value)) if value.is_finite() => {}
+                            (CandidateDisposition::Verified, Some(value)) if value.is_finite() => {
+                                round_scored_scores.push(value);
+                            }
                             (CandidateDisposition::Verified, _) => {
                                 return Err(CampaignTapeError::new(
                                     format!("events[{event_index}].score"),
@@ -559,6 +583,10 @@ impl CampaignTape {
                             semantic_delta_sha256,
                             proposal_sha256,
                             descriptor_sha256,
+                            parent_score,
+                            inspired_by_scores,
+                            opening_evaluation_count,
+                            opening_global_best,
                             disposition,
                             score,
                         },
@@ -568,6 +596,15 @@ impl CampaignTape {
                         validate_sha256("semantic_delta_sha256", semantic_delta_sha256)?;
                         validate_sha256("proposal_sha256", proposal_sha256)?;
                         validate_sha256("descriptor_sha256", descriptor_sha256)?;
+                        if parent_score.is_some_and(|value| !value.is_finite())
+                            || inspired_by_scores.iter().any(|value| !value.is_finite())
+                            || opening_global_best.is_some_and(|value| !value.is_finite())
+                        {
+                            return Err(CampaignTapeError::new(
+                                format!("events[{event_index}].score_context"),
+                                "parent, inspiration and opening-best values must be finite when present",
+                            ));
+                        }
                         match (disposition, score) {
                             (
                                 DirectionProposalDisposition::Admitted { .. }
@@ -603,6 +640,14 @@ impl CampaignTape {
                         new_claims += 1;
                         match disposition {
                             DirectionProposalDisposition::Admitted { canonical_direction_id } => {
+                                if *opening_evaluation_count != Some(round_opening_evaluation_count)
+                                    || *opening_global_best != round_opening_global_best
+                                {
+                                    return Err(CampaignTapeError::new(
+                                        format!("events[{event_index}].opening_context"),
+                                        "new direction opening context must equal the pre-batch evaluation count/global best",
+                                    ));
+                                }
                                 validate_id("canonical_direction_id", canonical_direction_id)?;
                                 if known_directions.contains(canonical_direction_id)
                                     || !pending_new_directions.insert(canonical_direction_id.clone())
@@ -614,6 +659,12 @@ impl CampaignTape {
                                 }
                             }
                             DirectionProposalDisposition::Duplicate { existing_direction_id } => {
+                                if opening_evaluation_count.is_some() || opening_global_best.is_some() {
+                                    return Err(CampaignTapeError::new(
+                                        format!("events[{event_index}].opening_context"),
+                                        "duplicate mapping cannot declare a new direction opening context",
+                                    ));
+                                }
                                 validate_id("existing_direction_id", existing_direction_id)?;
                                 if !known_directions.contains(existing_direction_id)
                                     && !pending_new_directions.contains(existing_direction_id)
@@ -626,8 +677,17 @@ impl CampaignTape {
                             }
                             DirectionProposalDisposition::Rejected { reason_code }
                             | DirectionProposalDisposition::Inconclusive { reason_code } => {
+                                if opening_evaluation_count.is_some() || opening_global_best.is_some() {
+                                    return Err(CampaignTapeError::new(
+                                        format!("events[{event_index}].opening_context"),
+                                        "rejected or inconclusive proposal cannot open a direction",
+                                    ));
+                                }
                                 validate_id("reason_code", reason_code)?;
                             }
+                        }
+                        if let Some(value) = score {
+                            round_scored_scores.push(*value);
                         }
                     }
                     (
@@ -703,6 +763,12 @@ impl CampaignTape {
                 ));
             }
             known_directions.extend(pending_new_directions);
+            scored_evaluation_count = scored_evaluation_count
+                .checked_add(round_scored_scores.len() as u64)
+                .ok_or_else(|| CampaignTapeError::new("scored_evaluation_count", "overflow"))?;
+            if let Some(round_best) = round_scored_scores.into_iter().max_by(f64::total_cmp) {
+                global_best_score = Some(global_best_score.map_or(round_best, |best| best.max(round_best)));
+            }
             previous_round = round_id;
         }
 
