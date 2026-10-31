@@ -333,6 +333,16 @@ mod tests {
     }
 
     #[test]
+    fn measured_partial_tables_are_only_marked_when_the_source_says_measured() {
+        let measured: Vec<_> = instrument_descriptors()
+            .into_iter()
+            .filter(|entry| entry.partial_table_evidence == PartialTableEvidence::Measured)
+            .map(|entry| entry.id)
+            .collect();
+        assert_eq!(measured, vec!["piano", "piano.pp", "violin", "cello"]);
+    }
+
+    #[test]
     fn gm_program_and_synthesis_path_are_only_mappings_not_qualification() {
         let oud = descriptor_for(Instrument::Oud).unwrap();
         assert_eq!(oud.gm_program, Instrument::Oud.gm_program());
