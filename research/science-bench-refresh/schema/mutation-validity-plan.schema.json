@@ -1,0 +1,351 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/mutation-validity-plan.schema.json",
+  "title": "Symthaea Semantic Mutation Validity Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "analyzer_source_revision",
+    "purpose",
+    "study_id",
+    "generator_source_revision",
+    "evaluator_source_revision",
+    "generator_policy_sha256",
+    "semantic_task_set_sha256",
+    "review_protocol_sha256",
+    "metamorphic_plan_sha256",
+    "evaluator_prompt_sha256",
+    "rubric_sha256",
+    "reviewers_per_mutation",
+    "variants",
+    "plan_commitment_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_mutation_validity_plan.v1"
+    },
+    "analyzer_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "purpose": {
+      "enum": [
+        "example_only",
+        "qualified_run"
+      ]
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "generator_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "evaluator_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "generator_policy_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "semantic_task_set_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "review_protocol_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "metamorphic_plan_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "evaluator_prompt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "rubric_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "reviewers_per_mutation": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 7
+    },
+    "variants": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/variant"
+      }
+    },
+    "plan_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "modality",
+        "content_sha256",
+        "byte_length"
+      ],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "modality": {
+          "enum": [
+            "text",
+            "image",
+            "audio",
+            "video",
+            "structured",
+            "multimodal"
+          ]
+        },
+        "content_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mutation_id",
+        "metamorphic_pair_id",
+        "family",
+        "intended_relation",
+        "target_dimension",
+        "baseline_input_sha256",
+        "variant_input_sha256",
+        "baseline_artifacts",
+        "variant_artifacts"
+      ],
+      "properties": {
+        "mutation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "metamorphic_pair_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "family": {
+          "enum": [
+            "paraphrase",
+            "formatting",
+            "entity_substitution",
+            "unit_change",
+            "date_change",
+            "scope_change",
+            "evidence_addition",
+            "evidence_withdrawal",
+            "source_retraction",
+            "multimodal_composition",
+            "other"
+          ]
+        },
+        "intended_relation": {
+          "enum": [
+            "preserving",
+            "changing"
+          ]
+        },
+        "target_dimension": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "baseline_input_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "variant_input_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "baseline_artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/artifact"
+          }
+        },
+        "variant_artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/artifact"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "intended_relation": {
+                "const": "changing"
+              }
+            },
+            "required": [
+              "intended_relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "target_dimension": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "intended_relation": {
+                "const": "preserving"
+              }
+            },
+            "required": [
+              "intended_relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "target_dimension": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "purpose": {
+            "const": "qualified_run"
+          }
+        },
+        "required": [
+          "purpose"
+        ]
+      },
+      "then": {
+        "properties": {
+          "analyzer_source_revision": {
+            "not": {
+              "pattern": "^0{40}$"
+            }
+          },
+          "generator_source_revision": {
+            "not": {
+              "pattern": "^0{40}$"
+            }
+          },
+          "evaluator_source_revision": {
+            "not": {
+              "pattern": "^0{40}$"
+            }
+          },
+          "generator_policy_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "semantic_task_set_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "review_protocol_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "metamorphic_plan_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "evaluator_prompt_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "rubric_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "plan_commitment_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "variants": {
+            "items": {
+              "properties": {
+                "baseline_input_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "variant_input_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "baseline_artifacts": {
+                  "items": {
+                    "properties": {
+                      "content_sha256": {
+                        "not": {
+                          "pattern": "^0{64}$"
+                        }
+                      }
+                    }
+                  }
+                },
+                "variant_artifacts": {
+                  "items": {
+                    "properties": {
+                      "content_sha256": {
+                        "not": {
+                          "pattern": "^0{64}$"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
