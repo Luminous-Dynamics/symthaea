@@ -2124,6 +2124,103 @@ mod tests {
     }
 
     #[test]
+    fn sparse_system_search_reuses_partition_terms_across_state_pairs_with_dense_parity() {
+        let dense = dense_ring_model(3);
+        let sparse = SparseBinaryCausalModel::from_dense(&dense).unwrap();
+        let candidate = [0, 1, 2];
+        let current_state = [true, false, true];
+        let config = crate::Iit4SystemPhiSearchConfig {
+            max_partition_combinations: 100,
+            max_state_pair_evaluations: 64,
+            max_partition_score_evaluations: 10_000,
+            ..crate::Iit4SystemPhiSearchConfig::default()
+        };
+
+        let dense_result = dense
+            .analyze_iit4_2023_system_phi_s(&candidate, &current_state, config)
+            .unwrap();
+        let sparse_result = sparse
+            .analyze_iit4_2023_system_phi_s(&candidate, &current_state, config, 1 << 16)
+            .unwrap();
+        assert_eq!(sparse_result.formalism, dense_result.formalism);
+        assert_eq!(sparse_result.status, dense_result.status);
+        assert_eq!(sparse_result.selected_state_pair_index, dense_result.selected_state_pair_index);
+        assert_eq!(sparse_result.tied_state_pair_indices, dense_result.tied_state_pair_indices);
+        assert_eq!(sparse_result.partition_score_evaluations, dense_result.partition_score_evaluations);
+        assert_eq!(sparse_result.state_pair_results.len(), dense_result.state_pair_results.len());
+        match (sparse_result.phi_s, dense_result.phi_s) {
+            (Some(left), Some(right)) => assert!((left - right).abs() <= 1e-12),
+            (None, None) => {}
+            other => panic!("dense/sparse phi_s presence differs: {other:?}"),
+        }
+        for (sparse_pair, dense_pair) in sparse_result
+            .state_pair_results
+            .iter()
+            .zip(&dense_result.state_pair_results)
+        {
+            assert_eq!(sparse_pair.system_state, dense_pair.system_state);
+            assert_eq!(
+                sparse_pair.winning_partition.cut_matrix(),
+                dense_pair.winning_partition.cut_matrix()
+            );
+            assert_eq!(sparse_pair.score.severed_connections, dense_pair.score.severed_connections);
+            assert!((sparse_pair.score.signed_phi - dense_pair.score.signed_phi).abs() <= 1e-12);
+            assert!((sparse_pair.score.normalized_phi - dense_pair.score.normalized_phi).abs() <= 1e-12);
+            assert!((sparse_pair.score.cause.signed_phi - dense_pair.score.cause.signed_phi).abs() <= 1e-12);
+            assert!((sparse_pair.score.effect.signed_phi - dense_pair.score.effect.signed_phi).abs() <= 1e-12);
+        }
+
+        // The base observation posterior is contracted once. Each partition query
+        // reuses that exact posterior and each partition's full repertoire terms
+        // are then independent of which tied specified-state pair is scored.
+        let baseline = sparse
+            .prepare_iit4_scoring_baseline(&candidate, &current_state, 1 << 16)
+            .unwrap();
+        assert!(!baseline.cause_forward.posterior_contraction_reused);
+        let partitions = enumerate_iit4_system_partitions(&candidate, 3, false, 100).unwrap();
+        assert!(partitions.len() > 1);
+        let terms = sparse.prepare_iit4_partition_terms(&partitions[0], &baseline).unwrap();
+        assert!(terms.partitioned_cause.posterior_contraction_reused);
+        assert_eq!(
+            terms.partitioned_cause.posterior_factor_multiplications,
+            baseline.cause_forward.posterior_factor_multiplications
+        );
+
+        let intrinsic = sparse
+            .system_intrinsic_specification_iit4(&candidate, &current_state, 6, 1 << 16)
+            .unwrap();
+        let pairs = intrinsic.state_pairs();
+        for partition in partitions.iter().take(3) {
+            let cached_terms = sparse.prepare_iit4_partition_terms(partition, &baseline).unwrap();
+            for system_state in pairs.iter().take(3) {
+                let cached = sparse
+                    .score_iit4_system_partition_from_terms(
+                        partition,
+                        system_state,
+                        &baseline,
+                        &cached_terms,
+                    )
+                    .unwrap();
+                let independently_prepared = sparse
+                    .score_iit4_system_partition(
+                        partition,
+                        &current_state,
+                        system_state,
+                        1 << 16,
+                    )
+                    .unwrap();
+                assert!((cached.score.signed_phi - independently_prepared.score.signed_phi).abs() <= 1e-12);
+                assert!((cached.score.normalized_phi - independently_prepared.score.normalized_phi).abs() <= 1e-12);
+                assert_eq!(
+                    cached.score.severed_connections,
+                    independently_prepared.score.severed_connections
+                );
+                assert!(cached.receipt_sha256().is_ok());
+            }
+        }
+    }
+
+    #[test]
     fn sparse_effect_repertoire_matches_dense_eq3_for_embedded_subsystems() {
         let dense = dense_ring_model(5);
         let sparse = SparseBinaryCausalModel::from_dense(&dense).unwrap();
