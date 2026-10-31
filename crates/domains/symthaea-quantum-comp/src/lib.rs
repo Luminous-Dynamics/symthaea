@@ -75,6 +75,7 @@ pub mod architecture_portfolio;
 pub mod architecture_routing;
 pub mod architecture_evidence;
 pub mod architecture_regime;
+pub mod architecture_memory;
 pub mod stability;
 pub mod statistics;
 pub mod substrate;
@@ -201,6 +202,15 @@ pub use architecture_regime::{
     WorkloadRegimeError,
     WorkloadRegimeQuery,
     WorkloadTemporalPattern,
+};
+pub use architecture_memory::{
+    validate_memory_topology, validate_memory_topology_binding,
+    validate_memory_topology_for_comparison, ArchitectureMemoryTopology,
+    MemoryCoherenceModel, MemoryConsistencyModel, MemoryPlacementMode,
+    MemoryPersistence, MemoryRegion, MemoryResidencyMode, MemoryRoute,
+    MemoryScope, MemoryStatePlacement, MemoryTier, MemoryTopologyError,
+    MemoryTopologyScenario, MemoryTopologySource, MemoryTopologySourceOrigin,
+    MemoryTransferDirection, MemoryTransferEdge, MemoryTransferFabric,
 };
 pub use architecture_evidence::{
     compare_architecture_evidence_records, select_architecture_candidate_from_evidence,
