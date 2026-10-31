@@ -628,9 +628,20 @@ mod tests {
     #[test]
     fn verifier_recomputes_labels_from_hidden_periods_and_weights() {
         let (task, mut oracle) = generate_multiscale_task(config(true)).unwrap();
-        oracle.hidden_periods[0] = 8;
-        // Recommit the modified oracle digest; validation must still reject
-        // an internally inconsistent oracle, not just a changed digest.
+        oracle.hidden_periods[0] = 1_000;
+        // Recommit the modified oracle digest; structural validation must
+        // still reject an out-of-contract latent model.
+        oracle.content_sha256 = multiscale_oracle_digest(&oracle);
+        assert_eq!(
+            verify_multiscale_trace(&task, &oracle),
+            Err(TemporalVerificationError::InvalidOracleModel)
+        );
+    }
+
+    #[test]
+    fn verifier_rejects_target_label_inconsistent_with_recommitted_oracle() {
+        let (task, mut oracle) = generate_multiscale_task(config(true)).unwrap();
+        oracle.targets[0].label = -oracle.targets[0].label;
         oracle.content_sha256 = multiscale_oracle_digest(&oracle);
         assert_eq!(
             verify_multiscale_trace(&task, &oracle),
