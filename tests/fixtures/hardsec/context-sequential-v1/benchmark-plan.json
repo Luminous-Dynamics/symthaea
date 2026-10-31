@@ -10,7 +10,8 @@
     "growing_reference_conformal_test_martingale",
     "fixed_reference_conditional_conformal_test_martingale",
     "context_agnostic_fixed_reference_eprocess",
-    "dkw_corrected_fixed_reference_cctm_rust"
+    "dkw_corrected_fixed_reference_cctm_rust",
+    "authors_python_official_cctm_current_main"
   ],
   "candidates": [
     "context_conditioned_fixed_reference_mixture_eprocess",
@@ -70,5 +71,24 @@
     "domain_pooling_forbidden": true,
     "random_window_confirmatory_claim_forbidden": true,
     "targets_not_achievements": true
-  }
+  },
+  "reference_implementations": [
+    {
+      "id": "published_paper_equations_v2",
+      "url": "https://arxiv.org/html/2602.13848",
+      "version": "arXiv 2602.13848v2 (2026-06-12)",
+      "implementation_status": "rust_equations_implemented_parity_not_yet_independently_reproduced"
+    },
+    {
+      "id": "authors_official_python_main",
+      "url": "https://github.com/shaersh/cctm",
+      "reference_branch": "main",
+      "source_blob_sha256": {
+        "cond_ctm_py": "f8aff50078ac868167ac7442fc978e0402cf0faa",
+        "optimization_py": "39d972a29507db3a8e2d7a20ce3b5a2162764974",
+        "utils_py": "a094f6a8bd1ab7e0cf9623e30d43b4b9bdbcc8ea"
+      },
+      "implementation_status": "source_pinned_metrics_and_execution_not_reproduced"
+    }
+  ]
 }
