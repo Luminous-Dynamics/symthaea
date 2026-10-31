@@ -146,9 +146,13 @@ pub struct KnowledgeScore {
     pub wrong_answers: usize,
     pub abstentions: usize,
     pub missing_predictions: usize,
+    pub future_knowledge_eligible_queries: usize,
     pub future_knowledge_leaks: usize,
+    pub missed_correction_eligible_queries: usize,
     pub missed_corrections: usize,
+    pub stale_after_retraction_eligible_queries: usize,
     pub stale_answers_after_retraction: usize,
+    pub historical_as_known_eligible_queries: usize,
     pub historical_as_known_preserved: usize,
 }
 
@@ -161,6 +165,32 @@ impl KnowledgeScore {
     pub fn prediction_coverage(&self) -> Option<f64> {
         (self.query_count > 0)
             .then(|| self.predictions_received as f64 / self.query_count as f64)
+    }
+
+    pub fn future_knowledge_leakage_rate(&self) -> Option<f64> {
+        (self.future_knowledge_eligible_queries > 0).then(|| {
+            self.future_knowledge_leaks as f64 / self.future_knowledge_eligible_queries as f64
+        })
+    }
+
+    pub fn missed_correction_rate(&self) -> Option<f64> {
+        (self.missed_correction_eligible_queries > 0).then(|| {
+            self.missed_corrections as f64 / self.missed_correction_eligible_queries as f64
+        })
+    }
+
+    pub fn stale_after_retraction_rate(&self) -> Option<f64> {
+        (self.stale_after_retraction_eligible_queries > 0).then(|| {
+            self.stale_answers_after_retraction as f64
+                / self.stale_after_retraction_eligible_queries as f64
+        })
+    }
+
+    pub fn historical_as_known_preservation_rate(&self) -> Option<f64> {
+        (self.historical_as_known_eligible_queries > 0).then(|| {
+            self.historical_as_known_preserved as f64
+                / self.historical_as_known_eligible_queries as f64
+        })
     }
 }
 
@@ -195,13 +225,47 @@ pub fn score_knowledge_predictions(
         wrong_answers: 0,
         abstentions: 0,
         missing_predictions: 0,
+        future_knowledge_eligible_queries: 0,
         future_knowledge_leaks: 0,
+        missed_correction_eligible_queries: 0,
         missed_corrections: 0,
+        stale_after_retraction_eligible_queries: 0,
         stale_answers_after_retraction: 0,
+        historical_as_known_eligible_queries: 0,
         historical_as_known_preserved: 0,
     };
 
     for expected in &oracle.answers {
+        let future_knowledge_eligible = expected.known_at < oracle.correction_observed_at
+            && expected.valid_at >= oracle.correction_valid_from;
+        let missed_correction_eligible = expected.known_at >= oracle.correction_observed_at
+            && expected.known_at < oracle.retraction_observed_at
+            && expected.valid_at >= oracle.correction_valid_from
+            && expected.valid_at < oracle.retraction_valid_from;
+        let stale_after_retraction_eligible =
+            expected.known_at >= oracle.retraction_observed_at
+                && expected.valid_at >= oracle.retraction_valid_from;
+        let historical_as_known_eligible =
+            expected.known_at >= oracle.correction_observed_at
+                && expected.valid_at < oracle.correction_valid_from;
+
+        if future_knowledge_eligible {
+            score.future_knowledge_eligible_queries =
+                score.future_knowledge_eligible_queries.saturating_add(1);
+        }
+        if missed_correction_eligible {
+            score.missed_correction_eligible_queries =
+                score.missed_correction_eligible_queries.saturating_add(1);
+        }
+        if stale_after_retraction_eligible {
+            score.stale_after_retraction_eligible_queries =
+                score.stale_after_retraction_eligible_queries.saturating_add(1);
+        }
+        if historical_as_known_eligible {
+            score.historical_as_known_eligible_queries =
+                score.historical_as_known_eligible_queries.saturating_add(1);
+        }
+
         let Some(prediction) = by_query.get(&expected.query_id).copied() else {
             score.missing_predictions = score.missing_predictions.saturating_add(1);
             continue;
@@ -232,22 +296,14 @@ pub fn score_knowledge_predictions(
                     score.future_knowledge_leaks =
                         score.future_knowledge_leaks.saturating_add(1);
                 }
-                if expected.known_at >= oracle.correction_observed_at
-                    && expected.valid_at >= oracle.correction_valid_from
-                    && value == oracle.initial_value
-                {
+                if missed_correction_eligible && value == oracle.initial_value {
                     score.missed_corrections = score.missed_corrections.saturating_add(1);
                 }
-                if expected.known_at >= oracle.retraction_observed_at
-                    && expected.valid_at >= oracle.retraction_valid_from
-                {
+                if stale_after_retraction_eligible {
                     score.stale_answers_after_retraction =
                         score.stale_answers_after_retraction.saturating_add(1);
                 }
-                if expected.known_at >= oracle.correction_observed_at
-                    && expected.valid_at < oracle.correction_valid_from
-                    && value == oracle.initial_value
-                {
+                if historical_as_known_eligible && value == oracle.initial_value {
                     score.historical_as_known_preserved =
                         score.historical_as_known_preserved.saturating_add(1);
                 }
@@ -936,6 +992,14 @@ mod tests {
         assert_eq!(score.stale_answers_after_retraction, 0);
         assert_eq!(score.missed_corrections, 0);
         assert_eq!(score.historical_as_known_preserved, 1);
+        assert_eq!(score.future_knowledge_eligible_queries, 1);
+        assert_eq!(score.missed_correction_eligible_queries, 1);
+        assert_eq!(score.stale_after_retraction_eligible_queries, 1);
+        assert_eq!(score.historical_as_known_eligible_queries, 1);
+        assert_eq!(score.future_knowledge_leakage_rate(), Some(0.0));
+        assert_eq!(score.missed_correction_rate(), Some(0.0));
+        assert_eq!(score.stale_after_retraction_rate(), Some(0.0));
+        assert_eq!(score.historical_as_known_preservation_rate(), Some(1.0));
         assert_eq!(score.exact_match_rate(), Some(1.0));
         assert_eq!(score.prediction_coverage(), Some(1.0));
     }
