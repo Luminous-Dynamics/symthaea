@@ -156,6 +156,140 @@ pub struct LexicalEvidenceHit {
     pub context: MemoryContextItem,
 }
 
+/// One item from an exact full-scope inventory of active evidence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceInventoryItem {
+    pub hdc_id: u64,
+    pub record: EvidenceRecord,
+    pub context: MemoryContextItem,
+}
+
+/// Receipt over the entire eligible evidence inventory at one bitemporal
+/// coordinate. complete == false means the response cap truncated the
+/// inventory; downstream proof/count operations must reject it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceInventoryReceipt {
+    pub schema_version: String,
+    pub scope_id: String,
+    pub valid_at_unix_ms: u64,
+    pub known_at_unix_ms: u64,
+    pub index_state_sha256: String,
+    pub inventory_sha256: String,
+    pub eligible_record_count: usize,
+    pub returned_record_count: usize,
+    pub max_items: usize,
+    pub complete: bool,
+}
+
+/// A deterministic complete-or-truncated snapshot of every active evidence
+/// record visible in one scope and valid-time coordinate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceInventorySnapshot {
+    pub receipt: EvidenceInventoryReceipt,
+    pub items: Vec<EvidenceInventoryItem>,
+}
+
+impl EvidenceInventorySnapshot {
+    /// Verify that a purportedly complete inventory contains every item
+    /// committed by its digest. Truncated snapshots can be retained for
+    /// diagnostics, but can never authorize closed-world event counts.
+    pub fn verify_internal_consistency(&self) -> Result<(), String> {
+        let receipt = &self.receipt;
+        if receipt.schema_version != EVIDENCE_SCHEMA_VERSION {
+            return Err("unsupported evidence inventory schema version".into());
+        }
+        if receipt.scope_id.trim().is_empty() {
+            return Err("inventory scope_id must be non-empty".into());
+        }
+        validate_sha256(&receipt.index_state_sha256, "index_state_sha256")?;
+        validate_sha256(&receipt.inventory_sha256, "inventory_sha256")?;
+        if receipt.max_items == 0 {
+            return Err("inventory max_items must be greater than zero".into());
+        }
+        if receipt.returned_record_count != self.items.len() {
+            return Err("inventory returned_record_count does not match item vector".into());
+        }
+        if !receipt.complete {
+            return Err("truncated evidence inventory cannot support a closed-world answer".into());
+        }
+        if receipt.eligible_record_count != self.items.len() {
+            return Err("complete inventory does not contain every eligible record".into());
+        }
+        let mut evidence_ids = BTreeSet::new();
+        let mut hdc_ids = BTreeSet::new();
+        let mut records = Vec::with_capacity(self.items.len());
+        for item in &self.items {
+            if item.record.scope_id != receipt.scope_id
+                || !item.record.is_eligible_for(&receipt.scope_id, receipt.valid_at_unix_ms)
+            {
+                return Err(format!(
+                    "inventory item {:?} is outside the declared scope or valid-time",
+                    item.record.evidence_id
+                ));
+            }
+            if !evidence_ids.insert(item.record.evidence_id.as_str()) {
+                return Err(format!("duplicate inventory evidence ID {:?}", item.record.evidence_id));
+            }
+            if !hdc_ids.insert(item.hdc_id) {
+                return Err(format!("duplicate inventory HDC ID {}", item.hdc_id));
+            }
+            match (&item.record.payload, &item.context.kind) {
+                (EvidencePayload::Text { value }, MemoryContextType::Text) => {
+                    if &item.context.value != value
+                        || sha256_hex(value.as_bytes()) != item.record.content_sha256
+                    {
+                        return Err(format!(
+                            "inventory text payload mismatch for {:?}",
+                            item.record.evidence_id
+                        ));
+                    }
+                }
+                (EvidencePayload::Image { .. }, MemoryContextType::Image) => {}
+                _ => {
+                    return Err(format!(
+                        "inventory payload type mismatch for {:?}",
+                        item.record.evidence_id
+                    ));
+                }
+            }
+            records.push((item.hdc_id, &item.record));
+        }
+        let digest = inventory_digest(
+            &receipt.scope_id,
+            receipt.valid_at_unix_ms,
+            receipt.known_at_unix_ms,
+            &receipt.index_state_sha256,
+            &records,
+        )?;
+        if digest != receipt.inventory_sha256 {
+            return Err("evidence inventory digest mismatch".into());
+        }
+        Ok(())
+    }
+}
+
+fn inventory_digest(
+    scope_id: &str,
+    valid_at_unix_ms: u64,
+    known_at_unix_ms: u64,
+    index_state_sha256: &str,
+    records: &[(u64, &EvidenceRecord)],
+) -> Result<String, String> {
+    let bytes = serde_json::to_vec(&(
+        EVIDENCE_SCHEMA_VERSION,
+        scope_id,
+        valid_at_unix_ms,
+        known_at_unix_ms,
+        index_state_sha256,
+        records,
+    ))
+    .map_err(|error| format!("cannot serialize evidence inventory: {error}"))?;
+    Ok(sha256_hex(&bytes))
+}
+
 impl EvidenceRecord {
     /// Structural validation; image existence and bytes are checked at use time.
     pub fn validate(&self) -> Result<(), String> {
@@ -355,6 +489,81 @@ impl EvidenceIndex {
             known_at_unix_ms,
             index_state_sha256: self.state_sha256()?,
         })
+    }
+
+    /// Enumerate all active evidence in a scope at one exact index snapshot.
+    ///
+    /// This intentionally does not use BM25 or semantic ranking: it is the
+    /// exhaustive source inventory against which later extraction/selection can
+    /// be audited. If more records exist than max_items, the returned receipt
+    /// is marked incomplete and verify_internal_consistency refuses to certify
+    /// it. The caller must raise the cap and retry rather than treating the
+    /// prefix as a closed world.
+    pub fn enumerate_active_at_snapshot(
+        &self,
+        scope_id: &str,
+        valid_at_unix_ms: u64,
+        known_at_unix_ms: u64,
+        payload_root: &Path,
+        max_items: usize,
+    ) -> Result<EvidenceInventorySnapshot, String> {
+        if scope_id.trim().is_empty() {
+            return Err("inventory scope_id must be non-empty".into());
+        }
+        if max_items == 0 {
+            return Err("inventory max_items must be greater than zero".into());
+        }
+        let snapshot = self.snapshot_receipt(known_at_unix_ms)?;
+        let eligible: Vec<(u64, EvidenceRecord)> = self
+            .records
+            .iter()
+            .filter(|(_, record)| record.is_eligible_for(scope_id, valid_at_unix_ms))
+            .map(|(hdc_id, record)| (*hdc_id, record.clone()))
+            .collect();
+        let digest_records: Vec<(u64, &EvidenceRecord)> = eligible
+            .iter()
+            .map(|(hdc_id, record)| (*hdc_id, record))
+            .collect();
+        let inventory_sha256 = inventory_digest(
+            scope_id,
+            valid_at_unix_ms,
+            known_at_unix_ms,
+            &snapshot.index_state_sha256,
+            &digest_records,
+        )?;
+        let returned: Vec<EvidenceInventoryItem> = eligible
+            .iter()
+            .take(max_items)
+            .map(|(hdc_id, record)| {
+                Ok(EvidenceInventoryItem {
+                    hdc_id: *hdc_id,
+                    record: record.clone(),
+                    context: record.context_item(payload_root)?,
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        let eligible_record_count = eligible.len();
+        let returned_record_count = returned.len();
+        let complete = eligible_record_count == returned_record_count;
+        let result = EvidenceInventorySnapshot {
+            receipt: EvidenceInventoryReceipt {
+                schema_version: EVIDENCE_SCHEMA_VERSION.to_string(),
+                scope_id: scope_id.to_string(),
+                valid_at_unix_ms,
+                known_at_unix_ms,
+                index_state_sha256: snapshot.index_state_sha256,
+                inventory_sha256,
+                eligible_record_count,
+                returned_record_count,
+                max_items,
+                complete,
+            },
+            items: returned,
+        };
+        if result.receipt.complete {
+            result.verify_internal_consistency()?;
+        }
+        Ok(result)
     }
 
     pub fn insert(&mut self, record: EvidenceRecord, source_bytes: &[u8]) -> Result<(), String> {
@@ -776,6 +985,15 @@ fn is_sha256(value: &str) -> bool {
         && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+fn validate_sha256(value: &str, field: &str) -> Result<(), String> {
+    if value.len() != 64
+        || !value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(format!("{field} must be a 64-character lowercase SHA-256 digest"));
+    }
+    Ok(())
+}
+
 fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes).iter().map(|byte| format!("{byte:02x}")).collect()
 }
@@ -825,6 +1043,61 @@ mod tests {
                 &source_bytes_for_text(text),
             )
             .unwrap();
+    }
+
+    #[test]
+    fn exhaustive_inventory_is_snapshot_bound_and_independent_of_top_k() {
+        let mut index = EvidenceIndex::new();
+        insert_text(&mut index, 1, "billing event one", "scope-a");
+        insert_text(&mut index, 2, "unrelated event two", "scope-a");
+        insert_text(&mut index, 3, "billing event three", "scope-a");
+        insert_text(&mut index, 4, "billing event private", "scope-b");
+        index.revoke(3).unwrap();
+
+        let inventory = index
+            .enumerate_active_at_snapshot("scope-a", 150, 200, Path::new("."), 10)
+            .unwrap();
+        assert!(inventory.receipt.complete);
+        assert_eq!(inventory.receipt.eligible_record_count, 2);
+        assert_eq!(
+            inventory.items.iter().map(|item| item.hdc_id).collect::<Vec<_>>(),
+            vec![1, 2]
+        );
+        inventory.verify_internal_consistency().unwrap();
+        assert!(inventory.items.iter().any(|item| item.record.evidence_id == "evidence-2"));
+    }
+
+    #[test]
+    fn inventory_response_cap_is_explicitly_incomplete_and_cannot_be_verified() {
+        let mut index = EvidenceIndex::new();
+        insert_text(&mut index, 1, "first eligible record", "scope-a");
+        insert_text(&mut index, 2, "second eligible record", "scope-a");
+        let inventory = index
+            .enumerate_active_at_snapshot("scope-a", 150, 200, Path::new("."), 1)
+            .unwrap();
+        assert!(!inventory.receipt.complete);
+        assert_eq!(inventory.receipt.eligible_record_count, 2);
+        assert_eq!(inventory.receipt.returned_record_count, 1);
+        assert!(inventory.verify_internal_consistency()
+            .unwrap_err()
+            .contains("truncated evidence inventory"));
+    }
+
+    #[test]
+    fn inventory_digest_binds_scope_time_source_and_payload() {
+        let mut index = EvidenceIndex::new();
+        insert_text(&mut index, 1, "session fact", "scope-a");
+        let first = index
+            .enumerate_active_at_snapshot("scope-a", 150, 200, Path::new("."), 10)
+            .unwrap();
+        let second = index
+            .enumerate_active_at_snapshot("scope-a", 151, 200, Path::new("."), 10)
+            .unwrap();
+        assert_ne!(first.receipt.inventory_sha256, second.receipt.inventory_sha256);
+
+        let mut tampered = first.clone();
+        tampered.items[0].record.content_sha256 = hash(b"forged content");
+        assert!(tampered.verify_internal_consistency().is_err());
     }
 
     #[test]
