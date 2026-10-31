@@ -23,3 +23,7 @@ path = "src/bin/poar_v1.rs"
 [[bin]]
 name = "poar-graph-export"
 path = "src/bin/poar_graph_export.rs"
+
+[[bin]]
+name = "poar-graph-eval"
+path = "src/bin/poar_graph_eval.rs"
