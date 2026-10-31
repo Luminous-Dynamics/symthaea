@@ -646,7 +646,7 @@ pub fn evaluate_genome(
         let semantic_verification = verify_composer_trace(
             &composer_trace,
             &semantic_bundle,
-            &score_sha256_for_trace_placeholder(&realization.score),
+            &score_sha256,
             0,
         );
         let semantic_trace_issues = semantic_verification.issues.iter()
