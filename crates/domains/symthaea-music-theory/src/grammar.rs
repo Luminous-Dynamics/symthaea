@@ -108,13 +108,21 @@ pub enum GrammarPlanEvidence {
     ModalArc(crate::modal_arc::ModalArcPlan),
     CallResponse(crate::call_response::CallResponsePlan),
     JazzChorus(crate::jazz_chorus::JazzChorusPlan),
-    ProgSuite(crate::prog_suite::ProgSuitePlan),
+    ProgSuite(ProgSuitePlanEvidence),
     Sonata(SonataPlanEvidence),
     Renaissance(RenaissancePlanEvidence),
     Compatibility {
         family: GrammarFamily,
         form_available: bool,
     },
+}
+
+/// ProgSuite plan paired with score-side verification of its mixed-meter
+/// return contract.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProgSuitePlanEvidence {
+    pub plan: crate::prog_suite::ProgSuitePlan,
+    pub verification: crate::prog_suite::ProgSuiteVerification,
 }
 
 /// Sonata plan paired with its independent score-side obligation results.
@@ -219,7 +227,10 @@ pub fn compose_with_grammar_plan(
                 GrammarRealization {
                     score: realized.score,
                     form: None,
-                    plan: GrammarPlanEvidence::ProgSuite(realized.plan),
+                    plan: GrammarPlanEvidence::ProgSuite(ProgSuitePlanEvidence {
+                        plan: realized.plan,
+                        verification: realized.verification,
+                    }),
                     trace: Default::default(),
                 }
             }
