@@ -130,8 +130,8 @@ Implemented:
 - `encode_prediction_artifact_v1` emits canonical frozen `POAR-PRED/1` records for model identity, dispositions, ranked retrieval, and citations.
 - `evaluate_poar_artifacts_v1` parses planner, oracle, and prediction bytes; validates UTF-8/LF canonical form, strict record ordering, lowercase hex, canonical integers, exact field counts, schema/version, digest equality, seed/split/generator identity, duplicate/dangling references, target-disposition completeness, and contiguous retrieval ranks.
 - Before scoring, the evaluator independently recomputes oracle claim states and proof witnesses from parsed source-truth labels and rejects incomplete or inconsistent `GOLD_CLAIM` / `GOLD_PATH` records.
-- The `poar-artifact-eval` CLI hashes exact input bytes, evaluates only after the prediction artifact is frozen, and emits a machine-readable `POAR-EVAL-RECEIPT/1` with input digests, model/config identity, per-run metrics, and a hard-invariant flag. The receipt is not cryptographically signed.
-- Six new parser/evaluator tests cover valid round-trip, malformed byte streams, digest mismatch, missing/duplicate dispositions, retrieval gaps, unknown evidence, oracle tampering, and proof citation scoring.
+- The `poar-graph-eval` CLI hashes exact input bytes, evaluates only after the prediction artifact is frozen, and emits a machine-readable `POAR-EVAL-RECEIPT/1` with input digests, model/config identity, per-run metrics, and a hard-invariant flag. The receipt is not cryptographically signed.
+- Seven parser/evaluator tests cover valid round-trip, malformed byte streams, digest mismatch, missing/duplicate dispositions, retrieval gaps, unknown evidence, oracle tampering, and proof citation scoring. Two additional SHA-256 known-answer tests verify the empty-input and abc vectors.
 
 Still not implemented:
 - Protected storage, key management, and permission boundaries that prevent the planner from reading oracle bytes.
