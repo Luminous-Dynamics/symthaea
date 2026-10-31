@@ -97,10 +97,11 @@ pub struct HybridComposition {
 /// Compile an explicit catalogue-layer recipe to the actual composer's
 /// declarative spec. V1 supports PeriodSentence owners using
 /// Ternary/Rondo/Variations, GrooveCycle owners with cycle-safe
-/// accompaniment pools, and ProcessAdditive owners whose motif-cell donor
-/// preserves the process engine's per-seed trajectory. Other dedicated
-/// engines remain fail-closed until family-specific donor-consumption
-/// adapters exist. Unsupported meter transfers, cycle incompatibilities,
+/// accompaniment pools, ProcessAdditive owners with shape-preserving
+/// motif-cell donors, and the dedicated BluesCallResponse/JazzChorus engines
+/// with family-specific melody, rhythm, harmony and tempo transfer contracts.
+/// Other dedicated engines remain fail-closed until their own donor-consumption
+/// contracts exist. Unsupported meter transfers, cycle incompatibilities,
 /// process-cell mismatches and unknown/unimplemented routes fail closed.
 pub fn compile_hybrid_style(
     hybrid: &HybridStyleSpec,
@@ -152,13 +153,13 @@ pub fn compile_hybrid_style(
         return Err(issues);
     };
 
-    // Dedicated engines consume different subsets of CompositionSpec. The
-    // first additional adapter is GrooveCycle: it is safe only when every
-    // selectable accompaniment is a cycle-bearing cell, because the engine
-    // chooses from the whole pool by seed and its resolver rejects ordinary
-    // textures. Validate the full pool, not the one item a fixture happens to
-    // select. Other dedicated engines remain fail-closed until their own
-    // consumption contracts and negative fixtures exist.
+    // Dedicated engines consume different subsets of CompositionSpec.
+    // Validate each family's real contract before transferring fields:
+    // GrooveCycle requires every selectable accompaniment to be a
+    // cycle-bearing cell; ProcessAdditive consumes the actual motif cell;
+    // BluesCallResponse and JazzChorus each own a fixed 4/4 chorus structure.
+    // Other dedicated engines remain fail-closed until their own consumption
+    // contracts and negative fixtures exist.
     let mut spec = structural_style.spec();
     let structural_family = structural_style.grammar_family();
     match structural_family {
@@ -220,7 +221,7 @@ pub fn compile_hybrid_style(
                 layer: Some(StyleMixLayer::Structure),
                 catalog_id: Some(structural_entry.id),
                 message: format!(
-                    "the {} structural grammar ({family:?}) requires its own hybrid donor adapter; compiler v1 supports PeriodSentence and GrooveCycle",
+                    "the {} structural grammar ({family:?}) requires its own hybrid donor adapter; compiler v1 supports PeriodSentence, GrooveCycle, ProcessAdditive, BluesCallResponse and JazzChorus",
                     structural_entry.display_name
                 ),
             });
