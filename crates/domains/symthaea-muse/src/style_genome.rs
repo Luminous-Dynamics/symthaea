@@ -1774,6 +1774,50 @@ mod tests {
     }
 
     #[test]
+    fn current_dedicated_plan_families_emit_qualified_native_phenotypes() {
+        use symthaea_music_theory::Style;
+
+        let styles = [
+            Style::Blues,
+            Style::JazzBallad,
+            Style::AfroCuban,
+            Style::HindustaniInspired,
+            Style::Minimalism,
+            Style::Fugue,
+            Style::ProgFolk,
+            Style::Sonata,
+            Style::RenaissancePolyphony,
+            Style::Opera,
+        ];
+        let intent = MusicalIntent {
+            bars: 12,
+            seed: 7,
+            ..Default::default()
+        };
+
+        for style in styles {
+            let realization = compose_with_grammar_plan(
+                style.grammar_profile(),
+                &intent,
+                &style.spec(),
+            );
+            assert!(
+                grammar_plan_well_formed(&realization.plan),
+                "{style:?} produced an incomplete native plan: {:?}",
+                realization.plan
+            );
+            assert!(
+                grammar_plan_signature(&realization.plan).is_some(),
+                "{style:?} has no family-native topology fingerprint"
+            );
+            assert!(
+                !grammar_transformations(&realization.plan).is_empty(),
+                "{style:?} has no named grammar operations"
+            );
+        }
+    }
+
+    #[test]
     fn compatibility_plans_abstain_from_native_topology_fitness() {
         let compatibility = GrammarPlanEvidence::Compatibility {
             family: symthaea_music_theory::grammar::GrammarFamily::AmbientTextural,
