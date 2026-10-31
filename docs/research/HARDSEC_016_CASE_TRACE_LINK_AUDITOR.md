@@ -29,7 +29,7 @@ The receipt is unsigned. Digest matching binds its declared input; it does not a
 
 ## Run
 
-First run the HARDSEC-014 auditor against the exact trace manifest used below:
+First run the HARDSEC-014 auditor from its own branch/checkout (or from the repository after PR #9416 is merged) against the exact trace manifest used below. The HARDSEC-014 source and harness are intentionally not copied into this stacked PR. The focused workflow here uses a fixed synthetic receipt only to test the receipt/linkage contract:
 
 ```bash
 cargo run --locked \
@@ -54,7 +54,7 @@ cargo run --locked \
   --receipt /tmp/case-trace-link-receipt.json
 ```
 
-The receipt is deterministic, unsigned, input-digest-bound and created with no-overwrite semantics. Put it outside every input directory.
+The receipt is deterministic, unsigned, input-digest-bound and created with no-overwrite semantics. Put it outside every input directory. For a real campaign, do not substitute the synthetic receipt: generate the receipt with the pinned HARDSEC-014 auditor from the exact same trace-manifest bytes.
 
 ## Synthetic known-answer fixture
 
