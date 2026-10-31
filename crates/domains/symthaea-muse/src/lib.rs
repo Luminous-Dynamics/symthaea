@@ -187,6 +187,8 @@ pub mod structure;
 #[cfg(feature = "theory")]
 pub mod studio_contract;
 #[cfg(feature = "theory")]
+pub mod instrumental_arena;
+#[cfg(feature = "theory")]
 pub mod study_artifact;
 #[cfg(feature = "theory")]
 pub mod study_collection;
