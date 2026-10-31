@@ -1099,7 +1099,7 @@ mod tests {
                 parent_score: None,
                 inspired_by_scores: Vec::new(),
                 opening_evaluation_count: if matches!(
-                    disposition,
+                    &disposition,
                     DirectionProposalDisposition::Admitted { .. }
                 ) { Some(0) } else { None },
                 opening_global_best: None,
