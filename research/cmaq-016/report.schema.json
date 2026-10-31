@@ -11,7 +11,8 @@
     "candidate_budgets",
     "scenarios",
     "policies",
-    "summary"
+    "summary",
+    "evaluator_diagnostic_grid_points"
   ],
   "properties": {
     "schema_version": {
@@ -126,6 +127,9 @@
           }
         }
       }
+    },
+    "evaluator_diagnostic_grid_points": {
+      "const": 201
     }
   }
 }
