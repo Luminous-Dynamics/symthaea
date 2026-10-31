@@ -1,0 +1,412 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/fresh-metamorphic-score-report-v1.json",
+  "title": "Fresh metamorphic exact accuracy and consistency report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "metric_id",
+    "run_id",
+    "model_provider",
+    "model_name",
+    "model_version",
+    "model_access_mode",
+    "model_checkpoint_sha256",
+    "batch_id",
+    "benchmark_id",
+    "benchmark_version",
+    "task_family",
+    "base_public_packet_sha256",
+    "base_manifest_sha256",
+    "base_sealed_oracle_sha256",
+    "metamorphic_public_packet_sha256",
+    "metamorphic_manifest_sha256",
+    "metamorphic_sealed_oracle_sha256",
+    "submission_sha256",
+    "inference_harness_sha256",
+    "prompt_and_decoding_sha256",
+    "metric_definition_sha256",
+    "run_execution_receipt_sha256",
+    "item_count",
+    "base_item_count",
+    "transformed_item_count",
+    "correct_count",
+    "incorrect_count",
+    "invalid_format_count",
+    "abstained_count",
+    "valid_response_count",
+    "base_correct_count",
+    "transformed_correct_count",
+    "accuracy_all_forms_permille",
+    "accuracy_base_form_permille",
+    "accuracy_transformed_forms_permille",
+    "coverage_permille",
+    "group_count",
+    "complete_valid_group_count",
+    "incomplete_group_count",
+    "consistent_group_count",
+    "disagreement_group_count",
+    "consistent_but_wrong_group_count",
+    "fully_correct_and_consistent_group_count",
+    "base_correct_variant_inconsistent_group_count",
+    "metamorphic_consistency_permille",
+    "model_call_count",
+    "input_token_count",
+    "output_token_count",
+    "wall_clock_millis",
+    "tool_call_count",
+    "human_assistance_minutes",
+    "compute_cost_microusd",
+    "independently_verified",
+    "items",
+    "groups",
+    "report_sha256",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.fresh_metamorphic_score_report.v1"
+    },
+    "metric_id": {
+      "const": "fresh-linear-system-metamorphic.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_access_mode": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "batch_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_family": {
+      "type": "string",
+      "minLength": 1
+    },
+    "base_public_packet_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "base_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "base_sealed_oracle_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "metamorphic_public_packet_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "metamorphic_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "metamorphic_sealed_oracle_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "submission_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "inference_harness_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prompt_and_decoding_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "metric_definition_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "run_execution_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "item_count": {
+      "type": "integer",
+      "minimum": 5
+    },
+    "base_item_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "transformed_item_count": {
+      "type": "integer",
+      "minimum": 4
+    },
+    "correct_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "incorrect_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "invalid_format_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "abstained_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "valid_response_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "base_correct_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "transformed_correct_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "accuracy_all_forms_permille": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "accuracy_base_form_permille": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "accuracy_transformed_forms_permille": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "coverage_permille": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "group_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "complete_valid_group_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "incomplete_group_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "consistent_group_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "disagreement_group_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "consistent_but_wrong_group_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "fully_correct_and_consistent_group_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "base_correct_variant_inconsistent_group_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "metamorphic_consistency_permille": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "model_call_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "input_token_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "output_token_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "wall_clock_millis": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "tool_call_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "human_assistance_minutes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "compute_cost_microusd": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "independently_verified": {
+      "const": false
+    },
+    "items": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 50000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "item_id",
+          "group_id",
+          "parent_item_id",
+          "form",
+          "response_sha256",
+          "status"
+        ],
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "group_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parent_item_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "form": {
+            "type": "string",
+            "enum": [
+              "base",
+              "swap_rows",
+              "scale_first_row_by_two",
+              "scale_second_row_by_negative_two",
+              "swap_and_scale_rows"
+            ]
+          },
+          "response_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "correct",
+              "incorrect",
+              "invalid_format",
+              "abstained"
+            ]
+          }
+        }
+      }
+    },
+    "groups": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "group_id",
+          "item_count",
+          "valid_response_count",
+          "correct_count",
+          "complete_valid_group",
+          "outputs_agree",
+          "fully_correct_and_consistent",
+          "consistent_but_wrong",
+          "base_correct_variant_inconsistent"
+        ],
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "item_count": {
+            "type": "integer",
+            "minimum": 5
+          },
+          "valid_response_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "correct_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "complete_valid_group": {
+            "type": "boolean"
+          },
+          "outputs_agree": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fully_correct_and_consistent": {
+            "type": "boolean"
+          },
+          "consistent_but_wrong": {
+            "type": "boolean"
+          },
+          "base_correct_variant_inconsistent": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "report_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
