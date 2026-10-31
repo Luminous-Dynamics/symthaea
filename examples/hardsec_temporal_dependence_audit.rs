@@ -831,6 +831,29 @@ mod tests {
         }
     }
 
+
+    #[test]
+    fn block_se_exposes_dependence_in_fixture_relative_to_iid_formula() {
+        let (model,data,_,_)=fixture();
+        let receipt=audit(&model,&data).unwrap();
+        for report in receipt["block_diagnostic"]["block_length_sensitivity"].as_array().unwrap() {
+            let block_se=report["block_standard_error"].as_f64().unwrap();
+            let iid_se=report["iid_standard_error"].as_f64().unwrap();
+            assert!(block_se > 2.0*iid_se, "block length {} failed to expose dependence", report["block_length"]);
+            assert_eq!(report["observed_coverage_inside_null_interval"],true);
+        }
+    }
+
+    #[test]
+    fn fdm_marginal_coverage_bound_known_answer_is_separate_from_sequential_pfa() {
+        let (model,data,_,_)=fixture();
+        let receipt=audit(&model,&data).unwrap();
+        let fdm=&receipt["functional_dependence"]["fdm_contract"];
+        let coverage=&fdm["marginal_coverage_bound_from_zhai_theorem_1"];
+        assert!((coverage["marginal_coverage_error_upper_bound"].as_f64().unwrap()-0.06052753944880749).abs()<1e-10);
+        assert_eq!(receipt["functional_dependence"]["sequential_ctm_validity_inferred"],false);
+    }
+
     #[test]
     fn normal_diagnostic_is_explicitly_non_anytime_valid() {
         let (model,data,_,_)=fixture();
