@@ -7,6 +7,7 @@
 pub mod graph;
 pub mod poar;
 pub mod recovery;
+pub mod recovery_journal;
 
 use std::collections::{BTreeMap, BTreeSet};
 
