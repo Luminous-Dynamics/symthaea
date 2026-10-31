@@ -90,5 +90,17 @@
     "Record hardware, device, wall-clock, inference/search cost and peak memory",
     "Retain raw per-episode outcomes, checkpoints and exact config/source digests"
   ],
-  "claim_ceiling": "upstream_reference_artifacts_only_not_reproduced"
+  "claim_ceiling": "upstream_reference_artifacts_only_not_reproduced",
+  "environment_wrapper_defaults": {
+    "dmc_source_file": "MRSQ/env_preprocessing.py",
+    "dmc_source_blob_sha": "b8e7ca7ec00b774621855b7efc8f5d6e700a9b74",
+    "action_repeat": 2,
+    "base_simulator_steps_per_action": 2,
+    "max_episode_controller_steps": 500,
+    "max_episode_base_simulator_steps": 1000,
+    "action_scaling": "dm_control action_scale wrapper with range [-1, 1]",
+    "reward_aggregation": "sum reward from each underlying dm_control step within one repeated action",
+    "observation_transform": "flatten OrderedDict observation values in their iteration order",
+    "note": "Defaults are derived from DmcHyperparameters.action_repeat=2 and DmcPreprocessing.step/max_ep_timesteps at this exact source revision. Verify environment kwargs and task-specific semantics in the adapter."
+  }
 }
