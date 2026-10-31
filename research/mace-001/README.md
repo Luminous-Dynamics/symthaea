@@ -43,6 +43,17 @@ The agent-facing TSV contains no family, pair ID, anchor/control label, oracle a
 
 The evaluator-only smoke artifact is still visible to anyone who can read this public repository. Path separation is not access control. Blind holdout labels must be kept in a separate private/access-controlled service and never mounted into the agent process, prompt, logs or tool responses.
 
+## Independent structural-causal reference
+
+`src/scm_oracle.rs` defines four deterministic toy mechanisms and the projection each should produce:
+
+- **Observational confounding:** a common cause moves pump, valve and flow together; the structural flow equation does not depend on valve. The oracle contrasts the two observed states with `do(valve=closed)` and `do(valve=open)` while holding the common cause/pump fixed, yielding zero valve effect. With no separating intervention in the observed history, the agent-facing conclusion remains `not_identified`.
+- **Controlled intervention:** pump is fixed on; four noiseless simulator replicates per arm produce flow 2 (valve closed) and 12 (valve open). The finite simulator effect is +10 L/min under the declared preconditions. This is a deterministic fixture contract, not a statistical estimate for a physical microgrid.
+- **Thermal regime shift:** the old equation predicts a 6-degree rise at heater power 3 with cooling off; active cooling changes the current output to 2 degrees. The old transition is therefore not directly reusable.
+- **Relay outcome:** the tool returns accepted while the observed relay state remains off. This is not completion evidence.
+
+During audit, each evaluator case's family and expected causal/transfer/action/completion labels are checked against this separate model projection. Mutating an answer-key label without changing the model fails the audit. The SCM is a small, deterministic reference world—not a general causal discovery engine or a physically validated plant model.
+
 ## Score semantics
 
 Four dimensions are reported independently:
