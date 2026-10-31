@@ -1505,11 +1505,6 @@ mod tests {
                     innovation_rng = (1_664_525_u64 * innovation_rng
                         + 1_013_904_223_u64) % 4_294_967_296_u64;
                     innovation += innovation_rng as f64 / 4_294_967_296.0;
-                    randomizer_rng = if _ == 11 {
-                        randomizer_rng
-                    } else {
-                        randomizer_rng
-                    };
                 }
                 innovation -= 6.0;
                 score = rho * score + innovation_scale * innovation;
