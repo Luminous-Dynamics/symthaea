@@ -1108,11 +1108,14 @@ mod tests {
     fn known_answer_uses_dkw_correction_ons_and_context_alpha_allocation() {
         let (p, s, pb, sb) = fixture();
         let receipt = audit_values(&p, &s, &pb, &sb).unwrap();
-        assert_eq!(receipt["result"], "alarm_threshold_crossed");
-        assert_eq!(receipt["sequential_monitor"]["overall_first_alarm_sequence_index"], 16);
+        assert_eq!(receipt["result"], "restarted_alarm_threshold_crossed");
+        assert_eq!(receipt["sequential_monitor"]["overall_first_alarm_sequence_index"], 22);
         assert_eq!(receipt["sequential_monitor"]["overall_first_alarm_context_id"], "compute");
-        assert_eq!(receipt["sequential_monitor"]["valid_observation_count"], 16);
+        assert_eq!(receipt["sequential_monitor"]["single_start_reference"]["first_alarm_sequence_index"], 16);
+        assert_eq!(receipt["sequential_monitor"]["valid_observation_count"], 23);
         assert_eq!(receipt["sequential_monitor"]["abstention_count"], 3);
+        assert_eq!(receipt["sequential_monitor"]["restart_guarantee_contract"]["weight_sum_at_most_one"], true);
+        assert!(receipt["sequential_monitor"]["restart_guarantee_contract"]["infinite_weight_sum_upper_bound"].as_f64().unwrap() < 0.744);
         assert_eq!(receipt["sequential_monitor"]["post_alarm_reset_count"], 0);
         assert_eq!(receipt["statistical_guarantees"]["null_stream_iid_assumption_status"], "assumption_not_verified");
         assert_eq!(receipt["statistical_guarantees"]["reference_sample_iid_assumption_status"], "assumption_not_verified");
@@ -1146,10 +1149,10 @@ mod tests {
         let (p, s, pb, sb) = fixture();
         let receipt = audit_values(&p, &s, &pb, &sb).unwrap();
         for row in receipt["sequential_monitor"]["window_decisions"].as_array().unwrap() {
-            if let Some(beta) = row["betting_factor"].as_f64() {
+            if let Some(beta) = row["single_start"]["betting_factor"].as_f64() {
                 assert!((0.0..=2.0).contains(&beta));
             }
-            if let Some(eta) = row["ons_eta_next"].as_f64() {
+            if let Some(eta) = row["single_start"]["ons_eta_next"].as_f64() {
                 assert!(eta.abs() <= 0.5);
             }
         }
@@ -1165,7 +1168,7 @@ mod tests {
     #[test]
     fn rejects_reference_evaluation_group_overlap() {
         let (mut p, s, _, _) = fixture();
-        p["contexts"][0]["reference_group_ids"][0] = json!("heldout-execution-cctm-01");
+        p["contexts"][0]["reference_group_ids"][0] = json!("heldout-execution-cctm-restart");
         assert!(audit(&p, &s).unwrap_err().contains("overlaps a null-reference group"));
     }
 
@@ -1186,24 +1189,26 @@ mod tests {
         assignment_receipt["runtime_mapping"]["assignments"][1]["decision_status"] = json!("abstained");
         assignment_receipt["runtime_mapping"]["assignments"][1]["decision_reason"] = json!("unknown_context");
         assignment_receipt["runtime_mapping"]["assignments"][1]["selected_context_id"] = Value::Null;
-        assignment_receipt["assignment_integrity"]["accepted_count"] = json!(15);
+        assignment_receipt["assignment_integrity"]["accepted_count"] = json!(22);
         assignment_receipt["assignment_integrity"]["abstained_count"] = json!(4);
-        assignment_receipt["assignment_integrity"]["accepted_accuracy_denominator"] = json!(15);
-        assignment_receipt["assignment_integrity"]["accepted_coverage"] = json!(15.0/19.0);
-        assignment_receipt["assignment_integrity"]["end_to_end_correct_context_coverage"] = json!(15.0/19.0);
+        assignment_receipt["assignment_integrity"]["accepted_accuracy_denominator"] = json!(22);
+        assignment_receipt["assignment_integrity"]["accepted_coverage"] = json!(22.0/26.0);
+        assignment_receipt["assignment_integrity"]["end_to_end_correct_context_coverage"] = json!(22.0/26.0);
         let pb = encode(&p);
         let sb = encode(&s);
         let rb = encode(&assignment_receipt);
         let r = audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
-        assert_eq!(r["sequential_monitor"]["valid_observation_count"], 14);
+        assert_eq!(r["sequential_monitor"]["valid_observation_count"], 21);
         assert_eq!(r["sequential_monitor"]["abstention_count"], 5);
         assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["invalid_sensor_state"], 3);
         assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["context_assignment_not_accepted"], 2);
         let decisions = r["sequential_monitor"]["window_decisions"].as_array().unwrap();
         assert_eq!(decisions[0]["abstention_reason"], "invalid_sensor_state");
-        assert_eq!(decisions[0]["log_wealth_context"], 0.0);
+        assert_eq!(decisions[0]["single_start_log_wealth_context"], 0.0);
+        assert_eq!(decisions[0]["restart_log_e_value_context"], 0.0);
         assert_eq!(decisions[1]["abstention_reason"], "context_assignment_not_accepted");
-        assert_eq!(decisions[1]["log_wealth_context"], 0.0);
+        assert_eq!(decisions[1]["single_start_log_wealth_context"], 0.0);
+        assert_eq!(decisions[1]["restart_log_e_value_context"], 0.0);
         assert_eq!(decisions[2]["abstention_reason"], Value::Null);
     }
 
@@ -1212,7 +1217,7 @@ mod tests {
         let (p, mut s, _, _) = fixture();
         s["records"][0]["pmu_qualification_result"] = json!("measurement_quality_gate_failed");
         let r = audit(&p, &s).unwrap();
-        assert_eq!(r["sequential_monitor"]["valid_observation_count"], 15);
+        assert_eq!(r["sequential_monitor"]["valid_observation_count"], 22);
         assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["pmu_acquisition_not_qualified"], 1);
     }
 
@@ -1351,7 +1356,7 @@ mod tests {
         let sb = encode(&s);
         let rb = encode(&assignment_receipt);
         assert!(audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb)
-            .unwrap_err().contains("aggregate counts do not match"));
+            .unwrap_err().contains("aggregate counts/coverage do not match"));
     }
 
 
@@ -1367,7 +1372,7 @@ mod tests {
             row["selected_context_id"] = Value::Null;
         }
         assignment_receipt["assignment_integrity"]["accepted_count"] = json!(0);
-        assignment_receipt["assignment_integrity"]["abstained_count"] = json!(19);
+        assignment_receipt["assignment_integrity"]["abstained_count"] = json!(26);
         assignment_receipt["assignment_integrity"]["accepted_accuracy"] = Value::Null;
         assignment_receipt["assignment_integrity"]["accepted_accuracy_denominator"] = json!(0);
         assignment_receipt["assignment_integrity"]["accepted_coverage"] = json!(0.0);
@@ -1375,7 +1380,7 @@ mod tests {
         let rb = encode(&assignment_receipt);
         let r = audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
         assert_eq!(r["sequential_monitor"]["valid_observation_count"], 0);
-        assert_eq!(r["sequential_monitor"]["abstention_count"], 19);
+        assert_eq!(r["sequential_monitor"]["abstention_count"], 26);
         assert_eq!(r["result"], "no_alarm_threshold_crossed");
     }
 
