@@ -215,9 +215,11 @@
     },
     "quite_pp": {
       "citation": "QuITE / QuITE++ (ICML 2026)",
-      "url": "https://meaningfull9502.github.io/QuITE/",
+      "url": "https://proceedings.mlr.press/v306/lim26b.html",
       "reported_scope": "QuITE++ authors report best results in 20 of 24 settings across 4 datasets, 3 horizons, MSE and MAE",
-      "reproduction_status": "literature_only_not_reproduced"
+      "reproduction_status": "literature_only_not_reproduced",
+      "authors_project_url": "https://meaningfull9502.github.io/QuITE/",
+      "code_url": "https://github.com/Meaningfull9502/QuITE"
     },
     "irregular_named_baselines": [
       "HyperIMTS",
@@ -232,6 +234,18 @@
       "citation": "DyH2-STGraph, IJCAI 2026",
       "url": "https://ijcai.org/proceedings/2026/573",
       "reproduction_status": "literature_only_not_reproduced"
+    },
+    "tempo_morse": {
+      "citation": "Hindman and Cantley, Neuromorphic Computing and Engineering 6(3), 2026",
+      "doi": "10.1088/2634-4386/ae84f7",
+      "url": "https://doi.org/10.1088/2634-4386/ae84f7",
+      "scope": "Morse timing robustness benchmark for SNN temporal processing; distinct from temporal QA/retrieval benchmarks"
+    },
+    "tempo_retrieval": {
+      "repository": "https://github.com/tempo-bench/Tempo",
+      "reported_scope": "1730 complex temporal queries, 3976 decomposed steps, 13 domains",
+      "proposed_use": "external temporal completeness and multi-period retrieval parity for T10/OAKS",
+      "license_audit_required": true
     }
   },
   "security": {
