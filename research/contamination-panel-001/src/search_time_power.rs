@@ -121,6 +121,9 @@ pub struct SearchTimePowerReportV1 {
     pub minimum_power_lower_permille: u16,
     pub minimum_coverage_lower_permille: u16,
     pub maximum_coverage_upper_permille: u16,
+    pub maximum_inconclusive_rate_permille: u16,
+    pub maximum_clipped_score_fraction_permille: u16,
+    pub maximum_type_i_upper_permille: u16,
     pub candidate_results: Vec<SearchPowerCandidateResultV1>,
     pub minimum_qualified_block_count: Option<u32>,
     pub design_qualified: bool,
@@ -252,6 +255,7 @@ fn validate_config(config: &SearchTimePowerConfigV1) -> Result<Vec<u8>, String> 
     let total_block_trials = config.candidate_block_counts.iter()
         .try_fold(0_u64, |sum, count| sum.checked_add(u64::from(*count)))
         .and_then(|sum| sum.checked_mul(u64::from(config.monte_carlo_repetitions)))
+        .and_then(|sum| sum.checked_mul(3))
         .ok_or_else(|| "total simulation block trials overflow u64".to_owned())?;
     if total_block_trials > SEARCH_POWER_MAX_BLOCK_TRIALS {
         return Err(format!(
@@ -277,8 +281,7 @@ fn validate_config(config: &SearchTimePowerConfigV1) -> Result<Vec<u8>, String> 
     }
     if config.within_block_correlation_permille > 999
         || config.missing_block_rate_permille > 999
-        || config.alpha_permille == 0
-        || config.alpha_permille > 200
+        || config.alpha_permille != 50
         || config.maximum_type_i_upper_permille < config.alpha_permille
         || config.maximum_type_i_upper_permille > 500
         || config.minimum_power_lower_permille < 500
@@ -290,7 +293,7 @@ fn validate_config(config: &SearchTimePowerConfigV1) -> Result<Vec<u8>, String> 
         || config.maximum_inconclusive_rate_permille > 500
         || config.maximum_clipped_score_fraction_permille > 500
     {
-        return Err("power/coverage/error thresholds are outside supported bounds".to_owned());
+        return Err("V1 requires a two-sided 5% test and bounded power/coverage/error thresholds".to_owned());
     }
     let seed = decode_seed_hex(&config.simulation_seed_hex)?;
     Ok(seed)
@@ -515,7 +518,6 @@ fn qualification_failures(
     let positive_outcome = positive.finish();
     let negative_outcome = negative.finish();
     let mut failures = Vec::new();
-    let alpha = f64::from(config.alpha_permille);
     match null_outcome.rejection_rate.upper_95_permille {
         Some(value) if value <= f64::from(config.maximum_type_i_upper_permille) => {}
         Some(value) => failures.push(format!(
@@ -570,7 +572,6 @@ fn qualification_failures(
             failures.push(format!("{name} has no completed score observations"));
         }
     }
-    let _ = alpha; // alpha is embodied in the prespecified t-interval rejection rule.
     failures
 }
 
@@ -637,6 +638,9 @@ pub fn qualify_search_time_trial_design(
         minimum_power_lower_permille: config.minimum_power_lower_permille,
         minimum_coverage_lower_permille: config.minimum_coverage_lower_permille,
         maximum_coverage_upper_permille: config.maximum_coverage_upper_permille,
+        maximum_inconclusive_rate_permille: config.maximum_inconclusive_rate_permille,
+        maximum_clipped_score_fraction_permille: config.maximum_clipped_score_fraction_permille,
+        maximum_type_i_upper_permille: config.maximum_type_i_upper_permille,
         candidate_results,
         minimum_qualified_block_count,
         design_qualified,
@@ -662,6 +666,58 @@ pub fn verify_search_time_power_report(
         .map_err(|error| format!("cannot serialize normalized power report: {error}"))?;
     if hash_domain(b"search-time-power-report.v1", &bytes) != report.report_sha256 {
         return Err("power report digest does not match contents".to_owned());
+    }
+    if report.alpha_permille != 50
+        || report.minimum_power_lower_permille > 1_000
+        || report.minimum_coverage_lower_permille >= report.maximum_coverage_upper_permille
+    {
+        return Err("power report contains unsupported V1 qualification thresholds".to_owned());
+    }
+    let mut previous_count = 0_u32;
+    for candidate in &report.candidate_results {
+        if candidate.candidate_block_count <= previous_count {
+            return Err("power report candidate block counts must be strictly increasing".to_owned());
+        }
+        previous_count = candidate.candidate_block_count;
+        let null = &candidate.null_type_i_error;
+        let positive = &candidate.positive_effect_power;
+        let negative = &candidate.negative_effect_power;
+        let inconclusive_rate = |outcome: &SearchPowerSimulationOutcomeV1| {
+            outcome.inconclusive_repetitions as f64 * 1_000.0
+                / outcome.planned_repetitions.max(1) as f64
+        };
+        let clipped = positive.clipped_score_fraction_permille
+            .into_iter()
+            .chain(negative.clipped_score_fraction_permille)
+            .fold(0.0_f64, f64::max);
+        let coverage_ok = |outcome: &SearchPowerSimulationOutcomeV1| {
+            matches!(
+                (outcome.coverage_rate.lower_95_permille, outcome.coverage_rate.upper_95_permille),
+                (Some(lower), Some(upper))
+                    if lower >= f64::from(report.minimum_coverage_lower_permille)
+                        && upper <= f64::from(report.maximum_coverage_upper_permille)
+            )
+        };
+        let expected_pass = matches!(
+            null.rejection_rate.upper_95_permille,
+            Some(upper) if upper <= f64::from(report.maximum_type_i_upper_permille)
+        ) && matches!(
+            positive.rejection_rate.lower_95_permille,
+            Some(lower) if lower >= f64::from(report.minimum_power_lower_permille)
+        ) && matches!(
+            negative.rejection_rate.lower_95_permille,
+            Some(lower) if lower >= f64::from(report.minimum_power_lower_permille)
+        ) && coverage_ok(positive)
+            && coverage_ok(negative)
+            && inconclusive_rate(null) <= f64::from(report.maximum_inconclusive_rate_permille)
+            && inconclusive_rate(positive) <= f64::from(report.maximum_inconclusive_rate_permille)
+            && inconclusive_rate(negative) <= f64::from(report.maximum_inconclusive_rate_permille)
+            && clipped <= f64::from(report.maximum_clipped_score_fraction_permille);
+        if candidate.qualification_passes != expected_pass
+            || candidate.qualification_passes != candidate.qualification_failures.is_empty()
+        {
+            return Err("power candidate pass/fail status does not match its Monte Carlo intervals and thresholds".to_owned());
+        }
     }
     let expected_minimum = report.candidate_results.iter()
         .find(|candidate| candidate.qualification_passes)
