@@ -145,3 +145,17 @@ The goal is not simply a bigger hypervolume. The target is a better verified Par
 6. Extend beyond four objectives only with an explicitly versioned algorithm and approximation-error tests.
 
 No SOTA result is claimed by this implementation.
+
+## Next paradigm shift: uncertainty-aware Pareto fronts
+
+The v0.1 API classifies dominance on point estimates. That is appropriate for deterministic fixtures, but noisy scientific and engineering measurements need a separate uncertainty-aware layer. Do not silently replace point estimates with confidence bounds in this API.
+
+The next version should report:
+- certain dominance when one candidate's conservative utility bounds dominate another's optimistic bounds;
+- possible dominance when the uncertainty regions overlap enough that either ordering remains plausible;
+- unresolved trade-offs when neither candidate dominates robustly;
+- feasibility probability for uncertain constraints;
+- distributions of hypervolume and Pareto-front membership across repeated trials;
+- tail resource use and worst-case regressions, not only means.
+
+A claim should not be called equivalent merely because confidence intervals overlap. Freeze the uncertainty model, practical effect margin, chance constraints and multiplicity treatment before confirmatory outcomes are examined. Point-estimate and robust fronts should be shown side by side.
