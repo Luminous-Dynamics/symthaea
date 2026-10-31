@@ -30,14 +30,27 @@
     "benchmark_executed": false,
     "hardware_energy_measured": false,
     "result_values_present": false,
-    "generator_scope": "Delayed-cue and multi-timescale forecasting/change-point synthetic generators; T8/T9 external reference-task adapters are specified but not implemented.",
+    "generator_scope": "Implemented Rust generators: T2 delayed cue, T3/T4 multiscale forecasting/change-point with delayed feedback, T8 BrainTrace DMS task semantics, T9 BrainTrace evidence-accumulation task semantics. T1/T5/T6/T7 and the full nine-task runner remain unimplemented.",
     "rust_tests_authored": true,
     "oracle_trace_verifier_implemented": true,
     "oracle_process_isolation_implemented": false,
-    "rust_tests_authored_count": 23,
+    "rust_tests_authored_count": 48,
     "rust_tests_by_file": {
       "research/temporal-bench/src/lib.rs": 9,
-      "research/temporal-bench/src/temporal.rs": 14
+      "research/temporal-bench/src/temporal.rs": 14,
+      "research/temporal-bench/src/dms.rs": 12,
+      "research/temporal-bench/src/evidence.rs": 13
+    },
+    "cryptographic_stream_digest_implemented": false,
+    "reference_generators": {
+      "delayed_cue": true,
+      "multiscale_forecast_change_point": true,
+      "braintrace_dms_semantics": true,
+      "braintrace_evidence_accumulation_semantics": true,
+      "fast_event": false,
+      "irregular_missingness": false,
+      "selective_retention": false,
+      "phase_prediction": false
     }
   },
   "workload_contract": {
@@ -48,7 +61,10 @@
     "failed_invalid_timed_out_runs_counted": true,
     "repeated_timesteps_are_independent_samples": false,
     "confirmatory_oracle_sealed_required": true,
-    "oracle_separation": "Generator currently returns public task and oracle in one process; the evaluator-side verifier is implemented, but qualification requires a separately permissioned oracle process."
+    "oracle_separation": "Task and oracle values are returned together by each generator; the evaluator-side verifiers are structural only and do not provide access isolation.",
+    "stream_id_semantics": "Deterministic 64-bit pairing identifier only; not cryptographic, not tamper evidence, and not a substitute for a SHA-256 content digest.",
+    "canonical_stream_digest_required": true,
+    "signed_evaluator_receipt_required": true
   },
   "temporal_axes": {
     "delayed_cue_steps": [
@@ -298,7 +314,8 @@
         "new_source_family_holdout",
         "one_shot_confirmatory_evaluation"
       ],
-      "audit_status": "public_reference_script_inspected; no score imported; paper-to-script exact revision match unverified"
+      "audit_status": "public_reference_script_inspected; no score imported; paper-to-script exact revision match unverified",
+      "implementation_status": "rust_generator_and_structural_oracle_verifier_authored; not compiled or executed"
     },
     {
       "id": "T9_BRAINTRACE_EVIDENCE_ACCUMULATION",
@@ -339,7 +356,8 @@
         "source_family_holdout",
         "separate_confirmatory_stream"
       ],
-      "audit_status": "public_generator_and_trainer_inspected; training-only loop has no separate held-out test path; no score imported"
+      "audit_status": "public_generator_and_trainer_inspected; training-only loop has no separate held-out test path; no score imported",
+      "implementation_status": "rust_generator_and_structural_oracle_verifier_authored; not compiled or executed"
     }
   ],
   "architecture_arms": [
