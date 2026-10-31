@@ -210,15 +210,23 @@ class CommonDepthCIFARCRC:
         return {"risk": risk, "expected_node_size": node_size,
                 "correct_specificity": specificity}
 
-    def aggregate_pool_metrics(self, controller: dict[tuple[int, ...], float],
-                               counts: tuple[int, int, int]) -> dict[str, float]:
-        if sum(counts) <= 0:
-            raise ValueError("pool counts must sum positive")
-        total = float(sum(counts))
+    def aggregate_test_metrics(self, controller: dict[tuple[int, ...], float],
+                               calibration_counts: tuple[int, int, int],
+                               test_counts: tuple[int, int, int]) -> dict[str, float]:
+        if calibration_counts not in controller or sum(calibration_counts) != self.n:
+            raise ValueError("invalid calibration count vector")
+        if sum(test_counts) <= 0 or any(c < 0 for c in test_counts):
+            raise ValueError("test counts must be nonnegative and sum positive")
+        depth = controller[calibration_counts]
+        total = float(sum(test_counts))
         accum = {"risk": 0.0, "expected_node_size": 0.0, "correct_specificity": 0.0}
-        for z, count in enumerate(counts):
-            metric = self.expected_metrics(controller[tuple(counts_cal)], z) if False else None
-        raise NotImplementedError("pool evaluation requires calibration-state lookup and split manifest")
+        for z, count in enumerate(test_counts):
+            if count == 0:
+                continue
+            metric = self.expected_metrics(depth, z)
+            for key in accum:
+                accum[key] += count * metric[key] / total
+        return accum
 
 
 def controller_summary(engine: CommonDepthCIFARCRC,
@@ -291,3 +299,103 @@ if __name__ == "__main__":
     print(json.dumps({"output":args.output,"bytes":len(raw),
                       "sha256":hashlib.sha256(raw).hexdigest(),
                       "tables":tables},indent=2))
+
+
+def _sample_finite_population_splits(
+    pool_counts: tuple[int, int, int], n_calibration: int, n_test: int,
+    n_splits: int, seed: int
+) -> list[tuple[tuple[int, int, int], tuple[int, int, int]]]:
+    """Sample calibration/test subsets without replacement within each split.
+
+    The common-depth controller depends on the frozen image pool only through
+    the three error-type counts. Thus the actual image IDs/prediction vectors
+    are not needed for this family once pool_counts are known. These are new
+    paired split draws, not the paper's original split manifest.
+    """
+    if len(pool_counts) != 3 or any(x < 0 for x in pool_counts) or sum(pool_counts) <= n_calibration+n_test:
+        raise ValueError("invalid finite population counts or split sizes")
+    if n_splits < 1:
+        raise ValueError("n_splits must be positive")
+    population = np.repeat(np.arange(3, dtype=np.int64), pool_counts)
+    rng = np.random.default_rng(seed)
+    splits = []
+    for _ in range(n_splits):
+        chosen = rng.choice(population.size, size=n_calibration+n_test, replace=False)
+        labels = population[chosen]
+        cal = tuple(int(x) for x in np.bincount(labels[:n_calibration], minlength=3))
+        test = tuple(int(x) for x in np.bincount(labels[n_calibration:], minlength=3))
+        splits.append((cal,test))
+    return splits
+
+
+def _metric_summary(values: list[float]) -> dict:
+    x=np.asarray(values,dtype=np.float64)
+    mean=float(x.mean())
+    se=float(x.std(ddof=1)/math.sqrt(x.size)) if x.size>1 else 0.0
+    return {"mean":mean,"se":se,"ci95":[mean-1.96*se,mean+1.96*se]}
+
+
+def run_pool_count_benchmark(
+    alphas: tuple[float,...]=(0.02,0.05,0.10,0.15),
+    pool_counts: tuple[int,int,int]=(7300,969,1731),
+    n_calibration: int=50, n_test: int=16, n_splits: int=300,
+    seed: int=20261031, rounds: tuple[int,...]=(0,1,3,10,20,50,100,200,500)
+) -> dict:
+    """Reproduce the common-depth *type-count* split experiment.
+
+    This reproduces the common-depth method and exact finite-population
+    sampling distribution at the type-count level using the published pool
+    counts. It cannot reproduce the original split IDs or confidence-adaptive
+    family, whose per-image confidence breakpoints are required.
+    """
+    splits=_sample_finite_population_splits(pool_counts,n_calibration,n_test,n_splits,seed)
+    all_results=[]
+    for alpha in alphas:
+        engine=CommonDepthCIFARCRC(n_calibration,alpha)
+        started=time.perf_counter()
+        baseline=engine.baseline("envelope")
+        controller=dict(baseline)
+        snapshots={0:dict(controller)}
+        for k in range(1,max(rounds)+1):
+            controller=engine.equal_share_round(controller)
+            if k in rounds:
+                snapshots[k]=dict(controller)
+        build_seconds=time.perf_counter()-started
+        method_rows={}
+        for k,table in snapshots.items():
+            split_metrics=[]
+            for cal,test in splits:
+                split_metrics.append(engine.aggregate_test_metrics(table,cal,test))
+            method_rows[str(k)]={
+                key:_metric_summary([row[key] for row in split_metrics])
+                for key in ("risk","expected_node_size","correct_specificity")
+            }
+        baseline_cs=np.asarray([engine.aggregate_test_metrics(baseline,cal,test)["correct_specificity"] for cal,test in splits])
+        deltas={}
+        for k,table in snapshots.items():
+            cs=np.asarray([engine.aggregate_test_metrics(table,cal,test)["correct_specificity"] for cal,test in splits])
+            deltas[str(k)]=_metric_summary((cs-baseline_cs).tolist())
+        all_results.append({
+            "alpha":alpha,"calibration_states":len(engine.states),
+            "augmented_states":len(engine.augmented),
+            "build_0_to_500_seconds":build_seconds,
+            "methods":method_rows,"paired_specificity_gain_vs_envelope":deltas,
+            "all_rounds_valid":True
+        })
+    return {
+        "protocol":{
+            "pool_counts_by_error_type":list(pool_counts),
+            "n_calibration":n_calibration,"n_test":n_test,"n_splits":n_splits,
+            "seed":seed,"within_split_sampling":"uniform without replacement from the 10,000-type finite population",
+            "same_splits_for_all_alphas_and_methods":True,
+            "data_provenance":"type-count reproduction using Appendix B.7 published pool totals; new seed and new split draws, not original image IDs",
+        },
+        "results":all_results,
+        "limitations":[
+            "common-depth family only; no confidence-adaptive per-image confidence breakpoints",
+            "not the paper's exact original split manifest, though the finite-population type-level draw law is the same",
+            "no cached per-image scores needed for common-depth because the method depends only on type counts",
+            "not a reproduction of paper Table 2 because exact original 300 splits are unavailable",
+            "finite exchangeability guarantee only; shift experiments are outside the guarantee"
+        ]
+    }
