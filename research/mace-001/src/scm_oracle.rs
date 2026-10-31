@@ -78,7 +78,10 @@ fn extract_top_level_json_value<'a>(json: &'a str, key: &str) -> Result<&'a str,
         }
         Err(format!("unterminated JSON string for {key:?}"))
     } else {
-        let end = json[start..].find([',', '}', ']']).map(|n| start + n).unwrap_or(json.len());
+        let end = json[start..]
+            .find(|character| matches!(character, ',' | '}' | ']'))
+            .map(|offset| start + offset)
+            .unwrap_or(json.len());
         if end == start {
             Err(format!("empty JSON value for {key:?}"))
         } else {
@@ -177,10 +180,12 @@ pub fn validate_irrelevant_pair(
     let control_context = extract_top_level_json_value(control_payload, "scenario_context")?;
     let anchor_context_without_close = anchor_context.strip_suffix('}')
         .ok_or_else(|| "anchor scenario_context is not an object".to_owned())?;
-    let expected_context = format!(
-        "{anchor_context_without_close},\"{context_key}\":{} }}",
+    let mut expected_context = anchor_context_without_close.to_owned();
+    expected_context.push_str(&format!(
+        ",\"{context_key}\":{}",
         json_string(context_value)
-    ).replace(" }", "}");
+    ));
+    expected_context.push('}');
     if control_context != expected_context {
         return Err(format!("pair {family:?} control context differs beyond {context_key:?}"));
     }
