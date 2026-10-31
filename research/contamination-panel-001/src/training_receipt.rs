@@ -874,6 +874,21 @@ mod tests {
     }
 
     #[test]
+    fn treatment_and_placebo_must_share_the_preregistered_training_rng_commitment() {
+        let design = design();
+        let manifest = randomize_intervention(&design, &seed()).unwrap();
+        let mut receipt = paired_receipt(&design, &manifest);
+        receipt.placebo.training_rng_seed_commitment_sha256 = digest("different-training-seed");
+        receipt.pair_receipt_sha256.clear();
+        let bytes0 = serde_json::to_vec(&receipt).unwrap();
+        receipt.pair_receipt_sha256 =
+            hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
+        assert!(validate_paired_training_execution_receipt(
+            &design, &manifest, &seed(), &serde_json::to_vec(&receipt).unwrap()
+        ).unwrap_err().contains("trainer code/runtime/tokenizer/configuration"));
+    }
+
+    #[test]
     fn mismatched_runtime_or_training_configuration_fails() {
         let design = design();
         let manifest = randomize_intervention(&design, &seed()).unwrap();
