@@ -134,7 +134,7 @@ pub struct VoCQualificationThresholds {
     pub max_top1_log_loss: f64,
     pub max_top1_brier: f64,
     pub max_top1_ece: f64,
-    pub max_topk_membership_brier: f64,
+    pub min_topk_membership_brier_skill: f64,
     pub min_topk_credible_set_coverage: f64,
     pub topk_inclusion_probability_floor: f64,
     pub max_mean_credible_set_size_fraction: f64,
@@ -163,7 +163,7 @@ impl Default for VoCQualificationThresholds {
             max_top1_log_loss: 1.00,
             max_top1_brier: 0.35,
             max_top1_ece: 0.08,
-            max_topk_membership_brier: 0.20,
+            min_topk_membership_brier_skill: 0.10,
             min_topk_credible_set_coverage: 0.90,
             topk_inclusion_probability_floor: 0.05,
             max_mean_credible_set_size_fraction: 0.60,
@@ -197,6 +197,7 @@ pub struct StratumMetrics {
     pub episodes: usize,
     pub top1_ece: f64,
     pub topk_membership_brier: f64,
+    pub topk_membership_brier_skill: f64,
     pub topk_credible_set_coverage: f64,
     pub interval_coverage: f64,
     pub mean_interval_width: f64,
@@ -339,10 +340,10 @@ pub fn qualify_voc_model(
         thresholds.max_top1_ece,
         &mut failure_reasons,
     );
-    check_at_most(
-        "topk_membership_brier",
-        metrics.topk_membership_brier,
-        thresholds.max_topk_membership_brier,
+    check_at_least(
+        "topk_membership_brier_skill",
+        metrics.topk_membership_brier_skill,
+        thresholds.min_topk_membership_brier_skill,
         &mut failure_reasons,
     );
     check_at_least(
@@ -433,10 +434,10 @@ pub fn qualify_voc_model(
             thresholds.max_top1_ece,
             &mut failure_reasons,
         );
-        check_at_most(
-            &format!("{}.topk_membership_brier", stratum.stratum_id),
-            stratum.topk_membership_brier,
-            thresholds.max_topk_membership_brier,
+        check_at_least(
+            &format!("{}.topk_membership_brier_skill", stratum.stratum_id),
+            stratum.topk_membership_brier_skill,
+            thresholds.min_topk_membership_brier_skill,
             &mut failure_reasons,
         );
         check_at_least(
@@ -545,7 +546,7 @@ fn validate_manifest(
             ));
         }
     }
-    if manifest.target_k == 0 || manifest.candidate_ids.len() < manifest.target_k {
+    if manifest.target_k == 0 || manifest.candidate_ids.len() <= manifest.target_k {
         return Err(QualificationError::new(
             "candidate_ids",
             "candidate count must be at least target_k and target_k must be positive",
@@ -673,8 +674,8 @@ fn validate_thresholds(
         ),
         ("max_top1_ece", thresholds.max_top1_ece),
         (
-            "max_topk_membership_brier",
-            thresholds.max_topk_membership_brier,
+            "min_topk_membership_brier_skill",
+            thresholds.min_topk_membership_brier_skill,
         ),
         (
             "min_topk_credible_set_coverage",
@@ -1055,6 +1056,7 @@ fn compute_metrics(
         top1_brier: global.top1.brier_score,
         top1_ece: global.top1.expected_calibration_error,
         topk_membership_brier: global.topk_membership_brier,
+        topk_membership_brier_skill: global.topk_membership_brier_skill,
         topk_credible_set_coverage: global.topk_credible_set_coverage,
         mean_credible_set_size_fraction: global.mean_credible_set_size_fraction,
         predictive_interval_coverage: global.interval_coverage,
@@ -1074,6 +1076,7 @@ struct EpisodeSummary {
     top1: CategoricalForecastMetrics,
     top1_accuracy: f64,
     topk_membership_brier: f64,
+    topk_membership_brier_skill: f64,
     topk_credible_set_coverage: f64,
     mean_credible_set_size_fraction: f64,
     interval_coverage: f64,
@@ -1165,10 +1168,15 @@ fn summarize_episodes(
     }
 
     let top1 = categorical_metrics(&top1_forecasts, thresholds.ece_bins)?;
+    let topk_membership_brier = membership_squared_error / membership_count as f64;
+    let topk_prevalence = manifest.target_k as f64 / candidate_count as f64;
+    let prevalence_brier = topk_prevalence * (1.0 - topk_prevalence);
+    let topk_membership_brier_skill = 1.0 - topk_membership_brier / prevalence_brier;
     Ok(EpisodeSummary {
         top1,
         top1_accuracy: correct_count as f64 / episodes.len() as f64,
-        topk_membership_brier: membership_squared_error / membership_count as f64,
+        topk_membership_brier,
+        topk_membership_brier_skill,
         topk_credible_set_coverage: credible_set_coverage as f64 / episodes.len() as f64,
         mean_credible_set_size_fraction: credible_set_size / episodes.len() as f64 / candidate_count as f64,
         interval_coverage: interval_covered as f64 / interval_count as f64,
@@ -1203,6 +1211,7 @@ fn compute_strata(
             episodes: group.len(),
             top1_ece: summary.top1.expected_calibration_error,
             topk_membership_brier: summary.topk_membership_brier,
+            topk_membership_brier_skill: summary.topk_membership_brier_skill,
             topk_credible_set_coverage: summary.topk_credible_set_coverage,
             interval_coverage: summary.interval_coverage,
             mean_interval_width: summary.mean_interval_width,
@@ -1528,7 +1537,7 @@ mod tests {
             max_top1_log_loss: 0.1,
             max_top1_brier: 0.1,
             max_top1_ece: 0.1,
-            max_topk_membership_brier: 0.1,
+            min_topk_membership_brier_skill: 0.1,
             min_topk_credible_set_coverage: 1.0,
             topk_inclusion_probability_floor: 0.05,
             max_mean_credible_set_size_fraction: 1.0,
@@ -1647,6 +1656,32 @@ mod tests {
         second.fidelity_ids.reverse();
         second.split_manifest_sha256 = compute_split_manifest_sha256(&second).unwrap();
         assert_ne!(first.split_manifest_sha256, second.split_manifest_sha256);
+    }
+
+    #[test]
+    fn membership_brier_skill_is_zero_for_the_constant_prevalence_baseline() {
+        // With two candidates and K=1, the constant 0.5 forecast has Brier 0.25,
+        // exactly matching the K/N prevalence baseline.
+        let manifest = manifest();
+        let mut replay = episode("ep-1");
+        for row in &mut replay.particle_values {
+            *row = vec![0.5, 0.5];
+        }
+        replay.realized_final_values = vec![0.9, 0.1];
+        let receipt = qualify_voc_model(&manifest, &[replay], &thresholds()).unwrap();
+        assert!((receipt.metrics.topk_membership_brier_skill - 0.0).abs() < 1e-12);
+        assert_eq!(receipt.decision, QualificationDecision::Abstain);
+    }
+
+    #[test]
+    fn negative_topk_membership_brier_skill_fails_the_gate() {
+        let manifest = manifest();
+        let mut replay = episode("ep-1");
+        replay.particle_values = vec![vec![0.1, 0.9], vec![0.1, 0.9]];
+        replay.realized_final_values = vec![0.9, 0.1];
+        let receipt = qualify_voc_model(&manifest, &[replay], &thresholds()).unwrap();
+        assert!(receipt.metrics.topk_membership_brier_skill < 0.0);
+        assert_eq!(receipt.decision, QualificationDecision::Abstain);
     }
 
     #[test]
