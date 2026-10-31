@@ -588,6 +588,7 @@ pub fn verify_knowledge_stream(
                         || *operation != expected.1
                         || *value != expected.2
                         || event.observed_at != expected.3
+                        || event.ordinal != 0
                     {
                         return Err(KnowledgeVerificationError::InvalidRevision {
                             fact_id: *fact_id, revision: *revision,
@@ -625,6 +626,10 @@ pub fn verify_knowledge_stream(
 
     // Independent verification: scan the public history for the highest
     // revision eligible at both valid_at and known_at, then compare the answer.
+    let answer_ids: BTreeSet<_> = oracle.answers.iter().map(|answer| answer.query_id).collect();
+    if answer_ids != BTreeSet::from([1_u64, 2, 3, 4, 5]) {
+        return Err(KnowledgeVerificationError::InvalidTimeline);
+    }
     let expected_query_coordinates = [
         (
             1_u64,
