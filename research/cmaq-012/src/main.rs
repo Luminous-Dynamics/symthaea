@@ -446,7 +446,7 @@ impl<'a> JsonParser<'a> {
                     values.push(self.value()?);
                     self.whitespace();
                     match self.bytes.get(self.position) {
-                        Some(b',') => self.position += 1,
+                        Some(&b',') => self.position += 1,
                         Some(&b']') => { self.position += 1; break; }
                         _ => return Err(format!("expected comma or closing bracket at byte {}", self.position)),
                     }
