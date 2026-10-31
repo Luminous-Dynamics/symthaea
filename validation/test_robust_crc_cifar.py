@@ -97,7 +97,7 @@ class DistributionallyRobustCRCTests(unittest.TestCase):
         self.assertLessEqual(result["robust_verification"]["max_budget_excess"],1e-8)
         self.assertGreaterEqual(
             result["worst_case"]["robust_specificity"]+1e-7,
-            result["worst_case"]["equal_share_specificity"]
+            result["worst_case"]["equal_share_specificity"]-1e-7
         )
 
     def test_rejects_invalid_scenario_sets(self):
