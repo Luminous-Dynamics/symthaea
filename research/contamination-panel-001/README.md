@@ -771,3 +771,66 @@ Schemas:
 - schema/search-time-exposure-findings.schema.json
 - schema/search-time-exposure-findings-audit.schema.json
 
+
+
+## Compositional multi-tool exposure
+
+The module src/search_time_composition.rs adds an evaluator-side record for conclusions that become inferable only by combining multiple tool responses. Event-local metadata/context/answer labels are not sufficient to represent this case: two individually harmless results can jointly expose a protected conclusion.
+
+This follows the three conditions formalized in the October 2026 TOP-R / TOP-Bench work:
+1. the target conclusion is sensitive;
+2. each individual source is insufficient;
+3. the source set jointly suffices.
+
+The public report never contains the protected conclusion, raw tool responses, or the evaluator seed.
+
+### Minimal supporting set
+
+Each compositional finding binds:
+- an opaque SHA-256 commitment to the protected conclusion;
+- benchmark item IDs;
+- at least two sorted, unique, allowed, response-bearing event sequence IDs from one search trace;
+- an evaluator evidence digest and method for every single event's insufficiency;
+- a leave-one-out evidence record for every event, with the exact remaining event sequence list and its canonical subset digest;
+- joint-sufficiency evidence for the full set;
+- an explicit monotonicity assumption and evidence digest (or explicit absence);
+- evaluator confidence.
+
+The auditor verifies every event reference and its request/destination/response digests, exact trace/run binding, single-event and leave-one-out coverage, exact subset membership, joint evidence presence, finding uniqueness and all artifact hashes.
+
+For a monotone inference predicate, if the complete set is sufficient and every one-source-removed subset is insufficient, the set is inclusion-minimal: every smaller proper subset is contained in at least one insufficient leave-one-out set. This conclusion is valid only under the declared monotonicity assumption. Without it, the same evidence is still recorded, but minimality_certified_count does not increase.
+
+### Audit command
+
+~~~sh
+cargo run --locked -- audit-search-time-compositions \
+  /secure/evaluator/search-time-trace.json \
+  /secure/evaluator/compositional-exposure-findings.json \
+  /secure/evaluator/compositional-exposure-audit.json
+~~~
+
+Schemas:
+- schema/compositional-exposure-findings.schema.json
+- schema/compositional-exposure-audit.schema.json
+
+### Adversarial tests
+
+The Rust tests include:
+- valid three-event composition with all single and leave-one-out insufficiency receipts;
+- non-monotone predicate produces no minimality certificate;
+- incomplete single-source insufficiency evidence;
+- incomplete or incorrect leave-one-out subset;
+- blocked or zero-response source event;
+- unsorted/duplicate or single-event support set;
+- stale trace binding and unknown event;
+- duplicate finding ID and duplicate support set;
+- invalid evidence digest, confidence and monotonicity binding;
+- audit report mutation;
+- strict top-level and nested schema/struct alignment.
+
+### Claim boundary
+
+This auditor verifies structure and consistency of evaluator-supplied evidence, not semantic truth. It does not inspect raw response bodies, independently establish that each source is insufficient, decide that the combination is genuinely sufficient, or prove the model used the information. Those require a separately qualified matcher/adjudication process and controlled model-run evidence.
+
+TOP-R's published 1,000-instance set is an external comparator, not a reproduced Symthaea result. No TOP-Bench dataset has been copied into this repository, and no external model run or leakage rate is claimed.
+

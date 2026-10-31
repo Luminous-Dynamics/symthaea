@@ -1313,3 +1313,5 @@ pub mod fresh_instance;
 pub mod fresh_scoring;
 
 pub mod search_time;
+
+pub mod search_time_composition;

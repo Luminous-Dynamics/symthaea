@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/compositional-exposure-findings-v1.json",
+  "title": "Compositional multi-tool exposure findings v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "run_id",
+    "trace_root_sha256",
+    "findings",
+    "findings_sha256",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.compositional_exposure_findings.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trace_root_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "finding_id",
+          "exposure_class",
+          "protected_conclusion_commitment_sha256",
+          "matched_item_ids",
+          "supporting_event_sequences",
+          "single_event_insufficiency",
+          "leave_one_out_insufficiency",
+          "joint_sufficiency",
+          "monotonicity_assumed",
+          "monotonicity_evidence_sha256",
+          "confidence_permille"
+        ],
+        "properties": {
+          "finding_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "exposure_class": {
+            "type": "string",
+            "enum": [
+              "context_bearing",
+              "answer_bearing",
+              "unknown"
+            ]
+          },
+          "protected_conclusion_commitment_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "matched_item_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100000,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "supporting_event_sequences": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 256,
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "single_event_insufficiency": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 256,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "event_sequence",
+                "evidence_sha256",
+                "method",
+                "confidence_permille"
+              ],
+              "properties": {
+                "event_sequence": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "evidence_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "method": {
+                  "type": "string",
+                  "enum": [
+                    "exact_match",
+                    "fuzzy_text",
+                    "semantic_review",
+                    "human_adjudication",
+                    "other"
+                  ]
+                },
+                "confidence_permille": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                }
+              }
+            }
+          },
+          "leave_one_out_insufficiency": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 256,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "omitted_event_sequence",
+                "tested_event_sequences",
+                "tested_subset_sha256",
+                "evidence_sha256",
+                "method",
+                "confidence_permille"
+              ],
+              "properties": {
+                "omitted_event_sequence": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "tested_event_sequences": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "tested_subset_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "evidence_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "method": {
+                  "type": "string",
+                  "enum": [
+                    "exact_match",
+                    "fuzzy_text",
+                    "semantic_review",
+                    "human_adjudication",
+                    "other"
+                  ]
+                },
+                "confidence_permille": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                }
+              }
+            }
+          },
+          "joint_sufficiency": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "evidence_sha256",
+              "method",
+              "confidence_permille"
+            ],
+            "properties": {
+              "evidence_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "method": {
+                "type": "string",
+                "enum": [
+                  "exact_match",
+                  "fuzzy_text",
+                  "semantic_review",
+                  "human_adjudication",
+                  "other"
+                ]
+              },
+              "confidence_permille": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000
+              }
+            }
+          },
+          "monotonicity_assumed": {
+            "type": "boolean"
+          },
+          "monotonicity_evidence_sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confidence_permille": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          }
+        }
+      }
+    },
+    "findings_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
