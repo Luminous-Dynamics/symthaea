@@ -930,6 +930,7 @@ pub fn build_and_sign_tail_profile(
     let context = context.ok_or(TailProfileError::EventCountMismatch)?;
     let mut profile = create_profile_unsigned(
         spec,
+        &topology.attestation,
         context,
         &observations,
         &benchmark_audit.manifest_sha256,
@@ -994,6 +995,7 @@ pub fn verify_tail_profile(
     // clustered observations. A signed aggregate number is not accepted alone.
     let expected = create_profile_unsigned(
         &profile.builder_spec,
+        &profile.topology_attestation,
         profile.context.clone(),
         &profile.event_observations,
         &profile.benchmark_manifest_sha256,
