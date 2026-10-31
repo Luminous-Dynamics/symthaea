@@ -1,6 +1,6 @@
 # MEL-MR-EVAL-035 — signed, topology-specific tail-profile registry
 
-**Status:** Rust registry and replay-verification code authored. Twelve unit tests are authored. No compilation, test execution, FluidSynth render, topology inspection, profile issuance or runtime qualification is claimed.
+**Status:** Rust registry and replay-verification code authored. Fourteen registry unit tests and eleven adapter tests are authored. No compilation, test execution, FluidSynth render, topology inspection, profile issuance or runtime qualification is claimed.
 
 ## Problem
 
@@ -80,7 +80,7 @@ Calibration and qualification lineage sets must be disjoint. The profile also re
 ### 4. Replayable signed profile
 
 The signed profile retains:
-- exact renderer topology/context and attestation digest;
+- the complete signed renderer-topology attestation, its authority key ID and exact renderer topology/context digest;
 - segmentation configuration digest and operation family;
 - benchmark manifest/audit digests;
 - full event-level observation references;
@@ -95,7 +95,9 @@ Verification recomputes the event-set digest, lineage summaries, builder digest 
 ### 5. Registry and exact resolution
 
 `TailProfileRegistry`:
-- loads an explicit trusted publisher key set;
+- loads an explicit trusted key set containing both renderer-topology authorities and tail-profile publishers;
+- re-verifies the embedded renderer-topology signature independently from the profile-publisher signature;
+- rejects a topology attestation whose digest or any renderer/effect/output field does not match the profile context;
 - accepts only verified, signed and qualified profiles;
 - rejects duplicate profile digests;
 - resolves only when the caller supplies the exact expected `TailProfileContext`;
