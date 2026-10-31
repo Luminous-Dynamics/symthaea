@@ -2297,7 +2297,7 @@ mod tests {
             tagged_row("e4", false, 0.9, "zebrafish", true, 0.8),
         ];
         let (status, axis, overall, overall_bootstrap, domains, ood) =
-            domain_shift_evaluation(&rows, true, Some(0.5), 500, "test:domain-bootstrap").unwrap();
+            domain_shift_evaluation(&rows, true, Some(0.5), 500, 500, "test:domain-bootstrap").unwrap();
         assert_eq!(status, "OOD_SCORED");
         assert_eq!(axis.as_deref(), Some("species"));
         assert!(overall.is_some());
@@ -2309,14 +2309,14 @@ mod tests {
     #[test]
     fn domain_audit_refuses_missing_metadata_when_required() {
         let rows = vec![row("n1", true, 0.9, 0.9, 1.0, 1.0, "merge")];
-        assert!(domain_shift_evaluation(&rows, true, None, 100, "test:missing-domain").is_err());
+        assert!(domain_shift_evaluation(&rows, true, None, 100, 100, "test:missing-domain").is_err());
     }
 
     #[test]
     fn domain_audit_refuses_threshold_without_novelty_scores() {
         let mut item = tagged_row("n2", true, 0.9, "mouse", false, 0.2);
         item.ood_score = None;
-        assert!(domain_shift_evaluation(&[item], false, Some(0.5), 100, "test:missing-ood").is_err());
+        assert!(domain_shift_evaluation(&[item], false, Some(0.5), 100, 100, "test:missing-ood").is_err());
     }
 
     #[test]
