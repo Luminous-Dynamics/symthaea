@@ -29,6 +29,12 @@ def semantic_errors(instance: dict) -> list[str]:
             errors.append("comparison control ID is not registered")
         if comparison["status"] == "qualified":
             required_match = {"episodes", "seeds", "observations", "actions", "horizon"}
+            for baseline_id in (comparison["treatment_id"], comparison["control_id"]):
+                baseline = baseline_by_id[baseline_id]
+                if baseline["eligibility"] != "eligible_for_primary_contrast":
+                    errors.append("qualified contrast uses an ineligible baseline")
+                if baseline["kind"] == "oracle":
+                    errors.append("qualified contrast cannot use evaluator oracle as a treatment/control")
             if not required_match.issubset(set(comparison["matched_dimensions"])):
                 errors.append("qualified contrast is missing a core matched dimension")
             if "compute" in comparison["matched_dimensions"]:
@@ -39,6 +45,37 @@ def semantic_errors(instance: dict) -> list[str]:
                     baseline = baseline_by_id.get(baseline_id)
                     if baseline is None or baseline["cost_accounting"] != "measured":
                         errors.append("qualified compute contrast includes an unmeasured baseline")
+
+    build_status = instance["candidate"]["build_status"]
+    artifact_digest = instance["candidate"]["artifact_sha256"]
+    if build_status == "source_only_not_compiled" and artifact_digest is not None:
+        errors.append("source-only candidate cannot claim a built artifact digest")
+    if build_status in {"built_and_hashed", "external_frozen_artifact"} and artifact_digest is None:
+        errors.append("built or external candidate must carry an artifact digest")
+
+    if instance["qualification"]["stage"] == "qualification":
+        qualification = instance["qualification"]
+        if not (
+            qualification["candidate_frozen"]
+            and qualification["evaluator_frozen"]
+            and qualification["thresholds_frozen"]
+            and qualification["qualification_data_sealed"]
+        ):
+            errors.append("qualification stage requires frozen candidate/evaluator/thresholds and sealed data")
+
+    split = instance["sample"]["mechanism_family_split"]
+    if split["family_disjoint"]:
+        development = set(split["development"])
+        calibration = set(split["calibration"])
+        qualification = set(split["qualification"])
+        if development & calibration or development & qualification or calibration & qualification:
+            errors.append("mechanism-family splits overlap despite family_disjoint=true")
+
+    for source in instance["data_sources"]:
+        if source["visibility"] == "evaluator_only" and source["candidate_access"]:
+            errors.append("evaluator-only data source cannot expose candidate-access fields")
+        if source["visibility"] == "candidate_visible" and not source["candidate_access"]:
+            errors.append("candidate-visible data source must declare its visible fields")
 
     if instance["candidate"]["source_commit"] != instance["repository"]["commit"]:
         errors.append("candidate source commit differs from frozen repository commit")
@@ -145,6 +182,21 @@ def main() -> None:
     mutated["comparisons"][0]["matched_dimensions"].append("compute")
     mutated["budgets"]["matching_method"] = "candidate_budget_only"
     hostile_cases.append(("qualified compute claim uses candidate-count-only budget", mutated))
+
+    mutated = copy.deepcopy(example)
+    mutated["qualification"]["stage"] = "qualification"
+    mutated["qualification"]["qualification_data_sealed"] = False
+    hostile_cases.append(("qualification stage without sealed data", mutated))
+
+    mutated = copy.deepcopy(example)
+    mutated["candidate"]["build_status"] = "built_and_hashed"
+    mutated["candidate"]["artifact_sha256"] = None
+    hostile_cases.append(("built candidate without artifact digest", mutated))
+
+    mutated = copy.deepcopy(example)
+    mutated["data_sources"][0]["visibility"] = "evaluator_only"
+    mutated["data_sources"][0]["candidate_access"] = ["hidden_truth"]
+    hostile_cases.append(("evaluator-only dataset exposes fields to candidate", mutated))
 
     for label, hostile in hostile_cases:
         if fail_closed(validator, hostile):
