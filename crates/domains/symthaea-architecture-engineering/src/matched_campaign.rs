@@ -761,7 +761,7 @@ mod tests {
             json!({"prior": 1.0}),
             0.91,
             false,
-            H2,
+            1,
             120,
         );
         let summary = reconcile_mechanism_matched_campaign(&[left, right]).unwrap();
