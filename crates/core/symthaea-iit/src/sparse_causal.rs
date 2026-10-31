@@ -1192,11 +1192,17 @@ impl SparseBinaryCausalModel {
             max_factor_entries,
         );
         let empty_summary = Iit4SystemPhiPartitionSummary::default();
+        let certified_upper_bound =
+            crate::certified_iit4_2023_system_phi_upper_bound(
+                candidate_system.len(),
+                config.include_total_cut,
+            );
         let null_result = |status, phi_s| Iit4SystemPhiAnalysis {
             formalism: FormalismProfile::Iit4_0_2023,
             candidate_system: candidate_system.to_vec(),
             request_sha256: request_sha256.clone(),
             search_config: config,
+            certified_upper_bound,
             status,
             phi_s,
             selected_state_pair_index: None,
@@ -1359,6 +1365,7 @@ impl SparseBinaryCausalModel {
             candidate_system: candidate_system.to_vec(),
             request_sha256,
             search_config: config,
+            certified_upper_bound,
             status,
             phi_s,
             selected_state_pair_index,
