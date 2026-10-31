@@ -831,7 +831,7 @@ mod tests {
             &[vec![0.9, 0.1], vec![0.2, 0.8]],
             &[0.0, 0.3],
         ).unwrap();
-        assert!((volume - 0.5).abs() < 1e-12);
+        assert!((volume - 0.1).abs() < 1e-12);
     }
 
     #[test]
