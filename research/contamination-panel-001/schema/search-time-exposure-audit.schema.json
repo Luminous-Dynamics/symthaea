@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/search-time-exposure-audit-v1.json",
+  "title": "Search-time exposure trace audit v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "valid",
+    "hash_chain_replayed",
+    "trace_root_matches",
+    "sequence_complete",
+    "timestamps_valid_and_monotonic",
+    "request_receipts_complete",
+    "accepted_response_receipts_complete",
+    "blocked_events_have_no_response_bytes",
+    "network_disabled_policy_respected",
+    "allowlist_policy_respected",
+    "all_event_channels_declared_instrumented",
+    "all_known_channel_types_accounted_for",
+    "no_unobserved_channels_declared",
+    "complete_mediation_verified",
+    "independently_verified",
+    "event_count",
+    "allowed_event_count",
+    "blocked_event_count",
+    "run_id",
+    "trace_root_sha256",
+    "coverage_status",
+    "issues",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.search_time_exposure_audit.v1"
+    },
+    "valid": {
+      "type": "boolean"
+    },
+    "hash_chain_replayed": {
+      "type": "boolean"
+    },
+    "trace_root_matches": {
+      "type": "boolean"
+    },
+    "sequence_complete": {
+      "type": "boolean"
+    },
+    "timestamps_valid_and_monotonic": {
+      "type": "boolean"
+    },
+    "request_receipts_complete": {
+      "type": "boolean"
+    },
+    "accepted_response_receipts_complete": {
+      "type": "boolean"
+    },
+    "blocked_events_have_no_response_bytes": {
+      "type": "boolean"
+    },
+    "network_disabled_policy_respected": {
+      "type": "boolean"
+    },
+    "allowlist_policy_respected": {
+      "type": "boolean"
+    },
+    "all_event_channels_declared_instrumented": {
+      "type": "boolean"
+    },
+    "all_known_channel_types_accounted_for": {
+      "type": "boolean"
+    },
+    "no_unobserved_channels_declared": {
+      "type": "boolean"
+    },
+    "complete_mediation_verified": {
+      "const": false
+    },
+    "independently_verified": {
+      "const": false
+    },
+    "event_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "allowed_event_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "blocked_event_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trace_root_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "coverage_status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
