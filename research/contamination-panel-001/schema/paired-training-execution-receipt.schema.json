@@ -1,0 +1,255 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/paired-training-execution-receipt-v1.json",
+  "title": "Paired treatment/placebo training execution receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "experiment_id",
+    "replicate_id",
+    "design_sha256",
+    "intervention_manifest_sha256",
+    "treatment",
+    "placebo",
+    "pair_receipt_sha256",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.paired_training_execution_receipt.v1"
+    },
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "replicate_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "design_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "intervention_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "treatment": {
+      "$ref": "#/$defs/arm"
+    },
+    "placebo": {
+      "$ref": "#/$defs/arm"
+    },
+    "pair_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "arm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arm",
+        "status",
+        "run_id",
+        "base_checkpoint_sha256",
+        "parent_checkpoint_sha256",
+        "output_checkpoint_sha256",
+        "training_corpus_sha256",
+        "shared_training_corpus_sha256",
+        "intervention_manifest_sha256",
+        "intervention_assignment_sha256",
+        "intervention_payload_sha256",
+        "shared_training_token_count",
+        "intervention_token_count",
+        "observed_shared_training_token_count",
+        "observed_intervention_token_count",
+        "observed_total_training_token_count",
+        "requested_total_training_token_budget",
+        "requested_training_steps",
+        "observed_training_steps",
+        "training_code_sha256",
+        "runtime_image_sha256",
+        "tokenization_pipeline_sha256",
+        "training_hyperparameters_sha256",
+        "optimizer_schedule_sha256",
+        "corpus_shard_manifest_sha256",
+        "post_tokenization_manifest_sha256",
+        "trainer_job_execution_receipt_sha256",
+        "checkpoint_custody_receipt_sha256",
+        "runner_attestation_sha256",
+        "started_at_utc",
+        "completed_at_utc",
+        "wall_clock_millis",
+        "cpu_time_millis",
+        "accelerator_time_millis"
+      ],
+      "properties": {
+        "arm": {
+          "type": "string",
+          "enum": [
+            "treatment",
+            "placebo"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "completed",
+            "partial",
+            "failed"
+          ]
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "base_checkpoint_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "parent_checkpoint_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "output_checkpoint_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "training_corpus_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "shared_training_corpus_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "intervention_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "intervention_assignment_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "intervention_payload_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "shared_training_token_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "intervention_token_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observed_shared_training_token_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observed_intervention_token_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observed_total_training_token_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "requested_total_training_token_budget": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "requested_training_steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "observed_training_steps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "training_code_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "runtime_image_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "tokenization_pipeline_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "training_hyperparameters_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "optimizer_schedule_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "corpus_shard_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "post_tokenization_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "trainer_job_execution_receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "checkpoint_custody_receipt_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "runner_attestation_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "started_at_utc": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "completed_at_utc": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "wall_clock_millis": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cpu_time_millis": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "accelerator_time_millis": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
