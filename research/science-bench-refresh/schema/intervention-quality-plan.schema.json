@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/intervention-quality-plan.schema.json",
+  "title": "Symthaea Intervention Quality Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "analyzer_source_revision",
+    "purpose",
+    "study_id",
+    "generator_source_revision",
+    "generator_prompt_sha256",
+    "semantic_verifier_source_revision",
+    "semantic_verifier_policy_sha256",
+    "candidate_sampling_policy",
+    "adjudication_policy",
+    "candidates",
+    "plan_commitment_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_intervention_quality_plan.v1"
+    },
+    "analyzer_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "not": {
+        "pattern": "^0{40}$"
+      }
+    },
+    "purpose": {
+      "enum": [
+        "example_only",
+        "qualified_run"
+      ]
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "generator_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "generator_prompt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "semantic_verifier_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "semantic_verifier_policy_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "candidate_sampling_policy": {
+      "const": "full_census"
+    },
+    "adjudication_policy": {
+      "$ref": "#/$defs/policy"
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    },
+    "plan_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewers_per_candidate",
+        "consensus_threshold_permille",
+        "require_blind_to_generator_identity",
+        "require_blind_to_intended_relation",
+        "require_blind_to_pipeline_disposition",
+        "require_blind_to_evaluator_outcome"
+      ],
+      "properties": {
+        "consensus_threshold_permille": {
+          "type": "integer",
+          "minimum": 501,
+          "maximum": 1000
+        },
+        "require_blind_to_generator_identity": {
+          "const": true
+        },
+        "require_blind_to_pipeline_disposition": {
+          "const": true
+        },
+        "require_blind_to_evaluator_outcome": {
+          "const": true
+        },
+        "reviewers_per_candidate": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 7
+        },
+        "require_blind_to_intended_relation": {
+          "const": true
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "transformation_family",
+        "target_failure_mode",
+        "semantic_cluster_sha256",
+        "intended_relation",
+        "pipeline_disposition",
+        "baseline_input_sha256",
+        "variant_input_sha256",
+        "generation_tokens",
+        "generation_cost_micro_usd",
+        "generation_wall_clock_ms"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "transformation_family": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "target_failure_mode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "semantic_cluster_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "intended_relation": {
+          "enum": [
+            "semantic_invariant",
+            "semantic_change"
+          ]
+        },
+        "pipeline_disposition": {
+          "enum": [
+            "accepted",
+            "rejected",
+            "abstained"
+          ]
+        },
+        "baseline_input_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "variant_input_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "generation_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "generation_cost_micro_usd": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "generation_wall_clock_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

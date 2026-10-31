@@ -31,6 +31,10 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - src/judge_factorial.rs: strict full-factorial plan/receipt verification, exact condition/input binding, candidate-choice and score effects, per-criterion order effects, and all ten pairwise interactions.
 - schema/judge-factorial-plan.schema.json, schema/judge-factorial-receipt.schema.json and schema/judge-factorial-report.schema.json: preregistered plan, ordinal-bound complete-denominator receipt and typed report contracts.
 - tools/judge_factorial_fixture.py: deterministic synthetic 32-cell/two-repeat CLI fixture; no empirical judge run.
+- docs/research/SCI-INTERVENTION-QUALITY-001.md: independent quality protocol for evaluator interventions: semantic validity, adjudication ambiguity, diversity and cost-effectiveness.
+- src/intervention_quality.rs: census-based candidate and blinded-panel receipt validator, semantic validity precision/recall, raw pairwise agreement, Fleiss' kappa, unique test yield and cost metrics.
+- schema/intervention-quality-plan.schema.json, schema/intervention-quality-receipt.schema.json and schema/intervention-quality-report.schema.json: strict plan, fixed-panel blinded adjudication and quality report contracts.
+- tools/intervention_quality_fixture.py: deterministic seven-candidate synthetic census with valid, invalid and ambiguous panel outcomes; not a human study.
 
 - `docs/research/SCI-BENCH-REFRESH-001.md`: benchmark-lifecycle protocol and competitive targets.
 - `schema/generation-manifest.schema.json`: versioned JSON Schema for the v1 generation manifest.
@@ -41,6 +45,19 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - `fixtures/generator-config.example.json`: four-family synthetic generator configuration whose exact bytes are SHA-256-pinned by a real manifest.
 - `src/lib.rs`, `src/generator.rs`, and `src/main.rs`: standalone Rust validator, commitment calculator, deterministic generator/replayer, task-set contract checker, and post-run reveal verifier.
 - `tools/reference_replay.py`: standard-library-only, test-only independent semantic reconstruction used by CI to cross-check Rust task generation; it is not part of production CLI paths.
+
+## Audit quality of generated evaluator interventions
+
+This audit evaluates the mutation generator and semantic-verification pipeline, not the judge under test. V1 requires a full census of generated candidates and a fixed-size blinded human panel, blind to the declared intended relation as well as generator identity, pipeline disposition and evaluator outcome. It reports accepted-valid precision (with ambiguous accepts retained in the denominator), confirmed-invalid acceptance, ambiguity, valid-candidate recall, relation-stratified accepted/rejected/abstained outcomes, reviewer pairwise agreement, Fleiss' kappa, diversity and unique valid test yield per resource.
+
+```sh
+python3 research/science-bench-refresh/tools/intervention_quality_fixture.py /tmp/intervention-quality
+cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  analyze-intervention-quality /tmp/intervention-quality/intervention-quality-plan.example.json \
+  /tmp/intervention-quality/intervention-quality-receipt.example.json
+```
+
+The fixture is synthetic and non-scoring. Panel labels are supplied declarations; the analyzer does not prove reviewer independence, source custody, semantic truth or downstream judge fault detection. Ambiguous candidates are never treated as valid. Sampled/adaptive selection is intentionally excluded from v1 to avoid selective-adjudication bias. See [SCI-INTERVENTION-QUALITY-001](../../docs/research/SCI-INTERVENTION-QUALITY-001.md).
 
 ## Analyze interacting judge nuisance factors
 

@@ -46,6 +46,7 @@ jobs:
           research/science-bench-refresh/src/main.rs
           research/science-bench-refresh/src/lib.rs
           research/science-bench-refresh/src/judge_factorial.rs
+          research/science-bench-refresh/src/intervention_quality.rs
           research/science-bench-refresh/src/evidence_behavior_contracts.rs
           research/science-bench-refresh/src/reference_assurance.rs
 
@@ -1048,6 +1049,23 @@ jobs:
             > /tmp/sbr-judge-factorial-report.json
           jq -e '.planned_block_count == 1 and .observed_block_count == 1 and .planned_condition_count == 64 and .observed_condition_count == 64 and .completed_condition_count == 64 and .ineligible_condition_count == 0 and .all_blocks_present == true and .all_conditions_present == true and .all_conditions_completed == true and .analyzer_worktree_clean == true and .balanced_repeat_count == 2 and .excluded_incomplete_repeat_count == 0 and .effects_use_only_fully_completed_repeats == true and ([.pairwise_interactions[] | select(.factor_a == "candidate_order" and .factor_b == "provenance_cue") | select(.complete_00_count == 16 and .complete_01_count == 16 and .complete_10_count == 16 and .complete_11_count == 16 and .decisive_00_count == 16 and .decisive_01_count == 16 and .decisive_10_count == 16 and .decisive_11_count == 16)] | length) == 1 and .execution_authenticity_proven == false and .randomization_proven == false and .raw_prompt_custody_proven == false and .semantic_equivalence_proven == false and .causal_effect_identified == false and .generalized_accuracy_estimated == false and .external_anchor_required == true and .scoring_eligible_declared == false and (.report_commitment_sha256 | test("^[0-9a-f]{64}$"))' /tmp/sbr-judge-factorial-report.json >/dev/null
           jq -e '([.main_effects[] | select(.factor == "candidate_order") | select((.candidate_score_gap_delta_millionths + 30000 | fabs) < 0.001 and (.candidate_a_choice_rate_delta_millionths + 500000 | fabs) < 0.001)] | length) == 1 and ([.main_effects[] | select(.factor == "provenance_cue") | select((.candidate_score_gap_delta_millionths - 20000 | fabs) < 0.001 and (.candidate_a_choice_rate_delta_millionths - 500000 | fabs) < 0.001)] | length) == 1 and ([.main_effects[] | select(.factor == "score_option_order") | select((.criterion_score_delta_millionths - 500000 | fabs) < 0.001)] | length) == 1 and ([.criterion_order_effects[] | select(.criterion_id == "evidence") | select((.reversed_minus_canonical_millionths - 1000000 | fabs) < 0.001)] | length) == 1 and ([.pairwise_interactions[] | select(.factor_a == "candidate_order" and .factor_b == "provenance_cue") | select((.candidate_score_gap_interaction_millionths - 40000 | fabs) < 0.001 and (.candidate_a_choice_interaction_millionths - 1000000 | fabs) < 0.001 and .decisive_00_count == 16 and .decisive_01_count == 16 and .decisive_10_count == 16 and .decisive_11_count == 16 and .excluded_conditions_across_four_cells == 0)] | length) == 1' /tmp/sbr-judge-factorial-report.json >/dev/null
+
+      - name: Intervention quality census and adjudication controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq empty research/science-bench-refresh/schema/intervention-quality-plan.schema.json
+          jq empty research/science-bench-refresh/schema/intervention-quality-receipt.schema.json
+          jq empty research/science-bench-refresh/schema/intervention-quality-report.schema.json
+          python3 research/science-bench-refresh/tools/intervention_quality_fixture.py /tmp/sbr-intervention-quality
+          python3 research/science-bench-refresh/tools/intervention_quality_fixture.py /tmp/sbr-intervention-quality-repeat
+          cmp /tmp/sbr-intervention-quality/intervention-quality-plan.example.json /tmp/sbr-intervention-quality-repeat/intervention-quality-plan.example.json
+          cmp /tmp/sbr-intervention-quality/intervention-quality-receipt.example.json /tmp/sbr-intervention-quality-repeat/intervention-quality-receipt.example.json
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            analyze-intervention-quality /tmp/sbr-intervention-quality/intervention-quality-plan.example.json \
+            /tmp/sbr-intervention-quality/intervention-quality-receipt.example.json \
+            > /tmp/sbr-intervention-quality-report.json
+          jq -e '.candidate_count == 7 and .adjudicated_candidate_count == 7 and .accepted_count == 4 and .rejected_count == 2 and .abstained_count == 1 and .valid_relation_count == 3 and .invalid_relation_count == 1 and .ambiguous_relation_count == 3 and .accepted_valid_count == 2 and .accepted_invalid_count == 1 and .accepted_ambiguous_count == 1 and .rejected_valid_count == 1 and .rejected_ambiguous_count == 1 and .abstained_valid_count == 0 and .abstained_invalid_count == 0 and .abstained_ambiguous_count == 1 and .accepted_valid_precision_lower_bound_ppm == 500000 and .accepted_confirmed_invalid_rate_ppm == 250000 and .accepted_ambiguous_rate_ppm == 250000 and .valid_candidate_recall_ppm == 666666 and .pipeline_acceptance_rate_ppm == 571428 and .reviewer_pairwise_comparison_count == 21 and .reviewer_pairwise_agreement_ppm == 523809 and (.reviewer_fleiss_kappa != null) and .unique_transformation_family_count == 3 and .unique_failure_mode_count == 7 and .unique_semantic_cluster_count == 6 and .unique_valid_accepted_test_unit_count == 2 and .generation_tokens == 700 and .generation_cost_micro_usd == 7000 and .reviewer_independence_proven == false and .raw_adjudication_custody_proven == false and .semantic_truth_proven == false and .execution_authenticity_proven == false and .external_anchor_required == true and .scoring_eligible_declared == false and (.report_commitment_sha256 | test("^[0-9a-f]{64}$"))' /tmp/sbr-intervention-quality-report.json >/dev/null
 
       - name: Reference assurance schema and example package
         shell: bash

@@ -1,0 +1,391 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/intervention-quality-report.schema.json",
+  "title": "Symthaea Intervention Quality Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "study_id",
+    "analyzer_source_revision",
+    "plan_sha256",
+    "receipt_sha256",
+    "plan_commitment_sha256",
+    "report_commitment_sha256",
+    "candidate_count",
+    "adjudicated_candidate_count",
+    "accepted_count",
+    "rejected_count",
+    "abstained_count",
+    "valid_relation_count",
+    "invalid_relation_count",
+    "ambiguous_relation_count",
+    "accepted_valid_count",
+    "accepted_invalid_count",
+    "accepted_ambiguous_count",
+    "rejected_valid_count",
+    "rejected_invalid_count",
+    "rejected_ambiguous_count",
+    "abstained_valid_count",
+    "abstained_invalid_count",
+    "abstained_ambiguous_count",
+    "accepted_valid_precision_lower_bound_ppm",
+    "accepted_confirmed_invalid_rate_ppm",
+    "accepted_ambiguous_rate_ppm",
+    "valid_candidate_recall_ppm",
+    "pipeline_acceptance_rate_ppm",
+    "reviewer_pairwise_agreement_ppm",
+    "reviewer_pairwise_comparison_count",
+    "reviewer_fleiss_kappa",
+    "unique_transformation_family_count",
+    "unique_failure_mode_count",
+    "unique_semantic_cluster_count",
+    "unique_valid_accepted_test_unit_count",
+    "generation_tokens",
+    "generation_cost_micro_usd",
+    "generation_wall_clock_ms",
+    "valid_unique_accepted_per_1000_tokens",
+    "valid_unique_accepted_per_usd",
+    "family_metrics",
+    "failure_mode_metrics",
+    "reviewer_independence_proven",
+    "raw_adjudication_custody_proven",
+    "semantic_truth_proven",
+    "execution_authenticity_proven",
+    "external_anchor_required",
+    "scoring_eligible_declared",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_intervention_quality_report.v1"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "analyzer_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "plan_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "receipt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "plan_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "report_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "candidate_count": {
+      "$ref": "#/$defs/count"
+    },
+    "adjudicated_candidate_count": {
+      "$ref": "#/$defs/count"
+    },
+    "accepted_count": {
+      "$ref": "#/$defs/count"
+    },
+    "rejected_count": {
+      "$ref": "#/$defs/count"
+    },
+    "abstained_count": {
+      "$ref": "#/$defs/count"
+    },
+    "valid_relation_count": {
+      "$ref": "#/$defs/count"
+    },
+    "invalid_relation_count": {
+      "$ref": "#/$defs/count"
+    },
+    "ambiguous_relation_count": {
+      "$ref": "#/$defs/count"
+    },
+    "accepted_valid_count": {
+      "$ref": "#/$defs/count"
+    },
+    "accepted_invalid_count": {
+      "$ref": "#/$defs/count"
+    },
+    "accepted_ambiguous_count": {
+      "$ref": "#/$defs/count"
+    },
+    "rejected_valid_count": {
+      "$ref": "#/$defs/count"
+    },
+    "rejected_invalid_count": {
+      "$ref": "#/$defs/count"
+    },
+    "rejected_ambiguous_count": {
+      "$ref": "#/$defs/count"
+    },
+    "accepted_valid_precision_lower_bound_ppm": {
+      "$ref": "#/$defs/nullable_ppm"
+    },
+    "accepted_confirmed_invalid_rate_ppm": {
+      "$ref": "#/$defs/nullable_ppm"
+    },
+    "accepted_ambiguous_rate_ppm": {
+      "$ref": "#/$defs/nullable_ppm"
+    },
+    "valid_candidate_recall_ppm": {
+      "$ref": "#/$defs/nullable_ppm"
+    },
+    "pipeline_acceptance_rate_ppm": {
+      "$ref": "#/$defs/nullable_ppm"
+    },
+    "reviewer_pairwise_agreement_ppm": {
+      "$ref": "#/$defs/nullable_ppm"
+    },
+    "reviewer_pairwise_comparison_count": {
+      "$ref": "#/$defs/count"
+    },
+    "unique_transformation_family_count": {
+      "$ref": "#/$defs/count"
+    },
+    "unique_failure_mode_count": {
+      "$ref": "#/$defs/count"
+    },
+    "unique_semantic_cluster_count": {
+      "$ref": "#/$defs/count"
+    },
+    "unique_valid_accepted_test_unit_count": {
+      "$ref": "#/$defs/count"
+    },
+    "generation_tokens": {
+      "$ref": "#/$defs/count"
+    },
+    "generation_cost_micro_usd": {
+      "$ref": "#/$defs/count"
+    },
+    "generation_wall_clock_ms": {
+      "$ref": "#/$defs/count"
+    },
+    "valid_unique_accepted_per_1000_tokens": {
+      "$ref": "#/$defs/nullable_number"
+    },
+    "valid_unique_accepted_per_usd": {
+      "$ref": "#/$defs/nullable_number"
+    },
+    "family_metrics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/family_metrics"
+      }
+    },
+    "failure_mode_metrics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/failure_metrics"
+      }
+    },
+    "reviewer_independence_proven": {
+      "const": false
+    },
+    "raw_adjudication_custody_proven": {
+      "const": false
+    },
+    "semantic_truth_proven": {
+      "const": false
+    },
+    "execution_authenticity_proven": {
+      "const": false
+    },
+    "external_anchor_required": {
+      "const": true
+    },
+    "scoring_eligible_declared": {
+      "const": false
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reviewer_fleiss_kappa": {
+      "$ref": "#/$defs/nullable_number"
+    },
+    "abstained_valid_count": {
+      "$ref": "#/$defs/count"
+    },
+    "abstained_invalid_count": {
+      "$ref": "#/$defs/count"
+    },
+    "abstained_ambiguous_count": {
+      "$ref": "#/$defs/count"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "nullable_ppm": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "nullable_number": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "family_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transformation_family",
+        "candidate_count",
+        "accepted_count",
+        "accepted_valid_count",
+        "accepted_invalid_count",
+        "accepted_ambiguous_count",
+        "rejected_valid_count",
+        "rejected_invalid_count",
+        "rejected_ambiguous_count",
+        "abstained_valid_count",
+        "abstained_invalid_count",
+        "abstained_ambiguous_count",
+        "abstained_count",
+        "unique_semantic_cluster_count",
+        "unique_valid_accepted_test_unit_count",
+        "generation_tokens",
+        "generation_cost_micro_usd",
+        "valid_unique_accepted_per_1000_tokens",
+        "valid_unique_accepted_per_usd"
+      ],
+      "properties": {
+        "transformation_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_count": {
+          "$ref": "#/$defs/count"
+        },
+        "accepted_count": {
+          "$ref": "#/$defs/count"
+        },
+        "accepted_valid_count": {
+          "$ref": "#/$defs/count"
+        },
+        "accepted_invalid_count": {
+          "$ref": "#/$defs/count"
+        },
+        "accepted_ambiguous_count": {
+          "$ref": "#/$defs/count"
+        },
+        "rejected_valid_count": {
+          "$ref": "#/$defs/count"
+        },
+        "rejected_invalid_count": {
+          "$ref": "#/$defs/count"
+        },
+        "rejected_ambiguous_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstained_count": {
+          "$ref": "#/$defs/count"
+        },
+        "unique_semantic_cluster_count": {
+          "$ref": "#/$defs/count"
+        },
+        "unique_valid_accepted_test_unit_count": {
+          "$ref": "#/$defs/count"
+        },
+        "generation_tokens": {
+          "$ref": "#/$defs/count"
+        },
+        "generation_cost_micro_usd": {
+          "$ref": "#/$defs/count"
+        },
+        "valid_unique_accepted_per_1000_tokens": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "valid_unique_accepted_per_usd": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "abstained_valid_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstained_invalid_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstained_ambiguous_count": {
+          "$ref": "#/$defs/count"
+        }
+      }
+    },
+    "failure_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_failure_mode",
+        "candidate_count",
+        "accepted_valid_count",
+        "accepted_invalid_count",
+        "accepted_ambiguous_count",
+        "rejected_valid_count",
+        "rejected_invalid_count",
+        "rejected_ambiguous_count",
+        "abstained_valid_count",
+        "abstained_invalid_count",
+        "abstained_ambiguous_count",
+        "abstained_count",
+        "unique_valid_accepted_test_unit_count"
+      ],
+      "properties": {
+        "target_failure_mode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_count": {
+          "$ref": "#/$defs/count"
+        },
+        "accepted_valid_count": {
+          "$ref": "#/$defs/count"
+        },
+        "accepted_invalid_count": {
+          "$ref": "#/$defs/count"
+        },
+        "accepted_ambiguous_count": {
+          "$ref": "#/$defs/count"
+        },
+        "rejected_valid_count": {
+          "$ref": "#/$defs/count"
+        },
+        "rejected_invalid_count": {
+          "$ref": "#/$defs/count"
+        },
+        "rejected_ambiguous_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstained_count": {
+          "$ref": "#/$defs/count"
+        },
+        "unique_valid_accepted_test_unit_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstained_valid_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstained_invalid_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstained_ambiguous_count": {
+          "$ref": "#/$defs/count"
+        }
+      }
+    }
+  }
+}
