@@ -89,7 +89,7 @@ Operational authorization must still consume #9388 qualification capability and 
 
 ## 8. Validation and adversarial benchmark plan
 
-Authored unit tests cover manifest uniqueness/order/digest, family and threshold/support immutability, unknown stream rejection, independent stream sequencing, multi-look parent links, exact cumulative sample counts, tampered batches even when the outer batch/ledger hashes are recomputed, look rollback/duplication, missing/reordered streams, broken prefix chains, corrupted receipts, final ledger digest mismatch, and JSON round-trip.
+**Nineteen authored unit tests** cover manifest uniqueness/order/digest, family and threshold/support immutability, unknown stream rejection, independent stream sequencing, multi-look parent links, exact cumulative sample counts, tampered batches even when the outer batch/ledger hashes are recomputed, look rollback/duplication, missing/reordered streams, broken prefix chains, corrupted receipts, final ledger digest mismatch, JSON round-trip, and rejection of unknown serialized fields.
 
 Before qualification, run:
 - exact-head Rust unit and crate integration tests;
