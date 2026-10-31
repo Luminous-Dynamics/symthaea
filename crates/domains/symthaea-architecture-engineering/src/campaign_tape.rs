@@ -612,7 +612,6 @@ impl CampaignTape {
                                         "new admission must create a unique canonical direction",
                                     ));
                                 }
-                                *direction_claims.entry(canonical_direction_id.clone()).or_default() += 1;
                             }
                             DirectionProposalDisposition::Duplicate { existing_direction_id } => {
                                 validate_id("existing_direction_id", existing_direction_id)?;
@@ -624,7 +623,6 @@ impl CampaignTape {
                                         "duplicate must map to an already known or same-round admitted direction",
                                     ));
                                 }
-                                *direction_claims.entry(existing_direction_id.clone()).or_default() += 1;
                             }
                             DirectionProposalDisposition::Rejected { reason_code }
                             | DirectionProposalDisposition::Inconclusive { reason_code } => {
@@ -1348,7 +1346,7 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_novel_candidate_counts_toward_the_existing_direction_claim_cap() {
+    fn duplicate_novel_candidates_consume_new_arm_claim_capacity() {
         let mut campaign_config = config();
         campaign_config.worker_count = 3;
         let mut tape = CampaignTape::new(
@@ -1358,17 +1356,25 @@ mod tests {
             campaign_config,
         ).unwrap();
         tape.append(evaluation_event("e1", 1, "bootstrap", 0, "A")).unwrap();
-        tape.append(evaluation_event("e2", 2, "w1", 1, "A")).unwrap();
-        tape.append(evaluation_event("e3", 2, "w2", 1, "A")).unwrap();
         tape.append(novel_candidate_event(
-            "n4",
+            "n2",
             2,
-            "w3",
+            "w1",
             1,
             DirectionProposalDisposition::Duplicate {
                 existing_direction_id: "A".to_owned(),
             },
             Some(0.78),
+        )).unwrap();
+        tape.append(novel_candidate_event(
+            "n3",
+            2,
+            "w2",
+            1,
+            DirectionProposalDisposition::Rejected {
+                reason_code: "not_novel".to_owned(),
+            },
+            None,
         )).unwrap();
         assert!(tape.seal().is_err());
     }
