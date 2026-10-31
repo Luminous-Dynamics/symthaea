@@ -224,8 +224,6 @@ fn json_string(value: &str) -> String {
 pub fn projection_for_family(family: &str) -> Result<OracleProjection, String> {
     match family {
         "observational_confounding" => {
-            // Two observations: the common cause changes, and pump/valve co-move.
-            // There is no observed intervention that separates valve from pump.
             let observations = [
                 (false, false, false, 0),
                 (true, true, true, 12),
@@ -235,10 +233,6 @@ pub fn projection_for_family(family: &str) -> Result<OracleProjection, String> {
             let valve_changed = observations[0].2 != observations[1].2;
             let flow_changed = observations[0].3 != observations[1].3;
             let intervention_separates_valve = false;
-
-            // Counterfactual SCM check: holding the common cause and pump fixed,
-            // intervening on the valve has no effect because valve is not a parent
-            // of the structural flow equation.
             let do_closed = confounded_flow(true, true, false);
             let do_open = confounded_flow(true, true, true);
             let valve_effect = do_open - do_closed;
@@ -255,14 +249,6 @@ pub fn projection_for_family(family: &str) -> Result<OracleProjection, String> {
                     expected_transfer: "record_association_only",
                     expected_action: "seek_intervention_or_preserve_uncertainty",
                     expected_completion: "not_applicable",
-                    expected_write: "store_transition_with_regime",
-                    expected_maintain: "mark_stale_on_regime_change",
-                    expected_retrieve: "retrieve_with_regime_warning",
-                    expected_use: "requalify_before_action",
-                    expected_write: "store_qualified_transition",
-                    expected_maintain: "retain_with_preconditions",
-                    expected_retrieve: "retrieve_preconditioned_transition",
-                    expected_use: "reuse_if_preconditions_hold",
                     expected_write: "store_association_only",
                     expected_maintain: "preserve_uncertainty",
                     expected_retrieve: "retrieve_association_evidence",
@@ -274,8 +260,6 @@ pub fn projection_for_family(family: &str) -> Result<OracleProjection, String> {
         }
         "controlled_intervention" => {
             // Four deterministic replicates per arm under the same pump-on regime.
-            // The fixture is explicitly a noiseless simulator contract, not an
-            // estimate of a real-world population effect.
             let control = [controlled_flow(true, false); 4];
             let treatment = [controlled_flow(true, true); 4];
             let control_sum: i32 = control.iter().sum();
@@ -291,6 +275,10 @@ pub fn projection_for_family(family: &str) -> Result<OracleProjection, String> {
                     expected_transfer: "reuse_qualified_transition",
                     expected_action: "reuse_valve_effect_with_preconditions",
                     expected_completion: "not_applicable",
+                    expected_write: "store_qualified_transition",
+                    expected_maintain: "retain_with_preconditions",
+                    expected_retrieve: "retrieve_preconditioned_transition",
+                    expected_use: "reuse_if_preconditions_hold",
                 })
             } else {
                 Err("controlled-intervention SCM fixture failed its deterministic effect check".to_owned())
@@ -311,6 +299,10 @@ pub fn projection_for_family(family: &str) -> Result<OracleProjection, String> {
                     expected_transfer: "requalify_before_reuse",
                     expected_action: "request_new_measurement_or_abstain",
                     expected_completion: "not_applicable",
+                    expected_write: "store_transition_with_regime",
+                    expected_maintain: "mark_stale_on_regime_change",
+                    expected_retrieve: "retrieve_with_regime_warning",
+                    expected_use: "requalify_before_action",
                 })
             } else {
                 Err("thermal regime-shift SCM fixture no longer changes the prediction".to_owned())
