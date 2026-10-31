@@ -16,9 +16,8 @@ use std::{
     collections::BTreeSet,
     env,
     fs,
-    io::Write,
     path::Path,
-    process::{Command, ExitCode, Stdio},
+    process::ExitCode,
 };
 
 use anyhow::{Context, Result, bail};
@@ -35,8 +34,10 @@ const SOURCE_SHA256: &str =
 const SOURCE_BYTES: usize = 1_599_271;
 const EXPECTED_TASK_COUNT: usize = 1_000;
 const EXPECTED_PROJECT_COUNT: usize = 78;
-const EXPECTED_DOCUMENTATION: &str =
-    "deduplicated list of sorries, for each unique goal string the most recent inclusion date is chosen";
+const EXPECTED_DOCUMENTATION: &str = concat!(
+    "deduplicated list of sorries, for each unique goal string ",
+    "the most recent inclusion date is chosen"
+);
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -133,38 +134,76 @@ fn sha256_hex(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
 
-fn git_blob_sha1(raw: &[u8]) -> Result<String> {
-    let mut child = Command::new("git")
-        .args(["hash-object", "--stdin"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .context("spawn git hash-object to verify the upstream blob identity")?;
-    {
-        let mut stdin = child
-            .stdin
-            .take()
-            .context("open git hash-object stdin")?;
-        stdin.write_all(raw).context("write source bytes to git hash-object")?;
+fn sha1_hex(input: &[u8]) -> String {
+    let bit_len = (input.len() as u64).wrapping_mul(8);
+    let mut padded = input.to_vec();
+    padded.push(0x80);
+    while padded.len() % 64 != 56 {
+        padded.push(0);
     }
-    let output = child
-        .wait_with_output()
-        .context("wait for git hash-object")?;
-    if !output.status.success() {
-        bail!(
-            "git hash-object failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+    padded.extend_from_slice(&bit_len.to_be_bytes());
+
+    let mut h0 = 0x6745_2301_u32;
+    let mut h1 = 0xEFCD_AB89_u32;
+    let mut h2 = 0x98BA_DCFE_u32;
+    let mut h3 = 0x1032_5476_u32;
+    let mut h4 = 0xC3D2_E1F0_u32;
+
+    for chunk in padded.chunks_exact(64) {
+        let mut words = [0_u32; 80];
+        for (index, word) in words.iter_mut().take(16).enumerate() {
+            let offset = index * 4;
+            *word = u32::from_be_bytes([
+                chunk[offset],
+                chunk[offset + 1],
+                chunk[offset + 2],
+                chunk[offset + 3],
+            ]);
+        }
+        for index in 16..80 {
+            words[index] = (words[index - 3]
+                ^ words[index - 8]
+                ^ words[index - 14]
+                ^ words[index - 16])
+                .rotate_left(1);
+        }
+
+        let (mut a, mut b, mut c, mut d, mut e) = (h0, h1, h2, h3, h4);
+        for (index, word) in words.iter().enumerate() {
+            let (function, constant) = match index {
+                0..=19 => ((b & c) | ((!b) & d), 0x5A82_7999_u32),
+                20..=39 => (b ^ c ^ d, 0x6ED9_EBA1_u32),
+                40..=59 => ((b & c) | (b & d) | (c & d), 0x8F1B_BCDC_u32),
+                _ => (b ^ c ^ d, 0xCA62_C1D6_u32),
+            };
+            let temporary = a
+                .rotate_left(5)
+                .wrapping_add(function)
+                .wrapping_add(e)
+                .wrapping_add(constant)
+                .wrapping_add(*word);
+            e = d;
+            d = c;
+            c = b.rotate_left(30);
+            b = a;
+            a = temporary;
+        }
+        h0 = h0.wrapping_add(a);
+        h1 = h1.wrapping_add(b);
+        h2 = h2.wrapping_add(c);
+        h3 = h3.wrapping_add(d);
+        h4 = h4.wrapping_add(e);
     }
-    let digest = String::from_utf8(output.stdout)
-        .context("git hash-object emitted non-UTF-8 output")?
-        .trim()
-        .to_owned();
-    if !is_lower_hex(&digest, 40) {
-        bail!("git hash-object returned an invalid Git blob SHA-1");
-    }
-    Ok(digest)
+
+    format!("{h0:08x}{h1:08x}{h2:08x}{h3:08x}{h4:08x}")
+}
+
+fn git_blob_sha1(raw: &[u8]) -> String {
+    let header = format!("blob {}\\0", raw.len());
+    let mut object = Vec::with_capacity(header.len() + raw.len());
+    object.extend_from_slice(header.as_bytes());
+    object.extend_from_slice(raw);
+    sha1_hex(&object)
 }
 
 fn is_lower_hex(value: &str, expected_len: usize) -> bool {
@@ -224,7 +263,9 @@ fn validate_relative_source_path(path: &str) -> Result<()> {
     }
     for component in path.split('/') {
         if component.is_empty() || component == "." || component == ".." {
-            bail!("source path contains an empty, current-directory, or parent-directory component");
+            bail!(
+                "source path contains an empty, current-directory, or parent-directory component"
+            );
         }
     }
     Ok(())
@@ -290,7 +331,7 @@ fn validate_snapshot(raw: &[u8]) -> Result<SourceSnapshot> {
             "SorryDB source SHA-256 mismatch: expected {SOURCE_SHA256}, received {actual_sha256}"
         );
     }
-    let actual_git_blob_sha1 = git_blob_sha1(raw)?;
+    let actual_git_blob_sha1 = git_blob_sha1(raw);
     if actual_git_blob_sha1 != SOURCE_GIT_BLOB_SHA1 {
         bail!(
             "SorryDB Git blob SHA-1 mismatch: expected {SOURCE_GIT_BLOB_SHA1}, received {actual_git_blob_sha1}"
@@ -421,7 +462,11 @@ fn run_self_test() -> Result<()> {
         bail!("self-test: reversed source span was accepted");
     }
     println!(
-        "PITB_SORRYDB_IMPORTER_SELF_TEST_PASS: pinned cohort constants, path safety, remote/commit/Lean tags, zero-based columns, and source-span controls"
+        "{}",
+        concat!(
+            "PITB_SORRYDB_IMPORTER_SELF_TEST_PASS: pinned cohort constants, path safety, ",
+            "remote/commit/Lean tags, zero-based columns, and source-span controls"
+        )
     );
     Ok(())
 }
@@ -482,7 +527,10 @@ fn run() -> Result<()> {
             fs::write(out_path, &encoded)
                 .with_context(|| format!("write PITB task manifest {}", out_path.display()))?;
             println!(
-                "PITB_SORRYDB_IMPORT_PASS: snapshot=SorryDB_2601 tasks={} repositories={} source_sha256={} manifest_sha256={}",
+                concat!(
+                    "PITB_SORRYDB_IMPORT_PASS: snapshot=SorryDB_2601 ",
+                    "tasks={} repositories={} source_sha256={} manifest_sha256={}"
+                ),
                 manifest.payload.task_count,
                 manifest.payload.project_count,
                 SOURCE_SHA256,
@@ -533,6 +581,18 @@ mod tests {
             end_column: 5,
         })
         .is_err());
+    }
+
+    #[test]
+    fn sha1_matches_known_digest_and_git_blob_object() {
+        assert_eq!(
+            sha1_hex(b"abc"),
+            "a9993e364706816aba3e25717850c26c9cd0d89d"
+        );
+        assert_eq!(
+            git_blob_sha1(b"abc"),
+            "f2ba8f84ab5c1bce84a7b441cb1959cfc7093b7f"
+        );
     }
 
     #[test]
