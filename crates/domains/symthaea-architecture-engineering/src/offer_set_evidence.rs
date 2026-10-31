@@ -606,7 +606,7 @@ mod tests {
         )).unwrap();
         let right = OfferSetStateArtifact::new(source_state(
             vec!["A".into(), "B".into()],
-            json!({"eligible": ["A", "B"], "verifier_epoch": 7}),
+            json!({"available_direction_ids": ["A", "B"], "new_proposal_allowed": true, "state": {"verifier_epoch": 7}}),
         )).unwrap();
         assert_eq!(left, right);
         assert_eq!(left.state.available_direction_ids, vec!["A", "B"]);
@@ -678,7 +678,7 @@ mod tests {
             0,
             vec!["A".into()],
             true,
-            json!({"eligible": ["A"], "verifier_epoch": 3}),
+            json!({"available_direction_ids": ["A"], "new_proposal_allowed": true, "state": {"verifier_epoch": 3}}),
         ).unwrap();
         let mut bundle = OfferSetEvidenceBundle::new(&event_tape, vec![state]).unwrap();
         bundle.state_artifacts[0].state.evaluator_state["state"]["verifier_epoch"] = json!(4);
