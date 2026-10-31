@@ -21,7 +21,9 @@
     "context_conditioned_fixed_reference_mixture_eprocess",
     "symthaea_hdc_score_plus_sequential_layer",
     "symthaea_liquid_score_plus_sequential_layer",
-    "context_conditioned_dkw_cctm_ons"
+    "context_conditioned_dkw_cctm_ons",
+    "dkw_fixed_reference_cctm_restarted_near_harmonic",
+    "dkw_fixed_reference_cctm_restarted_telescoping"
   ],
   "scenarios": [
     "stationary_null",
@@ -40,7 +42,16 @@
     "very_late_change_point_t_10000",
     "very_late_change_point_t_100000",
     "restart_lifetime_expiry",
-    "context_specific_interleaved_sequences"
+    "context_specific_interleaved_sequences",
+    "late_change_point_t_1000",
+    "late_change_point_t_1000000",
+    "small_effect_size_change",
+    "large_effect_size_change",
+    "benign_short_phase_shift",
+    "overlapping_window_dependency",
+    "burst_missingness_and_context_abstention",
+    "adversarial_workload_context_mimicry",
+    "low_reference_support_dkw_cost"
   ],
   "holdout_axes": [
     "execution",
@@ -69,7 +80,17 @@
     "late_changepoint_detection_delay",
     "restart_active_state_count",
     "restart_e_value_log10",
-    "restart_cpu_cost_per_observation"
+    "restart_cpu_cost_per_observation",
+    "late_change_delay_by_change_time",
+    "detection_delay_conditional_on_attack_effect",
+    "restart_state_age_distribution",
+    "restart_expiry_count",
+    "restart_weight_capital_reserve",
+    "cpu_cycles_per_accepted_observation",
+    "p95_incremental_decision_latency",
+    "p99_end_to_end_detection_latency",
+    "energy_per_monitored_device_hour",
+    "accepted_context_coverage"
   ],
   "aspirational_targets": {
     "p95_delay_reduction_vs_best_reproduced_baseline": 0.2,
@@ -84,7 +105,10 @@
     "alpha_budget_allocated_across_streams": true,
     "domain_pooling_forbidden": true,
     "random_window_confirmatory_claim_forbidden": true,
-    "targets_not_achievements": true
+    "targets_not_achievements": true,
+    "pfa_and_arl_not_conflated": true,
+    "finite_restart_lifetime_requires_predictable_kill": true,
+    "iid_or_conditional_superuniformity_required_for_sequential_guarantees": true
   },
   "reference_implementations": [
     {
@@ -103,6 +127,12 @@
         "utils_py": "a094f6a8bd1ab7e0cf9623e30d43b4b9bdbcc8ea"
       },
       "implementation_status": "source_pinned_metrics_and_execution_not_reproduced"
+    },
+    {
+      "id": "bhattacharyya_ramdas_restarted_conformal_martingales_paper",
+      "url": "https://arxiv.org/abs/2609.27179",
+      "version": "arXiv 2609.27179 (2026-09-23)",
+      "implementation_status": "paper_protocol_not_yet_reproduced"
     }
   ],
   "reference_calibration_design": {
