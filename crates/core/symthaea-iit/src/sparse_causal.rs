@@ -1369,6 +1369,12 @@ impl SparseBinaryCausalModel {
                 )
             };
 
+        crate::validate_certified_iit4_2023_system_phi(
+            phi_s,
+            certified_upper_bound,
+            config.decimal_precision,
+        )?;
+
         Ok(Iit4SystemPhiAnalysis {
             formalism: FormalismProfile::Iit4_0_2023,
             candidate_system: candidate_system.to_vec(),
