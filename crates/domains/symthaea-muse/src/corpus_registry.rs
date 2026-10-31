@@ -73,6 +73,7 @@ pub enum RightsDisposition {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RightsGrant {
     pub layer: RightsLayer,
     pub disposition: RightsDisposition,
@@ -110,6 +111,7 @@ pub enum ConsentDisposition {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CulturalProtocolEvidence {
     pub requirement: ConsentRequirement,
     pub disposition: ConsentDisposition,
@@ -145,6 +147,7 @@ pub enum LabelKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SourceLabel {
     pub kind: LabelKind,
     pub value: String,
@@ -165,6 +168,7 @@ pub enum WorkRelationKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct WorkRelation {
     pub related_artifact_id: String,
     pub relation: WorkRelationKind,
@@ -173,6 +177,7 @@ pub struct WorkRelation {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AlignmentEvidence {
     pub method: String,
     pub reference_modality: ArtifactModality,
@@ -188,6 +193,7 @@ pub struct AlignmentEvidence {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CorpusArtifactRecord {
     pub schema: String,
     pub corpus_id: String,
@@ -218,6 +224,7 @@ pub struct CorpusArtifactRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CorpusRegistrySnapshot {
     pub schema: String,
     pub artifact_count: usize,
@@ -234,6 +241,7 @@ pub struct EligibilityIssue {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EligibilityRequest {
     pub intended_use: IntendedUse,
     /// Jurisdiction for the planned use, not necessarily the source country.
@@ -408,14 +416,28 @@ pub fn validate_artifact_record(record: &CorpusArtifactRecord) -> Vec<Eligibilit
         }
     }
 
-    let mut seen_layers = BTreeSet::new();
+    let mut seen_layer_jurisdictions = Vec::<(RightsLayer, String)>::new();
     for grant in &record.rights {
-        if !seen_layers.insert(grant.layer) {
-            issues.push(issue(
-                "duplicate_rights_layer",
-                Some(grant.layer),
-                "rights layer must have one consolidated grant record per artifact".into(),
-            ));
+        for jurisdiction in &grant.jurisdictions {
+            let normalized = jurisdiction.trim().to_ascii_uppercase();
+            let overlaps = seen_layer_jurisdictions.iter().any(|(layer, existing)| {
+                *layer == grant.layer
+                    && (existing == WORLDWIDE_JURISDICTION
+                        || normalized == WORLDWIDE_JURISDICTION
+                        || *existing == normalized)
+            });
+            if overlaps {
+                issues.push(issue(
+                    "overlapping_rights_grant",
+                    Some(grant.layer),
+                    format!(
+                        "rights grants for {:?} overlap jurisdiction {}",
+                        grant.layer, jurisdiction
+                    ),
+                ));
+            } else {
+                seen_layer_jurisdictions.push((grant.layer, normalized));
+            }
         }
         if grant.jurisdictions.is_empty()
             || grant.jurisdictions.iter().any(|jurisdiction| jurisdiction.trim().is_empty())
@@ -563,11 +585,37 @@ pub fn evaluate_eligibility(
 
     let required = required_rights_layers(record.modality);
     for layer in &required {
-        let Some(grant) = record.rights.iter().find(|grant| grant.layer == *layer) else {
+        let layer_grants: Vec<_> = record
+            .rights
+            .iter()
+            .filter(|grant| grant.layer == *layer)
+            .collect();
+        if layer_grants.is_empty() {
             issues.push(issue(
                 "required_rights_layer_missing",
                 Some(*layer),
                 format!("no rights record for required layer {layer:?}"),
+            ));
+            continue;
+        }
+        let jurisdiction = request.jurisdiction.trim().to_ascii_uppercase();
+        let matching_grants: Vec<_> = layer_grants
+            .into_iter()
+            .filter(|grant| {
+                grant.jurisdictions.iter().any(|value| {
+                    value.trim().eq_ignore_ascii_case(WORLDWIDE_JURISDICTION)
+                        || value.trim().eq_ignore_ascii_case(&jurisdiction)
+                })
+            })
+            .collect();
+        let Some(grant) = matching_grants.first() else {
+            issues.push(issue(
+                "rights_jurisdiction_not_covered",
+                Some(*layer),
+                format!(
+                    "{layer:?} has rights records, but none covers requested jurisdiction {}",
+                    request.jurisdiction
+                ),
             ));
             continue;
         };
@@ -592,21 +640,6 @@ pub fn evaluate_eligibility(
             continue;
         }
 
-        let jurisdiction = request.jurisdiction.trim().to_ascii_uppercase();
-        let covers_jurisdiction = grant.jurisdictions.iter().any(|value| {
-            value.trim().eq_ignore_ascii_case(WORLDWIDE_JURISDICTION)
-                || value.trim().eq_ignore_ascii_case(&jurisdiction)
-        });
-        if !covers_jurisdiction {
-            issues.push(issue(
-                "rights_jurisdiction_not_covered",
-                Some(*layer),
-                format!(
-                    "{layer:?} evidence does not cover requested jurisdiction {}",
-                    request.jurisdiction
-                ),
-            ));
-        }
         if !grant.permitted_uses.contains(&request.intended_use) {
             issues.push(issue(
                 "intended_use_not_granted",
@@ -825,6 +858,41 @@ mod tests {
         assert!(result.issues.iter().any(|issue| {
             issue.code == "required_rights_layer_missing"
                 && issue.layer == Some(RightsLayer::Metadata)
+        }));
+    }
+
+    #[test]
+    fn rights_status_can_differ_by_jurisdiction_without_global_inference() {
+        let mut record = audio_record();
+        record.rights[0].jurisdictions = vec!["US".into()];
+        let us = evaluate_eligibility(&record, &research_request());
+        assert!(us.eligible);
+
+        let za = EligibilityRequest {
+            intended_use: IntendedUse::NonCommercialResearch,
+            jurisdiction: "ZA".into(),
+        };
+        let result = evaluate_eligibility(&record, &za);
+        assert!(!result.eligible);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == "rights_jurisdiction_not_covered"
+                && issue.layer == Some(RightsLayer::UnderlyingComposition)
+        }));
+    }
+
+    #[test]
+    fn overlapping_worldwide_and_country_grants_are_rejected_as_ambiguous() {
+        let mut record = audio_record();
+        let mut local = grant(
+            RightsLayer::SoundRecording,
+            vec![IntendedUse::NonCommercialResearch],
+        );
+        local.jurisdictions = vec!["US".into()];
+        record.rights.push(local);
+        let issues = validate_artifact_record(&record);
+        assert!(issues.iter().any(|issue| {
+            issue.code == "overlapping_rights_grant"
+                && issue.layer == Some(RightsLayer::SoundRecording)
         }));
     }
 
