@@ -229,6 +229,10 @@ pub struct AdjudicationPanelReportV1 {
     pub adjudicated_pair_count: u64,
     pub disputed_pair_count: u64,
     pub insufficient_evidence_pair_count: u64,
+    pub distinct_reviewer_count_total: u64,
+    pub distinct_independence_group_count_total: u64,
+    pub repeated_reviewer_assignments_across_pairs: u64,
+    pub repeated_independence_group_assignments_across_pairs: u64,
     pub pairs: Vec<PairAdjudicationSummaryV1>,
     pub reviewer_identity: String,
     pub independence_groups: String,
@@ -801,6 +805,10 @@ pub fn audit_blinded_adjudications(
     let mut observed_review_count = 0_u64;
     let mut disputed_pair_count = 0_u64;
     let mut insufficient_evidence_pair_count = 0_u64;
+    let mut all_reviewer_ids = BTreeSet::<String>::new();
+    let mut all_independence_groups = BTreeSet::<String>::new();
+    let mut reviewer_assignments = BTreeMap::<String, u64>::new();
+    let mut group_assignments = BTreeMap::<String, u64>::new();
 
     for pair in &packet.pairs {
         let pair_records = records_by_pair
@@ -830,6 +838,20 @@ pub fn audit_blinded_adjudications(
                     pair.pair_id, record.independence_group
                 ));
             }
+            all_reviewer_ids.insert(record.reviewer_pseudonym.clone());
+            all_independence_groups.insert(record.independence_group.clone());
+            let reviewer_count = reviewer_assignments
+                .entry(record.reviewer_pseudonym.clone())
+                .or_default();
+            *reviewer_count = reviewer_count
+                .checked_add(1)
+                .ok_or_else(|| "reviewer assignment counter overflow".to_owned())?;
+            let group_count = group_assignments
+                .entry(record.independence_group.clone())
+                .or_default();
+            *group_count = group_count
+                .checked_add(1)
+                .ok_or_else(|| "independence-group assignment counter overflow".to_owned())?;
             let decision = record.decision.as_str().to_owned();
             let count = decision_counts.entry(decision).or_default();
             *count = count
@@ -880,6 +902,21 @@ pub fn audit_blinded_adjudications(
         return Err("adjudication panel contains an unexpected pair grouping".to_owned());
     }
 
+    let repeated_reviewer_assignments_across_pairs = reviewer_assignments
+        .values()
+        .try_fold(0_u64, |total, count| {
+            total
+                .checked_add(count.saturating_sub(1))
+                .ok_or_else(|| "repeated reviewer assignment counter overflow".to_owned())
+        })?;
+    let repeated_independence_group_assignments_across_pairs = group_assignments
+        .values()
+        .try_fold(0_u64, |total, count| {
+            total
+                .checked_add(count.saturating_sub(1))
+                .ok_or_else(|| "repeated independence-group assignment counter overflow".to_owned())
+        })?;
+
     Ok(AdjudicationPanelReportV1 {
         schema: ADJUDICATION_REPORT_SCHEMA.to_owned(),
         valid: true,
@@ -894,6 +931,12 @@ pub fn audit_blinded_adjudications(
             .ok_or_else(|| "adjudicated-pair count underflow".to_owned())?,
         disputed_pair_count,
         insufficient_evidence_pair_count,
+        distinct_reviewer_count_total: u64::try_from(all_reviewer_ids.len())
+            .map_err(|_| "distinct reviewer count overflow")?,
+        distinct_independence_group_count_total: u64::try_from(all_independence_groups.len())
+            .map_err(|_| "distinct independence-group count overflow")?,
+        repeated_reviewer_assignments_across_pairs,
+        repeated_independence_group_assignments_across_pairs,
         pairs: summaries,
         reviewer_identity: "pseudonymous_self_declared_not_authenticated".to_owned(),
         independence_groups: "declared_distinct_per_pair_not_independently_verified".to_owned(),
@@ -1153,6 +1196,10 @@ mod tests {
         assert!(report.valid);
         assert_eq!(report.pair_count, 16);
         assert_eq!(report.observed_review_count, 48);
+        assert_eq!(report.distinct_reviewer_count_total, 3);
+        assert_eq!(report.distinct_independence_group_count_total, 3);
+        assert_eq!(report.repeated_reviewer_assignments_across_pairs, 45);
+        assert_eq!(report.repeated_independence_group_assignments_across_pairs, 45);
         assert_eq!(report.disputed_pair_count, 0);
         assert_eq!(report.insufficient_evidence_pair_count, 0);
         assert_eq!(report.reviewer_identity, "pseudonymous_self_declared_not_authenticated");
