@@ -143,3 +143,70 @@ All targets require independent-group support, preregistered thresholds and exac
 ## 8. Claim ceiling
 
 The receipt validates fixed-reference monitor mechanics on supplied inputs. It does not prove conditional super-uniformity, temporal independence, false-alarm control, attack-effect detection, SOTA superiority, cross-platform transfer or hardware security. The algorithm is an experimental candidate awaiting benchmark and theorem-level qualification.
+
+## 9. DKW-corrected CCTM implementation
+
+The stronger v1 candidate is implemented separately in `examples/hardsec_context_cctm_monitor.rs` (harness feature `hardsec-context-cctm-monitor`). It follows the published paper's equations (6)–(8) and Algorithms 1–2 rather than treating a fixed-reference ECDF rank as automatically valid.
+
+For context (c), it computes the fixed-reference ECDF value:
+
+[
+\hat p_t=\hat F_{0,c}(X_t)=\frac{1}{n_c}\sum_{i=1}^{n_c}\mathbf{1}\{X^0_{i,c}\leq X_t\}.
+]
+
+It constructs a DKW band with total reference-confidence budget (delta), allocated as (delta_c=delta/K) across (K) predeclared contexts:
+
+[
+\epsilon_c=\sqrt{\frac{\ln(2/\delta_c)}{2n_c}},\qquad
+C_c=\frac{1}{0.5+\sqrt{1+k^2}\,\epsilon_c}.
+]
+
+The corrected bet is:
+
+[
+b_t=1+C_c\left(\eta_t(\hat p_t-0.5)-\sqrt{\eta_t^2+k^2}\,\epsilon_c\right).
+]
+
+The ONS update is predictable: use (eta_t) for the current bet, then calculate
+
+[
+g'_t=C_c\left(\hat p_t-0.5-\frac{\eta_t}{\sqrt{\eta_t^2+k^2}}\epsilon_c\right),\quad
+z_t=\frac{g'_t}{b_t},\quad
+a_t=a_{t-1}+z_t^2,
+]
+[
+\eta_{t+1}=\operatorname{clip}\left(\eta_t+\frac{4z_t}{a_t},-0.5,0.5\right).
+]
+
+Each context has a separate wealth process with (alpha_c=alpha/K); the DKW failure budget is also divided by context. Under the paper's within-context i.i.d. null/reference assumptions and externally assigned contexts, a union bound composes the finite context family. The output reports the theorem's conditional structure and the corresponding (alpha+delta) unconditional upper-bound implication, but keeps every assumption unverified.
+
+**Scope warning:** the paper's null is an i.i.d. score stream (X_t\sim P_c) within each context, with i.i.d. calibration scores from the same (P_c). It is not a theorem for arbitrary autocorrelated telemetry. PMU windows from a single execution may violate these assumptions badly. The 600 synthetic reference rows are assigned unique synthetic group IDs to test the contract; this does not establish independence in a physical dataset.
+
+### Paper/official-code parity
+
+The paper's HTML v2 Algorithm 2 specifies the ONS step (4z_t/a_t) and equation (8) uses (C=1/(0.5+\sqrt{1+k^2}\epsilon)). The authors' public Python `optimization.py` currently uses a different step coefficient (2/(2-\log 3)), and `utils.py` uses (1/(0.5+(1+k)\epsilon)). This Rust executable follows the published equation/algorithm, not byte-for-byte parity with that Python implementation. A parity/reproduction comparison is required before describing it as a faithful port of the authors' software package. See the [paper](https://arxiv.org/html/2602.13848) and [official implementation](https://github.com/shaersh/cctm).
+
+CCTM fixture:
+- Plan: `schemas/hardsec-context-cctm-plan-v1.schema.json`
+- Stream: `schemas/hardsec-context-cctm-stream-v1.schema.json`
+- Fixtures: `tests/fixtures/hardsec/context-cctm-v1/plan.json` and `stream.json`
+- 600 declared reference rows per context; two contexts; 18 total stream records.
+- Synthetic sequence crosses the compute-context alpha boundary at stream index 15; stale telemetry, unseen context and untrusted sensor records abstain.
+- Fifteen authored Rust tests cover DKW width, (alpha/delta) allocation, ONS bounds, reference-group separation, invalid inputs and the known answer.
+
+Run:
+
+```bash
+cargo test --locked \
+  --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml \
+  --features hardsec-context-cctm-monitor \
+  --example hardsec_context_cctm_monitor
+
+cargo run --locked \
+  --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml \
+  --features hardsec-context-cctm-monitor \
+  --example hardsec_context_cctm_monitor -- \
+  --plan tests/fixtures/hardsec/context-cctm-v1/plan.json \
+  --stream tests/fixtures/hardsec/context-cctm-v1/stream.json \
+  --receipt /tmp/hardsec-019-cctm-receipt.json
+```
