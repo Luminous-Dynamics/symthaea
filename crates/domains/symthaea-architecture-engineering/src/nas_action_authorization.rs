@@ -1337,7 +1337,7 @@ mod tests {
             &[0.0, 0.0],
             &HypervolumeQmcConfig {
                 samples_per_replicate: 4096,
-                scramble_replicates: 16,
+                scramble_replicates: 128,
                 seed: 19,
             },
         )
