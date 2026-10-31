@@ -30,11 +30,11 @@
     "benchmark_executed": false,
     "hardware_energy_measured": false,
     "result_values_present": false,
-    "generator_scope": "Implemented Rust generators: T1 always-on sparse event/quiet idle, T2 delayed cue, T3/T4 multiscale forecasting/change-point with delayed feedback, T5 irregular-time/missingness, T6 selective retention/invalidation, T8 BrainTrace DMS task semantics, T9 BrainTrace evidence-accumulation task semantics. T7 phase prediction, burst-cluster variants, and the full nine-task runner remain unimplemented.",
+    "generator_scope": "Prototype Rust generators are authored for all nine task families: T1 sparse event/quiet idle, T2 delayed cue, T3/T4 multiscale forecast/change-point, T5 irregular/missingness, T6 selective retention/invalidation, T7 phase prediction, T8 BrainTrace DMS semantics, T9 BrainTrace evidence accumulation. T1 burst clusters, sinusoidal/frequency-sweep T7 extensions, runner/oracle isolation, datasets, and system measurements remain unimplemented.",
     "rust_tests_authored": true,
     "oracle_trace_verifier_implemented": true,
     "oracle_process_isolation_implemented": false,
-    "rust_tests_authored_count": 122,
+    "rust_tests_authored_count": 139,
     "rust_tests_by_file": {
       "research/temporal-bench/src/digest.rs": 2,
       "research/temporal-bench/src/lib.rs": 16,
@@ -43,7 +43,8 @@
       "research/temporal-bench/src/evidence.rs": 17,
       "research/temporal-bench/src/irregular.rs": 13,
       "research/temporal-bench/src/retention.rs": 15,
-      "research/temporal-bench/src/fast_event.rs": 21
+      "research/temporal-bench/src/fast_event.rs": 21,
+      "research/temporal-bench/src/phase.rs": 17
     },
     "cryptographic_stream_digest_implemented": true,
     "reference_generators": {
@@ -54,7 +55,7 @@
       "fast_event": true,
       "irregular_missingness": true,
       "selective_retention": true,
-      "phase_prediction": false
+      "phase_prediction": true
     },
     "cryptographic_oracle_digest_implemented": true,
     "signed_evaluator_receipt_implemented": false
@@ -305,11 +306,28 @@
         ]
       },
       "primary_metrics": [
-        "phase_error",
-        "next_event_error",
-        "forecast_error_by_horizon"
+        "circular_phase_error_p50_p95_p99_permille",
+        "next_rising_crossing_absolute_error_p50_p95_p99_us",
+        "worst_case_phase_error",
+        "worst_case_next_event_error_us"
       ],
-      "oracle": "Exact oscillator phase and event times"
+      "oracle": "Exact oscillator phase and event times",
+      "implementation_status": "Rust fixed-point periodic/phase/frequency-shift generator, exact next-crossing oracle, SHA-256 task/oracle digests, semantic verifier, circular phase/absolute crossing-error scorer authored; not compiled or executed",
+      "generator": {
+        "path": "research/temporal-bench/src/phase.rs",
+        "reference_slots": 4096,
+        "sample_interval_us": 1000,
+        "base_period_us": 64000,
+        "modes": [
+          "stable",
+          "phase_shift",
+          "frequency_shift",
+          "mixed"
+        ],
+        "waveform": "fixed-point triangle oscillator",
+        "phase_target": "circular phase permille and exact next rising zero-crossing timestamp",
+        "description": "Synthetic deterministic phase/timing control; not a sinusoidal Fourier benchmark or external dataset reproduction."
+      }
     },
     {
       "id": "T8_BRAINTRACE_DMS",
