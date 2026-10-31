@@ -86,6 +86,7 @@ impl Table {
 #[derive(Clone, Debug)]
 struct AgentCase {
     task: String,
+    payload: String,
 }
 
 #[derive(Clone, Debug)]
@@ -226,7 +227,7 @@ fn load_agent(input: &str) -> Result<HashMap<String, AgentCase>, String> {
             return Err(format!("agent input: case {id} task column does not match payload_json"));
         }
 
-        if cases.insert(id.clone(), AgentCase { task }).is_some() {
+        if cases.insert(id.clone(), AgentCase { task, payload }).is_some() {
             return Err(format!("agent input: duplicate case_id {id:?}"));
         }
     }
@@ -330,6 +331,9 @@ fn audit_inputs(
 
     let mut pairs: HashMap<String, Vec<&OracleCase>> = HashMap::new();
     for item in oracle.values() {
+        let agent_case = agent.get(&item.id)
+            .ok_or_else(|| format!("agent input is missing case {:?}", item.id))?;
+        scm_oracle::validate_agent_payload(&item.family, &agent_case.payload)?;
         let projection = scm_oracle::projection_for_family(&item.family)?;
         if item.causal_status != projection.causal_status
             || item.expected_transfer != projection.expected_transfer
@@ -361,6 +365,11 @@ fn audit_inputs(
         if anchor_agent.task != control_agent.task {
             return Err(format!("pair {pair_id:?} changes the task prompt"));
         }
+        scm_oracle::validate_irrelevant_pair(
+            &anchor.family,
+            &anchor_agent.payload,
+            &control_agent.payload,
+        )?;
         if anchor.family != control.family
             || anchor.causal_status != control.causal_status
             || anchor.expected_transfer != control.expected_transfer
