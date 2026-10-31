@@ -6,12 +6,12 @@ This standalone Rust crate is the first executable fault-injection slice for iss
 
 ~~~sh
 cargo test --manifest-path research/poar-rx-lab/Cargo.toml
-cargo run --manifest-path research/poar-rx-lab/Cargo.toml
+cargo run --manifest-path research/poar-rx-lab/Cargo.toml --bin poar-rx-lab
 cargo fmt --manifest-path research/poar-rx-lab/Cargo.toml -- --check
 cargo clippy --manifest-path research/poar-rx-lab/Cargo.toml --all-targets -- -D warnings
 ~~~
 
-The runner emits a tab-separated matrix over three controller policies, four deterministic fault schedules, and two tool idempotency contracts.
+The default runner emits a tab-separated single-action matrix over three controller policies, four deterministic fault schedules, and two tool idempotency contracts.
 
 ## Compared policies
 
@@ -44,6 +44,16 @@ An acknowledged retry can therefore be a false completion even when the transpor
 
 ## Current claim boundary
 
-This v0.1 simulator is deliberately narrow. It does not model concurrent writers, permission revocation, partial multi-target commits, compensation, crash consistency, durable journals, tool-schema drift, network partitions, or arbitrary external side effects. It is not a production adapter, a protected benchmark service, or evidence of a Symthaea SOTA result. The simulator's oracle is the local effect store and is not hidden from a local experiment runner.
+This v0.1 single-action simulator is deliberately narrow. It is not a production adapter, a protected benchmark service, or evidence of a Symthaea SOTA result. Its oracle is local to the simulator.
 
-The next tranche should add deterministic paired multi-action workflows, crash-point replay, permission revocation, stale preconditions and concurrent mutation, partial commit, and compensation failure; then add ablations for journal, reconciliation, and proof-gate removal. Those should remain separate report columns and use held-out action and fault families.
+## Two-target workflow experiment
+
+The additional `workflow` module compares blind whole-workflow replay, saga compensation, and proof-gated reconciliation over eight deterministic fault families and two compensation-authorization states (48 rows). It detects lost concurrent updates, unauthorized effects, duplicate logical writes, false completion and failed compensation. See `research/pod-meta-lab/POAR_RX_PARALLEL_WORKFLOW_V1.md` for the protocol, external comparisons, metrics and claim limits.
+
+Run it with:
+
+~~~sh
+cargo run --manifest-path research/poar-rx-lab/Cargo.toml --bin poar-rx-workflow-matrix
+~~~
+
+The two-target simulator is still a deterministic microbenchmark. It does not model durable crash consistency, real distributed systems, real IAM, arbitrary asynchronous workflows or production external APIs. It uses a public local oracle; no general recovery or SOTA claim follows from it.
