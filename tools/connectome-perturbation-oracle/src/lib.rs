@@ -31,6 +31,26 @@ pub struct Network {
     pub edges: Vec<Edge>,
 }
 
+/// A declared extrasynaptic/latent coupling kept separate from anatomical edges.
+///
+/// This is a phenomenological model term. Its presence does not identify a
+/// peptide, receptor, or any specific biological mechanism.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ExtrasynapticCoupling {
+    pub source: usize,
+    pub target: usize,
+    pub weight: f64,
+    pub delay: usize,
+}
+
+/// A model that keeps direct anatomical routes and extrasynaptic terms typed
+/// separately. Structural graph queries must use the anatomy field only.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CouplingModel {
+    pub anatomy: Network,
+    pub extrasynaptic: Vec<ExtrasynapticCoupling>,
+}
+
 /// Node-major state values indexed as values[epoch][node].
 #[derive(Debug, Clone, PartialEq)]
 pub struct Trajectory {
@@ -176,6 +196,65 @@ pub fn simulate(
     }
 
     Ok(Trajectory { values })
+}
+
+fn combined_model_network(model: &CouplingModel) -> Result<Network, OracleError> {
+    let mut edges = model.anatomy.edges.clone();
+    for coupling in &model.extrasynaptic {
+        if coupling.source >= model.anatomy.node_count {
+            return Err(OracleError::NodeOutOfRange {
+                node: coupling.source,
+                node_count: model.anatomy.node_count,
+            });
+        }
+        if coupling.target >= model.anatomy.node_count {
+            return Err(OracleError::NodeOutOfRange {
+                node: coupling.target,
+                node_count: model.anatomy.node_count,
+            });
+        }
+        if coupling.delay == 0 {
+            return Err(OracleError::ZeroDelay);
+        }
+        if !coupling.weight.is_finite() {
+            return Err(OracleError::NonFiniteParameter);
+        }
+        edges.push(Edge {
+            source: coupling.source,
+            target: coupling.target,
+            weight: coupling.weight,
+            delay: coupling.delay,
+        });
+    }
+    Ok(Network {
+        node_count: model.anatomy.node_count,
+        edges,
+    })
+}
+
+/// Simulate a declared phenomenological model with extrasynaptic terms.
+///
+/// The anatomical graph remains separately accessible on the model. Callers
+/// must not write extrasynaptic terms back as structural edges.
+pub fn simulate_with_extrasynaptic(
+    model: &CouplingModel,
+    horizon: usize,
+    inputs: &[Injection],
+) -> Result<Trajectory, OracleError> {
+    let combined = combined_model_network(model)?;
+    simulate(&combined, horizon, inputs)
+}
+
+/// Paired intervention replay for a model with distinct anatomical and
+/// extrasynaptic channels. Only the intervention differs between the arms.
+pub fn intervention_effect_with_extrasynaptic(
+    model: &CouplingModel,
+    horizon: usize,
+    baseline_inputs: &[Injection],
+    intervention: Injection,
+) -> Result<Trajectory, OracleError> {
+    let combined = combined_model_network(model)?;
+    intervention_effect(&combined, horizon, baseline_inputs, intervention)
 }
 
 /// Estimate a paired finite-horizon intervention response by subtracting
@@ -820,6 +899,76 @@ mod tests {
         assert_eq!(
             pairwise_edge_reachability_interaction(&network, 2, 0, 0, 1),
             Err(OracleError::BaselineQueryUnreachable)
+        );
+    }
+
+
+    #[test]
+    fn extrasynaptic_effect_can_exist_without_an_anatomical_direct_edge() {
+        let model = CouplingModel {
+            anatomy: make_network(2, &[]),
+            extrasynaptic: vec![ExtrasynapticCoupling {
+                source: 0,
+                target: 1,
+                weight: 0.4,
+                delay: 1,
+            }],
+        };
+        assert!(!directed_path_exists(&model.anatomy, 0, 1, &[]).unwrap());
+
+        let effect = intervention_effect_with_extrasynaptic(
+            &model,
+            4,
+            &[],
+            Injection {
+                node: 0,
+                epoch: 0,
+                amplitude: 2.0,
+            },
+        )
+        .unwrap();
+        assert_eq!(effect.node_trace(1).unwrap(), trace(&[0.0, 0.8, 0.0, 0.0]));
+    }
+
+    #[test]
+    fn anatomy_only_simulation_does_not_silently_include_extrasynaptic_terms() {
+        let model = CouplingModel {
+            anatomy: make_network(2, &[]),
+            extrasynaptic: vec![ExtrasynapticCoupling {
+                source: 0,
+                target: 1,
+                weight: 1.0,
+                delay: 1,
+            }],
+        };
+        let input = [Injection {
+            node: 0,
+            epoch: 0,
+            amplitude: 1.0,
+        }];
+        let anatomical = simulate(&model.anatomy, 3, &input).unwrap();
+        let extended = simulate_with_extrasynaptic(&model, 3, &input).unwrap();
+        assert_eq!(anatomical.node_trace(1).unwrap(), trace(&[0.0, 0.0, 0.0]));
+        assert_eq!(extended.node_trace(1).unwrap(), trace(&[0.0, 1.0, 0.0]));
+    }
+
+    #[test]
+    fn invalid_extrasynaptic_coupling_fails_closed() {
+        let model = CouplingModel {
+            anatomy: make_network(2, &[]),
+            extrasynaptic: vec![ExtrasynapticCoupling {
+                source: 0,
+                target: 2,
+                weight: 1.0,
+                delay: 1,
+            }],
+        };
+        assert_eq!(
+            simulate_with_extrasynaptic(&model, 3, &[]),
+            Err(OracleError::NodeOutOfRange {
+                node: 2,
+                node_count: 2
+            })
         );
     }
 
