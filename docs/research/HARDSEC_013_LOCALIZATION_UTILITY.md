@@ -205,7 +205,8 @@ The first semantic auditor is implemented at `examples/hardsec_localization_audi
 - hashes exact explanation, graph and oracle bytes;
 - computes a canonical node/edge-map digest;
 - verifies design and source identity bindings;
-- rejects unknown candidate nodes/edges, duplicate region IDs/ranks, duplicate graph IDs and discontinuous retained paths;
+- rejects unknown candidate nodes/edges, candidate edges whose endpoints fall outside their declared region, duplicate region IDs/ranks, duplicate graph IDs and discontinuous retained paths;
+- validates model, explainer and threshold digests, decision score bounds and supported path-coverage states;
 - checks retained declared paths against the separately supplied reference-path oracle;
 - only permits a `complete` path-coverage claim when the caller declares the oracle reference-path set complete and every supplied reference path is matched;
 - reports insertion-footprint precision/recall over region, gate or edge review budgets, including a fixed review-budget curve;
@@ -231,7 +232,7 @@ The receipt's score is an evaluator result, not a `pass`. The tool does not pars
 
 The known-answer fixture labels nodes `g17` and `g18` as insertion-footprint positives; the top-ranked candidate region contains both, yielding precision 1.0 and recall 2/3 at a one-region review budget. A separate benign decoy region is included. This is synthetic evaluator-mechanics evidence only.
 
-Fourteen focused unit tests are authored for known-answer scoring, source digest mutation, unknown node mutation, discontinuous paths, incomplete-oracle completeness claims, causal-claim rejection, duplicate ranks, unknown oracle labels, retained-path mismatch, edge review budgets, unknown path handling, exact complete-path matching, empty path sets and review-curve emission. The dedicated workflow runs rustfmt, the locked Cargo suite and the known-answer CLI receipt assertion.
+Eighteen focused unit tests are authored for known-answer scoring, source digest mutation, unknown node mutation, candidate-region endpoint mismatch, malformed model digest, out-of-range decision score, unsupported path-coverage state, discontinuous paths, incomplete-oracle completeness claims, causal-claim rejection, duplicate ranks, unknown oracle labels, retained-path mismatch, edge review budgets, unknown path handling, exact complete-path matching, empty path sets and review-curve emission. The dedicated workflow runs rustfmt, the locked Cargo suite and the known-answer CLI receipt assertion.
 
 The JSON schemas describe record shape; the semantic auditor is responsible for cross-record ID/path checks. Neither alone proves the truth or authority of source lineage, labels, equivalence certificates or completeness statements.
 
