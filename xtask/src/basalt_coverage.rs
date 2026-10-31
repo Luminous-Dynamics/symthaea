@@ -39,6 +39,9 @@ pub struct CoverageCounts {
     pub required_channels: usize,
     pub assessed_channels: usize,
     pub required_event_kinds: usize,
+    pub required_root_classes: usize,
+    pub assessed_root_classes: usize,
+    pub monitored_roots: usize,
     pub observed_event_kinds: usize,
     pub unresolved_event_kinds: usize,
     pub excluded_event_kinds: usize,
@@ -63,6 +66,7 @@ struct Profile {
     platform: PlatformConstraints,
     allowed_controls: Vec<String>,
     required_controls: Vec<String>,
+    root_classes: Vec<String>,
     channels: Vec<ProfileChannel>,
 }
 
@@ -120,9 +124,19 @@ struct CaptureEnvelope {
     end_monotonic_ns: u64,
     root_pid: u32,
     process_tree_closed: bool,
-    monitored_roots: Vec<String>,
+    root_scopes: Vec<RootScopeAssessment>,
     snapshot_manifest_digest: String,
     snapshot_consistency: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RootScopeAssessment {
+    class_id: String,
+    paths: Vec<String>,
+    status: String,
+    manifest_digest: Option<String>,
+    reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -233,11 +247,12 @@ pub fn audit_bytes(profile_bytes: &[u8], receipt_bytes: &[u8]) -> CoverageAuditR
             || receipt.platform.kernel_build_id.as_deref().is_some_and(|value| !value.trim().is_empty()))
         && (!profile.platform.require_kernel_btf_digest
             || receipt.platform.kernel_btf_digest.as_deref().is_some_and(valid_digest));
+    let root_scopes_complete = validate_root_scopes(&profile, &receipt, &mut report);
     let capture_complete = receipt.capture.start_monotonic_ns < receipt.capture.end_monotonic_ns
         && receipt.capture.root_pid > 0
         && receipt.capture.process_tree_closed
         && receipt.capture.snapshot_consistency == "stable"
-        && !receipt.capture.monitored_roots.is_empty();
+        && root_scopes_complete;
     let health_clean = receipt.health.event_count > 0
         && receipt.health.dropped_event_count == 0
         && receipt.health.ring_buffer_overflow_count == 0
@@ -324,6 +339,14 @@ fn validate_profile(profile: &Profile, report: &mut CoverageAuditReport) {
         push_error(report, "E_PROFILE_ARCH_DUPLICATE", "profile.platform.architectures", "supported architectures must be unique");
     }
 
+    let root_classes: BTreeSet<&str> = profile.root_classes.iter().map(String::as_str).collect();
+    if profile.root_classes.is_empty() || profile.root_classes.len() > 32
+        || root_classes.len() != profile.root_classes.len()
+        || profile.root_classes.iter().any(|class_id| !valid_identifier(class_id))
+    {
+        push_error(report, "E_PROFILE_ROOT_CLASSES", "profile.root_classes", "profile must define 1..=32 unique valid root classes");
+    }
+
     let mut channel_ids = BTreeSet::new();
     let mut total_events = 0usize;
     for (index, channel) in profile.channels.iter().enumerate() {
@@ -384,8 +407,12 @@ fn validate_receipt_shape(receipt: &Receipt, report: &mut CoverageAuditReport) {
     if receipt.channels.len() > MAX_CHANNELS {
         push_error(report, "E_RECEIPT_CHANNEL_LIMIT", "receipt.channels", "receipt exceeds 64 channels");
     }
-    if receipt.capture.monitored_roots.len() > MAX_ROOTS {
-        push_error(report, "E_ROOT_LIMIT", "receipt.capture.monitored_roots", "receipt exceeds 1024 monitored roots");
+    if receipt.capture.root_scopes.len() > 32 {
+        push_error(report, "E_ROOT_CLASS_LIMIT", "receipt.capture.root_scopes", "receipt exceeds 32 root-class assessments");
+    }
+    let path_count: usize = receipt.capture.root_scopes.iter().map(|scope| scope.paths.len()).sum();
+    if path_count > MAX_ROOTS {
+        push_error(report, "E_ROOT_LIMIT", "receipt.capture.root_scopes", "receipt exceeds 1024 monitored root paths");
     }
 }
 
@@ -428,13 +455,65 @@ fn validate_capture(receipt: &Receipt, report: &mut CoverageAuditReport) {
     if capture.snapshot_consistency != "stable" && capture.snapshot_consistency != "raced" && capture.snapshot_consistency != "unknown" {
         push_error(report, "E_SNAPSHOT_STATE", "receipt.capture.snapshot_consistency", "snapshot_consistency must be stable, raced or unknown");
     }
-    let mut roots = BTreeSet::new();
-    for (index, root) in capture.monitored_roots.iter().enumerate() {
-        if !valid_absolute_root(root) || !roots.insert(root.as_str()) {
-            push_error(report, "E_MONITORED_ROOT", &format!("receipt.capture.monitored_roots[{index}]"), "monitored roots must be unique normalized absolute paths without dot or parent components");
+    // Root classes are checked separately against the pinned profile below.
+
+}
+
+fn validate_root_scopes(profile: &Profile, receipt: &Receipt, report: &mut CoverageAuditReport) -> bool {
+    let expected: BTreeSet<&str> = profile.root_classes.iter().map(String::as_str).collect();
+    let mut seen = BTreeSet::new();
+    let mut complete = expected.len() == profile.root_classes.len() && !expected.is_empty();
+    for (index, scope) in receipt.capture.root_scopes.iter().enumerate() {
+        let path = format!("receipt.capture.root_scopes[{index}]");
+        if !expected.contains(scope.class_id.as_str()) {
+            push_error(report, "E_UNKNOWN_ROOT_CLASS", &format!("{path}.class_id"), "root class is not declared by the pinned profile");
+            complete = false;
+            continue;
+        }
+        if !seen.insert(scope.class_id.as_str()) {
+            push_error(report, "E_DUPLICATE_ROOT_CLASS", &format!("{path}.class_id"), "each required root class must be assessed exactly once");
+            complete = false;
+            continue;
+        }
+        let mut unique_paths = BTreeSet::new();
+        for (path_index, root) in scope.paths.iter().enumerate() {
+            if !valid_absolute_root(root) || !unique_paths.insert(root.as_str()) {
+                push_error(report, "E_MONITORED_ROOT", &format!("{path}.paths[{path_index}]"), "root paths must be unique normalized absolute paths without dot or parent components");
+            }
+        }
+        match scope.status.as_str() {
+            "monitored" => {
+                if scope.paths.is_empty()
+                    || !scope.manifest_digest.as_deref().is_some_and(valid_digest)
+                    || scope.reason.is_some()
+                {
+                    push_error(report, "E_MONITORED_ROOT_WITNESS", &path, "monitored root classes require paths and a manifest digest, with no downgrade reason");
+                    complete = false;
+                } else {
+                    report.counts.monitored_roots += scope.paths.len();
+                }
+            }
+            "unresolved" | "excluded" => {
+                if scope.reason.as_deref().is_none_or(|reason| reason.trim().is_empty() || reason.len() > 1024)
+                    || scope.manifest_digest.is_some()
+                {
+                    push_error(report, "E_ROOT_SCOPE_DOWNGRADE", &path, "unresolved/excluded root classes require a reason and must not claim a manifest digest");
+                }
+                complete = false;
+            }
+            _ => {
+                push_error(report, "E_ROOT_SCOPE_STATUS", &format!("{path}.status"), "root scope status must be monitored, unresolved or excluded");
+                complete = false;
+            }
         }
     }
-    report.counts.monitored_roots = roots.len();
+    for missing in expected.difference(&seen) {
+        push_error(report, "E_ROOT_CLASS_MISSING", "receipt.capture.root_scopes", &format!("required root class {missing} is not assessed"));
+        complete = false;
+    }
+    report.counts.required_root_classes = expected.len();
+    report.counts.assessed_root_classes = seen.len();
+    complete
 }
 
 fn validate_channels(profile: &Profile, receipt: &Receipt, report: &mut CoverageAuditReport) {
@@ -587,6 +666,15 @@ mod tests {
                 "sandbox_policy_binding",
                 "snapshot_manifest_binding"
             ],
+            "root_classes": [
+                "workspace",
+                "toolchain_and_sysroot",
+                "build_output_and_cache",
+                "temporary_filesystems",
+                "home_and_user_config",
+                "procfs_sysfs",
+                "devices_and_mounts"
+            ],
             "channels": [
                 {"channel_id":"filesystem","required_event_kinds":["content_read","metadata_read","directory_enumeration","symlink_target","mmap_access","namespace_mutation"]},
                 {"channel_id":"process","required_event_kinds":["process_exec","child_start","child_exit","argv_cwd","inherited_fd"]},
@@ -639,7 +727,26 @@ mod tests {
                 "end_monotonic_ns":200,
                 "root_pid":123,
                 "process_tree_closed":true,
-                "monitored_roots":["/workspace","/nix/store"],
+                "root_scopes":profile["root_classes"].as_array().unwrap().iter().map(|class_id| {
+                    let class = class_id.as_str().unwrap();
+                    let paths: Vec<&str> = match class {
+                        "workspace" => vec!["/workspace"],
+                        "toolchain_and_sysroot" => vec!["/nix/store"],
+                        "build_output_and_cache" => vec!["/workspace/target"],
+                        "temporary_filesystems" => vec!["/tmp"],
+                        "home_and_user_config" => vec!["/home/basalt"],
+                        "procfs_sysfs" => vec!["/proc", "/sys"],
+                        "devices_and_mounts" => vec!["/dev", "/run"],
+                        _ => Vec::new()
+                    };
+                    json!({
+                        "class_id":class,
+                        "paths":paths,
+                        "status":"monitored",
+                        "manifest_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                        "reason":null
+                    })
+                }).collect::<Vec<_>>(),
                 "snapshot_manifest_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 "snapshot_consistency":"stable"
             },
@@ -760,7 +867,7 @@ mod tests {
     fn rejects_invalid_capture_interval_or_root_path() {
         for (field, value_set) in [
             ("end_monotonic_ns",json!(100)),
-            ("monitored_roots",json!(["/workspace/../etc"]))
+            ("root_scopes",json!([{"class_id":"workspace","paths":["/workspace/../etc"],"status":"monitored","manifest_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","reason":null}]))
         ] {
             let (profile, receipt) = encoded_pair("complete_within_profile");
             let mut value: Value = serde_json::from_slice(&receipt).unwrap();
