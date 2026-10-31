@@ -45,7 +45,7 @@ For each scenario × budget × policy, the JSON report emits:
 - fraction of episodes selecting the predeclared exploit pocket;
 - candidate-query count per episode and uniform-grid prediction MSE.
 
-The prediction MSE is descriptive only. It is never substituted for selected-action error, realized utility or regret.
+Direct-policy and oracle controls have no model score or optimizer-optimism value; those report fields are null, not copied from environment truth. The prediction MSE is descriptive only. It is never substituted for selected-action error, realized utility or regret. The five-head policy's larger head-evaluation count is a real compute cost and must be included in any quality/cost comparison.
 
 ## Execution
 
