@@ -254,6 +254,7 @@ struct SparseEq4PosteriorContext {
 struct SparseIit4ScoringBaseline {
     posterior: SparseEq4PosteriorContext,
     cause_forward: SparseEq4Report,
+    cause_forward_receipt_sha256: String,
     cause_selectivity: Vec<f64>,
     effect_selectivity: Vec<f64>,
 }
@@ -263,6 +264,7 @@ struct SparseIit4ScoringBaseline {
 #[derive(Debug, Clone)]
 struct SparseIit4PartitionTerms {
     partitioned_cause: SparseEq4Report,
+    partitioned_cause_receipt_sha256: String,
     effect_partitioned: Vec<f64>,
     severed_connections: usize,
 }
@@ -646,6 +648,7 @@ impl SparseBinaryCausalModel {
             &posterior,
             false,
         )?;
+        let cause_forward_receipt_sha256 = cause_forward.receipt_sha256()?;
         let cause_mass = cause_forward.forward_likelihood.iter().sum::<f64>();
         if !cause_mass.is_finite() || cause_mass <= 0.0 {
             return Err(SparseCausalError::UndefinedBackgroundPosterior);
@@ -665,6 +668,7 @@ impl SparseBinaryCausalModel {
         Ok(SparseIit4ScoringBaseline {
             posterior,
             cause_forward,
+            cause_forward_receipt_sha256,
             cause_selectivity,
             effect_selectivity,
         })
@@ -685,6 +689,7 @@ impl SparseBinaryCausalModel {
             &baseline.posterior,
             true,
         )?;
+        let partitioned_cause_receipt_sha256 = partitioned_cause.receipt_sha256()?;
         let candidate = partition.candidate_system();
         let effect_partitioned = cut_model.effect_repertoire_iit4(
             candidate,
@@ -695,6 +700,7 @@ impl SparseBinaryCausalModel {
         )?;
         Ok(SparseIit4PartitionTerms {
             partitioned_cause,
+            partitioned_cause_receipt_sha256,
             effect_partitioned,
             severed_connections,
         })
@@ -770,8 +776,8 @@ impl SparseBinaryCausalModel {
         Ok(SparsePartitionScoreReport {
             request_sha256,
             max_factor_entries: baseline.posterior.max_factor_entries,
-            uncut_cause_receipt_sha256: baseline.cause_forward.receipt_sha256()?,
-            partitioned_cause_receipt_sha256: terms.partitioned_cause.receipt_sha256()?,
+            uncut_cause_receipt_sha256: baseline.cause_forward_receipt_sha256.clone(),
+            partitioned_cause_receipt_sha256: terms.partitioned_cause_receipt_sha256.clone(),
             score,
         })
     }
@@ -2248,7 +2254,18 @@ mod tests {
                     cached.score.severed_connections,
                     independently_prepared.score.severed_connections
                 );
-                assert!(cached.receipt_sha256().is_ok());
+                assert_eq!(
+                    cached.uncut_cause_receipt_sha256,
+                    baseline.cause_forward_receipt_sha256
+                );
+                assert_eq!(
+                    cached.partitioned_cause_receipt_sha256,
+                    cached_terms.partitioned_cause_receipt_sha256
+                );
+                assert_eq!(
+                    cached.receipt_sha256().unwrap(),
+                    independently_prepared.receipt_sha256().unwrap()
+                );
             }
         }
     }
