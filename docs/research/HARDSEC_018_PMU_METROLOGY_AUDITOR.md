@@ -53,7 +53,8 @@ Fail-closed checks:
 - Every trial uses the exact fixed work-unit denominator and platform/workload/protocol IDs.
 - Order indices must be unique and contiguous; every trial uses the preregistered randomization seed.
 - The co-scheduled group cannot exceed programmable counter capacity and each event must meet the declared running-fraction gate.
-- The overcommitted set must exceed capacity and record at least one event whose running time is less than enabled time.
+- The overcommitted set must contain every declared event, exceed capacity and record at least one event whose running time is less than enabled time.
+- Sample loss and PMU read overhead are gated independently; their limits are preregistered in the plan.
 - Matched block count must reach the preregistered minimum for descriptive quantiles.
 
 The receipt binds exact plan and observation bytes by SHA-256; it is unsigned and written without overwriting an existing file. It leaves effective sample size null and independence unestablished. Quantiles are descriptive summaries across the supplied matched blocks, not population confidence intervals.
@@ -75,7 +76,7 @@ cargo run --locked \
   --receipt /tmp/hardsec-018-receipt.json
 ```
 
-Thirteen authored Rust tests cover the known answer, invalid running times, event aliasing, work-unit mismatch, duplicated trials, condition imbalance, missing multiplex evidence, wrong randomization seed, unpaired blocks, sample-loss errors and evidence-domain mismatch.
+Fifteen authored Rust tests cover the known answer, invalid running times, event aliasing, work-unit mismatch, duplicated trials, condition imbalance, missing multiplex evidence, wrong randomization seed, unpaired blocks, sample-loss errors and evidence-domain mismatch.
 
 The fixture intentionally contains two synthetic matched blocks. It exercises the contract only; it does not represent C910/HARPY-V, GEM5 or any measured physical platform.
 
