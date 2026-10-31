@@ -87,6 +87,8 @@ pub struct CounterfactualRun {
     /// Sorted, unique IDs of items retained during this run.
     pub selected_item_ids: Vec<u64>,
     pub bytes_used: u64,
+    /// Evaluator-measured retained-memory occupancy integrated over time.
+    pub retained_byte_us: u128,
     pub measured_cost: MeasuredRunCost,
     pub outcome: ExposureOutcome,
 }
@@ -105,6 +107,10 @@ pub struct CounterfactualEffect {
     pub intervention_item_ids: Vec<u64>,
     pub retained_run_id: u64,
     pub evicted_run_id: u64,
+    pub retained_bytes_used: u64,
+    pub evicted_bytes_used: u64,
+    pub retained_byte_us: u128,
+    pub evicted_byte_us: u128,
     pub retained_cost: MeasuredRunCost,
     pub evicted_cost: MeasuredRunCost,
     pub delta_evict_minus_retain: ExposureDelta,
@@ -285,6 +291,10 @@ pub fn evaluate_paired_intervention(
         intervention_item_ids,
         retained_run_id: retained.run_id,
         evicted_run_id: evicted.run_id,
+        retained_bytes_used: retained.bytes_used,
+        evicted_bytes_used: evicted.bytes_used,
+        retained_byte_us: retained.retained_byte_us,
+        evicted_byte_us: evicted.retained_byte_us,
         retained_cost: retained.measured_cost,
         evicted_cost: evicted.measured_cost,
         delta_evict_minus_retain: ExposureDelta {
@@ -389,6 +399,7 @@ pub fn qualify_exact_subsets(
             subset_mask: mask,
             selected_item_ids: run.selected_item_ids.clone(),
             bytes_used: run.bytes_used,
+            retained_byte_us: run.retained_byte_us,
             measured_cost: run.measured_cost,
             outcome: run.outcome,
         };
@@ -622,6 +633,7 @@ mod tests {
             run_id,
             selected_item_ids,
             bytes_used,
+            retained_byte_us: u128::from(bytes_used) * 100,
             measured_cost: MeasuredRunCost {
                 compute_used: 500,
                 refreshes_used: 3,
@@ -743,18 +755,40 @@ mod tests {
 
     #[test]
     fn group_intervention_captures_nonadditive_memory_interaction() {
-        let retained = run(1, vec![10, 20], 5, ExposureOutcome {
+        let both_retained = run(1, vec![10, 20], 5, ExposureOutcome {
             wrong_belief_us: 2,
             abstention_us: 0,
             missing_output_us: 0,
         });
-        let evicted = run(2, vec![], 0, ExposureOutcome {
+        let neither_retained = run(2, vec![], 0, ExposureOutcome {
             wrong_belief_us: 7,
             abstention_us: 0,
             missing_output_us: 0,
         });
-        let effect = evaluate_paired_intervention(&registry(), &retained, &evicted, &[10, 20], 123).unwrap();
-        assert_eq!(effect.delta_evict_minus_retain.wrong_belief_us, 5);
+        let only_first_retained = run(3, vec![10], 2, ExposureOutcome {
+            wrong_belief_us: 7,
+            abstention_us: 0,
+            missing_output_us: 0,
+        });
+        let only_second_retained = run(4, vec![20], 3, ExposureOutcome {
+            wrong_belief_us: 7,
+            abstention_us: 0,
+            missing_output_us: 0,
+        });
+        let first_alone = evaluate_paired_intervention(
+            &registry(), &only_first_retained, &neither_retained, &[10], 123
+        ).unwrap();
+        let second_alone = evaluate_paired_intervention(
+            &registry(), &only_second_retained, &neither_retained, &[20], 123
+        ).unwrap();
+        let together = evaluate_paired_intervention(
+            &registry(), &both_retained, &neither_retained, &[10, 20], 123
+        ).unwrap();
+        assert_eq!(first_alone.delta_evict_minus_retain.wrong_belief_us, 0);
+        assert_eq!(second_alone.delta_evict_minus_retain.wrong_belief_us, 0);
+        assert_eq!(together.delta_evict_minus_retain.wrong_belief_us, 5);
+        assert_eq!(together.retained_byte_us, 500);
+        assert_eq!(together.evicted_byte_us, 0);
     }
 
     #[test]
