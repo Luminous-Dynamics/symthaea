@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/fresh-metamorphic-submission-v1.json",
+  "title": "Fresh metamorphic model response submission v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "run_id",
+    "model_provider",
+    "model_name",
+    "model_version",
+    "model_access_mode",
+    "model_checkpoint_sha256",
+    "base_public_packet_sha256",
+    "base_manifest_sha256",
+    "metamorphic_public_packet_sha256",
+    "metamorphic_manifest_sha256",
+    "inference_harness_sha256",
+    "prompt_and_decoding_sha256",
+    "metric_definition_sha256",
+    "run_execution_receipt_sha256",
+    "model_call_count",
+    "input_token_count",
+    "output_token_count",
+    "wall_clock_millis",
+    "tool_call_count",
+    "human_assistance_minutes",
+    "compute_cost_microusd",
+    "responses",
+    "submission_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.fresh_metamorphic_submission.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_access_mode": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "base_public_packet_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "base_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "metamorphic_public_packet_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "metamorphic_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "inference_harness_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prompt_and_decoding_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "metric_definition_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "run_execution_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "model_call_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "input_token_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "output_token_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "wall_clock_millis": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "tool_call_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "human_assistance_minutes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "compute_cost_microusd": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "responses": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 50000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "item_id",
+          "response_text",
+          "response_sha256"
+        ],
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "response_text": {
+            "type": "string",
+            "maxLength": 1048576
+          },
+          "response_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "submission_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
