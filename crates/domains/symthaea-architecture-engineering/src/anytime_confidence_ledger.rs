@@ -252,6 +252,8 @@ pub fn append_anytime_confidence_look(
     let batch_sha256 = compute_batch_sha256(replicate_batch);
     let prefix_chain_sha256 = compute_prefix_chain_sha256(
         previous_prefix,
+        &ledger.manifest.manifest_sha256,
+        stream_id,
         next_look,
         prior_count,
         replicate_batch,
@@ -455,6 +457,8 @@ pub fn verify_anytime_confidence_ledger(
 
             let expected_prefix = compute_prefix_chain_sha256(
                 previous_prefix.as_deref(),
+                &ledger.manifest.manifest_sha256,
+                &declaration.stream_id,
                 expected_look,
                 cumulative_values.len(),
                 &record.replicate_batch,
@@ -536,6 +540,8 @@ fn compute_batch_sha256(values: &[f64]) -> String {
 
 fn compute_prefix_chain_sha256(
     previous_prefix: Option<&str>,
+    manifest_sha256: &str,
+    stream_id: &str,
     look_index: u64,
     prior_count: usize,
     batch: &[f64],
@@ -543,6 +549,8 @@ fn compute_prefix_chain_sha256(
     let mut hasher = Sha256::new();
     hasher.update((PREFIX_DOMAIN.len() as u64).to_be_bytes());
     hasher.update(PREFIX_DOMAIN);
+    hash_text(&mut hasher, manifest_sha256);
+    hash_text(&mut hasher, stream_id);
     match previous_prefix {
         Some(previous) => {
             hasher.update([1u8]);
@@ -797,7 +805,14 @@ mod tests {
         record.replicate_batch[0] = 0.1;
         record.batch_sha256 = compute_batch_sha256(&record.replicate_batch);
         record.prefix_chain_sha256 =
-            compute_prefix_chain_sha256(None, 1, 0, &record.replicate_batch);
+            compute_prefix_chain_sha256(
+                None,
+                &ledger.manifest.manifest_sha256,
+                "energy",
+                1,
+                0,
+                &record.replicate_batch,
+            );
         record.record_sha256 = compute_look_record_sha256(record).unwrap();
         ledger.ledger_sha256 = compute_ledger_sha256(&ledger).unwrap();
         assert!(verify_anytime_confidence_ledger(&ledger)
