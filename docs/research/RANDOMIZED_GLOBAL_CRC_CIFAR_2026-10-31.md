@@ -66,7 +66,7 @@ The module now emits a `symthaea-risk-certificate-v1` manifest binding:
 
 The independent verifier recomputes the policy/constraint/objective digests, rechecks all augmented-state inequalities, validates the scope and risk target, and recomputes dual feasibility, stationarity, complementarity and the primal-dual gap. Regression tests are authored for tampering with policy rows, alpha, state-domain counts, assumptions, verifier receipts and dual marginals. Those exact committed module tests have not yet been run in a clean checkout; the certificate API is not claimed as validated yet. Hashes bind content but do not authenticate an issuer; signing/attestation remains a separate layer.
 
-The module now contains 16 authored tests. The local reference arithmetic checks cover all four alpha values and all primal/dual residual families.
+The module now contains 16 authored tests. A corrected independent Python replay (separate scratch implementation of the committed equations) re-ran all four LPs and all four 500-round equal-share controllers successfully. It confirms the metrics and residuals reported above; full matrix-build plus solve took 4.00 seconds across the four levels. It does not import or execute the exact GitHub module. The branch currently has 22 authored tests, but the exact committed module/tests have not been run in a clean checkout. No remote CI pass is claimed. arithmetic checks cover all four alpha values and all primal/dual residual families.
 ## Interpretation
 
 This is a small improvement, but an important scientific result:
