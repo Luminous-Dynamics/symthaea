@@ -1285,13 +1285,14 @@ mod tests {
         ];
         let mut randomized = Vec::new();
         let atom_groups = [(1.0, 5usize), (2.0, 3usize), (3.0, 2usize)];
-        let grid_per_atom = 10_000usize;
+        let grid_units_per_probability_mass = 1_000usize;
         let mut naive = Vec::new();
         for (score, mass) in atom_groups {
             let lower = reference.iter().filter(|v| **v < score).count() as f64 / reference.len() as f64;
             let atom_mass = mass as f64 / reference.len() as f64;
             let upper = lower + atom_mass;
             naive.push(upper);
+            let grid_per_atom = mass * grid_units_per_probability_mass;
             for index in 0..grid_per_atom {
                 let uniform = (index as f64 + 0.5) / grid_per_atom as f64;
                 let (value, _, observed_mass) = randomized_empirical_pit(&reference, score, uniform).unwrap();
