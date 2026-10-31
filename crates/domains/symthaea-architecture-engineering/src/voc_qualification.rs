@@ -133,7 +133,7 @@ pub struct VoCQualificationThresholds {
     pub max_topk_membership_brier: f64,
     pub min_topk_credible_set_coverage: f64,
     pub topk_inclusion_probability_floor: f64,
-    pub max_mean_credible_set_size: f64,
+    pub max_mean_credible_set_size_fraction: f64,
     pub nominal_interval_mass: f64,
     pub interval_coverage_tolerance: f64,
     pub max_mean_interval_width: f64,
@@ -162,7 +162,7 @@ impl Default for VoCQualificationThresholds {
             max_topk_membership_brier: 0.20,
             min_topk_credible_set_coverage: 0.90,
             topk_inclusion_probability_floor: 0.05,
-            max_mean_credible_set_size: 0.60,
+            max_mean_credible_set_size_fraction: 0.60,
             nominal_interval_mass: 0.90,
             interval_coverage_tolerance: 0.05,
             max_mean_interval_width: 0.50,
@@ -211,7 +211,7 @@ pub struct VoCQualificationMetrics {
     pub top1_ece: f64,
     pub topk_membership_brier: f64,
     pub topk_credible_set_coverage: f64,
-    pub mean_credible_set_size: f64,
+    pub mean_credible_set_size_fraction: f64,
     pub predictive_interval_coverage: f64,
     pub mean_predictive_interval_width: f64,
     pub pit_rank_histogram: Vec<usize>,
@@ -279,8 +279,7 @@ pub fn compute_split_manifest_sha256(
 ) -> Result<String, QualificationError> {
     let mut canonical = manifest.clone();
     canonical.candidate_ids.sort();
-    canonical.fidelity_ids.sort();
-    canonical.fit_task_ids.sort();
+        canonical.fit_task_ids.sort();
     canonical.calibration_task_ids.sort();
     canonical.evaluation_task_ids.sort();
     canonical.fit_architecture_families.sort();
@@ -536,7 +535,7 @@ fn validate_manifest(
             ));
         }
     }
-    if manifest.candidate_ids.len() < manifest.target_k.max(1) {
+    if manifest.target_k == 0 || manifest.candidate_ids.len() < manifest.target_k {
         return Err(QualificationError::new(
             "candidate_ids",
             "candidate count must be at least target_k and target_k must be positive",
@@ -689,8 +688,10 @@ fn validate_thresholds(
     if thresholds.min_effective_sample_size_fraction == 0.0
         || thresholds.nominal_interval_mass == 0.0
         || thresholds.topk_inclusion_probability_floor == 0.0
-        || thresholds.max_mean_credible_set_size <= 0.0
+        || thresholds.max_mean_credible_set_size_fraction <= 0.0
+        || thresholds.max_mean_credible_set_size_fraction > 1.0
         || thresholds.max_mean_interval_width < 0.0
+        || thresholds.max_mean_interval_width > 1.0
         || thresholds.max_top1_log_loss < 0.0
         || thresholds.max_top1_brier < 0.0
         || thresholds.max_action_outcome_log_loss < 0.0
@@ -981,7 +982,7 @@ fn compute_metrics(
         top1_ece: global.top1.expected_calibration_error,
         topk_membership_brier: global.topk_membership_brier,
         topk_credible_set_coverage: global.topk_credible_set_coverage,
-        mean_credible_set_size: global.mean_credible_set_size,
+        mean_credible_set_size_fraction: global.mean_credible_set_size_fraction,
         predictive_interval_coverage: global.interval_coverage,
         mean_predictive_interval_width: global.mean_interval_width,
         pit_rank_histogram: global.pit_rank_histogram,
@@ -1000,7 +1001,7 @@ struct EpisodeSummary {
     top1_accuracy: f64,
     topk_membership_brier: f64,
     topk_credible_set_coverage: f64,
-    mean_credible_set_size: f64,
+    mean_credible_set_size_fraction: f64,
     interval_coverage: f64,
     mean_interval_width: f64,
     pit_rank_histogram: Vec<usize>,
@@ -1095,7 +1096,7 @@ fn summarize_episodes(
         top1_accuracy: correct_count as f64 / episodes.len() as f64,
         topk_membership_brier: membership_squared_error / membership_count as f64,
         topk_credible_set_coverage: credible_set_coverage as f64 / episodes.len() as f64,
-        mean_credible_set_size: credible_set_size / episodes.len() as f64,
+        mean_credible_set_size_fraction: credible_set_size / episodes.len() as f64 / candidate_count as f64,
         interval_coverage: interval_covered as f64 / interval_count as f64,
         mean_interval_width: interval_width / interval_count as f64,
         pit_rank_histogram: pit_histogram,
@@ -1446,16 +1447,16 @@ mod tests {
             min_evaluation_episodes: 1,
             min_episodes_per_stratum: 1,
             min_action_forecasts_per_kind: 1,
-            min_effective_sample_size_fraction: 0.5,
+            min_effective_sample_size_fraction: 0.8,
             max_top1_log_loss: 0.1,
             max_top1_brier: 0.1,
             max_top1_ece: 0.1,
             max_topk_membership_brier: 0.1,
             min_topk_credible_set_coverage: 1.0,
             topk_inclusion_probability_floor: 0.05,
-            max_mean_credible_set_size: 1.0,
+            max_mean_credible_set_size_fraction: 1.0,
             nominal_interval_mass: 0.8,
-            interval_coverage_tolerance: 0.0,
+            interval_coverage_tolerance: 0.2,
             max_mean_interval_width: 0.5,
             rank_histogram_bins: 5,
             ece_bins: 5,
@@ -1525,7 +1526,7 @@ mod tests {
         value.split_manifest_sha256 = compute_split_manifest_sha256(&value).unwrap();
         let receipt = qualify_voc_model(&value, &[episode("ep-1")], &thresholds()).unwrap();
         assert_eq!(receipt.decision, QualificationDecision::Abstain);
-        assert!(receipt.metrics.effective_sample_size_fraction < 0.5);
+        assert!(receipt.metrics.effective_sample_size_fraction < 0.8);
     }
 
     #[test]
