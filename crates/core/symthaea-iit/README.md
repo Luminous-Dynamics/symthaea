@@ -447,11 +447,12 @@ eight-entry table ceiling, while conditioning one row leaves a residual graph of
 width at most two. The complete retained-state vector is checked against an
 independent full-joint log-domain enumeration. The separate scale sweep compares
 unconditioned and conditioned results on 4x4, 5x5, 6x6, and 8x8 grids; it records
-branch count, both induced widths, both peak table sizes, and timing. Per-fixture
-factor-entry budgets are 8, 8, 16, and 32 respectively; each case also asserts that
-ordinary min-fill is rejected under that same budget. The 8x8 baseline needs 1,024
-factor entries, while the conditioned residual fits within 32. Its timing ratio is
-a cost tradeoff, not a speedup claim.
+branch count, both induced widths, both peak table sizes, conditioned table
+entries materialized, branch-output log-add operations, factor multiplications,
+and timing. Per-fixture factor-entry budgets are 8, 8, 16, and 32 respectively;
+each case also asserts that ordinary min-fill is rejected under that same budget.
+The 8x8 baseline needs 1,024 factor entries, while the conditioned residual fits
+within 32. Its timing ratio is a cost tradeoff, not a speedup claim.
 
 Run:
 
