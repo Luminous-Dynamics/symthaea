@@ -7,6 +7,7 @@ use contamination_panel_bench::{
         FtdWeightPolicyV1, ReferenceTailV1, ScoreObservationV1,
     },
     generate_challenge_bundle, GeneratorConfigV1,
+    score_disclosure::validate_score_validity_disclosure,
 };
 use std::{
     env,
@@ -197,6 +198,29 @@ fn ftd_fuse(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn validate_disclosure(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench validate-disclosure <score-validity-disclosure.json> <validation-report.json>"
+                .into(),
+        );
+    }
+    let disclosure_bytes = fs::read(&args[1])?;
+    let report = validate_score_validity_disclosure(&disclosure_bytes)
+        .map_err(io::Error::other)?;
+    let report_bytes = serde_json::to_vec_pretty(&report)?;
+    write_bytes(&args[2], &report_bytes)?;
+    println!(
+        "publication_ready={} confirmatory_eligible={} unknown={} not_controlled={} acquired_status={:?}",
+        report.publication_ready,
+        report.confirmatory_eligible,
+        report.unknown_control_count,
+        report.not_controlled_control_count,
+        report.acquired_exposure_status
+    );
+    Ok(())
+}
+
 fn audit_adjudications(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 4 {
         return Err(
@@ -246,9 +270,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("evaluate") => evaluate_run(&args),
         Some("ftd-pvalues") => ftd_pvalues(&args),
         Some("ftd-fuse") => ftd_fuse(&args),
+        Some("validate-disclosure") => validate_disclosure(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | ftd-pvalues | ftd-fuse | ftd-calibrate | validate-disclosure | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }

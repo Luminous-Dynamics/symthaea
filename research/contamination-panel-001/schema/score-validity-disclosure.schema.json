@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/score-validity-disclosure-v1.json",
+  "title": "Symthaea Score Validity Disclosure v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "disclosure_id", "disclosure_created_at_utc", "run_status",
+    "identity", "benchmark", "metrics", "elicitation_budget",
+    "dataset_threat_controls", "acquired_exposure", "regeneration", "run_artifacts"
+  ],
+  "properties": {
+    "schema": { "const": "symthaea.score_validity_disclosure.v1" },
+    "disclosure_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "disclosure_created_at_utc": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "run_status": { "$ref": "#/$defs/status" },
+    "identity": { "$ref": "#/$defs/runIdentity" },
+    "benchmark": { "$ref": "#/$defs/benchmarkBinding" },
+    "metrics": {
+      "type": "array", "minItems": 1,
+      "items": { "$ref": "#/$defs/scoreMetric" }
+    },
+    "elicitation_budget": { "$ref": "#/$defs/elicitationBudget" },
+    "dataset_threat_controls": {
+      "type": "array", "minItems": 4, "maxItems": 4,
+      "items": { "$ref": "#/$defs/datasetThreatControl" }
+    },
+    "acquired_exposure": { "$ref": "#/$defs/acquiredExposure" },
+    "regeneration": { "$ref": "#/$defs/regeneration" },
+    "run_artifacts": { "$ref": "#/$defs/runArtifacts" }
+  },
+  "$defs": {
+    "status": {
+      "type": "string",
+      "enum": ["controlled", "not_controlled", "unknown", "not_applicable"]
+    },
+    "stringDisclosure": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "value"],
+      "properties": {
+        "status": { "$ref": "#/$defs/status" },
+        "value": { "type": ["string", "null"], "maxLength": 2048 }
+      }
+    },
+    "digestDisclosure": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "sha256"],
+      "properties": {
+        "status": { "$ref": "#/$defs/status" },
+        "sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "countDisclosure": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "value"],
+      "properties": {
+        "status": { "$ref": "#/$defs/status" },
+        "value": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "runIdentity": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "run_id", "model_provider", "model_name", "model_version", "model_access_mode",
+        "harness_revision", "prompt_digest", "tool_manifest_digest", "environment_digest"
+      ],
+      "properties": {
+        "run_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "model_provider": { "$ref": "#/$defs/stringDisclosure" },
+        "model_name": { "$ref": "#/$defs/stringDisclosure" },
+        "model_version": { "$ref": "#/$defs/stringDisclosure" },
+        "model_access_mode": { "$ref": "#/$defs/stringDisclosure" },
+        "harness_revision": { "$ref": "#/$defs/digestDisclosure" },
+        "prompt_digest": { "$ref": "#/$defs/digestDisclosure" },
+        "tool_manifest_digest": { "$ref": "#/$defs/digestDisclosure" },
+        "environment_digest": { "$ref": "#/$defs/digestDisclosure" }
+      }
+    },
+    "benchmarkBinding": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "benchmark_id", "benchmark_version", "cohort_id", "cohort_created_at_utc",
+        "task_set_digest", "benchmark_manifest_digest", "score_artifact_digest"
+      ],
+      "properties": {
+        "benchmark_id": { "type": "string", "minLength": 1 },
+        "benchmark_version": { "type": "string", "minLength": 1 },
+        "cohort_id": { "type": "string", "minLength": 1 },
+        "cohort_created_at_utc": { "$ref": "#/$defs/stringDisclosure" },
+        "task_set_digest": { "$ref": "#/$defs/digestDisclosure" },
+        "benchmark_manifest_digest": { "$ref": "#/$defs/digestDisclosure" },
+        "score_artifact_digest": { "$ref": "#/$defs/digestDisclosure" }
+      }
+    },
+    "scoreStratum": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "stratum_id", "task_family", "source_family", "task_count",
+        "observed_count", "success_count", "score_permille"
+      ],
+      "properties": {
+        "stratum_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "task_family": { "$ref": "#/$defs/stringDisclosure" },
+        "source_family": { "$ref": "#/$defs/stringDisclosure" },
+        "task_count": { "type": "integer", "minimum": 1 },
+        "observed_count": { "type": "integer", "minimum": 0 },
+        "success_count": { "type": "integer", "minimum": 0 },
+        "score_permille": { "type": "integer", "minimum": 0, "maximum": 1000 }
+      }
+    },
+    "scoreMetric": {
+      "type": "object", "additionalProperties": false,
+      "required": ["metric_id", "metric_definition_digest", "strata"],
+      "properties": {
+        "metric_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "metric_definition_digest": { "$ref": "#/$defs/digestDisclosure" },
+        "strata": {
+          "type": "array", "minItems": 1,
+          "items": { "$ref": "#/$defs/scoreStratum" }
+        }
+      }
+    },
+    "elicitationBudget": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "model_calls", "input_tokens", "output_tokens", "wall_clock_millis",
+        "retries", "tool_calls", "network_queries", "human_assistance_minutes",
+        "compute_cost_microusd"
+      ],
+      "properties": {
+        "model_calls": { "$ref": "#/$defs/countDisclosure" },
+        "input_tokens": { "$ref": "#/$defs/countDisclosure" },
+        "output_tokens": { "$ref": "#/$defs/countDisclosure" },
+        "wall_clock_millis": { "$ref": "#/$defs/countDisclosure" },
+        "retries": { "$ref": "#/$defs/countDisclosure" },
+        "tool_calls": { "$ref": "#/$defs/countDisclosure" },
+        "network_queries": { "$ref": "#/$defs/countDisclosure" },
+        "human_assistance_minutes": { "$ref": "#/$defs/countDisclosure" },
+        "compute_cost_microusd": { "$ref": "#/$defs/countDisclosure" }
+      }
+    },
+    "datasetThreatControl": {
+      "type": "object", "additionalProperties": false,
+      "required": ["threat_class", "status", "method_digest", "evidence_receipt_digest", "notes"],
+      "properties": {
+        "threat_class": {
+          "type": "string",
+          "enum": ["direct", "derivative", "temporal", "distributional"]
+        },
+        "status": { "$ref": "#/$defs/status" },
+        "method_digest": { "$ref": "#/$defs/digestDisclosure" },
+        "evidence_receipt_digest": { "$ref": "#/$defs/digestDisclosure" },
+        "notes": { "$ref": "#/$defs/stringDisclosure" }
+      }
+    },
+    "boundaryLayer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "monitor_receipt_digest"],
+      "properties": {
+        "status": { "$ref": "#/$defs/status" },
+        "monitor_receipt_digest": { "$ref": "#/$defs/digestDisclosure" }
+      }
+    },
+    "acquiredExposure": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "status", "independent_monitor_receipt_digest",
+        "network", "filesystem", "tools", "environment"
+      ],
+      "properties": {
+        "status": { "$ref": "#/$defs/status" },
+        "independent_monitor_receipt_digest": { "$ref": "#/$defs/digestDisclosure" },
+        "network": { "$ref": "#/$defs/boundaryLayer" },
+        "filesystem": { "$ref": "#/$defs/boundaryLayer" },
+        "tools": { "$ref": "#/$defs/boundaryLayer" },
+        "environment": { "$ref": "#/$defs/boundaryLayer" }
+      }
+    },
+    "regeneration": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "status", "generator_name", "generator_version", "source_revision",
+        "configuration_digest", "seed_commitment_digest", "cohort_manifest_digest"
+      ],
+      "properties": {
+        "status": { "$ref": "#/$defs/status" },
+        "generator_name": { "$ref": "#/$defs/stringDisclosure" },
+        "generator_version": { "$ref": "#/$defs/stringDisclosure" },
+        "source_revision": { "$ref": "#/$defs/digestDisclosure" },
+        "configuration_digest": { "$ref": "#/$defs/digestDisclosure" },
+        "seed_commitment_digest": { "$ref": "#/$defs/digestDisclosure" },
+        "cohort_manifest_digest": { "$ref": "#/$defs/digestDisclosure" }
+      }
+    },
+    "runArtifacts": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "transcript_digest", "tool_trace_digest", "output_sanitization",
+        "hidden_oracle_separation", "external_receipt_anchor"
+      ],
+      "properties": {
+        "transcript_digest": { "$ref": "#/$defs/digestDisclosure" },
+        "tool_trace_digest": { "$ref": "#/$defs/digestDisclosure" },
+        "output_sanitization": { "$ref": "#/$defs/status" },
+        "hidden_oracle_separation": { "$ref": "#/$defs/status" },
+        "external_receipt_anchor": { "$ref": "#/$defs/digestDisclosure" }
+      }
+    }
+  }
+}

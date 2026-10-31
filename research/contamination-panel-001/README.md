@@ -248,3 +248,45 @@ The reported p-value direction in the ACL paper's Eq. (4) appears to be a lower-
 
 This is not a full FTD reproduction: model scoring for PPL, Min-K and Min-K++ is not implemented here. Nor does running BH or a Cauchy combination alone establish an FDR guarantee. The null reference must be representative, p-values must be super-uniform under contamination, and the multiple-hypothesis dependence assumptions must be justified on the actual evaluation population.
 
+
+
+## Per-run score validity disclosure
+
+The module src/score_disclosure.rs validates a strict versioned ScoreValidityDisclosureV1. It is designed for every confirmatory score artifact, including detector, model, benchmark and FTD outputs.
+
+It binds:
+- run ID, model/provider/version/access mode;
+- harness, prompt, tool manifest and execution environment digests;
+- benchmark ID/version, cohort, task-set, manifest and score artifact digests;
+- per-metric and per-stratum denominators, observed counts, successes and reported scores;
+- elicitation budget: calls, input/output tokens, wall time, retries, tool calls, network queries, human assistance and compute cost;
+- dataset-level direct, derivative, temporal and distributional contamination controls;
+- run-level acquired exposure;
+- generator identity/revision/configuration/seed/cohort commitments;
+- transcript, tool trace, sanitization, hidden-oracle separation and external receipt anchor.
+
+Unknown, not_controlled and not_applicable are different values. An unknown budget or monitoring value is not silently converted into zero. A score can be publication_ready with a candid unknown disclosure, but it will not be confirmatory_eligible.
+
+### Acquired exposure requires independent monitoring
+
+A controlled acquired-exposure claim requires:
+- a digest for an independently captured monitor receipt;
+- controlled network boundary plus its monitor receipt digest;
+- controlled filesystem boundary plus its monitor receipt digest;
+- controlled tool boundary plus its monitor receipt digest;
+- controlled environment boundary plus its monitor receipt digest.
+
+A transcript in which the agent says it did not search cannot replace the external monitor evidence. The validator checks digest shape and claim consistency; it does not authenticate the monitor issuer, prove capture completeness, or certify the runner.
+
+### CLI validation
+
+~~~sh
+cargo run --locked -- validate-disclosure \
+  /secure/evaluator/score-validity-disclosure.json \
+  /secure/evaluator/score-validity-validation-report.json
+~~~
+
+The report distinguishes structural/publication readiness from confirmatory eligibility and reports unknown, not-controlled, not-applicable and controlled disclosure statuses separately.
+
+A syntactically valid disclosure is not a guarantee of scientific truth, representative sampling, oracle correctness, training-data absence, or authenticated chain of custody. It is a portable claim-scope and evidence-completeness record.
+
