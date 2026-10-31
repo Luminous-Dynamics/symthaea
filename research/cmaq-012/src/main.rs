@@ -5,8 +5,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
 
-const SCHEMA: &str = "cmaq-012-paired-aop-report-v0.2";
-const AUDITOR_VERSION: &str = "0.2.0";
+const SCHEMA: &str = "cmaq-012-paired-aop-report-v0.3";
+const AUDITOR_VERSION: &str = "0.3.0";
 const MIN_QUALIFICATION_PAIRS: usize = 20;
 const COMPUTE_WORK_TOLERANCE: f64 = 0.05;
 const LATENCY_TOLERANCE: f64 = 0.05;
@@ -638,6 +638,7 @@ struct GroupReport {
 #[derive(Clone, Debug)]
 struct Report {
     input_sha256: String, bootstrap_replicates: usize, bootstrap_seed: u64,
+    artifact_verification: ArtifactVerification,
     groups: Vec<GroupReport>,
 }
 
@@ -703,7 +704,10 @@ fn pair_is_within_tolerance(delta: &ResourcePairDelta) -> bool {
     ].iter().all(|value| *value == Some(true))
 }
 
-fn evaluate_resource_match(episodes: &[BTreeMap<Arm, Row>]) -> ResourceMatch {
+fn evaluate_resource_match(
+    episodes: &[BTreeMap<Arm, Row>],
+    receipt_verification_status: &'static str,
+) -> ResourceMatch {
     let reference = &episodes[0][&Arm::D0];
     let method = reference.resource_measurement_method;
     let d1_role_valid = episodes.iter().all(|episode| {
@@ -784,7 +788,7 @@ fn evaluate_resource_match(episodes: &[BTreeMap<Arm, Row>]) -> ResourceMatch {
         status,
         resource_measurement_method: method.name(),
         resource_profile_sha256: reference.resource_profile_sha256.clone(),
-        receipt_verification_status: "digest_only_not_independently_verified",
+        receipt_verification_status,
         d1_role_valid,
         learned_model_role_valid,
         w2_workload_match_valid,
@@ -891,21 +895,42 @@ fn bootstrap_ci(values: &[f64], replicates: usize, seed: u64) -> (f64, f64) {
 }
 
 fn build_report(input: &str, replicates: usize, bootstrap_seed: u64) -> Result<Report, String> {
+    build_report_with_artifacts(input, replicates, bootstrap_seed, None, false)
+}
+
+fn build_report_with_artifacts(
+    input: &str,
+    replicates: usize,
+    bootstrap_seed: u64,
+    artifacts_dir: Option<&Path>,
+    allow_fixtures: bool,
+) -> Result<Report, String> {
     if replicates < 100 { return Err("bootstrap replicates must be at least 100".into()); }
+    if allow_fixtures && artifacts_dir.is_none() {
+        return Err("--allow-fixtures requires --artifacts-dir".into());
+    }
     let paired_groups = parse_and_pair(input)?;
+    let artifact_verification = match artifacts_dir {
+        Some(directory) => verify_artifacts(&paired_groups, directory, allow_fixtures)?,
+        None => unverified_artifacts(),
+    };
     let mut groups = Vec::with_capacity(paired_groups.len());
     for (group_index, ((task, capability, split), episodes)) in paired_groups.into_iter().enumerate() {
         let episode_count = episodes.len();
         let mut arms = BTreeMap::new();
         for arm in ARMS { arms.insert(arm, summarize_arm(&episodes, arm)); }
-        let resource_match = evaluate_resource_match(&episodes);
+        let resource_match = evaluate_resource_match(&episodes, artifact_verification.status);
         let eligibility = if split != "qualification" || episode_count < MIN_QUALIFICATION_PAIRS {
             "smoke_only"
+        } else if resource_match.status == "budget_unmatched" {
+            "budget_unmatched"
+        } else if resource_match.status == "resource_unmeasured" {
+            "resource_unmeasured"
         } else {
-            match resource_match.status {
-                "budget_matched" => "budget_match_unverified",
-                "budget_unmatched" => "budget_unmatched",
-                _ => "resource_unmeasured",
+            match artifact_verification.status {
+                "content_verified_origin_unattested" => "budget_match_receipts_verified",
+                "synthetic_fixture_content_verified_origin_unattested" => "synthetic_fixture_only",
+                _ => "budget_match_unverified",
             }
         };
         let mut contrasts = Vec::with_capacity(CONTRASTS.len());
@@ -934,7 +959,7 @@ fn build_report(input: &str, replicates: usize, bootstrap_seed: u64) -> Result<R
     }
     Ok(Report {
         input_sha256: sha256_hex(input.as_bytes()), bootstrap_replicates: replicates,
-        bootstrap_seed, groups,
+        bootstrap_seed, artifact_verification, groups,
     })
 }
 
@@ -964,6 +989,14 @@ fn render_report(report: &Report) -> String {
     writeln!(&mut out, "  \"bootstrap_replicates\": {},", report.bootstrap_replicates).unwrap();
     writeln!(&mut out, "  \"bootstrap_seed\": {},", report.bootstrap_seed).unwrap();
     writeln!(&mut out, "  \"minimum_qualification_pairs\": {MIN_QUALIFICATION_PAIRS},").unwrap();
+    writeln!(&mut out,
+        "  \"artifact_verification\": {{\"status\":\"{}\",\"profiles_verified\":{},\"receipts_verified\":{},\"fixture_only\":{},\"claim_ceiling\":\"{}\"}},",
+        report.artifact_verification.status,
+        report.artifact_verification.profiles_verified,
+        report.artifact_verification.receipts_verified,
+        report.artifact_verification.fixture_only,
+        report.artifact_verification.claim_ceiling
+    ).unwrap();
     writeln!(&mut out, "  \"groups\": [").unwrap();
     for (group_index, group) in report.groups.iter().enumerate() {
         let group_comma = if group_index + 1 == report.groups.len() { "" } else { "," };
@@ -1385,36 +1418,43 @@ fn unverified_artifacts() -> ArtifactVerification {
     }
 }
 
-fn parse_args() -> Result<(PathBuf, usize, u64), String> {
+fn parse_args() -> Result<(PathBuf, usize, u64, Option<PathBuf>, bool), String> {
     let mut input = None;
     let mut replicates = 2000usize;
     let mut seed = 0xC0A0_0012_2026_1030u64;
+    let mut artifacts_dir = None;
+    let mut allow_fixtures = false;
     let args: Vec<String> = env::args().skip(1).collect();
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
             "--help" | "-h" => {
-                println!("CMAQ-012 paired advantage-of-prediction auditor\n\nUsage: cargo run -- --input FILE [--replicates N] [--bootstrap-seed N]\n\nReads a strict TSV result ledger and emits paired return/success contrasts as JSON.");
+                println!("CMAQ-012 paired advantage-of-prediction auditor\n\nUsage: cargo run -- --input FILE [--replicates N] [--bootstrap-seed N] [--artifacts-dir DIR] [--allow-fixtures]\n\nReads a strict TSV ledger. When --artifacts-dir is supplied, verifies exact profile and receipt bytes against every paired row. Fixture-only artifacts require the explicit --allow-fixtures flag.");
                 process::exit(0);
             }
             "--input" => { index += 1; input = Some(PathBuf::from(args.get(index).ok_or_else(|| "--input requires a path".to_string())?)); }
             "--replicates" => { index += 1; replicates = args.get(index).ok_or_else(|| "--replicates requires a number".to_string())?.parse().map_err(|_| "invalid --replicates value".to_string())?; }
             "--bootstrap-seed" => { index += 1; seed = args.get(index).ok_or_else(|| "--bootstrap-seed requires a number".to_string())?.parse().map_err(|_| "invalid --bootstrap-seed value".to_string())?; }
+            "--artifacts-dir" => { index += 1; artifacts_dir = Some(PathBuf::from(args.get(index).ok_or_else(|| "--artifacts-dir requires a directory".to_string())?)); }
+            "--allow-fixtures" => allow_fixtures = true,
             other => return Err(format!("unknown argument {other:?}; use --help")),
         }
         index += 1;
     }
-    Ok((input.ok_or_else(|| "--input is required".to_string())?, replicates, seed))
+    if allow_fixtures && artifacts_dir.is_none() {
+        return Err("--allow-fixtures requires --artifacts-dir".into());
+    }
+    Ok((input.ok_or_else(|| "--input is required".to_string())?, replicates, seed, artifacts_dir, allow_fixtures))
 }
 
 fn main() {
-    let (path, replicates, seed) = match parse_args() {
+    let (path, replicates, seed, artifacts_dir, allow_fixtures) = match parse_args() {
         Ok(args) => args, Err(error) => { eprintln!("{error}"); process::exit(2); }
     };
     let input = match fs::read_to_string(&path) {
         Ok(input) => input, Err(error) => { eprintln!("failed to read {}: {error}", path.display()); process::exit(2); }
     };
-    match build_report(&input, replicates, seed) {
+    match build_report_with_artifacts(&input, replicates, seed, artifacts_dir.as_deref(), allow_fixtures) {
         Ok(report) => print!("{}", render_report(&report)),
         Err(error) => { eprintln!("invalid CMAQ-012 input: {error}"); process::exit(1); }
     }
