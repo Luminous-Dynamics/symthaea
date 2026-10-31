@@ -2538,7 +2538,29 @@ impl BinaryCausalModel {
             });
         }
 
-        let mut enumeration = enumerate_iit4_system_partitions_with_stats(
+        // Estimate exact combinatorial work and enforce every admission limit
+        // before constructing partition objects or cut matrices.
+        let partition_work = estimate_iit4_system_partition_work(
+            candidate_system,
+            self.n_units,
+            config.include_total_cut,
+        )?;
+        if partition_work.canonical_direction_assignments > config.max_partition_combinations {
+            return Err(PartitionEnumerationError::BudgetExceeded {
+                max_combinations: config.max_partition_combinations,
+            }.into());
+        }
+        let partition_score_evaluations = partition_work.total_partition_candidates
+            .checked_mul(state_pair_count)
+            .ok_or(SystemPhiError::StatePairCounterOverflow)?;
+        if partition_score_evaluations > config.max_partition_score_evaluations {
+            return Err(SystemPhiError::PartitionScoreBudgetExceeded {
+                candidate_evaluations: partition_score_evaluations,
+                max_evaluations: config.max_partition_score_evaluations,
+            });
+        }
+
+        let enumeration = enumerate_iit4_system_partitions_with_stats(
             candidate_system,
             self.n_units,
             config.include_total_cut,
@@ -2551,19 +2573,8 @@ impl BinaryCausalModel {
             unique_non_total_cuts: enumeration.unique_non_total_cuts,
             total_cut_included: enumeration.total_cut_included,
         };
-        // Move the canonical partition list out of the stats report so only
-        // one candidate vector remains live during the scoring pass.
-        let partitions = std::mem::take(&mut enumeration.partitions);
-        let partition_score_evaluations = partitions
-            .len()
-            .checked_mul(state_pair_count)
-            .ok_or(SystemPhiError::StatePairCounterOverflow)?;
-        if partition_score_evaluations > config.max_partition_score_evaluations {
-            return Err(SystemPhiError::PartitionScoreBudgetExceeded {
-                candidate_evaluations: partition_score_evaluations,
-                max_evaluations: config.max_partition_score_evaluations,
-            });
-        }
+        let partitions = enumeration.partitions;
+        debug_assert_eq!(partitions.len(), partition_work.total_partition_candidates);
 
         let state_pairs = intrinsic.state_pairs();
         let mut state_pair_results = Vec::with_capacity(state_pair_count);
