@@ -412,10 +412,7 @@ fn pair_is_within_tolerance(delta: &ResourcePairDelta) -> bool {
     ].iter().all(|value| *value == Some(true))
 }
 
-fn evaluate_resource_match(
-    episodes: &[BTreeMap<Arm, Row>],
-    _arm_metrics: &BTreeMap<Arm, ArmMetrics>,
-) -> ResourceMatch {
+fn evaluate_resource_match(episodes: &[BTreeMap<Arm, Row>]) -> ResourceMatch {
     let reference = &episodes[0][&Arm::D0];
     let method = reference.resource_measurement_method;
     let d1_role_valid = episodes.iter().all(|episode| {
@@ -610,7 +607,7 @@ fn build_report(input: &str, replicates: usize, bootstrap_seed: u64) -> Result<R
         let episode_count = episodes.len();
         let mut arms = BTreeMap::new();
         for arm in ARMS { arms.insert(arm, summarize_arm(&episodes, arm)); }
-        let resource_match = evaluate_resource_match(&episodes, &arms);
+        let resource_match = evaluate_resource_match(&episodes);
         let eligibility = if split != "qualification" || episode_count < MIN_QUALIFICATION_PAIRS {
             "smoke_only"
         } else {
