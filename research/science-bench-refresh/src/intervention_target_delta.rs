@@ -1027,7 +1027,7 @@ mod tests {
             .collect()
     }
 
-    fn fixtures() -> (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, String, String) {
+    fn fixtures() -> (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, String) {
         let analyzer_revision = crate::BUILT_GENERATOR_SOURCE_REVISION.to_owned();
         let invariant_target_id = digest("claim:invariant-target");
         let changed_target_id = digest("claim:changed-target");
@@ -1181,12 +1181,7 @@ mod tests {
         });
         let target_receipt_bytes = serde_json::to_vec_pretty(&target_receipt_value).unwrap();
 
-        (quality_plan_bytes, quality_receipt_bytes, target_plan_bytes, target_receipt_bytes, changed_target_id, changed_control_id_placeholder())
-    }
-
-    fn changed_control_id_placeholder() -> String {
-        // Stable placeholder used only by test return shape; it is not a committed identity.
-        "unused-control-placeholder".to_owned()
+        (quality_plan_bytes, quality_receipt_bytes, target_plan_bytes, target_receipt_bytes, changed_target_id)
     }
 
     fn parse_receipt(bytes: &[u8]) -> Value {
@@ -1204,7 +1199,7 @@ mod tests {
 
     #[test]
     fn accepts_matching_global_and_target_delta_relations() {
-        let (quality_plan, quality_receipt, target_plan, target_receipt, _, _) = fixtures();
+        let (quality_plan, quality_receipt, target_plan, target_receipt, _) = fixtures();
         let result = report(&quality_plan, &quality_receipt, &target_plan, &target_receipt);
         assert_eq!(result.fields.candidate_count, 2);
         assert_eq!(result.fields.global_relation_valid_count, 2);
@@ -1214,13 +1209,13 @@ mod tests {
         assert_eq!(result.fields.exact_changed_scope_match_count, 2);
         assert_eq!(result.fields.reviewer_pairwise_comparison_count, 6);
         assert_eq!(result.fields.reviewer_target_transition_comparison_count, 6);
-        assert_eq!(result.fields.scoring_eligible_declared, false);
-        assert_eq!(result.fields.semantic_truth_proven, false);
+        assert!(!result.fields.scoring_eligible_declared);
+        assert!(!result.fields.semantic_truth_proven);
     }
 
     #[test]
     fn wrong_target_direction_is_invalid_even_when_global_relation_is_valid() {
-        let (quality_plan, quality_receipt, target_plan, target_receipt, _, _) = fixtures();
+        let (quality_plan, quality_receipt, target_plan, target_receipt, _) = fixtures();
         let mut receipt = parse_receipt(&target_receipt);
         for reviewer in receipt["adjudications"][1]["reviewers"].as_array_mut().unwrap() {
             reviewer["observed_target_change"] = json!("support_increased");
@@ -1309,7 +1304,7 @@ mod tests {
 
     #[test]
     fn rejects_target_plan_scope_and_parent_binding_tampering() {
-        let (quality_plan, quality_receipt, target_plan, target_receipt, changed_id, _) = fixtures();
+        let (quality_plan, quality_receipt, target_plan, target_receipt, changed_id) = fixtures();
         let mut target_plan_value = parse_receipt(&target_plan);
         let mut expanded_changed_scope = vec![changed_id, digest("unrelated material claim")];
         expanded_changed_scope.sort();
@@ -1355,7 +1350,7 @@ mod tests {
 
     #[test]
     fn rejects_a_target_delta_plan_bound_to_another_parent_study() {
-        let (quality_plan, _, target_plan, _, _, _) = fixtures();
+        let (quality_plan, _, target_plan, _, _) = fixtures();
         let mut plan = parse_receipt(&target_plan);
         plan["study_id"] = json!("different-study");
         let fields_value = {
