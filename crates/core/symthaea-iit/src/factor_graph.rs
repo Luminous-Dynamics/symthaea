@@ -244,16 +244,69 @@ impl BinaryLogFactor {
     /// least-significant-bit convention. Conditioning an absent variable is an
     /// identity operation, which is useful when a cutset variable is disconnected.
     pub fn condition(&self, variable: usize, value: bool) -> Result<Self, FactorGraphError> {
-        let Ok(variable_slot) = self.variables.binary_search(&variable) else {
+        self.condition_many(&[(variable, value)])
+    }
+
+    /// Condition an ascending set of variables in one table pass.
+    ///
+    /// Assignments whose variables are absent from this factor are ignored.
+    /// Unlike repeated single-variable conditioning, this builds the reduced table
+    /// once and avoids intermediate table allocations for a multi-variable cutset.
+    /// Assignment order must be strictly ascending and duplicate-free.
+    pub fn condition_many(
+        &self,
+        assignments: &[(usize, bool)],
+    ) -> Result<Self, FactorGraphError> {
+        for pair in assignments.windows(2) {
+            if pair[0].0 >= pair[1].0 {
+                return Err(FactorGraphError::ScopeNotStrictlyAscending {
+                    left: pair[0].0,
+                    right: pair[1].0,
+                });
+            }
+        }
+
+        let mut assignment_slot = 0usize;
+        let mut fixed_values = vec![None; self.variables.len()];
+        let mut variables = Vec::with_capacity(self.variables.len());
+        for (local_slot, variable) in self.variables.iter().copied().enumerate() {
+            while assignments
+                .get(assignment_slot)
+                .is_some_and(|(assigned, _)| *assigned < variable)
+            {
+                assignment_slot += 1;
+            }
+            if let Some((assigned, value)) = assignments.get(assignment_slot) {
+                if *assigned == variable {
+                    fixed_values[local_slot] = Some(*value);
+                    assignment_slot += 1;
+                    continue;
+                }
+            }
+            variables.push(variable);
+        }
+
+        if variables.len() == self.variables.len() {
             return Ok(self.clone());
-        };
-        let mut variables = self.variables.clone();
-        variables.remove(variable_slot);
+        }
+
         let entries = assignment_count(variables.len())?;
         let mut log_values = Vec::with_capacity(entries);
         for assignment in 0..entries {
-            let conditioned_index = insert_assignment_bit(assignment, variable_slot, value)?;
-            log_values.push(self.log_values[conditioned_index]);
+            let mut original_index = 0usize;
+            let mut output_slot = 0usize;
+            for (local_slot, fixed_value) in fixed_values.iter().copied().enumerate() {
+                let bit = match fixed_value {
+                    Some(value) => usize::from(value),
+                    None => {
+                        let value = (assignment >> output_slot) & 1;
+                        output_slot += 1;
+                        value
+                    }
+                };
+                original_index |= bit << local_slot;
+            }
+            log_values.push(self.log_values[original_index]);
         }
         Self::new(variables, log_values)
     }
@@ -742,15 +795,14 @@ pub fn min_fill_log_sum_product_with_cutset(
 
     for branch in 0..branch_count {
         let mut conditioned_factors = Vec::with_capacity(factors.len());
+        let cutset_assignment = canonical_cutset
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(slot, variable)| (variable, ((branch >> slot) & 1) != 0))
+            .collect::<Vec<_>>();
         for factor in factors {
-            let mut conditioned = factor.clone();
-            for (slot, variable) in canonical_cutset.iter().copied().enumerate() {
-                if conditioned.variables.binary_search(&variable).is_ok() {
-                    let value = ((branch >> slot) & 1) != 0;
-                    conditioned = conditioned.condition(variable, value)?;
-                }
-            }
-            conditioned_factors.push(conditioned);
+            conditioned_factors.push(factor.condition_many(&cutset_assignment)?);
         }
 
         let report = min_fill_log_sum_product_with_plan(&conditioned_factors, &plan)?;
@@ -1497,6 +1549,40 @@ mod tests {
                 assert_eq!(probability_report.peak_factor_entries, log_report.peak_factor_entries);
             }
         }
+    }
+
+    #[test]
+    fn multi_variable_conditioning_matches_repeated_single_variable_conditioning() {
+        let factor = BinaryLogFactor::new(
+            vec![1, 3, 5, 7],
+            (0..16)
+                .map(|index| if index == 9 { f64::NEG_INFINITY } else { (index as f64 + 1.0).ln() })
+                .collect(),
+        ).unwrap();
+
+        for mask in 0..16usize {
+            let assignments = [1usize, 3, 5, 7]
+                .into_iter()
+                .enumerate()
+                .map(|(slot, variable)| (variable, ((mask >> slot) & 1) != 0))
+                .collect::<Vec<_>>();
+            let repeated = assignments.iter().try_fold(
+                factor.clone(),
+                |current, (variable, value)| current.condition(*variable, *value),
+            ).unwrap();
+            let direct = factor.condition_many(&assignments).unwrap();
+            assert_eq!(direct, repeated, "conditioning mask {mask:04b}");
+        }
+
+        assert!(matches!(
+            factor.condition_many(&[(3, true), (1, false)]),
+            Err(FactorGraphError::ScopeNotStrictlyAscending { left: 3, right: 1 })
+        ));
+        assert!(matches!(
+            factor.condition_many(&[(1, true), (1, false)]),
+            Err(FactorGraphError::ScopeNotStrictlyAscending { left: 1, right: 1 })
+        ));
+        assert_eq!(factor.condition_many(&[(99, true)]).unwrap(), factor);
     }
 
     #[test]
