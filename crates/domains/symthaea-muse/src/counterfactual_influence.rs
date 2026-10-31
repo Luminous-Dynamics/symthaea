@@ -709,6 +709,7 @@ pub enum CounterfactualInfluenceError {
     InvalidInfluenceReceipt,
     InfluenceReplayMismatch,
     WindowIndexMismatch,
+    InvalidSupportPolicy(&'static str),
 }
 
 impl std::fmt::Display for CounterfactualInfluenceError {
@@ -766,6 +767,7 @@ impl std::fmt::Display for CounterfactualInfluenceError {
             Self::WindowIndexMismatch => {
                 write!(f, "calibration cells do not match the expected window/channel layout")
             }
+            Self::InvalidSupportPolicy(reason) => write!(f, "invalid temporal support policy: {reason}"),
         }
     }
 }
@@ -1037,6 +1039,175 @@ fn merge_intervals(mut intervals: Vec<FrameInterval>) -> Vec<FrameInterval> {
         }
     }
     merged
+}
+
+fn validate_support_policy(
+    policy: &InfluenceSupportPolicy,
+    total_frames: usize,
+    window_count: usize,
+) -> Result<(), CounterfactualInfluenceError> {
+    if policy.version != INFLUENCE_SUPPORT_POLICY_VERSION {
+        return Err(CounterfactualInfluenceError::InvalidSupportPolicy("unsupported policy version"));
+    }
+    if policy.release_threshold_ratio_microunits == 0
+        || policy.release_threshold_ratio_microunits >= MICROS_PER_RATIO_UNIT
+    {
+        return Err(CounterfactualInfluenceError::InvalidSupportPolicy(
+            "release threshold ratio must be strictly between zero and one",
+        ));
+    }
+    if policy.minimum_active_windows == 0 || policy.minimum_active_windows > window_count {
+        return Err(CounterfactualInfluenceError::InvalidSupportPolicy(
+            "minimum_active_windows must be in 1..=window_count",
+        ));
+    }
+    if policy.maximum_gap_windows > MAX_SUPPORT_GAP_WINDOWS {
+        return Err(CounterfactualInfluenceError::InvalidSupportPolicy(
+            "maximum_gap_windows exceeds the safety bound",
+        ));
+    }
+    if policy.tail_extension_frames > total_frames as u64 {
+        return Err(CounterfactualInfluenceError::InvalidSupportPolicy(
+            "tail_extension_frames cannot exceed the rendered output horizon",
+        ));
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SupportQualificationCounts {
+    qualified_channel_windows: usize,
+    bridged_channel_windows: usize,
+    tail_extension_frames_applied: u64,
+}
+
+/// Apply a temporal Schmitt-trigger-like support policy independently per
+/// channel. A new episode starts only on an enter-threshold crossing. Once
+/// active, lower release thresholds maintain it; a bounded number of
+/// consecutive below-release windows may be bridged. Trailing gaps never extend
+/// a measured episode. The configured tail extension is applied only after a
+/// qualifying episode and is capped by the exact output-frame horizon.
+fn qualify_support_windows(
+    measurements: &mut [InfluenceWindowMeasurement],
+    channels: usize,
+    total_frames: usize,
+    policy: &InfluenceSupportPolicy,
+) -> Result<(Vec<FrameInterval>, SupportQualificationCounts), CounterfactualInfluenceError> {
+    if channels == 0 || measurements.is_empty() || measurements.len() % channels != 0 {
+        return Err(CounterfactualInfluenceError::WindowIndexMismatch);
+    }
+    let window_count = measurements.len() / channels;
+    validate_support_policy(policy, total_frames, window_count)?;
+
+    let mut intervals = Vec::new();
+    let mut qualified_channel_windows = 0usize;
+    let mut bridged_channel_windows = 0usize;
+    let mut tail_extension_frames_applied = 0u64;
+
+    for channel in 0..channels {
+        let mut episode_start: Option<usize> = None;
+        let mut last_sustained_end = 0usize;
+        let mut sustained_window_count = 0usize;
+        let mut episode_indices = Vec::<usize>::new();
+        let mut pending_gap_indices = Vec::<usize>::new();
+
+        for index in (channel..measurements.len()).step_by(channels) {
+            let measurement = &measurements[index];
+            if measurement.channel != channel
+                || measurement.start_frame >= measurement.end_frame
+                || measurement.end_frame > total_frames
+            {
+                return Err(CounterfactualInfluenceError::WindowIndexMismatch);
+            }
+
+            if episode_start.is_none() {
+                if measurement.effect_detected {
+                    episode_start = Some(measurement.start_frame);
+                    last_sustained_end = measurement.end_frame;
+                    sustained_window_count = 1;
+                    episode_indices.push(index);
+                }
+                continue;
+            }
+
+            if measurement.release_detected {
+                if !pending_gap_indices.is_empty() {
+                    episode_indices.extend(pending_gap_indices.drain(..));
+                }
+                episode_indices.push(index);
+                sustained_window_count += 1;
+                last_sustained_end = measurement.end_frame;
+            } else {
+                pending_gap_indices.push(index);
+                if pending_gap_indices.len() > policy.maximum_gap_windows {
+                    if sustained_window_count >= policy.minimum_active_windows {
+                        let start = episode_start.expect("active support episode has a start");
+                        for member_index in &episode_indices {
+                            measurements[*member_index].in_qualified_support = true;
+                        }
+                        for gap_index in episode_indices.iter().copied() {
+                            if measurements[gap_index].release_detected == false
+                                && !measurements[gap_index].effect_detected
+                            {
+                                measurements[gap_index].bridged_gap = true;
+                                bridged_channel_windows += 1;
+                            }
+                        }
+                        qualified_channel_windows += episode_indices.len();
+                        let extended_end = (last_sustained_end as u64)
+                            .saturating_add(policy.tail_extension_frames)
+                            .min(total_frames as u64) as usize;
+                        tail_extension_frames_applied +=
+                            extended_end.saturating_sub(last_sustained_end) as u64;
+                        intervals.push(FrameInterval {
+                            start_frame: start,
+                            end_frame: extended_end,
+                        });
+                    }
+                    episode_start = None;
+                    last_sustained_end = 0;
+                    sustained_window_count = 0;
+                    episode_indices.clear();
+                    pending_gap_indices.clear();
+                }
+            }
+        }
+
+        if let Some(start) = episode_start
+            && sustained_window_count >= policy.minimum_active_windows
+        {
+            for member_index in &episode_indices {
+                measurements[*member_index].in_qualified_support = true;
+            }
+            for gap_index in episode_indices.iter().copied() {
+                if !measurements[gap_index].release_detected
+                    && !measurements[gap_index].effect_detected
+                {
+                    measurements[gap_index].bridged_gap = true;
+                    bridged_channel_windows += 1;
+                }
+            }
+            qualified_channel_windows += episode_indices.len();
+            let extended_end = (last_sustained_end as u64)
+                .saturating_add(policy.tail_extension_frames)
+                .min(total_frames as u64) as usize;
+            tail_extension_frames_applied +=
+                extended_end.saturating_sub(last_sustained_end) as u64;
+            intervals.push(FrameInterval {
+                start_frame: start,
+                end_frame: extended_end,
+            });
+        }
+    }
+
+    Ok((
+        merge_intervals(intervals),
+        SupportQualificationCounts {
+            qualified_channel_windows,
+            bridged_channel_windows,
+            tail_extension_frames_applied,
+        },
+    ))
 }
 
 fn seal_calibration(
