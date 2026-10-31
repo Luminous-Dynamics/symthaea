@@ -287,45 +287,40 @@ class ConfidenceAdaptiveCRC:
         heldout_group: int,
         counts: tuple[int, ...],
         tolerance: float = 1e-10,
+        grouped_table: dict[tuple[int, tuple[int, ...]], float] | None = None,
+        ungrouped_table: dict[tuple[int, tuple[int, ...]], float] | None = None,
     ) -> dict:
-        """Exhaustively compare this grouped cell to all point-level assignments.
+        """Compare one grouped cell with every point-level assignment.
 
-        Intended for small fixtures. Enumerates which members within each
-        duplicate pair-group carry type 2 and checks that the ungrouped
-        recursion gives one identical value for every such arrangement.
+        Optional table arguments let tests compare *recertified* tables, not
+        only the initial baseline. This is intended for small exact fixtures.
         """
         if ungrouped.group_duplicates:
             raise ValueError("comparison engine must use group_duplicates=False")
         if self.num_active_points != ungrouped.num_active_points:
             raise ValueError("grouped and ungrouped active point sets differ")
-        group_of = self.raw_to_group
-        target = self.group_pairs[heldout_group]
+        grouped_values = self.baseline_table if grouped_table is None else grouped_table
+        ungrouped_values = ungrouped.baseline_table if ungrouped_table is None else ungrouped_table
         heldout_raw_indices = [
-            i for i, g in enumerate(group_of) if g == heldout_group
+            i for i, g in enumerate(self.raw_to_group) if g == heldout_group
         ]
         values = []
         for heldout_raw in heldout_raw_indices:
-            # Each other group's subset of type-2 members can be chosen in all ways.
             group_choices = []
             for h, members in enumerate(self.group_members):
                 eligible = [i for i in members if i != heldout_raw]
                 group_choices.append(list(combinations(eligible, counts[h])))
             for chosen_per_group in product(*group_choices):
                 type2_set = {i for subset in chosen_per_group for i in subset}
-                ungrouped_counts = []
-                for raw in range(self.num_active_points):
-                    if raw == heldout_raw:
-                        ungrouped_counts.append(0)
-                    else:
-                        ungrouped_counts.append(1 if raw in type2_set else 0)
-                # In ungrouped mode, raw point index is its group index.
-                value = ungrouped.baseline_table.get(
-                    (heldout_raw, tuple(ungrouped_counts))
+                ungrouped_counts = tuple(
+                    0 if raw == heldout_raw else (1 if raw in type2_set else 0)
+                    for raw in range(self.num_active_points)
                 )
+                value = ungrouped_values.get((heldout_raw, ungrouped_counts))
                 if value is None:
                     raise KeyError("ungrouped state was not found")
                 values.append(float(value))
-        reference = self.baseline_table[(heldout_group, counts)]
+        reference = float(grouped_values[(heldout_group, counts)])
         if not values:
             raise ArithmeticError("no point-level assignments expanded this group state")
         return {
