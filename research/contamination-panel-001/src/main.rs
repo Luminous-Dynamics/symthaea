@@ -1,6 +1,6 @@
 use contamination_panel_bench::{
-    ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, DetectorEvaluationReportV1,
-    DetectorRunV1, DetectorSpecV1, PublicChallengePacketV1, SealedChallengeKeyV1,
+    ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, DetectorRunV1,
+    DetectorSpecV1, PublicChallengePacketV1, SealedChallengeKeyV1,
     audit_blinded_adjudications, detectors::{evaluate_detector_run, score_public_packet},
     generate_challenge_bundle, GeneratorConfigV1,
 };
@@ -95,7 +95,7 @@ fn score_builtins(args: &[String]) -> Result<(), Box<dyn Error>> {
 fn evaluate_run(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 5 {
         return Err(
-            "usage: contamination-panel-bench evaluate <public-packet.json> <sealed-key.json> <detector-run.json> <evaluation-report.json>"
+            "usage: contamination-panel-bench evaluate <public-packet.json> <sealed-key.json> <manifest.json> <detector-run.json> <evaluation-report.json>"
                 .into(),
         );
     }
