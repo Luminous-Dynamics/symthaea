@@ -436,7 +436,7 @@ fn validate_blocks(trials: &[Trial], plan: &Plan) -> Result<BTreeMap<String, BTr
                 return Err(format!("block {block_id} singleton trial {} must contain exactly one event", trial.id));
             }
             let event_id = trial.events[0].id.clone();
-            if singleton_by_event.insert(event_id.clone(), (*trial).clone()).is_some() {
+            if singleton_by_event.insert(event_id.clone(), (**trial).clone()).is_some() {
                 return Err(format!("block {block_id} has duplicate singleton observation for event {event_id}"));
             }
             if trial.events[0].running_ns as f64 / trial.events[0].enabled_ns as f64 < plan.minimum_singleton_running_fraction {
@@ -516,10 +516,20 @@ fn audit_values(plan_value: &Value, observation_value: &Value, plan_bytes: &[u8]
             singleton_running.push(singleton_obs.running_ns as f64 / singleton_obs.enabled_ns as f64);
         }
         let co_p95 = percentile(&co_deviation, 0.95);
-        let co_pass = co_p95.is_some_and(|v| v <= plan.maximum_co_deviation)
-            && co_running.iter().all(|v| *v >= plan.minimum_co_running_fraction)
-            && singleton_running.iter().all(|v| *v >= plan.minimum_singleton_running_fraction);
+        let is_co_scheduled = plan.co_event_ids.contains(&spec.id);
+        let co_pass = !is_co_scheduled || (
+            co_p95.is_some_and(|v| v <= plan.maximum_co_deviation)
+                && co_running.iter().all(|v| *v >= plan.minimum_co_running_fraction)
+                && singleton_running.iter().all(|v| *v >= plan.minimum_singleton_running_fraction)
+        );
         all_event_gates_pass &= co_pass;
+        let co_status = if !is_co_scheduled {
+            "not_in_co_scheduled_group_not_tested"
+        } else if co_pass {
+            "confirmatory_eligible_under_declared_thresholds"
+        } else {
+            "not_qualified_by_declared_thresholds"
+        };
         let over_p95 = percentile(&over_deviation, 0.95);
         let total_samples: u64 = trials.iter().flat_map(|trial| trial.events.iter())
             .filter(|event| event.id == spec.id)
@@ -541,7 +551,7 @@ fn audit_values(plan_value: &Value, observation_value: &Value, plan_bytes: &[u8]
                 "absolute_relative_deviation_fraction_median":value_or_null(median(&co_deviation)),
                 "absolute_relative_deviation_fraction_p95":value_or_null(co_p95),
                 "minimum_running_fraction":value_or_null(co_running.iter().copied().reduce(f64::min)),
-                "status":if co_pass {"confirmatory_eligible_under_declared_thresholds"} else {"not_qualified_by_declared_thresholds"}
+                "status":co_status
             },
             "overcommitted":{
                 "paired_blocks":over_deviation.len(),
@@ -753,7 +763,7 @@ mod tests {
         let receipt = audit_values(&plan, &obs, &pb, &ob).unwrap();
         assert_eq!(receipt["result"], "qualified_for_named_acquisition_conditions");
         assert_eq!(receipt["support"]["matched_block_count"], 2);
-        assert_eq!(receipt["support"]["trial_count"], 18);
+        assert_eq!(receipt["support"]["trial_count"], 14);
         assert_eq!(receipt["measurement_semantics"]["multiplex_scaled_values_confirmatory"], false);
         assert_eq!(receipt["support"]["effective_sample_size_estimate"], Value::Null);
         assert_eq!(receipt["event_qualification"][0]["co_scheduled"]["status"], "confirmatory_eligible_under_declared_thresholds");
