@@ -59,6 +59,9 @@ pub struct CounterfactualEventSupportEvidence {
     pub tail_guard_was_clipped: bool,
     /// Last projected note-off frame for all MIDI descendants of this source event.
     pub final_note_off_frame: u64,
+    /// Consecutive all-channel quiet windows, all beginning after final note-off.
+    pub trailing_quiet_windows: usize,
+    pub total_windows: usize,
     pub segmentation_config_sha256: String,
     pub source_score_sha256: String,
     pub baseline_event_map_artifact_sha256: String,
@@ -161,6 +164,8 @@ impl CounterfactualSupportAdapterReport {
                     && event.output_sample_format == self.output_sample_format
                     && event.effects_group_assignment == self.effects_group_assignment
                     && event.final_note_off_frame <= event.output_frame_count
+                    && event.total_windows > 0
+                    && event.trailing_quiet_windows <= event.total_windows
                     && event.support.support_evidence_sha256.as_deref()
                         == Some(event.evidence_sha256.as_str())
                     && is_sha256(&event.evidence_sha256)
@@ -217,6 +222,7 @@ pub enum CounterfactualSupportAdapterError {
     MissingEffectsGroupEvidence,
     InvalidEffectsGroupAssignment,
     InvalidSupportIntervals,
+    InvalidInfluenceWindowTrace,
     EventCountMismatch,
     DuplicateOrMissingEvent,
     InconsistentSourceOrRendererContext,
@@ -343,6 +349,42 @@ fn convert_intervals(
     Ok(merged)
 }
 
+fn trailing_quiet_windows_after_note_off(
+    window_segmentation: &[crate::counterfactual_influence::InfluenceWindowSegmentation],
+    channels: usize,
+    final_note_off_frame: u64,
+    output_frame_count: u64,
+) -> Result<(usize, usize), CounterfactualSupportAdapterError> {
+    if channels == 0 || window_segmentation.is_empty() || window_segmentation.len() % channels != 0 {
+        return Err(CounterfactualSupportAdapterError::InvalidInfluenceWindowTrace);
+    }
+    let mut by_window = std::collections::BTreeMap::<usize, (usize, bool, usize, usize)>::new();
+    for window in window_segmentation {
+        if window.channel >= channels || window.start_frame >= window.end_frame || window.end_frame as u64 > output_frame_count {
+            return Err(CounterfactualSupportAdapterError::InvalidInfluenceWindowTrace);
+        }
+        let entry = by_window.entry(window.window_index).or_insert((0, true, window.start_frame, window.end_frame));
+        if entry.2 != window.start_frame || entry.3 != window.end_frame {
+            return Err(CounterfactualSupportAdapterError::InvalidInfluenceWindowTrace);
+        }
+        entry.0 += 1;
+        entry.1 &= !window.onset_triggered && !window.release_triggered && !window.hysteresis_active;
+    }
+    let total_windows = by_window.len();
+    if total_windows == 0 || by_window.keys().copied().ne(0..total_windows)
+        || by_window.values().any(|(count, _, _, _)| *count != channels) {
+        return Err(CounterfactualSupportAdapterError::InvalidInfluenceWindowTrace);
+    }
+    let mut trailing = 0usize;
+    for index in (0..total_windows).rev() {
+        if by_window.get(&index).is_some_and(|(_, quiet, start, _)| *quiet && (*start as u64) >= final_note_off_frame) {
+            trailing += 1;
+        } else {
+            break;
+        }
+    }
+    Ok((trailing, total_windows))
+}
 fn build_event_support(
     report: &CounterfactualInfluenceSegmentedReport,
     input: &CounterfactualInfluenceInput<'_, '_>,
@@ -413,6 +455,12 @@ fn build_event_support(
     if final_note_off_frame > output_frame_count {
         return Err(CounterfactualSupportAdapterError::InvalidEventIdentity);
     }
+    let (trailing_quiet_windows, total_windows) = trailing_quiet_windows_after_note_off(
+        &report.window_segmentation,
+        base.channels,
+        final_note_off_frame,
+        output_frame_count,
+    )?;
 
     let mut domains = BTreeSet::new();
     for channel in baseline_lineage.iter().map(|lineage| lineage.midi_channel).collect::<BTreeSet<_>>() {
@@ -438,6 +486,8 @@ fn build_event_support(
         conservative_support_intervals: conservative_support_intervals.clone(),
         tail_guard_was_clipped: report.tail_guard_was_clipped,
         final_note_off_frame,
+        trailing_quiet_windows,
+        total_windows,
         segmentation_config_sha256: sha256_hex(&serde_json::to_vec(&report.segmentation).map_err(|_| CounterfactualSupportAdapterError::SerializationFailure)?),
         source_score_sha256: base.source_score_sha256.clone(),
         baseline_event_map_artifact_sha256: base.performed_event_map_sha256.clone(),
@@ -657,6 +707,8 @@ mod tests {
             conservative_support_intervals: intervals.clone(),
             tail_guard_was_clipped: false,
             final_note_off_frame: 45,
+            trailing_quiet_windows: 4,
+            total_windows: 10,
             segmentation_config_sha256: digest("segmentation-config"),
             source_score_sha256: digest("score"),
             baseline_event_map_artifact_sha256: digest("baseline-map-bytes"),
