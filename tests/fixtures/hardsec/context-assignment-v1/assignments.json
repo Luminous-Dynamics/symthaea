@@ -1,0 +1,409 @@
+{
+  "schema_version": "hardsec-context-assignment-stream-v1",
+  "evidence_domain": "synthetic_fixture",
+  "policy_id": "hs020-frozen-workload-context-v1",
+  "stream_id": "stream-cctm-demo-01",
+  "evaluation_group_id": "heldout-execution-cctm-01",
+  "assignment_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "records": [
+    {
+      "sequence_index": 1,
+      "window_id": "cctm-window-001",
+      "candidate_scores": [
+        {
+          "context_id": "compute",
+          "probability": 0.97
+        },
+        {
+          "context_id": "memory",
+          "probability": 0.03
+        }
+      ],
+      "top1_context_id": "compute",
+      "top1_confidence": 0.97,
+      "top1_top2_margin": 0.94,
+      "sensor_state": "valid",
+      "decision_status": "accepted",
+      "decision_reason": "accepted",
+      "selected_context_id": "compute"
+    },
+    {
+      "sequence_index": 2,
+      "window_id": "cctm-window-002",
+      "candidate_scores": [
+        {
+          "context_id": "memory",
+          "probability": 0.96
+        },
+        {
+          "context_id": "compute",
+          "probability": 0.04
+        }
+      ],
+      "top1_context_id": "memory",
+      "top1_confidence": 0.96,
+      "top1_top2_margin": 0.9199999999999999,
+      "sensor_state": "valid",
+      "decision_status": "accepted",
+      "decision_reason": "accepted",
+      "selected_context_id": "memory"
+    },
+    {
+      "sequence_index": 3,
+      "window_id": "cctm-window-003",
+      "candidate_scores": [
+        {
+          "context_id": "compute",
+          "probability": 0.97
+        },
+        {
+          "context_id": "memory",
+          "probability": 0.03
+        }
+      ],
+      "top1_context_id": "compute",
+      "top1_confidence": 0.97,
+      "top1_top2_margin": 0.94,
+      "sensor_state": "valid",
+      "decision_status": "accepted",
+      "decision_reason": "accepted",
+      "selected_context_id": "compute"
+    },
+    {
+      "sequence_index": 4,
+      "window_id": "cctm-window-004",
+      "candidate_scores": [
+        {
+          "context_id": "compute",
+          "probability": 0.97
+        },
+        {
+          "context_id": "memory",
+          "probability": 0.03
+        }
+      ],
+      "top1_context_id": "compute",
+      "top1_confidence": 0.97,
+      "top1_top2_margin": 0.94,
+      "sensor_state": "valid",
+      "decision_status": "accepted",
+      "decision_reason": "accepted",
+      "selected_context_id": "compute"
+    },
+    {
+      "sequence_index": 5,
+      "window_id": "cctm-window-005",
+      "candidate_scores": [
+        {
+          "context_id": "compute",
+          "probability": 0.97
+        },
+        {
+          "context_id": "memory",
+          "probability": 0.03
+        }
+      ],
+      "top1_context_id": "compute",
+      "top1_confidence": 0.97,
+      "top1_top2_margin": 0.94,
+      "sensor_state": "valid",
+      "decision_status": "accepted",
+      "decision_reason": "accepted",
+      "selected_context_id": "compute"
+    },
+    {
+      "sequence_index": 6,
+      "window_id": "cctm-window-006",
+      "candidate_scores": [
+        {
+          "context_id": "compute",
+          "probability": 0.97
+        },
+        {
+          "context_id": "memory",
+          "probability": 0.03
+        }
+      ],
+      "top1_context_id": "compute",
+      "top1_confidence": 0.97,
+      "top1_top2_margin": 0.94,
+      "sensor_state": "valid",
+      "decision_status": "accepted",
+      "decision_reason": "accepted",
+      "selected_context_id": "compute"
+    },
+    {
+      "sequence_index": 7,
+      "window_id": "cctm-window-007",
+      "candidate_scores": [
+        {
+          "context_id": "compute",
+          "probability": 0.97
+        },
+        {
+          "context_id": "memory",
+          "probability": 0.03
+        }
+      ],
+      "top1_context_id": "compute",
+      "top1_confidence": 0.97,
+      "top1_top2_margin": 0.94,
+      "sensor_state": "valid",
+      "decision_status": "accepted",
+      "decision_reason": "accepted",
+      "selected_context_id": "compute"
+    },
+    {
+      "sequence_index": 8,
+      "window_id": "cctm-window-008",
+      "candidate_scores": [
+        {
+          "context_id": "compute",
+          "probability": 0.97
+        },
+        {
+          "context_id": "memory",
+          "probability": 0.03
+        }
+      ],
+      "top1_context_id": "compute",
+      "top1_confidence": 0.97,
+      "top1_top2_margin": 0.94,
+      "sensor_state": "valid",
+      "decision_status": "accepted",
+      "decision_reason": "accepted",
+      "selected_context_id": "compute"
+    },
+    {
+      "sequence_index": 9,
+      "window_id": "cctm-window-009",
+      "candidate_scores": [
+        {
+          "context_id": "compute",
+          "probability": 0.97
+        },
+        {
+          "context_id": "memory",
+          "probability": 0.03
+        }
+      ],
+      "top1_context_id": "compute",
+      "top1_confidence": 0.97,
+      "top1_top2_margin": 0.94,
+      "sensor_state": "valid",
+      "decision_status": "accepted",
+      "decision_reason": "accepted",
+      "selected_context_id": "compute"
+    },
+    {
+      "sequence_index": 10,
+      "window_id": "cctm-window-010",
+      "candidate_scores": [
+        {
+          "context_id": "compute",
+          "probability": 0.97
+        },
+        {
+          "context_id": "memory",
+          "probability": 0.03
+        }
+      ],
+      "top1_context_id": "compute",
+      "top1_confidence": 0.97,
+      "top1_top2_margin": 0.94,
+      "sensor_state": "valid",
+      "decision_status": "accepted",
+      "decision_reason": "accepted",
+      "selected_context_id": "compute"
+    },
+    {
+      "sequence_index": 11,
+      "window_id": "cctm-window-011",
+      "candidate_scores": [
+        {
+          "context_id": "compute",
+          "probability": 0.97
+        },
+        {
+          "context_id": "memory",
+          "probability": 0.03
+        }
+      ],
+      "top1_context_id": "compute",
+      "top1_confidence": 0.97,
+      "top1_top2_margin": 0.94,
+      "sensor_state": "valid",
+      "decision_status": "accepted",
+      "decision_reason": "accepted",
+      "selected_context_id": "compute"
+    },
+    {
+      "sequence_index": 12,
+      "window_id": "cctm-window-012",
+      "candidate_scores": [
+        {
+          "context_id": "compute",
+          "probability": 0.97
+        },
+        {
+          "context_id": "memory",
+          "probability": 0.03
+        }
+      ],
+      "top1_context_id": "compute",
+      "top1_confidence": 0.97,
+      "top1_top2_margin": 0.94,
+      "sensor_state": "valid",
+      "decision_status": "accepted",
+      "decision_reason": "accepted",
+      "selected_context_id": "compute"
+    },
+    {
+      "sequence_index": 13,
+      "window_id": "cctm-window-013",
+      "candidate_scores": [
+        {
+          "context_id": "compute",
+          "probability": 0.97
+        },
+        {
+          "context_id": "memory",
+          "probability": 0.03
+        }
+      ],
+      "top1_context_id": "compute",
+      "top1_confidence": 0.97,
+      "top1_top2_margin": 0.94,
+      "sensor_state": "valid",
+      "decision_status": "accepted",
+      "decision_reason": "accepted",
+      "selected_context_id": "compute"
+    },
+    {
+      "sequence_index": 14,
+      "window_id": "cctm-window-014",
+      "candidate_scores": [
+        {
+          "context_id": "compute",
+          "probability": 0.97
+        },
+        {
+          "context_id": "memory",
+          "probability": 0.03
+        }
+      ],
+      "top1_context_id": "compute",
+      "top1_confidence": 0.97,
+      "top1_top2_margin": 0.94,
+      "sensor_state": "valid",
+      "decision_status": "accepted",
+      "decision_reason": "accepted",
+      "selected_context_id": "compute"
+    },
+    {
+      "sequence_index": 15,
+      "window_id": "cctm-window-015",
+      "candidate_scores": [
+        {
+          "context_id": "compute",
+          "probability": 0.97
+        },
+        {
+          "context_id": "memory",
+          "probability": 0.03
+        }
+      ],
+      "top1_context_id": "compute",
+      "top1_confidence": 0.97,
+      "top1_top2_margin": 0.94,
+      "sensor_state": "valid",
+      "decision_status": "accepted",
+      "decision_reason": "accepted",
+      "selected_context_id": "compute"
+    },
+    {
+      "sequence_index": 16,
+      "window_id": "cctm-window-016",
+      "candidate_scores": [
+        {
+          "context_id": "compute",
+          "probability": 0.97
+        },
+        {
+          "context_id": "memory",
+          "probability": 0.03
+        }
+      ],
+      "top1_context_id": "compute",
+      "top1_confidence": 0.97,
+      "top1_top2_margin": 0.94,
+      "sensor_state": "valid",
+      "decision_status": "accepted",
+      "decision_reason": "accepted",
+      "selected_context_id": "compute"
+    },
+    {
+      "sequence_index": 17,
+      "window_id": "cctm-window-017",
+      "candidate_scores": [
+        {
+          "context_id": "compute",
+          "probability": 0.97
+        },
+        {
+          "context_id": "memory",
+          "probability": 0.03
+        }
+      ],
+      "top1_context_id": "compute",
+      "top1_confidence": 0.97,
+      "top1_top2_margin": 0.94,
+      "sensor_state": "stale",
+      "decision_status": "abstained",
+      "decision_reason": "invalid_sensor",
+      "selected_context_id": null
+    },
+    {
+      "sequence_index": 18,
+      "window_id": "cctm-window-018",
+      "candidate_scores": [
+        {
+          "context_id": "new-regime",
+          "probability": 0.95
+        },
+        {
+          "context_id": "compute",
+          "probability": 0.05
+        }
+      ],
+      "top1_context_id": "new-regime",
+      "top1_confidence": 0.95,
+      "top1_top2_margin": 0.8999999999999999,
+      "sensor_state": "valid",
+      "decision_status": "abstained",
+      "decision_reason": "unknown_context",
+      "selected_context_id": null
+    },
+    {
+      "sequence_index": 19,
+      "window_id": "cctm-window-019",
+      "candidate_scores": [
+        {
+          "context_id": "memory",
+          "probability": 0.97
+        },
+        {
+          "context_id": "compute",
+          "probability": 0.03
+        }
+      ],
+      "top1_context_id": "memory",
+      "top1_confidence": 0.97,
+      "top1_top2_margin": 0.94,
+      "sensor_state": "untrusted",
+      "decision_status": "abstained",
+      "decision_reason": "invalid_sensor",
+      "selected_context_id": null
+    }
+  ]
+}
