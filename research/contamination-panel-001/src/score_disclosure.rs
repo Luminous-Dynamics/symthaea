@@ -520,12 +520,12 @@ pub fn validate_score_validity_disclosure(
         if !observed_threats.insert(control.threat_class.as_str()) {
             return Err(format!("duplicate dataset threat control {}", control.threat_class));
         }
+        validate_digest_status(&control.method_digest, "threat.method_digest", &mut unknown_count)?;
+        validate_digest_status(&control.evidence_receipt_digest, "threat.evidence_receipt_digest", &mut unknown_count)?;
+        count_status(control.method_digest.status, &mut controlled_count, &mut not_controlled_count, &mut not_applicable_count)?;
+        count_status(control.evidence_receipt_digest.status, &mut controlled_count, &mut not_controlled_count, &mut not_applicable_count)?;
         match control.status {
             DisclosureStatusV1::Controlled => {
-                validate_digest_status(&control.method_digest, "threat.method_digest", &mut unknown_count)?;
-                validate_digest_status(&control.evidence_receipt_digest, "threat.evidence_receipt_digest", &mut unknown_count)?;
-                count_status(control.method_digest.status, &mut controlled_count, &mut not_controlled_count, &mut not_applicable_count)?;
-                count_status(control.evidence_receipt_digest.status, &mut controlled_count, &mut not_controlled_count, &mut not_applicable_count)?;
                 if control.method_digest.status != DisclosureStatusV1::Controlled
                     || control.evidence_receipt_digest.status != DisclosureStatusV1::Controlled
                 {
@@ -540,7 +540,13 @@ pub fn validate_score_validity_disclosure(
             DisclosureStatusV1::NotControlled => {
                 dataset_threat_controls_complete = false;
             }
-            DisclosureStatusV1::NotApplicable => {}
+            DisclosureStatusV1::NotApplicable => {
+                if control.method_digest.status != DisclosureStatusV1::NotApplicable
+                    || control.evidence_receipt_digest.status != DisclosureStatusV1::NotApplicable
+                {
+                    return Err(format!("not_applicable {} threat requires not_applicable evidence fields", control.threat_class));
+                }
+            }
         }
         count_status(control.status, &mut controlled_count, &mut not_controlled_count, &mut not_applicable_count)?;
         validate_text_status(control.notes.status, control.notes.value.as_deref(), "threat.notes", &mut unknown_count)?;
@@ -938,6 +944,15 @@ mod tests {
             sha256: None,
         };
         assert!(validate(&disclosure).unwrap_err().contains("controlled direct threat requires"));
+    }
+
+    #[test]
+    fn malformed_digests_are_rejected_even_when_threat_is_not_controlled() {
+        let mut disclosure = valid_disclosure();
+        disclosure.dataset_threat_controls[0].status = DisclosureStatusV1::NotControlled;
+        disclosure.dataset_threat_controls[0].method_digest.sha256 = Some("not-a-sha256".to_owned());
+        let error = validate(&disclosure).unwrap_err();
+        assert!(error.contains("threat.method_digest must be a lowercase SHA-256 digest"));
     }
 
     #[test]
