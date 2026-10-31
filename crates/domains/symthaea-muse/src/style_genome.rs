@@ -6,11 +6,11 @@
 //! intentionally absent from this module. A candidate is admitted only when
 //! universal score invariants pass, the grammar emits a non-empty trace, all
 //! trace references resolve against the exact score, and fingerprints are
-//! finite. Trace integrity in this v1 is referential/order integrity only;
-//! it does not elevate composer assertions into independently verified
-//! musical semantics. Style-specific musical judgments remain reported separately;
-//! this module does not force every tradition through common-practice tonal
-//! rules.
+//! finite. The trace audit verifies reference existence and ordering; it
+//! does not elevate composer assertions into independently verified musical
+//! semantics. Family-native plan obligations are checked separately.
+//! Style-specific musical judgments remain reported separately; this module
+//! does not force every tradition through common-practice tonal rules.
 //!
 //! This v2 uses the existing hybrid compiler, typed family-native grammar
 //! plans, native trace, score validator and structural fingerprint. It does
