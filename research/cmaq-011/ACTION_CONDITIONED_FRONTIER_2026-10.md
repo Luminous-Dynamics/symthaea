@@ -28,9 +28,11 @@ No one benchmark below covers all four.
 - Paper: https://arxiv.org/abs/2605.25874.
 - Public data: https://huggingface.co/datasets/meituan-longcat/WBench.
 - 289 cases / 1,058 interaction turns / four interaction types (navigation, subject action, event editing, perspective switching).
+- The pinned repository README says 39 models; the live public leaderboard page observed 2026-10-31 lists 45 entries (13 text, 21 camera, 11 action). These are distinct snapshots and must not be silently merged.
 - 158-case Navi subset for camera-conditioned (6-DoF) and discrete-action conditioned interfaces. Keep text-conditioned 289-case comparisons separate.
 - Five dimensions / 22 metrics: quality (6), consistency (8), interaction (4), setting (2), physical (2). Exact metric names and source hashes are in `wbench-baseline.lock.json`.
-- Published Oct 12 results:
+- Live leaderboard page (last updated 2026-10-12, observed 2026-10-31) shows the overall Navi table led by Alaya-EVOKE-Turbo 82.0, XGEN-Jing 81.9, and Enuma 81.7; VWA-World is rank 4 at 81.7. The table includes multiple model interfaces, so these are not an action-only ranking.
+- Published Oct 12 provenance examples:
   - VWA-World, action-conditioned, Navi, 158 cases: 81.7. Provenance states 16 submitter-evaluated metrics + 3 organizer-evaluated VLM metrics (causal fidelity, scene adherence, subject adherence); the 16 local metrics had aggregate schema/count checks only, with no per-case local scores supplied.
   - gd_world, camera-conditioned, Navi, 158 cases: 81.2, organizer evaluation. It is a camera interface, not an action-conditioned result.
 - Judge model listed in the pinned provenance: `doubao-seed-2-0-lite-260215`. WBench warns that scores from different judges are not directly comparable.
