@@ -929,14 +929,21 @@ mod tests {
                 baseline.score, candidate.score,
                 "{axis} donor did not change the Blues score"
             );
-            match &candidate.grammar_plan {
-                GrammarPlanEvidence::CallResponse(plan) => {
-                    assert_eq!(plan.bars_per_chorus, 12);
-                    assert_eq!(plan.call_starts, vec![0, 4, 8]);
-                    assert_eq!(plan.response_starts, vec![2, 6, 10]);
+            match (&baseline.plan, &candidate.grammar_plan) {
+                (
+                    GrammarPlanEvidence::CallResponse(expected),
+                    GrammarPlanEvidence::CallResponse(actual),
+                ) => {
+                    assert_eq!(actual.bars_per_chorus, 12);
+                    assert_eq!(actual.call_starts, vec![0, 4, 8]);
+                    assert_eq!(actual.response_starts, vec![2, 6, 10]);
+                    assert_eq!(actual.trajectory, expected.trajectory);
                 }
-                other => panic!("wrong Blues grammar plan: {other:?}"),
+                (expected, actual) => {
+                    panic!("wrong Blues grammar plans: {expected:?} vs {actual:?}")
+                }
             }
+            assert!(!candidate.grammar_trace.structures.is_empty());
         }
     }
 
@@ -1014,13 +1021,20 @@ mod tests {
                 baseline.score, candidate.score,
                 "{axis} donor did not change the JazzChorus score"
             );
-            match &candidate.grammar_plan {
-                GrammarPlanEvidence::JazzChorus(plan) => {
-                    assert_eq!(plan.bars_per_chorus, 8);
-                    assert_eq!(plan.choruses, 3);
+            match (&baseline.plan, &candidate.grammar_plan) {
+                (
+                    GrammarPlanEvidence::JazzChorus(expected),
+                    GrammarPlanEvidence::JazzChorus(actual),
+                ) => {
+                    assert_eq!(actual.bars_per_chorus, 8);
+                    assert_eq!(actual.choruses, 3);
+                    assert_eq!(actual.trajectory, expected.trajectory);
                 }
-                other => panic!("wrong JazzChorus grammar plan: {other:?}"),
+                (expected, actual) => {
+                    panic!("wrong JazzChorus grammar plans: {expected:?} vs {actual:?}")
+                }
             }
+            assert!(!candidate.grammar_trace.structures.is_empty());
         }
     }
 
