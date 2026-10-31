@@ -676,10 +676,6 @@ pub fn verify_search_time_power_report(
 mod tests {
     use super::*;
 
-    fn digest(label: &str) -> String {
-        hash_domain(b"search-time-power-test", label.as_bytes())
-    }
-
     fn config() -> SearchTimePowerConfigV1 {
         SearchTimePowerConfigV1 {
             schema: SEARCH_POWER_CONFIG_SCHEMA.to_owned(),
