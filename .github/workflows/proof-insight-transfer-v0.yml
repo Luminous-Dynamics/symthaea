@@ -15,7 +15,32 @@ permissions:
   contents: read
 
 jobs:
+  proof-insight-target:
+    name: Proof insight source-target preflight
+    runs-on: ubuntu-latest
+    outputs:
+      present: ${{ steps.target.outputs.present }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - id: target
+        name: Check the actual indexer package before staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f crates/bridges/symthaea-proof-insights/Cargo.toml ]]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "PITB_TARGET_PRESENT: the proof-insight indexer package exists"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::PITB_NOT_APPLICABLE: crates/bridges/symthaea-proof-insights/Cargo.toml is absent; symthaea-proof-audit is a separate crate and is not substituted."
+          fi
+
   proof-insight-indexer:
+    name: Proof insight indexer (only when its source crate exists)
+    needs: proof-insight-target
+    if: ${{ needs.proof-insight-target.outputs.present == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
