@@ -331,6 +331,8 @@ pub struct Iit4SystemPhiAnalysis {
     pub request_sha256: String,
     /// All caller-selected numeric and search-budget settings, bound by the receipt.
     pub search_config: Iit4SystemPhiSearchConfig,
+    /// Certified Table 2 ceiling when the theorem's assumptions hold; None outside that domain.
+    pub certified_upper_bound: Option<usize>,
     pub status: Iit4SystemPhiStatus,
     pub phi_s: Option<f64>,
     pub selected_state_pair_index: Option<usize>,
@@ -369,6 +371,7 @@ impl Iit4SystemPhiAnalysis {
         receipt_usize(&mut bytes, self.search_config.max_state_pair_evaluations);
         receipt_usize(&mut bytes, self.search_config.max_partition_score_evaluations);
         bytes.push(u8::from(self.search_config.include_total_cut));
+        receipt_optional_usize(&mut bytes, self.certified_upper_bound);
 
         bytes.push(match self.status {
             Iit4SystemPhiStatus::ExactUniqueStatePair => 0,
@@ -2519,6 +2522,10 @@ impl BinaryCausalModel {
             candidate_system: candidate_system.to_vec(),
             request_sha256: request_sha256.clone(),
             search_config: config,
+            certified_upper_bound: certified_iit4_2023_system_phi_upper_bound(
+                candidate_system.len(),
+                config.include_total_cut,
+            ),
             status,
             phi_s,
             selected_state_pair_index: None,
@@ -2697,6 +2704,10 @@ impl BinaryCausalModel {
             candidate_system: candidate_system.to_vec(),
             request_sha256,
             search_config: config,
+            certified_upper_bound: certified_iit4_2023_system_phi_upper_bound(
+                candidate_system.len(),
+                config.include_total_cut,
+            ),
             status,
             phi_s,
             selected_state_pair_index,
