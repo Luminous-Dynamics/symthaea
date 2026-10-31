@@ -387,7 +387,7 @@ fn available_probe_queries(
     (safe, authorization_blocked, posterior_safety_blocked)
 }
 
-fn allocator_score_evaluations(strategy: Strategy, safe_candidate_count: usize) -> usize {
+fn allocator_work_units(strategy: Strategy, safe_candidate_count: usize) -> usize {
     if safe_candidate_count == 0 {
         return 0;
     }
@@ -549,7 +549,7 @@ struct Summary {
     mean_decision_flip_fraction: f64,
     beneficial_flip_fraction: f64,
     harmful_flip_fraction: f64,
-    mean_allocator_score_evaluations: f64,
+    mean_allocator_work_units: f64,
     mean_allocator_cost: f64,
     mean_authorization_blocked_candidates: f64,
     mean_posterior_safety_blocked_candidates: f64,
@@ -782,7 +782,7 @@ fn run() -> Result<(), String> {
     }
     let worlds = mechanisms();
     print!(
-        "{{\"schema_version\":\"{REPORT_SCHEMA}\",\"seed\":{},\"mechanisms\":{},\"families\":3,\"contexts\":{},\"actions\":{},\"probe_budget\":{},\"decision_horizon\":{},\"probe_cost\":{},\"allocator_cost_per_score_evaluation\":{},\"results\":[",
+        "{{\"schema_version\":\"{REPORT_SCHEMA}\",\"seed\":{},\"mechanisms\":{},\"families\":3,\"contexts\":{},\"actions\":{},\"probe_budget\":{},\"decision_horizon\":{},\"probe_cost\":{},\"allocator_cost_per_work_unit\":{},\"results\":[",
         seed, worlds.len(), CONTEXTS, ACTIONS, probe_budget, decision_horizon, probe_cost, allocator_cost
     );
     for (position, strategy) in Strategy::all().into_iter().enumerate() {
