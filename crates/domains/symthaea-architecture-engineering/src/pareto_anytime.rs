@@ -676,6 +676,7 @@ impl AnytimeHistory {
                                 },
                                 decision_sha256: decision_sha256.clone(),
                                 evidence_level: EvidenceLevel::Recorded,
+                                verification_rejected: false,
                             });
                         }
                         _ => {
@@ -698,6 +699,9 @@ impl AnytimeHistory {
                         return Err(AnytimeError::new(format!("{path}.level"), "verification must advance beyond Recorded"));
                     }
                     let state = successful.get_mut(candidate_id).ok_or_else(|| AnytimeError::new(format!("{path}.candidate_id"), "verification must follow successful evaluation"))?;
+                    if state.verification_rejected {
+                        return Err(AnytimeError::new(format!("{path}.candidate_id"), "a rejected candidate cannot be promoted later in the same run"));
+                    }
                     if &state.candidate.evidence_sha256 != evidence_sha256 {
                         return Err(AnytimeError::new(format!("{path}.evidence_sha256"), "verifier receipt refers to different evidence digest"));
                     }
@@ -712,10 +716,17 @@ impl AnytimeHistory {
                     if rejection_reason.trim().is_empty() {
                         return Err(AnytimeError::new(format!("{path}.rejection_reason"), "verifier rejection requires a reason"));
                     }
-                    let state = successful.get(candidate_id).ok_or_else(|| AnytimeError::new(format!("{path}.candidate_id"), "rejection must follow successful candidate evaluation"))?;
+                    let state = successful.get_mut(candidate_id).ok_or_else(|| AnytimeError::new(format!("{path}.candidate_id"), "rejection must follow successful candidate evaluation"))?;
+                    if state.verification_rejected {
+                        return Err(AnytimeError::new(format!("{path}.candidate_id"), "candidate verification may be rejected only once per run"));
+                    }
+                    if state.evidence_level != EvidenceLevel::Recorded {
+                        return Err(AnytimeError::new(format!("{path}.candidate_id"), "a candidate cannot be rejected after a verification promotion; contradictory verifier outcomes invalidate the run"));
+                    }
                     if &state.candidate.evidence_sha256 != evidence_sha256 {
                         return Err(AnytimeError::new(format!("{path}.evidence_sha256"), "rejection receipt refers to different evidence digest"));
                     }
+                    state.verification_rejected = true;
                 }
                 AnytimeAction::AuxiliaryAction { action_id, action_kind } => {
                     if action_id.trim().is_empty() || !auxiliary_ids.insert(action_id.as_str()) {
@@ -744,6 +755,7 @@ struct CandidateState {
     candidate: ParetoCandidate,
     decision_sha256: String,
     evidence_level: EvidenceLevel,
+    verification_rejected: bool,
 }
 
 fn event_digest(
@@ -891,6 +903,7 @@ pub fn analyze_anytime_history(history: &AnytimeHistory) -> Result<AnytimeRunRec
                     },
                     decision_sha256: decision_sha256.clone(),
                     evidence_level: EvidenceLevel::Recorded,
+                    verification_rejected: false,
                 });
             }
             AnytimeAction::CandidateVerification { candidate_id, level, .. } => {
