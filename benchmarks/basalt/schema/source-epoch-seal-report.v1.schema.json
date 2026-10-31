@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT source-epoch seal integrity report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_version",
+    "ledger_digest",
+    "seal_commitment",
+    "source_id",
+    "epoch_id",
+    "partition_id",
+    "ledger_reconciled",
+    "seal_well_formed",
+    "ledger_binding_matches",
+    "event_chain_matches",
+    "classified_range_chain_matches",
+    "source_close_claims_match",
+    "commitment_matches",
+    "integrity_passed",
+    "signature_verified",
+    "signer_authorized",
+    "anti_rollback_verified",
+    "close_coordinator_qualified",
+    "observer_delivery_qualified",
+    "qualification_eligible",
+    "errors"
+  ],
+  "properties": {
+    "report_version": {
+      "const": 1
+    },
+    "ledger_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "seal_commitment": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "source_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 128
+    },
+    "epoch_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 128
+    },
+    "partition_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 128
+    },
+    "ledger_reconciled": {
+      "type": "boolean"
+    },
+    "seal_well_formed": {
+      "type": "boolean"
+    },
+    "ledger_binding_matches": {
+      "type": "boolean"
+    },
+    "event_chain_matches": {
+      "type": "boolean"
+    },
+    "classified_range_chain_matches": {
+      "type": "boolean"
+    },
+    "source_close_claims_match": {
+      "type": "boolean"
+    },
+    "commitment_matches": {
+      "type": "boolean"
+    },
+    "integrity_passed": {
+      "type": "boolean"
+    },
+    "signature_verified": {
+      "const": false
+    },
+    "signer_authorized": {
+      "const": false
+    },
+    "anti_rollback_verified": {
+      "const": false
+    },
+    "close_coordinator_qualified": {
+      "const": false
+    },
+    "observer_delivery_qualified": {
+      "const": false
+    },
+    "qualification_eligible": {
+      "const": false
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "path",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
