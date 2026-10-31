@@ -19,6 +19,9 @@
     "shared_training_token_count",
     "total_training_token_budget",
     "training_steps",
+    "training_code_sha256",
+    "runtime_image_sha256",
+    "tokenization_pipeline_sha256",
     "training_hyperparameters_sha256",
     "optimizer_schedule_sha256",
     "treatment_training_corpus_sha256",
@@ -117,6 +120,15 @@
     "shared_training_token_count": {
       "type": "integer",
       "minimum": 1
+    },
+    "training_code_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "runtime_image_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "tokenization_pipeline_sha256": {
+      "$ref": "#/$defs/sha256"
     }
   },
   "$defs": {
