@@ -259,6 +259,10 @@ def main() -> None:
     mutated["candidate"]["config_path"] = "../README.md"
     hostile_cases.append(("artifact path traversal", mutated))
 
+    mutated = copy.deepcopy(example)
+    mutated["candidate"]["config_path"] = "research/cmaq-common/examples/assets/cmaq018/missing-artifact.json"
+    hostile_cases.append(("missing artifact path", mutated))
+
     with tempfile.TemporaryDirectory(prefix=".cmaq-manifest-hostile-", dir=ROOT) as temporary:
         temporary_root = Path(temporary)
         tampered = temporary_root / "tampered-config.json"
