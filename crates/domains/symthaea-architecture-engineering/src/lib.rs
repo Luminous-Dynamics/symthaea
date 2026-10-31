@@ -27,6 +27,7 @@ pub mod offer_set_evidence;
 pub mod pareto_objectives;
 pub mod pareto_benchmarks;
 pub mod pareto_nsga2;
+pub mod pareto_moead;
 pub mod coral_baseline;
 pub mod coral_execution;
 pub mod resource_pareto;
