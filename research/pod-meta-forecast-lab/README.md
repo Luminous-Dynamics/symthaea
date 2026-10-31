@@ -30,7 +30,7 @@ The training split uses four evidence regimes. The fifth regime, held_out_shift,
 
 ## Selection arms
 
-Selection uses one logical proof obligation with four alternative operation families. Each operation has a fixed synthetic work-unit cost. A policy ranks candidates by predicted probability of verified progress per work unit, attempts affordable actions under the hard budget, and stops only after an independently generated simulator success. Fixed-order and budget-matched-random are controls. The oracle upper bound sees the simulator's probability table and is diagnostic only.
+Selection uses one logical proof obligation with four alternative operation families. Each operation has a fixed synthetic work-unit cost. A policy ranks candidates by predicted probability of verified progress per work unit, attempts affordable actions under the hard budget, and stops only after an independently generated simulator success. Fixed-order and budget-matched-random are controls. The evaluator-only oracle ranks with the simulator's true success probability per work unit; it is diagnostic only, not an exact knapsack optimum or a deployable baseline.
 
 All policies are scored on the same episode outcome arrays. The selection metrics preserve success rate, total work, progress per work unit, work per verified proof, maximum per-episode work, and budget violations separately. No weighted composite is computed.
 
