@@ -165,6 +165,7 @@ struct Plan {
     predicted_prefix_return: Option<f64>,
     candidate_queries: usize,
     model_head_evaluations: usize,
+    model_transition_evaluations: usize,
     oracle_transition_evaluations: usize,
 }
 
@@ -177,6 +178,7 @@ struct EpisodeMetrics {
     reference_model_false_safe_rate: f64,
     candidate_queries: usize,
     model_head_evaluations: usize,
+    model_transition_evaluations: usize,
     oracle_transition_evaluations: usize,
     executed_steps: usize,
 }
@@ -443,6 +445,7 @@ fn plan_actions(
             predicted_prefix_return: None,
             candidate_queries: 0,
             model_head_evaluations: 0,
+            model_transition_evaluations: 0,
             oracle_transition_evaluations: 0,
         };
     }
@@ -510,6 +513,7 @@ fn plan_actions(
         predicted_prefix_return: selected.score.predicted_prefix_return,
         candidate_queries: candidate_budget,
         model_head_evaluations: candidate_budget * policy.heads(),
+        model_transition_evaluations: candidate_budget * policy.heads() * horizon,
         oracle_transition_evaluations: if policy.is_oracle() {
             candidate_budget * horizon
         } else {
@@ -541,6 +545,7 @@ fn run_episode(
     let mut false_safe_count = 0usize;
     let mut candidate_queries = 0usize;
     let mut model_head_evaluations = 0usize;
+    let mut model_transition_evaluations = 0usize;
     let mut oracle_transition_evaluations = 0usize;
 
     while time < ENVIRONMENT_STEPS {
@@ -562,6 +567,7 @@ fn run_episode(
 
         candidate_queries += plan.candidate_queries;
         model_head_evaluations += plan.model_head_evaluations;
+        model_transition_evaluations += plan.model_transition_evaluations;
         oracle_transition_evaluations += plan.oracle_transition_evaluations;
 
         let mut actual_block_return = 0.0;
@@ -609,6 +615,7 @@ fn run_episode(
         reference_model_false_safe_rate: false_safe_count as f64 / denominator,
         candidate_queries,
         model_head_evaluations,
+        model_transition_evaluations,
         oracle_transition_evaluations,
         executed_steps,
     }
@@ -673,6 +680,12 @@ fn append_row(
         .collect();
 
     let (mean_return, return_low, return_high) = mean_and_ci(&returns);
+    let mut sorted_returns = returns.clone();
+    sorted_returns.sort_by(f64::total_cmp);
+    let lower_tail_count = sorted_returns.len().div_ceil(10).max(1);
+    let lower_decile_mean_return =
+        sorted_returns[..lower_tail_count].iter().sum::<f64>() / lower_tail_count as f64;
+    let worst_episode_return = sorted_returns[0];
     let (direct_delta, direct_low, direct_high) = mean_and_ci(&paired_direct);
     let (matched_delta, matched_low, matched_high) = mean_and_ci(&paired_matched);
     let (oracle_gap, oracle_low, oracle_high) = mean_and_ci(&paired_oracle_gap);
@@ -709,6 +722,11 @@ fn append_row(
         .map(|row| row.model_head_evaluations as f64)
         .sum::<f64>()
         / denominator;
+    let mean_model_transitions = episode_results
+        .iter()
+        .map(|row| row.model_transition_evaluations as f64)
+        .sum::<f64>()
+        / denominator;
     let mean_oracle_transitions = episode_results
         .iter()
         .map(|row| row.oracle_transition_evaluations as f64)
@@ -733,7 +751,7 @@ fn append_row(
     .expect("writing to String cannot fail");
     write!(
         output,
-        "\"mean_return\":{mean_return:.9},\"return_ci95_lower\":{return_low:.9},\"return_ci95_upper\":{return_high:.9},"
+        "\"mean_return\":{mean_return:.9},\"return_ci95_lower\":{return_low:.9},\"return_ci95_upper\":{return_high:.9},\"lower_decile_mean_return\":{lower_decile_mean_return:.9},\"worst_episode_return\":{worst_episode_return:.9},"
     )
     .expect("writing to String cannot fail");
     write!(
@@ -755,7 +773,7 @@ fn append_row(
     write_option(output, mean_gap);
     write!(
         output,
-        ",\"mean_ood_visit_fraction\":{mean_ood:.9},\"mean_selected_one_step_state_rmse\":{mean_state_rmse:.9},\"reference_model_false_safe_rate\":{mean_false_safe:.9},\"mean_candidate_sequence_queries\":{mean_queries:.3},\"mean_model_head_evaluations\":{mean_heads:.3},\"mean_oracle_transition_evaluations\":{mean_oracle_transitions:.3},\"mean_executed_steps\":{mean_steps:.3}}}"
+        ",\"mean_ood_visit_fraction\":{mean_ood:.9},\"mean_selected_one_step_state_rmse\":{mean_state_rmse:.9},\"reference_model_false_safe_rate\":{mean_false_safe:.9},\"mean_candidate_sequence_queries\":{mean_queries:.3},\"mean_model_head_evaluations\":{mean_heads:.3},\"mean_model_transition_evaluations\":{mean_model_transitions:.3},\"mean_oracle_transition_evaluations\":{mean_oracle_transitions:.3},\"mean_evaluator_diagnostic_transition_evaluations\":{mean_steps:.3},\"mean_executed_steps\":{mean_steps:.3}}}"
     )
     .expect("writing to String cannot fail");
 }
