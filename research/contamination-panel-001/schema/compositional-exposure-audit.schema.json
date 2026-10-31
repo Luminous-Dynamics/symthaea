@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/compositional-exposure-audit-v1.json",
+  "title": "Compositional multi-tool exposure audit v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "valid",
+    "trace_integrity_replayed",
+    "findings_digest_matches",
+    "every_source_event_was_individually_insufficient_attested",
+    "every_leave_one_out_set_was_insufficient_attested",
+    "every_joint_set_was_sufficient_attested",
+    "minimality_certified_only_under_monotonicity",
+    "finding_count",
+    "context_bearing_count",
+    "answer_bearing_count",
+    "unknown_count",
+    "minimality_certified_count",
+    "single_source_attestation_count",
+    "leave_one_out_attestation_count",
+    "matched_item_reference_count",
+    "run_id",
+    "trace_root_sha256",
+    "findings_sha256",
+    "independently_verified",
+    "semantic_evidence_independently_verified",
+    "claim_boundary",
+    "report_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.compositional_exposure_audit.v1"
+    },
+    "valid": {
+      "type": "boolean"
+    },
+    "trace_integrity_replayed": {
+      "type": "boolean"
+    },
+    "findings_digest_matches": {
+      "type": "boolean"
+    },
+    "every_source_event_was_individually_insufficient_attested": {
+      "type": "boolean"
+    },
+    "every_leave_one_out_set_was_insufficient_attested": {
+      "type": "boolean"
+    },
+    "every_joint_set_was_sufficient_attested": {
+      "type": "boolean"
+    },
+    "minimality_certified_only_under_monotonicity": {
+      "type": "boolean"
+    },
+    "finding_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "context_bearing_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "answer_bearing_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unknown_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "minimality_certified_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "single_source_attestation_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "leave_one_out_attestation_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "matched_item_reference_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trace_root_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "findings_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "independently_verified": {
+      "const": false
+    },
+    "semantic_evidence_independently_verified": {
+      "const": false
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "report_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
