@@ -23,6 +23,11 @@ pub struct JepaState {
     /// Most recent latent prediction error (cosine loss from last forward pass).
     pub last_pe: f32,
 
+    /// Pending action-conditioned transitions dropped because no valid action
+    /// was bound before the next observation arrived.
+    #[serde(default)]
+    pub dropped_pending_transitions: u64,
+
     /// Running variance of each latent dimension (for collapse detection).
     /// Updated via Welford's online algorithm.
     pub latent_variance: Vec<f32>,
@@ -42,6 +47,7 @@ impl JepaState {
             cumulative_loss: 0.0,
             steps: 0,
             last_pe: 1.0, // Start with maximum uncertainty
+            dropped_pending_transitions: 0,
             latent_variance: vec![1.0; latent_dim],
             latent_mean: vec![0.0; latent_dim],
             latent_m2: vec![0.0; latent_dim],
