@@ -435,6 +435,10 @@ pub fn audit_bytes(bytes: &[u8]) -> DeliveryAuditReport {
         if lost_count > 0 || required_discard_count > 0 {
             loss_free = false;
         }
+        if excluded_discard_count > 0 {
+            push_error(&mut report, "E_POLICY_EXCLUSION_UNVERIFIED", "$.classified_ranges", "policy-excluded discards remain visible but cannot be treated as loss-free until a separate pinned policy evaluator approves them");
+            loss_free = false;
+        }
     }
 
     for key in events_by_source.keys() {
@@ -675,8 +679,9 @@ mod tests {
         }]);
         let report = audit(&input);
         assert!(report.sequence_accounting_reconciled);
-        assert!(report.loss_free);
-        assert!(report.audit_passed, "{:?}", report.errors);
+        assert!(!report.loss_free);
+        assert!(!report.audit_passed);
+        assert!(report.errors.iter().any(|e| e.code == "E_POLICY_EXCLUSION_UNVERIFIED"));
         assert_eq!(report.counts.excluded_discards, 1);
     }
 
