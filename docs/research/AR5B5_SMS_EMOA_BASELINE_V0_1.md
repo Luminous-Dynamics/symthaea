@@ -108,3 +108,5 @@ For every algorithm and problem instance:
 - No machine-level resource telemetry is recorded in the optimizer report.
 
 No benchmark win or SOTA claim is made.
+
+The test fixture includes four mutually nondominated points with known 2D exclusive contributions. Two points tie at the smallest contribution; the deterministic tie rule removes the most recently created one. This tests the selection decision rather than merely checking that population size decreases.
