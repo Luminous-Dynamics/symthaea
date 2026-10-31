@@ -40,7 +40,8 @@
         "environment_id",
         "episode_horizon_base_simulator_steps",
         "simulator_steps_per_action",
-        "reward_aggregation"
+        "reward_aggregation",
+        "episode_horizon"
       ],
       "properties": {
         "suite": {
