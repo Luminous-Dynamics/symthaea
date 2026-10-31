@@ -940,6 +940,35 @@ mod tests {
         }
     }
 
+    fn completeness(
+        index: u64,
+        total_synapse_count: u64,
+        fully_proofread_partner_count: u64,
+    ) -> SynapticCompletenessEvidence {
+        SynapticCompletenessEvidence {
+            population_id: "synthetic-whole-volume-synapses".into(),
+            population_definition_sha256: "e".repeat(64),
+            synapse_population_sha256: "f".repeat(64),
+            fully_proofread_cell_set_sha256: format!("{:0>64}", format!("{:x}", index + 10)),
+            total_synapse_count,
+            synapses_with_both_partners_in_fully_proofread_cells: fully_proofread_partner_count,
+        }
+    }
+
+    fn attach_completeness(
+        snapshots: &mut [Snapshot],
+        total_synapse_count: u64,
+        fully_proofread_partner_count: u64,
+    ) {
+        for snapshot in snapshots {
+            snapshot.synaptic_completeness = Some(completeness(
+                snapshot.snapshot.sequence_index,
+                total_synapse_count,
+                fully_proofread_partner_count,
+            ));
+        }
+    }
+
     fn jsonl(snapshots: &[Snapshot]) -> Vec<u8> {
         snapshots.iter().map(|snapshot| serde_json::to_string(snapshot).unwrap())
             .collect::<Vec<_>>().join("\n").into_bytes()
@@ -954,6 +983,79 @@ mod tests {
             forecast_min_training_snapshots: 4,
             output: None,
         }
+    }
+
+    #[test]
+    fn checked_in_false_stop_counterexample_separates_invariants_from_synaptic_completeness() {
+        let bytes = include_str!("../../../../docs/neuroscience/examples/CONNECTOME_STOPPING_FALSE_STOP_COUNTEREXAMPLE.example.jsonl").as_bytes();
+        let snapshots = parse_jsonl(bytes).expect("false-stop counterexample should parse");
+        let report = build_report(bytes, &snapshots, &args(3));
+        assert_eq!(report.status, "VALIDATED_NOT_STOPPED", "{:?}", report.errors);
+        assert_eq!(report.graph_invariants_stable_in_tail, Some(true));
+        assert_eq!(report.query_metrics_stable_in_tail, Some(false));
+        assert_eq!(report.synaptic_completeness.status, "AVAILABLE");
+        assert_eq!(report.synaptic_completeness.observed_snapshot_count, 3);
+        assert_eq!(report.synaptic_completeness.latest_total_synapse_count, Some(10_000));
+        assert_eq!(report.synaptic_completeness.latest_fully_proofread_partner_synapse_count, Some(2_000));
+        assert!((report.synaptic_completeness.latest_fraction.unwrap() - 0.20).abs() < 1.0e-12);
+        assert_eq!(report.synaptic_completeness.stability.stable_under_declared_tolerance, Some(true));
+        assert_eq!(report.recommendation, "CONTINUE_REVIEW");
+    }
+
+    #[test]
+    fn missing_synaptic_completeness_in_tail_is_not_silently_filtered() {
+        let mut snapshots = vec![
+            snapshot(0, 0, &"1".repeat(64), None, 1.0, 12.0),
+            snapshot(1, 1, &"2".repeat(64), Some(&"1".repeat(64)), 1.0, 12.0),
+            snapshot(2, 2, &"3".repeat(64), Some(&"2".repeat(64)), 1.0, 12.0),
+        ];
+        snapshots[0].synaptic_completeness = Some(completeness(0, 100, 20));
+        snapshots[1].synaptic_completeness = Some(completeness(1, 100, 20));
+        let report = build_report(&jsonl(&snapshots), &snapshots, &args(3));
+        assert_eq!(report.synaptic_completeness.status, "INCOMPLETE_TAIL");
+        assert_eq!(report.synaptic_completeness.latest_fraction, None);
+        assert_eq!(report.synaptic_completeness.stability.stable_under_declared_tolerance, None);
+        assert_eq!(report.recommendation, "CONTINUE_REVIEW");
+    }
+
+    #[test]
+    fn synaptic_completeness_absence_is_reported_not_inferred_from_graph_invariants() {
+        let snapshots = vec![
+            snapshot(0, 0, &"1".repeat(64), None, 1.0, 12.0),
+            snapshot(1, 1, &"2".repeat(64), Some(&"1".repeat(64)), 1.0, 12.0),
+            snapshot(2, 2, &"3".repeat(64), Some(&"2".repeat(64)), 1.0, 12.0),
+        ];
+        let report = build_report(&jsonl(&snapshots), &snapshots, &args(3));
+        assert_eq!(report.graph_invariants_stable_in_tail, Some(true));
+        assert_eq!(report.synaptic_completeness.status, "NOT_PROVIDED");
+        assert_eq!(report.synaptic_completeness.latest_fraction, None);
+        assert_eq!(report.synaptic_completeness.stability.stable_under_declared_tolerance, None);
+        assert_eq!(report.recommendation, "CONTINUE_REVIEW");
+    }
+
+    #[test]
+    fn invalid_synaptic_completeness_counts_and_digests_fail_closed() {
+        let mut item = snapshot(0, 0, &"1".repeat(64), None, 1.0, 12.0);
+        let mut evidence = completeness(0, 100, 20);
+        evidence.synapses_with_both_partners_in_fully_proofread_cells = 101;
+        evidence.synapse_population_sha256 = "bad".into();
+        item.synaptic_completeness = Some(evidence);
+        let report = build_report(&jsonl(&[item.clone()]), &[item], &args(2));
+        assert!(report.errors.iter().any(|error| error.contains("synaptic completeness synapse_population_sha256")));
+        assert!(report.errors.iter().any(|error| error.contains("count exceeds the declared synapse population")));
+        assert_eq!(report.recommendation, "CONTINUE_REVIEW");
+    }
+
+    #[test]
+    fn synaptic_completeness_population_definition_cannot_change_inside_series() {
+        let mut a = snapshot(0, 0, &"1".repeat(64), None, 1.0, 12.0);
+        let mut b = snapshot(1, 1, &"2".repeat(64), Some(&"1".repeat(64)), 1.0, 12.0);
+        a.synaptic_completeness = Some(completeness(0, 100, 20));
+        let mut second = completeness(1, 100, 21);
+        second.population_definition_sha256 = "9".repeat(64);
+        b.synaptic_completeness = Some(second);
+        let report = build_report(&jsonl(&[a.clone(), b.clone()]), &[a, b], &args(2));
+        assert!(report.errors.iter().any(|error| error.contains("population identity/definition changed")));
     }
 
     #[test]
