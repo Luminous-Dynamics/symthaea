@@ -162,7 +162,7 @@ The executable scalar suite currently has eight deterministic payoff families (l
 
 Do not label the current deterministic high-variance payoff fixture as stochastic noise, or the scalar benchmark as multi-objective.
 
-The six-family criterion is a floor, not a sample-size guarantee. Use at least 100 paired landscape instances/seeds per family for the initial confirmatory campaign, then set final sample size using pilot variance, a predeclared minimum effect and multiplicity control. Seeds generated from the same payoff template are not independent landscapes; uncertainty must be clustered at the independent landscape/template level.
+The six-family criterion is a floor, not a sample-size guarantee. The inference implementation now has explicit tiers: Pilot requires at least six independent landscape clusters and four paired seeds per landscape; Confirmatory requires at least 100 independent landscape clusters and four paired seeds per landscape. The 100-landscape floor is an initial protocol minimum, not a power guarantee. Set final sample size using pilot variance, a predeclared minimum practical effect and multiplicity control. Seeds generated from the same payoff template are not independent landscapes; uncertainty must be clustered at the independent landscape/template level.
 
 Use two separate tracks:
 
