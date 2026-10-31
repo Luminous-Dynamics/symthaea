@@ -732,7 +732,7 @@ mod tests {
     #[test]
     fn split_graph_depths_are_held_out_in_difficulty_order() {
         fn chain_depth(suite: &GraphSuite) -> usize {
-            let case = find(suite, "long-chain-");
+            let case = suite.planner_cases().iter().find(|c| c.id.contains("long-chain-")).expect("chain fixture exists");
             case.claims.iter().filter(|c| c.id.starts_with("chain-")).count()
         }
         let dev = generate_poar_graph_suite(41,DatasetSplit::Development);
@@ -768,6 +768,18 @@ mod tests {
         let first_predictions=first.planner_cases().iter().map(ProofPacket::abstain_all).collect::<Vec<_>>();
         let second_predictions=second.planner_cases().iter().map(ProofPacket::abstain_all).collect::<Vec<_>>();
         assert_eq!(first.evaluate(&first_predictions),second.evaluate(&second_predictions));
+    }
+
+    #[test]
+    fn source_ids_are_seed_specific_within_a_split() {
+        let first=generate_poar_graph_suite(7,DatasetSplit::Development);
+        let second=generate_poar_graph_suite(8,DatasetSplit::Development);
+        let source_ids = |suite: &GraphSuite| suite.planner_cases().iter()
+            .flat_map(|case| case.evidence.iter().map(|e| e.source_id.clone())).collect::<BTreeSet<_>>();
+        let family_ids = |suite: &GraphSuite| suite.planner_cases().iter()
+            .flat_map(|case| case.evidence.iter().map(|e| e.source_family_id.clone())).collect::<BTreeSet<_>>();
+        assert!(source_ids(&first).is_disjoint(&source_ids(&second)));
+        assert_eq!(family_ids(&first),family_ids(&second));
     }
 
     #[test]
@@ -820,15 +832,25 @@ mod tests {
     }
 
     #[test]
-    fn retraction_mutation_invalidates_transitive_dependency() {
+    fn retraction_invalidates_dependents_but_preserves_unrelated_claims() {
         let mut suite=generate_poar_graph_suite(7,DatasetSplit::Test);
         let c=find(&suite,"retraction-dependency");
         let id=c.id.clone();
-        let p=packet(c,"root",ClaimDisposition::Supported{alternative_id:"root-via-base".into()},&["e-base"]);
-        assert_eq!(suite.evaluate(&[p.clone()]).case_scores[5].correct_dispositions,1);
+        let p=ProofPacket {
+            case_id:id.clone(),
+            claim_dispositions:BTreeMap::from([
+                ("root".into(),ClaimDisposition::Supported{alternative_id:"root-via-base".into()}),
+                ("unaffected".into(),ClaimDisposition::Supported{alternative_id:"unaffected-path".into()}),
+            ]),
+            retrieval_ranking:vec!["e-base".into(),"e-unaffected".into()],
+            cited_evidence_ids:BTreeSet::from(["e-base".into(),"e-unaffected".into()]),
+        };
+        assert_eq!(suite.evaluate(&[p.clone()]).case_scores[5].correct_dispositions,2);
         assert!(suite.retract_evidence(&id,"e-base"));
-        let score=&suite.evaluate(&[p]).case_scores[5];
+        let report=suite.evaluate(&[p]);
+        let score=&report.case_scores[5];
         assert_eq!(score.false_supported_claims,1);
+        assert_eq!(score.correct_dispositions,1);
         assert_eq!(score.retracted_citations,1);
         assert_eq!(score.invalid_citations,1);
     }
