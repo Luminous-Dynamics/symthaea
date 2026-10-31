@@ -153,6 +153,18 @@
       },
       "unit": "absolute_proportion_delta",
       "alternative_gate": "non_inferior_success_with_materially_lower_cost"
+    },
+    {
+      "metric_id": "semantic_access_retention",
+      "phase": "safety",
+      "definition": "Fraction of read-but-discard scenarios where the accessed resource is attributed exactly once and changed-input evidence is invalidated or reverified, despite an unchanged declared task-output digest.",
+      "numerator": "read-but-discard cases with exactly one matching observed resource and reuse_decision invalidated or reverified",
+      "denominator": "all independently adjudicated read-but-discard cases",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
     }
   ],
   "gates": {
@@ -160,7 +172,8 @@
       "hidden_dependency_recall",
       "stale_evidence_false_acceptances",
       "unsupported_channel_disclosure",
-      "integrity_loss_fail_closed"
+      "integrity_loss_fail_closed",
+      "semantic_access_retention"
     ],
     "selectivity": [
       "false_invalidation_rate",
@@ -191,7 +204,8 @@
       "scenario_family",
       "mutation_kind",
       "kernel_profile",
-      "observer_profile"
+      "observer_profile",
+      "semantic_effect_class"
     ],
     "required_costs": [
       "wall_time",
@@ -208,7 +222,8 @@
       "oracle_trust_boundary",
       "observer_loss_events",
       "excluded_scenarios_with_reasons",
-      "exact_input_digests"
+      "exact_input_digests",
+      "semantic_effect_scope"
     ],
     "forbidden_claims": [
       "profile_qualified_from_catalog_parse",

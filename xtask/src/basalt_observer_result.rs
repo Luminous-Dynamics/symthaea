@@ -1741,6 +1741,76 @@ mod tests {
         (catalog_bytes, oracle_bytes, receipts_bytes)
     }
 
+    fn semantic_pair_inputs() -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut catalog_value: Value =
+            serde_json::from_slice(&catalog).expect("catalog fixture parses");
+        catalog_value["cases"][1]["expected_disposition"] = json!("capture_dependency");
+        catalog_value["cases"][1]["required_receipt_facts"] =
+            json!(["resource_identity", "content_digest", "read_event"]);
+        let catalog = serde_json::to_vec(&catalog_value).expect("semantic catalog serializes");
+
+        let mut oracle_value: Value =
+            serde_json::from_slice(&oracle).expect("oracle fixture parses");
+        oracle_value["records"][0]["semantic_effect"] = json!("demonstrated");
+        oracle_value["records"][1]["ground_truth"] = json!("consumed");
+        oracle_value["records"][1]["witness_kind"] = json!("controlled_read");
+        oracle_value["records"][1]["semantic_effect"] =
+            json!("not_demonstrated_in_tested_domain");
+        let constant_output = json!(format!("sha256:{}", "d".repeat(64)));
+        oracle_value["records"][1]["execution_witness"]["baseline_output_digest"] =
+            constant_output.clone();
+        oracle_value["records"][1]["execution_witness"]["mutated_output_digest"] =
+            constant_output;
+        oracle_value["records"][1]["execution_witness"]["baseline_bytes_read"] = json!(8);
+        oracle_value["records"][1]["execution_witness"]["mutated_bytes_read"] = json!(9);
+        let oracle = serde_json::to_vec(&oracle_value).expect("semantic oracle serializes");
+
+        let mut receipt_value: Value =
+            serde_json::from_slice(&receipts).expect("receipt fixture parses");
+        receipt_value["records"][1]["disposition"] = json!("captured");
+        receipt_value["records"][1]["observed_resources"] = json!([{
+            "resource_id": "fixture:paired-secret.txt",
+            "digest": format!("sha256:{}", "b".repeat(64))
+        }]);
+        receipt_value["records"][1]["facts"] =
+            json!(["resource_identity", "content_digest", "read_event"]);
+        receipt_value["records"][1]["reuse_decision"] = json!("reverified");
+        let receipts = serde_json::to_vec(&receipt_value).expect("semantic receipts serialize");
+        (catalog, oracle, receipts)
+    }
+
+    #[test]
+    fn accepts_read_but_discarded_access_without_reclassifying_it_as_unconsumed() {
+        let (catalog, oracle, receipts) = semantic_pair_inputs();
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(report.adjudication_complete, "{:?}", report.errors);
+        assert!(report.adjudication_passed, "{:?}", report.errors);
+        assert_eq!(report.metrics.semantic_access_without_output_effect_in_tested_domain, 1);
+        assert_eq!(report.metrics.semantic_influence_demonstrated, 1);
+        assert!(report.cases.iter().any(|case| {
+            case.case_id == "unused-neighbor"
+                && case.semantic_effect.as_deref() == Some("not_demonstrated_in_tested_domain")
+        }));
+        assert!(!report.qualification_eligible);
+    }
+
+    #[test]
+    fn rejects_semantic_non_influence_when_observer_drops_the_accessed_resource() {
+        let (catalog, oracle, receipts) = semantic_pair_inputs();
+        let mut receipt_value: Value =
+            serde_json::from_slice(&receipts).expect("semantic receipts parse");
+        receipt_value["records"][1]["observed_resources"] = json!([]);
+        let receipts = serde_json::to_vec(&receipt_value).expect("mutated semantic receipts serialize");
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(!report.adjudication_passed);
+        assert!(report.metrics.hidden_dependency_misses >= 1);
+        assert!(report.errors.iter().any(|error| {
+            error.code == "E_SEMANTIC_PAIR_ACCESS_MISSED"
+                || error.code == "E_HIDDEN_DEPENDENCY_MISSED"
+        }));
+    }
+
     #[test]
     fn accepts_paired_recall_and_selectivity_control_without_qualifying_profile() {
         let (catalog, oracle, receipts) = fixture_inputs();

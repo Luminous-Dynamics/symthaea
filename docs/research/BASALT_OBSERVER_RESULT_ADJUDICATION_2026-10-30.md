@@ -120,7 +120,7 @@ Only the last two are allowed to constrain a bounded reuse claim, and only under
 3. **Program slicing / dependency graphs** can explain data and control paths, but static approximations may over- or under-approximate dynamic behavior.
 4. **Metamorphic and property-based perturbation** can broaden the tested input domain, while preserving a clear distinction between sampled robustness and universal guarantees.
 
-This yields a second, non-compensatory benchmark axis: first measure access-observation soundness; only then measure influence-classification precision and safe retention. A system must never improve its retention score by silently failing to observe a read. No production evidence should be reused solely because one counterfactual output happened to remain unchanged.
+This yields a second, non-compensatory benchmark axis: first measure access-observation soundness; only then measure influence-classification precision and safe retention. The machine-readable benchmark now includes `semantic_access_retention` as a mandatory safety gate: 100% of read-but-discard scenarios must retain exactly one resource attribution and block reuse after the mutation, even though the declared output digest is unchanged. A system must never improve its retention score by silently failing to observe a read. No production evidence should be reused solely because one counterfactual output happened to remain unchanged.
 
 ## Do not collapse freshness, coverage and integrity into one status
 
