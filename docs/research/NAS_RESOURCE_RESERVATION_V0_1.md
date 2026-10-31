@@ -8,7 +8,7 @@ Implementation branch: \`research/nas-resource-reservation-v0.1\`
 
 The #9483 preflight verifier recomputes the value-of-computation action, objective/hardware identity, anytime confidence stream, and resource frontier. It is read-only. Two callers could both pass preflight against the same available budget and subsequently oversubscribe a device or an exclusive instrument.
 
-This module adds a reference compare-and-swap (CAS) reservation state machine. It consumes an in-process \`VerifiedMeasurementReservation\` capability that can only be obtained by calling the complete measurement preflight. The capability binds the exact preflight receipt, action-scope digest, resource cost vector, budget/registry identities, and reservation-ledger head seen by preflight.
+This module adds a reference compare-and-swap (CAS) reservation state machine. It consumes an in-process \`VerifiedMeasurementReservation\` capability that can only be obtained by calling the complete measurement preflight. The capability binds the exact preflight receipt, action-scope digest, resource cost vector, budget/registry identities, and reservation-ledger head seen by preflight. The reservation record persists that original observed head explicitly, and idempotent retries must match it.
 
 ## 2. Resource lifecycle
 
@@ -99,7 +99,7 @@ Until such an adapter exists and passes multi-process crash/replay tests, this m
 
 ## 7. Qualification tests
 
-Fifteen Rust test declarations cover:
+Sixteen Rust test declarations cover:
 - genesis and empty ledger replay;
 - exact-head reserve and resource headroom;
 - stale-head competition (first reservation succeeds, second fails);
@@ -113,6 +113,7 @@ Fifteen Rust test declarations cover:
 - event/record/top-level digest tampering;
 - rejection of an expired-but-still-reserved record;
 - JSON round-trip and unknown-field rejection;
+- a deterministic 128-action state-machine stress sequence with replay/accounting checks.
 - lease-horizon rejection.
 
 These tests are authored, not passing tests. The current authoring environment has no \`cargo\`, \`rustc\`, or \`rustfmt\`, so this code has not been compiled or executed.
