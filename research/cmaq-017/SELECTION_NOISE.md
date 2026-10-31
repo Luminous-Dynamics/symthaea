@@ -2,6 +2,12 @@
 
 **Status (2026-10-31):** executable selection-noise metric primitives and a proposed continuation protocol. The current CMAQ-017 planner/report is unchanged; this increment does not yet inject repeated continuation seeds into its existing episode runner or claim a benchmark result.
 
+## Programme alignment
+
+CMAQ-016 issue [#9396](https://github.com/Luminous-Dynamics/symthaea/issues/9396) owns the broader optimizer-in-the-loop exploitability programme, including larger candidate pools (8/32/128/512), adaptive search schedules, localized error families and realized regret. This CMAQ-017 increment isolates one additional mechanism in that programme: stochastic continuation noise and best-of-N selection optimism. It is a metric kernel and follow-on protocol, not a replacement for CMAQ-016 or a new leaderboard.
+
+The current CMAQ-017 v0.1 budgets (8/32/64) remain useful for its immediate synthetic parent benchmark. They must not be substituted for the broader CMAQ-016 qualification sweep. The repeated-continuation lane should be integrated as an additional stratum once the simulator supports reproducible stochastic branching.
+
 ## Research trigger
 
 The CMAQ-017 v0.1 environment is deterministic conditional on an episode seed and step: the true transition disturbance is derived from that fixed seed and step. The current episode runner is tested for exact repeatability. This is appropriate for deterministic model-error experiments, but it cannot yet isolate a planner's tendency to select a lucky candidate continuation.
