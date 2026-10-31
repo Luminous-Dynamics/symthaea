@@ -111,8 +111,8 @@
     },
     "metrics": {
       "type": "array",
-      "minItems": 9,
-      "maxItems": 9,
+      "minItems": 10,
+      "maxItems": 10,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -136,7 +136,8 @@
               "unrelated_evidence_retention",
               "normalized_reverification_work",
               "paired_shifted_task_success_delta",
-              "semantic_access_retention"
+              "semantic_access_retention",
+              "undeclared_build_script_stale_replay_detection"
             ]
           },
           "phase": {
@@ -208,7 +209,7 @@
       "properties": {
         "safety": {
           "type": "array",
-          "minItems": 5,
+          "minItems": 6,
           "uniqueItems": true,
           "items": {
             "enum": [
@@ -216,7 +217,8 @@
               "stale_evidence_false_acceptances",
               "unsupported_channel_disclosure",
               "integrity_loss_fail_closed",
-              "semantic_access_retention"
+              "semantic_access_retention",
+              "undeclared_build_script_stale_replay_detection"
             ]
           }
         },
@@ -314,7 +316,7 @@
       "properties": {
         "required_strata": {
           "type": "array",
-          "minItems": 6,
+          "minItems": 7,
           "uniqueItems": true,
           "items": {
             "type": "string"
@@ -641,6 +643,25 @@
             "properties": {
               "metric_id": {
                 "const": "semantic_access_retention"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "undeclared_build_script_stale_replay_detection"
               }
             },
             "required": [

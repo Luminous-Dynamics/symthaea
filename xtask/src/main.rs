@@ -5,6 +5,7 @@ mod basalt_state;
 mod basalt_observer;
 mod basalt_observer_result;
 mod basalt_fixture;
+mod basalt_cargo_fixture;
 mod basalt_validate;
 mod crate_status;
 mod duplicate_scan;
@@ -54,6 +55,13 @@ enum Commands {
         /// Case ID to execute; reciprocal paired controls are added automatically.
         #[arg(long = "case-id", action = clap::ArgAction::Append, required = true)]
         case_ids: Vec<String>,
+    },
+    /// Run a real Cargo build-script challenge with an intentionally undeclared input.
+    BasaltCargoBuildScriptFixtureRun {
+        #[arg(long)]
+        catalog: PathBuf,
+        #[arg(long)]
+        out_dir: PathBuf,
     },
     /// Validate a BASALT versioned run record and its cross-record evidence invariants.
     BasaltValidate {
@@ -155,6 +163,10 @@ fn main() -> anyhow::Result<()> {
             case_ids,
         } => {
             let report = basalt_fixture::run(&catalog, &out_dir, &case_ids)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Commands::BasaltCargoBuildScriptFixtureRun { catalog, out_dir } => {
+            let report = basalt_cargo_fixture::run(&catalog, &out_dir)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
         Commands::BasaltValidate { input, manifest, spec_root } => {

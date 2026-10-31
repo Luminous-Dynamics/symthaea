@@ -74,7 +74,32 @@ The oracle now records optional `semantic_effect` values (`demonstrated` or `not
 
 The fixture command intentionally rejects every catalog case it does not implement. It does not create fake records for environment, procfs, toolchain, cache, network, observer overflow or other unimplemented channels. The run scope in the oracle and observer receipt ledgers must match exactly. A selected paired case requires its reciprocal partner in the same run; a full-corpus qualification still requires a later run covering all 36 cases and all required independent challenge strata.
 
-The fixture evidence schema is `benchmarks/basalt/schema/observer-fixture-evidence.v1.schema.json`. Its execution records identify the separate worker binary, relative resource path, process IDs, Git tracking classification, baseline Git commit and before/after output witnesses. Three fixture-orchestrator tests now cover supported-resource rejection, semantic-mode mapping, and the ignored-untracked/tracked Git-state setup. The standalone worker has three tests, including read-but-discard behavior; the result adjudicator has two additional semantic-influence tests. Total authored Rust tests in this stack: 25; none are claimed as executed. The oracle and receipt schemas now require `selected_case_ids`; oracle records also carry the worker binary digest, before/after task-output digests and byte counts. The result adjudicator checks that the selected scope is non-empty, unique, known to the catalog, identical across both ledgers, and complete for every selected pair. Its `adjudication_complete` field means complete **for that declared run scope**; `scope_is_full_catalog` independently reports whether every catalog case was selected. Neither field implies that the observer profile is qualified.
+The fixture evidence schema is `benchmarks/basalt/schema/observer-fixture-evidence.v1.schema.json`. Its execution records identify the separate worker binary, relative resource path, process IDs, Git tracking classification, baseline Git commit and before/after output witnesses. Three fixture-orchestrator tests now cover supported-resource rejection, semantic-mode mapping, and the ignored-untracked/tracked Git-state setup. The standalone worker has three tests, including read-but-discard behavior; the result adjudicator has two additional semantic-influence tests. Total authored Rust tests in this stack: 27; none are claimed as executed. The oracle and receipt schemas now require `selected_case_ids`; oracle records also carry the worker binary digest, before/after task-output digests and byte counts. The result adjudicator checks that the selected scope is non-empty, unique, known to the catalog, identical across both ledgers, and complete for every selected pair. Its `adjudication_complete` field means complete **for that declared run scope**; `scope_is_full_catalog` independently reports whether every catalog case was selected. Neither field implies that the observer profile is qualified.
+
+## Real Cargo build-script hidden-input fixture
+
+The new command basalt-cargo-build-script-fixture-run exercises the catalog's existing cargo-build-script-input challenge using an actual dependency-free Cargo package. Its build.rs reads build.rs-input.txt, but deliberately declares only rerun-if-changed=build.rs. The input is ignored and untracked in the fixture's isolated Git repository.
+
+The experiment runs three stages:
+
+1. Baseline cargo run --offline --locked into a warm target directory; output must equal baseline-state.
+2. Mutate only the ignored build-script input, then rerun with the same target directory; output is expected to remain at the baseline value because Cargo's declared rerun set omitted the input.
+3. Run the mutated fixture with a fresh target directory; the build script runs again and output must equal mutated-state.
+
+The runner pins the Cargo executable digest and version, fixture-template digest, catalog digest, input digests and Git baseline commit. It records Cargo process IDs, stdout/stderr digests, stage-specific output and the two target-directory identities. It refuses to report a successful counterfactual if the warm run does not reproduce the stale value or the fresh replay does not reflect the mutation.
+
+**Interpretation:** this is a real Cargo incremental-cache failure fixture, not a test that BASALT's observer catches it. The evidence's ground-truth basis is checked-in build-script source plus a controlled input mutation and fresh-target replay. The runner does not capture the spawned build-script child's PID, does not independently observe its file open at the kernel level, and does not emit an observer receipt. independent_kernel_observation and qualification_eligible remain hard false.
+
+Run it with:
+
+    cargo run -p xtask --bin xtask -- basalt-cargo-build-script-fixture-run \
+      --catalog benchmarks/basalt/coverage/observer-challenges.v1.json \
+      --out-dir reports/basalt-cargo-fixtures
+
+The fixture is dependency-free and network-disabled at invocation (--offline --locked). Cargo's documented build-script semantics specify that emitted rerun-if-changed paths control whether the script runs again. This fixture intentionally omits its actual input from that declaration. See the Cargo Book build-script reference and example:
+
+- https://doc.rust-lang.org/cargo/reference/build-scripts.html
+- https://doc.rust-lang.org/stable/cargo/reference/build-script-examples.html
 
 ## Next paradigm shift: access is not semantic influence
 
@@ -229,4 +254,4 @@ The existing qualification note already identifies why fanotify alone cannot est
 
 ## Execution status and limitations
 
-This branch authors the scoped result adjudicator, separate worker executable, fixture runner, schemas, CLI integration, benchmark protocol, research documentation and corpus correction. Twenty-four Rust unit tests are authored across the adjudicator, fixture orchestration and worker binary (19 adjudicator, 2 fixture-orchestrator, 3 worker tests). The environment used for this work has no `cargo`, `rustc` or `rustfmt`; Rust compilation, formatting, unit-test execution, fixture execution and observer qualification have **not** been run here. The current worker's byte-count field is still a worker claim, and the task is a synthetic controlled fixture rather than a real repository build/test. The next step is to build and execute these artifacts on an exact checkout, then add independent kernel/process observation of the worker and an adapter for real build/test tasks. Oracle signing, a separately trusted replay verifier and observer receipts remain future work. The report's strict-false policy remains in force even for a passing unit test or future green CI run.
+This branch authors the scoped result adjudicator, separate worker executable, fixture runner, schemas, CLI integration, benchmark protocol, research documentation and corpus correction. Twenty-seven Rust unit tests are authored across the adjudicator, filesystem fixture, Cargo fixture and worker binary (19 adjudicator, 2 filesystem fixture, 3 Cargo fixture, 3 worker tests). The environment used for this work has no `cargo`, `rustc` or `rustfmt`; Rust compilation, formatting, unit-test execution, filesystem fixture execution, Cargo fixture execution and observer qualification have **not** been run here. The filesystem worker's byte-count field is still a worker claim. The Cargo fixture exercises a real offline Cargo build-script/cache path, but remains a source-controlled challenge without independent kernel observation. The next step is to build and execute these artifacts on an exact checkout, then add independent kernel/process observation of the worker and an adapter for real build/test tasks. Oracle signing, a separately trusted replay verifier and observer receipts remain future work. The report's strict-false policy remains in force even for a passing unit test or future green CI run.

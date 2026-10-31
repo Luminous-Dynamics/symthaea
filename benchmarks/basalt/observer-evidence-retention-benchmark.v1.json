@@ -165,6 +165,18 @@
         "value": 1
       },
       "unit": "proportion"
+    },
+    {
+      "metric_id": "undeclared_build_script_stale_replay_detection",
+      "phase": "safety",
+      "definition": "Fraction of preregistered Cargo build-script hidden-input scenarios where the warm incremental result remains stale after mutation and a fresh replay reflects the changed input.",
+      "numerator": "Cargo build-script hidden-input cases with stale warm output and changed fresh-replay output both confirmed",
+      "denominator": "all independently adjudicated Cargo build-script hidden-input scenarios in the supported profile",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
     }
   ],
   "gates": {
@@ -173,7 +185,8 @@
       "stale_evidence_false_acceptances",
       "unsupported_channel_disclosure",
       "integrity_loss_fail_closed",
-      "semantic_access_retention"
+      "semantic_access_retention",
+      "undeclared_build_script_stale_replay_detection"
     ],
     "selectivity": [
       "false_invalidation_rate",
@@ -205,7 +218,8 @@
       "mutation_kind",
       "kernel_profile",
       "observer_profile",
-      "semantic_effect_class"
+      "semantic_effect_class",
+      "build_system"
     ],
     "required_costs": [
       "wall_time",
