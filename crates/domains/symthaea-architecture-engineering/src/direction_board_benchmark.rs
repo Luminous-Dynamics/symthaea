@@ -1131,10 +1131,10 @@ impl DirectionCampaignRun {
         for action in &self.actions {
             let slot = u64::try_from(action.slot)
                 .map_err(|_| "action slot does not fit u64".to_owned())?;
-            if slot == 0 || slot != tape.events.len() as u64 + 1 {
+            if slot == 0 || slot != tape.events().len() as u64 + 1 {
                 return Err("action slots must be contiguous and start at one".to_owned());
             }
-            let event_id = format!("{}:event:{slot}", tape.header.campaign_id);
+            let event_id = format!("{}:event:{slot}", tape.header().campaign_id);
             let (intent, outcome) = if action.is_new_proposal {
                 proposal_index = proposal_index
                     .checked_add(1)
@@ -1237,6 +1237,7 @@ impl DirectionCampaignRun {
             };
             let resources = ResourceReceipt {
                 host_cpu_millis: unknown("synthetic campaign does not meter host CPU"),
+                wall_millis: unknown("synthetic campaign does not meter per-action wall time"),
                 accelerator_millis: unknown("synthetic campaign does not meter accelerator time"),
                 peak_memory_bytes: unknown("synthetic campaign does not meter peak memory"),
                 energy_millijoules: unknown("synthetic campaign does not meter energy"),
