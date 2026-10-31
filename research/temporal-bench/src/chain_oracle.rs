@@ -12,10 +12,33 @@ const MAX_MODULES: usize = 4;
 const MAX_STEPS: usize = 100_000;
 const FD_EPSILON: f64 = 1.0e-6;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ScalarActivation {
+    Identity,
+    Tanh,
+}
+
+impl ScalarActivation {
+    fn apply(self, value: f64) -> f64 {
+        match self {
+            Self::Identity => value,
+            Self::Tanh => value.tanh(),
+        }
+    }
+
+    fn derivative(self, activated_value: f64) -> f64 {
+        match self {
+            Self::Identity => 1.0,
+            Self::Tanh => 1.0 - activated_value * activated_value,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScalarChainConfig {
     pub recurrent_weights: Vec<f64>,
     pub feedforward_weights: Vec<f64>,
+    pub activations: Vec<ScalarActivation>,
     pub readout_weight: f64,
     pub target: f64,
     pub inputs: Vec<f64>,
@@ -26,6 +49,7 @@ impl ScalarChainConfig {
         Self {
             recurrent_weights: vec![0.7, 0.8],
             feedforward_weights: vec![0.4, 0.6],
+            activations: vec![ScalarActivation::Identity; 2],
             readout_weight: 1.2,
             target: 0.25,
             inputs: vec![0.2, -0.1, 0.4, 0.3, -0.2, 0.15],
@@ -36,6 +60,7 @@ impl ScalarChainConfig {
         Self {
             recurrent_weights: vec![0.65, 0.7, 0.75, 0.8],
             feedforward_weights: vec![0.35, 0.45, 0.55, 0.65],
+            activations: vec![ScalarActivation::Identity; 4],
             readout_weight: 0.9,
             target: -0.1,
             inputs: vec![0.3, -0.2, 0.1, 0.4, -0.15, 0.25, 0.05],
@@ -49,6 +74,7 @@ impl ScalarChainConfig {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScalarChainTrace {
+    pub pre_activations: Vec<Vec<f64>>,
     pub states: Vec<Vec<f64>>,
     pub prediction: f64,
     pub loss: f64,
@@ -140,7 +166,9 @@ pub fn validate(config: &ScalarChainConfig) -> Result<(), ChainOracleError> {
             maximum: MAX_MODULES,
         });
     }
-    if config.feedforward_weights.len() != modules {
+    if config.feedforward_weights.len() != modules
+        || config.activations.len() != modules
+    {
         return Err(ChainOracleError::ParameterLengthMismatch);
     }
     if config.inputs.is_empty() {
@@ -197,9 +225,11 @@ pub fn forward(
     validate(config)?;
     let modules = config.module_count();
     let mut states: Vec<Vec<f64>> = Vec::with_capacity(config.inputs.len());
+    let mut pre_activations: Vec<Vec<f64>> = Vec::with_capacity(config.inputs.len());
 
     for (time, input) in config.inputs.iter().enumerate() {
         let mut current = vec![0.0; modules];
+        let mut pre = vec![0.0; modules];
         for module in 0..modules {
             let previous_temporal = if time == 0 {
                 0.0
@@ -211,9 +241,11 @@ pub fn forward(
             } else {
                 current[module - 1]
             };
-            current[module] = config.recurrent_weights[module] * previous_temporal
+            pre[module] = config.recurrent_weights[module] * previous_temporal
                 + config.feedforward_weights[module] * previous_spatial;
+            current[module] = config.activations[module].apply(pre[module]);
         }
+        pre_activations.push(pre);
         states.push(current);
     }
 
@@ -221,6 +253,7 @@ pub fn forward(
     let prediction = config.readout_weight * final_state;
     let residual = prediction - config.target;
     Ok(ScalarChainTrace {
+        pre_activations,
         states,
         prediction,
         loss: 0.5 * residual * residual,
@@ -247,7 +280,8 @@ pub fn full_bptt_gradient(
 
     for time in (0..time_steps).rev() {
         for module in (0..modules).rev() {
-            let adjoint = adjoints[time][module];
+            let adjoint = adjoints[time][module]
+                * config.activations[module].derivative(trace.states[time][module]);
             let previous_temporal = if time == 0 {
                 0.0
             } else {
@@ -304,7 +338,8 @@ pub fn gradient_with_temporal_detachment(
 
     for time in (0..time_steps).rev() {
         for module in (0..modules).rev() {
-            let adjoint = adjoints[time][module];
+            let adjoint = adjoints[time][module]
+                * config.activations[module].derivative(trace.states[time][module]);
             let previous_temporal = if time == 0 {
                 0.0
             } else {
@@ -471,7 +506,11 @@ pub fn spatial_cut_with_auxiliary(
         for module in (0..modules).rev() {
             let global_adjoint = global_adjoints[time][module];
             let local_adjoint = local_adjoints[time][module];
-            let total_adjoint = global_adjoint + local_adjoint;
+            let activation_derivative =
+                config.activations[module].derivative(trace.states[time][module]);
+            let global_pre_adjoint = global_adjoint * activation_derivative;
+            let local_pre_adjoint = local_adjoint * activation_derivative;
+            let total_adjoint = global_pre_adjoint + local_pre_adjoint;
             let previous_temporal = if time == 0 {
                 0.0
             } else {
@@ -488,17 +527,17 @@ pub fn spatial_cut_with_auxiliary(
 
             if time > 0 {
                 global_adjoints[time - 1][module] +=
-                    global_adjoint * config.recurrent_weights[module];
+                    global_pre_adjoint * config.recurrent_weights[module];
                 local_adjoints[time - 1][module] +=
-                    local_adjoint * config.recurrent_weights[module];
+                    local_pre_adjoint * config.recurrent_weights[module];
             }
             if module > 0 {
                 if module != boundary_module + 1 {
                     global_adjoints[time][module - 1] +=
-                        global_adjoint * config.feedforward_weights[module];
+                        global_pre_adjoint * config.feedforward_weights[module];
                 }
                 local_adjoints[time][module - 1] +=
-                    local_adjoint * config.feedforward_weights[module];
+                    local_pre_adjoint * config.feedforward_weights[module];
             }
         }
     }
@@ -566,6 +605,42 @@ mod tests {
         let finite = centered_finite_difference(config).unwrap();
         for (actual, expected) in exact.flatten_main().into_iter().zip(finite.flatten_main()) {
             close(actual, expected, 2.0e-7);
+        }
+    }
+
+    #[test]
+    fn four_module_tanh_chain_bptt_matches_finite_difference() {
+        let mut config = ScalarChainConfig::four_module_reference();
+        config.activations = vec![ScalarActivation::Tanh; 4];
+        check_gradients(&config);
+    }
+
+    #[test]
+    fn nonlinear_spatial_cut_local_gradient_matches_finite_difference() {
+        let mut config = ScalarChainConfig::four_module_reference();
+        config.activations = vec![ScalarActivation::Tanh; 4];
+        let boundary = 1;
+        let auxiliary_weight = 0.9;
+        let without_aux =
+            spatial_cut_with_auxiliary(&config, boundary, auxiliary_weight, 0.0).unwrap();
+        let with_aux =
+            spatial_cut_with_auxiliary(&config, boundary, auxiliary_weight, 1.0).unwrap();
+        let finite =
+            centered_finite_difference_local_auxiliary(&config, boundary, auxiliary_weight)
+                .unwrap();
+        for module in 0..config.module_count() {
+            close(
+                with_aux.gradient.recurrent_weights[module]
+                    - without_aux.gradient.recurrent_weights[module],
+                finite.recurrent_weights[module],
+                2.0e-7,
+            );
+            close(
+                with_aux.gradient.feedforward_weights[module]
+                    - without_aux.gradient.feedforward_weights[module],
+                finite.feedforward_weights[module],
+                2.0e-7,
+            );
         }
     }
 
