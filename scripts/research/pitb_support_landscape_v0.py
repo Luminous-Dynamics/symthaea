@@ -156,6 +156,8 @@ def validate_row(row, index, max_variables=8):
     for key in costs:
         if type(row[key]) is not int or row[key] < 0:
             raise ContractError(f"row {index}.{key} must be a non-negative integer")
+    if row["semantic_gate_passed"] and not row["kernel_passed"]:
+        raise ContractError(f"row {index}: semantic gate cannot pass when the trusted kernel check failed")
     passed = row["kernel_passed"] and row["semantic_gate_passed"]
     if row["outcome"] == "verified_success":
         if not well_formed or not row["solver_started"] or not passed:
@@ -172,9 +174,12 @@ def validate_row(row, index, max_variables=8):
 
 
 def identity_key(row):
+    bound = {key: row[key] for key in IDENTITY}
+    # A context-schema change must not silently split a study into smaller groups.
+    for key in ("mutable_declarations", "fixed_declarations", "declaration_order", "declaration_dependencies"):
+        bound[key] = row[key]
     return hashlib.sha256(json.dumps(
-        {key: row[key] for key in IDENTITY},
-        sort_keys=True, separators=(",", ":")
+        bound, sort_keys=True, separators=(",", ":")
     ).encode()).hexdigest()
 
 
@@ -222,6 +227,9 @@ def analyze_group(gid, rows, reliability_floor=0.80, min_replicates=20, max_vari
             raise ContractError(f"group {gid}: mixed identity fields")
         if row["mutable_declarations"] != universe:
             raise ContractError(f"group {gid}: mutable declaration universe changed")
+        for key in ("fixed_declarations", "declaration_order", "declaration_dependencies"):
+            if row[key] != first[key]:
+                raise ContractError(f"group {gid}: {key} changed across the paired subset lattice")
         if graph != first["declaration_dependencies"]:
             raise ContractError(f"group {gid}: dependency graph changed")
         subset = tuple(row["requested_declarations"])
@@ -348,9 +356,10 @@ def analyze_group(gid, rows, reliability_floor=0.80, min_replicates=20, max_vari
 
 def analyze(rows, reliability_floor=0.80, min_replicates=20, max_variables=8):
     grouped = defaultdict(list)
-    for raw in rows:
+    for index, raw in enumerate(rows, 1):
         if not isinstance(raw, dict):
             raise ContractError("each outcome row must be a JSON object")
+        validate_row(raw, index, max_variables)
         grouped[identity_key(raw)].append(raw)
     reports = [
         analyze_group(gid, group, reliability_floor, min_replicates, max_variables)
@@ -501,6 +510,28 @@ def self_test():
     else:
         raise AssertionError("false context-well-formed claim was accepted")
 
+    changed_fixed = [dict(row) for row in alternative]
+    changed_fixed[-1]["fixed_declarations"] = ["different-fixed-base"]
+    try:
+        grouped = defaultdict(list)
+        for row in changed_fixed:
+            grouped[identity_key(row)].append(row)
+        for gid, group in grouped.items():
+            analyze_group(gid, group)
+    except ContractError:
+        pass
+    else:
+        raise AssertionError("changed fixed context was accepted")
+
+    wrong_semantics = dict(alternative[0], kernel_passed=False, semantic_gate_passed=True,
+                           outcome="non_solve")
+    try:
+        validate_row(wrong_semantics, 1000)
+    except ContractError:
+        pass
+    else:
+        raise AssertionError("semantic pass without kernel pass was accepted")
+
     print("PITB_SUPPORT_LANDSCAPE_SELF_TEST_PASS: alternative routes, conjunction, dependency closure, repeated-seed reliability, Wilson threshold, incomplete schedule, paired-seed and invalid-context controls")
 
 
@@ -545,7 +576,7 @@ def main():
         args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(f"PITB_SUPPORT_LANDSCAPE_ANALYSIS: groups={report['group_count']} reliability_floor={args.reliability_floor:.3f} report={args.report}")
         return 0
-    except (ContractError, OSError, UnicodeError, json.JSONDecodeError) as exc:
+    except (ContractError, OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError) as exc:
         print(f"PITB support landscape rejected: {exc}", file=sys.stderr)
         return 2
 
