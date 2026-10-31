@@ -47,3 +47,12 @@ The first event links to a digest of the frozen header, so changing the budget, 
 ## Qualification limits
 
 Passing the tape validator establishes structural integrity and accounting completeness under the declared contract. It does not establish that a scientific claim is novel, that the evaluator's labels are correct, or that one policy is superior. Confirmatory comparisons still require paired landscapes, independent templates, pre-registered endpoints, sealed evaluation, external baseline reproduction, independent replay, and held-out transfer.
+
+
+## Cross-policy campaign reconciliation
+
+The `matched_campaign` module accepts two or more per-policy tapes for one campaign/seed/budget. It requires a common source commit, execution-environment digest, task recipe, comparison profile, evaluator/verifier identities, proposal-source and proposal-stream digests, budget-model ID/digest, budget ceiling, initial direction registry, and identical execution/seat contract. Policy IDs, algorithms and configurations are intentionally allowed to differ.
+
+For every candidate digest appearing in multiple tapes, direction, parent, semantic delta, and full evaluator/verifier outcome must agree. The same rule applies to repeated proposal descriptor digests and verifier outcomes. The summary reports candidate/proposal identity overlap, per-policy event counts and charges, batch completion, strict resource qualification, and oracle-policy IDs separately.
+
+This reconciler establishes common-contract consistency and cross-policy outcome consistency for identities that overlap. It does **not** prove that the evaluator's complete offered-choice set was materialized or that a shared stream digest faithfully represents every possible option. A future campaign-input artifact must carry the actual offer-set manifest and digest, with independent verification that every policy received the same manifest. It also does not establish scientific superiority; paired statistical analysis and held-out transfer remain separate gates.
