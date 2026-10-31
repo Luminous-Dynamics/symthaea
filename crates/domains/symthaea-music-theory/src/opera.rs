@@ -315,17 +315,28 @@ fn pitch_belongs_to_key(note: &ScoreNote, key: Key) -> bool {
     })
 }
 
-fn verify_opera_plan(score: &Score, home_key: Key, plan: &OperaPlan) -> OperaVerification {
+pub(crate) fn verify_opera_plan(score: &Score, home_key: Key, plan: &OperaPlan) -> OperaVerification {
     let meter = plan.meter as f64;
     let expected_total = plan.total_bars as f64 * meter;
+    let expected_sections = [
+        ("statement-a", 0, 2, "home"),
+        ("statement-b", 2, 4, "relative"),
+        ("dialogue", 4, 8, "home"),
+        ("interruption-cadence", 8, 9, "home"),
+    ];
+    let section_layout_matches = plan.sections.len() == expected_sections.len()
+        && plan.sections.iter().zip(expected_sections).all(
+            |(section, (id, start, end, key_context))| {
+                section.id == id
+                    && section.start_bar == start
+                    && section.end_bar_exclusive == end
+                    && section.key_context == key_context
+            },
+        );
     let timeline_matches = score.meter == plan.meter
         && (score.total_beats.beats() - expected_total).abs() <= 1e-7
-        && plan.sections.len() == 4
-        && plan.sections.iter().map(|section| section.id.as_str()).collect::<Vec<_>>()
-            == ["statement-a", "statement-b", "dialogue", "interruption-cadence"]
-        && plan.sections.windows(2).all(|pair| {
-            pair[0].end_bar_exclusive == pair[1].start_bar
-        });
+        && plan.total_bars == 9
+        && section_layout_matches;
 
     let statement_a_melody: Vec<_> = (0..2)
         .flat_map(|bar| notes_in_bar(score, VoiceRole::Melody, bar, meter))
@@ -350,7 +361,15 @@ fn verify_opera_plan(score: &Score, home_key: Key, plan: &OperaPlan) -> OperaVer
     let statement_b_uses_relative_key = !statement_b_counter.is_empty()
         && statement_b_counter.iter().all(|note| pitch_belongs_to_key(note, relative_key));
 
-    let dialogue_alternates_one_bar_at_a_time = plan.dialogue_voice_order.len() == 4
+    let expected_dialogue = [
+        VoiceRole::Melody,
+        VoiceRole::CounterMelody,
+        VoiceRole::Melody,
+        VoiceRole::CounterMelody,
+    ];
+    let dialogue_alternates_one_bar_at_a_time =
+        plan.dialogue_voice_order.as_slice() == expected_dialogue
+        && plan.dialogue_voice_order.len() == 4
         && (0..4u8).all(|index| {
             let bar = 4 + index;
             let expected = plan.dialogue_voice_order[index as usize];
@@ -365,6 +384,10 @@ fn verify_opera_plan(score: &Score, home_key: Key, plan: &OperaPlan) -> OperaVer
 
     let interruption_start = plan.interruption_bar as f64 * meter;
     let cutoff = plan.interruption_cutoff.beats();
+    let interruption_plan_matches =
+        plan.interruption_bar == 8
+            && (cutoff - 2.0).abs() <= 1e-7
+            && (plan.cadence_entry.beats() - 2.0).abs() <= 1e-7;
     let counter_interruption: Vec<_> = score
         .notes
         .iter()
@@ -378,8 +401,9 @@ fn verify_opera_plan(score: &Score, home_key: Key, plan: &OperaPlan) -> OperaVer
         .iter()
         .map(|note| (note.onset + note.duration).beats())
         .max_by(f64::total_cmp);
-    let interruption_cuts_theme_b_at_exact_boundary = last_counter_end
-        .is_some_and(|end| (end - (interruption_start + cutoff)).abs() <= 1e-7)
+    let interruption_cuts_theme_b_at_exact_boundary = interruption_plan_matches
+        && last_counter_end
+            .is_some_and(|end| (end - (interruption_start + cutoff)).abs() <= 1e-7)
         && counter_interruption.iter().all(|note| {
             (note.onset + note.duration).beats() <= interruption_start + cutoff + 1e-7
         });
