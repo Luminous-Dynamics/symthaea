@@ -137,8 +137,8 @@
     },
     "metrics": {
       "type": "array",
-      "minItems": 11,
-      "maxItems": 11,
+      "minItems": 14,
+      "maxItems": 14,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -162,7 +162,10 @@
               "namespace_cross_join_false_acceptances",
               "ambiguous_process_identity_acceptances",
               "p95_audit_latency_ms",
-              "p95_report_bytes"
+              "p95_report_bytes",
+              "exec_image_identity_recall",
+              "exec_occurrence_order_integrity",
+              "clone_flag_semantic_integrity"
             ]
           },
           "phase": {
@@ -218,8 +221,8 @@
       "properties": {
         "safety": {
           "type": "array",
-          "minItems": 9,
-          "maxItems": 9,
+          "minItems": 12,
+          "maxItems": 12,
           "uniqueItems": true,
           "items": {
             "enum": [
@@ -231,7 +234,10 @@
               "event_loss_false_acceptances",
               "closed_tree_false_acceptances",
               "namespace_cross_join_false_acceptances",
-              "ambiguous_process_identity_acceptances"
+              "ambiguous_process_identity_acceptances",
+              "exec_image_identity_recall",
+              "exec_occurrence_order_integrity",
+              "clone_flag_semantic_integrity"
             ]
           }
         },
