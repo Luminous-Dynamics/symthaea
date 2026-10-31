@@ -55,16 +55,18 @@ class SelfFinancingProjectiveEclosureTests(unittest.TestCase):
         json.dumps(result, sort_keys=True, separators=(",", ":"))
 
     def test_future_priority_and_evidence_do_not_rewrite_past_receipts(self):
+        # Coordinate 2 is not active until the final update, so its future
+        # score and future evidence must not alter the first two decisions.
+        active = [0b01, 0b01, 0b11]
         first = select_self_financing_capacity_actions(
-            self.increments, self.active, self.scores, self.alpha,
+            self.increments, active, [1, 1], self.alpha,
             self.values, self.costs, self.capacity,
             self.thresholds, self.adjuster_increments,
         )
         changed_increments = copy.deepcopy(self.increments)
         changed_increments[1][2] = 32
-        changed_scores = [1, 999]
         second = select_self_financing_capacity_actions(
-            changed_increments, self.active, changed_scores, self.alpha,
+            changed_increments, active, [1, 999], self.alpha,
             self.values, self.costs, self.capacity,
             self.thresholds, self.adjuster_increments,
         )
