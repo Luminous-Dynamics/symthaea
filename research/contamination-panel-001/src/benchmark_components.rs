@@ -242,6 +242,7 @@ pub struct BenchmarkComponentAuditV1 {
     pub no_orphan_evaluator_checks: bool,
     pub no_unknown_requirement_references: bool,
     pub no_unknown_precondition_references: bool,
+    pub review_dispositions_valid: bool,
     pub ambiguous_requirement_count: u64,
     pub inferred_requirement_count: u64,
     pub uncovered_explicit_requirement_count: u64,
@@ -404,6 +405,7 @@ pub fn audit_benchmark_components(
     let mut no_orphan_checks = true;
     let mut no_unknown_requirement_refs = true;
     let mut no_unknown_precondition_refs = true;
+    let mut review_dispositions_valid = true;
 
     let component_ids = [
         manifest.user_task.artifact_id.as_str(),
@@ -550,9 +552,14 @@ pub fn audit_benchmark_components(
             }
         }
     }
-    if check_ids != manifest.evaluation.check_ids.iter().map(String::as_str).collect() {
+    let declared_check_ids: BTreeSet<&str> =
+        manifest.evaluation.check_ids.iter().map(String::as_str).collect();
+    if declared_check_ids.len() != manifest.evaluation.check_ids.len()
+        || declared_check_ids.iter().any(|id| id.trim().is_empty())
+        || check_ids != declared_check_ids
+    {
         evaluation_check_bindings_valid = false;
-        issues.push("evaluation component check_ids do not exactly match evaluator check records".to_owned());
+        issues.push("evaluation component check_ids must be unique, nonempty and exactly match evaluator check records".to_owned());
     }
     let mut uncovered_explicit_count = 0_u64;
     let mut uncovered_precondition_count = 0_u64;
@@ -594,6 +601,7 @@ pub fn audit_benchmark_components(
         if finding.review_method == ComponentReviewMethodV1::ModelTriage {
             model_triage += 1;
             if finding.disposition == ComponentFindingDispositionV1::HumanConfirmed {
+                review_dispositions_valid = false;
                 issues.push(format!("model-triage finding {} cannot self-assert human confirmation", finding.finding_id));
             }
         }
@@ -616,6 +624,7 @@ pub fn audit_benchmark_components(
         && no_orphan_checks
         && no_unknown_requirement_refs
         && no_unknown_precondition_refs
+        && review_dispositions_valid
         && unresolved_blockers == 0;
     let mut report = BenchmarkComponentAuditV1 {
         schema: COMPONENT_AUDIT_SCHEMA.to_owned(),
@@ -632,6 +641,7 @@ pub fn audit_benchmark_components(
         no_orphan_evaluator_checks: no_orphan_checks,
         no_unknown_requirement_references: no_unknown_requirement_refs,
         no_unknown_precondition_references: no_unknown_precondition_refs,
+        review_dispositions_valid,
         ambiguous_requirement_count: ambiguous_count,
         inferred_requirement_count: inferred_count,
         uncovered_explicit_requirement_count: uncovered_explicit_count,
@@ -685,6 +695,7 @@ pub fn verify_benchmark_component_audit_integrity(
             && report.no_orphan_evaluator_checks
             && report.no_unknown_requirement_references
             && report.no_unknown_precondition_references
+            && report.review_dispositions_valid
             && report.unresolved_blocker_count == 0)
     {
         return Err("benchmark component audit report validity does not match its checks".to_owned());
