@@ -275,42 +275,51 @@ fn shuffled_action(action: Intervention) -> Intervention {
 
 fn branch_predictions(
     model: Model,
+    history: ObservedHistory,
+    actions: &[Intervention],
+) -> Vec<Option<BranchPrediction>> {
+    actions
+        .iter()
+        .map(|action| match model {
+            Model::PointOutcome => Some(point_outcome_prediction(history, *action)),
+            Model::ExplicitEffectHead | Model::Oracle => None,
+            Model::ShuffledActionLabels => {
+                Some(point_outcome_prediction(history, shuffled_action(*action)))
+            }
+            Model::SupportAwarePoint => supported_intervention(*action)
+                .then(|| point_outcome_prediction(history, *action)),
+        })
+        .collect()
+}
+
+fn oracle_branch_predictions(
     scenario: Scenario,
     case: EpisodeCase,
     actions: &[Intervention],
 ) -> Vec<Option<BranchPrediction>> {
     actions
         .iter()
-        .map(|action| match model {
-            Model::PointOutcome => Some(point_outcome_prediction(case.history, *action)),
-            Model::ExplicitEffectHead => None,
-            Model::ShuffledActionLabels => {
-                Some(point_outcome_prediction(case.history, shuffled_action(*action)))
-            }
-            Model::SupportAwarePoint => supported_intervention(*action)
-                .then(|| point_outcome_prediction(case.history, *action)),
-            Model::Oracle => {
-                let truth = true_outcome(case, scenario, *action);
-                Some(BranchPrediction {
-                    utility: truth.utility,
-                    next_x: truth.next_x,
-                    next_v: truth.next_v,
-                    terminal: truth.terminal,
-                })
-            }
+        .map(|action| {
+            let truth = true_outcome(case, scenario, *action);
+            Some(BranchPrediction {
+                utility: truth.utility,
+                next_x: truth.next_x,
+                next_v: truth.next_v,
+                terminal: truth.terminal,
+            })
         })
         .collect()
 }
 
 fn predicted_effect(
     model: Model,
-    case: EpisodeCase,
+    history: ObservedHistory,
     left: Intervention,
     right: Intervention,
     predictions: &[Option<BranchPrediction>],
 ) -> Option<f64> {
     if model == Model::ExplicitEffectHead {
-        let slope = if case.history.x < 0.0 { 0.62 } else { -0.62 };
+        let slope = if history.x < 0.0 { 0.62 } else { -0.62 };
         return Some(
             slope * (left.force - right.force) + 0.12 * (left.grip - right.grip),
         );
@@ -356,7 +365,11 @@ fn evaluate_episode(
         })
         .collect();
 
-    let predictions = branch_predictions(model, scenario, case, &canonical);
+    let predictions = if model == Model::Oracle {
+        oracle_branch_predictions(scenario, case, &canonical)
+    } else {
+        branch_predictions(model, case.history, &canonical)
+    };
     let branch_prediction_evaluations = predictions
         .iter()
         .filter(|prediction| prediction.is_some())
@@ -385,7 +398,7 @@ fn evaluate_episode(
 
             if let Some(predicted_delta) = predicted_effect(
                 model,
-                case,
+                case.history,
                 left_action,
                 right_action,
                 &predictions,
@@ -429,7 +442,9 @@ fn evaluate_episode(
     let mut selected_action: Option<Intervention> = None;
     let mut selected_score = f64::NEG_INFINITY;
     for action in &canonical {
-        if let Some(score) = predicted_effect(model, case, *action, baseline, &predictions) {
+        if let Some(score) =
+            predicted_effect(model, case.history, *action, baseline, &predictions)
+        {
             if score > selected_score {
                 selected_score = score;
                 selected_action = Some(*action);
@@ -826,9 +841,9 @@ mod tests {
         other.history.x += 0.15;
         other.history.v -= 0.12;
         let prediction_first =
-            branch_predictions(Model::PointOutcome, Scenario::Monotone, case, &ACTIONS);
+            branch_predictions(Model::PointOutcome, case.history, &ACTIONS);
         let prediction_second =
-            branch_predictions(Model::PointOutcome, Scenario::Monotone, other, &ACTIONS);
+            branch_predictions(Model::PointOutcome, other.history, &ACTIONS);
         let first = predicted_effect(
             Model::PointOutcome,
             case,
@@ -852,7 +867,7 @@ mod tests {
     fn support_aware_model_abstains_on_unsupported_interventions() {
         let case = make_episode_case(BASE_SEED);
         let predictions =
-            branch_predictions(Model::SupportAwarePoint, Scenario::Monotone, case, &ACTIONS);
+            branch_predictions(Model::SupportAwarePoint, case.history, &ACTIONS);
         assert!(predictions[0].is_some());
         assert!(predictions[3].is_some());
         assert!(predictions[4].is_none());
