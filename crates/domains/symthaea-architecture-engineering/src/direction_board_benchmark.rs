@@ -1232,7 +1232,7 @@ fn maximum_future_payoff(
         )
 }
 
-fn payoff(
+pub(crate) fn payoff(
     landscape: DirectionLandscapeFamily,
     direction_id: &str,
     evaluation_index: usize,
@@ -1268,7 +1268,7 @@ fn schedule(
     }
 }
 
-fn digest(value: &str) -> String {
+pub(crate) fn digest(value: &str) -> String {
     digest_bytes(value.as_bytes())
 }
 
