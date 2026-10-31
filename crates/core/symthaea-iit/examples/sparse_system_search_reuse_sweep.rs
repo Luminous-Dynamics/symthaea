@@ -289,11 +289,55 @@ fn verify_equal(
         return Err("unexpected phi_s presence".to_string());
     }
 
+    let tied_state_pair_indices = naive
+        .state_pair_winners
+        .iter()
+        .enumerate()
+        .filter(|(_, winner)| pyphi_eq(winner.score.phi, maximum_phi, epsilon))
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    let (expected_status, expected_phi_s, expected_selected_index) =
+        if tied_state_pair_indices.len() == 1 {
+            (
+                symthaea_iit::Iit4SystemPhiStatus::ExactUniqueStatePair,
+                Some(maximum_phi),
+                Some(tied_state_pair_indices[0]),
+            )
+        } else if tied_state_pair_indices
+            .iter()
+            .all(|index| naive.state_pair_winners[*index].score.phi == 0.0)
+        {
+            (
+                symthaea_iit::Iit4SystemPhiStatus::UnresolvedCanonicalTie,
+                Some(0.0),
+                None,
+            )
+        } else {
+            (
+                symthaea_iit::Iit4SystemPhiStatus::UnresolvedCompositionTie,
+                None,
+                None,
+            )
+        };
+    if optimized.status != expected_status
+        || optimized.tied_state_pair_indices != tied_state_pair_indices
+        || optimized.selected_state_pair_index != expected_selected_index
+    {
+        return Err("system-level tied-state resolution differs".to_string());
+    }
+    match (optimized.phi_s, expected_phi_s) {
+        (Some(actual), Some(expected)) if (actual - expected).abs() <= 1e-12 => {}
+        (None, None) => {}
+        (actual, expected) => {
+            return Err(format!("system phi_s differs: optimized={actual:?}, uncached={expected:?}"));
+        }
+    }
+
     Ok((
         naive.partition_count,
         naive.state_pair_count,
         naive.partition_score_evaluations,
-        optimized.phi_s.unwrap_or(maximum_phi),
+        optimized.phi_s,
     ))
 }
 
@@ -398,7 +442,7 @@ fn run() -> Result<(), String> {
         let reused_partition_terms = partition_count;
 
         println!(
-            "{},{},{},{},{},{},{},{},{},{},{:.4},{},{},{},{},{:.17},{}",
+            "{},{},{},{},{},{},{},{},{},{},{:.4},{},{},{},{},{},{}",
             n_units,
             CANDIDATE.len(),
             partition_count,
@@ -414,7 +458,7 @@ fn run() -> Result<(), String> {
             reused_posterior_preparations,
             naive_partition_terms,
             reused_partition_terms,
-            phi_s,
+            phi_s.map(|value| format!("{value:.17}")).unwrap_or_else(|| "UNRESOLVED".to_string()),
             true
         );
     }
