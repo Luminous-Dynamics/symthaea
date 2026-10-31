@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT event delivery audit report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_version",
+    "ledger_digest",
+    "run_id",
+    "ledger_well_formed",
+    "sequence_accounting_reconciled",
+    "counters_consistent",
+    "sources_closed",
+    "loss_free",
+    "audit_passed",
+    "qualification_eligible",
+    "counts",
+    "errors"
+  ],
+  "properties": {
+    "report_version": {
+      "const": 1
+    },
+    "ledger_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "run_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ledger_well_formed": {
+      "type": "boolean"
+    },
+    "sequence_accounting_reconciled": {
+      "type": "boolean"
+    },
+    "counters_consistent": {
+      "type": "boolean"
+    },
+    "sources_closed": {
+      "type": "boolean"
+    },
+    "loss_free": {
+      "type": "boolean"
+    },
+    "audit_passed": {
+      "type": "boolean"
+    },
+    "qualification_eligible": {
+      "const": false
+    },
+    "counts": {
+      "$ref": "#/$defs/counts"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "path",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_epochs",
+        "events",
+        "attempted_sequences",
+        "published_sequences",
+        "lost_sequences",
+        "required_discards",
+        "excluded_discards",
+        "unclassified_sequences",
+        "overlapping_sequences",
+        "counter_mismatches",
+        "unclosed_sources",
+        "restarted_sources",
+        "unmonitored_producers"
+      ],
+      "properties": {
+        "source_epochs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "attempted_sequences": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "published_sequences": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lost_sequences": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "required_discards": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "excluded_discards": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unclassified_sequences": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "overlapping_sequences": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "counter_mismatches": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unclosed_sources": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "restarted_sources": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unmonitored_producers": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
