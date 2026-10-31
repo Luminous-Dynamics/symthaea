@@ -39,18 +39,56 @@ impl ChannelCounts {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChannelBounds {
-    pub counts: ChannelCounts,
-    pub total_one_sided_streams: u64,
-    pub tpr_lower: f64,
-    pub fpr_lower: f64,
-    pub fpr_upper: f64,
-    pub test_positive_upper: f64,
-    pub channel_separation_established: bool,
+    counts: ChannelCounts,
+    total_one_sided_streams: u64,
+    tpr_lower: f64,
+    fpr_lower: f64,
+    fpr_upper: f64,
+    test_positive_upper: f64,
+    channel_separation_established: bool,
     /// False when the simultaneous test-positive and FPR bounds are
     /// incompatible with q = f + (t - f)p for any p in [0, 1].
-    pub measurement_channel_consistent: bool,
+    measurement_channel_consistent: bool,
     /// None means measurement-channel inversion is not justified.
-    pub failure_prevalence_upper: Option<f64>,
+    failure_prevalence_upper: Option<f64>,
+}
+
+impl ChannelBounds {
+    pub fn counts(&self) -> ChannelCounts {
+        self.counts
+    }
+
+    pub fn total_one_sided_streams(&self) -> u64 {
+        self.total_one_sided_streams
+    }
+
+    pub fn tpr_lower(&self) -> f64 {
+        self.tpr_lower
+    }
+
+    pub fn fpr_lower(&self) -> f64 {
+        self.fpr_lower
+    }
+
+    pub fn fpr_upper(&self) -> f64 {
+        self.fpr_upper
+    }
+
+    pub fn test_positive_upper(&self) -> f64 {
+        self.test_positive_upper
+    }
+
+    pub fn channel_separation_established(&self) -> bool {
+        self.channel_separation_established
+    }
+
+    pub fn measurement_channel_consistent(&self) -> bool {
+        self.measurement_channel_consistent
+    }
+
+    pub fn failure_prevalence_upper(&self) -> Option<f64> {
+        self.failure_prevalence_upper
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
