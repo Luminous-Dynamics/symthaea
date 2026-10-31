@@ -21,7 +21,7 @@ The result adjudicator joins these exact artifacts and checks their byte digests
 - `benchmarks/basalt/schema/observer-receipts.v1.schema.json`: strict Draft 2020-12 observer-receipt schema.
 - `benchmarks/basalt/observer-evidence-retention-benchmark.v1.json` plus its schema: machine-readable comparison arms, metric definitions, safety/selectivity/efficiency gates and sample-size protocol.
 - `xtask/src/main.rs`: `basalt-observer-result-audit` command.
-- Seventeen Rust tests cover paired recall/selectivity, stale reuse, event loss, unrelated-resource attribution, unsupported channels, false invalidation, counterfactual output/read witnesses, worker-binary mismatch, scoped-pair completeness, cross-run/cross-catalog mismatch and incomplete receipts.
+- Nineteen Rust tests cover paired recall/selectivity, stale reuse, event loss, unrelated-resource attribution, unsupported channels, false invalidation, counterfactual output/read witnesses, worker-binary mismatch, scoped-pair completeness, cross-run/cross-catalog mismatch, incomplete receipts, and read-but-discard semantic access.
 - The adjudicator first runs the existing challenge-catalog structural auditor. Catalog validity and execution-result validity remain distinct checks.
 
 The result protocol deliberately rejects malformed, over-sized, duplicate, missing, unknown, cross-run, cross-profile, and cross-catalog records. Oracle mutation digests must be present (including explicit nulls when no mutation applies); applied mutations require distinct before/after SHA-256 values. The current 36-case catalog is the fixture definition, not evidence that any observer has executed it. The adjudicator also reports `unrelated_evidence_not_retained` separately from explicit `false_invalidations`, so unresolved or otherwise non-reused positive controls cannot disappear from the retention accounting.
@@ -74,7 +74,71 @@ The oracle now records optional `semantic_effect` values (`demonstrated` or `not
 
 The fixture command intentionally rejects every catalog case it does not implement. It does not create fake records for environment, procfs, toolchain, cache, network, observer overflow or other unimplemented channels. The run scope in the oracle and observer receipt ledgers must match exactly. A selected paired case requires its reciprocal partner in the same run; a full-corpus qualification still requires a later run covering all 36 cases and all required independent challenge strata.
 
-The fixture evidence schema is `benchmarks/basalt/schema/observer-fixture-evidence.v1.schema.json`. Its execution records identify the separate worker binary, relative resource path, process IDs, Git tracking classification, baseline Git commit and before/after output witnesses. Three fixture-orchestrator tests now cover supported-resource rejection, semantic-mode mapping, and the ignored-untracked/tracked Git-state setup. The standalone worker has three tests, including read-but-discard behavior; the result adjudicator has two additional semantic-influence tests. Total authored Rust tests in this stack: 25; none are claimed as executed. The oracle and receipt schemas now require `selected_case_ids`; oracle records also carry the worker binary digest, before/after task-output digests and byte counts. The result adjudicator checks that the selected scope is non-empty, unique, known to the catalog, identical across both ledgers, and complete for every selected pair. Its `adjudication_complete` field means complete **for that declared run scope**; `scope_is_full_catalog` independently reports whether every catalog case was selected. Neither field implies that the observer profile is qualified.
+The fixture evidence schema is `benchmarks/basalt/schema/observer-fixture-evidence.v1.schema.json`. Its execution records identify the separate worker binary, relative resource path, process IDs, Git tracking classification, baseline Git commit and before/after output witnesses. Three fixture-orchestrator tests now cover supported-resource rejection, semantic-mode mapping, and the ignored-untracked/tracked Git-state setup. The standalone worker has three tests, including read-but-discard behavior; the result adjudicator has two additional semantic-influence tests. Total authored Rust tests in this stack: 27; none are claimed as executed. The oracle and receipt schemas now require `selected_case_ids`; oracle records also carry the worker binary digest, before/after task-output digests and byte counts. The result adjudicator checks that the selected scope is non-empty, unique, known to the catalog, identical across both ledgers, and complete for every selected pair. Its `adjudication_complete` field means complete **for that declared run scope**; `scope_is_full_catalog` independently reports whether every catalog case was selected. Neither field implies that the observer profile is qualified.
+
+## Real Cargo build-script hidden-input fixture
+
+The new command basalt-cargo-build-script-fixture-run exercises the catalog's existing cargo-build-script-input challenge using an actual dependency-free Cargo package. Its build.rs reads build.rs-input.txt, but deliberately declares only rerun-if-changed=build.rs. The input is ignored and untracked in the fixture's isolated Git repository.
+
+The experiment runs three stages:
+
+1. Baseline cargo run --offline --locked into a warm target directory; output must equal baseline-state.
+2. Mutate only the ignored build-script input, then rerun with the same target directory; output is expected to remain at the baseline value because Cargo's declared rerun set omitted the input.
+3. Run the mutated fixture with a fresh target directory; the build script runs again and output must equal mutated-state.
+
+The runner pins the Cargo executable digest/version and the rustc launcher plus sysroot compiler binary digests, rustc version and sysroot identity. It also pins the fixture-template digest, catalog digest, input digests and Git baseline commit. It records Cargo process IDs, stdout/stderr digests, stage-specific output and the two target-directory identities. Rust compiler wrappers and ambient RUSTFLAGS are removed for this controlled fixture run. It refuses to report a successful counterfactual if the warm run does not reproduce the stale value or the fresh replay does not reflect the mutation.
+
+**Interpretation:** this is a real Cargo incremental-cache failure fixture, not a test that BASALT's observer catches it. The evidence's ground-truth basis is checked-in build-script source plus a controlled input mutation and fresh-target replay. The runner does not capture the spawned build-script child's PID, does not independently observe its file open at the kernel level, and does not emit an observer receipt. independent_kernel_observation and qualification_eligible remain hard false.
+
+Run it with:
+
+    cargo run -p xtask --bin xtask -- basalt-cargo-build-script-fixture-run \
+      --catalog benchmarks/basalt/coverage/observer-challenges.v1.json \
+      --out-dir reports/basalt-cargo-fixtures
+
+The fixture is dependency-free and network-disabled at invocation (--offline --locked). Cargo's documented build-script semantics specify that emitted rerun-if-changed paths control whether the script runs again. This fixture intentionally omits its actual input from that declaration. See the Cargo Book build-script reference and example:
+
+- https://doc.rust-lang.org/cargo/reference/build-scripts.html
+- https://doc.rust-lang.org/stable/cargo/reference/build-script-examples.html
+
+All five standalone Cargo fixture packages declare their own `[workspace]` root. This is deliberate: the runners can write their temporary workspaces beneath a repository checkout, and without an explicit root Cargo may discover the caller repository's outer workspace and reject or reinterpret the nested fixture. Unit tests enforce this boundary for the hidden-input, mtime, and environment packages.
+
+## Cargo mtime-preserving dependency challenge
+
+A separate `basalt-cargo-mtime-fixture-run` command adds a correctly-declared positive control and an mtime-preserving adversarial control. Both build scripts read the same logical input and emit `rerun-if-changed=build.rs-input.txt`.
+
+The positive control mutates the bytes and advances the input mtime, then requires warm Cargo execution to regenerate the output. The adversarial control mutates the bytes but restores the exact original mtime using Rust's standard-library file timestamp API. The runner records whether the warm incremental cache misses that mutation, then requires a fresh-target replay to emit the changed value. It records exact before/after mtime nanoseconds, content digests, Cargo/rustc binary identities, the isolated CARGO_HOME, and the absence of ancestor Cargo config files.
+
+This tests a separate boundary from an omitted rerun declaration. Cargo's current documentation says `rerun-if-changed` uses file modification timestamps. An observer that only mirrors the build system's invalidation decisions may therefore reproduce its blind spot. BASALT's proposed requirement is stronger: changed content must remain visible to the independent dependency observer even when mtime does not change. The runner records the observed Cargo behavior rather than assuming future Cargo releases remain mtime-blind.
+
+The evidence still states `independent_kernel_observation=false` and `qualification_eligible=false`; it demonstrates a controlled Cargo cache behavior, not an observer pass. References: [Cargo build scripts](https://doc.rust-lang.org/cargo/reference/build-scripts.html), [Cargo configuration hierarchy](https://doc.rust-lang.org/cargo/reference/config.html).
+
+## Independent Cargo mtime evidence replay
+
+The separate command `basalt-cargo-mtime-evidence-verify` consumes retained mtime evidence and the exact challenge catalog. It checks the catalog digest, embedded fixture digest and every retained fixture-template file; Cargo/rustc binary, version, sysroot and PATH identity; retained Git baseline and clean working tree; ignored/untracked input state; final input bytes and content digests; build-script source digests; and exact recorded mtime.
+
+It reuses the recorded isolated CARGO_HOME to avoid changing Cargo's configuration/cache namespace, reruns Cargo against the retained warm target directory, and compares output and digest with the original warm-cache evidence. Each verification invocation creates a fresh, exclusive replay-target directory. Finally, it performs a new fresh-target replay and requires the mutated value and digest.
+
+Run it after the mtime fixture has emitted its evidence:
+
+```sh
+cargo run -p xtask --bin xtask -- basalt-cargo-mtime-evidence-verify \
+  --evidence reports/basalt-cargo-mtime-fixtures/<run-id>/cargo-mtime-fixture-evidence.v1.json \
+  --catalog benchmarks/basalt/coverage/observer-challenges.v1.json
+```
+
+This is a second-process replay check, not an independent trust root: the verifier remains in the same repository/toolchain, does not observe the build-script file open at kernel level, and does not authenticate a signature. Its `oracle_authenticity_established` and `qualification_eligible` fields remain hard false.
+
+## Cargo build-script environment-variable dependency challenge
+
+A third real Cargo dimension is invocation environment state. The fixture suite includes two packages that read BASALT_BUILD_INPUT at build-script runtime:
+
+- env-hidden/ reads the value but does not emit rerun-if-env-changed=BASALT_BUILD_INPUT.
+- env-declared/ reads the same variable and explicitly emits that rerun declaration as a positive control.
+
+The runner invokes both packages with a baseline value, changes only the environment value supplied to the Cargo invocation, then reuses the warm target directories. The hidden case must preserve stale output; the declared control must regenerate. A fresh target for the hidden case must reveal the mutated value.
+
+The evidence stores only SHA-256 commitments to the before/after environment values, not the raw variable value. It binds Cargo/rustc identities, fixture/catalog digests, Git baseline and all stage output digests. This differs from env! or option_env! in crate source: the test reads the value at build-script runtime via std::env::var, while Cargo documents that rerun-if-env-changed applies to variables received by the Cargo invocation, not Cargo-provided build-script variables such as TARGET. References: [Cargo build scripts](https://doc.rust-lang.org/cargo/reference/build-scripts.html) and [Cargo environment variables](https://doc.rust-lang.org/cargo/reference/environment-variables.html).
 
 ## Next paradigm shift: access is not semantic influence
 
@@ -157,7 +221,7 @@ Every preserve control must be paired with a capture control over the **same res
 
 ## Paradigm shift: benchmark the evidence-retention frontier
 
-The executable benchmark contract is `benchmarks/basalt/observer-evidence-retention-benchmark.v1.json`. It freezes seven matched comparison arms and eight metrics, including their numerators, denominators and targets. The protocol forbids compensating for a safety failure with a speed improvement; all four safety gates must pass before selectivity or cost can influence a promotion decision.
+The executable benchmark contract is `benchmarks/basalt/observer-evidence-retention-benchmark.v1.json`. It freezes seven matched comparison arms and twelve metrics, including their numerators, denominators and targets. The protocol forbids compensating for a safety failure with a speed improvement; all eight safety gates must pass before selectivity or cost can influence a promotion decision.
 
 A conventional cache benchmark tends to optimize cache hit rate and rebuild time. BASALT should instead optimize a constrained frontier:
 
@@ -194,6 +258,34 @@ The comparison is deliberately layered rather than a blanket claim that BASALT i
 
 SLSA provenance and in-toto supply-chain layouts provide valuable build and workflow provenance, authorized-step and integrity checks. BASALT should compose with these formats where useful, not reimplement their signature or supply-chain semantics. A provenance statement still depends on its builder/platform trust boundary; the SLSA specification explicitly distinguishes external inputs from parameters trusted because of the build platform. The BASALT oracle therefore needs its own independently reviewed trust root and replay semantics.
 
+## Current industry baseline and the actual gap
+
+BASALT should be designed as a composable proof layer, not as a replacement for build systems:
+
+| System | Strongest existing contribution | What BASALT should add alongside it |
+|---|---|---|
+| Cargo | Build-script execution and incremental invalidation from declared rerun paths | Challenge missing rerun declarations against actual build-script reads; detect stale warm-target output after hidden-input mutation |
+| Bazel | Declared action inputs, per-action execution roots and sandboxing | Independent evidence that the action's observed inputs fit its declared closure, and a fail-closed receipt for channels outside that boundary |
+| Nix | Store-based dependency closure and sandboxing with private namespaces | Runtime evidence for the precise execution, explicit unresolved channels, and receipt integrity/currentness |
+| SLSA / in-toto | Builder identity, provenance, workflow and artifact integrity | Independent challenge of dependency-coverage assertions rather than assuming an attested builder's input list is exhaustive |
+| Reproducible Builds | Bit-for-bit comparison of outputs across independent rebuilds | Detect hidden inputs before they cause stale reuse; define exactly which execution inputs and side effects were in the observation envelope |
+
+Bazel's own documentation identifies the precise failure class: without action sandboxing, undeclared input files can change while Bazel still considers the action up to date, producing incorrect incremental results; incorrect remote-cache entries can then affect many developers. Its action execroot contains known inputs, while sandbox behavior differs by platform and does not fully hide all host state. BASALT should measure both the sandbox-prevention arm and the observer/receipt arm, not claim that tracing alone beats a functioning sandbox.
+
+Nix sandboxing limits build visibility to declared store dependencies, the temporary build directory and selected special paths; on Linux it also uses private namespaces. Fixed-output derivations are an explicit network exception. This is a strong hermeticity boundary. BASALT should compare against it as a separate arm and treat any admitted external path or network exception as part of the declared profile.
+
+SLSA v1.2 is the approved specification; its published Build Track describes levels L0-L3, and its provenance model treats resolved-dependency completeness as best-effort through Build L3. The SLSA main-branch draft provenance text describes technically enforced dependency completeness as a proposed Build L4 requirement. Treat that as draft/future direction, not as an adopted v1.2 requirement or a guarantee supplied by today's L3 provenance. BASALT should report compatibility against the published SLSA version and compose with its provenance model rather than claim an equivalent SLSA level. This distinction is important: BASALT's proposed value is independently challenged runtime coverage, not another signature around an unverified dependency list.
+
+Reproducible Builds defines reproducibility as independent parties being able to recreate bit-identical artifacts from the same source, environment and instructions. That is an essential cross-check, but two identical outputs do not prove that every dependency was observed or that a prior incremental result was correctly invalidated after a hidden input changed.
+
+Primary references:
+- Cargo build-script change detection: https://doc.rust-lang.org/cargo/reference/build-scripts.html
+- Bazel sandboxing and undeclared inputs: https://bazel.build/versions/7.5.0/docs/sandboxing
+- Nix sandbox configuration: https://nix.dev/manual/nix/2.25/command-ref/conf-file
+- SLSA v1.2 Build provenance: https://slsa.dev/spec/v1.2/build-provenance
+- SLSA v1.2 future directions: https://slsa.dev/spec/v1.2/future-directions
+- Reproducible Builds definition: https://reproducible-builds.org/docs/definition/
+
 ### Proposed research gates (targets, not results)
 
 | Gate | Target |
@@ -201,13 +293,14 @@ SLSA provenance and in-toto supply-chain layouts provide valuable build and work
 | Hidden dependency recall | 100% of seeded consumed inputs inside the declared profile, or explicit unresolved/invalidated |
 | Stale-evidence false acceptance | Zero in qualification and held-out challenge sets |
 | Integrity-loss response | 100% fail-closed or explicit unresolved for injected observer-loss cases |
+| Mtime-preserving input mutation detection | 100% of correctly declared same-mtime content mutations remain visible to the independent observer |
 | Semantic access retention | 100% of read-but-discard mutations retain the accessed resource and block reuse despite unchanged output |
 | Unrelated evidence retention | Preserve every independently proven unaffected case in the paired conformance set |
 | False invalidation | At most 5% on independently proven unrelated controls, with scenario-level intervals |
 | Re-verification cost | At least 30% less work than global rerun, only after all safety gates pass |
 | Shifted engineering outcomes | +3 percentage points paired success over a strong matched baseline, or non-inferior success at materially lower cost |
 
-A 36-case conformance set is not a statistical qualification sample. For a one-sided 95% upper bound near 0.1% after zero misses, the simple binomial rule-of-three requires about 2,995 independent scenario units. Cluster related mutations by task/repository lineage, report channel-stratified intervals, keep an untouched holdout, and do not count syscalls/events as independent trials.
+A 38-case conformance set is not a statistical qualification sample. For a one-sided 95% upper bound near 0.1% after zero misses, the simple binomial rule-of-three requires about 2,995 independent scenario units. Cluster related mutations by task/repository lineage, report channel-stratified intervals, keep an untouched holdout, and do not count syscalls/events as independent trials.
 
 ## Critical next work: make the oracle independently executable
 
@@ -229,4 +322,4 @@ The existing qualification note already identifies why fanotify alone cannot est
 
 ## Execution status and limitations
 
-This branch authors the scoped result adjudicator, separate worker executable, fixture runner, schemas, CLI integration, benchmark protocol, research documentation and corpus correction. Twenty-four Rust unit tests are authored across the adjudicator, fixture orchestration and worker binary (19 adjudicator, 2 fixture-orchestrator, 3 worker tests). The environment used for this work has no `cargo`, `rustc` or `rustfmt`; Rust compilation, formatting, unit-test execution, fixture execution and observer qualification have **not** been run here. The current worker's byte-count field is still a worker claim, and the task is a synthetic controlled fixture rather than a real repository build/test. The next step is to build and execute these artifacts on an exact checkout, then add independent kernel/process observation of the worker and an adapter for real build/test tasks. Oracle signing, a separately trusted replay verifier and observer receipts remain future work. The report's strict-false policy remains in force even for a passing unit test or future green CI run.
+This branch authors the scoped result adjudicator, separate worker executable, fixture runner, schemas, CLI integration, benchmark protocol, research documentation and corpus correction. Thirty-six Rust unit tests are authored across the adjudicator, filesystem fixture, Cargo fixtures and worker binary (19 adjudicator, 2 filesystem fixture, 3 undeclared-input fixture, 9 mtime/environment/replay-verifier tests, 3 worker tests). The environment used for this work has no `cargo`, `rustc` or `rustfmt`; Rust compilation, formatting, unit-test execution, filesystem fixture execution, the undeclared-input Cargo fixture, the mtime Cargo fixture and observer qualification have **not** been run here. The filesystem worker's byte-count field is still a worker claim. The Cargo fixture exercises a real offline Cargo build-script/cache path, but remains a source-controlled challenge without independent kernel observation. The next step is to execute both fixture runners on an exact checkout, then attach an independent kernel/process observation lane to the real Cargo build-script child and compare its receipt against the fixture supervisor and fresh replay. Broader adapters should follow only after this first Linux path has pinned hook coverage, process lineage and event-loss accounting. Oracle signing, a separately trusted replay verifier and observer receipts remain future work. The report's strict-false policy remains in force even for a passing unit test or future green CI run.

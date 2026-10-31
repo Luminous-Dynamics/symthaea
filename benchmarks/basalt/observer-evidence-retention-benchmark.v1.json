@@ -165,6 +165,42 @@
         "value": 1
       },
       "unit": "proportion"
+    },
+    {
+      "metric_id": "undeclared_build_script_stale_replay_detection",
+      "phase": "safety",
+      "definition": "Fraction of preregistered Cargo build-script hidden-input scenarios where the warm incremental result remains stale after mutation and a fresh replay reflects the changed input.",
+      "numerator": "Cargo build-script hidden-input cases with stale warm output and changed fresh-replay output both confirmed",
+      "denominator": "all independently adjudicated Cargo build-script hidden-input scenarios in the supported profile",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "mtime_preserving_build_script_mutation_detection",
+      "phase": "safety",
+      "definition": "Fraction of correctly declared build-script inputs whose bytes change while mtime is held constant that the independent observer still records as changed dependencies.",
+      "numerator": "mtime-preserving input mutations with a matching changed-content digest in the observer receipt and stale evidence rejected",
+      "denominator": "all independently adjudicated mtime-preserving build-script mutation scenarios in the supported profile",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "build_script_environment_mutation_detection",
+      "phase": "safety",
+      "definition": "Fraction of controlled build-script invocation-environment mutations that an independent observer records and prevents from reusing stale evidence, including the positive control with rerun-if-env-changed.",
+      "numerator": "environment mutation cases with matching changed-value commitment, observer attribution and stale evidence rejection",
+      "denominator": "all independently adjudicated build-script environment mutation scenarios in the supported profile",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
     }
   ],
   "gates": {
@@ -173,7 +209,10 @@
       "stale_evidence_false_acceptances",
       "unsupported_channel_disclosure",
       "integrity_loss_fail_closed",
-      "semantic_access_retention"
+      "semantic_access_retention",
+      "undeclared_build_script_stale_replay_detection",
+      "mtime_preserving_build_script_mutation_detection",
+      "build_script_environment_mutation_detection"
     ],
     "selectivity": [
       "false_invalidation_rate",
@@ -205,7 +244,10 @@
       "mutation_kind",
       "kernel_profile",
       "observer_profile",
-      "semantic_effect_class"
+      "semantic_effect_class",
+      "build_system",
+      "mutation_timestamp_mode",
+      "environment_input_kind"
     ],
     "required_costs": [
       "wall_time",

@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT Cargo mtime-preserving build-script evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version","suite_id","run_id","case_id","catalog_digest","fixture_digest",
+    "cargo_binary_digest","cargo_version","rustc_launcher_digest","rustc_sysroot_binary_digest",
+    "rustc_version","rustc_sysroot","path_environment_digest","cargo_home_relative_path",
+    "cargo_configuration_policy","ancestor_cargo_config_absent","workspace_relative_path",
+    "git_baseline_commit","resource_id","input_git_state","before_content_digest",
+    "after_content_digest","declared_build_script_digest","declared_rerun_paths",
+    "mtime_build_script_digest","mtime_rerun_paths","baseline",
+    "declared_control_after_advanced_mtime","mtime_control_baseline",
+    "mtime_control_after_preserving_mutation","mtime_control_fresh_replay",
+    "declared_control_detected_mutation","mtime_before_unix_ns","mtime_after_unix_ns",
+    "mtime_preserved_exactly","cargo_incremental_missed_same_mtime_mutation",
+    "fresh_replay_detected_mutation","ground_truth_basis",
+    "independent_kernel_observation","qualification_eligible"
+  ],
+  "properties": {
+    "format_version": { "const": 1 },
+    "suite_id": { "const": "basalt-cargo-mtime-fixture-evidence-v1" },
+    "run_id": { "type": "string", "pattern": "^basalt-cargo-mtime-[0-9]+-[0-9]+$" },
+    "case_id": { "const": "cargo-mtime-preserving-input" },
+    "catalog_digest": { "$ref": "#/$defs/digest" },
+    "fixture_digest": { "$ref": "#/$defs/digest" },
+    "cargo_binary_digest": { "$ref": "#/$defs/digest" },
+    "cargo_version": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "rustc_launcher_digest": { "$ref": "#/$defs/digest" },
+    "rustc_sysroot_binary_digest": { "$ref": "#/$defs/digest" },
+    "rustc_version": { "type": "string", "minLength": 1, "maxLength": 2048 },
+    "rustc_sysroot": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "path_environment_digest": { "$ref": "#/$defs/digest" },
+    "cargo_home_relative_path": { "const": "cargo-home" },
+    "cargo_configuration_policy": { "const": "isolated_empty_cargo_home_no_ancestor_dot_cargo_config" },
+    "ancestor_cargo_config_absent": { "const": true },
+    "workspace_relative_path": { "const": "workspace" },
+    "git_baseline_commit": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+    "resource_id": { "const": "fixture:build.rs-input-mtime-preserved.txt" },
+    "input_git_state": { "const": "ignored_untracked" },
+    "before_content_digest": { "$ref": "#/$defs/digest" },
+    "after_content_digest": { "$ref": "#/$defs/digest" },
+    "declared_build_script_digest": { "$ref": "#/$defs/digest" },
+    "declared_rerun_paths": {
+      "type": "array", "minItems": 2, "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "mtime_build_script_digest": { "$ref": "#/$defs/digest" },
+    "mtime_rerun_paths": {
+      "type": "array", "minItems": 2, "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "baseline": { "$ref": "#/$defs/execution" },
+    "declared_control_after_advanced_mtime": { "$ref": "#/$defs/execution" },
+    "mtime_control_baseline": { "$ref": "#/$defs/execution" },
+    "mtime_control_after_preserving_mutation": { "$ref": "#/$defs/execution" },
+    "mtime_control_fresh_replay": { "$ref": "#/$defs/execution" },
+    "declared_control_detected_mutation": { "const": true },
+    "mtime_before_unix_ns": { "type": "integer", "minimum": 0 },
+    "mtime_after_unix_ns": { "type": "integer", "minimum": 0 },
+    "mtime_preserved_exactly": { "const": true },
+    "cargo_incremental_missed_same_mtime_mutation": { "type": "boolean" },
+    "fresh_replay_detected_mutation": { "const": true },
+    "ground_truth_basis": { "type": "string", "minLength": 1 },
+    "independent_kernel_observation": { "const": false },
+    "qualification_eligible": { "const": false }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage","package","target_directory","cargo_process_id","exit_code",
+        "stdout_value","stdout_digest","stderr_digest"
+      ],
+      "properties": {
+        "stage": {
+          "enum": [
+            "declared_baseline","declared_control_after_advanced_mtime",
+            "mtime_baseline","mtime_control_after_preserving_mutation",
+            "mtime_control_fresh_replay"
+          ]
+        },
+        "package": { "enum": ["declared","mtime"] },
+        "target_directory": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "cargo_process_id": { "type": "integer", "minimum": 1 },
+        "exit_code": { "const": 0 },
+        "stdout_value": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "stdout_digest": { "$ref": "#/$defs/digest" },
+        "stderr_digest": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

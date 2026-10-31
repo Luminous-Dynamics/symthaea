@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT Cargo hidden build-script input fixture evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "suite_id",
+    "run_id",
+    "case_id",
+    "catalog_digest",
+    "fixture_digest",
+    "cargo_binary_digest",
+    "rustc_launcher_digest",
+    "rustc_sysroot_binary_digest",
+    "rustc_version",
+    "rustc_sysroot",
+    "cargo_version",
+    "workspace_relative_path",
+    "git_baseline_commit",
+    "input_resource_id",
+    "input_git_state",
+    "baseline_input_digest",
+    "mutated_input_digest",
+    "build_script_digest",
+    "build_script_declared_rerun_paths",
+    "build_script_reads",
+    "baseline",
+    "warm_incremental_after_mutation",
+    "fresh_replay_after_mutation",
+    "stale_incremental_output_reproduced",
+    "fresh_replay_observed_mutated_value",
+    "ground_truth_basis",
+    "independent_kernel_observation",
+    "qualification_eligible"
+  ],
+  "properties": {
+    "format_version": {
+      "const": 1
+    },
+    "suite_id": {
+      "const": "basalt-cargo-build-script-fixture-evidence-v1"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^basalt-cargo-[0-9]+-[0-9]+$"
+    },
+    "case_id": {
+      "const": "cargo-build-script-input"
+    },
+    "catalog_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "fixture_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "cargo_binary_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "cargo_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "workspace_relative_path": {
+      "const": "workspace"
+    },
+    "git_baseline_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40,64}$"
+    },
+    "input_resource_id": {
+      "const": "fixture:build.rs-input.txt"
+    },
+    "input_git_state": {
+      "const": "ignored_untracked"
+    },
+    "baseline_input_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "mutated_input_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "build_script_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "build_script_declared_rerun_paths": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "build_script_reads": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "baseline": {
+      "$ref": "#/$defs/execution"
+    },
+    "warm_incremental_after_mutation": {
+      "$ref": "#/$defs/execution"
+    },
+    "fresh_replay_after_mutation": {
+      "$ref": "#/$defs/execution"
+    },
+    "stale_incremental_output_reproduced": {
+      "const": true
+    },
+    "fresh_replay_observed_mutated_value": {
+      "const": true
+    },
+    "ground_truth_basis": {
+      "type": "string",
+      "minLength": 1
+    },
+    "independent_kernel_observation": {
+      "const": false
+    },
+    "qualification_eligible": {
+      "const": false
+    },
+    "rustc_launcher_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "rustc_sysroot_binary_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "rustc_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "rustc_sysroot": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "target_directory",
+        "cargo_process_id",
+        "exit_code",
+        "stdout_value",
+        "stdout_digest",
+        "stderr_digest"
+      ],
+      "properties": {
+        "stage": {
+          "enum": [
+            "baseline",
+            "warm_incremental_after_mutation",
+            "fresh_replay_after_mutation"
+          ]
+        },
+        "target_directory": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "cargo_process_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "exit_code": {
+          "const": 0
+        },
+        "stdout_value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "stdout_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "stderr_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  }
+}
