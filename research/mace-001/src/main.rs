@@ -99,6 +99,10 @@ struct OracleCase {
     expected_transfer: String,
     expected_action: String,
     expected_completion: String,
+    expected_write: String,
+    expected_maintain: String,
+    expected_retrieve: String,
+    expected_use: String,
 }
 
 #[derive(Clone, Debug)]
@@ -107,6 +111,10 @@ struct CandidateCase {
     transfer: String,
     action: String,
     completion: String,
+    write_decision: String,
+    maintenance_decision: String,
+    retrieval_decision: String,
+    use_decision: String,
     prediction_before_action: bool,
     prediction_record_id: String,
     latency_us: u64,
@@ -168,6 +176,22 @@ fn valid_completion(value: &str) -> bool {
             | "not_effect_verified"
             | "unknown_pending_reconciliation"
     )
+}
+
+fn valid_write_stage(value: &str) -> bool {
+    matches!(value, "store_association_only" | "store_qualified_transition" | "store_transition_with_regime" | "store_outcome_unknown")
+}
+
+fn valid_maintenance_stage(value: &str) -> bool {
+    matches!(value, "preserve_uncertainty" | "retain_with_preconditions" | "mark_stale_on_regime_change" | "retain_unknown_until_reconciled")
+}
+
+fn valid_retrieval_stage(value: &str) -> bool {
+    matches!(value, "retrieve_association_evidence" | "retrieve_preconditioned_transition" | "retrieve_with_regime_warning" | "retrieve_execution_conflict" | "retrieve_more_evidence")
+}
+
+fn valid_use_stage(value: &str) -> bool {
+    matches!(value, "do_not_generalize_causal_effect" | "reuse_if_preconditions_hold" | "requalify_before_action" | "reconcile_before_retry")
 }
 
 fn parse_bool(value: &str, field: &str, case_id: &str) -> Result<bool, String> {
