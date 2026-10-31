@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/hardsec-temporal-dependence-benchmark-v1.schema.json",
+  "title": "HARDSEC temporal dependence benchmark plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "status",
+    "comparators",
+    "scenarios",
+    "holdout_axes",
+    "metrics",
+    "reference_implementations",
+    "claim_rules"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-temporal-dependence-benchmark-v1"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "planned",
+        "active",
+        "complete",
+        "superseded"
+      ]
+    },
+    "comparators": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "holdout_axes": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "reference_implementations": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "url",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "status": {
+            "enum": [
+              "paper_protocol_implemented_in_part_not_independently_reproduced",
+              "paper_reference_only_not_implemented"
+            ]
+          }
+        }
+      }
+    },
+    "claim_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fdm_assumptions_not_authenticated_by_digest",
+        "block_standard_error_is_not_anytime_valid",
+        "block_standard_error_is_not_an_e_value",
+        "no_sequential_ctm_validity_from_fdm_coverage_bound",
+        "raw_acf_is_not_an_fdm_proof",
+        "independent_windows_not_inferred_from_unique_window_ids",
+        "pfa_and_arl_not_conflated"
+      ],
+      "properties": {
+        "fdm_assumptions_not_authenticated_by_digest": {
+          "const": true
+        },
+        "block_standard_error_is_not_anytime_valid": {
+          "const": true
+        },
+        "block_standard_error_is_not_an_e_value": {
+          "const": true
+        },
+        "no_sequential_ctm_validity_from_fdm_coverage_bound": {
+          "const": true
+        },
+        "raw_acf_is_not_an_fdm_proof": {
+          "const": true
+        },
+        "independent_windows_not_inferred_from_unique_window_ids": {
+          "const": true
+        },
+        "pfa_and_arl_not_conflated": {
+          "const": true
+        }
+      }
+    }
+  }
+}
