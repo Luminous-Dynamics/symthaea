@@ -1322,6 +1322,31 @@ mod tests {
     }
 
     #[test]
+    fn rejected_verification_is_charged_without_promoting_candidate() {
+        let mut history = AnytimeHistory::new(header()).unwrap();
+        append_candidate(&mut history, 1, "candidate-a", "eval-a", vec![0.0, 1.0]);
+        let mut verifier_cost = known_cost(3, 2048);
+        verifier_cost.verifier_calls = Some(1);
+        history.append(AnytimeEventDraft {
+            started_elapsed_millis: 1,
+            completed_elapsed_millis: 2,
+            resources: verifier_cost,
+            action: AnytimeAction::CandidateVerificationRejected {
+                candidate_id: "candidate-a".to_owned(),
+                evidence_sha256: H4.to_owned(),
+                verifier_receipt_sha256: H5.to_owned(),
+                rejection_reason: "held-out regression detected".to_owned(),
+            },
+        }).unwrap();
+        let receipt = analyze_anytime_history(&history).unwrap();
+        let heldout = receipt.target_results.iter().find(|t| t.target_id == "heldout-hv").unwrap();
+        assert_eq!(heldout.status, TargetAttainmentStatus::NotReachedByBudget);
+        assert_eq!(receipt.total_resources.verifier_calls, Some(1));
+        assert_eq!(receipt.event_count, 2);
+        verify_anytime_run_receipt(&history, &receipt).unwrap();
+    }
+
+    #[test]
     fn overlapping_events_and_mismatched_verifier_evidence_are_rejected() {
         let mut history = AnytimeHistory::new(header()).unwrap();
         append_candidate(&mut history, 1, "candidate-a", "eval-a", vec![0.0, 1.0]);
