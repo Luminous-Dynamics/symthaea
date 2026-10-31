@@ -222,7 +222,7 @@ fn verify_equal(
     model: &SparseBinaryCausalModel,
     current_state: &[bool],
     config: Iit4SystemPhiSearchConfig,
-) -> Result<(usize, usize, usize, Option<f64>), String> {
+) -> Result<(usize, usize, usize, Option<f64>, symthaea_iit::Iit4SystemPhiStatus), String> {
     let optimized = model
         .analyze_iit4_2023_system_phi_s(
             &CANDIDATE,
@@ -234,6 +234,9 @@ fn verify_equal(
     let naive = uncached_exhaustive_search(model, current_state, config)?;
     if !optimized.complete {
         return Err("optimized path returned an incomplete search".to_string());
+    }
+    if naive.state_pair_winners.is_empty() {
+        return Err("benchmark fixture unexpectedly produced a null/no-state-pair analysis".to_string());
     }
     if optimized.state_pair_results.len() != naive.state_pair_winners.len() {
         return Err("state-pair result count mismatch".to_string());
@@ -330,6 +333,7 @@ fn verify_equal(
         naive.state_pair_count,
         naive.partition_score_evaluations,
         optimized.phi_s,
+        optimized.status,
     ))
 }
 
@@ -379,7 +383,7 @@ fn parse_args() -> Result<(usize, usize), String> {
 fn run() -> Result<(), String> {
     let (repeats, max_units) = parse_args()?;
     println!(
-        "substrate_units,candidate_units,partitions,state_pairs,partition_score_evaluations,repeats,naive_median_ns,naive_p95_ns,reused_median_ns,reused_p95_ns,median_speedup,uncut_posterior_preparations_naive,uncut_posterior_preparations_reused,partition_repertoire_preparations_naive,partition_repertoire_preparations_reused,phi_s,validated"
+        "substrate_units,candidate_units,partitions,state_pairs,partition_score_evaluations,repeats,naive_median_ns,naive_p95_ns,reused_median_ns,reused_p95_ns,median_speedup,uncut_posterior_preparations_naive,uncut_posterior_preparations_reused,partition_repertoire_preparations_naive,partition_repertoire_preparations_reused,phi_s,result_status,validated"
     );
 
     let config = search_config();
@@ -390,7 +394,7 @@ fn run() -> Result<(), String> {
             .collect::<Vec<_>>();
 
         // Warm both paths and verify exact same selected partition and score.
-        let (partition_count, state_pair_count, score_evaluations, phi_s) =
+        let (partition_count, state_pair_count, score_evaluations, phi_s, result_status) =
             verify_equal(&model, &current_state, config)?;
 
         let mut naive_samples = Vec::with_capacity(repeats);
@@ -434,7 +438,7 @@ fn run() -> Result<(), String> {
         let reused_partition_terms = partition_count;
 
         println!(
-            "{},{},{},{},{},{},{},{},{},{},{:.4},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{},{},{:.4},{},{},{},{},{},{:?},{}",
             n_units,
             CANDIDATE.len(),
             partition_count,
@@ -451,6 +455,7 @@ fn run() -> Result<(), String> {
             naive_partition_terms,
             reused_partition_terms,
             phi_s.map(|value| format!("{value:.17}")).unwrap_or_else(|| "UNRESOLVED".to_string()),
+            result_status,
             true
         );
     }
