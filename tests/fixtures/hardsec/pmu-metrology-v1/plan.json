@@ -69,7 +69,9 @@
     "minimum_singleton_running_fraction": 0.99,
     "minimum_co_scheduled_running_fraction": 0.95,
     "maximum_co_scheduled_relative_deviation": 0.05,
-    "maximum_instrumentation_throughput_degradation": 0.02
+    "maximum_instrumentation_throughput_degradation": 0.02,
+    "maximum_sample_loss_fraction": 0,
+    "maximum_pmu_read_overhead_fraction": 0.01
   },
   "claim_scope": "measurement_configuration_and_declared_trial_record_qualification_only"
 }
