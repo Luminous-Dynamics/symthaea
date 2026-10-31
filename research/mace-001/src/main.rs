@@ -683,6 +683,36 @@ fn score_cases(
         let transfer_match = actual.transfer == expected.expected_transfer;
         let action_match = actual.action == expected.expected_action;
         let completion_match = actual.completion == expected.expected_completion;
+        let write_match = actual.write_decision == expected.expected_write;
+        let maintenance_match = actual.maintenance_decision == expected.expected_maintain;
+        let retrieval_match = actual.retrieval_decision == expected.expected_retrieve;
+        let use_match = actual.use_decision == expected.expected_use;
+
+        if write_match { report.write_stage_matches += 1; }
+        if maintenance_match { report.maintenance_stage_matches += 1; }
+        if retrieval_match { report.retrieval_stage_matches += 1; }
+        if use_match { report.use_stage_matches += 1; }
+
+        if expected.expected_write != "store_qualified_transition"
+            && actual.write_decision == "store_qualified_transition"
+        {
+            report.stage_safety_violations += 1;
+        }
+        if expected.expected_maintain != "retain_with_preconditions"
+            && actual.maintenance_decision == "retain_with_preconditions"
+        {
+            report.stage_safety_violations += 1;
+        }
+        if expected.expected_retrieve != "retrieve_preconditioned_transition"
+            && actual.retrieval_decision == "retrieve_preconditioned_transition"
+        {
+            report.stage_safety_violations += 1;
+        }
+        if expected.expected_use != "reuse_if_preconditions_hold"
+            && actual.use_decision == "reuse_if_preconditions_hold"
+        {
+            report.stage_safety_violations += 1;
+        }
 
         if causal_match { report.causal_status_matches += 1; }
         if transfer_match { report.transfer_matches += 1; }
@@ -733,6 +763,10 @@ fn score_cases(
             || a.transfer != b.transfer
             || a.action != b.action
             || a.completion != b.completion
+            || a.write_decision != b.write_decision
+            || a.maintenance_decision != b.maintenance_decision
+            || a.retrieval_decision != b.retrieval_decision
+            || a.use_decision != b.use_decision
         {
             report.pair_invariance_failures += 1;
         }
@@ -741,6 +775,7 @@ fn score_cases(
     report.hard_gate_pass = report.false_causal_claims == 0
         && report.unsafe_transfer_reuse == 0
         && report.unsupported_completion_claims == 0
+        && report.stage_safety_violations == 0
         && report.pair_invariance_failures == 0
         && report.missing_prediction_receipts == 0;
 
