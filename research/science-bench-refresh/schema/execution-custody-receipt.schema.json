@@ -1,0 +1,491 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/execution-custody-receipt.schema.json",
+  "title": "Symthaea Execution Custody Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "analyzer_source_revision",
+    "purpose",
+    "run_id",
+    "plan_sha256",
+    "plan_commitment_sha256",
+    "evaluator_source_revision",
+    "evaluator_prompt_sha256",
+    "rubric_sha256",
+    "environment_sha256",
+    "events",
+    "external_checkpoint"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_execution_custody_receipt.v1"
+    },
+    "analyzer_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "purpose": {
+      "enum": [
+        "example_only",
+        "qualified_run"
+      ]
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "plan_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "plan_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evaluator_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "evaluator_prompt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rubric_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "environment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "events": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 1000000,
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "external_checkpoint": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/external_checkpoint"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "timestamp_unix_milliseconds",
+        "previous_event_sha256",
+        "payload",
+        "event_sha256"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999
+        },
+        "timestamp_unix_milliseconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "previous_event_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "payload": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "event_type",
+                "run_id",
+                "plan_sha256",
+                "runner_id_sha256",
+                "environment_sha256"
+              ],
+              "properties": {
+                "event_type": {
+                  "const": "run_started"
+                },
+                "run_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "plan_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "runner_id_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "environment_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "event_type",
+                "condition_id",
+                "planned_ordinal",
+                "input_sha256",
+                "input_bytes"
+              ],
+              "properties": {
+                "event_type": {
+                  "const": "input_rendered"
+                },
+                "condition_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "planned_ordinal": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "input_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "input_bytes": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "event_type",
+                "condition_id",
+                "planned_ordinal",
+                "evaluator_source_revision",
+                "evaluator_prompt_sha256"
+              ],
+              "properties": {
+                "event_type": {
+                  "const": "evaluation_started"
+                },
+                "condition_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "planned_ordinal": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "evaluator_source_revision": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{40}$"
+                },
+                "evaluator_prompt_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "event_type",
+                "condition_id",
+                "tool_name_sha256",
+                "request_sha256",
+                "request_bytes",
+                "response_sha256",
+                "response_bytes"
+              ],
+              "properties": {
+                "event_type": {
+                  "const": "tool_call"
+                },
+                "condition_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "tool_name_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "request_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "request_bytes": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "response_sha256": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "response_bytes": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "event_type",
+                "condition_id",
+                "planned_ordinal",
+                "status",
+                "output_sha256",
+                "output_bytes",
+                "evaluator_call_count",
+                "evaluator_token_count"
+              ],
+              "properties": {
+                "event_type": {
+                  "const": "evaluation_finished"
+                },
+                "condition_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "planned_ordinal": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "status": {
+                  "enum": [
+                    "completed",
+                    "timed_out",
+                    "blocked",
+                    "invalid_receipt",
+                    "not_started",
+                    "failed"
+                  ]
+                },
+                "output_sha256": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "output_bytes": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "evaluator_call_count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "evaluator_token_count": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "event_type",
+                "run_id",
+                "planned_condition_count",
+                "completed_condition_count",
+                "terminal_condition_count",
+                "run_status"
+              ],
+              "properties": {
+                "event_type": {
+                  "const": "run_finished"
+                },
+                "run_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "planned_condition_count": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "completed_condition_count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "terminal_condition_count": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "run_status": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              }
+            }
+          ]
+        },
+        "event_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "leaf_index",
+        "tree_size",
+        "sibling_sha256"
+      ],
+      "properties": {
+        "leaf_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tree_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sibling_sha256": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "external_checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "log_id",
+        "record_id",
+        "bundle_sha256",
+        "checkpoint_root_sha256",
+        "tree_size",
+        "anchored_at_unix_milliseconds",
+        "inclusion_proof"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "log_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "record_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "bundle_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "checkpoint_root_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "tree_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "anchored_at_unix_milliseconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "inclusion_proof": {
+          "$ref": "#/$defs/proof"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "purpose": {
+            "const": "qualified_run"
+          }
+        },
+        "required": [
+          "purpose"
+        ]
+      },
+      "then": {
+        "properties": {
+          "analyzer_source_revision": {
+            "not": {
+              "pattern": "^0{40}$"
+            }
+          },
+          "plan_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "plan_commitment_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "evaluator_prompt_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "rubric_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "environment_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
