@@ -1,0 +1,56 @@
+{
+  "schema_version": "cmaq-011-external-baseline-lock-v0.1",
+  "baseline_id": "worldsimprobe",
+  "name": "WorldSimProbe: Diagnosing Simulator Faithfulness in Action-Conditioned World Models for Embodied Manipulation",
+  "repository_url": "https://github.com/pxxq25/WorldSimProbe",
+  "project_url": "https://evophys.com/WorldSimProbe/",
+  "source_commit": "6df13422cef04ea41492a5c662bd7a60b9e64f1a",
+  "source_commit_url": "https://github.com/pxxq25/WorldSimProbe/commit/6df13422cef04ea41492a5c662bd7a60b9e64f1a",
+  "source_commit_date": "2026-09-30T12:58:20Z",
+  "license": "MIT",
+  "public_test_inputs": "https://huggingface.co/datasets/petersonco/worldsimprobe",
+  "public_local_validation": "https://huggingface.co/datasets/petersonco/worldsimprobe_validation",
+  "hidden_official_scoring_references": {
+    "status": "evaluator_side_not_public",
+    "policy": "Do not access, mirror or infer hidden reference labels. Public local validation examples are distinct from official hidden scoring references."
+  },
+  "tasks": [
+    "local_action_calibration",
+    "global_trajectory_coverage",
+    "action_source_behavior_preservation",
+    "interaction_grounding",
+    "interaction_dynamics"
+  ],
+  "task_semantics": {
+    "task_1": "Small/large action perturbation response ratio compared with hidden simulator response ratio.",
+    "task_2": "Donor action stream in receiver scene, robot-masked optical-flow similarity against simulator reference.",
+    "task_3": "Action-source preservation across policy/expert/human traces; synthetic human-like profiles are not accepted as real teleoperation.",
+    "task_4": "Distractor/fake-contact/proximity hallucination checks with object displacement and robot-arm motion gates.",
+    "task_5": "Eight-way interaction primitive classification with agent-motion/object-motion agreement checks and shared physical-time sampling."
+  },
+  "evaluator_dependencies": {
+    "python": ">=3.10",
+    "cuda_worker": "Tasks 2-4 require NVIDIA CUDA for RobotSeg/DPFlow/TAPNext++ stack.",
+    "ptlflow": "0.4.1",
+    "hydra_core": "1.3.2",
+    "robotseg_commit": "dafb8c0d507276e2f96d2b07ac3661a7b3a41a5f",
+    "tapnet_commit": "c2cbab81cc06092b5f05bfe2da7bfec54e2079c9",
+    "task5_vlm": "Qwen/Qwen3-VL-8B-Instruct",
+    "versioning_policy": "Pin exact model/checkpoint revisions, Python lock, simulator assets and CUDA runtime before reproduction. The README's minimum package requirements are not a fully resolved runtime lock."
+  },
+  "source_files": {
+    "README.md": "de3e005d858febdd44acc7b7e63f38f1d8d1f341",
+    "docs/tasks.md": "3c7f8d7e5f3b139faac70ad9a09a4a8ae480c784",
+    "docs/metrics.md": "c14a13c4a3f997d7707bf1a66c1c9da263d7805d",
+    "docs/evaluator_setup.md": "2c7c2c5662878aa60537d9d4ad0aae4161e3fbcd",
+    "LICENSE": "fe9aea5ecfde5e168f19009e890549e4cd95f98f",
+    "pyproject.toml": "a4499fea6b4996dc23446c815a8fb745834c2022"
+  },
+  "reproduction_policy": {
+    "status": "pinned_external_reference_not_reproduced",
+    "no_vendoring": "Keep WorldSimProbe as an isolated external evaluator; consume validated reports and digests from the pinned run.",
+    "public_validation": "Use only the explicitly released local validation split for evaluator smoke; do not substitute it for hidden official qualification.",
+    "wrapper_normalization": "Keep native video sampling/action-source/metric protocol as a paper-native track. CMAQ-normalized intervention runs must be labelled adapted and must not overwrite native scores."
+  },
+  "claim_ceiling": "Source and task contract pinned for adapter planning. No reproduction, matched comparison, model result or SOTA claim."
+}
