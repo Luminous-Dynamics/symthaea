@@ -20,7 +20,7 @@
   },
   "benchmark_alignment": {
     "neurobench": "Separate hardware-independent algorithm results from deployed-system results.",
-    "mlperf_tiny_v1_4": "Use fixed workloads/quality targets and explicit latency/energy boundaries where a compatible workload exists."
+    "mlperf_tiny_v1_4": "Use its continuous streaming/idle-listening and calibrated-energy measurement principles; the synthetic fast-event task is not the official audio workload or an MLPerf submission."
   },
   "execution_state": {
     "protocol_authored": true,
@@ -30,11 +30,11 @@
     "benchmark_executed": false,
     "hardware_energy_measured": false,
     "result_values_present": false,
-    "generator_scope": "Implemented Rust generators: T2 delayed cue, T3/T4 multiscale forecasting/change-point with delayed feedback, T5 irregular-time/missingness, T6 selective retention/invalidation, T8 BrainTrace DMS task semantics, T9 BrainTrace evidence-accumulation task semantics. T1/T7 and the full nine-task runner remain unimplemented.",
+    "generator_scope": "Implemented Rust generators: T1 always-on sparse event/quiet idle, T2 delayed cue, T3/T4 multiscale forecasting/change-point with delayed feedback, T5 irregular-time/missingness, T6 selective retention/invalidation, T8 BrainTrace DMS task semantics, T9 BrainTrace evidence-accumulation task semantics. T7 phase prediction, burst-cluster variants, and the full nine-task runner remain unimplemented.",
     "rust_tests_authored": true,
     "oracle_trace_verifier_implemented": true,
     "oracle_process_isolation_implemented": false,
-    "rust_tests_authored_count": 101,
+    "rust_tests_authored_count": 122,
     "rust_tests_by_file": {
       "research/temporal-bench/src/digest.rs": 2,
       "research/temporal-bench/src/lib.rs": 16,
@@ -42,7 +42,8 @@
       "research/temporal-bench/src/dms.rs": 16,
       "research/temporal-bench/src/evidence.rs": 17,
       "research/temporal-bench/src/irregular.rs": 13,
-      "research/temporal-bench/src/retention.rs": 15
+      "research/temporal-bench/src/retention.rs": 15,
+      "research/temporal-bench/src/fast_event.rs": 21
     },
     "cryptographic_stream_digest_implemented": true,
     "reference_generators": {
@@ -50,7 +51,7 @@
       "multiscale_forecast_change_point": true,
       "braintrace_dms_semantics": true,
       "braintrace_evidence_accumulation_semantics": true,
-      "fast_event": false,
+      "fast_event": true,
       "irregular_missingness": true,
       "selective_retention": true,
       "phase_prediction": false
@@ -136,18 +137,35 @@
       "id": "T1_FAST_EVENT",
       "name": "Fast reaction and event timing",
       "strata": [
-        "isolated_event",
-        "burst",
-        "quiet_idle",
-        "distractor_noise"
+        "rare_target_events",
+        "high_similarity_distractors",
+        "low_similarity_distractors",
+        "quiet_idle_control"
       ],
       "primary_metrics": [
-        "event_precision",
-        "event_recall",
-        "false_triggers_per_idle_hour",
-        "event_to_decision_latency_p50_p95_p99"
+        "target_event_precision",
+        "target_event_recall",
+        "target_event_misses",
+        "duplicate_target_activations",
+        "distractor_false_alarms",
+        "quiet_idle_false_alarms",
+        "quiet_exposure_us",
+        "idle_false_triggers_per_hour",
+        "detection_latency_p50_p95_p99_us"
       ],
-      "oracle": "Exact event-time labels with causal emission bounds"
+      "oracle": "Exact event-time labels with causal emission bounds",
+      "implementation_status": "Rust always-on event stream generator, quiet-idle control, SHA-256 task/oracle digests, structural verifier, event scorer, false-alarm exposure and latency quantiles authored; not compiled or executed",
+      "generator": {
+        "path": "research/temporal-bench/src/fast_event.rs",
+        "reference_slots": 16384,
+        "sample_interval_us": 1000,
+        "target_events": 8,
+        "distractor_events": 16,
+        "event_width_samples": 8,
+        "block_size_samples": 64,
+        "background_noise_abs_max": 40,
+        "description": "Synthetic scalar event stream for always-on timing/false-alarm prequalification; not MLPerf audio or a wake-word reproduction."
+      }
     },
     {
       "id": "T2_DELAYED_CUE",
@@ -439,7 +457,11 @@
     "pp_prop_gradient_or_learning_trajectory_deviation_from_d_rtrl_or_bptt",
     "time_to_target_quality_under_equal_online_feedback_budget",
     "stale_memory_false_recall_after_invalidation",
-    "selective_retention_quality_by_distractor_similarity"
+    "selective_retention_quality_by_distractor_similarity",
+    "idle_false_triggers_per_monitored_hour_with_exposure",
+    "always_on_idle_power_w",
+    "energy_per_correct_event_detection",
+    "energy_per_hour_of_continuous_monitoring"
   ],
   "statistical_design": {
     "pilot_paired_seeds_min": 10,
