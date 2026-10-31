@@ -9,6 +9,7 @@ mod basalt_cargo_fixture;
 mod basalt_cargo_mtime_fixture;
 mod basalt_coverage;
 mod basalt_linux_probe;
+mod basalt_linux_smoke;
 mod basalt_validate;
 mod crate_status;
 mod duplicate_scan;
@@ -103,6 +104,15 @@ enum Commands {
         /// Create a new JSON inventory report at this path.
         #[arg(long)]
         out: PathBuf,
+    },
+    /// Run explicit, bounded Linux syscall smoke tests without observer attachment or workload capture.
+    BasaltLinuxRuntimeSmoke {
+        /// Create a new JSON smoke-test report at this path.
+        #[arg(long)]
+        out: PathBuf,
+        /// Also attempt FAN_CLASS_CONTENT group initialization (may require CAP_SYS_ADMIN).
+        #[arg(long)]
+        probe_permission_class: bool,
     },
     /// Validate a BASALT versioned run record and its cross-record evidence invariants.
     BasaltValidate {
@@ -231,6 +241,10 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::BasaltLinuxCapabilityProbe { out } => {
             let report = basalt_linux_probe::run(&out)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Commands::BasaltLinuxRuntimeSmoke { out, probe_permission_class } => {
+            let report = basalt_linux_smoke::run(&out, probe_permission_class)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
         Commands::BasaltValidate { input, manifest, spec_root } => {
