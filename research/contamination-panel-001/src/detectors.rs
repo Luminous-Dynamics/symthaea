@@ -5,8 +5,8 @@
 //! planted controls; uncertainty and generalization require separate analysis.
 
 use crate::{
-    ExposureMechanismV1, PUBLIC_PACKET_SCHEMA, PublicChallengePacketV1, SealedChallengeKeyV1,
-    SEALED_KEY_SCHEMA, TierV1, hash_domain, pair_digest, validate_pair_packet,
+    PUBLIC_PACKET_SCHEMA, PublicChallengePacketV1, SealedChallengeKeyV1, SEALED_KEY_SCHEMA,
+    TierV1, hash_domain, validate_pair_packet,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -461,7 +461,7 @@ fn packet_digest(packet: &PublicChallengePacketV1) -> Result<String, String> {
 mod tests {
     use super::*;
     use crate::{
-        GeneratorConfigV1, generate_challenge_bundle,
+        ExposureMechanismV1, GeneratorConfigV1, generate_challenge_bundle,
     };
     use serde_json::json;
 
