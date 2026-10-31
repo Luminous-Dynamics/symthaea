@@ -123,3 +123,16 @@ The interfaces must remain distinct. CMAQ-002 currently chooses a causal interve
 - Allocator work units and costs are declared synthetic quantities, not hardware-measured operations or energy.
 - Decision-flip benefit/harm uses evaluator-only true outcomes and does not imply candidate access to counterfactual labels.
 - The current benchmark still uses a finite, deterministic hypothesis catalogue. It is not a live Symthaea HDC/CfC-LTC/memory/planner integration, and it does not establish external generalization or SOTA.
+
+
+## Pinned ActiveArena reference
+
+The external active-perception bridge is now accompanied by [activearena-baseline.lock.json](activearena-baseline.lock.json) and [activearena-baseline.schema.json](activearena-baseline.schema.json). The lock pins the ActiveArena simulator source and ActiveArena-VLA source separately, records the five native task categories, the 18D action space, head-camera-only candidate observation, fixed ID/OOD seed protocol, upstream simulator/asset/policy dependency revisions, and paper-reported OFT/Plan reference scores.
+
+Important reproducibility boundaries:
+- ActiveArena code is MIT; the public ActiveArena-Data Hugging Face card reports Apache-2.0 and about 581k LeRobot rows. Its immutable dataset revision and per-file checksum manifest have not been pinned in this lock, so it is metadata-only and no dataset has been downloaded.
+- The base RoboTwin assets and ActiveArena supplementary assets are pinned to upstream revisions, but their separate dataset/asset licenses still require review. No asset archives have been downloaded.
+- ActiveArena-VLA source is pinned separately. Its released checkpoint bundles do not yet have an immutable revision and manifest in this lock; the Qwen3-VL base model is pinned to the model-snapshot revision but has not been downloaded or licensed for this run.
+- The simulator runtime requires Linux/Python 3.10, CUDA/Vulkan/NVIDIA GPU, and its own Python/PyTorch/SAPIEN/CuRobo/PyTorch3D stack. This must remain an isolated external runtime, not production Symthaea code.
+
+The focused workflow schema-validates this lock and asserts that the dataset, asset archives and policy weights remain un-downloaded until the outstanding version/license/checksum gates are resolved. Paper-reported ID/OOD scores are comparison targets only; they are not Symthaea measurements.
