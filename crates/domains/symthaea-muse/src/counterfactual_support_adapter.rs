@@ -34,9 +34,9 @@ use std::collections::BTreeSet;
 pub const COUNTERFACTUAL_SUPPORT_ADAPTER_VERSION: &str =
     "mel-mr-eval-025-counterfactual-support-adapter-v2";
 const EVENT_EVIDENCE_DOMAIN: &[u8] =
-    b"luminous-dynamics-mel-mr-eval-025-event-support-evidence-v1\0";
+    b"luminous-dynamics-mel-mr-eval-025-event-support-evidence-v2\0";
 const ADAPTER_REPORT_DOMAIN: &[u8] =
-    b"luminous-dynamics-mel-mr-eval-025-support-adapter-report-v1\0";
+    b"luminous-dynamics-mel-mr-eval-025-support-adapter-report-v2\0";
 const MAX_ADAPTER_EVENTS: usize = 100_000;
 const MAX_SUPPORT_INTERVALS_PER_EVENT: usize = 100_000;
 const ROUTING_INCOMPLETE_REASON: &str =
