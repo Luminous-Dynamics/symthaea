@@ -618,7 +618,7 @@ pub fn analyze_execution_custody(
         }
         _ => return Err("last event must be run_finished".to_owned()),
     };
-    if receipt.events.iter().enumerate().any(|(index,event)| matches!(event.payload, ExecutionEventPayloadV1::RunStarted {..} if index != 0) || matches!(event.payload, ExecutionEventPayloadV1::RunFinished {..} if index+1 != receipt.events.len())) {
+    if receipt.events.iter().enumerate().any(|(index,event)| matches!(&event.payload, ExecutionEventPayloadV1::RunStarted {..} if index != 0) || matches!(&event.payload, ExecutionEventPayloadV1::RunFinished {..} if index+1 != receipt.events.len())) {
         return Err("run start/finish event is duplicated or misplaced".to_owned());
     }
 
@@ -922,6 +922,16 @@ mod tests {
         (plan, bytes)
     }
 
+    fn rehash_events(events: &mut [ExecutionEventV1]) {
+        let mut previous = ZERO_DIGEST.to_owned();
+        for (index, event) in events.iter_mut().enumerate() {
+            event.sequence = index as u64;
+            event.previous_event_sha256 = previous.clone();
+            event.event_sha256 = event_hash(&event.fields()).unwrap();
+            previous = event.event_sha256.clone();
+        }
+    }
+
     fn make_receipt(with_anchor: bool) -> (Vec<u8>, Vec<u8>) {
         let (plan, plan_bytes) = make_plan();
         let plan_sha = sha256_hex(&plan_bytes);
@@ -1110,11 +1120,15 @@ mod tests {
         let (plan, receipt) = make_receipt(false);
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         value["events"][1]["payload"]["input_sha256"] = serde_json::json!(digest("different input"));
-        assert!(analyze_execution_custody(&plan, &serde_json::to_vec(&value).unwrap())
+        let mut typed: ExecutionCustodyReceiptV1 = serde_json::from_value(value).unwrap();
+        rehash_events(&mut typed.events);
+        assert!(analyze_execution_custody(&plan, &serde_json::to_vec(&typed).unwrap())
             .unwrap_err().contains("rendered input differs"));
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         value["events"][1]["payload"]["planned_ordinal"] = serde_json::json!(8);
-        assert!(analyze_execution_custody(&plan, &serde_json::to_vec(&value).unwrap())
+        let mut typed: ExecutionCustodyReceiptV1 = serde_json::from_value(value).unwrap();
+        rehash_events(&mut typed.events);
+        assert!(analyze_execution_custody(&plan, &serde_json::to_vec(&typed).unwrap())
             .unwrap_err().contains("committed serial schedule"));
     }
 
@@ -1135,7 +1149,9 @@ mod tests {
         assert!(analyze_execution_custody(&plan, &serde_json::to_vec(&value).unwrap()).is_err());
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         value["events"][5]["payload"]["completed_condition_count"] = serde_json::json!(0);
-        assert!(analyze_execution_custody(&plan, &serde_json::to_vec(&value).unwrap())
+        let mut typed: ExecutionCustodyReceiptV1 = serde_json::from_value(value).unwrap();
+        rehash_events(&mut typed.events);
+        assert!(analyze_execution_custody(&plan, &serde_json::to_vec(&typed).unwrap())
             .unwrap_err().contains("completed count"));
     }
 
