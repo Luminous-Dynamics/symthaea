@@ -184,6 +184,36 @@
         "value": 1048576
       },
       "unit": "bytes"
+    },
+    {
+      "metric_id": "exec_image_identity_recall",
+      "phase": "safety",
+      "definition": "Fraction of exec event occurrences matched by process instance, per-process ordinal and exact executable-image SHA-256 digest.",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "exec_occurrence_order_integrity",
+      "phase": "safety",
+      "definition": "Fraction of process instances whose exec ordinals are unique, contiguous from one and consistent between the independent oracle and observer receipt.",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "clone_flag_semantic_integrity",
+      "phase": "safety",
+      "definition": "Fraction of clone events whose exact clone flags reconcile, with CLONE_THREAD excluded from the process-only profile rather than normalized as a process child.",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
     }
   ],
   "gates": {
@@ -196,7 +226,10 @@
       "event_loss_false_acceptances",
       "closed_tree_false_acceptances",
       "namespace_cross_join_false_acceptances",
-      "ambiguous_process_identity_acceptances"
+      "ambiguous_process_identity_acceptances",
+      "exec_image_identity_recall",
+      "exec_occurrence_order_integrity",
+      "clone_flag_semantic_integrity"
     ],
     "efficiency": [
       "p95_audit_latency_ms",
@@ -239,7 +272,12 @@
       "unmonitored_child",
       "capture_interval_does_not_cover_task",
       "multiple_exec_events_within_one_process_instance",
-      "CLONE_THREAD_task_creation_and_process_only_exclusion"
+      "CLONE_THREAD_task_creation_and_process_only_exclusion",
+      "exec_image_digest_mismatch",
+      "exec_ordinal_reorder",
+      "duplicate_exec_ordinal",
+      "clone_flags_mismatch",
+      "CLONE_THREAD_normalized_as_process_child"
     ],
     "splits": "Separate development, qualification and untouched confirmatory task lineages. Hold out workload templates and PID/namespace mutation strategies, not merely random event rows.",
     "stopping": "Preregister independent task attempt count, host/kernel strata, mutation generators, event-rate controls, retries, exclusions and confidence intervals before qualification."
@@ -263,7 +301,10 @@
     "unmonitored_process_count",
     "namespace_crossing_policy",
     "thread_group_and_CLONE_THREAD_treatment",
-    "process_vs_task_identity_policy"
+    "process_vs_task_identity_policy",
+    "exec_image_digest_method_and_snapshot_binding",
+    "per_process_exec_ordinal_method",
+    "clone_flags_capture_method"
   ],
   "forbidden_claims": [
     "PID_alone_is_a_process_instance_identity",
