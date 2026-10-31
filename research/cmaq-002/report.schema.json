@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-002-evoi-report-v0.3.json",
+  "title": "CMAQ-002 active causal learning decision-value report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "seed",
+    "mechanisms",
+    "families",
+    "contexts",
+    "actions",
+    "probe_budget",
+    "decision_horizon",
+    "probe_cost",
+    "allocator_cost_per_work_unit",
+    "results",
+    "open_class_control"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-002-evoi-report-v0.3"
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "mechanisms": {
+      "const": 9
+    },
+    "families": {
+      "const": 3
+    },
+    "contexts": {
+      "const": 4
+    },
+    "actions": {
+      "const": 3
+    },
+    "probe_budget": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8
+    },
+    "decision_horizon": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000
+    },
+    "probe_cost": {
+      "type": "number",
+      "minimum": 0
+    },
+    "allocator_cost_per_work_unit": {
+      "type": "number",
+      "minimum": 0
+    },
+    "results": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "strategy",
+          "mean_probes",
+          "mean_posterior_size",
+          "mean_decision_utility",
+          "mean_net_utility",
+          "mean_regret",
+          "mean_net_regret",
+          "mean_decision_gain_vs_no_probe",
+          "mean_decision_flip_fraction",
+          "beneficial_flip_fraction",
+          "harmful_flip_fraction",
+          "mean_allocator_work_units",
+          "mean_allocator_cost",
+          "mean_authorization_blocked_candidates",
+          "mean_posterior_safety_blocked_candidates",
+          "unsafe_actions",
+          "unsafe_probes",
+          "contradictions"
+        ],
+        "properties": {
+          "strategy": {
+            "enum": [
+              "no_probe",
+              "fixed",
+              "random",
+              "max_information",
+              "evoi",
+              "oracle"
+            ]
+          },
+          "mean_probes": {
+            "type": "number",
+            "minimum": 0
+          },
+          "mean_posterior_size": {
+            "type": "number",
+            "minimum": 1
+          },
+          "mean_decision_utility": {
+            "type": "number"
+          },
+          "mean_net_utility": {
+            "type": "number"
+          },
+          "mean_regret": {
+            "type": "number",
+            "minimum": 0
+          },
+          "mean_net_regret": {
+            "type": "number",
+            "minimum": 0
+          },
+          "mean_decision_gain_vs_no_probe": {
+            "type": "number"
+          },
+          "mean_decision_flip_fraction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "beneficial_flip_fraction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "harmful_flip_fraction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "mean_allocator_work_units": {
+            "type": "number",
+            "minimum": 0
+          },
+          "mean_allocator_cost": {
+            "type": "number",
+            "minimum": 0
+          },
+          "mean_authorization_blocked_candidates": {
+            "type": "number",
+            "minimum": 0
+          },
+          "mean_posterior_safety_blocked_candidates": {
+            "type": "number",
+            "minimum": 0
+          },
+          "unsafe_actions": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unsafe_probes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "contradictions": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "open_class_control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tested_mechanisms",
+        "detected",
+        "mean_queries_to_detection",
+        "max_queries_to_detection"
+      ],
+      "properties": {
+        "tested_mechanisms": {
+          "const": 3
+        },
+        "detected": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "mean_queries_to_detection": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_queries_to_detection": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 12
+        }
+      }
+    }
+  }
+}
