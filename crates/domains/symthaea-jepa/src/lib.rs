@@ -75,6 +75,8 @@ pub struct JepaTelemetry {
     pub collapse_detected: bool,
     /// Current variance regularization penalty.
     pub variance_penalty: f32,
+    /// Pending transitions discarded because no FEP action was bound.
+    pub dropped_pending_transitions: u64,
 }
 
 /// JEPA engine: the top-level API composing all components.
@@ -82,12 +84,20 @@ pub struct JepaTelemetry {
 /// Call `forward()` each cognitive cycle with the current and next HDC states
 /// to get a latent prediction error. Call `train_step()` to update the
 /// context encoder and predictor (target encoder updates via EMA).
+struct PendingTransition {
+    source: ContinuousHV,
+    action: Option<u8>,
+    context_latent: Option<Vec<f32>>,
+    predicted_latent: Option<Vec<f32>>,
+}
+
 pub struct JepaEngine {
     context: ContextEncoder,
     target: TargetEncoder,
     predictor: LatentPredictor,
     config: JepaConfig,
     state: JepaState,
+    pending_transition: Option<PendingTransition>,
 }
 
 impl JepaEngine {
@@ -104,6 +114,7 @@ impl JepaEngine {
             predictor,
             config,
             state,
+            pending_transition: None,
         }
     }
 
@@ -186,6 +197,169 @@ impl JepaEngine {
         total_loss
     }
 
+    /// Stage the current real observation as the source of a future transition.
+    ///
+    /// The action is deliberately bound later, after FEP selects it. On the next
+    /// observation, resolve_pending_transition trains against that independently
+    /// observed target. This avoids using a model-generated forecast as its own
+    /// training target and avoids pairing the current observation with a stale action.
+    pub fn stage_transition_source(
+        &mut self,
+        source: &ContinuousHV,
+    ) -> Result<(), String> {
+        if source.dim() != self.config.input_dim {
+            return Err(format!(
+                "JEPA transition source dimension mismatch: got {}, expected {}",
+                source.dim(),
+                self.config.input_dim
+            ));
+        }
+        if !source.as_slice().iter().all(|value| value.is_finite()) {
+            return Err("JEPA transition source contains non-finite values".into());
+        }
+        if self.pending_transition.is_some() {
+            return Err("JEPA previous transition has not been resolved or dropped".into());
+        }
+        self.pending_transition = Some(PendingTransition {
+            source: source.clone(),
+            action: None,
+            context_latent: None,
+            predicted_latent: None,
+        });
+        Ok(())
+    }
+
+    /// Bind the FEP-selected action and create the action-conditioned latent
+    /// prediction before the environment can return the next observation.
+    ///
+    /// Returns false when no source observation has been staged. The prediction
+    /// is frozen until resolve_pending_transition receives the actual next input.
+    pub fn condition_pending_transition(&mut self, action: u8) -> Result<bool, String> {
+        let Some(pending) = self.pending_transition.as_ref() else {
+            return Ok(false);
+        };
+        if action as usize >= self.config.num_actions {
+            return Err(format!(
+                "JEPA action index {action} is outside configured action count {}",
+                self.config.num_actions
+            ));
+        }
+        if pending.action.is_some() {
+            return Err("JEPA pending transition is already action-conditioned".into());
+        }
+
+        let context_latent = self.context.encode(&pending.source);
+        let predicted_latent = self.predictor.predict(&context_latent, action);
+        if !context_latent.iter().all(|value| value.is_finite())
+            || !predicted_latent.iter().all(|value| value.is_finite())
+        {
+            return Err("JEPA action-conditioned prediction contains non-finite values".into());
+        }
+
+        let pending = self.pending_transition.as_mut().expect("pending transition checked above");
+        pending.action = Some(action);
+        pending.context_latent = Some(context_latent);
+        pending.predicted_latent = Some(predicted_latent);
+        // Charge the prediction now, even if the environment never returns a
+        // scoreable next observation. Training later must not hide inference cost.
+        self.state.total_energy_spent += self.config.effective_energy_per_forward();
+        Ok(true)
+    }
+
+    /// Resolve the staged action-conditioned prediction against the next real
+    /// observation, then update the context/predictor and EMA target networks.
+    ///
+    /// Returns None if there is no pending transition. If an action was never
+    /// bound, the transition is explicitly dropped and counted rather than
+    /// silently training an action-free or stale-action pair.
+    pub fn resolve_pending_transition(
+        &mut self,
+        actual_next: &ContinuousHV,
+        learning_rate: f32,
+    ) -> Result<Option<f32>, String> {
+        let Some(pending) = self.pending_transition.as_ref() else {
+            return Ok(None);
+        };
+        if actual_next.dim() != self.config.input_dim {
+            return Err(format!(
+                "JEPA next observation dimension mismatch: got {}, expected {}",
+                actual_next.dim(),
+                self.config.input_dim
+            ));
+        }
+        if !actual_next.as_slice().iter().all(|value| value.is_finite()) {
+            return Err("JEPA next observation contains non-finite values".into());
+        }
+        if !learning_rate.is_finite() || learning_rate <= 0.0 {
+            return Err(format!("JEPA learning rate must be finite and > 0, got {learning_rate}"));
+        }
+
+        let (Some(action), Some(context_latent), Some(predicted_latent)) = (
+            pending.action,
+            pending.context_latent.as_ref(),
+            pending.predicted_latent.as_ref(),
+        ) else {
+            self.pending_transition = None;
+            self.state.dropped_pending_transitions =
+                self.state.dropped_pending_transitions.saturating_add(1);
+            return Ok(None);
+        };
+
+        let source = pending.source.clone();
+        let action = action;
+        let context_latent = context_latent.clone();
+        let predicted_latent = predicted_latent.clone();
+        let target_latent = self.target.encode(actual_next);
+        if !target_latent.iter().all(|value| value.is_finite()) {
+            return Err("JEPA target encoder produced non-finite values".into());
+        }
+
+        let cosine = cosine_loss(&predicted_latent, &target_latent);
+        let variance_penalty = self.state.variance_penalty(self.config.variance_floor);
+        let total_loss = cosine + variance_penalty;
+        if !total_loss.is_finite() {
+            return Err("JEPA transition loss is non-finite".into());
+        }
+
+        let output_grad = cosine_loss_gradient(&predicted_latent, &target_latent);
+        let latent_grad = self.predictor.backward(
+            &context_latent,
+            action,
+            &output_grad,
+            learning_rate,
+        );
+        let (weight_grad, bias_grad) = self.context.backward(&source, &latent_grad);
+        self.context
+            .apply_gradients(&weight_grad, &bias_grad, learning_rate, 1e-5);
+        self.target
+            .update_from_context(&self.context, self.config.ema_momentum);
+
+        self.state.last_pe = prediction_error(&predicted_latent, &target_latent);
+        self.state.cumulative_loss += total_loss as f64;
+        self.state.update_variance(&target_latent);
+        self.pending_transition = None;
+        Ok(Some(total_loss))
+    }
+
+    /// Return the pending prediction without exposing or mutating the target.
+    /// This is intended for diagnostics and pre-observation forecast receipts.
+    pub fn pending_prediction(&self) -> Option<&[f32]> {
+        self.pending_transition
+            .as_ref()
+            .and_then(|pending| pending.predicted_latent.as_deref())
+    }
+
+    /// Explicitly discard an incomplete pending transition.
+    pub fn discard_pending_transition(&mut self) -> bool {
+        if self.pending_transition.take().is_some() {
+            self.state.dropped_pending_transitions =
+                self.state.dropped_pending_transitions.saturating_add(1);
+            true
+        } else {
+            false
+        }
+    }
+
     /// Get the most recent latent prediction error.
     pub fn latent_pe(&self) -> f32 {
         self.state.last_pe
@@ -204,6 +378,7 @@ impl JepaEngine {
             steps: self.state.steps,
             collapse_detected: self.state.has_collapse(self.config.variance_floor),
             variance_penalty: self.state.variance_penalty(self.config.variance_floor),
+            dropped_pending_transitions: self.state.dropped_pending_transitions,
         }
     }
 
