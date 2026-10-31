@@ -9,8 +9,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const FACTORIAL_PLAN_SCHEMA: &str =
-    "symthaea.science_bench_refresh_judge_factorial_plan.v1";
+pub const FACTORIAL_PLAN_SCHEMA: &str = "symthaea.science_bench_refresh_judge_factorial_plan.v1";
 pub const FACTORIAL_RECEIPT_SCHEMA: &str =
     "symthaea.science_bench_refresh_judge_factorial_receipt.v1";
 pub const FACTORIAL_REPORT_SCHEMA: &str =
@@ -91,7 +90,6 @@ impl JudgeNuisanceFactorV1 {
         Self::ProvenanceCue,
         Self::PresentationFormat,
     ];
-
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -440,13 +438,17 @@ fn digest_domain(domain: &[u8], payload: &[u8]) -> Result<String, String> {
 
 fn valid_digest(value: &str, allow_zero: bool) -> bool {
     value.len() == 64
-        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
         && (allow_zero || value.bytes().any(|byte| byte != b'0'))
 }
 
 fn valid_revision(value: &str, allow_placeholder: bool) -> bool {
     value.len() == 40
-        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
         && (allow_placeholder || value.bytes().any(|byte| byte != b'0'))
 }
 
@@ -454,15 +456,23 @@ fn nonempty(value: &str, max: usize) -> bool {
     !value.trim().is_empty() && value.len() <= max
 }
 
-fn condition_id(block_id: &str, repeat_index: u32, factors: JudgeNuisanceFactorsV1) -> Result<String, String> {
+fn condition_id(
+    block_id: &str,
+    repeat_index: u32,
+    factors: JudgeNuisanceFactorsV1,
+) -> Result<String, String> {
     #[derive(Serialize)]
     struct Identity<'a> {
         block_id: &'a str,
         repeat_index: u32,
         factors: JudgeNuisanceFactorsV1,
     }
-    let payload = serde_json::to_vec(&Identity { block_id, repeat_index, factors })
-        .map_err(|error| format!("cannot serialize condition identity: {error}"))?;
+    let payload = serde_json::to_vec(&Identity {
+        block_id,
+        repeat_index,
+        factors,
+    })
+    .map_err(|error| format!("cannot serialize condition identity: {error}"))?;
     digest_domain(CONDITION_DOMAIN, &payload)
 }
 
@@ -484,7 +494,9 @@ pub fn validate_judge_factorial_plan_fields(
     if !valid_revision(&fields.analyzer_source_revision, false)
         || fields.analyzer_source_revision != crate::BUILT_GENERATOR_SOURCE_REVISION
     {
-        issues.push("analyzer_source_revision must match the exact compiled validator revision".to_owned());
+        issues.push(
+            "analyzer_source_revision must match the exact compiled validator revision".to_owned(),
+        );
     }
     if fields.purpose.qualified() && crate::BUILT_GENERATOR_WORKTREE_CLEAN != "true" {
         issues.push("qualified factorial plans require a clean analyzer worktree".to_owned());
@@ -493,7 +505,8 @@ pub fn validate_judge_factorial_plan_fields(
         issues.push("study_id must be non-empty and at most 128 bytes".to_owned());
     }
     if !valid_revision(&fields.judge_source_revision, allow_zero) {
-        issues.push("judge_source_revision must be a valid nonzero 40-character revision".to_owned());
+        issues
+            .push("judge_source_revision must be a valid nonzero 40-character revision".to_owned());
     }
     for (label, value) in [
         ("judge_prompt_sha256", &fields.judge_prompt_sha256),
@@ -505,12 +518,16 @@ pub fn validate_judge_factorial_plan_fields(
         }
     }
     if fields.repeats_per_condition == 0 || fields.repeats_per_condition > MAX_REPEATS {
-        issues.push(format!("repeats_per_condition must be in 1..={MAX_REPEATS}"));
+        issues.push(format!(
+            "repeats_per_condition must be in 1..={MAX_REPEATS}"
+        ));
     }
     if fields.blocks.is_empty() || fields.blocks.len() > MAX_BLOCKS {
         issues.push(format!("blocks must contain 1..={MAX_BLOCKS} blocks"));
     }
-    let planned_total = fields.blocks.len()
+    let planned_total = fields
+        .blocks
+        .len()
         .checked_mul(FACTORIAL_CELLS)
         .and_then(|count| count.checked_mul(fields.repeats_per_condition as usize));
     if planned_total.is_none_or(|count| count > MAX_CONDITIONS) {
@@ -523,34 +540,53 @@ pub fn validate_judge_factorial_plan_fields(
             issues.push("block_id must be non-empty, bounded and unique".to_owned());
         }
         if !valid_digest(&block.task_semantics_sha256, allow_zero) {
-            issues.push(format!("block {} has invalid task_semantics_sha256", block.block_id));
+            issues.push(format!(
+                "block {} has invalid task_semantics_sha256",
+                block.block_id
+            ));
         }
         if !nonempty(&block.candidate_a_id, 128)
             || !nonempty(&block.candidate_b_id, 128)
             || block.candidate_a_id == block.candidate_b_id
         {
-            issues.push(format!("block {} requires two distinct non-empty candidate IDs", block.block_id));
+            issues.push(format!(
+                "block {} requires two distinct non-empty candidate IDs",
+                block.block_id
+            ));
         }
         if block.criterion_ids.len() < 2
             || block.criterion_ids.len() > 128
             || block.criterion_ids.iter().any(|id| !nonempty(id, 128))
-            || block.criterion_ids.iter().collect::<BTreeSet<_>>().len() != block.criterion_ids.len()
+            || block.criterion_ids.iter().collect::<BTreeSet<_>>().len()
+                != block.criterion_ids.len()
         {
-            issues.push(format!("block {} requires 2..=128 unique criterion IDs", block.block_id));
+            issues.push(format!(
+                "block {} requires 2..=128 unique criterion IDs",
+                block.block_id
+            ));
         }
         if block.score_options.len() < 2 || block.score_options.len() > 16 {
-            issues.push(format!("block {} requires 2..=16 score options", block.block_id));
+            issues.push(format!(
+                "block {} requires 2..=16 score options",
+                block.block_id
+            ));
         }
         let mut option_ids = BTreeSet::new();
         let mut previous_score = None;
         for option in &block.score_options {
             if !nonempty(&option.option_id, 128) || !option_ids.insert(option.option_id.as_str()) {
-                issues.push(format!("block {} has empty or duplicate score option ID", block.block_id));
+                issues.push(format!(
+                    "block {} has empty or duplicate score option ID",
+                    block.block_id
+                ));
             }
             if option.score_millionths > 1_000_000
                 || previous_score.is_some_and(|previous| option.score_millionths <= previous)
             {
-                issues.push(format!("block {} score options must have strictly increasing scores in 0..=1,000,000", block.block_id));
+                issues.push(format!(
+                    "block {} score options must have strictly increasing scores in 0..=1,000,000",
+                    block.block_id
+                ));
             }
             previous_score = Some(option.score_millionths);
         }
@@ -558,13 +594,21 @@ pub fn validate_judge_factorial_plan_fields(
         if block.conditions.len() != expected_count {
             issues.push(format!(
                 "block {} has {} conditions; expected {} for a complete 2^5 design",
-                block.block_id, block.conditions.len(), expected_count
+                block.block_id,
+                block.conditions.len(),
+                expected_count
             ));
         }
-        let condition_ids: BTreeSet<&str> =
-            block.conditions.iter().map(|condition| condition.condition_id.as_str()).collect();
+        let condition_ids: BTreeSet<&str> = block
+            .conditions
+            .iter()
+            .map(|condition| condition.condition_id.as_str())
+            .collect();
         if condition_ids.len() != block.conditions.len() {
-            issues.push(format!("block {} contains duplicate condition IDs", block.block_id));
+            issues.push(format!(
+                "block {} contains duplicate condition IDs",
+                block.block_id
+            ));
         }
         let schedule_ids: BTreeSet<&str> =
             block.execution_order.iter().map(String::as_str).collect();
@@ -578,18 +622,30 @@ pub fn validate_judge_factorial_plan_fields(
         let mut seen_cells = BTreeSet::new();
         for condition in &block.conditions {
             if condition.repeat_index >= fields.repeats_per_condition {
-                issues.push(format!("condition {} repeat_index is outside the planned range", condition.condition_id));
+                issues.push(format!(
+                    "condition {} repeat_index is outside the planned range",
+                    condition.condition_id
+                ));
             }
             if !valid_digest(&condition.input_sha256, allow_zero) {
-                issues.push(format!("condition {} has invalid input_sha256", condition.condition_id));
+                issues.push(format!(
+                    "condition {} has invalid input_sha256",
+                    condition.condition_id
+                ));
             }
             match condition_id(&block.block_id, condition.repeat_index, condition.factors) {
                 Ok(expected) if expected == condition.condition_id => {}
-                Ok(_) => issues.push(format!("condition {} ID does not match its block/repeat/factor assignment", condition.condition_id)),
+                Ok(_) => issues.push(format!(
+                    "condition {} ID does not match its block/repeat/factor assignment",
+                    condition.condition_id
+                )),
                 Err(error) => issues.push(error),
             }
             if !seen_cells.insert((condition.repeat_index, condition.factors)) {
-                issues.push(format!("block {} repeats a factorial cell within the same repeat index", block.block_id));
+                issues.push(format!(
+                    "block {} repeats a factorial cell within the same repeat index",
+                    block.block_id
+                ));
             }
         }
         for repeat in 0..fields.repeats_per_condition {
@@ -597,7 +653,10 @@ pub fn validate_judge_factorial_plan_fields(
                 let bits = std::array::from_fn(|index| code & (1 << index) != 0);
                 let factors = JudgeNuisanceFactorsV1::from_bits(bits);
                 if !seen_cells.contains(&(repeat, factors)) {
-                    issues.push(format!("block {} is missing factorial cell {code} at repeat {repeat}", block.block_id));
+                    issues.push(format!(
+                        "block {} is missing factorial cell {code} at repeat {repeat}",
+                        block.block_id
+                    ));
                 }
             }
         }
@@ -618,16 +677,17 @@ pub fn validate_judge_factorial_plan_fields(
             }
         }
     }
-    if issues.is_empty() { Ok(()) } else { Err(issues) }
+    if issues.is_empty() {
+        Ok(())
+    } else {
+        Err(issues)
+    }
 }
 
-pub fn compute_judge_factorial_plan_commitment(
-    fields_bytes: &[u8],
-) -> Result<String, String> {
+pub fn compute_judge_factorial_plan_commitment(fields_bytes: &[u8]) -> Result<String, String> {
     let fields: JudgeFactorialPlanFieldsV1 = serde_json::from_slice(fields_bytes)
         .map_err(|error| format!("judge factorial plan fields invalid: {error}"))?;
-    validate_judge_factorial_plan_fields(&fields)
-        .map_err(|issues| issues.join("; "))?;
+    validate_judge_factorial_plan_fields(&fields).map_err(|issues| issues.join("; "))?;
     plan_fields_commitment(&fields)
 }
 
@@ -637,8 +697,7 @@ pub fn verify_judge_factorial_plan(
     let plan: JudgeFactorialPlanV1 = serde_json::from_slice(plan_bytes)
         .map_err(|error| format!("judge factorial plan invalid: {error}"))?;
     let fields = plan.fields();
-    validate_judge_factorial_plan_fields(&fields)
-        .map_err(|issues| issues.join("; "))?;
+    validate_judge_factorial_plan_fields(&fields).map_err(|issues| issues.join("; "))?;
     let expected = plan_fields_commitment(&fields)?;
     if !valid_digest(&plan.plan_commitment_sha256, !plan.purpose.qualified())
         || plan.plan_commitment_sha256 != expected
@@ -667,31 +726,59 @@ fn metric_for_observation(
     condition: &FactorialConditionV1,
     observation: &JudgeFactorialObservationV1,
 ) -> Result<CompletedMetricV1, String> {
-    let candidate_a = observation.candidate_a_score_millionths
-        .ok_or_else(|| format!("completed condition {} omitted candidate A score", condition.condition_id))?;
-    let candidate_b = observation.candidate_b_score_millionths
-        .ok_or_else(|| format!("completed condition {} omitted candidate B score", condition.condition_id))?;
+    let candidate_a = observation.candidate_a_score_millionths.ok_or_else(|| {
+        format!(
+            "completed condition {} omitted candidate A score",
+            condition.condition_id
+        )
+    })?;
+    let candidate_b = observation.candidate_b_score_millionths.ok_or_else(|| {
+        format!(
+            "completed condition {} omitted candidate B score",
+            condition.condition_id
+        )
+    })?;
     let mut scores = BTreeMap::new();
-    let option_index: BTreeMap<&str, usize> = block.score_options.iter()
-        .enumerate().map(|(index, option)| (option.option_id.as_str(), index)).collect();
+    let option_index: BTreeMap<&str, usize> = block
+        .score_options
+        .iter()
+        .enumerate()
+        .map(|(index, option)| (option.option_id.as_str(), index))
+        .collect();
     let mut score_sum = 0.0;
     let mut position_sum = 0.0;
     for score in &observation.criterion_scores {
         if !block.criterion_ids.contains(&score.criterion_id) {
-            return Err(format!("condition {} has an unknown criterion ID", condition.condition_id));
+            return Err(format!(
+                "condition {} has an unknown criterion ID",
+                condition.condition_id
+            ));
         }
-        let option = block.score_options.iter()
+        let option = block
+            .score_options
+            .iter()
             .find(|option| option.option_id == score.selected_option_id)
-            .ok_or_else(|| format!("condition {} selected an unknown score option", condition.condition_id))?;
+            .ok_or_else(|| {
+                format!(
+                    "condition {} selected an unknown score option",
+                    condition.condition_id
+                )
+            })?;
         if score.score_millionths != option.score_millionths {
-            return Err(format!("condition {} score does not match its selected semantic option", condition.condition_id));
+            return Err(format!(
+                "condition {} score does not match its selected semantic option",
+                condition.condition_id
+            ));
         }
-        let index = *option_index.get(score.selected_option_id.as_str()).unwrap_or(&0);
-        let displayed_position = if condition.factors.score_option_order == ScoreOptionOrderV1::Reversed {
-            block.score_options.len() - 1 - index
-        } else {
-            index
-        };
+        let index = *option_index
+            .get(score.selected_option_id.as_str())
+            .unwrap_or(&0);
+        let displayed_position =
+            if condition.factors.score_option_order == ScoreOptionOrderV1::Reversed {
+                block.score_options.len() - 1 - index
+            } else {
+                index
+            };
         let normalized = if block.score_options.len() <= 1 {
             0.0
         } else {
@@ -699,10 +786,16 @@ fn metric_for_observation(
         };
         position_sum += normalized;
         score_sum += f64::from(score.score_millionths);
-        scores.insert(score.criterion_id.clone(), f64::from(score.score_millionths));
+        scores.insert(
+            score.criterion_id.clone(),
+            f64::from(score.score_millionths),
+        );
     }
     if scores.len() != block.criterion_ids.len() {
-        return Err(format!("condition {} must report every planned criterion exactly once", condition.condition_id));
+        return Err(format!(
+            "condition {} must report every planned criterion exactly once",
+            condition.condition_id
+        ));
     }
     let criterion_count = block.criterion_ids.len() as f64;
     Ok(CompletedMetricV1 {
@@ -717,15 +810,27 @@ fn metric_for_observation(
             Some(FactorialDecisionV1::CandidateB) => Some(0.0),
             Some(FactorialDecisionV1::Tie | FactorialDecisionV1::Abstain) | None => None,
         },
-        tie_indicator: if observation.decision == Some(FactorialDecisionV1::Tie) { 1.0 } else { 0.0 },
-        abstention_indicator: if observation.decision == Some(FactorialDecisionV1::Abstain) { 1.0 } else { 0.0 },
+        tie_indicator: if observation.decision == Some(FactorialDecisionV1::Tie) {
+            1.0
+        } else {
+            0.0
+        },
+        abstention_indicator: if observation.decision == Some(FactorialDecisionV1::Abstain) {
+            1.0
+        } else {
+            0.0
+        },
         criterion_scores: scores,
     })
 }
 
 fn mean(values: impl Iterator<Item = f64>) -> Option<f64> {
     let values: Vec<f64> = values.collect();
-    if values.is_empty() { None } else { Some(values.iter().sum::<f64>() / values.len() as f64) }
+    if values.is_empty() {
+        None
+    } else {
+        Some(values.iter().sum::<f64>() / values.len() as f64)
+    }
 }
 
 fn select_balanced_factorial_repeats(
@@ -734,7 +839,8 @@ fn select_balanced_factorial_repeats(
 ) -> (Vec<CompletedMetricV1>, u64, u64) {
     let mut grouped: BTreeMap<(String, u32), Vec<&CompletedMetricV1>> = BTreeMap::new();
     for metric in metrics {
-        grouped.entry((metric.block_id.clone(), metric.repeat_index))
+        grouped
+            .entry((metric.block_id.clone(), metric.repeat_index))
             .or_default()
             .push(metric);
     }
@@ -775,19 +881,35 @@ fn main_effects(
     plan: &JudgeFactorialPlanV1,
     metrics: &[CompletedMetricV1],
     observations_by_id: &BTreeMap<String, &JudgeFactorialObservationV1>,
-) -> (Vec<FactorialMainEffectV1>, Vec<FactorialLevelCountsV1>, Vec<CriterionOrderEffectV1>) {
+) -> (
+    Vec<FactorialMainEffectV1>,
+    Vec<FactorialLevelCountsV1>,
+    Vec<CriterionOrderEffectV1>,
+) {
     let mut effects = Vec::new();
     let mut counts = Vec::new();
     let mut criterion_effects = Vec::new();
     for factor in JudgeNuisanceFactorV1::ALL {
-        let low: Vec<&CompletedMetricV1> = metrics.iter().filter(|metric| !metric.factors.level(factor)).collect();
-        let high: Vec<&CompletedMetricV1> = metrics.iter().filter(|metric| metric.factors.level(factor)).collect();
+        let low: Vec<&CompletedMetricV1> = metrics
+            .iter()
+            .filter(|metric| !metric.factors.level(factor))
+            .collect();
+        let high: Vec<&CompletedMetricV1> = metrics
+            .iter()
+            .filter(|metric| metric.factors.level(factor))
+            .collect();
         let low_gap = mean(low.iter().map(|metric| metric.candidate_score_gap));
         let high_gap = mean(high.iter().map(|metric| metric.candidate_score_gap));
         let low_score = mean(low.iter().map(|metric| metric.mean_criterion_score));
         let high_score = mean(high.iter().map(|metric| metric.mean_criterion_score));
-        let low_position = mean(low.iter().map(|metric| metric.mean_selected_option_position));
-        let high_position = mean(high.iter().map(|metric| metric.mean_selected_option_position));
+        let low_position = mean(
+            low.iter()
+                .map(|metric| metric.mean_selected_option_position),
+        );
+        let high_position = mean(
+            high.iter()
+                .map(|metric| metric.mean_selected_option_position),
+        );
         let low_choice = mean(low.iter().filter_map(|metric| metric.candidate_a_choice));
         let high_choice = mean(high.iter().filter_map(|metric| metric.candidate_a_choice));
         let low_tie_rate = mean(low.iter().map(|metric| metric.tie_indicator));
@@ -804,14 +926,26 @@ fn main_effects(
         for block in &plan.blocks {
             for condition in &block.conditions {
                 let high_level = condition.factors.level(factor);
-                let completed = observations_by_id.get(&condition.condition_id)
-                    .is_some_and(|observation| observation.status == FactorialExecutionStatusV1::Completed);
+                let completed =
+                    observations_by_id
+                        .get(&condition.condition_id)
+                        .is_some_and(|observation| {
+                            observation.status == FactorialExecutionStatusV1::Completed
+                        });
                 if high_level {
                     planned_high += 1;
-                    if completed { completed_high += 1; } else { ineligible_high += 1; }
+                    if completed {
+                        completed_high += 1;
+                    } else {
+                        ineligible_high += 1;
+                    }
                 } else {
                     planned_low += 1;
-                    if completed { completed_low += 1; } else { ineligible_low += 1; }
+                    if completed {
+                        completed_low += 1;
+                    } else {
+                        ineligible_low += 1;
+                    }
                 }
             }
         }
@@ -823,20 +957,48 @@ fn main_effects(
             excluded_completed_high_count: completed_high.saturating_sub(high.len() as u64),
             ineligible_low_count: ineligible_low,
             ineligible_high_count: ineligible_high,
-            candidate_score_gap_delta_millionths: high_gap.zip(low_gap).map(|(high, low)| high - low),
-            criterion_score_delta_millionths: high_score.zip(low_score).map(|(high, low)| high - low),
-            selected_option_position_delta_millionths: high_position.zip(low_position)
-                .map(|(high, low)| (high - low) * 1_000_000.0),
-            candidate_a_choice_rate_delta_millionths: high_choice.zip(low_choice)
+            candidate_score_gap_delta_millionths: high_gap
+                .zip(low_gap)
                 .map(|(high, low)| high - low),
-            decisive_low_count: low.iter().filter(|metric| metric.candidate_a_choice.is_some()).count() as u64,
-            decisive_high_count: high.iter().filter(|metric| metric.candidate_a_choice.is_some()).count() as u64,
-            tie_rate_delta_millionths: high_tie_rate.zip(low_tie_rate).map(|(high, low)| (high - low) * 1_000_000.0),
-            abstention_rate_delta_millionths: high_abstention_rate.zip(low_abstention_rate).map(|(high, low)| (high - low) * 1_000_000.0),
-            tie_low_count: low.iter().filter(|metric| metric.tie_indicator > 0.5).count() as u64,
-            tie_high_count: high.iter().filter(|metric| metric.tie_indicator > 0.5).count() as u64,
-            abstention_low_count: low.iter().filter(|metric| metric.abstention_indicator > 0.5).count() as u64,
-            abstention_high_count: high.iter().filter(|metric| metric.abstention_indicator > 0.5).count() as u64,
+            criterion_score_delta_millionths: high_score
+                .zip(low_score)
+                .map(|(high, low)| high - low),
+            selected_option_position_delta_millionths: high_position
+                .zip(low_position)
+                .map(|(high, low)| (high - low) * 1_000_000.0),
+            candidate_a_choice_rate_delta_millionths: high_choice
+                .zip(low_choice)
+                .map(|(high, low)| high - low),
+            decisive_low_count: low
+                .iter()
+                .filter(|metric| metric.candidate_a_choice.is_some())
+                .count() as u64,
+            decisive_high_count: high
+                .iter()
+                .filter(|metric| metric.candidate_a_choice.is_some())
+                .count() as u64,
+            tie_rate_delta_millionths: high_tie_rate
+                .zip(low_tie_rate)
+                .map(|(high, low)| (high - low) * 1_000_000.0),
+            abstention_rate_delta_millionths: high_abstention_rate
+                .zip(low_abstention_rate)
+                .map(|(high, low)| (high - low) * 1_000_000.0),
+            tie_low_count: low
+                .iter()
+                .filter(|metric| metric.tie_indicator > 0.5)
+                .count() as u64,
+            tie_high_count: high
+                .iter()
+                .filter(|metric| metric.tie_indicator > 0.5)
+                .count() as u64,
+            abstention_low_count: low
+                .iter()
+                .filter(|metric| metric.abstention_indicator > 0.5)
+                .count() as u64,
+            abstention_high_count: high
+                .iter()
+                .filter(|metric| metric.abstention_indicator > 0.5)
+                .count() as u64,
         });
         counts.push(FactorialLevelCountsV1 {
             factor,
@@ -851,12 +1013,19 @@ fn main_effects(
         });
     }
 
-    for criterion_id in plan.blocks.iter().flat_map(|block| block.criterion_ids.iter()).collect::<BTreeSet<_>>() {
-        let canonical: Vec<f64> = metrics.iter()
+    for criterion_id in plan
+        .blocks
+        .iter()
+        .flat_map(|block| block.criterion_ids.iter())
+        .collect::<BTreeSet<_>>()
+    {
+        let canonical: Vec<f64> = metrics
+            .iter()
             .filter(|metric| metric.factors.criterion_order == CriterionOrderV1::Canonical)
             .filter_map(|metric| metric.criterion_scores.get(criterion_id).copied())
             .collect();
-        let reversed: Vec<f64> = metrics.iter()
+        let reversed: Vec<f64> = metrics
+            .iter()
             .filter(|metric| metric.factors.criterion_order == CriterionOrderV1::Reversed)
             .filter_map(|metric| metric.criterion_scores.get(criterion_id).copied())
             .collect();
@@ -866,7 +1035,8 @@ fn main_effects(
             criterion_id: criterion_id.to_string(),
             canonical_mean_millionths: canonical_mean,
             reversed_mean_millionths: reversed_mean,
-            reversed_minus_canonical_millionths: reversed_mean.zip(canonical_mean)
+            reversed_minus_canonical_millionths: reversed_mean
+                .zip(canonical_mean)
                 .map(|(reversed, canonical)| reversed - canonical),
             canonical_completed_count: canonical.len() as u64,
             reversed_completed_count: reversed.len() as u64,
@@ -885,9 +1055,15 @@ fn pairwise_interactions(
             let factor_a = JudgeNuisanceFactorV1::ALL[first];
             let factor_b = JudgeNuisanceFactorV1::ALL[second];
             let mean_at = |a: bool, b: bool, select: fn(&CompletedMetricV1) -> f64| {
-                mean(metrics.iter().filter(|metric| {
-                    metric.factors.level(factor_a) == a && metric.factors.level(factor_b) == b
-                }).map(select))
+                mean(
+                    metrics
+                        .iter()
+                        .filter(|metric| {
+                            metric.factors.level(factor_a) == a
+                                && metric.factors.level(factor_b) == b
+                        })
+                        .map(select),
+                )
             };
             let m00_gap = mean_at(false, false, |metric| metric.candidate_score_gap);
             let m01_gap = mean_at(false, true, |metric| metric.candidate_score_gap);
@@ -898,53 +1074,105 @@ fn pairwise_interactions(
             let m10_score = mean_at(true, false, |metric| metric.mean_criterion_score);
             let m11_score = mean_at(true, true, |metric| metric.mean_criterion_score);
             let mean_choice_at = |a: bool, b: bool| {
-                mean(metrics.iter().filter(|metric| {
-                    metric.factors.level(factor_a) == a && metric.factors.level(factor_b) == b
-                }).filter_map(|metric| metric.candidate_a_choice))
+                mean(
+                    metrics
+                        .iter()
+                        .filter(|metric| {
+                            metric.factors.level(factor_a) == a
+                                && metric.factors.level(factor_b) == b
+                        })
+                        .filter_map(|metric| metric.candidate_a_choice),
+                )
             };
             let m00_choice = mean_choice_at(false, false);
             let m01_choice = mean_choice_at(false, true);
             let m10_choice = mean_choice_at(true, false);
             let m11_choice = mean_choice_at(true, true);
             let mean_indicator_at = |a: bool, b: bool, select: fn(&CompletedMetricV1) -> f64| {
-                mean(metrics.iter().filter(|metric| {
-                    metric.factors.level(factor_a) == a && metric.factors.level(factor_b) == b
-                }).map(select))
+                mean(
+                    metrics
+                        .iter()
+                        .filter(|metric| {
+                            metric.factors.level(factor_a) == a
+                                && metric.factors.level(factor_b) == b
+                        })
+                        .map(select),
+                )
             };
             let m00_tie = mean_indicator_at(false, false, |metric| metric.tie_indicator);
             let m01_tie = mean_indicator_at(false, true, |metric| metric.tie_indicator);
             let m10_tie = mean_indicator_at(true, false, |metric| metric.tie_indicator);
             let m11_tie = mean_indicator_at(true, true, |metric| metric.tie_indicator);
-            let m00_abstention = mean_indicator_at(false, false, |metric| metric.abstention_indicator);
-            let m01_abstention = mean_indicator_at(false, true, |metric| metric.abstention_indicator);
-            let m10_abstention = mean_indicator_at(true, false, |metric| metric.abstention_indicator);
-            let m11_abstention = mean_indicator_at(true, true, |metric| metric.abstention_indicator);
-            let count_at = |a: bool, b: bool| metrics.iter().filter(|metric| {
-                metric.factors.level(factor_a) == a && metric.factors.level(factor_b) == b
-            }).count() as u64;
+            let m00_abstention =
+                mean_indicator_at(false, false, |metric| metric.abstention_indicator);
+            let m01_abstention =
+                mean_indicator_at(false, true, |metric| metric.abstention_indicator);
+            let m10_abstention =
+                mean_indicator_at(true, false, |metric| metric.abstention_indicator);
+            let m11_abstention =
+                mean_indicator_at(true, true, |metric| metric.abstention_indicator);
+            let count_at = |a: bool, b: bool| {
+                metrics
+                    .iter()
+                    .filter(|metric| {
+                        metric.factors.level(factor_a) == a && metric.factors.level(factor_b) == b
+                    })
+                    .count() as u64
+            };
             let counts = [
-                count_at(false, false), count_at(false, true),
-                count_at(true, false), count_at(true, true),
+                count_at(false, false),
+                count_at(false, true),
+                count_at(true, false),
+                count_at(true, true),
             ];
-            let decisive_at = |a: bool, b: bool| metrics.iter().filter(|metric| {
-                metric.factors.level(factor_a) == a
-                    && metric.factors.level(factor_b) == b
-                    && metric.candidate_a_choice.is_some()
-            }).count() as u64;
+            let decisive_at = |a: bool, b: bool| {
+                metrics
+                    .iter()
+                    .filter(|metric| {
+                        metric.factors.level(factor_a) == a
+                            && metric.factors.level(factor_b) == b
+                            && metric.candidate_a_choice.is_some()
+                    })
+                    .count() as u64
+            };
             let decisive_counts = [
-                decisive_at(false, false), decisive_at(false, true),
-                decisive_at(true, false), decisive_at(true, true),
+                decisive_at(false, false),
+                decisive_at(false, true),
+                decisive_at(true, false),
+                decisive_at(true, true),
             ];
-            let tie_at = |a: bool, b: bool| metrics.iter().filter(|metric| {
-                metric.factors.level(factor_a) == a && metric.factors.level(factor_b) == b
-                    && metric.tie_indicator > 0.5
-            }).count() as u64;
-            let abstention_at = |a: bool, b: bool| metrics.iter().filter(|metric| {
-                metric.factors.level(factor_a) == a && metric.factors.level(factor_b) == b
-                    && metric.abstention_indicator > 0.5
-            }).count() as u64;
-            let tie_counts = [tie_at(false, false), tie_at(false, true), tie_at(true, false), tie_at(true, true)];
-            let abstention_counts = [abstention_at(false, false), abstention_at(false, true), abstention_at(true, false), abstention_at(true, true)];
+            let tie_at = |a: bool, b: bool| {
+                metrics
+                    .iter()
+                    .filter(|metric| {
+                        metric.factors.level(factor_a) == a
+                            && metric.factors.level(factor_b) == b
+                            && metric.tie_indicator > 0.5
+                    })
+                    .count() as u64
+            };
+            let abstention_at = |a: bool, b: bool| {
+                metrics
+                    .iter()
+                    .filter(|metric| {
+                        metric.factors.level(factor_a) == a
+                            && metric.factors.level(factor_b) == b
+                            && metric.abstention_indicator > 0.5
+                    })
+                    .count() as u64
+            };
+            let tie_counts = [
+                tie_at(false, false),
+                tie_at(false, true),
+                tie_at(true, false),
+                tie_at(true, true),
+            ];
+            let abstention_counts = [
+                abstention_at(false, false),
+                abstention_at(false, true),
+                abstention_at(true, false),
+                abstention_at(true, true),
+            ];
             let completed_in_four_cells = counts.iter().copied().sum::<u64>();
             let planned_per_cell = plan.blocks.len() as u64
                 * u64::from(plan.repeats_per_condition)
@@ -953,10 +1181,14 @@ fn pairwise_interactions(
             output.push(FactorialInteractionV1 {
                 factor_a,
                 factor_b,
-                candidate_score_gap_interaction_millionths: m11_gap.zip(m10_gap)
-                    .zip(m01_gap.zip(m00_gap)).map(|((m11, m10), (m01, m00))| m11 - m10 - m01 + m00),
-                criterion_score_interaction_millionths: m11_score.zip(m10_score)
-                    .zip(m01_score.zip(m00_score)).map(|((m11, m10), (m01, m00))| m11 - m10 - m01 + m00),
+                candidate_score_gap_interaction_millionths: m11_gap
+                    .zip(m10_gap)
+                    .zip(m01_gap.zip(m00_gap))
+                    .map(|((m11, m10), (m01, m00))| m11 - m10 - m01 + m00),
+                criterion_score_interaction_millionths: m11_score
+                    .zip(m10_score)
+                    .zip(m01_score.zip(m00_score))
+                    .map(|((m11, m10), (m01, m00))| m11 - m10 - m01 + m00),
                 complete_00_count: counts[0],
                 complete_01_count: counts[1],
                 complete_10_count: counts[2],
@@ -973,13 +1205,20 @@ fn pairwise_interactions(
                 abstention_01_count: abstention_counts[1],
                 abstention_10_count: abstention_counts[2],
                 abstention_11_count: abstention_counts[3],
-                candidate_a_choice_interaction_millionths: m11_choice.zip(m10_choice)
-                    .zip(m01_choice.zip(m00_choice)).map(|((m11, m10), (m01, m00))| m11 - m10 - m01 + m00),
-                tie_rate_interaction_millionths: m11_tie.zip(m10_tie).zip(m01_tie.zip(m00_tie))
+                candidate_a_choice_interaction_millionths: m11_choice
+                    .zip(m10_choice)
+                    .zip(m01_choice.zip(m00_choice))
+                    .map(|((m11, m10), (m01, m00))| m11 - m10 - m01 + m00),
+                tie_rate_interaction_millionths: m11_tie
+                    .zip(m10_tie)
+                    .zip(m01_tie.zip(m00_tie))
                     .map(|((m11, m10), (m01, m00))| (m11 - m10 - m01 + m00) * 1_000_000.0),
-                abstention_rate_interaction_millionths: m11_abstention.zip(m10_abstention).zip(m01_abstention.zip(m00_abstention))
+                abstention_rate_interaction_millionths: m11_abstention
+                    .zip(m10_abstention)
+                    .zip(m01_abstention.zip(m00_abstention))
                     .map(|((m11, m10), (m01, m00))| (m11 - m10 - m01 + m00) * 1_000_000.0),
-                excluded_conditions_across_four_cells: planned_in_four_cells.saturating_sub(completed_in_four_cells),
+                excluded_conditions_across_four_cells: planned_in_four_cells
+                    .saturating_sub(completed_in_four_cells),
             });
         }
     }
@@ -1003,64 +1242,112 @@ pub fn analyze_judge_factorial(
     if receipt.analyzer_source_revision != plan.analyzer_source_revision
         || receipt.analyzer_source_revision != crate::BUILT_GENERATOR_SOURCE_REVISION
     {
-        return Err("receipt analyzer revision differs from the exact compiled validator revision".to_owned());
+        return Err(
+            "receipt analyzer revision differs from the exact compiled validator revision"
+                .to_owned(),
+        );
     }
     if !nonempty(&receipt.run_id, 128) {
         return Err("receipt run_id must be non-empty and at most 128 bytes".to_owned());
     }
-    if receipt.plan_sha256 != plan_sha256 || receipt.plan_commitment_sha256 != plan.plan_commitment_sha256 {
+    if receipt.plan_sha256 != plan_sha256
+        || receipt.plan_commitment_sha256 != plan.plan_commitment_sha256
+    {
         return Err("receipt does not bind exact plan bytes and commitment".to_owned());
     }
     if receipt.judge_source_revision != plan.judge_source_revision
         || receipt.judge_prompt_sha256 != plan.judge_prompt_sha256
         || receipt.rubric_sha256 != plan.rubric_sha256
     {
-        return Err("receipt evaluator revision/prompt/rubric differs from the frozen plan".to_owned());
+        return Err(
+            "receipt evaluator revision/prompt/rubric differs from the frozen plan".to_owned(),
+        );
     }
 
     let mut expected = BTreeMap::new();
     for block in &plan.blocks {
-        let conditions_by_id: BTreeMap<&str, &FactorialConditionV1> = block.conditions.iter()
+        let conditions_by_id: BTreeMap<&str, &FactorialConditionV1> = block
+            .conditions
+            .iter()
             .map(|condition| (condition.condition_id.as_str(), condition))
             .collect();
         for (ordinal, condition_id) in block.execution_order.iter().enumerate() {
-            let condition = conditions_by_id.get(condition_id.as_str())
-                .ok_or_else(|| format!("block {} execution schedule references an unknown condition", block.block_id))?;
-            let execution_ordinal = u32::try_from(ordinal)
-                .map_err(|_| "execution ordinal exceeds u32".to_owned())?;
-            expected.insert(condition_id.as_str(), (block, *condition, execution_ordinal));
+            let condition = conditions_by_id.get(condition_id.as_str()).ok_or_else(|| {
+                format!(
+                    "block {} execution schedule references an unknown condition",
+                    block.block_id
+                )
+            })?;
+            let execution_ordinal =
+                u32::try_from(ordinal).map_err(|_| "execution ordinal exceeds u32".to_owned())?;
+            expected.insert(
+                condition_id.as_str(),
+                (block, *condition, execution_ordinal),
+            );
         }
     }
     let mut observed_ids = BTreeSet::new();
     for observation in &receipt.observations {
         if !observed_ids.insert(observation.condition_id.as_str()) {
-            return Err(format!("duplicate observation condition_id {}", observation.condition_id));
+            return Err(format!(
+                "duplicate observation condition_id {}",
+                observation.condition_id
+            ));
         }
-        let (block, condition, expected_execution_ordinal) = expected.get(observation.condition_id.as_str())
-            .ok_or_else(|| format!("unexpected observation condition_id {}", observation.condition_id))?;
+        let (block, condition, expected_execution_ordinal) = expected
+            .get(observation.condition_id.as_str())
+            .ok_or_else(|| {
+                format!(
+                    "unexpected observation condition_id {}",
+                    observation.condition_id
+                )
+            })?;
         if observation.execution_ordinal != *expected_execution_ordinal {
-            return Err(format!("condition {} execution_ordinal differs from the committed schedule", condition.condition_id));
+            return Err(format!(
+                "condition {} execution_ordinal differs from the committed schedule",
+                condition.condition_id
+            ));
         }
         if observation.input_sha256 != condition.input_sha256 {
-            return Err(format!("condition {} input digest differs from the committed plan", condition.condition_id));
+            return Err(format!(
+                "condition {} input digest differs from the committed plan",
+                condition.condition_id
+            ));
         }
         match observation.status {
             FactorialExecutionStatusV1::Completed => {
-                let digest = observation.judge_receipt_sha256.as_deref()
-                    .ok_or_else(|| format!("completed condition {} requires judge_receipt_sha256", condition.condition_id))?;
+                let digest = observation.judge_receipt_sha256.as_deref().ok_or_else(|| {
+                    format!(
+                        "completed condition {} requires judge_receipt_sha256",
+                        condition.condition_id
+                    )
+                })?;
                 if !valid_digest(digest, false) {
-                    return Err(format!("completed condition {} has invalid judge receipt digest", condition.condition_id));
+                    return Err(format!(
+                        "completed condition {} has invalid judge receipt digest",
+                        condition.condition_id
+                    ));
                 }
                 if observation.decision.is_none()
                     || observation.candidate_a_score_millionths.is_none()
                     || observation.candidate_b_score_millionths.is_none()
                 {
-                    return Err(format!("completed condition {} omitted decision or candidate scores", condition.condition_id));
+                    return Err(format!(
+                        "completed condition {} omitted decision or candidate scores",
+                        condition.condition_id
+                    ));
                 }
-                if observation.candidate_a_score_millionths.is_some_and(|value| value > 1_000_000)
-                    || observation.candidate_b_score_millionths.is_some_and(|value| value > 1_000_000)
+                if observation
+                    .candidate_a_score_millionths
+                    .is_some_and(|value| value > 1_000_000)
+                    || observation
+                        .candidate_b_score_millionths
+                        .is_some_and(|value| value > 1_000_000)
                 {
-                    return Err(format!("completed condition {} has out-of-range candidate score", condition.condition_id));
+                    return Err(format!(
+                        "completed condition {} has out-of-range candidate score",
+                        condition.condition_id
+                    ));
                 }
                 metric_for_observation(block, condition, observation)?;
             }
@@ -1071,21 +1358,36 @@ pub fn analyze_judge_factorial(
                     || observation.candidate_b_score_millionths.is_some()
                     || !observation.criterion_scores.is_empty()
                 {
-                    return Err(format!("ineligible condition {} must not carry a partial outcome", condition.condition_id));
+                    return Err(format!(
+                        "ineligible condition {} must not carry a partial outcome",
+                        condition.condition_id
+                    ));
                 }
             }
         }
     }
-    let missing: Vec<&str> = expected.keys().filter(|id| !observed_ids.contains(**id)).copied().collect();
+    let missing: Vec<&str> = expected
+        .keys()
+        .filter(|id| !observed_ids.contains(**id))
+        .copied()
+        .collect();
     if !missing.is_empty() {
-        return Err(format!("receipt is missing {} planned condition observations", missing.len()));
+        return Err(format!(
+            "receipt is missing {} planned condition observations",
+            missing.len()
+        ));
     }
 
-    let observations_by_id: BTreeMap<String, &JudgeFactorialObservationV1> = receipt.observations.iter()
-        .map(|observation| (observation.condition_id.clone(), observation)).collect();
+    let observations_by_id: BTreeMap<String, &JudgeFactorialObservationV1> = receipt
+        .observations
+        .iter()
+        .map(|observation| (observation.condition_id.clone(), observation))
+        .collect();
     let mut metrics = Vec::new();
     for observation in &receipt.observations {
-        if observation.status != FactorialExecutionStatusV1::Completed { continue; }
+        if observation.status != FactorialExecutionStatusV1::Completed {
+            continue;
+        }
         let (block, condition, _) = expected.get(observation.condition_id.as_str()).unwrap();
         metrics.push(metric_for_observation(block, condition, observation)?);
     }
@@ -1099,8 +1401,17 @@ pub fn analyze_judge_factorial(
     let mut completed_total = 0_u64;
     let mut ineligible_total = 0_u64;
     for block in &plan.blocks {
-        let completed = block.conditions.iter().filter(|condition| observations_by_id
-            .get(&condition.condition_id).is_some_and(|observation| observation.status == FactorialExecutionStatusV1::Completed)).count() as u64;
+        let completed = block
+            .conditions
+            .iter()
+            .filter(|condition| {
+                observations_by_id
+                    .get(&condition.condition_id)
+                    .is_some_and(|observation| {
+                        observation.status == FactorialExecutionStatusV1::Completed
+                    })
+            })
+            .count() as u64;
         let planned = block.conditions.len() as u64;
         let ineligible = planned.saturating_sub(completed);
         completed_total += completed;
@@ -1154,7 +1465,10 @@ pub fn analyze_judge_factorial(
     let report_payload = serde_json::to_vec(&fields)
         .map_err(|error| format!("cannot serialize factorial report fields: {error}"))?;
     let commitment = digest_domain(REPORT_DOMAIN, &report_payload)?;
-    Ok(JudgeFactorialReportV1 { fields, report_commitment_sha256: commitment })
+    Ok(JudgeFactorialReportV1 {
+        fields,
+        report_commitment_sha256: commitment,
+    })
 }
 
 #[cfg(test)]
@@ -1173,9 +1487,18 @@ mod tests {
             candidate_b_id: "candidate-B".to_owned(),
             criterion_ids: vec!["accuracy".to_owned(), "evidence".to_owned()],
             score_options: vec![
-                ScoreOptionV1 { option_id: "low".to_owned(), score_millionths: 0 },
-                ScoreOptionV1 { option_id: "middle".to_owned(), score_millionths: 500_000 },
-                ScoreOptionV1 { option_id: "high".to_owned(), score_millionths: 1_000_000 },
+                ScoreOptionV1 {
+                    option_id: "low".to_owned(),
+                    score_millionths: 0,
+                },
+                ScoreOptionV1 {
+                    option_id: "middle".to_owned(),
+                    score_millionths: 500_000,
+                },
+                ScoreOptionV1 {
+                    option_id: "high".to_owned(),
+                    score_millionths: 1_000_000,
+                },
             ],
             execution_order: Vec::new(),
             conditions: Vec::new(),
@@ -1223,7 +1546,9 @@ mod tests {
         };
         let plan_bytes = serde_json::to_vec_pretty(&plan).unwrap();
         let options = &block.score_options;
-        let execution_ordinals: BTreeMap<&str, u32> = block.execution_order.iter()
+        let execution_ordinals: BTreeMap<&str, u32> = block
+            .execution_order
+            .iter()
             .enumerate()
             .map(|(ordinal, condition_id)| (condition_id.as_str(), ordinal as u32))
             .collect();
@@ -1234,12 +1559,17 @@ mod tests {
             } else {
                 "low"
             };
-            let score = options.iter().find(|option| option.option_id == selected).unwrap().score_millionths;
-            let mut candidate_a_score = if condition.factors.candidate_order == CandidateOrderV1::CandidateAFirst {
-                700_000
-            } else {
-                650_000
-            };
+            let score = options
+                .iter()
+                .find(|option| option.option_id == selected)
+                .unwrap()
+                .score_millionths;
+            let mut candidate_a_score =
+                if condition.factors.candidate_order == CandidateOrderV1::CandidateAFirst {
+                    700_000
+                } else {
+                    650_000
+                };
             if condition.factors.candidate_order == CandidateOrderV1::CandidateBFirst
                 && condition.factors.provenance_cue == ProvenanceCueV1::Displayed
             {
@@ -1254,18 +1584,24 @@ mod tests {
             };
             observations.push(JudgeFactorialObservationV1 {
                 condition_id: condition.condition_id.clone(),
-                execution_ordinal: *execution_ordinals.get(condition.condition_id.as_str()).unwrap(),
+                execution_ordinal: *execution_ordinals
+                    .get(condition.condition_id.as_str())
+                    .unwrap(),
                 input_sha256: condition.input_sha256.clone(),
                 status: FactorialExecutionStatusV1::Completed,
                 judge_receipt_sha256: Some(digest(&format!("receipt-{}", condition.condition_id))),
                 decision: Some(decision),
                 candidate_a_score_millionths: Some(candidate_a_score),
                 candidate_b_score_millionths: Some(600_000),
-                criterion_scores: block.criterion_ids.iter().map(|criterion_id| CriterionOutcomeV1 {
-                    criterion_id: criterion_id.clone(),
-                    score_millionths: score,
-                    selected_option_id: selected.to_owned(),
-                }).collect(),
+                criterion_scores: block
+                    .criterion_ids
+                    .iter()
+                    .map(|criterion_id| CriterionOutcomeV1 {
+                        criterion_id: criterion_id.clone(),
+                        score_millionths: score,
+                        selected_option_id: selected.to_owned(),
+                    })
+                    .collect(),
             });
         }
         let receipt = JudgeFactorialReceiptV1 {
@@ -1299,22 +1635,58 @@ mod tests {
         let report = analyze_judge_factorial(&plan, &receipt).unwrap();
         assert_eq!(report.fields.planned_condition_count, 64);
         assert_eq!(report.fields.completed_condition_count, 64);
-        let candidate = report.fields.main_effects.iter()
-            .find(|effect| effect.factor == JudgeNuisanceFactorV1::CandidateOrder).unwrap();
-        assert_eq!(candidate.candidate_score_gap_delta_millionths, Some(-30_000.0));
-        assert_eq!(candidate.candidate_a_choice_rate_delta_millionths, Some(-500_000.0));
-        let option = report.fields.main_effects.iter()
-            .find(|effect| effect.factor == JudgeNuisanceFactorV1::ScoreOptionOrder).unwrap();
+        let candidate = report
+            .fields
+            .main_effects
+            .iter()
+            .find(|effect| effect.factor == JudgeNuisanceFactorV1::CandidateOrder)
+            .unwrap();
+        assert_eq!(
+            candidate.candidate_score_gap_delta_millionths,
+            Some(-30_000.0)
+        );
+        assert_eq!(
+            candidate.candidate_a_choice_rate_delta_millionths,
+            Some(-500_000.0)
+        );
+        let option = report
+            .fields
+            .main_effects
+            .iter()
+            .find(|effect| effect.factor == JudgeNuisanceFactorV1::ScoreOptionOrder)
+            .unwrap();
         assert!(option.criterion_score_delta_millionths.unwrap() > 0.0);
-        let provenance = report.fields.main_effects.iter()
-            .find(|effect| effect.factor == JudgeNuisanceFactorV1::ProvenanceCue).unwrap();
-        assert_eq!(provenance.candidate_score_gap_delta_millionths, Some(20_000.0));
-        assert_eq!(provenance.candidate_a_choice_rate_delta_millionths, Some(500_000.0));
-        let interaction = report.fields.pairwise_interactions.iter()
-            .find(|effect| effect.factor_a == JudgeNuisanceFactorV1::CandidateOrder
-                && effect.factor_b == JudgeNuisanceFactorV1::ProvenanceCue).unwrap();
-        assert_eq!(interaction.candidate_score_gap_interaction_millionths, Some(40_000.0));
-        assert_eq!(interaction.candidate_a_choice_interaction_millionths, Some(1_000_000.0));
+        let provenance = report
+            .fields
+            .main_effects
+            .iter()
+            .find(|effect| effect.factor == JudgeNuisanceFactorV1::ProvenanceCue)
+            .unwrap();
+        assert_eq!(
+            provenance.candidate_score_gap_delta_millionths,
+            Some(20_000.0)
+        );
+        assert_eq!(
+            provenance.candidate_a_choice_rate_delta_millionths,
+            Some(500_000.0)
+        );
+        let interaction = report
+            .fields
+            .pairwise_interactions
+            .iter()
+            .find(|effect| {
+                effect.factor_a == JudgeNuisanceFactorV1::CandidateOrder
+                    && effect.factor_b == JudgeNuisanceFactorV1::ProvenanceCue
+            })
+            .unwrap();
+        assert_eq!(
+            interaction.candidate_score_gap_interaction_millionths,
+            Some(40_000.0)
+        );
+        assert_eq!(
+            interaction.candidate_a_choice_interaction_millionths,
+            Some(1_000_000.0)
+        );
         assert_eq!(
             [
                 interaction.decisive_00_count,
@@ -1335,8 +1707,12 @@ mod tests {
         let altered = serde_json::to_vec(&value).unwrap();
         let report = analyze_judge_factorial(&plan, &altered).unwrap();
 
-        let candidate_order = report.fields.main_effects.iter()
-            .find(|effect| effect.factor == JudgeNuisanceFactorV1::CandidateOrder).unwrap();
+        let candidate_order = report
+            .fields
+            .main_effects
+            .iter()
+            .find(|effect| effect.factor == JudgeNuisanceFactorV1::CandidateOrder)
+            .unwrap();
         assert_eq!(candidate_order.complete_low_count, 32);
         assert_eq!(candidate_order.complete_high_count, 32);
         assert_eq!(candidate_order.decisive_low_count, 30);
@@ -1346,24 +1722,37 @@ mod tests {
         assert_eq!(candidate_order.abstention_low_count, 1);
         assert_eq!(candidate_order.abstention_high_count, 0);
         assert_eq!(candidate_order.tie_rate_delta_millionths, Some(-31_250.0));
-        assert_eq!(candidate_order.abstention_rate_delta_millionths, Some(-31_250.0));
+        assert_eq!(
+            candidate_order.abstention_rate_delta_millionths,
+            Some(-31_250.0)
+        );
 
-        let interaction = report.fields.pairwise_interactions.iter()
-            .find(|effect| effect.factor_a == JudgeNuisanceFactorV1::CandidateOrder
-                && effect.factor_b == JudgeNuisanceFactorV1::ProvenanceCue).unwrap();
+        let interaction = report
+            .fields
+            .pairwise_interactions
+            .iter()
+            .find(|effect| {
+                effect.factor_a == JudgeNuisanceFactorV1::CandidateOrder
+                    && effect.factor_b == JudgeNuisanceFactorV1::ProvenanceCue
+            })
+            .unwrap();
         assert_eq!(interaction.complete_00_count, 16);
         assert_eq!(interaction.decisive_00_count, 14);
         assert_eq!(interaction.tie_00_count, 1);
         assert_eq!(interaction.abstention_00_count, 1);
         assert_eq!(interaction.tie_rate_interaction_millionths, Some(62_500.0));
-        assert_eq!(interaction.abstention_rate_interaction_millionths, Some(62_500.0));
+        assert_eq!(
+            interaction.abstention_rate_interaction_millionths,
+            Some(62_500.0)
+        );
     }
 
     #[test]
     fn analysis_is_deterministic_for_exact_input_bytes() {
         let (_, plan, receipt) = make_plan();
         let first = serde_json::to_vec(&analyze_judge_factorial(&plan, &receipt).unwrap()).unwrap();
-        let second = serde_json::to_vec(&analyze_judge_factorial(&plan, &receipt).unwrap()).unwrap();
+        let second =
+            serde_json::to_vec(&analyze_judge_factorial(&plan, &receipt).unwrap()).unwrap();
         assert_eq!(first, second);
     }
 
@@ -1373,7 +1762,11 @@ mod tests {
         let mut fields = plan.fields();
         fields.analyzer_source_revision = "b".repeat(40);
         let issues = validate_judge_factorial_plan_fields(&fields).unwrap_err();
-        assert!(issues.iter().any(|issue| issue.contains("exact compiled validator revision")));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.contains("exact compiled validator revision"))
+        );
     }
 
     #[test]
@@ -1382,8 +1775,11 @@ mod tests {
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         value["analyzer_source_revision"] = serde_json::json!("b".repeat(40));
         let altered = serde_json::to_vec(&value).unwrap();
-        assert!(analyze_judge_factorial(&plan, &altered).unwrap_err()
-            .contains("exact compiled validator revision"));
+        assert!(
+            analyze_judge_factorial(&plan, &altered)
+                .unwrap_err()
+                .contains("exact compiled validator revision")
+        );
     }
 
     #[test]
@@ -1395,7 +1791,8 @@ mod tests {
         let mut remapped_ids = BTreeMap::new();
         for condition in &mut second.conditions {
             let old_id = condition.condition_id.clone();
-            let new_id = condition_id(&second.block_id, condition.repeat_index, condition.factors).unwrap();
+            let new_id =
+                condition_id(&second.block_id, condition.repeat_index, condition.factors).unwrap();
             remapped_ids.insert(old_id, new_id.clone());
             condition.condition_id = new_id;
         }
@@ -1406,8 +1803,16 @@ mod tests {
         second.score_options[0].score_millionths = 10_000;
         fields.blocks.push(second);
         let issues = validate_judge_factorial_plan_fields(&fields).unwrap_err();
-        assert!(issues.iter().any(|issue| issue.contains("criterion IDs/order differ")));
-        assert!(issues.iter().any(|issue| issue.contains("score options differ")));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.contains("criterion IDs/order differ"))
+        );
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.contains("score options differ"))
+        );
     }
 
     #[test]
@@ -1440,8 +1845,11 @@ mod tests {
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         value["observations"][0]["execution_ordinal"] = serde_json::json!(999);
         let altered = serde_json::to_vec(&value).unwrap();
-        assert!(analyze_judge_factorial(&plan, &altered).unwrap_err()
-            .contains("execution_ordinal differs from the committed schedule"));
+        assert!(
+            analyze_judge_factorial(&plan, &altered)
+                .unwrap_err()
+                .contains("execution_ordinal differs from the committed schedule")
+        );
     }
 
     #[test]
@@ -1450,7 +1858,11 @@ mod tests {
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         value["observations"][0]["input_sha256"] = serde_json::json!(digest("wrong input"));
         let altered = serde_json::to_vec(&value).unwrap();
-        assert!(analyze_judge_factorial(&plan, &altered).unwrap_err().contains("input digest differs"));
+        assert!(
+            analyze_judge_factorial(&plan, &altered)
+                .unwrap_err()
+                .contains("input digest differs")
+        );
     }
 
     #[test]
@@ -1458,20 +1870,33 @@ mod tests {
         let (_, plan, receipt) = make_plan();
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         value["observations"].as_array_mut().unwrap().pop();
-        assert!(analyze_judge_factorial(&plan, &serde_json::to_vec(&value).unwrap()).unwrap_err().contains("missing"));
+        assert!(
+            analyze_judge_factorial(&plan, &serde_json::to_vec(&value).unwrap())
+                .unwrap_err()
+                .contains("missing")
+        );
 
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         let first = value["observations"][0].clone();
         value["observations"].as_array_mut().unwrap().push(first);
-        assert!(analyze_judge_factorial(&plan, &serde_json::to_vec(&value).unwrap()).unwrap_err().contains("duplicate"));
+        assert!(
+            analyze_judge_factorial(&plan, &serde_json::to_vec(&value).unwrap())
+                .unwrap_err()
+                .contains("duplicate")
+        );
     }
 
     #[test]
     fn rejects_semantic_option_score_mismatch() {
         let (_, plan, receipt) = make_plan();
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
-        value["observations"][0]["criterion_scores"][0]["score_millionths"] = serde_json::json!(1_000_000);
-        assert!(analyze_judge_factorial(&plan, &serde_json::to_vec(&value).unwrap()).unwrap_err().contains("does not match"));
+        value["observations"][0]["criterion_scores"][0]["score_millionths"] =
+            serde_json::json!(1_000_000);
+        assert!(
+            analyze_judge_factorial(&plan, &serde_json::to_vec(&value).unwrap())
+                .unwrap_err()
+                .contains("does not match")
+        );
     }
 
     #[test]
@@ -1491,8 +1916,12 @@ mod tests {
         assert_eq!(report.fields.excluded_incomplete_repeat_count, 1);
         assert!(report.fields.effects_use_only_fully_completed_repeats);
         assert!(!report.fields.all_conditions_completed);
-        let candidate = report.fields.main_effects.iter()
-            .find(|effect| effect.factor == JudgeNuisanceFactorV1::CandidateOrder).unwrap();
+        let candidate = report
+            .fields
+            .main_effects
+            .iter()
+            .find(|effect| effect.factor == JudgeNuisanceFactorV1::CandidateOrder)
+            .unwrap();
         assert_eq!(candidate.complete_low_count, 16);
         assert_eq!(candidate.complete_high_count, 16);
         assert_eq!(candidate.excluded_completed_low_count, 15);
@@ -1504,6 +1933,10 @@ mod tests {
         let (_, plan, receipt) = make_plan();
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         value["observations"][0]["status"] = serde_json::json!("blocked");
-        assert!(analyze_judge_factorial(&plan, &serde_json::to_vec(&value).unwrap()).unwrap_err().contains("partial outcome"));
+        assert!(
+            analyze_judge_factorial(&plan, &serde_json::to_vec(&value).unwrap())
+                .unwrap_err()
+                .contains("partial outcome")
+        );
     }
 }
