@@ -90,11 +90,31 @@ jobs:
               tau = row["mean_rank_tau_b"]
               assert tau is None or -1.0 <= tau <= 1.0
 
+          interval_pairs = [
+              ("mean_effect_sign_accuracy", "effect_sign_accuracy_ci95_lower", "effect_sign_accuracy_ci95_upper"),
+              ("mean_effect_magnitude_mae", "effect_magnitude_mae_ci95_lower", "effect_magnitude_mae_ci95_upper"),
+              ("mean_rank_tau_b", "rank_tau_b_ci95_lower", "rank_tau_b_ci95_upper"),
+              ("mean_top1_regret", "top1_regret_ci95_lower", "top1_regret_ci95_upper"),
+              ("mean_terminal_false_safe_rate", "terminal_false_safe_rate_ci95_lower", "terminal_false_safe_rate_ci95_upper"),
+          ]
+          for row in rows:
+              for mean_key, lower_key, upper_key in interval_pairs:
+                  mean_value = row[mean_key]
+                  lower = row[lower_key]
+                  upper = row[upper_key]
+                  if mean_value is None:
+                      assert lower is None and upper is None
+                  else:
+                      assert lower is not None and upper is not None
+                      assert lower <= mean_value <= upper
+
           # Null effects must not be mistaken for evidence of a nonzero action effect.
           null_point = get("null_effect", "point_outcome")
           assert null_point["mean_null_false_effect_rate"] == 1.0
           assert null_point["mean_effect_sign_accuracy"] is None
           assert null_point["mean_rank_tau_b"] is None
+          assert null_point["effect_sign_accuracy_ci95_lower"] is None
+          assert null_point["rank_tau_b_ci95_upper"] is None
 
           # Support-aware coverage must explicitly expose the unsupported action branches.
           support = get("monotone", "support_aware_point")
@@ -113,6 +133,8 @@ jobs:
               oracle = get(scenario, "oracle")
               assert oracle["mean_pair_coverage"] == 1.0
               assert oracle["mean_effect_magnitude_mae"] == 0.0
+              assert oracle["effect_magnitude_mae_ci95_lower"] == 0.0
+              assert oracle["effect_magnitude_mae_ci95_upper"] == 0.0
               assert oracle["mean_top1_regret"] == 0.0
               assert oracle["mean_branch_outcome_mae"] == 0.0
               assert oracle["mean_branch_state_mae"] == 0.0
