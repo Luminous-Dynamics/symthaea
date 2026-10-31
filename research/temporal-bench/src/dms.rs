@@ -654,6 +654,7 @@ mod tests {
     fn excess_spike_probability_is_rejected() {
         let mut config = DmsConfig::braintrace_reference(1);
         config.dt_ms = 100;
+        config.fixation_ms = 100;
         config.firing_rate_hz = 1_000.0;
         assert!(matches!(
             generate_dms_task(config),
