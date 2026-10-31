@@ -1,0 +1,60 @@
+name: POD-Meta Lab Qualification
+on:
+  push:
+    branches:
+      - research/proof-obligation-driven-metareasoning-2026-10-30
+    paths:
+      - research/pod-meta-lab/**
+      - .github/workflows/pod-meta-lab-qualification.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pod-meta-lab-qualification-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Exact source receipt
+        run: echo "head_sha=$GITHUB_SHA" > pod-meta-qualification-receipt.txt
+      - name: Format
+        run: cargo fmt --manifest-path research/pod-meta-lab/Cargo.toml -- --check
+      - name: Tests
+        run: cargo test --manifest-path research/pod-meta-lab/Cargo.toml
+      - name: Clippy
+        run: cargo clippy --manifest-path research/pod-meta-lab/Cargo.toml --all-targets -- -D warnings
+      - name: Scheduler demos
+        run: |
+          cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin pod-meta-demo
+          cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-v1
+      - name: Export, predict, and evaluate
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/poar-artifacts"
+          mkdir -p "$d"
+          cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-graph-export -- 1729 test "$d/planner.poar" "$d/oracle.poar.sealed" "$GITHUB_SHA"
+          p="$(sha256sum "$d/planner.poar" | cut -d ' ' -f 1)"
+          test "$p" = "$(head -n 1 "$d/oracle.poar.sealed" | cut -f 3)"
+          cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-prediction-demo -- 1729 test "$p" "$d/predictions.poar"
+          cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-graph-eval -- "$d/planner.poar" "$d/oracle.poar.sealed" "$d/predictions.poar" "$GITHUB_SHA" "$d/evaluation-receipt.tsv"
+          test -s "$d/evaluation-receipt.tsv"
+          grep -q POAR-EVAL-RECEIPT/1 "$d/evaluation-receipt.tsv"
+          grep -q "planner_sha256=$p" "$d/evaluation-receipt.tsv"
+          grep -q cases=16 "$d/evaluation-receipt.tsv"
+          cat "$d/evaluation-receipt.tsv" >> pod-meta-qualification-receipt.txt
+          rm -rf "$d"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pod-meta-qualification-${{ github.sha }}
+          path: pod-meta-qualification-receipt.txt
+          if-no-files-found: error
+          retention-days: 90
