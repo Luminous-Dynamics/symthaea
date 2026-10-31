@@ -631,3 +631,10 @@ The independent verifier verify_fresh_score_report_integrity recomputes the repo
 
 A valid score report always sets independently_verified=false because the execution receipt digest is self-reported. It proves exact oracle agreement with the supplied outputs, not that a trusted model runner actually produced them.
 
+Independently check the score report's content hash, outcome partition and recomputed summary rates without opening the sealed oracle:
+
+~~~sh
+cargo run --locked -- verify-fresh-score \
+  /secure/evaluator/fresh-score-report.json
+~~~
+
