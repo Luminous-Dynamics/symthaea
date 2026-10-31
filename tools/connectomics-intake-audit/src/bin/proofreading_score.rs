@@ -1885,7 +1885,7 @@ fn validate_domain_split_provenance(
         .collect::<BTreeSet<_>>();
     let observed_ids = records.iter().map(|row| row.sample_id.clone()).collect::<BTreeSet<_>>();
     if expected_ids.is_empty() {
-        return Err("domain split manifest has no entries for the requested evaluation partition".into());
+        return Err("domain split manifest does not match requested evaluation partition; no entries are present for that role".into());
     }
     if expected_ids != observed_ids {
         let missing = expected_ids.difference(&observed_ids).next().cloned();
