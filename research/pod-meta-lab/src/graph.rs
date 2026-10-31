@@ -95,6 +95,8 @@ pub enum ClaimDisposition {
 pub struct ProofPacket {
     pub case_id: String,
     pub claim_dispositions: BTreeMap<String, ClaimDisposition>,
+    /// Ranked retrieval results (best first); distinct from final proof citations.
+    pub retrieval_ranking: Vec<String>,
     pub cited_evidence_ids: BTreeSet<String>,
 }
 
@@ -104,10 +106,15 @@ impl ProofPacket {
             case_id: case.id.clone(),
             claim_dispositions: case.target_claim_ids.iter()
                 .map(|id| (id.clone(), ClaimDisposition::Abstain)).collect(),
+            retrieval_ranking: Vec::new(),
             cited_evidence_ids: BTreeSet::new(),
         }
     }
 }
+
+/// Fixed cutoff for the synthetic retrieval contract. Confirmatory TEMPO runs
+/// must use that benchmark's official cutoffs and evaluator.
+pub const TEMPORAL_RETRIEVAL_K: usize = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct CaseScore {
@@ -128,6 +135,26 @@ pub struct CaseScore {
     pub retracted_citations: usize,
     pub correlation_violations: usize,
     pub abstained_claims: usize,
+    /// Number of hidden-oracle-relevant, time-admissible graph evidence items.
+    pub temporal_relevant_evidence: usize,
+    /// Unique relevant evidence found among the first TEMPORAL_RETRIEVAL_K ranked results.
+    pub temporal_relevant_retrieved_at_k: usize,
+    /// Number of ranked result slots evaluated (at most TEMPORAL_RETRIEVAL_K).
+    pub temporal_retrieved_at_k: usize,
+}
+
+impl CaseScore {
+    pub fn temporal_coverage_at_k(&self) -> Option<f64> {
+        (self.temporal_relevant_evidence > 0).then_some(
+            self.temporal_relevant_retrieved_at_k as f64 / self.temporal_relevant_evidence as f64
+        )
+    }
+
+    pub fn temporal_precision_at_k(&self) -> Option<f64> {
+        (self.temporal_retrieved_at_k > 0).then_some(
+            self.temporal_relevant_retrieved_at_k as f64 / self.temporal_retrieved_at_k as f64
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -354,6 +381,53 @@ fn resolve_claim(
     result
 }
 
+fn collect_reachable_evidence_requirements(
+    case: &PlannerCase,
+    claim_id: &str,
+    visited_claims: &mut BTreeSet<String>,
+    requirements: &mut BTreeSet<(String, String)>,
+) {
+    if !visited_claims.insert(claim_id.to_string()) {
+        return;
+    }
+    let Some(node) = case.claims.iter().find(|node| node.id == claim_id) else {
+        return;
+    };
+    for alternative in &node.alternatives {
+        for requirement in &alternative.requirements {
+            match requirement {
+                ProofRequirement::Evidence(evidence_id) => {
+                    requirements.insert((claim_id.to_string(), evidence_id.clone()));
+                }
+                ProofRequirement::Claim { claim_id: child, .. } => {
+                    collect_reachable_evidence_requirements(case, child, visited_claims, requirements);
+                }
+            }
+        }
+    }
+}
+
+fn oracle_relevant_evidence_ids(
+    case: &PlannerCase,
+    labels: &BTreeMap<String, HiddenTruth>,
+) -> BTreeSet<String> {
+    let mut requirements = BTreeSet::<(String, String)>::new();
+    let mut visited = BTreeSet::new();
+    for target in &case.target_claim_ids {
+        collect_reachable_evidence_requirements(case, target, &mut visited, &mut requirements);
+    }
+
+    let evidence_by_id: BTreeMap<&str, &EvidenceRevision> =
+        case.evidence.iter().map(|e| (e.id.as_str(), e)).collect();
+    requirements.into_iter().filter_map(|(claim_id, evidence_id)| {
+        let evidence = evidence_by_id.get(evidence_id.as_str())?;
+        (evidence.subject_claim_id == claim_id
+            && admissible(evidence, &case.query)
+            && truth_matches(evidence, labels))
+            .then_some(evidence_id)
+    }).collect()
+}
+
 fn score_case(
     case: &PlannerCase,
     labels: &BTreeMap<String, HiddenTruth>,
@@ -362,7 +436,22 @@ fn score_case(
     let evidence_by_id: BTreeMap<&str, &EvidenceRevision> =
         case.evidence.iter().map(|e| (e.id.as_str(), e)).collect();
     let mut memo = BTreeMap::new();
-    let mut score = CaseScore { case_id: case.id.clone(), target_claims: case.target_claim_ids.len(), ..CaseScore::default() };
+    let relevant_evidence = oracle_relevant_evidence_ids(case, labels);
+    let mut score = CaseScore {
+        case_id: case.id.clone(),
+        target_claims: case.target_claim_ids.len(),
+        temporal_relevant_evidence: relevant_evidence.len(),
+        ..CaseScore::default()
+    };
+    let mut seen_retrieval = BTreeSet::new();
+    for evidence_id in packet.retrieval_ranking.iter().take(TEMPORAL_RETRIEVAL_K) {
+        score.temporal_retrieved_at_k += 1;
+        if seen_retrieval.insert(evidence_id.clone())
+            && relevant_evidence.contains(evidence_id)
+        {
+            score.temporal_relevant_retrieved_at_k += 1;
+        }
+    }
 
     for id in &case.target_claim_ids {
         let evaluation = resolve_claim(case, labels, id, &mut BTreeSet::new(), &mut memo);
@@ -625,6 +714,7 @@ mod tests {
         ProofPacket {
             case_id: c.id.clone(),
             claim_dispositions: BTreeMap::from([(claim.into(),disposition)]),
+            retrieval_ranking: citations.iter().map(|id| (*id).into()).collect(),
             cited_evidence_ids: citations.iter().map(|id| (*id).into()).collect(),
         }
     }
@@ -678,14 +768,21 @@ mod tests {
         let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
         let before=find(&suite,"temporal-before-correction");
         let after=find(&suite,"temporal-after-correction");
-        let report=suite.evaluate(&[
-            packet(before,"claim",ClaimDisposition::Supported{alternative_id:"revision-one".into()},&["e-rev-one"]),
-            packet(after,"claim",ClaimDisposition::Refuted{alternative_id:"revision-two".into()},&["e-rev-two"]),
-        ]);
+        let mut before_packet=packet(before,"claim",ClaimDisposition::Supported{alternative_id:"revision-one".into()},&["e-rev-one"]);
+        before_packet.retrieval_ranking=vec!["e-rev-two".into(),"e-rev-one".into()];
+        let mut after_packet=packet(after,"claim",ClaimDisposition::Refuted{alternative_id:"revision-two".into()},&["e-rev-two"]);
+        after_packet.retrieval_ranking=vec!["e-rev-one".into(),"e-rev-two".into()];
+        let report=suite.evaluate(&[before_packet,after_packet]);
         assert_eq!(report.case_scores[3].correct_dispositions,1);
         assert_eq!(report.case_scores[4].correct_dispositions,1);
         assert_eq!(report.case_scores[3].temporal_violations,0);
         assert_eq!(report.case_scores[4].temporal_violations,0);
+        assert_eq!(report.case_scores[3].temporal_relevant_evidence,1);
+        assert_eq!(report.case_scores[4].temporal_relevant_evidence,1);
+        assert_eq!(report.case_scores[3].temporal_coverage_at_k(),Some(1.0));
+        assert_eq!(report.case_scores[4].temporal_coverage_at_k(),Some(1.0));
+        assert_eq!(report.case_scores[3].temporal_precision_at_k(),Some(0.5));
+        assert_eq!(report.case_scores[4].temporal_precision_at_k(),Some(0.5));
     }
 
     #[test]
@@ -827,7 +924,7 @@ mod tests {
         let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
         let c=find(&suite,"and-chain");
         let p=ProofPacket::abstain_all(c);
-        let unknown=ProofPacket{case_id:"unknown".into(),claim_dispositions:BTreeMap::new(),cited_evidence_ids:BTreeSet::new()};
+        let unknown=ProofPacket{case_id:"unknown".into(),claim_dispositions:BTreeMap::new(),retrieval_ranking:Vec::new(),cited_evidence_ids:BTreeSet::new()};
         let report=suite.evaluate(&[p.clone(),p,unknown]);
         assert_eq!(report.duplicate_prediction_packets,1);
         assert_eq!(report.unknown_prediction_packets,1);
