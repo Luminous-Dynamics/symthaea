@@ -36,9 +36,15 @@ When configured, the tool preserves the V1 sample-index radius-only and multifea
 - `physical_arclength_radius_only_piecewise_linear`;
 - `physical_arclength_multifeature_piecewise_linear`.
 
-The report records the interval, physical half-window, effective resampled half-window sample count, interpolation policy and per-track original/resampled sample counts. This allows a reviewer to confirm that all compared profiles used the same physical receptive field. Keep the resampling interval, half-window, feature transforms, thresholds and minimum separation identical across a sampling-density metamorphic comparison.
+The report emits separate resampling metadata and proposal/evaluation methods for two fixed policies:
+- `piecewise_linear_on_uniform_arclength_grid_v1`: interpolates each feature linearly between source observations. This is suitable for smooth profiles but can smear abrupt boundaries across a coarse source interval.
+- `nearest_source_observation_on_uniform_arclength_grid_v1`: assigns each physical grid point to its nearest source observation, with deterministic ties assigned to the earlier observation. This preserves sampled discontinuities more sharply but quantizes their localization to the source sampling resolution.
 
-The physical mode fixes the sample-index receptive-field problem; it does **not** solve statistical calibration. The score threshold remains a heuristic based on supplied scalar noise scales, features are still treated as independently scaled SSE gains, and an abrupt morphology transition is not proof of neuronal identity change. The physical variant must be calibrated on a disjoint same-neuron null set and lockbox before biological use. V1 remains the transparent control.
+For each policy, the report records the interval, physical half-window, effective resampled half-window sample count, interpolation policy, and per-track original/resampled sample counts plus uncovered terminal tail. The detector returns separate radius-only and multifeature proposals for each policy. Keep the resampling interval, half-window, feature transforms, thresholds, and minimum separation identical across a sampling-density metamorphic comparison.
+
+The nearest-observation regression uses the same synthetic physical step at 25/50/100/200 nm source spacing. Its required localization tolerance includes half the source sample interval plus one resampling interval; do not demand sub-voxel localization from information that was never sampled. The linear policy is retained as a comparator because it can smear discontinuities; the policies are not interchangeable.
+
+The physical modes fix the sample-index receptive-field problem; they do **not** solve statistical calibration. The score threshold remains a heuristic based on supplied scalar noise scales, features are still treated as independently scaled SSE gains, and an abrupt morphology transition is not proof of neuronal identity change. The physical variant must be calibrated on a disjoint same-neuron null set and lockbox before biological use. V1 remains the transparent control.
 
 ## Reproducible run
 
