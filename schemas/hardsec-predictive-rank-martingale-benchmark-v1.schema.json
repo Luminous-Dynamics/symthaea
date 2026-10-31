@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/hardsec-predictive-rank-martingale-benchmark-v1.schema.json",
+  "title": "HARDSEC PRM benchmark plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "status",
+    "comparators",
+    "candidates",
+    "scenarios",
+    "holdout_axes",
+    "metrics",
+    "claim_rules",
+    "reference_paper"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-predictive-rank-martingale-benchmark-v1"
+    },
+    "benchmark_id": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "planned",
+        "active",
+        "complete",
+        "superseded"
+      ]
+    },
+    "comparators": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "holdout_axes": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_rules": {
+      "type": "object",
+      "additionalProperties": {
+        "const": true
+      }
+    },
+    "reference_paper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "url",
+        "source_version"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "source_version": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
