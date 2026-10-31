@@ -46,6 +46,76 @@ impl Default for HypervolumeQmcConfig {
     }
 }
 
+/// Immutable integration design shared by every prior/posterior/portfolio comparison.
+/// Private fields prevent downstream callers from mutating the reference or random shifts after
+/// the sampling-design digest has been computed.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HypervolumeQmcDesign {
+    reference: Vec<f64>,
+    config: HypervolumeQmcConfig,
+    scramble_shifts: Vec<Vec<f64>>,
+    box_volume: f64,
+    sampling_design_sha256: String,
+}
+
+impl HypervolumeQmcDesign {
+    pub fn new(
+        reference: &[f64],
+        config: &HypervolumeQmcConfig,
+    ) -> Result<Self, HypervolumeQmcError> {
+        validate_config(config)?;
+        let dimension = reference.len();
+        if !(MIN_DIMENSIONS..=MAX_DIMENSIONS).contains(&dimension) {
+            return Err(HypervolumeQmcError::new(
+                "reference",
+                format!("dimension must be in {MIN_DIMENSIONS}..={MAX_DIMENSIONS}"),
+            ));
+        }
+        for (index, value) in reference.iter().copied().enumerate() {
+            if !value.is_finite() || !(0.0..1.0).contains(&value) {
+                return Err(HypervolumeQmcError::new(
+                    format!("reference[{index}]"),
+                    "reference coordinates must be finite and in [0,1)",
+                ));
+            }
+        }
+
+        let mut scramble_shifts = Vec::with_capacity(config.scramble_replicates);
+        for replicate in 0..config.scramble_replicates {
+            let mut rng = SplitMix64::new(
+                config.seed
+                    ^ (replicate as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15)
+                    ^ 0xbb67_ae85_84ca_a73b,
+            );
+            scramble_shifts.push((0..dimension).map(|_| rng.next_f64()).collect());
+        }
+        let box_volume = reference
+            .iter()
+            .map(|lower| 1.0 - lower)
+            .product::<f64>();
+        let sampling_design_sha256 = compute_sampling_design_sha256(reference, config);
+        Ok(Self {
+            reference: reference.to_vec(),
+            config: config.clone(),
+            scramble_shifts,
+            box_volume,
+            sampling_design_sha256,
+        })
+    }
+
+    pub fn reference(&self) -> &[f64] {
+        &self.reference
+    }
+
+    pub fn config(&self) -> &HypervolumeQmcConfig {
+        &self.config
+    }
+
+    pub fn sampling_design_sha256(&self) -> &str {
+        &self.sampling_design_sha256
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct HypervolumeQmcEstimate {
     pub estimate: f64,
@@ -85,37 +155,28 @@ impl fmt::Display for HypervolumeQmcError {
 
 impl Error for HypervolumeQmcError {}
 
-/// Estimate the union volume dominated by points in the box [reference, 1]^d.
-///
-/// The function supports 2..=16 objectives and arbitrary candidate counts. All objective
-/// coordinates must already have been normalized to [0,1], with larger always better.
-/// A sample is dominated if at least one candidate is no worse in every objective.
-/// Points that fail to dominate the reference in any coordinate contribute zero volume.
-///
-/// QMC sample locations are generated from Halton sequences with independent random shifts
-/// per replicate. The same config gives common random numbers for comparing nested point sets.
+/// Create a reusable randomized-QMC design, then estimate one point set with it.
 pub fn estimate_hypervolume_qmc(
     points: &[Vec<f64>],
     reference: &[f64],
     config: &HypervolumeQmcConfig,
 ) -> Result<HypervolumeQmcEstimate, HypervolumeQmcError> {
-    validate_config(config)?;
-    let dimension = reference.len();
-    if !(MIN_DIMENSIONS..=MAX_DIMENSIONS).contains(&dimension) {
-        return Err(HypervolumeQmcError::new(
-            "reference",
-            format!("dimension must be in {MIN_DIMENSIONS}..={MAX_DIMENSIONS}"),
-        ));
-    }
-    for (index, value) in reference.iter().copied().enumerate() {
-        if !value.is_finite() || !(0.0..1.0).contains(&value) {
-            return Err(HypervolumeQmcError::new(
-                format!("reference[{index}]"),
-                "reference coordinates must be finite and in [0,1)",
-            ));
-        }
-    }
+    let design = HypervolumeQmcDesign::new(reference, config)?;
+    estimate_hypervolume_qmc_with_design(points, &design)
+}
 
+/// Estimate dominated hypervolume using an immutable, reusable sampling design.
+///
+/// Reusing the same design across posterior states and portfolios provides common random
+/// numbers for lower-variance *differences* in hypervolume. The between-scramble uncertainty
+/// remains an empirical randomized-QMC diagnostic, not a rigorous confidence guarantee.
+pub fn estimate_hypervolume_qmc_with_design(
+    points: &[Vec<f64>],
+    design: &HypervolumeQmcDesign,
+) -> Result<HypervolumeQmcEstimate, HypervolumeQmcError> {
+    let reference = &design.reference;
+    let config = &design.config;
+    let dimension = reference.len();
     let mut eligible = Vec::with_capacity(points.len());
     for (point_index, point) in points.iter().enumerate() {
         if point.len() != dimension {
@@ -142,11 +203,8 @@ pub fn estimate_hypervolume_qmc(
     }
 
     let point_set_sha256 = compute_point_set_sha256(points, reference);
-    let sampling_design_sha256 = compute_sampling_design_sha256(reference, config);
-    let box_volume = reference
-        .iter()
-        .map(|lower| 1.0 - lower)
-        .product::<f64>();
+    let sampling_design_sha256 = design.sampling_design_sha256.clone();
+    let box_volume = design.box_volume;
 
     if eligible.is_empty() {
         return Ok(HypervolumeQmcEstimate {
@@ -165,15 +223,8 @@ pub fn estimate_hypervolume_qmc(
 
     let mut replicate_estimates = Vec::with_capacity(config.scramble_replicates);
     let mut hit_counts_per_replicate = Vec::with_capacity(config.scramble_replicates);
-    for replicate in 0..config.scramble_replicates {
-        let mut rng = SplitMix64::new(
-            config.seed
-                ^ (replicate as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15)
-                ^ 0xbb67_ae85_84ca_a73b,
-        );
-        let shifts: Vec<f64> = (0..dimension).map(|_| rng.next_f64()).collect();
+    for shifts in &design.scramble_shifts {
         let mut hits = 0usize;
-
         for sample_index in 0..config.samples_per_replicate {
             let sequence_index = sample_index as u64 + 1;
             let mut dominated = false;
@@ -380,6 +431,23 @@ mod tests {
         let estimate = estimate_hypervolume_qmc(&points, &[0.0, 0.0], &config()).unwrap();
         assert!((exact - 0.4).abs() < 1e-12);
         assert!((estimate.estimate - exact).abs() < 0.005);
+    }
+
+    #[test]
+    fn one_immutable_design_reuses_identical_scrambles_across_point_sets() {
+        let design = HypervolumeQmcDesign::new(&[0.0, 0.0, 0.0], &config()).unwrap();
+        let first = estimate_hypervolume_qmc_with_design(
+            &[vec![0.8, 0.3, 0.6]],
+            &design,
+        )
+        .unwrap();
+        let second = estimate_hypervolume_qmc_with_design(
+            &[vec![0.8, 0.3, 0.6], vec![0.4, 0.7, 0.5]],
+            &design,
+        )
+        .unwrap();
+        assert_eq!(first.sampling_design_sha256, second.sampling_design_sha256);
+        assert!(second.estimate >= first.estimate);
     }
 
     #[test]
