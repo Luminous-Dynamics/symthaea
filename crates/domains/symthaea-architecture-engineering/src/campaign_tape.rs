@@ -204,6 +204,18 @@ pub enum CampaignEventPayload {
         parent_candidate_sha256: Option<String>,
         disposition: DirectionProposalDisposition,
     },
+    /// One paid candidate evaluation that also asks the verifier to admit or map its
+    /// proposed direction. This is the correct representation for Coral-style NEW agents:
+    /// proposal and scored attempt are one work unit, not two separately charged actions.
+    NovelCandidateEvaluation {
+        candidate_sha256: String,
+        parent_candidate_sha256: String,
+        semantic_delta_sha256: String,
+        proposal_sha256: String,
+        descriptor_sha256: String,
+        disposition: DirectionProposalDisposition,
+        score: Option<f64>,
+    },
 }
 
 /// One action and its visibility/accounting context in the append-only campaign tape.
@@ -532,6 +544,85 @@ impl CampaignTape {
                             }
                         }
                         *direction_claims.entry(direction_id.clone()).or_default() += 1;
+                    }
+                    (
+                        ArmClaim::NewDirection,
+                        CampaignEventPayload::NovelCandidateEvaluation {
+                            candidate_sha256,
+                            parent_candidate_sha256,
+                            semantic_delta_sha256,
+                            proposal_sha256,
+                            descriptor_sha256,
+                            disposition,
+                            score,
+                        },
+                    ) => {
+                        validate_sha256("candidate_sha256", candidate_sha256)?;
+                        validate_sha256("parent_candidate_sha256", parent_candidate_sha256)?;
+                        validate_sha256("semantic_delta_sha256", semantic_delta_sha256)?;
+                        validate_sha256("proposal_sha256", proposal_sha256)?;
+                        validate_sha256("descriptor_sha256", descriptor_sha256)?;
+                        match (disposition, score) {
+                            (
+                                DirectionProposalDisposition::Admitted { .. }
+                                | DirectionProposalDisposition::Duplicate { .. },
+                                Some(value),
+                            ) if value.is_finite() => {}
+                            (
+                                DirectionProposalDisposition::Admitted { .. }
+                                | DirectionProposalDisposition::Duplicate { .. },
+                                _,
+                            ) => {
+                                return Err(CampaignTapeError::new(
+                                    format!("events[{event_index}].score"),
+                                    "admitted or duplicate novel candidate requires a finite verified score",
+                                ));
+                            }
+                            (
+                                DirectionProposalDisposition::Rejected { .. }
+                                | DirectionProposalDisposition::Inconclusive { .. },
+                                None,
+                            ) => {}
+                            (
+                                DirectionProposalDisposition::Rejected { .. }
+                                | DirectionProposalDisposition::Inconclusive { .. },
+                                Some(_),
+                            ) => {
+                                return Err(CampaignTapeError::new(
+                                    format!("events[{event_index}].score"),
+                                    "rejected or inconclusive novel candidate cannot publish a score",
+                                ));
+                            }
+                        }
+                        new_claims += 1;
+                        match disposition {
+                            DirectionProposalDisposition::Admitted { canonical_direction_id } => {
+                                validate_id("canonical_direction_id", canonical_direction_id)?;
+                                if known_directions.contains(canonical_direction_id)
+                                    || !pending_new_directions.insert(canonical_direction_id.clone())
+                                {
+                                    return Err(CampaignTapeError::new(
+                                        format!("events[{event_index}].disposition"),
+                                        "new admission must create a unique canonical direction",
+                                    ));
+                                }
+                            }
+                            DirectionProposalDisposition::Duplicate { existing_direction_id } => {
+                                validate_id("existing_direction_id", existing_direction_id)?;
+                                if !known_directions.contains(existing_direction_id)
+                                    && !pending_new_directions.contains(existing_direction_id)
+                                {
+                                    return Err(CampaignTapeError::new(
+                                        format!("events[{event_index}].disposition"),
+                                        "duplicate must map to an already known or same-round admitted direction",
+                                    ));
+                                }
+                            }
+                            DirectionProposalDisposition::Rejected { reason_code }
+                            | DirectionProposalDisposition::Inconclusive { reason_code } => {
+                                validate_id("reason_code", reason_code)?;
+                            }
+                        }
                     }
                     (
                         ArmClaim::NewDirection,
