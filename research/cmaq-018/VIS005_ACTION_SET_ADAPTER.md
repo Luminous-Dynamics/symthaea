@@ -134,3 +134,12 @@ A *false-dominance certificate* occurs when the selected interval's lower endpoi
 The episode—not an action, pair or draw—is the sampling unit. The known-answer synthetic fixture reports 4 episodes, 2 actions, mean regret 1.25, mean bound 1.25, 75% bound coverage, 75% simultaneous interval coverage, 2 dominance certificates and 1 false certificate (50% false-dominance rate). This is a hostile fixture, not a performance or calibration result. The focused workflow validates its schema and rejects impossible false-certificate counts.
 
 The bound is conditional on all intervals covering the true outcomes. It is not a safety proof. A future producer should abstain or request more evidence when action-set coverage is unsupported or the selected action is not robustly dominant; the decision must still be checked against an independent authority gate.
+
+
+## Fail-closed action selection
+
+The metric layer now exposes `select_interval_dominant_action`. It returns a certified index only when exactly one candidate's lower interval endpoint is at least every competitor's upper endpoint. It returns an explicit abstention when no action is interval-dominant, and abstains on an ambiguous multi-dominant boundary case rather than selecting by row order.
+
+The selector validates the whole interval set and requires a common nominal level. Its certificate is conditional on simultaneous action-set coverage, is not a physical safety proof, and must never bypass the independent authority gate. New tests cover unique dominance, overlapping intervals, boundary ambiguity, mixed nominal levels and undersized action sets.
+
+The current benchmark plan is in [INDUSTRY_BENCHMARK_MATRIX_2026-11-01.md](INDUSTRY_BENCHMARK_MATRIX_2026-11-01.md). It separates P0 visual fidelity from P5 decision advantage and P6 robustness; requires D0/D1/W1/W2/W3 matched-budget comparators; and scores action-set coverage, selected regret, false dominance, abstention utility and net decision value.
