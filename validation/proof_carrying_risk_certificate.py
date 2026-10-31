@@ -108,8 +108,8 @@ def _validate_manifest(manifest: dict) -> None:
     _validate_digest_map(evidence, "evidence")
 
     if kind == "expected_risk":
-        if lane != "exact_finite_exchangeability":
-            raise CertificateError("expected_risk requires exact_finite_exchangeability in this v1 contract")
+        if lane not in {"exact_finite_exchangeability", "simulation_only"}:
+            raise CertificateError("expected_risk requires an exact finite-exchangeability or non-certifying simulation lane")
         if assumptions.get("sampling") != "finite_exchangeability":
             raise CertificateError("expected_risk certificate must declare finite exchangeability")
         if scope.get("universe") != "all_augmented_count_vectors":
@@ -122,8 +122,8 @@ def _validate_manifest(manifest: dict) -> None:
             raise CertificateError("finite CRC expected risk is not a time-uniform guarantee")
 
     elif kind == "high_probability_risk":
-        if lane != "high_probability_bound":
-            raise CertificateError("high_probability_risk requires high_probability_bound")
+        if lane not in {"high_probability_bound", "simulation_only"}:
+            raise CertificateError("high_probability_risk requires a high-probability or non-certifying simulation lane")
         confidence = parse_exact_fraction(target.get("confidence_level"), "risk_target.confidence_level")
         if not 0 < confidence < 1:
             raise CertificateError("confidence_level must be in (0,1)")
@@ -131,8 +131,8 @@ def _validate_manifest(manifest: dict) -> None:
             raise CertificateError("high-probability risk needs a declared sampling assumption")
 
     elif kind == "fdr":
-        if lane not in {"analytical_fdr_theorem", "exact_intersection_closure"}:
-            raise CertificateError("offline FDR needs a fixed-family FDR proof lane")
+        if lane not in {"analytical_fdr_theorem", "exact_intersection_closure", "simulation_only"}:
+            raise CertificateError("offline FDR needs a fixed-family proof lane or non-certifying simulation lane")
         if scope.get("fixed_family") is not True or scope.get("time_uniform") is not False:
             raise CertificateError("FDR certificate must be explicitly fixed-family and offline")
         if not isinstance(scope.get("family_size"), int) or scope["family_size"] < 1:
@@ -143,8 +143,8 @@ def _validate_manifest(manifest: dict) -> None:
             raise CertificateError("FDR e-value guarantee must state its dependence scope")
 
     elif kind == "supfdr":
-        if lane != "theorem_backed_eprocess":
-            raise CertificateError("SupFDR requires a theorem-backed e-process lane")
+        if lane not in {"theorem_backed_eprocess", "simulation_only"}:
+            raise CertificateError("SupFDR requires a theorem-backed e-process or non-certifying simulation lane")
         if target.get("time_uniform") is not True or scope.get("online") is not True:
             raise CertificateError("SupFDR must be explicitly online and time-uniform")
         if assumptions.get("filtration") != "one_global_filtration":
@@ -156,8 +156,8 @@ def _validate_manifest(manifest: dict) -> None:
             raise CertificateError("SupFDR needs an explicit positive or unbounded horizon")
 
     elif kind == "fwer":
-        if lane not in {"exact_intersection_closure", "high_probability_bound"}:
-            raise CertificateError("FWER needs a closure or high-probability proof lane")
+        if lane not in {"exact_intersection_closure", "high_probability_bound", "simulation_only"}:
+            raise CertificateError("FWER needs a closure, high-probability or non-certifying simulation lane")
         if not isinstance(scope.get("family_size"), int) or scope["family_size"] < 1:
             raise CertificateError("FWER scope needs a positive family_size")
 
