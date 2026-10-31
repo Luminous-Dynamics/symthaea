@@ -187,7 +187,11 @@ For production anti-rollback, an independently protected anchor must bind at lea
 - latest accepted log origin/tree size/root;
 - accepted receipt digest or an immutable transaction digest.
 
-The anchor must itself provide linearizable compare-and-advance or witness-backed non-equivocation. The verifier checks local state against it after startup and before trust promotion.
+The anchor must itself provide linearizable compare-and-advance or witness-backed non-equivocation. Its authoritative state record must durably bind the new source cursor, new log cursor, exact receipt digest, policy versions and monotonically increasing revision as one commit unit. It must retain enough immutable state (or a content-addressed, independently durable state record) to recover the accepted cursors after a client crash.
+
+For a remote-anchor deployment, the remote CAS is the authoritative acceptance/commit point. The local database is a materialized cache, not a second authority: after the remote CAS commits, the client updates its cache; if it crashes before doing so, it reconstructs the cache from the exact committed remote state record. If the remote CAS response is lost, the client queries by the exact receipt digest/idempotency key and returns already_committed only when the complete committed state record matches. If the remote service cannot be queried, the result is indeterminate/unknown, not a guessed success or failure. A local cache that is ahead of the remote record is never promoted.
+
+Do not try to make a remote quorum and a local SQLite transaction appear atomic through ordering alone. The remote commit record must contain both logical cursors; the local database is derived afterward. The external transparency-log append remains a prior, independently retryable effect and still requires exact-entry lookup or idempotency support.
 
 If the local database is restored to an older snapshot:
 - anchor newer than local state => rollback detected;
@@ -208,7 +212,7 @@ A backend adapter should expose:
 
 The snapshot must be internally consistent across revision, log cursor and all source cursors relevant to the transaction. The CAS must be linearizable for competing writers. The backend must document process-crash, OS-crash, power-loss, filesystem, controller-cache, network-partition and restore assumptions separately.
 
-An in-memory model is useful for state-machine/property tests but cannot qualify durability. A local durable database can qualify crash consistency for its pinned storage configuration, but not malicious snapshot rollback. A remote or hardware anchor requires a separate fault and trust-root qualification.
+An in-memory model is useful for state-machine/property tests but cannot qualify durability. A local durable database can qualify crash consistency for its pinned storage configuration, but not malicious snapshot rollback. In a remote-anchor deployment, test the remote linearizable CAS as the single authoritative commit and treat local state as a recoverable cache. A hardware anchor requires a separate device-specific transaction/recovery proof; this benchmark does not assume TPM counter + filesystem atomicity.
 
 ## Failure taxonomy
 
