@@ -16,6 +16,7 @@ The current proof-engineering landscape measures several different capabilities.
 | Repair efficiency and trajectory quality | BlueprintTrace / BlueprintRepair | Typed local repair actions vs exact source patches vs whole-module rewrites | 142 controlled failure states; similar coverage, with typed repair cheapest per solved state in reported runs |
 | Premise retrieval | Legendre / MathlibQR and MathlibMPR | Relevant-declaration recall and complete multi-premise route coverage | Lean Finder v2: 97.3% Recall@100 on 894 resolved queries; LeanGraphSearch: 94.7% on a different 810-query subset and 42.8% Covered@20 on MathlibMPR |
 | Graduate-level theorem proving | ProofBench v1.1 | Natural-language problems paired with reviewed Lean statements | Private 100-problem split with an agentic 40-turn tool budget; current scores must be read with model/harness/cost settings |
+| Open, evolving Lean formalization | LeanEval v1 | Hard mathematical problems with reviewed statements and automatic comparator verification | Small, actively updated public leaderboard; useful as an external challenge set, not a stable fixed-snapshot comparison |
 | Advanced mathematics formalization | AutoformBench | Formalize proof developments with missing definitions, intermediate lemmas and supporting infrastructure | 341 audited tasks from 24 sources; current source-present leaderboard shows GPT-6 Astra 281/341 (82.4%) and Opus 5 211/341 (61.9%); separate from fill-in-the-sorry |
 | Theory-scale autoformalization | LCS-Bench | Build coherent formal libraries across many interdependent textbook items | 327 items, 4,076+ declarations and 85K+ Lean LOC; reported best autoformalization result 20.1% |
 | Implementation-level software verification | Aegis | Prove or refute generated specifications for translated, real safe-Rust implementations | 2,045 Rust–Lean pairs and 11,533 candidate specifications; EasyProver solves 52.7% of a stratified 2,000-statement sample within 30 minutes per statement |
@@ -97,6 +98,7 @@ The key paradigm shift is not a larger prover. It is a proof-engineering control
 - Legendre Mathlib retrieval board: https://www.legendre-leaderboard.com/
 - LeanGraphSearch: https://pluslabnlp.github.io/LeanGraphSearch/
 - ProofBench v1.1: https://www.vals.ai/benchmarks/proof_bench
+- LeanEval: https://lean-lang.org/eval/
 - AutoformBench: https://github.com/facebookresearch/autoformbench and https://ai.meta.com/research/publications/autoformbench-a-lean-formalization-benchmark-for-advanced-mathematics/
 - LCS-Bench: https://arxiv.org/abs/2606.26525
 - EasyProver / Aegis: https://arxiv.org/abs/2610.38174
@@ -176,3 +178,6 @@ Promotion is now a content-addressed transaction. A branch candidate carries a d
 PITB's R0–R4 runtime comparison is recorded in a branch ledger. Branches may return retrieval routes, partial lemmas, repair plans, counterexamples, or complete proof candidates, but all remain untrusted. A proof candidate is represented by a SHA-256 of the exact candidate bytes. Promotion must bind that digest to the source branch, the sorry-only patch digest, the original target-type digest, a checker identity/receipt, and a distinct independent replay identity/receipt. The checker and replay must attest the same candidate bytes. Changing the target statement, promoting a different branch artifact, adding unapproved axioms, or escaping the sorry span blocks success.
 
 Resource accounting separates elapsed wall-clock from summed branch wall-work. Parallel branches may accumulate 180 branch-ms while completing in 120 elapsed-ms; that is not an accounting contradiction. Token count, model calls, Lean CPU and cost remain additive. The Rust `analyze_sorrydb_branch_ledger` binary validates these joins and budget invariants and has a synthetic negative-control suite. The fixture is contract-only and does not record an executed branch or proof.
+
+
+LeanEval is a useful complementary destination for open challenge problems: it aims to capture difficult Lean formalization tasks with reviewer-vetted statements and automatically comparator-checked submissions. Its public leaderboard is evolving and currently small, so treat it as a prospective external challenge set rather than a stable fixed-cohort benchmark. See https://lean-lang.org/eval/.

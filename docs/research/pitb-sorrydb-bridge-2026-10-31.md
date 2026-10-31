@@ -54,3 +54,10 @@ The primary first win should be lower cost at fixed reliability, not an inflated
 ## Positioning
 
 SorryDB is a practical proof-engineering cohort, not a replacement for MiniF2F, PutnamBench, FormalMATH, LeanGraphSearch, T², BlueprintTrace, or PITB's own support-landscape benchmark. Each measures a different capability. A useful PITB release should publish a capability vector and resource frontier rather than collapse these endpoints into one composite score.
+
+
+## Implementation status update (2026-10-31)
+
+The SorryDB_2601 source split is now pinned to repository commit `74b3b63f8ba890d675f362924b21ac55db410383`, Git blob `af3b663429dc4689ee728d2fb5c7d8d5034476f7`, 1,599,271 bytes, and SHA-256 `26bfd11099f6b8db7f80d49bdea5d9f8ea0d23ba65d44d93f67ed42ba1530062`. The 1,000-row cohort has 78 repo remotes and 14 Lean toolchain tags. A Rust snapshot importer, a three-project/three-toolchain smoke manifest and source verifier, a local-instance compatibility probe, and a bounded speculative-branch ledger/verifier have been committed to PR #8154. None has yet been compiled or run in the current session; no Lean target has been built or attempted.
+
+Leaderboard version note: the currently hosted leaderboard's 63.2% is a live union over its current list of systems. The ICML 2026 paper's Table 2 reports a 35.7% union for its smaller published method set. These are not single-system scores. Aleph Prover's current 57.2% Pass@1 is a useful stretch comparator, but fair head-to-head claims require matched system, environment, resource and checker policies.
