@@ -13,7 +13,8 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use super::event_tape::{
-    ActionIntent, ActionOutcome, ComparisonMode, EventTape, EventTapeSummary,
+    ActionIntent, ActionOutcome, ComparisonMode, EventTape, EventTapeSummary, MeterValue,
+    ResourceReceipt,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,10 +55,92 @@ pub struct MatchedCampaignSummary {
     pub shared_proposal_identity_count: usize,
     pub proposal_identity_shared_by_all_policies: usize,
     pub all_execution_schedules_complete: bool,
+    /// Full per-dimension aggregate receipts, with None for any unknown/overflowed dimension.
+    pub resource_totals_by_policy: BTreeMap<String, ResourceTotals>,
+    /// True only if all policies spend exactly the same fully measured normalized budget.
+    pub normalized_budget_spend_matched: bool,
     /// True only if every tape passes strict multi-resource qualification.
     pub resource_budget_qualified: bool,
     /// This is a necessary but not sufficient condition for full scientific comparison.
     pub matched_contract_reconciled: bool,
+}
+
+/// Per-policy resource totals. Each field is None if any action had an unknown
+/// measurement or if summation overflowed. These vectors are intentionally not collapsed
+/// into one scalar so Pareto trade-offs remain inspectable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourceTotals {
+    pub host_cpu_millis: Option<u64>,
+    pub wall_millis: Option<u64>,
+    pub accelerator_millis: Option<u64>,
+    pub peak_memory_bytes: Option<u64>,
+    pub accelerator_peak_memory_bytes: Option<u64>,
+    pub energy_millijoules: Option<u64>,
+    pub input_tokens: Option<u64>,
+    pub output_tokens: Option<u64>,
+    pub tool_calls: Option<u64>,
+    pub evaluator_calls: Option<u64>,
+    pub verifier_calls: Option<u64>,
+    pub charged_budget_microunits: Option<u64>,
+}
+
+impl Default for ResourceTotals {
+    fn default() -> Self {
+        Self {
+            host_cpu_millis: Some(0),
+            wall_millis: Some(0),
+            accelerator_millis: Some(0),
+            peak_memory_bytes: Some(0),
+            accelerator_peak_memory_bytes: Some(0),
+            energy_millijoules: Some(0),
+            input_tokens: Some(0),
+            output_tokens: Some(0),
+            tool_calls: Some(0),
+            evaluator_calls: Some(0),
+            verifier_calls: Some(0),
+            charged_budget_microunits: Some(0),
+        }
+    }
+}
+
+impl ResourceTotals {
+    fn add_receipt(
+        &mut self,
+        receipt: &ResourceReceipt,
+        path: &str,
+    ) -> Result<(), MatchedCampaignError> {
+        add_meter(&mut self.host_cpu_millis, &receipt.host_cpu_millis, &format!("{path}.host_cpu_millis"))?;
+        add_meter(&mut self.wall_millis, &receipt.wall_millis, &format!("{path}.wall_millis"))?;
+        add_meter(&mut self.accelerator_millis, &receipt.accelerator_millis, &format!("{path}.accelerator_millis"))?;
+        add_meter(&mut self.peak_memory_bytes, &receipt.peak_memory_bytes, &format!("{path}.peak_memory_bytes"))?;
+        add_meter(&mut self.accelerator_peak_memory_bytes, &receipt.accelerator_peak_memory_bytes, &format!("{path}.accelerator_peak_memory_bytes"))?;
+        add_meter(&mut self.energy_millijoules, &receipt.energy_millijoules, &format!("{path}.energy_millijoules"))?;
+        add_meter(&mut self.input_tokens, &receipt.input_tokens, &format!("{path}.input_tokens"))?;
+        add_meter(&mut self.output_tokens, &receipt.output_tokens, &format!("{path}.output_tokens"))?;
+        add_meter(&mut self.tool_calls, &receipt.tool_calls, &format!("{path}.tool_calls"))?;
+        add_meter(&mut self.evaluator_calls, &receipt.evaluator_calls, &format!("{path}.evaluator_calls"))?;
+        add_meter(&mut self.verifier_calls, &receipt.verifier_calls, &format!("{path}.verifier_calls"))?;
+        add_meter(&mut self.charged_budget_microunits, &receipt.charged_budget_microunits, &format!("{path}.charged_budget_microunits"))?;
+        Ok(())
+    }
+}
+
+fn add_meter(
+    total: &mut Option<u64>,
+    value: &MeterValue,
+    path: &str,
+) -> Result<(), MatchedCampaignError> {
+    match value {
+        MeterValue::Unknown { .. } => *total = None,
+        MeterValue::Measured { value } => {
+            if let Some(current) = total {
+                *current = current.checked_add(*value).ok_or_else(|| {
+                    MatchedCampaignError::new(path, "resource total overflow")
+                })?;
+            }
+        }
+    }
+    Ok(())
 }
 
 #[derive(Serialize)]
@@ -113,6 +196,7 @@ pub fn reconcile_mechanism_matched_campaign(
     let mut oracle_policy_ids = Vec::new();
     let mut event_counts_by_policy = BTreeMap::new();
     let mut charged_budget_by_policy_microunits = BTreeMap::new();
+    let mut resource_totals_by_policy = BTreeMap::new();
     let mut candidate_records = BTreeMap::<String, CandidateRecord>::new();
     let mut proposal_records = BTreeMap::<String, ProposalRecord>::new();
     let mut common_contract_sha256: Option<String> = None;
@@ -163,6 +247,14 @@ pub fn reconcile_mechanism_matched_campaign(
         event_counts_by_policy.insert(policy_id.clone(), summary.event_count);
         charged_budget_by_policy_microunits
             .insert(policy_id.clone(), summary.total_charged_budget_microunits);
+        let mut resource_totals = ResourceTotals::default();
+        for (event_index, envelope) in tape.events().iter().enumerate() {
+            resource_totals.add_receipt(
+                &envelope.payload.resources,
+                &format!("tapes[{tape_index}].events[{event_index}].resources"),
+            )?;
+        }
+        resource_totals_by_policy.insert(policy_id.clone(), resource_totals);
 
         if let Some(expected_campaign) = &campaign_id {
             if expected_campaign != &header.campaign_id {
@@ -275,6 +367,17 @@ pub fn reconcile_mechanism_matched_campaign(
     }
 
     let policy_count = policy_ids.len();
+    let normalized_budget_spend_matched = {
+        let complete_spends: BTreeSet<u64> = charged_budget_by_policy_microunits
+            .values()
+            .filter_map(|value| *value)
+            .collect();
+        charged_budget_by_policy_microunits
+            .values()
+            .all(Option::is_some)
+            && complete_spends.len() == 1
+            && charged_budget_by_policy_microunits.len() == policy_count
+    };
     let shared_candidate_identity_count = candidate_records
         .values()
         .filter(|record| record.4.len() >= 2)
@@ -305,6 +408,8 @@ pub fn reconcile_mechanism_matched_campaign(
         oracle_policy_ids,
         event_counts_by_policy,
         charged_budget_by_policy_microunits,
+        resource_totals_by_policy,
+        normalized_budget_spend_matched,
         shared_candidate_identity_count,
         candidate_identity_shared_by_all_policies,
         shared_proposal_identity_count,
