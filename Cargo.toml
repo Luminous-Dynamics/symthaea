@@ -15,6 +15,11 @@ members = [
 # members despite being listed below, because of this). `default-members`
 # below may still reference "." — only the `members` array triggers the bug.
 exclude = [
+    # Source-only adapter imports a receipt API absent from current symthaea-core.
+    # Keep it quarantined until #7291 restores/defines a maintained contract.
+    "crates/core/symthaea-observation-attestation",
+    # Incomplete verifier directory has no package manifest; see #8673.
+    "crates/domains/symthaea-rea-evidence-verifier",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it
