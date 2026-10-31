@@ -49,9 +49,10 @@ The first two tasks are the minimum useful cross-suite slice. Exact task IDs, pa
 Use a staged path rather than trying to reproduce a large vision-model leaderboard immediately:
 
 1. **LIBERO-Spatial and LIBERO-Long** as the first manipulation slices. The current LeRobot docs list 10 tasks per suite. Freeze policy-visible camera/state inputs, language instruction, action representation, reward/termination, reset and physics versions. The Long suite tests multi-step dependencies; Spatial isolates geometric reasoning.
-2. **RoboTwin 2.0 / WorldArena 2.0** as the contact-rich extension. Add visuo-tactile input only after the same D0/D1/W1/W2/W3 protocol works without tactile input. Separate slip, contact, force and object-interaction strata.
-3. **World-In-World** as a separate visual closed-loop suite: Active Recognition, Active Embodied QA, Image-Goal Navigation and Robotic Manipulation.
-4. **AgileX ALOHA sim-to-real** only after simulation results are independently reproducible and a robot-specific safety case, action limits and emergency-stop procedure exist.
+2. **RoboWM-Bench** as an executable-manipulation bridge: generated video is converted into actions and the resulting behavior is checked in reconstructed simulation. Score action executability, object/contact outcome and task success separately; visual quality is not manipulation competence.
+3. **RoboTwin 2.0 / WorldArena 2.0** as the contact-rich extension. Add visuo-tactile input only after the same D0/D1/W1/W2/W3 protocol works without tactile input. Separate slip, contact, force and object-interaction strata.
+4. **World-In-World** as a separate visual closed-loop suite: Active Recognition, Active Embodied QA, Image-Goal Navigation and Robotic Manipulation.
+5. **AgileX ALOHA sim-to-real** only after simulation results are independently reproducible and a robot-specific safety case, action limits and emergency-stop procedure exist.
 
 Do not pool image/video, visuo-tactile, vector-state and physical-robot scores. Where Symthaea cannot supply a compatible observation/action interface, report adapter infeasibility rather than manufacture a proxy score. Do not use privileged simulator state as input to a deployed policy; it is allowed only for oracle scoring and clearly labelled upper bounds.
 
