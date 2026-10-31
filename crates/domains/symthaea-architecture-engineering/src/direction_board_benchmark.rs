@@ -55,6 +55,8 @@ pub enum DirectionLandscapeFamily {
     CorrelatedDirections,
     /// Explicit no-breakthrough/no-new-opportunity null control.
     NullNoBreakthrough,
+    /// Seeded stochastic rewards with arm-specific variance and policy-matched realizations.
+    SeededHeteroscedasticNoise,
 }
 
 /// Search policies compared under identical action budgets and payoff schedules.
@@ -602,7 +604,7 @@ fn evaluate_direction(
         .get_mut(direction_id)
         .ok_or_else(|| format!("selected unknown direction {direction_id:?}"))?;
     let evaluation_index = values.len();
-    let score = payoff(landscape, direction_id, evaluation_index);
+    let score = stochastic_payoff(landscape, direction_id, evaluation_index, seed);
     let direction_sha = direction_digests
         .get(direction_id)
         .ok_or_else(|| format!("missing canonical digest for direction {direction_id:?}"))?
@@ -1004,6 +1006,41 @@ fn payoff(
     schedule[evaluation_index.min(schedule.len() - 1)]
 }
 
+/// Generate a deterministic-by-seed evaluator observation for the stochastic landscape.
+///
+/// The surface expectation is frozen by the mean schedule; only the observation is noisy. The
+/// random stream is keyed by campaign seed, direction ID and within-direction evaluation index,
+/// so every policy sees the same realized potential outcome for a given arm/seed/index,
+/// independent of the order in which it chooses arms.
+fn stochastic_payoff(
+    landscape: DirectionLandscapeFamily,
+    direction_id: &str,
+    evaluation_index: usize,
+    seed: u64,
+) -> f64 {
+    if landscape != DirectionLandscapeFamily::SeededHeteroscedasticNoise {
+        return payoff(landscape, direction_id, evaluation_index);
+    }
+    let mean = payoff(landscape, direction_id, evaluation_index);
+    let standard_deviation = match direction_id {
+        "A" => 0.28,
+        "B" => 0.025,
+        "C" => 0.06,
+        _ => 0.0,
+    };
+    if standard_deviation == 0.0 {
+        return mean;
+    }
+    let arm_hash = direction_id.bytes().fold(
+        0xcbf2_9ce4_8422_2325u64,
+        |hash, byte| (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3),
+    );
+    let mut state = seed
+        ^ arm_hash
+        ^ (evaluation_index as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15);
+    (mean + standard_deviation * standard_normal(&mut state)).clamp(0.0, 1.0)
+}
+
 fn schedule(
     landscape: DirectionLandscapeFamily,
     direction_id: &str,
@@ -1051,6 +1088,15 @@ fn schedule(
         }
         (DirectionLandscapeFamily::NullNoBreakthrough, "C") => {
             &[0.60, 0.60, 0.60, 0.60, 0.60]
+        }
+        (DirectionLandscapeFamily::SeededHeteroscedasticNoise, "A") => {
+            &[0.72, 0.72, 0.72, 0.72, 0.72, 0.72]
+        }
+        (DirectionLandscapeFamily::SeededHeteroscedasticNoise, "B") => {
+            &[0.74, 0.74, 0.74, 0.74, 0.74, 0.74]
+        }
+        (DirectionLandscapeFamily::SeededHeteroscedasticNoise, "C") => {
+            &[0.67, 0.67, 0.67, 0.67, 0.67, 0.67]
         }
         _ => &[],
     }
@@ -1372,7 +1418,7 @@ mod tests {
         DirectionCampaignPolicy::OracleUpperBound,
     ];
 
-    const LANDSCAPES: [DirectionLandscapeFamily; 8] = [
+    const LANDSCAPES: [DirectionLandscapeFamily; 9] = [
         DirectionLandscapeFamily::DelayedBreakthrough,
         DirectionLandscapeFamily::NoNewDirection,
         DirectionLandscapeFamily::NewOperatorBreakthrough,
@@ -1381,6 +1427,7 @@ mod tests {
         DirectionLandscapeFamily::HeteroscedasticRewards,
         DirectionLandscapeFamily::CorrelatedDirections,
         DirectionLandscapeFamily::NullNoBreakthrough,
+        DirectionLandscapeFamily::SeededHeteroscedasticNoise,
     ];
 
     #[test]
@@ -1585,6 +1632,83 @@ mod tests {
         assert_eq!(aggregate[0].seed_count, 1);
         assert_eq!(aggregate[0].mean_total_cost_units, 32.0);
         assert!(aggregate_direction_campaign_runs(&[run.clone(), run]).is_err());
+    }
+
+
+    #[test]
+    fn seeded_heteroscedastic_noise_replays_exactly_and_varies_by_arm() {
+        let first = stochastic_payoff(
+            DirectionLandscapeFamily::SeededHeteroscedasticNoise,
+            "A",
+            0,
+            0x5eed,
+        );
+        let replay = stochastic_payoff(
+            DirectionLandscapeFamily::SeededHeteroscedasticNoise,
+            "A",
+            0,
+            0x5eed,
+        );
+        let other_seed = stochastic_payoff(
+            DirectionLandscapeFamily::SeededHeteroscedasticNoise,
+            "A",
+            0,
+            0x5eee,
+        );
+        assert_eq!(first, replay);
+        assert_ne!(first, other_seed);
+
+        let variance = |direction: &str| {
+            let values: Vec<f64> = (0..512u64)
+                .map(|seed| {
+                    stochastic_payoff(
+                        DirectionLandscapeFamily::SeededHeteroscedasticNoise,
+                        direction,
+                        0,
+                        seed,
+                    )
+                })
+                .collect();
+            let mean = values.iter().sum::<f64>() / values.len() as f64;
+            values
+                .iter()
+                .map(|value| (value - mean).powi(2))
+                .sum::<f64>()
+                / values.len() as f64
+        };
+        assert!(
+            variance("A") > variance("B") * 20.0,
+            "arm A must have materially higher observation variance than arm B"
+        );
+    }
+
+    #[test]
+    fn stochastic_landscape_campaign_is_reproducible_but_not_a_deterministic_reward_fixture() {
+        let first = run_direction_campaign(
+            DirectionLandscapeFamily::SeededHeteroscedasticNoise,
+            DirectionCampaignPolicy::ThompsonSampling,
+            64,
+            0x5eed,
+        )
+        .unwrap();
+        let replay = run_direction_campaign(
+            DirectionLandscapeFamily::SeededHeteroscedasticNoise,
+            DirectionCampaignPolicy::ThompsonSampling,
+            64,
+            0x5eed,
+        )
+        .unwrap();
+        let other_seed = run_direction_campaign(
+            DirectionLandscapeFamily::SeededHeteroscedasticNoise,
+            DirectionCampaignPolicy::ThompsonSampling,
+            64,
+            0x5eee,
+        )
+        .unwrap();
+        assert_eq!(first, replay);
+        assert_ne!(first.actions, other_seed.actions);
+        assert_eq!(first.action_count, 64);
+        assert_eq!(first.total_cost_units, 64);
     }
 
     #[test]
