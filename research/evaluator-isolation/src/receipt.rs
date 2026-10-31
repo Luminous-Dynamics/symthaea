@@ -14,7 +14,7 @@ use sha2::{Digest, Sha256};
 use std::ffi::CString;
 use std::fmt;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::fd::{AsRawFd, FromRawFd};
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
@@ -177,9 +177,7 @@ impl SignedReceipt {
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, ReceiptError> {
         let mut decoder = Decoder::new(bytes);
-        if decoder.take::<{ DOMAIN.len() }>()? != *DOMAIN {
-            return Err(ReceiptError::MalformedEnvelope);
-        }
+        decoder.expect(DOMAIN)?;
         let schema_version = u16::from_le_bytes(decoder.take::<2>()?);
         let signing_key_id = decoder.take::<16>()?;
         let run_id = decoder.take::<16>()?;
@@ -357,13 +355,21 @@ pub fn load_signing_key_from_systemd_credential(
         return Err(ReceiptError::CredentialMalformed);
     }
     let mut seed = [0_u8; 32];
-    file.read_exact(&mut seed).map_err(|_| ReceiptError::CredentialMalformed)?;
-    let mut extra = [0_u8; 1];
-    if file.read(&mut extra).map_err(|_| ReceiptError::CredentialMalformed)? != 0 {
+    let read_result = (|| -> Result<(), std::io::Error> {
+        file.read_exact(&mut seed)?;
+        let mut extra = [0_u8; 1];
+        if file.read(&mut extra)? != 0 {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "credential is longer than 32 bytes"));
+        }
+        Ok(())
+    })();
+    if read_result.is_err() {
         seed.fill(0);
         return Err(ReceiptError::CredentialMalformed);
     }
-    Ok(SigningKey::from_bytes(&seed))
+    let signing_key = SigningKey::from_bytes(&seed);
+    seed.fill(0);
+    Ok(signing_key)
 }
 
 fn key_id(key: &VerifyingKey) -> [u8; 16] {
@@ -403,6 +409,16 @@ impl<'a> Decoder<'a> {
         result.copy_from_slice(source);
         self.cursor = end;
         Ok(result)
+    }
+
+    fn expect(&mut self, expected: &[u8]) -> Result<(), ReceiptError> {
+        let end = self.cursor.checked_add(expected.len()).ok_or(ReceiptError::ArithmeticOverflow)?;
+        let actual = self.bytes.get(self.cursor..end).ok_or(ReceiptError::MalformedEnvelope)?;
+        if actual != expected {
+            return Err(ReceiptError::MalformedEnvelope);
+        }
+        self.cursor = end;
+        Ok(())
     }
 
     fn optional_u64(&mut self) -> Result<Option<u64>, ReceiptError> {
