@@ -31,7 +31,7 @@ cargo run --locked -- generate \
   contamination-panel-2026-10-a \
   25 \
   "$seed_hex" \
-  /secure/evaluator/public-packet.json \
+  /reviewer-release/public-packet.json \
   /secure/evaluator/sealed-key.json \
   /secure/evaluator/manifest.json
 ~~~
@@ -90,7 +90,7 @@ Run the validator:
 
 ~~~sh
 cargo run --locked -- audit-adjudications \
-  /secure/evaluator/public-packet.json \
+  /reviewer-release/public-packet.json \
   /secure/evaluator/adjudications.jsonl \
   /secure/evaluator/adjudication-report.json
 ~~~
