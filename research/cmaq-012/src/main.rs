@@ -348,10 +348,10 @@ impl<'a> JsonParser<'a> {
         let mut value = 0u16;
         for byte in &self.bytes[self.position..self.position + 4] {
             value = value.checked_mul(16).ok_or_else(|| "Unicode escape overflow".to_string())?;
-            value += match byte {
-                b'0'..=b'9' => (byte - b'0') as u16,
-                b'a'..=b'f' => (byte - b'a' + 10) as u16,
-                b'A'..=b'F' => (byte - b'A' + 10) as u16,
+            value += match *byte {
+                b'0'..=b'9' => (*byte - b'0') as u16,
+                b'a'..=b'f' => (*byte - b'a' + 10) as u16,
+                b'A'..=b'F' => (*byte - b'A' + 10) as u16,
                 _ => return Err("invalid hexadecimal digit in Unicode escape".into()),
             };
         }
