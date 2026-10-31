@@ -59,7 +59,7 @@ The sealed key stores all planted mechanisms present, not only a single positive
 | T3 semantic | Authored semantically equivalent reformulation | Same domain with inverse/different target |
 | T4 task-level | Same abstract recipe, distinct instances and answers | Same broad algebra domain, different task recipe |
 
-T3 paraphrases are authored fixtures, not expert-validated semantic gold. T4 positives are shared-recipe controls, not proof that seeing one item contaminates a later benchmark. Both require blinded expert validation before their labels are treated as human-grounded reference truth. Keep synthetic construction truth separate from expert construct-validity adjudication.
+T3 paraphrases are authored fixtures, not expert-validated semantic gold. T4 positives are shared-recipe controls, not proof that seeing one item contaminates a later benchmark. The current generator uses one small algebra/linear-mapping domain and should be treated as a software fixture and protocol test—not a representative contamination benchmark or a meaningful detector leaderboard. Build additional domains and task families before any cross-domain or SOTA claim. Both T3 and T4 require blinded expert validation before their labels are treated as human-grounded reference truth. Keep synthetic construction truth separate from expert construct-validity adjudication.
 
 ## Blind adjudication
 
@@ -84,7 +84,7 @@ Each reviewer supplies one JSON object per line in adjudications.jsonl with this
 }
 ~~~
 
-The allowed decisions are same_target_same_instance, same_construct_different_instance, shared_recipe_different_instance, different_construct, and indeterminate. The current implementation requires exactly three adjudicators per pair, with distinct reviewer pseudonyms and declared independence groups. It does not authenticate identities or institutions. The blinding fields are reviewer self-attestations, not proof that reviewers could not infer the task type from its content.
+The allowed decisions are same_target_same_instance, same_construct_different_instance, shared_recipe_different_instance, same_domain_different_target, shared_domain_different_recipe, different_construct, and indeterminate. This keeps same-domain negative controls distinguishable from semantically equivalent targets and shared task recipes. The implementation requires exactly three adjudicators per pair, with distinct reviewer pseudonyms and declared independence groups within that pair. It reports total unique reviewers/groups and reviewer/group reuse across pairs; reuse is expected in a repeated panel and must be treated as a rater-clustering factor in downstream inference. It does not authenticate identities or institutions. The blinding fields are reviewer self-attestations, not proof that reviewers could not infer the task type from its content.
 
 Run the validator:
 
