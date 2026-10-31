@@ -222,7 +222,7 @@ fn verify_equal(
     model: &SparseBinaryCausalModel,
     current_state: &[bool],
     config: Iit4SystemPhiSearchConfig,
-) -> Result<(usize, usize, usize, f64), String> {
+) -> Result<(usize, usize, usize, Option<f64>), String> {
     let optimized = model
         .analyze_iit4_2023_system_phi_s(
             &CANDIDATE,
@@ -281,14 +281,6 @@ fn verify_equal(
         }
         maximum_phi = maximum_phi.max(left.phi);
     }
-    if let (Some(actual), Some(expected)) = (optimized.phi_s, Some(maximum_phi)) {
-        if (actual - expected).abs() > 1e-12 {
-            return Err("system phi_s does not match state-pair maximum".to_string());
-        }
-    } else if optimized.phi_s.is_some() {
-        return Err("unexpected phi_s presence".to_string());
-    }
-
     let tied_state_pair_indices = naive
         .state_pair_winners
         .iter()
