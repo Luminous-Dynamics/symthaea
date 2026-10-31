@@ -86,6 +86,13 @@ pub struct ResourceBudgetLimit {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceHeadroom {
+    pub resource_id: String,
+    pub unit: String,
+    pub available_units: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceBudget {
     pub resource_registry_sha256: String,
     /// Exactly one sorted limit for every resource in the frozen registry.
@@ -104,7 +111,10 @@ pub struct ResourceBudgetAction {
 pub struct ActionBudgetAssessment {
     pub action_id: String,
     pub conservative_regret_reduction: f64,
-    pub feasible: bool,
+    /// Whether every resource-cost component fits the remaining hard budget.
+    pub resource_feasible: bool,
+    /// Whether the conservative lower bound on regret reduction is strictly positive.
+    pub benefit_eligible: bool,
     pub blocked_resources: Vec<String>,
 }
 
@@ -115,7 +125,7 @@ pub struct ResourceActionFrontier {
     /// Non-dominated actions. No scalar exchange rate between different resource types is used.
     pub frontier_action_ids: Vec<String>,
     pub blocked_action_ids: Vec<String>,
-    pub resource_headroom: Vec<ResourceBudgetLimit>,
+    pub resource_headroom: Vec<ResourceHeadroom>,
     pub lower_bound_z: f64,
 }
 
@@ -192,6 +202,16 @@ pub fn validate_resource_registry(
             ));
         }
     }
+    if registry
+        .resources
+        .windows(2)
+        .any(|pair| pair[0].resource_id >= pair[1].resource_id)
+    {
+        return Err(ResourceBudgetError::new(
+            "resources",
+            "resources must be strictly sorted by resource_id",
+        ));
+    }
     if compute_resource_registry_sha256(registry)? != registry.registry_sha256 {
         return Err(ResourceBudgetError::new(
             "registry_sha256",
@@ -243,12 +263,10 @@ pub fn remaining_resource_headroom(
                 "spent resources plus protected reserves exceed the total budget",
             )
         })?;
-        headroom.push(ResourceBudgetLimit {
+        headroom.push(ResourceHeadroom {
             resource_id: limit.resource_id.clone(),
             unit: limit.unit.clone(),
-            total_units: remaining,
-            already_spent_units: 0,
-            protected_reserve_units: 0,
+            available_units: remaining,
         });
     }
     Ok(headroom)
@@ -354,17 +372,19 @@ pub fn plan_resource_action_frontier(
             .iter()
             .zip(&headroom)
             .filter_map(|(cost, available)| {
-                (cost.units > available.total_units).then(|| cost.resource_id.clone())
+                (cost.units > available.available_units).then(|| cost.resource_id.clone())
             })
             .collect();
-        let feasible = blocked_resources.is_empty() && conservative_regret_reduction > 0.0;
-        if feasible {
+        let resource_feasible = blocked_resources.is_empty();
+        let benefit_eligible = conservative_regret_reduction > 0.0;
+        if resource_feasible && benefit_eligible {
             feasible_indices.push(index);
         }
         assessments.push(ActionBudgetAssessment {
             action_id: action.action_id.clone(),
             conservative_regret_reduction,
-            feasible,
+            resource_feasible,
+            benefit_eligible,
             blocked_resources,
         });
     }
@@ -409,7 +429,7 @@ pub fn plan_resource_action_frontier(
         .collect();
     let blocked_action_ids = assessments
         .iter()
-        .filter(|assessment| !assessment.feasible)
+        .filter(|assessment| !assessment.resource_feasible || !assessment.benefit_eligible)
         .map(|assessment| assessment.action_id.clone())
         .collect();
 
@@ -561,6 +581,14 @@ mod tests {
     }
 
     #[test]
+    fn rejects_noncanonical_resource_registry_order() {
+        let mut invalid = registry();
+        invalid.resources.reverse();
+        invalid.registry_sha256 = compute_resource_registry_sha256(&invalid).unwrap();
+        assert!(validate_resource_registry(&invalid).is_err());
+    }
+
+    #[test]
     fn rejects_stale_registry_digest_and_changed_cost_model() {
         let mut changed = registry();
         changed.resources[0].cost_model_sha256 = sha('f');
@@ -651,6 +679,21 @@ mod tests {
         ];
         let result = plan_resource_action_frontier(&registry(), &budget(), &actions).unwrap();
         assert_eq!(result.frontier_action_ids, vec!["dominant"]);
+    }
+
+    #[test]
+    fn distinguishes_resource_feasibility_from_nonpositive_benefit() {
+        let actions = vec![action(
+            "low-value-within-budget",
+            0.0,
+            0.0,
+            cost("low-value-within-budget", 1, 1, 1),
+        )];
+        let result = plan_resource_action_frontier(&registry(), &budget(), &actions).unwrap();
+        assert!(result.assessments[0].resource_feasible);
+        assert!(!result.assessments[0].benefit_eligible);
+        assert!(result.frontier_action_ids.is_empty());
+        assert_eq!(result.blocked_action_ids, vec!["low-value-within-budget"]);
     }
 
     #[test]
