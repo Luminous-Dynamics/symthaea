@@ -129,21 +129,29 @@
       "sequence_index": 16,
       "window_id": "cctm-window-016",
       "context_id": "compute",
-      "anomaly_score": 8.5,
-      "sensor_state": "stale",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
       "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
     },
     {
       "sequence_index": 17,
       "window_id": "cctm-window-017",
+      "context_id": "compute",
+      "anomaly_score": 8.5,
+      "sensor_state": "stale",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 18,
+      "window_id": "cctm-window-018",
       "context_id": "new-regime",
       "anomaly_score": 8.5,
       "sensor_state": "valid",
       "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
     },
     {
-      "sequence_index": 18,
-      "window_id": "cctm-window-018",
+      "sequence_index": 19,
+      "window_id": "cctm-window-019",
       "context_id": "memory",
       "anomaly_score": 8.5,
       "sensor_state": "untrusted",
