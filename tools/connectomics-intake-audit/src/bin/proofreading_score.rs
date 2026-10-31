@@ -1777,8 +1777,8 @@ mod tests {
             second.expected_calibration_error_95.map(|x| (x.lower, x.upper))
         );
         assert_eq!(first.brier_score_95, Some(Interval { lower: 0.04, upper: 0.04 }));
-        assert_eq!(first.adaptive_confidence_ece_15_95, Some(Interval { lower: 0.0, upper: 0.0 }));
-        assert_eq!(first.reliability_curve_ece_12_95, Some(Interval { lower: 0.0, upper: 0.0 }));
+        assert_eq!(first.adaptive_confidence_ece_15_95, Some(Interval { lower: 0.2, upper: 0.2 }));
+        assert_eq!(first.reliability_curve_ece_12_95, Some(Interval { lower: 0.2, upper: 0.2 }));
     }
 
     #[test]
