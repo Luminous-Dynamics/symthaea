@@ -30,18 +30,19 @@
     "benchmark_executed": false,
     "hardware_energy_measured": false,
     "result_values_present": false,
-    "generator_scope": "Implemented Rust generators: T2 delayed cue, T3/T4 multiscale forecasting/change-point with delayed feedback, T5 irregular-time/missingness, T8 BrainTrace DMS task semantics, T9 BrainTrace evidence-accumulation task semantics. T1/T6/T7 and the full nine-task runner remain unimplemented.",
+    "generator_scope": "Implemented Rust generators: T2 delayed cue, T3/T4 multiscale forecasting/change-point with delayed feedback, T5 irregular-time/missingness, T6 selective retention/invalidation, T8 BrainTrace DMS task semantics, T9 BrainTrace evidence-accumulation task semantics. T1/T7 and the full nine-task runner remain unimplemented.",
     "rust_tests_authored": true,
     "oracle_trace_verifier_implemented": true,
     "oracle_process_isolation_implemented": false,
-    "rust_tests_authored_count": 86,
+    "rust_tests_authored_count": 101,
     "rust_tests_by_file": {
       "research/temporal-bench/src/digest.rs": 2,
       "research/temporal-bench/src/lib.rs": 16,
       "research/temporal-bench/src/temporal.rs": 22,
       "research/temporal-bench/src/dms.rs": 16,
       "research/temporal-bench/src/evidence.rs": 17,
-      "research/temporal-bench/src/irregular.rs": 13
+      "research/temporal-bench/src/irregular.rs": 13,
+      "research/temporal-bench/src/retention.rs": 15
     },
     "cryptographic_stream_digest_implemented": true,
     "reference_generators": {
@@ -51,7 +52,7 @@
       "braintrace_evidence_accumulation_semantics": true,
       "fast_event": false,
       "irregular_missingness": true,
-      "selective_retention": false,
+      "selective_retention": true,
       "phase_prediction": false
     },
     "cryptographic_oracle_digest_implemented": true,
@@ -266,7 +267,8 @@
         "stale_memory_false_recall",
         "retention_after_invalidation"
       ],
-      "oracle": "Versioned trace validity and hidden target identities"
+      "oracle": "Versioned trace validity and hidden target identities",
+      "implementation_status": "Rust target/distractor/query/invalidation generator, before/after oracle answers, semantic verifier and SHA-256 digests authored; not compiled or executed"
     },
     {
       "id": "T7_PHASE_PREDICTION",
@@ -435,7 +437,9 @@
     "eligibility_trace_bytes_by_sequence_length",
     "online_update_compute_time_by_sequence_length",
     "pp_prop_gradient_or_learning_trajectory_deviation_from_d_rtrl_or_bptt",
-    "time_to_target_quality_under_equal_online_feedback_budget"
+    "time_to_target_quality_under_equal_online_feedback_budget",
+    "stale_memory_false_recall_after_invalidation",
+    "selective_retention_quality_by_distractor_similarity"
   ],
   "statistical_design": {
     "pilot_paired_seeds_min": 10,
