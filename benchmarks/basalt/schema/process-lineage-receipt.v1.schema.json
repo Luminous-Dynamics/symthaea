@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT untrusted process lineage observer receipt v1",
+  "description": "Observer-reported process graph and event stream. The receipt is untrusted and must be reconciled against an independent supervisor oracle.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "suite_id",
+    "run_id",
+    "task_id",
+    "attempt_id",
+    "host_boot_id_digest",
+    "pid_namespace_inode",
+    "capture_start_monotonic_ns",
+    "capture_end_monotonic_ns",
+    "root_process",
+    "observer_binary_digest",
+    "observer_configuration_digest",
+    "reported_tree_closed",
+    "processes",
+    "events",
+    "health"
+  ],
+  "properties": {
+    "format_version": {
+      "const": 1
+    },
+    "suite_id": {
+      "const": "basalt-process-lineage-receipt-v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "attempt_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "host_boot_id_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "pid_namespace_inode": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "capture_start_monotonic_ns": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "capture_end_monotonic_ns": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "root_process": {
+      "$ref": "#/$defs/processIdentity"
+    },
+    "observer_binary_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "observer_configuration_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "reported_tree_closed": {
+      "type": "boolean"
+    },
+    "processes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "identity",
+          "parent"
+        ],
+        "properties": {
+          "identity": {
+            "$ref": "#/$defs/processIdentity"
+          },
+          "parent": {
+            "$ref": "#/$defs/parentRelation"
+          }
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_id",
+          "sequence",
+          "kind",
+          "process",
+          "observed_at_monotonic_ns",
+          "evidence_digest"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "kind": {
+            "enum": [
+              "root_start",
+              "fork",
+              "clone",
+              "vfork",
+              "exec",
+              "exit"
+            ]
+          },
+          "process": {
+            "$ref": "#/$defs/processIdentity"
+          },
+          "observed_at_monotonic_ns": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "evidence_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_count",
+        "dropped_event_count",
+        "ring_buffer_overflow_count",
+        "observer_restart_count",
+        "unmonitored_process_count",
+        "sequence_gap_count"
+      ],
+      "properties": {
+        "event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dropped_event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ring_buffer_overflow_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observer_restart_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unmonitored_process_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sequence_gap_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "$defs": {
+    "processIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pid",
+        "start_time_ticks"
+      ],
+      "properties": {
+        "pid": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "start_time_ticks": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "parentRelation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "relation"
+          ],
+          "properties": {
+            "relation": {
+              "const": "root"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "relation",
+            "identity"
+          ],
+          "properties": {
+            "relation": {
+              "const": "parent"
+            },
+            "identity": {
+              "$ref": "#/$defs/processIdentity"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

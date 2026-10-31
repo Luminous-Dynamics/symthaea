@@ -10,6 +10,7 @@ mod basalt_cargo_mtime_fixture;
 mod basalt_coverage;
 mod basalt_linux_probe;
 mod basalt_linux_smoke;
+mod basalt_process_lineage;
 mod basalt_validate;
 mod crate_status;
 mod duplicate_scan;
@@ -113,6 +114,15 @@ enum Commands {
         /// Also attempt FAN_CLASS_CONTENT group initialization (may require CAP_SYS_ADMIN).
         #[arg(long)]
         probe_permission_class: bool,
+    },
+    /// Reconcile an independently supervised process graph against an untrusted observer event stream.
+    BasaltProcessLineageAudit {
+        /// Path to the independently authored process-lineage oracle JSON.
+        #[arg(long)]
+        oracle: PathBuf,
+        /// Path to the raw observer process/event receipt JSON.
+        #[arg(long)]
+        receipt: PathBuf,
     },
     /// Validate a BASALT versioned run record and its cross-record evidence invariants.
     BasaltValidate {
@@ -246,6 +256,13 @@ fn main() -> anyhow::Result<()> {
         Commands::BasaltLinuxRuntimeSmoke { out, probe_permission_class } => {
             let report = basalt_linux_smoke::run(&out, probe_permission_class)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Commands::BasaltProcessLineageAudit { oracle, receipt } => {
+            let report = basalt_process_lineage::audit_files(&oracle, &receipt)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if !report.lineage_audit_passed {
+                anyhow::bail!("BASALT process-lineage reconciliation failed");
+            }
         }
         Commands::BasaltValidate { input, manifest, spec_root } => {
             let report = basalt_validate::validate_file(&input, &manifest, &spec_root)?;
