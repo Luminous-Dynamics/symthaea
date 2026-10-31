@@ -366,15 +366,19 @@ fn choose_next(
             Some(affordable[(state as usize) % affordable.len()])
         }
         Policy::ProofObligationGuided => {
-            let mandatory_pending: Vec<usize> = affordable.iter().copied()
-                .filter(|i| case.operations[*i].public.mandatory_mask != 0)
+            let mandatory_remaining: Vec<usize> = case.operations.iter().enumerate()
+                .filter_map(|(i, operation)| {
+                    (operation.public.mandatory_mask != 0 && !attempted[i]).then_some(i)
+                })
                 .collect();
-            if !mandatory_pending.is_empty() {
+            if !mandatory_remaining.is_empty() {
+                // Reserve the complete remaining mandatory verification budget
+                // before spending on competitive or opportunistic operations.
                 let total_mandatory = case.mandatory_cost(attempted);
                 if total_mandatory > remaining {
                     return None;
                 }
-                return mandatory_pending.into_iter().min_by(|a, b| {
+                return mandatory_remaining.into_iter().min_by(|a, b| {
                     case.operations[*a].public.cost.cmp(&case.operations[*b].public.cost)
                         .then_with(|| case.operations[*a].public.id.cmp(case.operations[*b].public.id))
                 });
@@ -532,7 +536,7 @@ mod tests {
             .find(|c| c.id == "valid_multi_obligation_packet").unwrap();
         let result = run_trial(&case, Policy::ProofObligationGuided, 7, 1729);
         assert!(result.completion_verified);
-        assert_eq!(result.spent, 5);
+        assert_eq!(result.spent, 6);
         assert_eq!(result.missed_mandatory_count, 0);
         assert_eq!(result.false_support_count, 0);
     }
