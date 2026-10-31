@@ -316,7 +316,11 @@ fn audit_search_time_findings_cli(args: &[String]) -> Result<(), Box<dyn Error>>
                 .into(),
         );
     }
-    let trace: SearchTimeExposureTraceV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
+    let trace_bytes = fs::read(&args[1])?;
+    if trace_bytes.len() > SEARCH_MAX_TRACE_BYTES {
+        return Err("search-time trace exceeds 256 MiB safety bound".into());
+    }
+    let trace: SearchTimeExposureTraceV1 = serde_json::from_slice(&trace_bytes)?;
     let trace_audit = audit_search_time_trace(&trace).map_err(io::Error::other)?;
     if !trace_audit.valid {
         return Err("search-time trace failed integrity audit".into());
