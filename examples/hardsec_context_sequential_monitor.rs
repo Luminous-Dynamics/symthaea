@@ -49,6 +49,7 @@ struct Plan {
     evidence_domain: String,
     stream_id: String,
     evaluation_group_id: String,
+    scoring_artifact_sha256: String,
     alpha_budget: f64,
     minimum_reference_scores: usize,
     betting_mixture: Vec<BettingTerm>,
@@ -134,6 +135,13 @@ fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> 
     let declared_evaluation_group = string_field(value, "evaluation_group_id", "plan")?;
     if declared_evaluation_group != evaluation_group_id {
         return Err("stream evaluation_group_id does not match the preregistered plan".to_owned());
+    }
+    let scoring_artifact_sha256 = string_field(value, "scoring_artifact_sha256", "plan")?.to_owned();
+    if scoring_artifact_sha256.len() != 64 || !scoring_artifact_sha256.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()) {
+        return Err("plan.scoring_artifact_sha256 must be a lowercase SHA-256 digest".to_owned());
+    }
+    if string_field(value, "anomaly_score_direction", "plan")? != "higher_is_more_anomalous" {
+        return Err("anomaly_score_direction must be higher_is_more_anomalous".to_owned());
     }
     if string_field(value, "reference_update_policy", "plan")? != "immutable_no_test_time_updates" {
         return Err("reference_update_policy must be immutable_no_test_time_updates".to_owned());
@@ -230,6 +238,7 @@ fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> 
         evidence_domain,
         stream_id,
         evaluation_group_id: evaluation_group_id.to_owned(),
+        scoring_artifact_sha256,
         alpha_budget,
         minimum_reference_scores,
         betting_mixture,
@@ -249,6 +258,9 @@ fn parse_stream(value: &Value, plan: &Plan) -> Result<Vec<StreamRecord>, String>
     }
     if string_field(value, "evaluation_group_id", "stream")? != plan.evaluation_group_id {
         return Err("evaluation_group_id does not match the preregistered plan".to_owned());
+    }
+    if string_field(value, "scoring_artifact_sha256", "stream")? != plan.scoring_artifact_sha256 {
+        return Err("stream scoring_artifact_sha256 does not match the preregistered score artifact".to_owned());
     }
 
     let records = value.get("records").and_then(Value::as_array)
@@ -415,6 +427,8 @@ fn audit_values(plan_value: &Value, stream_value: &Value, plan_bytes: &[u8], str
         "stream_id":plan.stream_id,
         "evidence_domain":plan.evidence_domain,
         "evaluation_group_id":plan.evaluation_group_id,
+        "scoring_artifact_sha256":plan.scoring_artifact_sha256,
+        "anomaly_score_direction":"higher_is_more_anomalous",
         "inputs":{
             "plan_sha256":sha256(plan_bytes),
             "stream_sha256":sha256(stream_bytes)
@@ -668,6 +682,13 @@ mod tests {
         let second = audit_values(&p, &s, &pb, &sb).unwrap();
         assert_eq!(first["reference_policy"]["references"], second["reference_policy"]["references"]);
         assert_eq!(first["reference_policy"]["test_time_reference_updates"], 0);
+    }
+
+    #[test]
+    fn scoring_artifact_digest_mismatch_is_rejected() {
+        let (p, mut s, _, _) = fixture();
+        s["scoring_artifact_sha256"] = json!("d".repeat(64));
+        assert!(audit(&p, &s).unwrap_err().contains("scoring_artifact_sha256 does not match"));
     }
 
     #[test]
