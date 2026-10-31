@@ -1,0 +1,53 @@
+name: MACE-001 causal experience evaluator
+
+on:
+  pull_request:
+    paths:
+      - "research/mace-001/**"
+      - ".github/workflows/mace-001.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "research/mace-001/**"
+      - ".github/workflows/mace-001.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evaluator:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: research/mace-001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Test dependency-free evaluator and mutation suite
+        run: cargo test --locked
+      - name: Audit agent/oracle separation and paired fixture contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$(cargo run --quiet --locked -- audit fixtures/agent-visible/cases-smoke-v0.1.tsv fixtures/evaluator-only/oracles-smoke-v0.1.tsv)"
+          printf '%s\n' "$report"
+          grep -F '"schema_version": "mace-001-audit-v0.1"' <<< "$report"
+          grep -F '"case_count": 8' <<< "$report"
+          grep -F '"pair_count": 4' <<< "$report"
+          grep -F '"oracle_separated_from_agent_input": true' <<< "$report"
+      - name: Score synthetic positive control (not a model result)
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$(cargo run --quiet --locked -- score fixtures/agent-visible/cases-smoke-v0.1.tsv fixtures/evaluator-only/oracles-smoke-v0.1.tsv fixtures/evaluator-only/reference-perfect-control.tsv)"
+          printf '%s\n' "$report"
+          grep -F '"schema_version": "mace-001-score-v0.1"' <<< "$report"
+          grep -F '"exact_case_agreement_rate": 1.000000' <<< "$report"
+          grep -F '"false_causal_claims": 0' <<< "$report"
+          grep -F '"unsafe_transfer_reuse": 0' <<< "$report"
+          grep -F '"unsupported_completion_claims": 0' <<< "$report"
+          grep -F '"pair_invariance_failures": 0' <<< "$report"
+          grep -F '"hard_gate_pass": true' <<< "$report"
+          grep -F '"performance_metrics_are_measurements": false' <<< "$report"
