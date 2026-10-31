@@ -89,6 +89,14 @@ class FiniteExchangeabilityCrcTests(unittest.TestCase):
 
         report = verify_controller(invalid, n, alpha, base, slope)
         self.assertFalse(report["valid"])
+        step_report = verify_recertification_step(
+            invalid, invalid, n, alpha, base, slope
+        )
+        self.assertFalse(step_report["valid"])
+        self.assertTrue(
+            any(x[0] == "baseline_not_finite_exchangeability_valid"
+                for x in step_report["failures"])
+        )
         with self.assertRaises(ValueError):
             recertify_once(invalid, n, alpha, base, slope)
 
