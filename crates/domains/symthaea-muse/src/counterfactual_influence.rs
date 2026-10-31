@@ -111,11 +111,11 @@ pub enum EventIntervention {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InfluenceDisposition {
-    /// At least one channel/window exceeded both its absolute and empirical
-    /// repeatability thresholds in one of the independent measured channels.
+    /// At least one temporally qualified support episode passed the frozen
+    /// hysteresis, minimum-window and bounded-gap policy.
     EffectDetected,
-    /// The declared paired outputs did not exceed the calibrated thresholds.
-    /// This does not prove that the intervention had no audible effect.
+    /// No raw effect episode passed the temporal support policy. This does not
+    /// prove zero physical influence or absence of an audible effect.
     NoEffectAboveNoiseFloor,
 }
 
@@ -1100,7 +1100,7 @@ fn qualify_support_windows(
     let mut intervals = Vec::new();
     let mut qualified_channel_windows = 0usize;
     let mut bridged_channel_windows = 0usize;
-    let mut tail_extension_frames_applied = 0u64;
+    let mut qualified_intervals = Vec::new();
 
     for channel in 0..channels {
         let mut episode_start: Option<usize> = None;
@@ -1152,14 +1152,9 @@ fn qualify_support_windows(
                             }
                         }
                         qualified_channel_windows += episode_indices.len();
-                        let extended_end = (last_sustained_end as u64)
-                            .saturating_add(policy.tail_extension_frames)
-                            .min(total_frames as u64) as usize;
-                        tail_extension_frames_applied +=
-                            extended_end.saturating_sub(last_sustained_end) as u64;
-                        intervals.push(FrameInterval {
+                        qualified_intervals.push(FrameInterval {
                             start_frame: start,
-                            end_frame: extended_end,
+                            end_frame: last_sustained_end,
                         });
                     }
                     episode_start = None;
@@ -1186,20 +1181,42 @@ fn qualify_support_windows(
                 }
             }
             qualified_channel_windows += episode_indices.len();
-            let extended_end = (last_sustained_end as u64)
-                .saturating_add(policy.tail_extension_frames)
-                .min(total_frames as u64) as usize;
-            tail_extension_frames_applied +=
-                extended_end.saturating_sub(last_sustained_end) as u64;
-            intervals.push(FrameInterval {
+            qualified_intervals.push(FrameInterval {
                 start_frame: start,
-                end_frame: extended_end,
+                end_frame: last_sustained_end,
             });
         }
     }
 
+    // Keep raw interval diagnostics separate from temporally qualified
+    // episode windows. Tail extension is applied after channel union so shared
+    // stereo/channel frames are counted only once in the report.
+    let raw_measured = merge_intervals(intervals);
+    let qualified_before_tail = merge_intervals(qualified_intervals);
+    let baseline_support_frames: u64 = qualified_before_tail
+        .iter()
+        .map(|interval| (interval.end_frame - interval.start_frame) as u64)
+        .sum();
+    let mut tail_extended = Vec::with_capacity(qualified_before_tail.len());
+    for interval in &qualified_before_tail {
+        let end_frame = (interval.end_frame as u64)
+            .saturating_add(policy.tail_extension_frames)
+            .min(total_frames as u64) as usize;
+        tail_extended.push(FrameInterval {
+            start_frame: interval.start_frame,
+            end_frame,
+        });
+    }
+    let qualified_after_tail = merge_intervals(tail_extended);
+    let qualified_support_frames: u64 = qualified_after_tail
+        .iter()
+        .map(|interval| (interval.end_frame - interval.start_frame) as u64)
+        .sum();
+    let tail_extension_frames_applied =
+        qualified_support_frames.saturating_sub(baseline_support_frames);
+
     Ok((
-        merge_intervals(intervals),
+        qualified_after_tail,
         SupportQualificationCounts {
             qualified_channel_windows,
             bridged_channel_windows,
