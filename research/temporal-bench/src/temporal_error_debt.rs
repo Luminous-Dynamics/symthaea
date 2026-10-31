@@ -502,15 +502,15 @@ mod tests {
     }
 
     fn predictions(
-        oracle: &KnowledgeStreamOracle,
         first: KnowledgeCandidateAnswer,
-        after_correction: KnowledgeCandidateAnswer,
+        after_correction_early: KnowledgeCandidateAnswer,
+        after_correction_late: KnowledgeCandidateAnswer,
         after_retraction: KnowledgeCandidateAnswer,
     ) -> Vec<KnowledgeTimedPrediction> {
         vec![
             KnowledgeTimedPrediction { query_id: 77, checkpoint_index: 0, answer: first },
-            KnowledgeTimedPrediction { query_id: 77, checkpoint_index: 1, answer: after_correction },
-            KnowledgeTimedPrediction { query_id: 77, checkpoint_index: 2, answer: after_correction },
+            KnowledgeTimedPrediction { query_id: 77, checkpoint_index: 1, answer: after_correction_early },
+            KnowledgeTimedPrediction { query_id: 77, checkpoint_index: 2, answer: after_correction_late },
             KnowledgeTimedPrediction { query_id: 77, checkpoint_index: 3, answer: after_retraction },
         ]
     }
@@ -519,8 +519,8 @@ mod tests {
     fn event_aligned_candidate_has_zero_temporal_error_debt() {
         let (oracle, windows) = fixture();
         let candidate = predictions(
-            &oracle,
             KnowledgeCandidateAnswer::Value(oracle.initial_value),
+            KnowledgeCandidateAnswer::Value(oracle.corrected_value),
             KnowledgeCandidateAnswer::Value(oracle.corrected_value),
             KnowledgeCandidateAnswer::NoFact,
         );
@@ -540,9 +540,9 @@ mod tests {
     fn same_final_state_but_late_update_accumulates_wrong_belief_exposure() {
         let (oracle, windows) = fixture();
         let candidate = predictions(
-            &oracle,
             KnowledgeCandidateAnswer::Value(oracle.initial_value),
             KnowledgeCandidateAnswer::Value(oracle.initial_value),
+            KnowledgeCandidateAnswer::Value(oracle.corrected_value),
             KnowledgeCandidateAnswer::NoFact,
         );
         let score = score_temporal_error_debt(&oracle, &windows, &candidate).unwrap();
@@ -554,11 +554,26 @@ mod tests {
     }
 
     #[test]
+    fn no_fact_during_corrected_valid_interval_counts_as_missed_correction() {
+        let (oracle, windows) = fixture();
+        let candidate = predictions(
+            KnowledgeCandidateAnswer::Value(oracle.initial_value),
+            KnowledgeCandidateAnswer::NoFact,
+            KnowledgeCandidateAnswer::Value(oracle.corrected_value),
+            KnowledgeCandidateAnswer::NoFact,
+        );
+        let score = score_temporal_error_debt(&oracle, &windows, &candidate).unwrap();
+        assert_eq!(score.wrong_belief_exposure, 8);
+        assert_eq!(score.missed_correction_exposure, 8);
+        assert_eq!(score.correction_latency, Some(8));
+    }
+
+    #[test]
     fn stale_value_after_known_retraction_accumulates_its_own_exposure() {
         let (oracle, windows) = fixture();
         let candidate = predictions(
-            &oracle,
             KnowledgeCandidateAnswer::Value(oracle.initial_value),
+            KnowledgeCandidateAnswer::Value(oracle.corrected_value),
             KnowledgeCandidateAnswer::Value(oracle.corrected_value),
             KnowledgeCandidateAnswer::Value(oracle.corrected_value),
         );
@@ -601,7 +616,7 @@ mod tests {
     fn future_correction_answer_before_known_time_is_counted_as_leakage() {
         let (oracle, windows) = fixture();
         let candidate = predictions(
-            &oracle,
+            KnowledgeCandidateAnswer::Value(oracle.corrected_value),
             KnowledgeCandidateAnswer::Value(oracle.corrected_value),
             KnowledgeCandidateAnswer::Value(oracle.corrected_value),
             KnowledgeCandidateAnswer::NoFact,
@@ -667,15 +682,15 @@ mod tests {
     fn late_correction_equalizes_final_accuracy_but_not_time_integrated_debt() {
         let (oracle, windows) = fixture();
         let immediate = predictions(
-            &oracle,
             KnowledgeCandidateAnswer::Value(oracle.initial_value),
+            KnowledgeCandidateAnswer::Value(oracle.corrected_value),
             KnowledgeCandidateAnswer::Value(oracle.corrected_value),
             KnowledgeCandidateAnswer::NoFact,
         );
         let delayed = predictions(
-            &oracle,
             KnowledgeCandidateAnswer::Value(oracle.initial_value),
             KnowledgeCandidateAnswer::Value(oracle.initial_value),
+            KnowledgeCandidateAnswer::Value(oracle.corrected_value),
             KnowledgeCandidateAnswer::NoFact,
         );
         let a = score_temporal_error_debt(&oracle, &windows, &immediate).unwrap();
