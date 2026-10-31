@@ -18,7 +18,7 @@
     },
     {
       "case_id": "c2",
-      "response": "alert",
+      "response": "clear",
       "score": 0.12,
       "cost": {
         "acquisition_ns": 100,
@@ -73,7 +73,7 @@
     },
     {
       "case_id": "c7",
-      "response": "clear",
+      "response": "alert",
       "score": 0.81,
       "cost": {
         "acquisition_ns": 100,
