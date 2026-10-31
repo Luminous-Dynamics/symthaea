@@ -910,8 +910,8 @@ pub fn verify_tail_profile(
         || !profile.qualification.qualified
         || !valid_label(&profile.profile_id)
         || !valid_label(&profile.dataset_revision)
-        || !is_sha256(&profile.profile_sha256)
         || profile.profile_sha256 != profile_digest(profile)?
+        || !is_sha256(&profile.profile_sha256)
         || !is_sha256(&profile.calibration_lineage_set_sha256)
         || !is_sha256(&profile.qualification_lineage_set_sha256)
         || !is_sha256(&profile.event_evidence_set_sha256)
@@ -933,17 +933,39 @@ pub fn verify_tail_profile(
         || !verify_effects_group_assignment(&profile.context.effects_group_assignment)
         || profile.context.sample_rate_hz == 0
         || profile.context.channels == 0
-        || profile.statistics.guard_frames
-            != profile.statistics.upper_confidence_bound_frames.saturating_add(profile.statistics.safety_margin_frames)
-        || profile.statistics.independent_lineage_count == 0
-        || profile.statistics.confidence_coverage_lower_bound_micros
-            < profile.statistics.required_confidence_micros
-        || profile.qualification.independent_lineage_count == 0
-        || profile.qualification.missed_lineage_count != 0
-        || profile.statistics.guard_frames > MAX_GUARD_FRAMES
+        || !valid_label(&profile.context.operation_family)
+        || !valid_label(&profile.signer_key_id)
+        || profile.builder_spec.dataset_revision != profile.dataset_revision
+        || profile.builder_spec.profile_id != profile.profile_id
+        || builder_spec_digest(&profile.builder_spec)? != profile.builder_spec_sha256
+        || profile.event_observations.is_empty()
+        || profile.event_observations.len() > MAX_PROFILE_EVENTS
+        || event_set_digest(&profile.event_observations) != profile.event_evidence_set_sha256
+        || lineage_summaries(&profile.event_observations)? != profile.lineage_summaries
     {
         return Err(TailProfileError::ProfileReceiptInvalid);
     }
+
+    // Recompute every published statistic from the retained, source-lineage
+    // clustered observations. A signed aggregate number is not accepted alone.
+    let expected = create_profile_unsigned(
+        &profile.builder_spec,
+        profile.context.clone(),
+        &profile.event_observations,
+        &profile.benchmark_manifest_sha256,
+        &profile.benchmark_audit_sha256,
+        &profile.signer_key_id,
+    )?;
+    if expected.statistics != profile.statistics
+        || expected.qualification != profile.qualification
+        || expected.calibration_lineage_set_sha256 != profile.calibration_lineage_set_sha256
+        || expected.qualification_lineage_set_sha256 != profile.qualification_lineage_set_sha256
+        || expected.event_evidence_set_sha256 != profile.event_evidence_set_sha256
+        || expected.lineage_summaries != profile.lineage_summaries
+    {
+        return Err(TailProfileError::ProfileReceiptInvalid);
+    }
+
     let authority = authorities
         .get(&profile.signer_key_id)
         .ok_or(TailProfileError::InvalidAuthority)?;
@@ -1127,6 +1149,50 @@ mod tests {
         }
     }
 
+    fn signed_test_profile(
+        context: TailProfileContext,
+        key_id: &str,
+        signing_key: &SigningKey,
+    ) -> TailProfile {
+        let mut build_spec = spec();
+        build_spec.dataset_revision = "test".to_owned();
+        let mut observations = Vec::new();
+        for (split, count, prefix) in [
+            (TailProfileSplit::Calibration, 299usize, "cal"),
+            (TailProfileSplit::Qualification, 30usize, "qual"),
+        ] {
+            for index in 0..count {
+                let lineage = format!("{prefix}-lineage-{index}");
+                observations.push(TailProfileEventObservation {
+                    source_event_index: index,
+                    source_event_id: "score_event_index:0".to_owned(),
+                    source_lineage_sha256: digest(&lineage),
+                    split,
+                    event_evidence_sha256: digest(&format!("{prefix}-event-{index}")),
+                    final_note_off_frame: 100,
+                    raw_measured_end_frame: Some(220),
+                    hysteresis_support_end_frame: Some(220),
+                    observed_tail_frames: 120,
+                    output_frame_count: 1_000,
+                });
+            }
+        }
+        let mut profile = create_profile_unsigned(
+            &build_spec,
+            context,
+            &observations,
+            &digest("manifest"),
+            &digest("audit"),
+            key_id,
+        )
+        .unwrap();
+        let profile_sha = profile_digest(&profile).unwrap();
+        profile.profile_sha256 = profile_sha.clone();
+        profile.signature_ed25519_hex =
+            hex_encode(signing_key.sign(profile_sha.as_bytes()).to_bytes().as_ref());
+        profile
+    }
+
     fn observation(index: usize, lineage: u8, split: TailProfileSplit, tail: u64) -> TailProfileEventObservation {
         TailProfileEventObservation {
             source_event_index: index,
@@ -1216,48 +1282,13 @@ mod tests {
     fn signed_profile_registry_requires_exact_context_and_revocation() {
         let key = signing_key();
         let authority = authority("profile-publisher-v1", &key);
-        let mut profile = TailProfile {
-            version: PROFILE_VERSION.to_owned(),
-            profile_id: "test".to_owned(),
-            dataset_revision: "test".to_owned(),
-            benchmark_manifest_sha256: digest("manifest"),
-            benchmark_audit_sha256: digest("audit"),
-            context: context(&topology_attestation("profile-publisher-v1", &key)),
-            statistics: TailProfileStatistics {
-                selected_quantile_micros: 990_000,
-                required_confidence_micros: 950_000,
-                independent_lineage_count: 299,
-                empirical_quantile_frames: 100,
-                empirical_raw_tail_quantile_frames: 90,
-                empirical_hysteresis_tail_quantile_frames: 100,
-                upper_confidence_bound_frames: 120,
-                confidence_coverage_lower_bound_micros: 950_000,
-                maximum_observed_tail_frames: 120,
-                safety_margin_frames: 16,
-                guard_frames: 136,
-            },
-            qualification: TailProfileQualification {
-                independent_lineage_count: 30,
-                missed_lineage_count: 0,
-                maximum_held_out_tail_frames: 120,
-                zero_miss_upper_rate_95_micros: Some(95_000),
-                qualified: true,
-            },
-            calibration_lineage_set_sha256: digest("cal-lineages"),
-            qualification_lineage_set_sha256: digest("qual-lineages"),
-            event_evidence_set_sha256: digest("event-set"),
-            builder_spec_sha256: digest("builder-spec"),
-            signer_key_id: "profile-publisher-v1".to_owned(),
-            profile_sha256: String::new(),
-            signature_ed25519_hex: String::new(),
-        };
-        let profile_sha = profile_digest(&profile).unwrap();
-        profile.profile_sha256 = profile_sha.clone();
-        profile.signature_ed25519_hex = hex_encode(key.sign(profile_sha.as_bytes()).to_bytes().as_ref());
+        let attestation = topology_attestation("profile-publisher-v1", &key);
+        let profile = signed_test_profile(context(&attestation), "profile-publisher-v1", &key);
+        let profile_sha = profile.profile_sha256.clone();
         let mut registry = TailProfileRegistry::new(vec![authority]).unwrap();
         registry.register_profile(profile.clone()).unwrap();
         let resolved = registry.resolve(&profile_sha, &profile.context).unwrap();
-        assert_eq!(resolved.guard_frames(), 136);
+        assert_eq!(resolved.guard_frames(), 184);
         assert_eq!(
             resolved.apply_to_segmentation_config(&mut InfluenceSegmentationConfig {
                 threshold_combination: crate::counterfactual_influence::InfluenceThresholdCombination::AnyMetricExceeds,
@@ -1279,42 +1310,9 @@ mod tests {
     fn modified_profile_signature_or_context_cannot_resolve() {
         let key = signing_key();
         let authority = authority("profile-publisher-v1", &key);
-        let mut profile = TailProfile {
-            version: PROFILE_VERSION.to_owned(),
-            profile_id: "test".to_owned(),
-            dataset_revision: "test".to_owned(),
-            benchmark_manifest_sha256: digest("manifest"),
-            benchmark_audit_sha256: digest("audit"),
-            context: context(&topology_attestation("profile-publisher-v1", &key)),
-            statistics: TailProfileStatistics {
-                selected_quantile_micros: 990_000,
-                required_confidence_micros: 950_000,
-                independent_lineage_count: 299,
-                empirical_quantile_frames: 100,
-                upper_confidence_bound_frames: 120,
-                confidence_coverage_lower_bound_micros: 950_000,
-                maximum_observed_tail_frames: 120,
-                safety_margin_frames: 16,
-                guard_frames: 136,
-            },
-            qualification: TailProfileQualification {
-                independent_lineage_count: 30,
-                missed_lineage_count: 0,
-                maximum_held_out_tail_frames: 120,
-                zero_miss_upper_rate_95_micros: Some(95_000),
-                qualified: true,
-            },
-            calibration_lineage_set_sha256: digest("cal"),
-            qualification_lineage_set_sha256: digest("qual"),
-            event_evidence_set_sha256: digest("events"),
-            builder_spec_sha256: digest("builder"),
-            signer_key_id: "profile-publisher-v1".to_owned(),
-            profile_sha256: String::new(),
-            signature_ed25519_hex: String::new(),
-        };
-        let profile_sha = profile_digest(&profile).unwrap();
-        profile.profile_sha256 = profile_sha.clone();
-        profile.signature_ed25519_hex = hex_encode(key.sign(profile_sha.as_bytes()).to_bytes().as_ref());
+        let attestation = topology_attestation("profile-publisher-v1", &key);
+        let mut profile = signed_test_profile(context(&attestation), "profile-publisher-v1", &key);
+        let profile_sha = profile.profile_sha256.clone();
         let mut registry = TailProfileRegistry::new(vec![authority]).unwrap();
         registry.register_profile(profile.clone()).unwrap();
         let mut changed = profile.context.clone();
@@ -1324,6 +1322,8 @@ mod tests {
             TailProfileError::ProfileContextMismatch
         );
         profile.statistics.guard_frames += 1;
-        assert_eq!(verify_tail_profile(&profile, &registry.authorities).unwrap_err(), TailProfileError::ProfileReceiptInvalid);
-    }
-}
+        assert_eq!(
+            verify_tail_profile(&profile, &registry.authorities).unwrap_err(),
+            TailProfileError::ProfileReceiptInvalid
+        );
+    }}
