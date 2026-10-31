@@ -156,6 +156,8 @@ pub struct ReplicatedCausalAnalysisReportV1 {
     pub benchmark_id: String,
     pub benchmark_version: String,
     pub primary_metric_id: String,
+    pub study_sha256: String,
+    pub randomization_test_seed_commitment_sha256: String,
     pub independent_model_pair_replicate_count: u64,
     pub minimum_confirmatory_replicates: u32,
     pub replicate_count_meets_minimum: bool,
@@ -786,6 +788,11 @@ pub fn analyze_replicated_causal_study(
         .collect();
 
     let observed_localization = sample_mean(&localization_values)?;
+    let study_bytes = serde_json::to_vec(study)
+        .map_err(|error| format!("cannot serialize causal study for digest: {error}"))?;
+    let study_sha256 = hash_domain(b"replicated-contamination-causal-study.v1", &study_bytes);
+    let randomization_test_seed_commitment_sha256 =
+        hash_domain(b"causal-randomization-test-seed.v1", &root_seed);
     let randomization_p = randomization_p_value(
         &study.replicates,
         observed_localization,
@@ -850,6 +857,8 @@ pub fn analyze_replicated_causal_study(
         benchmark_id: study.benchmark_id.clone(),
         benchmark_version: study.benchmark_version.clone(),
         primary_metric_id: study.primary_metric_id.clone(),
+        study_sha256,
+        randomization_test_seed_commitment_sha256,
         independent_model_pair_replicate_count: u64::try_from(study.replicates.len())
             .map_err(|_| "replicate count overflows u64")?,
         minimum_confirmatory_replicates: study.minimum_confirmatory_replicates,
