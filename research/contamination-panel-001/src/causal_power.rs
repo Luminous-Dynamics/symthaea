@@ -90,6 +90,9 @@ pub struct CausalPowerPlanningReportV1 {
     pub config_sha256: String,
     pub simulation_seed_commitment_sha256: String,
     pub simulation_replicates: u32,
+    pub clusters_per_model_pair: u32,
+    pub task_family_count: u32,
+    pub maximum_inconclusive_fraction_permille: u16,
     pub nominal_alpha_permille: u16,
     pub target_power_permille: u16,
     pub target_interval_coverage_permille: u16,
@@ -491,6 +494,9 @@ pub fn plan_causal_power(
         config_sha256,
         simulation_seed_commitment_sha256,
         simulation_replicates: config.simulation_replicates,
+        clusters_per_model_pair: config.clusters_per_model_pair,
+        task_family_count: config.task_family_count,
+        maximum_inconclusive_fraction_permille: config.maximum_inconclusive_fraction_permille,
         nominal_alpha_permille: config.alpha_permille,
         target_power_permille: config.target_power_permille,
         target_interval_coverage_permille: CAUSAL_POWER_COVERAGE_TARGET_PERMILLE,
@@ -607,6 +613,8 @@ mod tests {
         assert!(verify_causal_power_report(&first).is_ok());
         assert_eq!(first.expected_primary_global_effect_permille, 225.0);
         assert_eq!(first.actual_balanced_exposure_fraction_permille, 500.0);
+        assert_eq!(first.clusters_per_model_pair, 32);
+        assert_eq!(first.task_family_count, 4);
     }
 
     #[test]
