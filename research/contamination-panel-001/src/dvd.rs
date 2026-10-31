@@ -464,7 +464,7 @@ pub fn score_dvd_item(input: &DvdGenerationInputV1) -> Result<DvdItemReportV1, S
         (&input.prompt_sha256, "prompt_sha256"),
         (&input.decoding_config_sha256, "decoding_config_sha256"),
         (&input.environment_sha256, "environment_sha256"),
-        (&input.generation_seed_commitment_sha256, "generation_seed_commitment_sha256"),
+        (&input.generation_seed_schedule_sha256, "generation_seed_schedule_sha256"),
     ] {
         validate_digest(value, label)?;
     }
