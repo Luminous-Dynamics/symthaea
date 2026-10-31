@@ -16,7 +16,7 @@
       "program_group_id": "train-p",
       "execution_group_id": "train-e",
       "device_config_id": "cpu-a",
-      "attack_family_id": "baseline-spectre-v1",
+      "attack_family_id": "spectre-baseline-train",
       "adaptation_family_id": "none",
       "adaptation_level": 0,
       "sensor_state": "valid"
@@ -27,7 +27,7 @@
       "program_group_id": "val-p",
       "execution_group_id": "val-e",
       "device_config_id": "cpu-a",
-      "attack_family_id": "baseline-spectre-v2",
+      "attack_family_id": "spectre-baseline-validation",
       "adaptation_family_id": "none",
       "adaptation_level": 0,
       "sensor_state": "valid"
