@@ -166,7 +166,9 @@ pub struct SearchTimeAccessTrialReportV1 {
     pub every_run_completed_with_matching_budgets: bool,
     pub every_trace_integrity_valid: bool,
     pub every_finding_report_bound_to_trace: bool,
-    pub run_state_namespaces_are_isolated: bool,
+    pub run_state_namespace_identifiers_unique: bool,
+    pub run_state_reset_receipts_present: bool,
+    pub run_state_isolation_independently_verified: bool,
     pub condition_means: Vec<SearchTrialConditionMeanV1>,
     pub allowlisted_minus_disabled_accuracy_permille: SearchTrialIntervalV1,
     pub unrestricted_minus_disabled_accuracy_permille: SearchTrialIntervalV1,
@@ -322,6 +324,7 @@ fn validate_run(
     expected_budget_sha256: &str,
     run_ids: &mut BTreeSet<String>,
     namespaces: &mut BTreeSet<String>,
+    execution_receipts: &mut BTreeSet<String>,
     issues: &mut Vec<String>,
 ) -> Result<(), String> {
     if run.status != SearchTrialRunStatusV1::Completed {
@@ -342,9 +345,19 @@ fn validate_run(
         (&run.run_execution_receipt_sha256, "run_execution_receipt_sha256"),
     ] {
         validate_digest(digest, label)?;
+    }
+    for (digest, label) in [
+        (&run.sandbox_namespace_sha256, "sandbox_namespace_sha256"),
+        (&run.agent_memory_namespace_sha256, "agent_memory_namespace_sha256"),
+        (&run.cache_namespace_sha256, "cache_namespace_sha256"),
+        (&run.state_reset_receipt_sha256, "state_reset_receipt_sha256"),
+    ] {
         if !namespaces.insert(digest.clone()) {
             return Err(format!("{label} must be unique across run arms and blocks"));
         }
+    }
+    if !execution_receipts.insert(run.run_execution_receipt_sha256.clone()) {
+        return Err("run execution receipt digests must be unique across run arms and blocks".to_owned());
     }
     if run.budget_spec_sha256 != expected_budget_sha256 {
         return Err(format!("run {} budget specification does not match study", run.run_id));
@@ -437,6 +450,7 @@ pub fn analyze_search_time_access_trial(
     let mut block_ids = BTreeSet::new();
     let mut run_ids = BTreeSet::new();
     let mut namespaces = BTreeSet::new();
+    let mut execution_receipts = BTreeSet::new();
     let mut every_run_completed = true;
     let mut every_trace_valid = true;
     let mut every_findings_bound = true;
@@ -486,6 +500,7 @@ pub fn analyze_search_time_access_trial(
                 &budget_sha256,
                 &mut run_ids,
                 &mut namespaces,
+                &mut execution_receipts,
                 &mut issues,
             )?;
             if condition_runs.insert(run.condition, run).is_some() {
@@ -602,7 +617,9 @@ pub fn analyze_search_time_access_trial(
         every_run_completed_with_matching_budgets: every_run_completed,
         every_trace_integrity_valid: every_trace_valid,
         every_finding_report_bound_to_trace: every_findings_bound,
-        run_state_namespaces_are_isolated: true,
+        run_state_namespace_identifiers_unique: true,
+        run_state_reset_receipts_present: true,
+        run_state_isolation_independently_verified: false,
         condition_means,
         allowlisted_minus_disabled_accuracy_permille: interval(&allowlisted_disabled_accuracy)?,
         unrestricted_minus_disabled_accuracy_permille: interval(&unrestricted_disabled_accuracy)?,
@@ -679,7 +696,15 @@ mod tests {
         };
         crate::search_time::seal_search_time_trace(&mut trace).unwrap();
 
-        let score_report = synthetic_score_report(study, &format!("run-{suffix}"), accuracy_permille);
+        let run_id = format!("run-{suffix}");
+        let run_execution_receipt_sha256 = digest(&format!("execution-{suffix}"));
+        let mut score_report = synthetic_score_report(study, &run_id, accuracy_permille);
+        score_report.run_execution_receipt_sha256 = run_execution_receipt_sha256.clone();
+        score_report.tool_call_count = if answer_findings > 0 { 1 } else { 0 };
+        score_report.report_sha256.clear();
+        let score_bytes = serde_json::to_vec(&score_report).unwrap();
+        score_report.report_sha256 =
+            hash_domain(b"fresh-instance-score-report.v1", &score_bytes);
         let mut findings = SearchTimeExposureFindingsV1 {
             schema: crate::search_time::SEARCH_FINDINGS_SCHEMA.to_owned(),
             run_id: format!("run-{suffix}"),
@@ -732,13 +757,13 @@ mod tests {
             condition,
             order_position,
             status: SearchTrialRunStatusV1::Completed,
-            run_id: format!("run-{suffix}"),
+            run_id,
             sandbox_namespace_sha256: digest(&format!("sandbox-{suffix}")),
             agent_memory_namespace_sha256: digest(&format!("memory-{suffix}")),
             cache_namespace_sha256: digest(&format!("cache-{suffix}")),
             state_reset_receipt_sha256: digest(&format!("reset-{suffix}")),
             budget_spec_sha256: budget_digest(&study.budget).unwrap(),
-            run_execution_receipt_sha256: digest(&format!("execution-{suffix}")),
+            run_execution_receipt_sha256,
             trace,
             findings,
             score_report,
@@ -786,7 +811,7 @@ mod tests {
             input_token_count: 1_000,
             output_token_count: 2_000,
             wall_clock_millis: 10_000,
-            tool_call_count: 0,
+            tool_call_count: 1,
             human_assistance_minutes: 0,
             compute_cost_microusd: 0,
             execution_receipt_verification: "digest_present_signature_not_cryptographically_verified".to_owned(),
@@ -824,7 +849,7 @@ mod tests {
                 max_input_tokens: 1_000,
                 max_output_tokens: 2_000,
                 max_wall_clock_millis: 10_000,
-                max_tool_calls: 0,
+                max_tool_calls: 10,
                 max_human_assistance_minutes: 0,
                 max_compute_cost_microusd: 0,
             },
