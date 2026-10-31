@@ -771,3 +771,70 @@ Schemas:
 - schema/search-time-exposure-findings.schema.json
 - schema/search-time-exposure-findings-audit.schema.json
 
+
+
+## Randomized search-time access-policy trials
+
+The module src/search_time_causal.rs estimates the performance effect of allowing a tool-using model to access external information during benchmark evaluation. It complements the tamper-evident trace layer: traces show what the declared perimeter recorded; the blocked randomized comparison estimates the effect of the access policy.
+
+### Experimental conditions
+
+Every independent run block contains three runs from the same frozen checkpoint and challenge packet:
+
+1. NetworkDisabled — no accepted web-search, browser, HTTP or remote-MCP egress.
+2. Allowlisted — only the preregistered destination digests may be accessed.
+3. Unrestricted — ordinary declared network/tool access.
+
+The order is deterministically randomized within each block from the evaluator-held 256-bit-or-longer seed. The study stores the order commitment; the report contains the seed commitment and the exact study digest.
+
+Every condition run must bind:
+- exact model provider/name/version/access mode, checkpoint, challenge packet, prompt/decoding, inference harness and metric;
+- a condition-specific policy digest preregistered at study level;
+- sandbox/process, agent-memory, cache namespace and state-reset receipt digests;
+- the same budget specification digest and model-call/token/tool/time/human/cost ceilings;
+- search-time trace, evaluator-supplied exposure findings and fresh exact-score report;
+- a separate run-execution receipt digest.
+
+Condition policy digests must remain identical across blocks. All output artifacts, run IDs and state namespace identifiers must be unique across arms and blocks. The same budget specification is intentionally reused; actual resource use may differ as a measured outcome, but no arm may exceed the shared cap.
+
+### Independent unit and estimands
+
+The independent inference unit is the **three-run block**, not the number of task items or tool calls. Items within one run remain nested observations.
+
+For each block, the engine computes paired differences:
+- Allowlisted minus NetworkDisabled accuracy;
+- Unrestricted minus NetworkDisabled accuracy;
+- Unrestricted minus Allowlisted accuracy;
+- corresponding coverage differences;
+- differences in evaluator-classified answer-bearing retrieval findings.
+
+It reports condition means, block-level effects, and two-sided 95% Student-t intervals across independent blocks. A 20-block minimum is an initial operational floor, not a universal power guarantee. Select confirmatory run count by preregistered power simulations using block-level variance, access-effect heterogeneity, tool-exposure prevalence, run failures and carryover risk.
+
+The comparison estimates the effect of the **declared access policy**, not the causal influence of a particular retrieved page. Answer-bearing retrieval counts are exposure diagnostics; they do not establish that retrieved content caused a model response.
+
+### State-isolation and trust boundary
+
+The analyzer requires distinct sandbox, agent-memory, cache and state-reset receipt digests. It can check that those identifiers are present and unique. It cannot prove the runner actually isolated the processes, reset cookies/cache/memory, blocked hidden proxies, or captured every egress channel.
+
+Accordingly:
+- run_state_namespace_identifiers_unique can be true;
+- run_state_reset_receipts_present can be true;
+- run_state_isolation_independently_verified is always false;
+- complete_mediation_verified, independently_verified and confirmatory_eligible are always false.
+
+The evaluator-held order seed belongs in protected study storage; do not publish it before the trial is complete.
+
+### CLI
+
+~~~sh
+cargo run --locked -- analyze-search-time-access-trial \
+  /secure/evaluator/search-time-access-study.json \
+  /secure/evaluator/search-time-access-report.json
+~~~
+
+Schemas:
+- schema/search-time-access-trial-study.schema.json
+- schema/search-time-access-trial-report.schema.json
+
+The Rust tests include synthetic one- and twenty-block fixtures, randomized-order checks, policy/score/trace binding, model identity and budget invariants, unique run-state/evidence artifacts, and nested schema/struct comparisons. These are software fixtures only, not evidence of live agent trials or retrieval contamination rates.
+
