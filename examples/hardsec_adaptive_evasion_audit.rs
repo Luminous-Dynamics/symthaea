@@ -1646,11 +1646,11 @@ mod tests {
     fn percentile_bootstrap_undercoverage_is_detected_at_boundary_rates() {
         // Exact enumeration of the Bernoulli-group sampling distribution;
         // this is not a Monte Carlo approximation.
-        assert!((exact_binary_percentile_bootstrap_coverage(10, 0.05) - 0.4).abs() < 1e-12);
-        assert!((exact_binary_percentile_bootstrap_coverage(10, 0.10) - 0.65).abs() < 1e-12);
+        assert!((exact_binary_percentile_bootstrap_coverage(10, 0.05) - 0.4002345628237306).abs() < 1e-12);
+        assert!((exact_binary_percentile_bootstrap_coverage(10, 0.10) - 0.6496866225).abs() < 1e-12);
         assert!((exact_binary_percentile_bootstrap_coverage(10, 0.50) - 0.978515625).abs() < 1e-12);
-        assert!((exact_binary_percentile_bootstrap_coverage(10, 0.90) - 0.65).abs() < 1e-12);
-        assert!((exact_binary_percentile_bootstrap_coverage(10, 0.95) - 0.4).abs() < 1e-12);
+        assert!((exact_binary_percentile_bootstrap_coverage(10, 0.90) - 0.6496866225).abs() < 1e-12);
+        assert!((exact_binary_percentile_bootstrap_coverage(10, 0.95) - 0.4002345628237306).abs() < 1e-12);
     }
 
     #[test]
