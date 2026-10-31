@@ -91,7 +91,7 @@ fn equivalent(left: &[f64], right: &[f64]) -> bool {
 fn run() -> Result<(), String> {
     let repeats = parse_repeats()?;
     println!(
-        "side,variables,factors,cutset_variables,cutset_assignments,cutset_factor_entry_budget,standard_minfill_fits_same_budget,baseline_induced_width,baseline_peak_entries,cutset_induced_width,cutset_peak_entries,baseline_median_ns,cutset_median_ns,cutset_over_baseline_time_ratio,exact_output_parity,within_cutset_budget"
+        "side,variables,factors,cutset_variables,cutset_assignments,cutset_factor_entry_budget,standard_minfill_rejected_same_budget,baseline_induced_width,baseline_peak_entries,cutset_induced_width,cutset_peak_entries,baseline_median_ns,cutset_median_ns,cutset_over_baseline_time_ratio,exact_output_parity,within_cutset_budget"
     );
 
     for fixture in FIXTURES {
@@ -145,6 +145,8 @@ fn run() -> Result<(), String> {
         if cutset_report.peak_factor_entries > cutset_factor_entry_budget
             || cutset_report.predicted_peak_factor_entries != cutset_report.peak_factor_entries
             || cutset_report.cutset_assignments_evaluated != branch_budget
+            || cutset_report.max_cutset_assignments != branch_budget
+            || cutset_report.max_factor_entries != cutset_factor_entry_budget
         {
             return Err(format!("cutset resource invariant failed for {side}x{side}"));
         }
