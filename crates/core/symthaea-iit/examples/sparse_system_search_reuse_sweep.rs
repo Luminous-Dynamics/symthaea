@@ -46,6 +46,18 @@ struct NaiveSearchResult {
     partition_score_evaluations: usize,
 }
 
+#[derive(Debug)]
+struct VerifiedSearchMetadata {
+    partition_count: usize,
+    state_pair_count: usize,
+    partition_score_evaluations: usize,
+    phi_s: Option<f64>,
+    status: symthaea_iit::Iit4SystemPhiStatus,
+    model_sha256: String,
+    request_sha256: String,
+    algorithm_id: &'static str,
+}
+
 fn ring_model(n_units: usize) -> Result<SparseBinaryCausalModel, String> {
     let mechanisms = (0..n_units)
         .map(|target| {
@@ -222,7 +234,7 @@ fn verify_equal(
     model: &SparseBinaryCausalModel,
     current_state: &[bool],
     config: Iit4SystemPhiSearchConfig,
-) -> Result<(usize, usize, usize, Option<f64>, symthaea_iit::Iit4SystemPhiStatus), String> {
+) -> Result<VerifiedSearchMetadata, String> {
     let optimized = model
         .analyze_iit4_2023_system_phi_s(
             &CANDIDATE,
@@ -329,13 +341,16 @@ fn verify_equal(
         }
     }
 
-    Ok((
-        naive.partition_count,
-        naive.state_pair_count,
-        naive.partition_score_evaluations,
-        optimized.phi_s,
-        optimized.status,
-    ))
+    Ok(VerifiedSearchMetadata {
+        partition_count: naive.partition_count,
+        state_pair_count: naive.state_pair_count,
+        partition_score_evaluations: naive.partition_score_evaluations,
+        phi_s: optimized.phi_s,
+        status: optimized.status,
+        model_sha256: model.model_sha256(),
+        request_sha256: optimized.request_sha256,
+        algorithm_id: optimized.algorithm_id,
+    })
 }
 
 fn median_duration(samples: &mut [Duration]) -> Duration {
@@ -384,7 +399,7 @@ fn parse_args() -> Result<(usize, usize), String> {
 fn run() -> Result<(), String> {
     let (repeats, max_units) = parse_args()?;
     println!(
-        "substrate_units,candidate_units,partitions,state_pairs,partition_score_evaluations,repeats,naive_median_ns,naive_p95_ns,reused_median_ns,reused_p95_ns,median_speedup,uncut_posterior_preparations_naive,uncut_posterior_preparations_reused,partition_repertoire_preparations_naive,partition_repertoire_preparations_reused,nested_eq4_receipt_hashes_naive,nested_eq4_receipt_hashes_reused,phi_s,result_status,validated"
+        "substrate_units,candidate_units,model_sha256,request_sha256,algorithm_id,decimal_precision,max_factor_entries,max_partition_combinations,max_state_pair_evaluations,max_partition_score_evaluations,partitions,state_pairs,partition_score_evaluations,repeats,naive_median_ns,naive_p95_ns,reused_median_ns,reused_p95_ns,median_speedup,uncut_posterior_preparations_naive,uncut_posterior_preparations_reused,partition_repertoire_preparations_naive,partition_repertoire_preparations_reused,nested_eq4_receipt_hashes_naive,nested_eq4_receipt_hashes_reused,phi_s,result_status,validated"
     );
 
     let config = search_config();
@@ -395,8 +410,12 @@ fn run() -> Result<(), String> {
             .collect::<Vec<_>>();
 
         // Warm both paths and verify exact same selected partition and score.
-        let (partition_count, state_pair_count, score_evaluations, phi_s, result_status) =
-            verify_equal(&model, &current_state, config)?;
+        let verified = verify_equal(&model, &current_state, config)?;
+        let partition_count = verified.partition_count;
+        let state_pair_count = verified.state_pair_count;
+        let score_evaluations = verified.partition_score_evaluations;
+        let phi_s = verified.phi_s;
+        let result_status = verified.status;
 
         let mut naive_samples = Vec::with_capacity(repeats);
         let mut reused_samples = Vec::with_capacity(repeats);
@@ -441,9 +460,17 @@ fn run() -> Result<(), String> {
         let reused_nested_receipt_hashes = partition_count + 1;
 
         println!(
-            "{},{},{},{},{},{},{},{},{},{},{:.4},{},{},{},{},{},{},{},{:?},{}",
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.4},{},{},{},{},{},{},{},{:?},{}",
             n_units,
             CANDIDATE.len(),
+            verified.model_sha256,
+            verified.request_sha256,
+            verified.algorithm_id,
+            config.decimal_precision,
+            MAX_FACTOR_ENTRIES,
+            config.max_partition_combinations,
+            config.max_state_pair_evaluations,
+            config.max_partition_score_evaluations,
             partition_count,
             state_pair_count,
             score_evaluations,
