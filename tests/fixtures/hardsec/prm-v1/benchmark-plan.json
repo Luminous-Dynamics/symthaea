@@ -1,0 +1,78 @@
+{
+  "schema_version": "hardsec-predictive-rank-martingale-benchmark-v1",
+  "benchmark_id": "hs023-fixed-reference-prm-vs-cctm",
+  "status": "planned",
+  "comparators": [
+    "hardsec019_dkw_cctm_paper_equations",
+    "hardsec019_official_python_cctm_source_pinned",
+    "hardsec021_restarted_dkw_cctm",
+    "standard_growing_reference_ctm",
+    "static_threshold",
+    "ewma",
+    "page_hinkley_cusum"
+  ],
+  "candidates": [
+    "order_prm_ons",
+    "dispersion_prm_ons",
+    "equal_weight_order_dispersion_prm_portfolio"
+  ],
+  "scenarios": [
+    "iid_continuous_null",
+    "iid_discrete_randomized_ties",
+    "gaussian_location_shift",
+    "delayed_location_shift",
+    "gradual_location_shift",
+    "symmetric_scale_shift",
+    "symmetric_tail_shift",
+    "zero_order_contrast_alternative",
+    "multimodal_shift",
+    "skewness_shift",
+    "late_change_point",
+    "calibration_size_power_ceiling",
+    "score_transform_leakage",
+    "context_misassignment",
+    "invalid_sensor_abstention",
+    "ar1_negative_control",
+    "block_dependence_negative_control",
+    "overlapping_pmu_window_negative_control",
+    "long_memory_negative_control"
+  ],
+  "holdout_axes": [
+    "execution_group",
+    "device_boot_group",
+    "program_binary",
+    "attack_family",
+    "workload_context",
+    "microarchitecture"
+  ],
+  "metrics": [
+    "anytime_pfa",
+    "detection_probability_by_time",
+    "median_detection_delay",
+    "p95_detection_delay",
+    "order_feature_contrast",
+    "dispersion_feature_contrast",
+    "portfolio_log_wealth",
+    "calibration_coverage",
+    "tie_rank_validity",
+    "rank_memory",
+    "cpu_cycles_per_observation",
+    "p95_latency",
+    "energy_per_device_hour",
+    "calibration_size_power_ceiling"
+  ],
+  "claim_rules": {
+    "calibration_and_online_iid_required": true,
+    "tie_randomization_independence_required_for_atoms": true,
+    "calibration_reuse_rank_dependence_is_modelled_not_ignored": true,
+    "no_sequential_guarantee_for_serial_pmu_without_separate_proof": true,
+    "marginal_validity_not_calibration_conditional": true,
+    "context_and_admission_exogeneity_unverified_until_proven": true,
+    "feature_portfolio_weights_sum_to_one": true
+  },
+  "reference_paper": {
+    "id": "kuang_xia_2026_predictive_rank_martingales",
+    "url": "https://arxiv.org/abs/2609.00536",
+    "source_version": "arXiv 2609.00536v1"
+  }
+}
