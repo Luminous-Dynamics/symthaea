@@ -29,6 +29,8 @@ pub struct ResultAuditReport {
     pub observer_receipts_digest: String,
     pub run_id: Option<String>,
     pub adjudication_complete: bool,
+    /// True only when this run explicitly selects every case in the catalog.
+    pub scope_is_full_catalog: bool,
     pub adjudication_passed: bool,
     /// Permanently false: this command adjudicates one run, not a profile.
     pub qualification_eligible: bool,
@@ -47,6 +49,7 @@ pub struct ResultAuditReport {
 #[derive(Debug, Default, Serialize)]
 pub struct ResultAuditCounts {
     pub challenge_cases: usize,
+    pub selected_cases: usize,
     pub oracle_records: usize,
     pub observer_receipts: usize,
     pub adjudicated_cases: usize,
@@ -63,6 +66,8 @@ pub struct ResultAuditMetrics {
     pub unresolved_channel_misses: usize,
     pub integrity_failures_not_invalidated: usize,
     pub observed_resource_attributions: usize,
+    pub semantic_influence_demonstrated: usize,
+    pub semantic_access_without_output_effect_in_tested_domain: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -72,6 +77,7 @@ pub struct CaseAssessment {
     pub oracle_ground_truth: Option<String>,
     pub observer_disposition: Option<String>,
     pub reuse_decision: Option<String>,
+    pub semantic_effect: Option<String>,
     pub passed: bool,
     pub error_codes: Vec<String>,
 }
@@ -162,6 +168,7 @@ struct OracleLedger {
     run_id: String,
     catalog_digest: String,
     profile_id: String,
+    selected_case_ids: Vec<String>,
     harness: HarnessIdentity,
     records: Vec<OracleRecord>,
 }
@@ -171,6 +178,7 @@ struct OracleLedger {
 struct HarnessIdentity {
     harness_id: String,
     binary_digest: String,
+    worker_binary_digest: String,
     fixture_digest: String,
 }
 
@@ -184,6 +192,19 @@ struct OracleRecord {
     mutation: MutationWitness,
     witness_kind: String,
     independent_replay: String,
+    #[serde(default)]
+    semantic_effect: Option<String>,
+    execution_witness: ExecutionWitness,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ExecutionWitness {
+    worker_binary_digest: String,
+    baseline_output_digest: String,
+    mutated_output_digest: String,
+    baseline_bytes_read: u64,
+    mutated_bytes_read: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -205,6 +226,7 @@ struct ObserverReceipts {
     catalog_digest: String,
     observer_profile_id: String,
     observer_binary_digest: String,
+    selected_case_ids: Vec<String>,
     records: Vec<ObserverReceipt>,
 }
 
@@ -264,6 +286,7 @@ pub fn audit_bytes(
         observer_receipts_digest: sha256_tagged(receipts_bytes),
         run_id: None,
         adjudication_complete: false,
+        scope_is_full_catalog: false,
         adjudication_passed: false,
         qualification_eligible: false,
         oracle_authenticity_established: false,
@@ -352,6 +375,7 @@ pub fn audit_bytes(
 
     report.run_id = Some(oracle.run_id.clone());
     report.counts.challenge_cases = catalog.cases.len();
+    report.counts.selected_cases = oracle.selected_case_ids.len();
     report.counts.oracle_records = oracle.records.len();
     report.counts.observer_receipts = receipts.records.len();
 
@@ -389,6 +413,48 @@ pub fn audit_bytes(
         }
     }
 
+    let selected_ids: BTreeSet<&str> =
+        oracle.selected_case_ids.iter().map(String::as_str).collect();
+    let catalog_scope_ids: BTreeSet<&str> =
+        catalog.cases.iter().map(|case| case.case_id.as_str()).collect();
+    report.scope_is_full_catalog = !catalog_scope_ids.is_empty()
+        && selected_ids.len() == oracle.selected_case_ids.len()
+        && selected_ids == catalog_scope_ids;
+    if selected_ids.is_empty() || selected_ids.len() != oracle.selected_case_ids.len() {
+        push_error(
+            &mut report,
+            None,
+            "E_ORACLE_SCOPE_INVALID",
+            "oracle.selected_case_ids",
+            "oracle scope must contain at least one unique case ID",
+        );
+    }
+    for selected_id in &selected_ids {
+        if !catalog_ids.contains(*selected_id) {
+            push_error(
+                &mut report,
+                Some(*selected_id),
+                "E_ORACLE_SCOPE_UNKNOWN",
+                "oracle.selected_case_ids",
+                "selected case ID is absent from the challenge catalog",
+            );
+        }
+    }
+
+    let receipt_scope: BTreeSet<&str> =
+        receipts.selected_case_ids.iter().map(String::as_str).collect();
+    if receipt_scope.len() != receipts.selected_case_ids.len()
+        || receipt_scope != selected_ids
+    {
+        push_error(
+            &mut report,
+            None,
+            "E_RECEIPT_SCOPE_MISMATCH",
+            "observer_receipts.selected_case_ids",
+            "observer receipt scope must contain exactly the same unique case IDs as the oracle scope",
+        );
+    }
+
     let mut oracle_by_id = BTreeMap::<&str, &OracleRecord>::new();
     for record in &oracle.records {
         if oracle_by_id.insert(&record.case_id, record).is_some() {
@@ -397,7 +463,7 @@ pub fn audit_bytes(
                 Some(&record.case_id),
                 "E_ORACLE_CASE_DUPLICATE",
                 "oracle.records",
-                "oracle must contain exactly one record per challenge case",
+                "oracle must contain exactly one record per selected challenge case",
             );
         }
         if !catalog_ids.contains(record.case_id.as_str()) {
@@ -407,6 +473,14 @@ pub fn audit_bytes(
                 "E_ORACLE_CASE_UNKNOWN",
                 "oracle.records",
                 "oracle contains a case ID that is absent from the catalog",
+            );
+        } else if !selected_ids.contains(record.case_id.as_str()) {
+            push_error(
+                &mut report,
+                Some(&record.case_id),
+                "E_ORACLE_CASE_OUT_OF_SCOPE",
+                "oracle.records",
+                "oracle record is not named in selected_case_ids",
             );
         }
     }
@@ -419,7 +493,7 @@ pub fn audit_bytes(
                 Some(&record.case_id),
                 "E_RECEIPT_CASE_DUPLICATE",
                 "observer_receipts.records",
-                "observer receipts must contain exactly one record per challenge case",
+                "observer receipts must contain exactly one record per selected challenge case",
             );
         }
         if !catalog_ids.contains(record.case_id.as_str()) {
@@ -430,13 +504,26 @@ pub fn audit_bytes(
                 "observer_receipts.records",
                 "observer receipts contain a case ID that is absent from the catalog",
             );
+        } else if !selected_ids.contains(record.case_id.as_str()) {
+            push_error(
+                &mut report,
+                Some(&record.case_id),
+                "E_RECEIPT_CASE_OUT_OF_SCOPE",
+                "observer_receipts.records",
+                "observer receipt is not named in selected_case_ids",
+            );
         }
     }
 
-    let mut complete = oracle_by_id.len() == catalog.cases.len()
-        && receipts_by_id.len() == catalog.cases.len();
+    let mut complete = !selected_ids.is_empty()
+        && oracle_by_id.len() == selected_ids.len()
+        && receipts_by_id.len() == selected_ids.len();
 
-    for case in &catalog.cases {
+    for case in catalog
+        .cases
+        .iter()
+        .filter(|case| selected_ids.contains(case.case_id.as_str()))
+    {
         let before_errors = report.errors.len();
         let oracle_record = oracle_by_id.get(case.case_id.as_str()).copied();
         let receipt_record = receipts_by_id.get(case.case_id.as_str()).copied();
@@ -503,6 +590,7 @@ pub fn audit_bytes(
             oracle_ground_truth: oracle_record.map(|record| record.ground_truth.clone()),
             observer_disposition: receipt_record.map(|record| record.disposition.clone()),
             reuse_decision: receipt_record.map(|record| record.reuse_decision.clone()),
+            semantic_effect: oracle_record.and_then(|record| record.semantic_effect.clone()),
             passed,
             error_codes,
         });
@@ -510,6 +598,7 @@ pub fn audit_bytes(
 
     validate_pairs(
         &catalog.cases,
+        &selected_ids,
         &oracle_by_id,
         &receipts_by_id,
         &mut report,
@@ -536,9 +625,9 @@ pub fn audit_bytes(
     }
 
     report.adjudication_complete = complete
-        && report.counts.adjudicated_cases == catalog.cases.len();
+        && report.counts.adjudicated_cases == selected_ids.len();
     report.adjudication_passed = report.adjudication_complete
-        && report.counts.passed_cases == catalog.cases.len()
+        && report.counts.passed_cases == selected_ids.len()
         && report.errors.is_empty();
 
     // These are policy constants, not values inferred from a green run.
@@ -629,6 +718,7 @@ fn validate_envelopes(
     }
     if !valid_digest(&oracle.catalog_digest)
         || !valid_digest(&oracle.harness.binary_digest)
+        || !valid_digest(&oracle.harness.worker_binary_digest)
         || !valid_digest(&oracle.harness.fixture_digest)
         || !valid_digest(&receipts.catalog_digest)
         || !valid_digest(&receipts.observer_binary_digest)
@@ -651,6 +741,17 @@ fn validate_envelopes(
             "oracle.harness",
             "run ID and harness identity must be non-empty bounded identifiers",
         );
+    }
+    for record in &oracle.records {
+        if record.execution_witness.worker_binary_digest != oracle.harness.worker_binary_digest {
+            push_error(
+                report,
+                Some(&record.case_id),
+                "E_WORKER_BINARY_MISMATCH",
+                "oracle.records.execution_witness.worker_binary_digest",
+                "child worker binary digest must match the pinned harness executable digest",
+            );
+        }
     }
     if oracle.profile_id != catalog.profile_id
         || receipts.observer_profile_id != catalog.profile_id
@@ -744,6 +845,7 @@ fn adjudicate_case(
             "independent fixture replay must confirm the injected ground-truth condition",
         );
     }
+    validate_execution_witness(case, oracle, report);
 
     let needs_mutation = matches!(
         case.expected_disposition.as_str(),
@@ -1094,8 +1196,95 @@ fn adjudicate_case(
     }
 }
 
+fn validate_execution_witness(
+    case: &ChallengeCase,
+    oracle: &OracleRecord,
+    report: &mut ResultAuditReport,
+) {
+    let case_id = case.case_id.as_str();
+    let witness = &oracle.execution_witness;
+    let path = format!("cases[{case_id}].oracle.execution_witness");
+
+    if !valid_digest(&witness.worker_binary_digest)
+        || !valid_digest(&witness.baseline_output_digest)
+        || !valid_digest(&witness.mutated_output_digest)
+    {
+        push_error(
+            report,
+            Some(case_id),
+            "E_EXECUTION_WITNESS_DIGEST",
+            &path,
+            "worker binary and both task-output digests must be valid SHA-256 values",
+        );
+    }
+
+    if let Some(effect) = oracle.semantic_effect.as_deref() {
+        if !matches!(effect, "demonstrated" | "not_demonstrated_in_tested_domain") {
+            push_error(
+                report,
+                Some(case_id),
+                "E_SEMANTIC_EFFECT_INVALID",
+                &format!("cases[{case_id}].oracle.semantic_effect"),
+                "semantic_effect must be demonstrated or not_demonstrated_in_tested_domain",
+            );
+        }
+    }
+
+    match case.expected_disposition.as_str() {
+        "capture_dependency" => {
+            if oracle.semantic_effect.as_deref() == Some("not_demonstrated_in_tested_domain") {
+                report.metrics.semantic_access_without_output_effect_in_tested_domain += 1;
+                if witness.baseline_bytes_read == 0
+                    || witness.mutated_bytes_read == 0
+                    || witness.baseline_output_digest != witness.mutated_output_digest
+                {
+                    push_error(
+                        report,
+                        Some(case_id),
+                        "E_SEMANTIC_NON_INFLUENCE_WITNESS",
+                        &path,
+                        "read-but-discard requires observed reads in both runs and identical declared task-output digests",
+                    );
+                }
+            } else {
+                if oracle.semantic_effect.as_deref() == Some("demonstrated") {
+                    report.metrics.semantic_influence_demonstrated += 1;
+                }
+                if witness.baseline_bytes_read == 0
+                    || witness.mutated_bytes_read == 0
+                    || witness.baseline_output_digest == witness.mutated_output_digest
+                {
+                    push_error(
+                        report,
+                        Some(case_id),
+                        "E_COUNTERFACTUAL_INFLUENCE_NOT_ESTABLISHED",
+                        &path,
+                        "consumed-input influence control requires bytes read in both runs and a changed task-output digest",
+                    );
+                }
+            }
+        }
+        "preserve_unrelated" => {
+            if witness.baseline_bytes_read != 0
+                || witness.mutated_bytes_read != 0
+                || witness.baseline_output_digest != witness.mutated_output_digest
+            {
+                push_error(
+                    report,
+                    Some(case_id),
+                    "E_COUNTERFACTUAL_NON_INFLUENCE_NOT_ESTABLISHED",
+                    &path,
+                    "unconsumed-input control requires zero bytes read and identical task-output digests",
+                );
+            }
+        }
+        _ => {}
+    }
+}
+
 fn validate_pairs(
     cases: &[ChallengeCase],
+    selected_ids: &BTreeSet<&str>,
     oracle_by_id: &BTreeMap<&str, &OracleRecord>,
     receipts_by_id: &BTreeMap<&str, &ObserverReceipt>,
     report: &mut ResultAuditReport,
@@ -1105,8 +1294,18 @@ fn validate_pairs(
         .map(|case| (case.case_id.as_str(), case))
         .collect::<BTreeMap<_, _>>();
 
-    for case in cases {
+    for case in cases.iter().filter(|case| selected_ids.contains(case.case_id.as_str())) {
         for paired_id in &case.paired_case_ids {
+            if !selected_ids.contains(paired_id.as_str()) {
+                push_error(
+                    report,
+                    Some(&case.case_id),
+                    "E_PAIR_SCOPE_INCOMPLETE",
+                    "oracle.selected_case_ids",
+                    "a selected challenge case requires its reciprocal pair in the same adjudication scope",
+                );
+                continue;
+            }
             // Reciprocal links are adjudicated once in stable lexical order.
             if case.case_id.as_str() > paired_id.as_str() {
                 continue;
@@ -1163,13 +1362,20 @@ fn validate_pairs(
             ];
             let is_recall_selectivity_pair = dispositions.contains(&"capture_dependency")
                 && dispositions.contains(&"preserve_unrelated");
-            if !is_recall_selectivity_pair {
+            let semantic_effects = [
+                left_oracle.semantic_effect.as_deref(),
+                right_oracle.semantic_effect.as_deref(),
+            ];
+            let is_semantic_influence_pair = dispositions.iter().all(|d| *d == "capture_dependency")
+                && semantic_effects.contains(&Some("demonstrated"))
+                && semantic_effects.contains(&Some("not_demonstrated_in_tested_domain"));
+            if !is_recall_selectivity_pair && !is_semantic_influence_pair {
                 push_error(
                     report,
                     Some(&case.case_id),
                     "E_PAIR_DISPOSITION_MISMATCH",
                     "catalog.cases.paired_case_ids",
-                    "paired controls must include one capture_dependency and one preserve_unrelated case",
+                    "paired controls must be either capture_dependency + preserve_unrelated or a demonstrated + read-but-discard capture_dependency pair",
                 );
             }
 
@@ -1177,36 +1383,28 @@ fn validate_pairs(
                 receipts_by_id.get(case.case_id.as_str()).copied(),
                 receipts_by_id.get(paired_id.as_str()).copied(),
             ) {
-                let capture_case = if case.expected_disposition == "capture_dependency" {
-                    Some((case, left))
-                } else if paired_case.expected_disposition == "capture_dependency" {
-                    Some((paired_case, right))
-                } else {
-                    None
-                };
-                let preserve_case = if case.expected_disposition == "preserve_unrelated" {
-                    Some((case, left))
-                } else if paired_case.expected_disposition == "preserve_unrelated" {
-                    Some((paired_case, right))
-                } else {
-                    None
-                };
-                if let (Some((capture, capture_receipt)), Some((preserve, preserve_receipt))) =
-                    (capture_case, preserve_case)
-                {
-                    let resource = capture.ground_truth_resource_id.value.as_deref();
-                    let capture_has_resource = resource.is_some_and(|id| {
-                        capture_receipt
-                            .observed_resources
-                            .iter()
-                            .any(|observed| observed.resource_id == id)
-                    });
-                    let preserve_has_resource = resource.is_some_and(|id| {
-                        preserve_receipt
-                            .observed_resources
-                            .iter()
-                            .any(|observed| observed.resource_id == id)
-                    });
+                let resource = case.ground_truth_resource_id.value.as_deref();
+                let left_has_resource = resource.is_some_and(|id| {
+                    left.observed_resources.iter().any(|observed| observed.resource_id == id)
+                });
+                let right_has_resource = resource.is_some_and(|id| {
+                    right.observed_resources.iter().any(|observed| observed.resource_id == id)
+                });
+
+                if is_semantic_influence_pair {
+                    if !left_has_resource || !right_has_resource {
+                        push_error(
+                            report,
+                            Some(&case.case_id),
+                            "E_SEMANTIC_PAIR_ACCESS_MISSED",
+                            "observer_receipts.records",
+                            "both read-but-discard and read-and-influence executions must retain the accessed resource; semantic non-influence never erases access",
+                        );
+                    }
+                } else if is_recall_selectivity_pair {
+                    let capture_is_left = case.expected_disposition == "capture_dependency";
+                    let capture_has_resource = if capture_is_left { left_has_resource } else { right_has_resource };
+                    let preserve_has_resource = if capture_is_left { right_has_resource } else { left_has_resource };
                     if !capture_has_resource || preserve_has_resource {
                         push_error(
                             report,
@@ -1369,9 +1567,14 @@ mod tests {
             "run_id": "test-run-001",
             "catalog_digest": catalog_digest,
             "profile_id": "linux-hermetic-candidate-v1",
+            "selected_case_ids": [
+                "hidden-input-read", "unused-neighbor",
+                "unresolved-env-channel", "event-loss"
+            ],
             "harness": {
                 "harness_id": "basalt-fixture-harness-v1",
                 "binary_digest": format!("sha256:{}", "c".repeat(64)),
+                "worker_binary_digest": format!("sha256:{}", "f".repeat(64)),
                 "fixture_digest": format!("sha256:{}", "d".repeat(64))
             },
             "records": [
@@ -1385,7 +1588,14 @@ mod tests {
                         "after_digest": after
                     },
                     "witness_kind": "controlled_read",
-                    "independent_replay": "confirmed"
+                    "independent_replay": "confirmed",
+                    "execution_witness": {
+                        "worker_binary_digest": format!("sha256:{}", "f".repeat(64)),
+                        "baseline_output_digest": before,
+                        "mutated_output_digest": after,
+                        "baseline_bytes_read": 8,
+                        "mutated_bytes_read": 9
+                    }
                 },
                 {
                     "case_id": "unused-neighbor",
@@ -1397,7 +1607,14 @@ mod tests {
                         "after_digest": after
                     },
                     "witness_kind": "controlled_non_read",
-                    "independent_replay": "confirmed"
+                    "independent_replay": "confirmed",
+                    "execution_witness": {
+                        "worker_binary_digest": format!("sha256:{}", "c".repeat(64)),
+                        "baseline_output_digest": format!("sha256:{}", "d".repeat(64)),
+                        "mutated_output_digest": format!("sha256:{}", "d".repeat(64)),
+                        "baseline_bytes_read": 0,
+                        "mutated_bytes_read": 0
+                    }
                 },
                 {
                     "case_id": "unresolved-env-channel",
@@ -1409,7 +1626,14 @@ mod tests {
                         "after_digest": null
                     },
                     "witness_kind": "unsupported_channel",
-                    "independent_replay": "confirmed"
+                    "independent_replay": "confirmed",
+                    "execution_witness": {
+                        "worker_binary_digest": format!("sha256:{}", "c".repeat(64)),
+                        "baseline_output_digest": format!("sha256:{}", "d".repeat(64)),
+                        "mutated_output_digest": format!("sha256:{}", "d".repeat(64)),
+                        "baseline_bytes_read": 0,
+                        "mutated_bytes_read": 0
+                    }
                 },
                 {
                     "case_id": "event-loss",
@@ -1421,7 +1645,14 @@ mod tests {
                         "after_digest": null
                     },
                     "witness_kind": "integrity_fault",
-                    "independent_replay": "confirmed"
+                    "independent_replay": "confirmed",
+                    "execution_witness": {
+                        "worker_binary_digest": format!("sha256:{}", "c".repeat(64)),
+                        "baseline_output_digest": format!("sha256:{}", "d".repeat(64)),
+                        "mutated_output_digest": format!("sha256:{}", "d".repeat(64)),
+                        "baseline_bytes_read": 0,
+                        "mutated_bytes_read": 0
+                    }
                 }
             ]
         });
@@ -1434,6 +1665,10 @@ mod tests {
             "catalog_digest": catalog_digest,
             "observer_profile_id": "linux-hermetic-candidate-v1",
             "observer_binary_digest": format!("sha256:{}", "e".repeat(64)),
+            "selected_case_ids": [
+                "hidden-input-read", "unused-neighbor",
+                "unresolved-env-channel", "event-loss"
+            ],
             "records": [
                 {
                     "case_id": "hidden-input-read",
@@ -1506,6 +1741,78 @@ mod tests {
         (catalog_bytes, oracle_bytes, receipts_bytes)
     }
 
+    fn semantic_pair_inputs() -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut catalog_value: Value =
+            serde_json::from_slice(&catalog).expect("catalog fixture parses");
+        catalog_value["cases"][1]["expected_disposition"] = json!("capture_dependency");
+        catalog_value["cases"][1]["required_receipt_facts"] =
+            json!(["resource_identity", "content_digest", "read_event"]);
+        let catalog = serde_json::to_vec(&catalog_value).expect("semantic catalog serializes");
+
+        let mut oracle_value: Value =
+            serde_json::from_slice(&oracle).expect("oracle fixture parses");
+        oracle_value["records"][0]["semantic_effect"] = json!("demonstrated");
+        oracle_value["records"][1]["ground_truth"] = json!("consumed");
+        oracle_value["records"][1]["witness_kind"] = json!("controlled_read");
+        oracle_value["records"][1]["execution_witness"]["worker_binary_digest"] =
+            json!(format!("sha256:{}", "f".repeat(64)));
+        oracle_value["records"][1]["semantic_effect"] =
+            json!("not_demonstrated_in_tested_domain");
+        let constant_output = json!(format!("sha256:{}", "d".repeat(64)));
+        oracle_value["records"][1]["execution_witness"]["baseline_output_digest"] =
+            constant_output.clone();
+        oracle_value["records"][1]["execution_witness"]["mutated_output_digest"] =
+            constant_output;
+        oracle_value["records"][1]["execution_witness"]["baseline_bytes_read"] = json!(8);
+        oracle_value["records"][1]["execution_witness"]["mutated_bytes_read"] = json!(9);
+        let oracle = serde_json::to_vec(&oracle_value).expect("semantic oracle serializes");
+
+        let mut receipt_value: Value =
+            serde_json::from_slice(&receipts).expect("receipt fixture parses");
+        receipt_value["records"][1]["disposition"] = json!("captured");
+        receipt_value["records"][1]["observed_resources"] = json!([{
+            "resource_id": "fixture:paired-secret.txt",
+            "digest": format!("sha256:{}", "b".repeat(64))
+        }]);
+        receipt_value["records"][1]["facts"] =
+            json!(["resource_identity", "content_digest", "read_event"]);
+        receipt_value["records"][1]["reuse_decision"] = json!("reverified");
+        let receipts = serde_json::to_vec(&receipt_value).expect("semantic receipts serialize");
+        (catalog, oracle, receipts)
+    }
+
+    #[test]
+    fn accepts_read_but_discarded_access_without_reclassifying_it_as_unconsumed() {
+        let (catalog, oracle, receipts) = semantic_pair_inputs();
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(report.adjudication_complete, "{:?}", report.errors);
+        assert!(report.adjudication_passed, "{:?}", report.errors);
+        assert_eq!(report.metrics.semantic_access_without_output_effect_in_tested_domain, 1);
+        assert_eq!(report.metrics.semantic_influence_demonstrated, 1);
+        assert!(report.cases.iter().any(|case| {
+            case.case_id == "unused-neighbor"
+                && case.semantic_effect.as_deref() == Some("not_demonstrated_in_tested_domain")
+        }));
+        assert!(!report.qualification_eligible);
+    }
+
+    #[test]
+    fn rejects_semantic_non_influence_when_observer_drops_the_accessed_resource() {
+        let (catalog, oracle, receipts) = semantic_pair_inputs();
+        let mut receipt_value: Value =
+            serde_json::from_slice(&receipts).expect("semantic receipts parse");
+        receipt_value["records"][1]["observed_resources"] = json!([]);
+        let receipts = serde_json::to_vec(&receipt_value).expect("mutated semantic receipts serialize");
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(!report.adjudication_passed);
+        assert!(report.metrics.hidden_dependency_misses >= 1);
+        assert!(report.errors.iter().any(|error| {
+            error.code == "E_SEMANTIC_PAIR_ACCESS_MISSED"
+                || error.code == "E_HIDDEN_DEPENDENCY_MISSED"
+        }));
+    }
+
     #[test]
     fn accepts_paired_recall_and_selectivity_control_without_qualifying_profile() {
         let (catalog, oracle, receipts) = fixture_inputs();
@@ -1517,6 +1824,7 @@ mod tests {
         assert_eq!(report.metrics.false_invalidations, 0);
         assert_eq!(report.metrics.unrelated_evidence_not_retained, 0);
         assert!(!report.qualification_eligible);
+        assert!(report.scope_is_full_catalog);
         assert!(!report.oracle_authenticity_established);
         assert!(!report.oracle_replay_executed_by_adjudicator);
         assert!(!report.observer_receipt_authenticity_established);
@@ -1643,6 +1951,99 @@ mod tests {
         assert!(!report.adjudication_passed);
         assert_eq!(report.metrics.false_invalidations, 1);
         assert_eq!(report.metrics.unrelated_evidence_not_retained, 1);
+    }
+
+    #[test]
+    fn rejects_consumed_control_without_counterfactual_output_change() {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut oracle_value: Value =
+            serde_json::from_slice(&oracle).expect("oracle fixture parses");
+        oracle_value["records"][0]["execution_witness"]["mutated_output_digest"] =
+            oracle_value["records"][0]["execution_witness"]["baseline_output_digest"].clone();
+        let oracle = serde_json::to_vec(&oracle_value).expect("mutated oracle serializes");
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(!report.adjudication_passed);
+        assert!(report.errors.iter().any(|error| {
+            error.code == "E_COUNTERFACTUAL_INFLUENCE_NOT_ESTABLISHED"
+        }));
+    }
+
+    #[test]
+    fn rejects_preserve_control_that_reads_or_changes_the_output() {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut oracle_value: Value =
+            serde_json::from_slice(&oracle).expect("oracle fixture parses");
+        oracle_value["records"][1]["execution_witness"]["mutated_bytes_read"] = json!(1);
+        let oracle = serde_json::to_vec(&oracle_value).expect("mutated oracle serializes");
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(!report.adjudication_passed);
+        assert!(report.errors.iter().any(|error| {
+            error.code == "E_COUNTERFACTUAL_NON_INFLUENCE_NOT_ESTABLISHED"
+        }));
+    }
+
+    #[test]
+    fn rejects_execution_witness_from_a_different_worker_binary() {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut oracle_value: Value =
+            serde_json::from_slice(&oracle).expect("oracle fixture parses");
+        oracle_value["records"][0]["execution_witness"]["worker_binary_digest"] =
+            json!(format!("sha256:{}", "a".repeat(64)));
+        let oracle = serde_json::to_vec(&oracle_value).expect("mutated oracle serializes");
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(!report.adjudication_passed);
+        assert!(report.errors.iter().any(|error| {
+            error.code == "E_WORKER_BINARY_MISMATCH"
+        }));
+    }
+
+    #[test]
+    fn accepts_complete_paired_subset_without_claiming_full_profile_qualification() {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut oracle_value: Value =
+            serde_json::from_slice(&oracle).expect("oracle fixture parses");
+        oracle_value["selected_case_ids"] =
+            json!(["hidden-input-read", "unused-neighbor"]);
+        oracle_value["records"].as_array_mut().expect("oracle records").truncate(2);
+        let oracle = serde_json::to_vec(&oracle_value).expect("scoped oracle serializes");
+
+        let mut receipt_value: Value =
+            serde_json::from_slice(&receipts).expect("receipt fixture parses");
+        receipt_value["selected_case_ids"] =
+            json!(["hidden-input-read", "unused-neighbor"]);
+        receipt_value["records"].as_array_mut().expect("receipt records").truncate(2);
+        let receipts = serde_json::to_vec(&receipt_value).expect("scoped receipts serialize");
+
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(report.adjudication_complete, "{:?}", report.errors);
+        assert!(report.adjudication_passed, "{:?}", report.errors);
+        assert_eq!(report.counts.challenge_cases, 4);
+        assert_eq!(report.counts.selected_cases, 2);
+        assert_eq!(report.counts.passed_cases, 2);
+        assert!(!report.scope_is_full_catalog);
+        assert!(!report.qualification_eligible);
+    }
+
+    #[test]
+    fn rejects_scoped_run_with_only_one_member_of_a_reciprocal_pair() {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut oracle_value: Value =
+            serde_json::from_slice(&oracle).expect("oracle fixture parses");
+        oracle_value["selected_case_ids"] = json!(["hidden-input-read"]);
+        oracle_value["records"].as_array_mut().expect("oracle records").truncate(1);
+        let oracle = serde_json::to_vec(&oracle_value).expect("scoped oracle serializes");
+
+        let mut receipt_value: Value =
+            serde_json::from_slice(&receipts).expect("receipt fixture parses");
+        receipt_value["selected_case_ids"] = json!(["hidden-input-read"]);
+        receipt_value["records"].as_array_mut().expect("receipt records").truncate(1);
+        let receipts = serde_json::to_vec(&receipt_value).expect("scoped receipts serialize");
+
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(!report.adjudication_passed);
+        assert!(report.errors.iter().any(|error| {
+            error.code == "E_PAIR_SCOPE_INCOMPLETE"
+        }));
     }
 
     #[test]

@@ -3,6 +3,10 @@ name = "xtask"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "basalt_observer_fixture_worker"
+path = "src/bin/basalt_observer_fixture_worker.rs"
+
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

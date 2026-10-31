@@ -11,6 +11,7 @@
     "catalog_digest",
     "observer_profile_id",
     "observer_binary_digest",
+    "selected_case_ids",
     "records"
   ],
   "properties": {
@@ -154,6 +155,16 @@
             }
           }
         }
+      }
+    },
+    "selected_case_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]{1,95}$"
       }
     }
   }

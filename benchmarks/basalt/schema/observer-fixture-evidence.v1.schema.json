@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT counterfactual fixture evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "suite_id",
+    "run_id",
+    "catalog_digest",
+    "selected_case_ids",
+    "harness_binary_digest",
+    "worker_binary_digest",
+    "worker_binary_name",
+    "workspace_relative_path",
+    "gitignore_content_digest",
+    "git_baseline_commit",
+    "executions",
+    "qualification_eligible"
+  ],
+  "properties": {
+    "format_version": {
+      "const": 1
+    },
+    "suite_id": {
+      "const": "basalt-observer-fixture-evidence-v1"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^basalt-[0-9]+-[0-9]+$"
+    },
+    "catalog_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "selected_case_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]{1,95}$"
+      }
+    },
+    "harness_binary_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "worker_binary_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "workspace_relative_path": {
+      "const": "workspace"
+    },
+    "gitignore_content_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "executions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "resource_id",
+          "relative_path",
+          "task_mode",
+          "git_tracking_state",
+          "git_baseline_commit",
+          "before_input_digest",
+          "after_input_digest",
+          "baseline_output_digest",
+          "mutated_output_digest",
+          "baseline_bytes_read",
+          "mutated_bytes_read",
+          "baseline_process_id",
+          "mutated_process_id",
+          "counterfactual_check"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{1,95}$"
+          },
+          "resource_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "relative_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "task_mode": {
+            "enum": [
+              "consume",
+              "ignore",
+              "read_discard"
+            ]
+          },
+          "before_input_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "after_input_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "baseline_output_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "mutated_output_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "baseline_bytes_read": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "mutated_bytes_read": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "baseline_process_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "mutated_process_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "counterfactual_check": {
+            "const": "confirmed"
+          },
+          "git_tracking_state": {
+            "enum": [
+              "ignored_untracked",
+              "tracked"
+            ]
+          },
+          "git_baseline_commit": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40,64}$"
+          }
+        }
+      }
+    },
+    "qualification_eligible": {
+      "const": false
+    },
+    "worker_binary_name": {
+      "const": "basalt_observer_fixture_worker"
+    },
+    "git_baseline_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40,64}$"
+    }
+  }
+}

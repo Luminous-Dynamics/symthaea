@@ -1,6 +1,6 @@
 # BASALT: independent observer-result adjudication
 
-**Status:** implementation proposal plus runner-independent Rust adjudicator; not an observer qualification result.
+**Status:** Rust result adjudicator plus scoped counterfactual fixture/oracle runner; not an observer qualification result.
 
 ## Decision
 
@@ -12,7 +12,7 @@ The next boundary after the challenge catalog is a three-artifact protocol:
 
 The result adjudicator joins these exact artifacts and checks their byte digests, run/profile identity, scenario coverage, resource attribution, required facts, explicit unresolved channels, integrity signals and evidence-reuse decision. It does not let the observer author the expected result.
 
-**Important trust boundary:** the current adjudicator verifies consistency against the supplied oracle ledger. It does not prove that the oracle was independently produced, that the claimed replay actually ran, or that the harness binary is trustworthy. SHA-256 binds bytes; it does not authenticate an author. Both `oracle_authenticity_established` and `qualification_eligible` are hard-coded false. A passing report means only that one observer receipt set conforms to the supplied oracle assertions. It is not a confirmatory result and cannot qualify the Linux profile.
+**Important trust boundary:** the current adjudicator verifies consistency against the supplied oracle ledger. It does not prove that the oracle was independently produced, that the claimed replay actually ran, or that the harness binary is trustworthy. SHA-256 binds bytes; it does not authenticate an author. `oracle_authenticity_established`, `oracle_replay_executed_by_adjudicator`, `observer_receipt_authenticity_established`, and `qualification_eligible` are all hard-coded false. A passing report means only that one observer receipt set conforms to the supplied oracle assertions. It is not a confirmatory result and cannot qualify the Linux profile.
 
 ## Added implementation
 
@@ -21,10 +21,10 @@ The result adjudicator joins these exact artifacts and checks their byte digests
 - `benchmarks/basalt/schema/observer-receipts.v1.schema.json`: strict Draft 2020-12 observer-receipt schema.
 - `benchmarks/basalt/observer-evidence-retention-benchmark.v1.json` plus its schema: machine-readable comparison arms, metric definitions, safety/selectivity/efficiency gates and sample-size protocol.
 - `xtask/src/main.rs`: `basalt-observer-result-audit` command.
-- Twelve Rust tests cover a paired recall/selectivity success case, stale reuse, event-loss misreporting, false attribution of an unrelated resource, and cross-run receipt mismatch.
+- Seventeen Rust tests cover paired recall/selectivity, stale reuse, event loss, unrelated-resource attribution, unsupported channels, false invalidation, counterfactual output/read witnesses, worker-binary mismatch, scoped-pair completeness, cross-run/cross-catalog mismatch and incomplete receipts.
 - The adjudicator first runs the existing challenge-catalog structural auditor. Catalog validity and execution-result validity remain distinct checks.
 
-The result protocol deliberately rejects malformed, over-sized, duplicate, missing, unknown, cross-run, cross-profile, and cross-catalog records. Oracle mutation digests must be present (including explicit nulls when no mutation applies); applied mutations require distinct before/after SHA-256 values. The current 34-case catalog is the fixture definition, not evidence that any observer has executed it. The adjudicator also reports `unrelated_evidence_not_retained` separately from explicit `false_invalidations`, so unresolved or otherwise non-reused positive controls cannot disappear from the retention accounting.
+The result protocol deliberately rejects malformed, over-sized, duplicate, missing, unknown, cross-run, cross-profile, and cross-catalog records. Oracle mutation digests must be present (including explicit nulls when no mutation applies); applied mutations require distinct before/after SHA-256 values. The current 36-case catalog is the fixture definition, not evidence that any observer has executed it. The adjudicator also reports `unrelated_evidence_not_retained` separately from explicit `false_invalidations`, so unresolved or otherwise non-reused positive controls cannot disappear from the retention accounting.
 
 ## Command
 
@@ -37,7 +37,90 @@ cargo run -p xtask -- basalt-observer-result-audit \
   --receipts path/to/observer-receipts.v1.json
 ```
 
-The command prints a machine-readable report. It exits non-zero unless every catalog case has exactly one oracle record and one observer receipt and all per-case, pair, digest and envelope checks pass. The report includes the exact input digests and scenario-level error codes. It does not sign output or make the supplied oracle authentic.
+The command prints a machine-readable report. It exits non-zero unless every **selected** case has exactly one oracle record and one observer receipt and all per-case, pair, digest and envelope checks pass. The report separately identifies `scope_is_full_catalog`; `adjudication_complete` means only that the declared scope is complete. The report includes the exact input digests and scenario-level error codes. It does not sign output or make the supplied oracle authentic.
+
+
+## Executable counterfactual fixture runner
+
+The follow-on harness command currently implements six filesystem cases as three reciprocal pairs:
+
+- `hidden-untracked-read` ↔ `unused-neighbor-change` on `fixture:unlisted-secret.txt`.
+- `irrelevant-docs-change` ↔ `docs-consumed-positive-control` on `fixture:docs/unused.md`.
+- `read-but-discard` ↔ `read-and-influence` on `fixture:docs/unused.md`.
+
+The third pair is a semantic-effect experiment: both tasks access the same resource, but one discards the value and the other emits an output derived from it. Both must remain captured dependencies.
+
+Run it with:
+
+```sh
+cargo build -p xtask --bins
+cargo run -p xtask --bin xtask -- basalt-observer-fixture-run \
+  --catalog benchmarks/basalt/coverage/observer-challenges.v1.json \
+  --out-dir reports/basalt-fixtures \
+  --case-id hidden-untracked-read
+```
+
+The harness automatically closes the requested selection over reciprocal pairs. It creates an exclusive run directory (an existing run directory is never reused), initializes a separate Git repository, commits `.gitignore` and the docs baseline when selected, and verifies tracking state with `git check-ignore` and `git ls-files`. It creates a unique run directory containing:
+
+- `oracle-ledger.v1.json`: selected case IDs, exact catalog digest, harness/worker binary digest, before/after resource digests, expected ground truth, and child-task counterfactual output/read witnesses.
+- `fixture-evidence.v1.json`: child process IDs, output digests, bytes-read values, workspace-relative paths, Git tracking-state assertions, baseline commit and fixture evidence digest inputs.
+- `workspace/`: an isolated Git repository. The `unlisted-secret.txt` fixture is verified as ignored and absent from the index; `docs/unused.md` is committed and verified as tracked at baseline.
+
+The parent harness runs the separate child worker twice per case, once against baseline bytes and once after mutation. The worker is a controlled synthetic task, not an existing Cargo test/build command, and this fixture runner does not yet attach the observer under test or produce observer receipts. For `consume`, it reads the resource and emits a digest of the bytes; the parent independently computes the expected digest and requires the output digest to change. For `read_discard`, it reads the resource but emits the same constant task-output digest for both mutations; the worker reports the positive byte count. For `ignore`, the worker's code path does not open or stat the path, emits a constant output digest, and reports zero bytes read; the parent independently checks that result.
+
+The oracle now records optional `semantic_effect` values (`demonstrated` or `not_demonstrated_in_tested_domain`) independently of ground-truth access. The adjudicator accepts a read-but-discard witness only when both executions report positive reads and the declared output digests are identical. This does **not** change the required observer disposition: the accessed resource must still appear in the receipt, the dependency change still requires re-verification or invalidation, and the resource cannot be omitted on the basis of one unchanged output. The task worker is a separately compiled `xtask/src/bin/basalt_observer_fixture_worker.rs` executable. Its digest is pinned separately from the parent harness digest; both child PIDs and the worker digest are recorded. Build both package binaries with `cargo build -p xtask --bins` before running the harness.
+
+**Trust boundary:** the task worker is a separate executable with a deliberately narrow interface; it cannot write oracle records or observer receipts. The parent harness independently checks its declared read/output witnesses and requires every record's worker digest to match the separately pinned worker digest. This is stronger process and binary separation from the observer, but it is not a cryptographically independent oracle root: both binaries are built from the same repository/toolchain, the harness controls the fixture and task mode, and the worker's byte-count report is still a claim made by that worker. The ledger is not signed, and the result adjudicator does not independently execute the replay. The report therefore keeps oracle authenticity, replay execution by the adjudicator, receipt authenticity and profile qualification false.
+
+The fixture command intentionally rejects every catalog case it does not implement. It does not create fake records for environment, procfs, toolchain, cache, network, observer overflow or other unimplemented channels. The run scope in the oracle and observer receipt ledgers must match exactly. A selected paired case requires its reciprocal partner in the same run; a full-corpus qualification still requires a later run covering all 36 cases and all required independent challenge strata.
+
+The fixture evidence schema is `benchmarks/basalt/schema/observer-fixture-evidence.v1.schema.json`. Its execution records identify the separate worker binary, relative resource path, process IDs, Git tracking classification, baseline Git commit and before/after output witnesses. Three fixture-orchestrator tests now cover supported-resource rejection, semantic-mode mapping, and the ignored-untracked/tracked Git-state setup. The standalone worker has three tests, including read-but-discard behavior; the result adjudicator has two additional semantic-influence tests. Total authored Rust tests in this stack: 25; none are claimed as executed. The oracle and receipt schemas now require `selected_case_ids`; oracle records also carry the worker binary digest, before/after task-output digests and byte counts. The result adjudicator checks that the selected scope is non-empty, unique, known to the catalog, identical across both ledgers, and complete for every selected pair. Its `adjudication_complete` field means complete **for that declared run scope**; `scope_is_full_catalog` independently reports whether every catalog case was selected. Neither field implies that the observer profile is qualified.
+
+## Next paradigm shift: access is not semantic influence
+
+The first fixture runner currently distinguishes a task that reads a resource from a task that never opens it. That is a necessary baseline, but it is not the full evidence-retention problem.
+
+A task can read bytes and deliberately discard them. A filesystem observer should still report the access. Yet an access event alone does not prove that a change to those bytes affected the task's observable output. Conversely, one unchanged output under one mutation is not proof that the resource is irrelevant under every input, branch, runtime state or future execution.
+
+BASALT should eventually separate three claims:
+
+| Claim | Evidence | What it does *not* establish |
+|---|---|---|
+| Access observed | File/metadata/mapping event with stable resource identity | That the resource affected the task result |
+| Influence demonstrated in this execution | Controlled perturbation changes a deterministic output or declared effect witness | That all possible values/paths have been explored |
+| Non-influence bounded to a declared domain | Multiple controlled perturbations, same task/environment, complete output/effect comparison, and a stated equivalence domain | Universal irrelevance outside that domain |
+
+### A read-but-discard challenge
+
+Add a separate semantic-impact fixture in which the task reads and hashes the resource into an internal value, deliberately discards that value, and emits a deterministic output independent of the resource. The observer's access receipt must include the resource; the counterfactual lane should show that the task output is unchanged for the tested mutation. This case must **not** be classified as `not_consumed`. It is `accessed_no_output_effect_in_tested_domain`.
+
+Then add a matched influence-positive fixture where the same resource is used in the emitted output. The same mutation should alter the output witness. Both tasks must run from identical snapshots and the test matrix must record all output and side-effect channels included in the equivalence claim.
+
+### Semantic influence: access and effect are separate axes
+
+BASALT now includes a matched read-but-discard pair. The worker reads the exact same resource before and after mutation in both cases. The discard worker emits a constant output; the positive-control worker emits a digest of the resource bytes. The independent oracle records the access ground truth as consumed in both cases, while the optional semantic-effect field distinguishes `not_demonstrated_in_tested_domain` from `demonstrated`.
+
+The result adjudicator accepts the pair only if both observer receipts retain the same resource. This deliberately prevents a semantic non-influence observation from being misused as evidence of non-access or as permission to omit a dependency. The semantic-effect value is bounded to the declared output digest for this synthetic worker; it does not cover filesystem side effects, stdout/stderr, exit status, timing, network effects, shared memory, or other unmodeled outputs.
+
+### Safe interpretation
+
+Do not let a single unchanged output erase a dependency. The report should retain separate sets:
+
+- `accessed_resources`: resources observed by the OS/build adapter.
+- `influence_demonstrated_resources`: resources whose controlled perturbation changed a declared output/effect witness.
+- `non_influence_tested_resources`: resources that were accessed but produced no observable difference within a preregistered mutation and execution domain.
+- `unresolved_influence_resources`: resources for which the task is nondeterministic, effects are not fully observable, or the tested domain is insufficient.
+
+Only the last two are allowed to constrain a bounded reuse claim, and only under a separately qualified influence profile. Outside that profile, the current conservative rule remains: a changed accessed resource is a dependency or makes evidence unresolved.
+
+### Research techniques to compare
+
+1. **Dynamic taint / information-flow tracking** can trace whether input-derived values reach declared outputs or side effects, but requires explicit coverage of system calls, native code, GPU/device activity, shared memory and language/runtime boundaries.
+2. **Differential replay** can perturb one input at a time and compare output/effect manifests, but only supports claims about tested executions and mutations.
+3. **Program slicing / dependency graphs** can explain data and control paths, but static approximations may over- or under-approximate dynamic behavior.
+4. **Metamorphic and property-based perturbation** can broaden the tested input domain, while preserving a clear distinction between sampled robustness and universal guarantees.
+
+This yields a second, non-compensatory benchmark axis: first measure access-observation soundness; only then measure influence-classification precision and safe retention. The machine-readable benchmark now includes `semantic_access_retention` as a mandatory safety gate: 100% of read-but-discard scenarios must retain exactly one resource attribution and block reuse after the mutation, even though the declared output digest is unchanged. A system must never improve its retention score by silently failing to observe a read. No production evidence should be reused solely because one counterfactual output happened to remain unchanged.
 
 ## Do not collapse freshness, coverage and integrity into one status
 
@@ -101,11 +184,13 @@ Use the same tasks, input snapshots, mutation injections, toolchain and executio
 
 Bazel documents why undeclared inputs can poison incremental and shared remote-cache results, and uses known action inputs as the sandbox execution root; its sandboxing documentation also describes limits on what the sandbox hides from the host. Nix sandboxing restricts builds to declared store dependencies and private namespaces, with documented exceptions for network-enabled fixed-output derivations. These are strong baselines for prevention/hermeticity, not a proof that a particular observation receipt is complete. See:
 
-- https://bazel.build/versions/7.5.0/docs/sandboxing
-- https://nix.dev/manual/nix/2.25/command-ref/conf-file
-- https://slsa.dev/spec/v1.2-rc2/build-provenance
+- https://bazel.build/docs/sandboxing
+- https://nix.dev/manual/nix/stable/command-ref/conf-file
+- https://slsa.dev/spec/v1.2/build-provenance
 - https://in-toto.io/docs/getting-started/
 - https://reproducible-builds.org/docs/definition/
+
+The comparison is deliberately layered rather than a blanket claim that BASALT is “better than Bazel/Nix/SLSA.” Bazel supplies action sandboxes and declared input models; Nix supplies dependency-closure and build sandbox controls; SLSA/in-toto supply provenance, identity and workflow integrity; reproducible-builds checks whether independent builds produce bit-identical outputs. None of those alone proves that a particular runtime observer captured every input to a given task. BASALT's proposed differentiator is an adversarially challenged, independently adjudicated runtime dependency-coverage claim, with explicit unresolved channels and evidence-retention correctness. It should integrate with these systems and only claim superiority when all arms are compared on the same tasks, snapshots, toolchains, resource limits and held-out lineages.
 
 SLSA provenance and in-toto supply-chain layouts provide valuable build and workflow provenance, authorized-step and integrity checks. BASALT should compose with these formats where useful, not reimplement their signature or supply-chain semantics. A provenance statement still depends on its builder/platform trust boundary; the SLSA specification explicitly distinguishes external inputs from parameters trusted because of the build platform. The BASALT oracle therefore needs its own independently reviewed trust root and replay semantics.
 
@@ -116,12 +201,13 @@ SLSA provenance and in-toto supply-chain layouts provide valuable build and work
 | Hidden dependency recall | 100% of seeded consumed inputs inside the declared profile, or explicit unresolved/invalidated |
 | Stale-evidence false acceptance | Zero in qualification and held-out challenge sets |
 | Integrity-loss response | 100% fail-closed or explicit unresolved for injected observer-loss cases |
+| Semantic access retention | 100% of read-but-discard mutations retain the accessed resource and block reuse despite unchanged output |
 | Unrelated evidence retention | Preserve every independently proven unaffected case in the paired conformance set |
 | False invalidation | At most 5% on independently proven unrelated controls, with scenario-level intervals |
 | Re-verification cost | At least 30% less work than global rerun, only after all safety gates pass |
 | Shifted engineering outcomes | +3 percentage points paired success over a strong matched baseline, or non-inferior success at materially lower cost |
 
-A 34-case conformance set is not a statistical qualification sample. For a one-sided 95% upper bound near 0.1% after zero misses, the simple binomial rule-of-three requires about 2,995 independent scenario units. Cluster related mutations by task/repository lineage, report channel-stratified intervals, keep an untouched holdout, and do not count syscalls/events as independent trials.
+A 36-case conformance set is not a statistical qualification sample. For a one-sided 95% upper bound near 0.1% after zero misses, the simple binomial rule-of-three requires about 2,995 independent scenario units. Cluster related mutations by task/repository lineage, report channel-stratified intervals, keep an untouched holdout, and do not count syscalls/events as independent trials.
 
 ## Critical next work: make the oracle independently executable
 
@@ -139,8 +225,8 @@ The ground-truth writer must be outside the observer's trust domain. To resist c
 
 ## Linux architecture implications
 
-The existing qualification note already identifies why fanotify alone cannot establish completeness. BPF-LSM is a promising complementary event lane for open, file permission, mmap and descriptor-receive paths, but hook availability, kernel/BTF identity, LSM ordering, attach success, privileges, verifier acceptance and ring-buffer loss must be pinned and challenged. Landlock should reduce accessible state; it should not be represented as a trace. The result adjudicator is intentionally independent of all those Linux choices.
+The existing qualification note already identifies why fanotify alone cannot establish completeness. BPF-LSM is a promising complementary event lane for selected open, file-permission, mmap and descriptor-receive paths, but hook availability, kernel/BTF identity, LSM ordering, attach success, privileges, verifier acceptance and ring-buffer loss must be pinned and challenged. Landlock should reduce accessible state; it should not be represented as a trace. A Landlock rule set is not proof that every access was observed. The result adjudicator is intentionally independent of all those Linux choices.
 
 ## Execution status and limitations
 
-This branch authors the adjudicator, schemas, CLI integration, tests and corpus correction. The environment used for this work has no `cargo`, `rustc` or `rustfmt`; Rust compilation, formatting, test execution, fixture execution and observer qualification have **not** been run here. The report's strict-false policy remains in force even for a passing unit test or future green CI run. The next step is to compile and execute this narrow module on an exact, reproducible checkout, then implement the fixture runner and independently verifiable oracle journal.
+This branch authors the scoped result adjudicator, separate worker executable, fixture runner, schemas, CLI integration, benchmark protocol, research documentation and corpus correction. Twenty-four Rust unit tests are authored across the adjudicator, fixture orchestration and worker binary (19 adjudicator, 2 fixture-orchestrator, 3 worker tests). The environment used for this work has no `cargo`, `rustc` or `rustfmt`; Rust compilation, formatting, unit-test execution, fixture execution and observer qualification have **not** been run here. The current worker's byte-count field is still a worker claim, and the task is a synthetic controlled fixture rather than a real repository build/test. The next step is to build and execute these artifacts on an exact checkout, then add independent kernel/process observation of the worker and an adapter for real build/test tasks. Oracle signing, a separately trusted replay verifier and observer receipts remain future work. The report's strict-false policy remains in force even for a passing unit test or future green CI run.

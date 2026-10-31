@@ -568,6 +568,42 @@
       ],
       "description": "The same changed documentation resource is deliberately consumed in this paired positive control.",
       "safety_property": "The observer must capture the resource when consumed, while the paired case preserves evidence when it is not consumed."
+    },
+    {
+      "case_id": "read-but-discard",
+      "family": "filesystem",
+      "channel": "filesystem",
+      "mutation_kind": "read_content",
+      "ground_truth_resource_id": "fixture:docs/unused.md",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "resource_identity",
+        "content_digest",
+        "read_event"
+      ],
+      "paired_case_ids": [
+        "read-and-influence"
+      ],
+      "description": "Read the mutated resource in both executions, then deliberately discard its data-derived value so the declared task output remains identical.",
+      "safety_property": "An accessed resource remains a captured dependency even when the tested output witness shows no semantic influence."
+    },
+    {
+      "case_id": "read-and-influence",
+      "family": "filesystem",
+      "channel": "filesystem",
+      "mutation_kind": "read_content",
+      "ground_truth_resource_id": "fixture:docs/unused.md",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "resource_identity",
+        "content_digest",
+        "read_event"
+      ],
+      "paired_case_ids": [
+        "read-but-discard"
+      ],
+      "description": "Read the same mutated resource and fold its bytes into the declared task output as the matched influence-positive control.",
+      "safety_property": "The positive control must change the task output while the read-but-discard control does not; both accesses remain dependencies."
     }
   ]
 }

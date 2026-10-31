@@ -111,8 +111,8 @@
     },
     "metrics": {
       "type": "array",
-      "minItems": 8,
-      "maxItems": 8,
+      "minItems": 9,
+      "maxItems": 9,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -135,7 +135,8 @@
               "false_invalidation_rate",
               "unrelated_evidence_retention",
               "normalized_reverification_work",
-              "paired_shifted_task_success_delta"
+              "paired_shifted_task_success_delta",
+              "semantic_access_retention"
             ]
           },
           "phase": {
@@ -207,14 +208,15 @@
       "properties": {
         "safety": {
           "type": "array",
-          "minItems": 4,
+          "minItems": 5,
           "uniqueItems": true,
           "items": {
             "enum": [
               "hidden_dependency_recall",
               "stale_evidence_false_acceptances",
               "unsupported_channel_disclosure",
-              "integrity_loss_fail_closed"
+              "integrity_loss_fail_closed",
+              "semantic_access_retention"
             ]
           }
         },
@@ -312,7 +314,7 @@
       "properties": {
         "required_strata": {
           "type": "array",
-          "minItems": 5,
+          "minItems": 6,
           "uniqueItems": true,
           "items": {
             "type": "string"
@@ -328,7 +330,7 @@
         },
         "required_disclosures": {
           "type": "array",
-          "minItems": 4,
+          "minItems": 5,
           "uniqueItems": true,
           "items": {
             "type": "string"
@@ -620,6 +622,25 @@
             "properties": {
               "metric_id": {
                 "const": "paired_shifted_task_success_delta"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "semantic_access_retention"
               }
             },
             "required": [

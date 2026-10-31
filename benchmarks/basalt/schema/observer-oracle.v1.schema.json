@@ -11,6 +11,7 @@
     "catalog_digest",
     "profile_id",
     "harness",
+    "selected_case_ids",
     "records"
   ],
   "properties": {
@@ -40,6 +41,7 @@
       "required": [
         "harness_id",
         "binary_digest",
+        "worker_binary_digest",
         "fixture_digest"
       ],
       "properties": {
@@ -53,6 +55,10 @@
           "pattern": "^sha256:[a-f0-9]{64}$"
         },
         "fixture_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "worker_binary_digest": {
           "type": "string",
           "pattern": "^sha256:[a-f0-9]{64}$"
         }
@@ -71,7 +77,8 @@
           "injected_resource_id",
           "mutation",
           "witness_kind",
-          "independent_replay"
+          "independent_replay",
+          "execution_witness"
         ],
         "properties": {
           "case_id": {
@@ -135,8 +142,59 @@
               "contradicted",
               "not_run"
             ]
+          },
+          "execution_witness": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "worker_binary_digest",
+              "baseline_output_digest",
+              "mutated_output_digest",
+              "baseline_bytes_read",
+              "mutated_bytes_read"
+            ],
+            "properties": {
+              "worker_binary_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "baseline_output_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "mutated_output_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "baseline_bytes_read": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "mutated_bytes_read": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "semantic_effect": {
+            "type": "string",
+            "enum": [
+              "demonstrated",
+              "not_demonstrated_in_tested_domain"
+            ],
+            "description": "Optional semantic-output effect classification. It never changes the ground-truth access classification or permission to omit an accessed resource."
           }
         }
+      }
+    },
+    "selected_case_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]{1,95}$"
       }
     }
   }
