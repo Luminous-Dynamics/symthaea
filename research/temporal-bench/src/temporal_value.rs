@@ -229,6 +229,16 @@ fn score_candidate(
         .map(|remaining| remaining.min(candidate.expected_retention_us))
         .unwrap_or(candidate.expected_retention_us);
 
+    // Return before score arithmetic when a hard validity boundary has
+    // expired; otherwise the capped retention horizon would be zero.
+    if !hard_valid || effective_horizon == 0 {
+        return Ok(RankedCandidate {
+            item_id: candidate.item_id,
+            rank_score: 0,
+            eligible: false,
+        });
+    }
+
     let (rank_score, eligible) = match policy {
         RetentionPolicy::TemporalValuePerByteSecond => {
             let mut weighted_value = u128::from(candidate.predicted_ted_reduction_us);
