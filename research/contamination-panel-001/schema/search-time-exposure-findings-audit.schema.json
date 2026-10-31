@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/search-time-exposure-findings-audit-v1.json",
+  "title": "Search-time exposure findings binding audit v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "valid",
+    "findings_digest_matches",
+    "all_findings_reference_allowed_events",
+    "unique_event_sequences",
+    "metadata_only_count",
+    "context_bearing_count",
+    "answer_bearing_count",
+    "unknown_count",
+    "matched_item_reference_count",
+    "findings_sha256",
+    "claim_boundary",
+    "issues"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.search_time_exposure_findings_audit.v1"
+    },
+    "valid": {
+      "type": "boolean"
+    },
+    "findings_digest_matches": {
+      "type": "boolean"
+    },
+    "all_findings_reference_allowed_events": {
+      "type": "boolean"
+    },
+    "unique_event_sequences": {
+      "type": "boolean"
+    },
+    "metadata_only_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "context_bearing_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "answer_bearing_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unknown_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "matched_item_reference_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "findings_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
