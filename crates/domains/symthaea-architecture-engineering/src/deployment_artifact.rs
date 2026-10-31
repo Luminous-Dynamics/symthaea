@@ -184,6 +184,12 @@ pub fn validate_deployment_pipeline_against(
             "pipeline target/profile does not match the supplied hardware profile",
         ));
     }
+    if manifest.benchmark_id != registry.benchmark_id {
+        return Err(DeploymentArtifactError::new(
+            "benchmark_id",
+            "pipeline benchmark ID does not match the objective registry benchmark ID",
+        ));
+    }
     if manifest.objective_registry_sha256 != registry.registry_sha256
         || compute_objective_registry_sha256(registry)
             .map_err(|error| DeploymentArtifactError::new("objective_registry", error.to_string()))?
@@ -864,6 +870,12 @@ mod tests {
         wrong_registry.benchmark_id = "other-benchmark".into();
         wrong_registry.registry_sha256 = compute_objective_registry_sha256(&wrong_registry).unwrap();
         assert!(validate_deployment_pipeline_against(&manifest, &profile, &wrong_registry).is_err());
+
+        let (mut manifest, profile, registry, _) = fixture();
+        manifest.benchmark_id = "different-benchmark".into();
+        manifest.pipeline_sha256 = compute_deployment_pipeline_sha256(&manifest).unwrap();
+        let error = validate_deployment_pipeline_against(&manifest, &profile, &registry).unwrap_err();
+        assert!(error.to_string().contains("benchmark ID does not match"));
     }
 
     #[test]
@@ -950,6 +962,13 @@ mod tests {
             1,
         );
         assert!(serde_json::from_str::<DeploymentMeasurementReceipt>(&injected).is_err());
+
+        let injected_nested = encoded.replacen(
+            "\"observation\":{\"candidate_id\"",
+            "\"observation\":{\"unrecognized_nested\":true,\"candidate_id\"",
+            1,
+        );
+        assert!(serde_json::from_str::<DeploymentMeasurementReceipt>(&injected_nested).is_err());
     }
 
     #[test]
