@@ -6,7 +6,7 @@
 //! selected left/right cue assignments. The public event stream contains only
 //! spikes; cue assignments and target are kept in the oracle record.
 
-use super::{mix64, SplitMix64};
+use super::{digest::CanonicalHasher, mix64, SplitMix64};
 use std::fmt;
 
 const MAX_EVIDENCE_STEPS: usize = 500_000;
@@ -69,6 +69,32 @@ pub struct EvidenceTask {
     pub recall_steps: u32,
     pub cue_count: usize,
     pub input_channels: usize,
+    /// SHA-256 over the versioned canonical public evidence stream.
+    pub content_sha256: [u8; 32],
+}
+
+/// Domain-separated canonical SHA-256 of the evidence-accumulation public stream.
+pub fn evidence_content_digest(task: &EvidenceTask) -> [u8; 32] {
+    let mut hash = CanonicalHasher::new(b"symthaea.temporal.evidence-accumulation.public.v1");
+    hash.u64(task.stream_id);
+    hash.u32(task.dt_ms);
+    hash.u32(task.recall_start_step);
+    hash.u32(task.recall_end_step);
+    hash.u32(task.interval_steps);
+    hash.u32(task.cue_steps);
+    hash.u32(task.delay_steps);
+    hash.u32(task.recall_steps);
+    hash.usize(task.cue_count);
+    hash.usize(task.input_channels);
+    hash.usize(task.observations.len());
+    for observation in &task.observations {
+        hash.u32(observation.step);
+        hash.usize(observation.active_channels.len());
+        for channel in &observation.active_channels {
+            hash.u16(*channel);
+        }
+    }
+    hash.finish()
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -220,20 +246,24 @@ pub fn generate_evidence_task(
         });
     }
 
+    let mut public_task = EvidenceTask {
+        stream_id,
+        dt_ms: config.dt_ms,
+        observations,
+        recall_start_step: recall_start,
+        recall_end_step: recall_end,
+        interval_steps,
+        cue_steps,
+        delay_steps,
+        recall_steps,
+        cue_count: config.cue_count,
+        input_channels: INPUT_CHANNELS,
+        content_sha256: [0; 32],
+    };
+    public_task.content_sha256 = evidence_content_digest(&public_task);
+
     Ok((
-        EvidenceTask {
-            stream_id,
-            dt_ms: config.dt_ms,
-            observations,
-            recall_start_step: recall_start,
-            recall_end_step: recall_end,
-            interval_steps,
-            cue_steps,
-            delay_steps,
-            recall_steps,
-            cue_count: config.cue_count,
-            input_channels: INPUT_CHANNELS,
-        },
+        public_task,
         EvidenceOracle {
             stream_id,
             hidden_ground_truth,
@@ -247,6 +277,7 @@ pub fn generate_evidence_task(
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EvidenceVerificationError {
     StreamIdMismatch,
+    ContentDigestMismatch,
     InvalidTaskWindow,
     InvalidOracle,
     InvalidObservation { expected_step: u32 },
@@ -260,6 +291,7 @@ impl fmt::Display for EvidenceVerificationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::StreamIdMismatch => write!(f, "evidence task and oracle stream IDs differ"),
+            Self::ContentDigestMismatch => write!(f, "evidence public task SHA-256 digest does not match its contents"),
             Self::InvalidTaskWindow => write!(f, "evidence task timing or input dimensions are invalid"),
             Self::InvalidOracle => write!(f, "evidence oracle assignments or majority label are invalid"),
             Self::InvalidObservation { expected_step } => {
@@ -290,6 +322,9 @@ pub fn verify_evidence_trace(
 ) -> Result<(), EvidenceVerificationError> {
     if task.stream_id != oracle.stream_id {
         return Err(EvidenceVerificationError::StreamIdMismatch);
+    }
+    if task.content_sha256 != evidence_content_digest(task) {
+        return Err(EvidenceVerificationError::ContentDigestMismatch);
     }
     let expected_sequence_end = u64::try_from(task.cue_count)
         .unwrap_or(u64::MAX)
@@ -512,6 +547,24 @@ mod tests {
         let config = EvidenceConfig::braintrace_reference(321);
         let (task, oracle) = generate_evidence_task(config).unwrap();
         assert_eq!(verify_evidence_trace(&task, &oracle), Ok(()));
+    }
+
+    #[test]
+    fn generated_public_stream_has_valid_sha256() {
+        let config = EvidenceConfig::braintrace_reference(321);
+        let (task, _) = generate_evidence_task(config).unwrap();
+        assert_eq!(task.content_sha256, evidence_content_digest(&task));
+    }
+
+    #[test]
+    fn verifier_rejects_post_generation_stream_mutation() {
+        let config = EvidenceConfig::braintrace_reference(321);
+        let (mut task, oracle) = generate_evidence_task(config).unwrap();
+        task.observations[0].step = 1;
+        assert_eq!(
+            verify_evidence_trace(&task, &oracle),
+            Err(EvidenceVerificationError::ContentDigestMismatch)
+        );
     }
 
     #[test]
