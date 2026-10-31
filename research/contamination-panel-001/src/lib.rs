@@ -1309,3 +1309,5 @@ pub mod training_receipt;
 pub mod causal_analysis;
 
 pub mod fresh_instance;
+
+pub mod fresh_scoring;

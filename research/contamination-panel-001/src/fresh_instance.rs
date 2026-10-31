@@ -37,6 +37,8 @@ pub struct FreshChallengeConfigV1 {
     pub solution_component_min: i32,
     pub solution_component_max: i32,
     pub minimum_absolute_determinant: i64,
+    /// Minimum |det(A)| / (||row_1|| * ||row_2||), in permille.
+    pub minimum_normalized_determinant_margin_permille: u16,
     pub model_checkpoint_sha256: String,
     pub checkpoint_freeze_receipt_sha256: String,
     pub checkpoint_frozen_at_utc: String,
@@ -100,6 +102,7 @@ pub struct SealedFreshOracleEntryV1 {
     pub item_id: String,
     pub parameters: LinearSystemParametersV1,
     pub solution: ExactLinearSolutionV1,
+    pub normalized_determinant_margin_permille: u16,
     pub parameter_sha256: String,
     pub answer_sha256: String,
 }
@@ -161,6 +164,8 @@ pub struct FreshChallengeAuditV1 {
     pub checkpoint_freeze_precedes_generation: bool,
     pub public_packet_contains_no_seed_or_oracle_answers: bool,
     pub all_matrices_are_nonsingular: bool,
+    pub all_matrices_meet_stability_margin: bool,
+    pub minimum_observed_stability_margin_permille: u16,
     pub all_answers_recompute_exactly: bool,
     pub item_count: u64,
     pub batch_id: String,
@@ -186,7 +191,7 @@ fn validate_digest(value: &str, label: &str) -> Result<(), String> {
     }
 }
 
-fn parse_timestamp(value: &str, label: &str) -> Result<(), String> {
+pub(crate) fn parse_timestamp(value: &str, label: &str) -> Result<(), String> {
     let bytes = value.as_bytes();
     if bytes.len() != 20
         || bytes[4] != b'-'
@@ -224,7 +229,7 @@ fn parse_timestamp(value: &str, label: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn canonical_config_digest(config: &FreshChallengeConfigV1) -> Result<String, String> {
+pub(crate) fn canonical_config_digest(config: &FreshChallengeConfigV1) -> Result<String, String> {
     let mut normalized = config.clone();
     normalized.generator_config_sha256.clear();
     let bytes = serde_json::to_vec(&normalized)
@@ -271,8 +276,16 @@ fn validate_config(config: &FreshChallengeConfigV1, seed: &[u8]) -> Result<(), S
     if config.matrix_coefficient_min >= config.matrix_coefficient_max
         || config.solution_component_min >= config.solution_component_max
         || config.minimum_absolute_determinant < 1
+        || !(1..=1_000).contains(&config.minimum_normalized_determinant_margin_permille)
     {
-        return Err("invalid matrix/solution bounds or minimum determinant".to_owned());
+        return Err("invalid matrix/solution bounds, determinant or normalized stability margin".to_owned());
+    }
+    if config.matrix_coefficient_min < -1_000
+        || config.matrix_coefficient_max > 1_000
+        || config.solution_component_min < -1_000
+        || config.solution_component_max > 1_000
+    {
+        return Err("initial exact-arithmetic generator bounds absolute coefficients and solutions to <=1000".to_owned());
     }
     if i64::from(config.matrix_coefficient_max)
         - i64::from(config.matrix_coefficient_min) > 1_000
@@ -334,6 +347,37 @@ fn determinant(parameters: &LinearSystemParametersV1) -> i64 {
         - i64::from(parameters.a12) * i64::from(parameters.a21)
 }
 
+/// Exact floor of the row-normalized determinant magnitude in permille.
+/// Computes the integer threshold with u128 arithmetic, avoiding floating
+/// point differences at generation cutoffs.
+pub(crate) fn normalized_determinant_margin_permille(
+    parameters: &LinearSystemParametersV1,
+) -> u16 {
+    let row_one_sq = (i128::from(parameters.a11).pow(2)
+        + i128::from(parameters.a12).pow(2)) as u128;
+    let row_two_sq = (i128::from(parameters.a21).pow(2)
+        + i128::from(parameters.a22).pow(2)) as u128;
+    if row_one_sq == 0 || row_two_sq == 0 {
+        return 0;
+    }
+    let det_abs = u128::from(determinant(parameters).unsigned_abs());
+    let numerator = det_abs * 1_000;
+    let lhs = numerator * numerator;
+    let denominator = row_one_sq * row_two_sq;
+    let mut low = 0_u32;
+    let mut high = 1_000_u32;
+    while low < high {
+        let mid = low + (high - low + 1) / 2;
+        let rhs = u128::from(mid) * u128::from(mid) * denominator;
+        if lhs >= rhs {
+            low = mid;
+        } else {
+            high = mid - 1;
+        }
+    }
+    low as u16
+}
+
 fn compute_rhs(
     parameters: &LinearSystemParametersV1,
     solution: &ExactLinearSolutionV1,
@@ -357,7 +401,7 @@ fn compute_rhs(
     Ok((b1, b2))
 }
 
-fn task_text(parameters: &LinearSystemParametersV1) -> String {
+pub(crate) fn task_text(parameters: &LinearSystemParametersV1) -> String {
     format!(
         "Find the integer values of x and y that satisfy both equations:\n{}x + {}y = {}\n{}x + {}y = {}\nReturn exactly one JSON object with integer fields x and y.",
         parameters.a11,
@@ -440,6 +484,10 @@ pub fn generate_fresh_challenge_bundle(
             if determinant(&parameters).abs() < config.minimum_absolute_determinant {
                 continue;
             }
+            let stability_margin = normalized_determinant_margin_permille(&parameters);
+            if stability_margin < config.minimum_normalized_determinant_margin_permille {
+                continue;
+            }
             let (b1, b2) = compute_rhs(&parameters, &solution)?;
             parameters.b1 = b1;
             parameters.b2 = b2;
@@ -468,10 +516,12 @@ pub fn generate_fresh_challenge_bundle(
             task_text: text,
             task_text_sha256: task_digest,
         });
+        let observed_margin = normalized_determinant_margin_permille(&parameters);
         entries.push(SealedFreshOracleEntryV1 {
             item_id,
             parameters,
             solution,
+            normalized_determinant_margin_permille: observed_margin,
             parameter_sha256,
             answer_sha256,
         });
@@ -577,10 +627,17 @@ pub fn audit_fresh_challenge_bundle(
         return Err("fresh challenge bundle content digest mismatch".to_owned());
     }
     let mut all_nonsingular = true;
+    let mut all_stability_margins_satisfied = true;
+    let mut minimum_observed_margin = u16::MAX;
     let mut all_answers_exact = true;
     for entry in &bundle.sealed_oracle_packet.entries {
         let determinant = determinant(&entry.parameters);
+        let observed_margin = normalized_determinant_margin_permille(&entry.parameters);
+        minimum_observed_margin = minimum_observed_margin.min(observed_margin);
         all_nonsingular &= determinant.abs() >= config.minimum_absolute_determinant;
+        all_stability_margins_satisfied &=
+            observed_margin >= config.minimum_normalized_determinant_margin_permille
+                && entry.normalized_determinant_margin_permille == observed_margin;
         let (b1, b2) = compute_rhs(&entry.parameters, &entry.solution)?;
         all_answers_exact &= b1 == entry.parameters.b1 && b2 == entry.parameters.b2;
         let parameter_bytes = serde_json::to_vec(&entry.parameters)
@@ -634,7 +691,9 @@ pub fn audit_fresh_challenge_bundle(
             && !public_serialized.contains("solution")
             && !public_serialized.contains("parameters")
             && !public_serialized.contains("answer_sha256");
-    if !all_nonsingular || !all_answers_exact || !public_contains_no_seed_or_answers {
+    if !all_nonsingular || !all_stability_margins_satisfied
+        || !all_answers_exact || !public_contains_no_seed_or_answers
+    {
         return Err("fresh challenge public/oracle separation or exact answer validation failed".to_owned());
     }
     Ok(FreshChallengeAuditV1 {
@@ -644,6 +703,8 @@ pub fn audit_fresh_challenge_bundle(
         checkpoint_freeze_precedes_generation: true,
         public_packet_contains_no_seed_or_oracle_answers: true,
         all_matrices_are_nonsingular: all_nonsingular,
+        all_matrices_meet_stability_margin: all_stability_margins_satisfied,
+        minimum_observed_stability_margin_permille: minimum_observed_margin,
         all_answers_recompute_exactly: all_answers_exact,
         item_count: bundle.manifest.item_count,
         batch_id: bundle.manifest.batch_id.clone(),
@@ -680,6 +741,7 @@ mod tests {
             solution_component_min: -9,
             solution_component_max: 9,
             minimum_absolute_determinant: 1,
+            minimum_normalized_determinant_margin_permille: 50,
             model_checkpoint_sha256: digest("checkpoint"),
             checkpoint_freeze_receipt_sha256: digest("freeze-receipt"),
             checkpoint_frozen_at_utc: "2026-10-31T18:00:00Z".to_owned(),
@@ -749,6 +811,11 @@ mod tests {
 
         let first_oracle = &bundle.sealed_oracle_packet.entries[0];
         let oracle_entry_schema = &oracle_schema["properties"]["entries"]["items"]["properties"];
+        let actual_entry: BTreeSet<String> = serde_json::to_value(first_oracle)
+            .unwrap().as_object().unwrap().keys().cloned().collect();
+        let expected_entry: BTreeSet<String> = oracle_entry_schema.as_object()
+            .unwrap().keys().cloned().collect();
+        assert_eq!(actual_entry, expected_entry);
         let actual_parameters: BTreeSet<String> = serde_json::to_value(&first_oracle.parameters)
             .unwrap().as_object().unwrap().keys().cloned().collect();
         let expected_parameters: BTreeSet<String> = oracle_entry_schema["parameters"]["properties"]
@@ -817,6 +884,28 @@ mod tests {
         assert!(!serialized.contains("solution"));
         assert!(!serialized.contains("a11"));
         assert!(!serialized.contains("answer_sha256"));
+    }
+
+    #[test]
+    fn generated_matrices_meet_exact_row_normalized_determinant_margin() {
+        let config = config();
+        let bundle = generate_fresh_challenge_bundle(&config, &seed()).unwrap();
+        assert!(bundle.sealed_oracle_packet.entries.iter().all(|entry| {
+            let margin = normalized_determinant_margin_permille(&entry.parameters);
+            margin >= config.minimum_normalized_determinant_margin_permille
+                && margin == entry.normalized_determinant_margin_permille
+        }));
+        let audit = audit_fresh_challenge_bundle(&config, &seed(), &bundle).unwrap();
+        assert!(audit.all_matrices_meet_stability_margin);
+        assert!(audit.minimum_observed_stability_margin_permille >= 50);
+    }
+
+    #[test]
+    fn out_of_range_stability_margin_fails_closed() {
+        let mut config = config();
+        config.minimum_normalized_determinant_margin_permille = 1_001;
+        assert!(generate_fresh_challenge_bundle(&config, &seed())
+            .unwrap_err().contains("invalid matrix/solution bounds"));
     }
 
     #[test]
