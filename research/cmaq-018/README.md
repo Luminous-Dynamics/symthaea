@@ -1,6 +1,6 @@
 # CMAQ-018 — Matched-History Counterfactual Branch Fidelity
 
-**Status:** deterministic synthetic v0.1 harness authored; exact-head Rust qualification is pending.
+**Status:** deterministic synthetic v0.1 harness authored; exact-head Rust qualification is pending. The candidate predictor boundary is now expressed as the VIS-005 adapter trait and a content-addressed interface contract.
 
 ## Research question
 
@@ -66,6 +66,10 @@ The fixed candidate, generator, metric, observation, action, reward, wrapper and
 - `data-manifest.v0.1.json`
 
 The frozen-manifest example in `research/cmaq-common` binds the SHA-256 digest of each artifact, the exact benchmark source commit and the 64-episode seed schedule. There are 64 episode histories **per scenario/model condition** (448 scenario-history cases across seven scenarios, with the same seed panel paired across the five predictor arms); pairs within one history remain clustered.
+
+## VIS-005 candidate predictor boundary
+
+The candidate-facing API is defined by CandidateBranchPredictor and CandidateEffectPredictor in src/main.rs, with a machine-readable contract in PREDICTOR_INTERFACE.json and an integration mapping in VIS-005_ADAPTER.md. Inputs are observed history, canonical hypothetical action and a requested forecast-kind tag. Outputs explicitly echo Predicted or Counterfactual provenance, or abstain. The interface exposes no evaluator keys and no observation-memory mutation API. The CMAQ-018 branch bank always requests Counterfactual forecasts because it evaluates hypothetical alternatives from the same observed history.
 
 ## Model arms
 
