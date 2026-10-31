@@ -148,9 +148,9 @@ The weighted model supports host CPU, action wall-time, accelerator time, energy
 
 The `matched_campaign::qualify_mechanism_matched_campaign` entry point consumes all policy tapes and all corresponding offer-set manifests. It first reconciles the common experiment and executable budget model, then verifies each manifest against its tape and requires identical options/state digests at every policy decision boundary. It returns an explicit qualification decision with blockers instead of treating a common header hash as a matched comparison.
 
-The gate qualifies a campaign for *confirmatory mechanism comparison* only when: at least two distinct policies have a common experiment contract; all decision-boundary offer sets match; all sequential/batched execution schedules are complete; every required resource meter and normalized charge is known and internally recomputed; and all policies have equal realized normalized spend. Equal ceilings alone are insufficient. An unmetered synthetic campaign remains structurally useful but is blocked from resource-efficiency claims.
+The gate marks a campaign as *matched-execution-qualified* only when: at least two distinct policies have a common experiment contract; all decision-boundary offer sets match; all sequential/batched execution schedules are complete; every required resource meter and normalized charge is known and internally recomputed; and all policies have equal realized normalized spend. Equal ceilings alone are insufficient. An unmetered synthetic campaign remains structurally useful but is blocked from resource-efficiency claims.
 
-This is an execution-fairness gate, not a scientific-discovery verdict. It does not prove novelty, human usefulness, causal mechanism, external replication, or SOTA. Those require independently controlled evaluator/verifier processes, sealed test landscapes, registered hypotheses/endpoints, held-out transfer, and independent replay.
+This is an execution-fairness precondition, not a full confirmatory-science gate or discovery verdict. It does not prove evaluator independence, novelty, human usefulness, causal mechanism, external replication, or SOTA. Those require independently controlled evaluator/verifier processes, sealed test landscapes, registered hypotheses/endpoints, held-out transfer, and independent replay.
 
 ## Current claim ceiling
 
