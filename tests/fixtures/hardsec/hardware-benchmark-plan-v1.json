@@ -148,7 +148,7 @@
     "median_end_to_end_overhead_fraction_max": 0.01,
     "p95_end_to_end_overhead_fraction_max": 0.02,
     "invalid_sensor_silent_clears_max": 0,
-    "scope_note": "Research targets only; not standards, achieved results or release criteria until preregistered per campaign."
+    "scope_note": "Research targets only; not achieved results, not standards, and not release criteria until preregistered per campaign."
   },
   "statistical_support": {
     "endpoint_alpha": 0.05,
