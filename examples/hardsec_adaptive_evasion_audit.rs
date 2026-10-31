@@ -319,9 +319,6 @@ fn next_bootstrap_u64(state: &mut u64) -> u64 {
     value.wrapping_mul(0x2545_F491_4F6C_DD1D)
 }
 
-/// Deterministic equal-group percentile bootstrap. The seed deliberately
-/// depends only on campaign ID, grouping axis and algorithm version, so
-/// matched model arms with the same ordered group IDs use common resamples.
 /// Finite-sample two-sided Hoeffding interval for a mean of independent
 /// bounded group-level observations. This is conservative but has a
 /// distribution-free coverage guarantee conditional on group independence.
@@ -369,6 +366,10 @@ fn hoeffding_mean_interval(
     })
 }
 
+/// Deterministic equal-group percentile range. The seed deliberately depends
+/// only on campaign ID, grouping axis and algorithm version, so matched model
+/// arms with the same ordered group IDs use common resamples. This is a
+/// descriptive range, not a finite-sample confidence guarantee.
 fn group_bootstrap_interval(
     groups: &BTreeMap<String, RecallCounts>,
     campaign_id: &str,
