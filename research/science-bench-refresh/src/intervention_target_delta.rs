@@ -1207,8 +1207,10 @@ mod tests {
         assert_eq!(result.fields.final_valid_count, 2);
         assert_eq!(result.fields.accepted_valid_count, 2);
         assert_eq!(result.fields.exact_changed_scope_match_count, 2);
-        assert_eq!(result.fields.reviewer_pairwise_comparison_count, 6);
-        assert_eq!(result.fields.reviewer_target_transition_comparison_count, 6);
+        assert_eq!(result.fields.reviewer_pairwise_comparison_count, 21);
+        assert_eq!(result.fields.reviewer_pairwise_agreement_ppm, Some(857_142));
+        assert_eq!(result.fields.reviewer_target_transition_comparison_count, 21);
+        assert_eq!(result.fields.reviewer_target_transition_agreement_ppm, Some(1_000_000));
         assert!(!result.fields.scoring_eligible_declared);
         assert!(!result.fields.semantic_truth_proven);
     }
