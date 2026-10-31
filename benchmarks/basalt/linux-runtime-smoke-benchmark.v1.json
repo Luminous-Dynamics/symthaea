@@ -155,7 +155,7 @@
       "container_or_host",
       "mount_namespace",
       "effective_capabilities",
-      "seccomp_profile",
+      "seccomp_mode",
       "Landlock_boot_state",
       "fanotify_privilege_context"
     ],
@@ -179,7 +179,8 @@
     "unattempted_bpf_tracepoint_and_cgroup_checks",
     "no_marks_or_events",
     "no_workload",
-    "no_qualification"
+    "no_qualification",
+    "seccomp_mode_not_filter_identity"
   ],
   "forbidden_claims": [
     "fanotify_group_init_proves_event_delivery",
