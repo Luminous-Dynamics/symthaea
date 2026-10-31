@@ -6,7 +6,7 @@
   "evaluation_group_id": "heldout-execution-cctm-01",
   "scoring_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
   "anomaly_score_direction": "higher_is_more_anomalous",
-  "alpha_budget": 0.05,
+  "alpha_budget": 0.04,
   "delta_budget": 0.01,
   "reference_update_policy": "immutable_no_test_time_updates",
   "context_assignment_policy": "external_workload_metadata_not_score_derived",
