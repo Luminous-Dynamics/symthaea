@@ -1168,6 +1168,7 @@ mod tests {
                 assert!(plan.countersubject);
                 assert!(plan.inversion);
                 assert!(plan.augmentation);
+                assert!(!plan.diminution, "the current fughetta does not claim diminution");
                 assert!(plan.stretto);
                 assert!(plan.controlled_dissonance);
                 assert!(plan.final_combination);
