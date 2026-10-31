@@ -984,6 +984,19 @@ mod tests {
     }
 
     #[test]
+    fn source_inventory_requires_one_disposition_for_unsupported_sources() {
+        let (inventory, admissions) = inventory_and_admissions();
+        let mut extraction = batch(&inventory);
+        extraction.rows[0].status = EventExtractionStatus::UnsupportedSource;
+        let speakers = speaker_attributions(&inventory, &admissions);
+        let result = enumerate_events_closed_world(
+            &inventory, &extraction, &admissions, &speakers, &query()
+        ).unwrap();
+        assert!(!result.receipt.extraction_complete);
+        assert!(!result.receipt.answer_is_permitted);
+    }
+
+    #[test]
     fn extractor_cannot_forge_user_speaker_for_assistant_source() {
         let (inventory, admissions) = inventory_and_admissions();
         let mut extraction = batch(&inventory);
