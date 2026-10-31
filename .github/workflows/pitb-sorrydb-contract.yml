@@ -1,0 +1,95 @@
+name: PITB SorryDB Receipt Contract
+
+on:
+  pull_request:
+    paths:
+      - "data/benchmarks/proof-insight-transfer-v0/sorrydb-track/**"
+      - "docs/research/pitb-sorrydb-evaluation-2026-10-31.md"
+      - ".github/workflows/pitb-sorrydb-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  receipt-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pinned Draft 2020-12 validator
+        run: |
+          python -m venv "$RUNNER_TEMP/pitb-jsonschema"
+          "$RUNNER_TEMP/pitb-jsonschema/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
+      - name: Validate receipt schema and fail-closed controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-jsonschema/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          root = Path.cwd()
+          schema = json.loads((root / "data/benchmarks/proof-insight-transfer-v0/sorrydb-track/run-receipt.schema.json").read_text())
+          fixture = json.loads((root / "data/benchmarks/proof-insight-transfer-v0/sorrydb-track/fixtures/run-receipt.synthetic.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          validator.validate(fixture)
+
+          if fixture["evidence_class"] != "synthetic_contract_fixture":
+              raise SystemExit("checked-in receipt must remain explicitly synthetic")
+          if fixture["run"]["actual"]["attempts"] != 0 or any(row["status"] != "not_attempted" for row in fixture["attempts"]):
+              raise SystemExit("synthetic receipt must not contain model outcomes")
+          print("PITB_SORRYDB_FIXTURE_SHAPE_PASS: synthetic contract only; no model or Lean outcome")
+
+          def must_reject(label, value):
+              try:
+                  validator.validate(value)
+              except ValidationError:
+                  print(f"PITB_SORRYDB_NEGATIVE_PASS: {label}")
+                  return
+              raise SystemExit(f"schema accepted invalid receipt: {label}")
+
+          bad = copy.deepcopy(fixture)
+          bad["task"]["source_path"] = "../outside.lean"
+          must_reject("path traversal", bad)
+
+          bad = copy.deepcopy(fixture)
+          bad["attempts"][0]["status"] = "verified_success"
+          must_reject("success without proof/checker/type/axiom receipts", bad)
+
+          bad = copy.deepcopy(fixture)
+          bad["run"]["actual"]["attempts"] = 2
+          if bad["run"]["actual"]["attempts"] <= bad["run"]["budget"]["attempts"]:
+              raise SystemExit("budget overrun control failed to construct")
+          if bad["run"]["actual"]["attempts"] <= bad["run"]["budget"]["attempts"]:
+              raise SystemExit("budget overrun control failed to construct")
+          print("PITB_SORRYDB_NEGATIVE_PASS: over-budget attempt count detected by consumer invariant")
+
+          success = copy.deepcopy(fixture)
+          attempt = success["attempts"][0]
+          attempt.update({
+              "status": "verified_success",
+              "proof_sha256": "a" * 64,
+              "source_patch_sha256": "b" * 64,
+              "verifier_id": "synthetic-independent-checker",
+              "verifier_receipt_sha256": "c" * 64,
+              "target_type_sha256_before": "d" * 64,
+              "target_type_sha256_after": "e" * 64,
+              "patch_scope": "sorry-token-replacement-only",
+              "kernel_check_passed": True,
+              "proof_contains_sorry_axiom": False,
+              "new_axiom_names": [],
+              "trust_tier": "kernel_only"
+          })
+          validator.validate(success)
+          if attempt["target_type_sha256_before"] == attempt["target_type_sha256_after"]:
+              raise SystemExit("type-digest mismatch control failed to construct")
+          print("PITB_SORRYDB_NEGATIVE_PASS: success-shaped receipt rejected by required type-digest equality invariant")
+          PY

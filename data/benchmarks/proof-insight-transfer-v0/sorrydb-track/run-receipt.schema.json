@@ -1,0 +1,435 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/run-receipt.schema.json",
+  "title": "PITB SorryDB task-arm run receipt",
+  "description": "One task x method arm x replicate. Aggregate Pass@k from attempt receipts; never accept a manually asserted solved flag.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "dataset",
+    "task",
+    "arm",
+    "run",
+    "environment",
+    "attempts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb.run-receipt.v0"
+    },
+    "evidence_class": {
+      "enum": [
+        "synthetic_contract_fixture",
+        "measured_run"
+      ]
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot_id",
+        "source_repository",
+        "source_split_path",
+        "source_split_sha256",
+        "full_snapshot_task_count",
+        "evaluation_task_count",
+        "source_project_count"
+      ],
+      "properties": {
+        "snapshot_id": {
+          "const": "SorryDB_2601"
+        },
+        "source_repository": {
+          "const": "SorryDB/SorryDB"
+        },
+        "source_split_path": {
+          "const": "data/SorryDB_2601/SorryDB_2601_1000_evaluation_split.json"
+        },
+        "source_split_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "full_snapshot_task_count": {
+          "const": 2601
+        },
+        "evaluation_task_count": {
+          "const": 1000
+        },
+        "source_project_count": {
+          "const": 78
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sorry_id",
+        "repository_remote",
+        "repository_branch",
+        "repository_commit",
+        "lean_version",
+        "source_path",
+        "start_line",
+        "start_column",
+        "end_line",
+        "end_column"
+      ],
+      "properties": {
+        "sorry_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository_remote": {
+          "type": "string",
+          "format": "uri"
+        },
+        "repository_branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "lean_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(/|$))"
+        },
+        "start_line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "start_column": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "end_line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "end_column": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "arm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arm_id",
+        "method",
+        "model_id",
+        "configuration_sha256",
+        "prompt_sha256",
+        "strategy_sha256",
+        "insight_manifest_sha256",
+        "retrieval_manifest_sha256"
+      ],
+      "properties": {
+        "arm_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method": {
+          "enum": [
+            "deterministic_tactics",
+            "general_one_shot",
+            "iterative_agentic",
+            "retrieval_only",
+            "typed_insight",
+            "hybrid"
+          ]
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "prompt_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "strategy_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "insight_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "retrieval_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "replicate_index",
+        "seed_manifest_sha256",
+        "budget",
+        "actual"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "replicate_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "seed_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "attempts",
+            "tokens",
+            "tool_calls",
+            "wall_time_ms",
+            "cost_microusd"
+          ],
+          "properties": {
+            "attempts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32
+            },
+            "tokens": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "tool_calls": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "wall_time_ms": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "cost_microusd": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "actual": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "attempts",
+            "tokens",
+            "tool_calls",
+            "wall_time_ms",
+            "cost_microusd"
+          ],
+          "properties": {
+            "attempts": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tool_calls": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "wall_time_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cost_microusd": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_commit",
+        "lean_version",
+        "checkout_tree_sha256",
+        "lake_manifest_sha256",
+        "target_type_serializer_id"
+      ],
+      "properties": {
+        "repository_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "lean_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checkout_tree_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "lake_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "target_type_serializer_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "attempts": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attempt_index",
+          "seed_sha256",
+          "status"
+        ],
+        "properties": {
+          "attempt_index": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 32
+          },
+          "seed_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "status": {
+            "enum": [
+              "verified_success",
+              "verified_failure",
+              "timeout",
+              "runner_unavailable",
+              "not_attempted",
+              "unknown"
+            ]
+          },
+          "proof_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "source_patch_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "verifier_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verifier_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "target_type_sha256_before": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "target_type_sha256_after": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "patch_scope": {
+            "const": "sorry-token-replacement-only"
+          },
+          "kernel_check_passed": {
+            "const": true
+          },
+          "proof_contains_sorry_axiom": {
+            "const": false
+          },
+          "new_axiom_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 0
+          },
+          "trust_tier": {
+            "enum": [
+              "kernel_only",
+              "approved_compiler_trust"
+            ]
+          },
+          "tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tool_calls": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "wall_time_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cost_microusd": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "verified_success"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "proof_sha256",
+                "source_patch_sha256",
+                "verifier_id",
+                "verifier_receipt_sha256",
+                "target_type_sha256_before",
+                "target_type_sha256_after",
+                "patch_scope",
+                "kernel_check_passed",
+                "proof_contains_sorry_axiom",
+                "new_axiom_names",
+                "trust_tier"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

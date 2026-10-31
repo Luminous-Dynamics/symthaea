@@ -1,0 +1,68 @@
+{
+  "schema_version": "pitb.sorrydb.run-receipt.v0",
+  "evidence_class": "synthetic_contract_fixture",
+  "dataset": {
+    "snapshot_id": "SorryDB_2601",
+    "source_repository": "SorryDB/SorryDB",
+    "source_split_path": "data/SorryDB_2601/SorryDB_2601_1000_evaluation_split.json",
+    "source_split_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "full_snapshot_task_count": 2601,
+    "evaluation_task_count": 1000,
+    "source_project_count": 78
+  },
+  "task": {
+    "sorry_id": "synthetic-task-not-real",
+    "repository_remote": "https://github.com/example/synthetic-lean-project",
+    "repository_branch": "main",
+    "repository_commit": "1111111111111111111111111111111111111111",
+    "lean_version": "v4.synthetic",
+    "source_path": "Synthetic/Example.lean",
+    "start_line": 12,
+    "start_column": 5,
+    "end_line": 12,
+    "end_column": 10
+  },
+  "arm": {
+    "arm_id": "S0",
+    "method": "general_one_shot",
+    "model_id": "synthetic-no-model-run",
+    "configuration_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "prompt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "strategy_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "insight_manifest_sha256": null,
+    "retrieval_manifest_sha256": null
+  },
+  "run": {
+    "run_id": "synthetic-not-executed",
+    "replicate_index": 0,
+    "seed_manifest_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "budget": {
+      "attempts": 1,
+      "tokens": 1000,
+      "tool_calls": 2,
+      "wall_time_ms": 30000,
+      "cost_microusd": 1000
+    },
+    "actual": {
+      "attempts": 0,
+      "tokens": 0,
+      "tool_calls": 0,
+      "wall_time_ms": 0,
+      "cost_microusd": 0
+    }
+  },
+  "environment": {
+    "repository_commit": "1111111111111111111111111111111111111111",
+    "lean_version": "v4.synthetic",
+    "checkout_tree_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "lake_manifest_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "target_type_serializer_id": "synthetic-placeholder-v0"
+  },
+  "attempts": [
+    {
+      "attempt_index": 1,
+      "seed_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "status": "not_attempted"
+    }
+  ]
+}
