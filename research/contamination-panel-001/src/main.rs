@@ -12,6 +12,11 @@ use contamination_panel_bench::{
         SEARCH_MAX_FINDINGS_BYTES, SEARCH_MAX_TRACE_BYTES,
         audit_search_time_trace, audit_search_time_findings,
     },
+    benchmark_components::{
+        BenchmarkComponentManifestV1, BenchmarkComponentAuditV1,
+        audit_benchmark_components, verify_benchmark_component_audit_integrity,
+        COMPONENT_MANIFEST_SCHEMA,
+    },
     DetectorSpecV1, PublicChallengePacketV1, SealedChallengeKeyV1,
     audit_blinded_adjudications, detectors::{evaluate_detector_run, score_public_packet},
     ftd::{
@@ -283,6 +288,57 @@ fn verify_fresh_score_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn audit_benchmark_components_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench audit-benchmark-components <manifest.json> <audit-report.json>"
+                .into(),
+        );
+    }
+    let manifest_bytes = fs::read(&args[1])?;
+    if manifest_bytes.len() > 128 * 1024 * 1024 {
+        return Err("benchmark component manifest exceeds 128 MiB safety bound".into());
+    }
+    let manifest: BenchmarkComponentManifestV1 = serde_json::from_slice(&manifest_bytes)?;
+    if manifest.schema != COMPONENT_MANIFEST_SCHEMA {
+        return Err("unknown benchmark component manifest schema".into());
+    }
+    let report = audit_benchmark_components(&manifest).map_err(io::Error::other)?;
+    write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "valid={} components={} explicit_uncovered={} preconditions_uncovered={} missing_capabilities={} prohibited_capabilities={} unresolved_blockers={} confirmatory_eligible={}",
+        report.valid,
+        report.all_four_components_present,
+        report.uncovered_explicit_requirement_count,
+        report.uncovered_precondition_count,
+        report.missing_capability_count,
+        report.exposed_prohibited_capability_count,
+        report.unresolved_blocker_count,
+        report.qualified_for_confirmatory_use
+    );
+    println!("semantic review and reviewer attestations are not independently verified.");
+    Ok(())
+}
+
+fn verify_benchmark_component_audit_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 2 {
+        return Err(
+            "usage: contamination-panel-bench verify-benchmark-component-audit <audit-report.json>"
+                .into(),
+        );
+    }
+    let report: BenchmarkComponentAuditV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
+    verify_benchmark_component_audit_integrity(&report).map_err(io::Error::other)?;
+    println!(
+        "report_integrity_valid=true benchmark={} version={} structural_valid={} confirmatory_eligible={}",
+        report.benchmark_id,
+        report.benchmark_version,
+        report.valid,
+        report.qualified_for_confirmatory_use
+    );
+    Ok(())
+}
+
 fn audit_search_time_trace_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 3 {
         return Err(
@@ -540,9 +596,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("verify-fresh-score") => verify_fresh_score_cli(&args),
         Some("audit-search-time-trace") => audit_search_time_trace_cli(&args),
         Some("audit-search-time-findings") => audit_search_time_findings_cli(&args),
+        Some("audit-benchmark-components") => audit_benchmark_components_cli(&args),
+        Some("verify-benchmark-component-audit") => verify_benchmark_component_audit_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | verify-fresh-score | audit-search-time-trace | audit-search-time-findings | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | verify-fresh-score | audit-search-time-trace | audit-search-time-findings | audit-benchmark-components | verify-benchmark-component-audit | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }

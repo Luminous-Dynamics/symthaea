@@ -1,0 +1,569 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/benchmark-component-manifest-v1.json",
+  "title": "Four-component benchmark contract manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "benchmark_id",
+    "benchmark_version",
+    "task_universe_sha256",
+    "user_task",
+    "environment",
+    "ground_truth",
+    "evaluation",
+    "interfaces",
+    "evaluator_checks",
+    "review_findings",
+    "manifest_sha256",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.benchmark_component_manifest.v1"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "task_universe_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "user_task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "artifact_sha256",
+        "revision_sha256",
+        "instruction_sha256",
+        "user_goal_sha256",
+        "user_role_sha256",
+        "requirements",
+        "required_capability_ids",
+        "prohibited_capability_ids"
+      ],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "artifact_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "revision_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "instruction_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "user_goal_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "user_role_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "requirements": {
+          "type": "array",
+          "maxItems": 100000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "requirement_id",
+              "source_span_sha256",
+              "criterion_sha256",
+              "kind",
+              "disposition",
+              "environment_precondition_ids"
+            ],
+            "properties": {
+              "requirement_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "source_span_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "criterion_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "must",
+                  "must_not",
+                  "boundary"
+                ]
+              },
+              "disposition": {
+                "type": "string",
+                "enum": [
+                  "explicit",
+                  "inferred",
+                  "ambiguous"
+                ]
+              },
+              "environment_precondition_ids": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                }
+              }
+            }
+          }
+        },
+        "required_capability_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "prohibited_capability_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "artifact_sha256",
+        "revision_sha256",
+        "runtime_image_sha256",
+        "initial_state_sha256",
+        "tool_manifest_sha256",
+        "setup_receipt_sha256",
+        "teardown_receipt_sha256",
+        "provided_capability_ids",
+        "precondition_ids",
+        "nondeterminism_policy_sha256"
+      ],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "artifact_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "revision_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "runtime_image_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "initial_state_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "tool_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "setup_receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "teardown_receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "provided_capability_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "precondition_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "nondeterminism_policy_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "ground_truth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "artifact_sha256",
+        "revision_sha256",
+        "oracle_sha256",
+        "reference_implementation_sha256",
+        "expected_outcomes_sha256",
+        "provenance_evidence_sha256",
+        "known_limitations_sha256"
+      ],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "artifact_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "revision_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "oracle_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reference_implementation_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "expected_outcomes_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "provenance_evidence_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "known_limitations_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "artifact_sha256",
+        "revision_sha256",
+        "grader_binary_sha256",
+        "grader_source_sha256",
+        "rubric_sha256",
+        "metric_definition_sha256",
+        "thresholds_sha256",
+        "blocking_rules_sha256",
+        "score_report_schema_sha256",
+        "check_ids",
+        "aggregation_policy_sha256"
+      ],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "artifact_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "revision_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "grader_binary_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "grader_source_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "rubric_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "metric_definition_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "score_report_schema_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "check_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "aggregation_policy_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "thresholds_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "blocking_rules_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "interfaces": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "interface_id",
+          "kind",
+          "source_component",
+          "target_component",
+          "contract_sha256",
+          "evidence_sha256"
+        ],
+        "properties": {
+          "interface_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user_to_environment",
+              "environment_to_ground_truth",
+              "ground_truth_to_evaluation",
+              "evaluation_to_user",
+              "other"
+            ]
+          },
+          "source_component": {
+            "type": "string",
+            "enum": [
+              "user_task",
+              "environment",
+              "ground_truth",
+              "evaluation"
+            ]
+          },
+          "target_component": {
+            "type": "string",
+            "enum": [
+              "user_task",
+              "environment",
+              "ground_truth",
+              "evaluation"
+            ]
+          },
+          "contract_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "evaluator_checks": {
+      "type": "array",
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "check_id",
+          "check_artifact_sha256",
+          "covered_requirement_ids",
+          "covered_precondition_ids"
+        ],
+        "properties": {
+          "check_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "check_artifact_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "covered_requirement_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "covered_precondition_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        }
+      }
+    },
+    "review_findings": {
+      "type": "array",
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "finding_id",
+          "component",
+          "defect_class",
+          "severity",
+          "evidence_sha256",
+          "affected_requirement_ids",
+          "review_method",
+          "reviewer_identity_commitment_sha256",
+          "reviewer_attestation_sha256",
+          "disposition"
+        ],
+        "properties": {
+          "finding_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "component": {
+            "type": "string",
+            "enum": [
+              "user_task",
+              "environment",
+              "ground_truth",
+              "evaluation"
+            ]
+          },
+          "defect_class": {
+            "type": "string",
+            "enum": [
+              "missing_or_stale_artifact",
+              "artifact_digest_mismatch",
+              "task_environment_mismatch",
+              "capability_mismatch",
+              "ambiguous_requirement",
+              "ground_truth_provenance",
+              "oracle_mismatch",
+              "grader_blind_spot",
+              "threshold_mismatch",
+              "metric_aggregation_mismatch",
+              "nondeterministic_environment",
+              "uncovered_requirement",
+              "unjustified_evaluator_check",
+              "cross_component_contradiction",
+              "unknown"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "blocker",
+              "major",
+              "minor",
+              "informational"
+            ]
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "affected_requirement_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "review_method": {
+            "type": "string",
+            "enum": [
+              "deterministic_rule",
+              "human_review",
+              "model_triage",
+              "external_audit"
+            ]
+          },
+          "reviewer_identity_commitment_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "reviewer_attestation_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "disposition": {
+            "type": "string",
+            "enum": [
+              "proposed",
+              "human_confirmed",
+              "rejected",
+              "resolved"
+            ]
+          }
+        }
+      }
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

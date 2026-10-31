@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/benchmark-component-audit-v1.json",
+  "title": "Four-component benchmark audit report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "valid",
+    "manifest_digest_matches",
+    "all_four_components_present",
+    "component_artifact_digests_valid",
+    "evaluation_check_bindings_valid",
+    "all_required_interfaces_present",
+    "required_capabilities_available",
+    "prohibited_capabilities_absent",
+    "all_explicit_requirements_covered",
+    "all_requirement_preconditions_covered",
+    "no_orphan_evaluator_checks",
+    "no_orphan_precondition_mappings",
+    "no_unknown_requirement_references",
+    "no_unknown_precondition_references",
+    "review_dispositions_valid",
+    "ambiguous_requirement_count",
+    "inferred_requirement_count",
+    "uncovered_explicit_requirement_count",
+    "uncovered_precondition_count",
+    "unknown_precondition_reference_count",
+    "missing_capability_count",
+    "exposed_prohibited_capability_count",
+    "orphan_evaluator_check_count",
+    "orphan_precondition_mapping_count",
+    "unknown_requirement_reference_count",
+    "review_finding_count",
+    "unresolved_blocker_count",
+    "model_triage_finding_count",
+    "reviewer_attestations_authenticated",
+    "semantic_component_validity_verified",
+    "qualified_for_confirmatory_use",
+    "benchmark_id",
+    "benchmark_version",
+    "manifest_sha256",
+    "issues",
+    "claim_boundary",
+    "report_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.benchmark_component_audit.v1"
+    },
+    "valid": {
+      "type": "boolean"
+    },
+    "manifest_digest_matches": {
+      "type": "boolean"
+    },
+    "all_four_components_present": {
+      "type": "boolean"
+    },
+    "component_artifact_digests_valid": {
+      "type": "boolean"
+    },
+    "evaluation_check_bindings_valid": {
+      "type": "boolean"
+    },
+    "all_required_interfaces_present": {
+      "type": "boolean"
+    },
+    "required_capabilities_available": {
+      "type": "boolean"
+    },
+    "prohibited_capabilities_absent": {
+      "type": "boolean"
+    },
+    "all_explicit_requirements_covered": {
+      "type": "boolean"
+    },
+    "all_requirement_preconditions_covered": {
+      "type": "boolean"
+    },
+    "no_orphan_evaluator_checks": {
+      "type": "boolean"
+    },
+    "no_unknown_requirement_references": {
+      "type": "boolean"
+    },
+    "no_unknown_precondition_references": {
+      "type": "boolean"
+    },
+    "review_dispositions_valid": {
+      "type": "boolean"
+    },
+    "ambiguous_requirement_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "inferred_requirement_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "uncovered_explicit_requirement_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "uncovered_precondition_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unknown_precondition_reference_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "missing_capability_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "exposed_prohibited_capability_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "orphan_evaluator_check_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unknown_requirement_reference_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "review_finding_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unresolved_blocker_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "model_triage_finding_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "reviewer_attestations_authenticated": {
+      "const": false
+    },
+    "semantic_component_validity_verified": {
+      "const": false
+    },
+    "qualified_for_confirmatory_use": {
+      "const": false
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "report_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "no_orphan_precondition_mappings": {
+      "type": "boolean"
+    },
+    "orphan_precondition_mapping_count": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}
