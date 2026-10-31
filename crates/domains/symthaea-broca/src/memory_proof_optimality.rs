@@ -20,6 +20,7 @@
 //! verification, contradiction discovery, tokenization, and rendering remain
 //! responsibilities of their separately identified trusted adapters.
 
+use crate::memory_evidence::EvidenceSpeakerRole;
 use crate::memory_proof_budget::{
     ProofBudgetRequest, ProofBudgetResult, ProofBudgetStatus, ProofEvidenceCandidate,
     SelectedProof, verify_proof_packet,
@@ -220,6 +221,8 @@ impl Enumeration<'_> {
             self.request.obligations[obligation_index].minimum_independent_families;
         let minimum_distinct_sessions =
             self.request.obligations[obligation_index].minimum_distinct_sessions;
+        let minimum_user_authored_evidence =
+            self.request.obligations[obligation_index].minimum_user_authored_evidence;
         let selection_overhead_tokens =
             self.request.obligations[obligation_index].selection_overhead_tokens;
         let alternatives = self.request.obligations[obligation_index].alternatives.clone();
@@ -227,6 +230,7 @@ impl Enumeration<'_> {
         for alternative in &alternatives {
             let mut families = BTreeSet::<String>::new();
             let mut sessions = BTreeSet::<String>::new();
+            let mut user_authored_evidence = BTreeSet::<String>::new();
             let mut alternative_is_admissible = true;
 
             for evidence_id in &alternative.evidence_dependencies {
@@ -246,11 +250,15 @@ impl Enumeration<'_> {
                     };
                     sessions.insert(session_id.clone());
                 }
+                if candidate.source_speaker == Some(EvidenceSpeakerRole::User) {
+                    user_authored_evidence.insert(candidate.evidence_id.clone());
+                }
             }
 
             if !alternative_is_admissible
                 || families.len() < minimum_independent_families as usize
                 || sessions.len() < minimum_distinct_sessions as usize
+                || user_authored_evidence.len() < minimum_user_authored_evidence as usize
             {
                 continue;
             }
@@ -396,6 +404,7 @@ mod tests {
             source_span_end: excerpt.len() as u64,
             source_family_id: family.into(),
             source_session_id: Some(format!("session-{id}")),
+            source_speaker: Some(EvidenceSpeakerRole::User),
             scope_id: "scope-1".into(),
             payload_sha256: digest("payload"),
             source_span_sha256: span_digest.clone(),
@@ -447,6 +456,7 @@ mod tests {
                 ],
                 minimum_independent_families: 1,
                 minimum_distinct_sessions: 0,
+                minimum_user_authored_evidence: 0,
                 selection_overhead_tokens: 2,
             }],
         }
