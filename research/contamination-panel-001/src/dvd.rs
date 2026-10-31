@@ -423,7 +423,15 @@ fn two_component_fit(values: &[f64]) -> Result<GaussianFit, String> {
             mean_posterior_entropy_nats: std::f64::consts::LN_2,
         });
     }
-    let initializations = [(0.10, 0.90), (0.20, 0.80), (0.25, 0.75), (0.35, 0.65)];
+    let initializations = [
+        (0.00, 1.00),
+        (0.02, 0.98),
+        (0.05, 0.95),
+        (0.10, 0.90),
+        (0.20, 0.80),
+        (0.25, 0.75),
+        (0.35, 0.65),
+    ];
     let mut best: Option<GaussianFit> = None;
     for (left_quantile, right_quantile) in initializations {
         let left = quantile_sorted(&sorted, left_quantile);
@@ -720,9 +728,23 @@ mod tests {
         let mut values = vec![-2.0; 48];
         values.extend([-0.8, -0.7]);
         let report = score_dvd_item(&input_from_difficulties(&values)).unwrap();
-        assert!(report.two_component.components.iter().any(|component| component.weight < DVD_GMM_MIN_COMPONENT_WEIGHT)
-            || report.two_component.minimum_component_weight_met);
+        assert_eq!(
+            report.two_component.minimum_component_weight_met,
+            report.two_component.components.iter()
+                .all(|component| component.weight >= DVD_GMM_MIN_COMPONENT_WEIGHT)
+        );
         assert!(report.two_component.components.iter().all(|component| component.weight > 0.0));
+    }
+
+    #[test]
+    fn rare_two_state_mode_is_reported_as_below_support_threshold() {
+        let mut values = vec![-2.0; 48];
+        values.extend([-0.7, -0.6]);
+        let report = score_dvd_item(&input_from_difficulties(&values)).unwrap();
+        assert!(report.two_component.components.iter().any(|component| {
+            component.weight < DVD_GMM_MIN_COMPONENT_WEIGHT
+        }));
+        assert!(!report.two_component.minimum_component_weight_met);
     }
 
     #[test]
