@@ -456,13 +456,20 @@ runs one preflighted min-fill plan on the residual factor graph, then combines
 branch outputs with log-sum-exp. The residual plan is computed once because all
 conditioned branches retain the same scopes.
 
-`plan_min_fill_cutset_elimination` exposes that preflight separately from
-numeric inference. Given factor scopes, an elimination set, candidate cutset,
-and both budgets, it returns the canonical cutset, exact branch count, largest
-original input factor, residual elimination order/width, and predicted peak
-factor entries. This enables deterministic comparison of candidate separators
-before evaluating any branch. It is a planner, not an automatic optimal-cutset
-solver; finding the minimum-cost cutset remains a separate bounded search problem.
+`plan_min_fill_cutset_elimination` exposes one candidate's preflight
+separately from numeric inference. Given factor scopes, an elimination set,
+candidate cutset, and both budgets, it returns the canonical cutset, exact
+branch count, largest original input factor, residual elimination order/width,
+and predicted peak factor entries.
+
+The reusable `plan_min_fill_cutset_frontier` accepts a family of candidate
+separators and returns every feasible plan, each rejected candidate with its
+error, and the original input indices of non-dominated plans. Its objective
+keeps branch count, residual induced width, and predicted peak factor entries
+as separate axes; exact metric ties retain the earliest input candidate. The
+API searches only the family supplied by the caller, not the full space of
+possible separators, so it is a Pareto planner rather than an optimal-cutset
+solver.
 
 This is an exact alternative when ordinary min-fill exceeds the caller's
 largest-factor-table budget. It trades an explicit branch count for a lower
