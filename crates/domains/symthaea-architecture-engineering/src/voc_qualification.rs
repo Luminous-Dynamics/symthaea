@@ -215,6 +215,7 @@ pub struct VoCQualificationMetrics {
     pub top1_brier: f64,
     pub top1_ece: f64,
     pub topk_membership_brier: f64,
+    pub topk_membership_brier_skill: f64,
     pub topk_credible_set_coverage: f64,
     pub mean_credible_set_size_fraction: f64,
     pub predictive_interval_coverage: f64,
@@ -1664,9 +1665,7 @@ mod tests {
         // exactly matching the K/N prevalence baseline.
         let manifest = manifest();
         let mut replay = episode("ep-1");
-        for row in &mut replay.particle_values {
-            *row = vec![0.5, 0.5];
-        }
+        replay.particle_values = vec![vec![0.9, 0.1], vec![0.1, 0.9]];
         replay.realized_final_values = vec![0.9, 0.1];
         let receipt = qualify_voc_model(&manifest, &[replay], &thresholds()).unwrap();
         assert!((receipt.metrics.topk_membership_brier_skill - 0.0).abs() < 1e-12);
