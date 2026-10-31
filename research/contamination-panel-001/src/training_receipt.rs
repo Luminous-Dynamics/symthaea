@@ -170,6 +170,32 @@ fn validate_utc_timestamp(value: &str, label: &str) -> Result<(), String> {
             return Err(format!("{label} must use YYYY-MM-DDTHH:MM:SSZ"));
         }
     }
+    let parse = |start: usize, end: usize| -> u32 {
+        value[start..end].parse::<u32>().unwrap_or(u32::MAX)
+    };
+    let year = parse(0, 4);
+    let month = parse(5, 7);
+    let day = parse(8, 10);
+    let hour = parse(11, 13);
+    let minute = parse(14, 16);
+    let second = parse(17, 19);
+    let leap_year = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap_year => 29,
+        2 => 28,
+        _ => 0,
+    };
+    if year == 0
+        || day == 0
+        || day > days_in_month
+        || hour > 23
+        || minute > 59
+        || second > 59
+    {
+        return Err(format!("{label} contains an impossible date or clock value"));
+    }
     Ok(())
 }
 
@@ -864,6 +890,20 @@ mod tests {
         assert!(validate_paired_training_execution_receipt(
             &design, &manifest, &seed(), &serde_json::to_vec(&receipt).unwrap()
         ).unwrap_err().contains("payload digest does not match"));
+    }
+
+    #[test]
+    fn impossible_calendar_dates_and_clock_values_are_rejected() {
+        for timestamp in [
+            "2026-02-30T00:00:00Z",
+            "2026-13-01T00:00:00Z",
+            "2026-10-31T24:00:00Z",
+            "2026-10-31T23:60:00Z",
+            "2026-10-31T23:59:60Z",
+        ] {
+            assert!(validate_utc_timestamp(timestamp, "test").is_err(), "{timestamp}");
+        }
+        assert!(validate_utc_timestamp("2024-02-29T23:59:59Z", "test").is_ok());
     }
 
     #[test]
