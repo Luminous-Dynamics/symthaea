@@ -1,0 +1,40 @@
+name: CMAQ frozen-run manifest
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/cmaq-common/**"
+      - ".github/workflows/cmaq-frozen-run-manifest.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/cmaq-common/**"
+      - ".github/workflows/cmaq-frozen-run-manifest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-frozen-run-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: research/cmaq-common/requirements-validation.txt
+      - name: Install CI-only validator
+        run: python -m pip install --disable-pip-version-check -r research/cmaq-common/requirements-validation.txt
+      - name: Validate schema, example and hostile mutations
+        run: python research/cmaq-common/scripts/validate_manifest.py
+      - name: Retain validation source identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum \
+            research/cmaq-common/frozen-run-manifest.schema.json \
+            research/cmaq-common/examples/cmaq-018-development-manifest.example.json \
+            research/cmaq-common/scripts/validate_manifest.py
