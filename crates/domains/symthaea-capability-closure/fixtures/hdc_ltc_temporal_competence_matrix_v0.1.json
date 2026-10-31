@@ -30,17 +30,18 @@
     "benchmark_executed": false,
     "hardware_energy_measured": false,
     "result_values_present": false,
-    "generator_scope": "Implemented Rust generators: T2 delayed cue, T3/T4 multiscale forecasting/change-point with delayed feedback, T8 BrainTrace DMS task semantics, T9 BrainTrace evidence-accumulation task semantics. T1/T5/T6/T7 and the full nine-task runner remain unimplemented.",
+    "generator_scope": "Implemented Rust generators: T2 delayed cue, T3/T4 multiscale forecasting/change-point with delayed feedback, T5 irregular-time/missingness, T8 BrainTrace DMS task semantics, T9 BrainTrace evidence-accumulation task semantics. T1/T6/T7 and the full nine-task runner remain unimplemented.",
     "rust_tests_authored": true,
     "oracle_trace_verifier_implemented": true,
     "oracle_process_isolation_implemented": false,
-    "rust_tests_authored_count": 66,
+    "rust_tests_authored_count": 83,
     "rust_tests_by_file": {
       "research/temporal-bench/src/digest.rs": 2,
-      "research/temporal-bench/src/lib.rs": 13,
-      "research/temporal-bench/src/temporal.rs": 18,
+      "research/temporal-bench/src/lib.rs": 16,
+      "research/temporal-bench/src/temporal.rs": 20,
       "research/temporal-bench/src/dms.rs": 16,
-      "research/temporal-bench/src/evidence.rs": 17
+      "research/temporal-bench/src/evidence.rs": 17,
+      "research/temporal-bench/src/irregular.rs": 12
     },
     "cryptographic_stream_digest_implemented": true,
     "reference_generators": {
@@ -49,7 +50,7 @@
       "braintrace_dms_semantics": true,
       "braintrace_evidence_accumulation_semantics": true,
       "fast_event": false,
-      "irregular_missingness": false,
+      "irregular_missingness": true,
       "selective_retention": false,
       "phase_prediction": false
     },
@@ -245,7 +246,8 @@
         "calibration_error",
         "invalid_timestamp_rejection"
       ],
-      "oracle": "Underlying continuous-time synthetic process"
+      "oracle": "Underlying continuous-time synthetic process",
+      "implementation_status": "Fixed-point irregular-time/missingness Rust generator, latent oracle, schedule/noise verifier, and SHA-256 digests authored; not compiled or executed"
     },
     {
       "id": "T6_SELECTIVE_RETENTION",
