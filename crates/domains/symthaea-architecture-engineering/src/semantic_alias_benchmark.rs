@@ -664,10 +664,16 @@ mod tests {
         let trial = inject_alias_corruptions(
             &challenge,
             &clean,
-            &[AliasCorruption::FalseMergeAsDuplicate {
-                proposal_id: "p3".to_owned(),
-                existing_canonical_direction_id: "dir-a".to_owned(),
-            }],
+            &[
+                AliasCorruption::FalseMergeAsDuplicate {
+                    proposal_id: "p3".to_owned(),
+                    existing_canonical_direction_id: "dir-a".to_owned(),
+                },
+                AliasCorruption::FalseMergeAsDuplicate {
+                    proposal_id: "p4".to_owned(),
+                    existing_canonical_direction_id: "dir-a".to_owned(),
+                },
+            ],
         ).unwrap();
         let report = evaluate_alias_trial(&challenge, &adjudication, &trial, 2).unwrap();
 
@@ -701,9 +707,14 @@ mod tests {
         let trial = inject_alias_corruptions(
             &challenge,
             &clean,
-            &[AliasCorruption::FalseNoveltyRejection {
-                proposal_id: "p3".to_owned(),
-            }],
+            &[
+                AliasCorruption::FalseNoveltyRejection {
+                    proposal_id: "p3".to_owned(),
+                },
+                AliasCorruption::Inconclusive {
+                    proposal_id: "p4".to_owned(),
+                },
+            ],
         ).unwrap();
         let report = evaluate_alias_trial(&challenge, &adjudication, &trial, 2).unwrap();
 
