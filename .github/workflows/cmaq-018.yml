@@ -102,6 +102,15 @@ jobs:
               for _, count_key, _, _ in interval_pairs:
                   assert isinstance(row[count_key], int)
                   assert 0 <= row[count_key] <= 64
+              for count_key in ("branch_outcome_mae_episode_count", "branch_state_mae_episode_count"):
+                  assert isinstance(row[count_key], int)
+                  assert 0 <= row[count_key] <= 64
+                  mean_key = count_key.removesuffix("_episode_count")
+                  mean_key = "mean_" + mean_key
+                  if row[mean_key] is None:
+                      assert row[count_key] == 0
+                  else:
+                      assert row[count_key] >= 1
               for mean_key, count_key, lower_key, upper_key in interval_pairs:
                   mean_value = row[mean_key]
                   count = row[count_key]
@@ -146,6 +155,10 @@ jobs:
           # An explicit effect head makes pair calls rather than absolute branch predictions.
           effect = get("monotone", "explicit_effect_head")
           assert effect["mean_branch_prediction_evaluations"] == 0.0
+          assert effect["branch_outcome_mae_episode_count"] == 0
+          assert effect["branch_state_mae_episode_count"] == 0
+          assert effect["mean_branch_outcome_mae"] is None
+          assert effect["mean_branch_state_mae"] is None
           assert effect["mean_pair_effect_evaluations"] == 21.0
           assert effect["mean_branch_outcome_mae"] is None
           assert effect["mean_branch_state_mae"] is None
@@ -160,7 +173,9 @@ jobs:
               assert oracle["effect_magnitude_mae_ci95_upper"] == 0.0
               assert oracle["mean_top1_regret"] == 0.0
               assert oracle["mean_branch_outcome_mae"] == 0.0
+              assert oracle["branch_outcome_mae_episode_count"] == 64
               assert oracle["mean_branch_state_mae"] == 0.0
+              assert oracle["branch_state_mae_episode_count"] == 64
               assert oracle["mean_terminal_false_safe_rate"] in (0.0, None)
               assert oracle["mean_oracle_branch_evaluations"] == 7.0
 
