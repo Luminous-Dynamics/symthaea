@@ -297,3 +297,25 @@ The current development sequence is:
 2. #9606: optimizer trace integration for NSGA-II, MOEA/D-DE, SMS-EMOA with no search-decision changes.
 3. #9608: bounded artifact resolver, receipt binding, and evidence-promotion reconstruction.
 4. External parity against pinned PlatEMO/COCO and confirmatory held-out cluster-level comparisons.
+
+
+### New verifier and long-horizon faithfulness benchmark requirements — October 2026
+
+Two recent Findings of EMNLP 2026 benchmarks directly affect the AR-5B5 verifier and engineering-search programme:
+
+- **Code Monitor Red Teaming / CodeMonitorBench:** across 71,000 generated candidates, 43,677 passed public tests and 23,081 of those still failed hidden tests. The work reports that weak verifiers miss most hidden bugs at a 5% false-positive operating point, and adversarial public-test-overfit pressure reduces AUROC and raises low-FPR misses. This is directly relevant to our semantic alias/verifier-corruption work: passing visible checks, matching a digest, or replaying a proposer is not sufficient. Add explicit public-test leakage, hidden-test inferability, adversarial overfit, verifier false-negative, verifier false-positive, and evidence-ceiling controls. Report the ROC/PR operating point and costs, not only accuracy.
+- **SLUMP (When the Specification Emerges):** evaluates whether a coding agent preserves design commitments that are progressively disclosed over long interactions. It contains 20 ML papers, 371 atomic verifiable components, and roughly 60 requests per paper; its exposure audit checks that scored requirements were actually available to the agent. This exposes another important failure mode for Symthaea: passing local tests while silently losing system-level architectural constraints. Add progressive-specification tasks with an immutable requirement ledger, exposure audit, and component-faithfulness scoring.
+
+The engineering benchmark programme should therefore include a separate verifier-quality and requirement-faithfulness stratum:
+
+1. Public-test/hidden-test divergence and test-overfit red-team controls.
+2. Evidence inferability audits: was the evidence available to the verifier, and did it actually support the claim?
+3. Long-horizon specification retention: preserve every frozen architectural and scientific requirement across changes.
+4. Cost to detect a hidden defect or implementation/specification divergence, including verifier false negatives and false positives.
+5. Adversarially corrupted evidence and explicit negative controls.
+
+Sources:
+- Code Monitor Red Teaming for Public-Test-Passing Code, Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.177/
+- When the Specification Emerges: Benchmarking Faithfulness Loss in Long-Horizon Coding Agents (SLUMP), Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.76/
+
+Claim boundary: these are external benchmark findings, not results for Symthaea. They motivate protocol additions; do not claim our verifier is superior until reproduced on a pinned compatible task set.
