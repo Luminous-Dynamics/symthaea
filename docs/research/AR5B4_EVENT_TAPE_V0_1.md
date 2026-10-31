@@ -12,9 +12,9 @@ It is not a benchmark result, a digital signature, proof of runner identity, or 
 
 ## Frozen identities
 
-The header binds the campaign, policy ID and algorithm ID, canonical JSON policy configuration and its SHA-256 digest, task recipe, comparison profile, evaluator, verifier, proposal source, initial canonical direction IDs, execution mode, worker count, declared seats per round, claim caps, and total normalized budget ceiling.
+The header binds the campaign, exact source commit, runtime/toolchain/dependency/hardware-manifest digest, policy ID and algorithm ID, canonical JSON policy configuration and its SHA-256 digest, task recipe, comparison profile, evaluator, verifier, proposal source, initial canonical direction IDs, execution mode, worker count, declared seats per round, claim caps, normalized-cost model ID and digest, and total normalized budget ceiling.
 
-A mechanism-matched tape must include a shared proposal-stream digest. A best-practical-system tape may use a different proposal source, but must identify that source. These comparison modes must not be merged into one result table.
+A mechanism-matched tape must include a shared proposal-stream digest. The source commit must be a full 40- or 64-character Git object ID, and the environment digest must cover the toolchain, dependency lock, runtime, and hardware manifest used for the run. A best-practical-system tape may use a different proposal source, but must identify that source. These comparison modes must not be merged into one result table.
 
 ## Event contents
 
@@ -28,7 +28,7 @@ Direction proposals bind a descriptor digest and semantic delta. Only the verifi
 
 Each action records host CPU milliseconds, wall milliseconds, accelerator milliseconds, peak memory bytes, energy millijoules, input/output tokens, tool calls, evaluator calls, verifier calls, and normalized budget charge in microunits.
 
-A reading is either `Measured(value)` or `Unknown(reason)`. Measured zero is valid; unknown is never converted to zero. `validate_integrity` preserves structurally valid but unmetered tapes for diagnosis. `validate` is the qualification gate and rejects any unknown measurement or unknown charge. Retries are separate events and consume separate charges. The running normalized charge may not exceed the header budget ceiling.
+Normalized charges are meaningful only relative to the frozen budget-model identity and digest; the same microunit value under two different models is not automatically comparable. A reading is either `Measured(value)` or `Unknown(reason)`. Measured zero is valid; unknown is never converted to zero. `validate_integrity` preserves structurally valid but unmetered tapes for diagnosis. `validate` is the qualification gate and rejects any unknown measurement or unknown charge. Retries are separate events and consume separate charges. The running normalized charge may not exceed the header budget ceiling.
 
 ## Sequential and batched visibility
 
