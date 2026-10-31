@@ -21,7 +21,7 @@ This is not ordinary observational prediction. A model can predict the average f
 - **MiraBench** complements this track with action-following fidelity and optimism-bias diagnostics across human-annotated judgments. Paper: https://arxiv.org/abs/2605.29360
 - **Rollback** uses rewind-and-branch counterfactual action comparisons for policy improvement. It is a downstream algorithmic comparator, not itself a guarantee that the imagined branch ordering is correct. Paper: https://arxiv.org/abs/2610.36068. Project: https://rollback-wm.github.io/
 
-WorldOracle's Hugging Face validation ground truth is currently labelled private pending a benchmark release and data-access policy decision. Do not access, mirror or use private validation labels; verify the official release and license before creating an adapter: https://huggingface.co/datasets/WorldOracle/worldoracle-validation
+WorldOracle's official repository now announces a public validation release (Oct 15, 2026) and describes disclosed validation GT, but the Hugging Face validation card still contains contradictory private/pending-release wording. Before any adapter, verify current downloadable files, exact dataset revision, manifest/SHA-256 inventory, and CC BY-NC-SA 4.0 data terms. The published validation release is non-commercial/share-alike; do not infer commercial training rights from the Apache-2.0 evaluator-code license. Test ground truth remains withheld and must not be accessed: https://github.com/WorldOracle-benchmark/WorldOracle and https://huggingface.co/datasets/WorldOracle/worldoracle-validation
 
 ## v0.1 protocol
 
