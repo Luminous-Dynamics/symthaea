@@ -1,4 +1,4 @@
-# CMAQ-011: External Manipulation Benchmark Feasibility — LIBERO and WorldArena 2.0
+# CMAQ-011: External Manipulation Benchmark Feasibility — LIBERO, RoboWM-Bench and WorldArena 2.0
 
 **Status:** source-audited feasibility note; no adapter or benchmark result yet  
 **Related:** [Issue #9094](https://github.com/Luminous-Dynamics/symthaea/issues/9094), [protocol](PROTOCOL.md), [matched predictive-advantage design](PREDICTIVE_ADVANTAGE.md)
@@ -9,8 +9,9 @@ Prioritize the first manipulation adapter as:
 
 1. **LIBERO-Spatial** (10 tasks) for geometric/spatial reasoning.
 2. **LIBERO-Long** (10 tasks) for multi-step dependencies and state persistence.
-3. **WorldArena 2.0 / RoboTwin 2.0** for visuo-tactile contact, online policy improvement and eventual sim-to-real.
-4. **World-In-World** as a separate visual closed-loop track for active recognition, embodied QA, image-goal navigation and manipulation.
+3. **RoboWM-Bench** for video-to-action executable manipulation evaluation and reconstructed-simulator outcome checks.
+4. **WorldArena 2.0 / RoboTwin 2.0** for visuo-tactile contact, online policy improvement and eventual sim-to-real.
+5. **World-In-World** as a separate visual closed-loop track for active recognition, embodied QA, image-goal navigation and manipulation.
 
 Do not start with a physical ALOHA run. First establish a reproducible simulator adapter, paired D0/D1/W1/W2/W3 comparisons, and a robot-specific safety case.
 
