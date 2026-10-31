@@ -19,7 +19,7 @@ pub const REQUIRED_MANDATORY: u8 = AUTHORITY | PROOF_PATH;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Policy {
-    FixedDepth,
+    FixedOrder,
     GenericVoc,
     BudgetMatchedRandom,
     ProofObligationGuided,
@@ -29,7 +29,7 @@ pub enum Policy {
 
 impl Policy {
     pub const ALL: [Self; 6] = [
-        Self::FixedDepth,
+        Self::FixedOrder,
         Self::GenericVoc,
         Self::BudgetMatchedRandom,
         Self::ProofObligationGuided,
@@ -39,7 +39,7 @@ impl Policy {
 
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::FixedDepth => "fixed_depth",
+            Self::FixedOrder => "fixed_order",
             Self::GenericVoc => "generic_voc",
             Self::BudgetMatchedRandom => "budget_matched_random",
             Self::ProofObligationGuided => "proof_obligation_guided",
@@ -254,6 +254,7 @@ pub fn build_cases() -> Vec<TaskCase> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct TrialResult {
     pub task_id: &'static str,
+    pub seed: u64,
     pub policy: Policy,
     pub budget: u32,
     pub spent: u32,
@@ -350,7 +351,7 @@ fn choose_next(
     }
 
     match policy {
-        Policy::FixedDepth => affordable.into_iter().next(),
+        Policy::FixedOrder => affordable.into_iter().next(),
         Policy::GenericVoc | Policy::UnverifiedConfidence => {
             affordable.into_iter().max_by(|a, b| {
                 let oa = &case.operations[*a].public;
@@ -505,6 +506,7 @@ pub fn run_trial(case: &TaskCase, policy: Policy, budget: u32, seed: u64) -> Tri
 
     TrialResult {
         task_id: case.id,
+        seed,
         policy,
         budget,
         spent,
@@ -656,7 +658,7 @@ mod tests {
         assert!(rejected.rejected_candidate_count > 0);
         assert!(rejected.rejected_candidate_cost > 0);
 
-        let redundant = run_trial(&cases[0], Policy::FixedDepth, 14, 10);
+        let redundant = run_trial(&cases[0], Policy::FixedOrder, 14, 10);
         assert!(redundant.redundant_operation_count > 0);
         assert!(redundant.wasted_operation_cost > 0);
     }
