@@ -83,6 +83,8 @@ pub struct DirectionCampaignPolicyConfig {
     pub board_exploration_coefficient: f64,
     pub global_ucb_exploration_coefficient: f64,
     pub new_direction_prior_credit: f64,
+    pub common_bootstrap_evaluations: u64,
+    pub board_minimum_initial_evaluations: u64,
     pub discounted_ucb_factor: f64,
     pub thompson_prior_alpha: f64,
     pub thompson_prior_beta: f64,
@@ -320,6 +322,8 @@ pub fn run_direction_campaign(
         board_exploration_coefficient: BOARD_EXPLORATION_COEFFICIENT,
         global_ucb_exploration_coefficient: GLOBAL_UCB_EXPLORATION,
         new_direction_prior_credit: NEW_DIRECTION_CREDIT,
+        common_bootstrap_evaluations: 3,
+        board_minimum_initial_evaluations: 1,
         discounted_ucb_factor: DISCOUNT_FACTOR,
         thompson_prior_alpha: 1.0,
         thompson_prior_beta: 1.0,
@@ -1089,6 +1093,24 @@ mod tests {
             .unwrap();
             assert_eq!(first, second);
         }
+    }
+
+    #[test]
+    fn policy_configuration_snapshot_is_complete_and_digest_bound() {
+        let run = run_direction_campaign(
+            DirectionLandscapeFamily::DelayedBreakthrough,
+            DirectionCampaignPolicy::ThompsonSampling,
+            32,
+            0xabc,
+        )
+        .expect("campaign should run");
+        let bytes = serde_json::to_vec(&run.policy_config).expect("config serializes");
+        assert_eq!(run.policy_config_sha256, digest_bytes(&bytes));
+        assert_eq!(run.policy_config.target_score, TARGET_SCORE);
+        assert_eq!(run.policy_config.common_bootstrap_evaluations, 3);
+        assert_eq!(run.policy_config.thompson_prior_alpha, 1.0);
+        assert_eq!(run.policy_config.thompson_prior_beta, 1.0);
+        assert!(!run.policy_config.oracle_uses_hidden_payoff_schedule);
     }
 
     #[test]
