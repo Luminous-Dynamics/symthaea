@@ -683,8 +683,15 @@ mod tests {
         let report_schema: Value = serde_json::from_str(include_str!(
             "../schema/causal-power-report.schema.json"
         )).unwrap();
-        let config_value = serde_json::to_value(config()).unwrap();
-        let report_value = serde_json::to_value(plan_causal_power(&config()).unwrap()).unwrap();
+        let fixture: CausalPowerPlanningConfigV1 = serde_json::from_str(include_str!(
+            "../fixtures/causal-power-planning-config.json"
+        )).unwrap();
+        assert_eq!(
+            serde_json::to_value(&fixture).unwrap(),
+            serde_json::to_value(config()).unwrap()
+        );
+        let config_value = serde_json::to_value(&fixture).unwrap();
+        let report_value = serde_json::to_value(plan_causal_power(&fixture).unwrap()).unwrap();
         for (schema, value, expected) in [
             (&config_schema, config_value, CAUSAL_POWER_CONFIG_SCHEMA),
             (&report_schema, report_value, CAUSAL_POWER_REPORT_SCHEMA),
