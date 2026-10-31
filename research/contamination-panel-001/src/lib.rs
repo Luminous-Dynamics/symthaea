@@ -1305,3 +1305,5 @@ mod tests {
 }
 
 pub mod training_receipt;
+
+pub mod causal_analysis;
