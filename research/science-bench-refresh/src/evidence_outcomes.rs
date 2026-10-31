@@ -5,7 +5,9 @@
 //! never claims that a digest authenticates the runner or that a label proves
 //! scientific truth. Inference/calibration uncertainty is a separate analysis.
 
-use crate::counterfactual_evidence::{EvidenceInterventionPlanV1, verify_evidence_intervention_plan};
+use crate::counterfactual_evidence::{
+    EvidenceInterventionPlanV1, verify_evidence_intervention_plan,
+};
 use crate::sha256_hex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -353,7 +355,11 @@ fn validate_json_shape(bytes: &[u8], full_report: bool) -> Result<(), String> {
     for (index, record) in records.iter().enumerate() {
         let label = format!("records[{index}]");
         require_keys(record, RECORD_KEYS, &label)?;
-        require_keys(&record["resources"], RESOURCE_KEYS, &format!("{label}.resources"))?;
+        require_keys(
+            &record["resources"],
+            RESOURCE_KEYS,
+            &format!("{label}.resources"),
+        )?;
     }
     Ok(())
 }
@@ -367,10 +373,10 @@ fn valid_digest(value: &str) -> bool {
 }
 
 fn digest_domain_framed(domain: &[u8], payload: &[u8]) -> Result<String, String> {
-    let domain_len = u64::try_from(domain.len())
-        .map_err(|_| "hash domain exceeds u64 length".to_owned())?;
-    let payload_len = u64::try_from(payload.len())
-        .map_err(|_| "hash payload exceeds u64 length".to_owned())?;
+    let domain_len =
+        u64::try_from(domain.len()).map_err(|_| "hash domain exceeds u64 length".to_owned())?;
+    let payload_len =
+        u64::try_from(payload.len()).map_err(|_| "hash payload exceeds u64 length".to_owned())?;
     let mut hasher = Sha256::new();
     hasher.update(HASH_PREFIX);
     hasher.update(domain_len.to_be_bytes());
@@ -436,16 +442,32 @@ fn validate_record(record: &EvidenceOutcomeRecordV1, position: usize) -> Vec<Str
         issues.push(format!("{label}.condition must be 1..=128 characters"));
     }
     for (name, digest) in [
-        ("runner_receipt_sha256", record.runner_receipt_sha256.as_deref()),
-        ("response_artifact_sha256", record.response_artifact_sha256.as_deref()),
-        ("evaluator_record_sha256", record.evaluator_record_sha256.as_deref()),
+        (
+            "runner_receipt_sha256",
+            record.runner_receipt_sha256.as_deref(),
+        ),
+        (
+            "response_artifact_sha256",
+            record.response_artifact_sha256.as_deref(),
+        ),
+        (
+            "evaluator_record_sha256",
+            record.evaluator_record_sha256.as_deref(),
+        ),
     ] {
         if digest.is_some_and(|value| !valid_digest(value)) {
-            issues.push(format!("{label}.{name} must be a nonzero lowercase SHA-256 digest"));
+            issues.push(format!(
+                "{label}.{name} must be a nonzero lowercase SHA-256 digest"
+            ));
         }
     }
-    if record.confidence_millionths.is_some_and(|value| value > 1_000_000) {
-        issues.push(format!("{label}.confidence_millionths must be between 0 and 1,000,000"));
+    if record
+        .confidence_millionths
+        .is_some_and(|value| value > 1_000_000)
+    {
+        issues.push(format!(
+            "{label}.confidence_millionths must be between 0 and 1,000,000"
+        ));
     }
     match (record.confidence_source, record.confidence_millionths) {
         (ConfidenceSourceV1::None, Some(_)) => {
@@ -464,7 +486,9 @@ fn validate_record(record: &EvidenceOutcomeRecordV1, position: usize) -> Vec<Str
         issues.push(format!("{label} started but lacks a runner receipt digest"));
     }
     if !executed && record.runner_receipt_sha256.is_some() {
-        issues.push(format!("{label} is not_started but carries a runner receipt"));
+        issues.push(format!(
+            "{label} is not_started but carries a runner receipt"
+        ));
     }
 
     match record.terminal_status {
@@ -473,10 +497,14 @@ fn validate_record(record: &EvidenceOutcomeRecordV1, position: usize) -> Vec<Str
                 issues.push(format!("{label} completed but response_status=no_response"));
             }
             if record.response_artifact_sha256.is_none() {
-                issues.push(format!("{label} completed but lacks a response artifact digest"));
+                issues.push(format!(
+                    "{label} completed but lacks a response artifact digest"
+                ));
             }
             if record.evaluator_record_sha256.is_none() {
-                issues.push(format!("{label} completed but lacks an evaluator record digest"));
+                issues.push(format!(
+                    "{label} completed but lacks an evaluator record digest"
+                ));
             }
             match record.response_status {
                 OutcomeResponseStatusV1::Answered => {
@@ -484,7 +512,9 @@ fn validate_record(record: &EvidenceOutcomeRecordV1, position: usize) -> Vec<Str
                         || record.evidence_use == EvidenceUseV1::NotEvaluated
                         || record.claim_support == ClaimSupportV1::NotEvaluated
                     {
-                        issues.push(format!("{label} answered but has unevaluated required axes"));
+                        issues.push(format!(
+                            "{label} answered but has unevaluated required axes"
+                        ));
                     }
                     if record.abstention_quality != AbstentionQualityV1::NotApplicable {
                         issues.push(format!(
@@ -529,14 +559,14 @@ fn validate_record(record: &EvidenceOutcomeRecordV1, position: usize) -> Vec<Str
             if record.confidence_millionths.is_some()
                 && record.response_status != OutcomeResponseStatusV1::Answered
             {
-                issues.push(format!("{label} records confidence without an answered response"));
+                issues.push(format!(
+                    "{label} records confidence without an answered response"
+                ));
             }
         }
         OutcomeTerminalStatusV1::Contaminated | OutcomeTerminalStatusV1::BudgetViolation => {
             if record.evaluator_record_sha256.is_none() {
-                issues.push(format!(
-                    "{label} lacks an evaluator disposition digest"
-                ));
+                issues.push(format!("{label} lacks an evaluator disposition digest"));
             }
             if record.response_status == OutcomeResponseStatusV1::NoResponse {
                 if record.response_artifact_sha256.is_some() {
@@ -561,7 +591,9 @@ fn validate_record(record: &EvidenceOutcomeRecordV1, position: usize) -> Vec<Str
         | OutcomeTerminalStatusV1::RunnerError
         | OutcomeTerminalStatusV1::NotStarted => {
             if record.response_status != OutcomeResponseStatusV1::NoResponse {
-                issues.push(format!("{label} has a non-completed terminal status with a response"));
+                issues.push(format!(
+                    "{label} has a non-completed terminal status with a response"
+                ));
             }
             if record.evaluator_record_sha256.is_some() {
                 issues.push(format!(
@@ -599,9 +631,7 @@ fn increment(map: &mut BTreeMap<String, u64>, key: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn resource_summary(
-    values: impl Iterator<Item = Option<u64>>,
-) -> Result<CounterSummaryV1, String> {
+fn resource_summary(values: impl Iterator<Item = Option<u64>>) -> Result<CounterSummaryV1, String> {
     let mut summary = CounterSummaryV1 {
         recorded_trials: 0,
         total_observed: 0,
@@ -661,8 +691,14 @@ fn scorecard(
             increment(&mut correctness_counts, record.task_correctness.as_str())?;
             increment(&mut evidence_use_counts, record.evidence_use.as_str())?;
             increment(&mut claim_support_counts, record.claim_support.as_str())?;
-            increment(&mut abstention_quality_counts, record.abstention_quality.as_str())?;
-            increment(&mut confidence_source_counts, record.confidence_source.as_str())?;
+            increment(
+                &mut abstention_quality_counts,
+                record.abstention_quality.as_str(),
+            )?;
+            increment(
+                &mut confidence_source_counts,
+                record.confidence_source.as_str(),
+            )?;
             if record.confidence_millionths.is_some() {
                 confidence_recorded_trials = confidence_recorded_trials
                     .checked_add(1)
@@ -752,8 +788,14 @@ fn validate_against_plan(
         issues.push("decision_rules_sha256 differs from the precommitted plan".to_owned());
     }
     for (name, value) in [
-        ("evaluator_revision_sha256", fields.evaluator_revision_sha256.as_str()),
-        ("decision_rules_sha256", fields.decision_rules_sha256.as_str()),
+        (
+            "evaluator_revision_sha256",
+            fields.evaluator_revision_sha256.as_str(),
+        ),
+        (
+            "decision_rules_sha256",
+            fields.decision_rules_sha256.as_str(),
+        ),
     ] {
         if !valid_digest(value) {
             issues.push(format!("{name} must be a nonzero lowercase SHA-256 digest"));
@@ -777,7 +819,10 @@ fn validate_against_plan(
     for (index, record) in fields.records.iter().enumerate() {
         issues.extend(validate_record(record, index));
         if !seen_trials.insert(record.trial_id.as_str()) {
-            issues.push(format!("duplicate trial_id in outcome report: {}", record.trial_id));
+            issues.push(format!(
+                "duplicate trial_id in outcome report: {}",
+                record.trial_id
+            ));
         }
         if let Some((pair_id, trial_id, condition)) = expected.get(index).copied() {
             if record.pair_id != pair_id
@@ -789,7 +834,9 @@ fn validate_against_plan(
                 ));
             }
         } else {
-            issues.push(format!("outcome report contains unknown extra record at index {index}"));
+            issues.push(format!(
+                "outcome report contains unknown extra record at index {index}"
+            ));
         }
     }
     if fields.records.len() != expected.len() {
@@ -833,9 +880,8 @@ pub fn verify_evidence_outcome_report(
     let fields = fields_from_report(&report);
     let (plan, mut issues) = validate_against_plan(plan_bytes, &fields)?;
     if !valid_digest(&report.report_commitment_sha256) {
-        issues.push(
-            "report_commitment_sha256 must be a nonzero lowercase SHA-256 digest".to_owned(),
-        );
+        issues
+            .push("report_commitment_sha256 must be a nonzero lowercase SHA-256 digest".to_owned());
     }
     let recomputed = commitment_from_fields(&fields)?;
     let commitment_matches = valid_digest(&report.report_commitment_sha256)
@@ -882,8 +928,7 @@ pub fn verify_evidence_outcome_report(
 mod tests {
     use super::*;
     use crate::counterfactual_evidence::{
-        EvidenceInterventionPairV1, EvidenceInterventionPlanFieldsV1,
-        EvidenceInterventionTrialV1,
+        EvidenceInterventionPairV1, EvidenceInterventionPlanFieldsV1, EvidenceInterventionTrialV1,
     };
     use serde_json::json;
 
@@ -935,7 +980,7 @@ mod tests {
             crate::counterfactual_evidence::compute_evidence_intervention_plan_commitment(
                 &fields_bytes,
             )
-        .unwrap();
+            .unwrap();
         let mut full = serde_json::to_value(fields).unwrap();
         full["plan_commitment_sha256"] = json!(commitment);
         serde_json::to_vec(&full).unwrap()
@@ -984,12 +1029,7 @@ mod tests {
             .iter()
             .flat_map(|pair| {
                 pair.trials.iter().enumerate().map(move |(index, trial)| {
-                    outcome_record(
-                        &pair.pair_id,
-                        &trial.trial_id,
-                        &trial.condition,
-                        index,
-                    )
+                    outcome_record(&pair.pair_id, &trial.trial_id, &trial.condition, index)
                 })
             })
             .collect::<Vec<_>>();
@@ -1048,11 +1088,15 @@ mod tests {
             1
         );
         assert_eq!(
-            scorecard.condition_summaries[0].cost_micro_usd.recorded_trials,
+            scorecard.condition_summaries[0]
+                .cost_micro_usd
+                .recorded_trials,
             0
         );
         assert_eq!(
-            scorecard.condition_summaries[0].cost_micro_usd.total_observed,
+            scorecard.condition_summaries[0]
+                .cost_micro_usd
+                .total_observed,
             0
         );
         assert!(!scorecard.runner_execution_proven);
@@ -1069,7 +1113,10 @@ mod tests {
         let scorecard = verification.scorecard.unwrap();
         assert_eq!(scorecard.planned_trial_count, 3);
         assert_eq!(scorecard.missing_trial_count, 0);
-        assert_eq!(scorecard.terminal_status_counts.get("not_started"), Some(&1));
+        assert_eq!(
+            scorecard.terminal_status_counts.get("not_started"),
+            Some(&1)
+        );
         let last_condition = scorecard.condition_summaries.last().unwrap();
         assert_eq!(last_condition.wall_clock_ms.recorded_trials, 0);
     }
@@ -1135,19 +1182,23 @@ mod tests {
 
         let mut missing = fields(&plan);
         missing.records.pop();
-        assert!(compute_evidence_outcome_report_commitment(
-            &plan,
-            &serde_json::to_vec(&missing).unwrap()
-        )
-        .is_err());
+        assert!(
+            compute_evidence_outcome_report_commitment(
+                &plan,
+                &serde_json::to_vec(&missing).unwrap()
+            )
+            .is_err()
+        );
 
         let mut duplicate = fields(&plan);
         duplicate.records[1] = duplicate.records[0].clone();
-        assert!(compute_evidence_outcome_report_commitment(
-            &plan,
-            &serde_json::to_vec(&duplicate).unwrap()
-        )
-        .is_err());
+        assert!(
+            compute_evidence_outcome_report_commitment(
+                &plan,
+                &serde_json::to_vec(&duplicate).unwrap()
+            )
+            .is_err()
+        );
         let duplicate_report = full_report(duplicate);
         let duplicate_verification =
             verify_evidence_outcome_report(&plan, &duplicate_report).unwrap();
@@ -1156,29 +1207,35 @@ mod tests {
 
         let mut wrong_condition = fields(&plan);
         wrong_condition.records[0].condition = "source_contradiction".to_owned();
-        assert!(compute_evidence_outcome_report_commitment(
-            &plan,
-            &serde_json::to_vec(&wrong_condition).unwrap()
-        )
-        .is_err());
+        assert!(
+            compute_evidence_outcome_report_commitment(
+                &plan,
+                &serde_json::to_vec(&wrong_condition).unwrap()
+            )
+            .is_err()
+        );
 
         // Evaluator revision and decision rules cannot be changed after the plan
         // commitment without invalidating outcome-report admission.
         let mut changed_evaluator = fields(&plan);
         changed_evaluator.evaluator_revision_sha256 = digest('1');
-        assert!(compute_evidence_outcome_report_commitment(
-            &plan,
-            &serde_json::to_vec(&changed_evaluator).unwrap()
-        )
-        .is_err());
+        assert!(
+            compute_evidence_outcome_report_commitment(
+                &plan,
+                &serde_json::to_vec(&changed_evaluator).unwrap()
+            )
+            .is_err()
+        );
 
         let mut changed_rules = fields(&plan);
         changed_rules.decision_rules_sha256 = digest('2');
-        assert!(compute_evidence_outcome_report_commitment(
-            &plan,
-            &serde_json::to_vec(&changed_rules).unwrap()
-        )
-        .is_err());
+        assert!(
+            compute_evidence_outcome_report_commitment(
+                &plan,
+                &serde_json::to_vec(&changed_rules).unwrap()
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -1211,11 +1268,13 @@ mod tests {
         assert!(verification.valid, "{:?}", verification.issues);
 
         contaminated.records[0].task_correctness = TaskCorrectnessV1::Correct;
-        assert!(compute_evidence_outcome_report_commitment(
-            &plan,
-            &serde_json::to_vec(&contaminated).unwrap()
-        )
-        .is_err());
+        assert!(
+            compute_evidence_outcome_report_commitment(
+                &plan,
+                &serde_json::to_vec(&contaminated).unwrap()
+            )
+            .is_err()
+        );
 
         let mut over_budget = fields(&plan);
         over_budget.records[1].terminal_status = OutcomeTerminalStatusV1::BudgetViolation;
@@ -1229,11 +1288,13 @@ mod tests {
         let verification = verify_evidence_outcome_report(&plan, &report).unwrap();
         assert!(verification.valid, "{:?}", verification.issues);
         over_budget.records[1].task_correctness = TaskCorrectnessV1::Incorrect;
-        assert!(compute_evidence_outcome_report_commitment(
-            &plan,
-            &serde_json::to_vec(&over_budget).unwrap()
-        )
-        .is_err());
+        assert!(
+            compute_evidence_outcome_report_commitment(
+                &plan,
+                &serde_json::to_vec(&over_budget).unwrap()
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -1241,19 +1302,17 @@ mod tests {
         let plan = intervention_plan();
         let mut bad = fields(&plan);
         bad.records[0].confidence_millionths = Some(1_000_001);
-        assert!(compute_evidence_outcome_report_commitment(
-            &plan,
-            &serde_json::to_vec(&bad).unwrap()
-        )
-        .is_err());
+        assert!(
+            compute_evidence_outcome_report_commitment(&plan, &serde_json::to_vec(&bad).unwrap())
+                .is_err()
+        );
 
         bad = fields(&plan);
         bad.records[0].confidence_source = ConfidenceSourceV1::None;
-        assert!(compute_evidence_outcome_report_commitment(
-            &plan,
-            &serde_json::to_vec(&bad).unwrap()
-        )
-        .is_err());
+        assert!(
+            compute_evidence_outcome_report_commitment(&plan, &serde_json::to_vec(&bad).unwrap())
+                .is_err()
+        );
     }
 
     #[test]
