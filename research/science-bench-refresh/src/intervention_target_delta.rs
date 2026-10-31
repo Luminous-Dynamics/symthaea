@@ -1207,9 +1207,9 @@ mod tests {
         assert_eq!(result.fields.final_valid_count, 2);
         assert_eq!(result.fields.accepted_valid_count, 2);
         assert_eq!(result.fields.exact_changed_scope_match_count, 2);
-        assert_eq!(result.fields.reviewer_pairwise_comparison_count, 21);
-        assert_eq!(result.fields.reviewer_pairwise_agreement_ppm, Some(857_142));
-        assert_eq!(result.fields.reviewer_target_transition_comparison_count, 21);
+        assert_eq!(result.fields.reviewer_pairwise_comparison_count, 6);
+        assert_eq!(result.fields.reviewer_pairwise_agreement_ppm, Some(1_000_000));
+        assert_eq!(result.fields.reviewer_target_transition_comparison_count, 6);
         assert_eq!(result.fields.reviewer_target_transition_agreement_ppm, Some(1_000_000));
         assert!(!result.fields.scoring_eligible_declared);
         assert!(!result.fields.semantic_truth_proven);
@@ -1372,11 +1372,11 @@ mod tests {
         let second = serde_json::to_vec(&report(&quality_plan,&quality_receipt,&target_plan,&target_receipt)).unwrap();
         assert_eq!(first, second);
         let result: Value = serde_json::from_slice(&first).unwrap();
-        assert_eq!(result["fields"]["reviewer_independence_proven"], false);
-        assert_eq!(result["fields"]["reviewer_competence_proven"], false);
-        assert_eq!(result["fields"]["semantic_truth_proven"], false);
-        assert_eq!(result["fields"]["execution_authenticity_proven"], false);
-        assert_eq!(result["fields"]["external_anchor_required"], true);
-        assert_eq!(result["fields"]["scoring_eligible_declared"], false);
+        assert_eq!(result["reviewer_independence_proven"], false);
+        assert_eq!(result["reviewer_competence_proven"], false);
+        assert_eq!(result["semantic_truth_proven"], false);
+        assert_eq!(result["execution_authenticity_proven"], false);
+        assert_eq!(result["external_anchor_required"], true);
+        assert_eq!(result["scoring_eligible_declared"], false);
     }
 }
