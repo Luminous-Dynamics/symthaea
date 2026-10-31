@@ -54,7 +54,7 @@ Every row is keyed by scenario, horizon, execution block, candidate budget, and 
 - Fraction of visited states outside a declared rectangular training-support proxy.
 - Uniform 201-point one-step state-transition RMSE and selected-trajectory one-step state RMSE against the reference point model. The former is an evaluator-only, low-dimensional diagnostic; the two errors are intentionally reported side by side.
 - Reference-model false-safe rate when the point model predicts nontermination but the environment terminates.
-- Candidate-sequence queries, model-head evaluations, learned-model transition evaluations, oracle transition evaluations, and evaluator-only diagnostic transitions, separately.
+- Candidate-sequence queries, model-head evaluations, learned-model transition evaluations, oracle transition evaluations, and evaluator-only diagnostic transitions, separately. Transition calls are counted at the rollout step where they occur, so terminal truncation reduces the recorded count rather than being charged as a full horizon.
 
 The false-safe and one-step error fields are evaluator-side diagnostics applied to every policy trajectory. They are **not** claims about a policy's own alarm or calibration. The support box is a controlled synthetic proxy, not a learned density estimate or a formal OOD detector.
 
