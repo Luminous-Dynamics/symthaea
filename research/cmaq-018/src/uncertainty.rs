@@ -214,7 +214,10 @@ fn validate_joint_action_set_shape(
     if !is_lower_hex_sha256(&bank.joint_draw_bank_sha256) {
         return Err(IntervalError::InvalidJointDrawDigest);
     }
-    if bank.action_ids.len() < 2 || bank.outcome_samples.len() != bank.action_ids.len() {
+    if bank.action_ids.len() < 2 {
+        return Err(IntervalError::InsufficientActions);
+    }
+    if bank.outcome_samples.len() != bank.action_ids.len() {
         return Err(IntervalError::UnequalActionSetCardinality);
     }
     if bank.joint_draw_ids.len() < 2 {
@@ -369,6 +372,15 @@ pub fn joint_action_effect_interval(
     nominal_coverage: f64,
 ) -> Result<ActionEffectInterval, IntervalError> {
     validate_joint_action_set(bank)?;
+    joint_action_effect_interval_validated(bank, left_action_id, right_action_id, nominal_coverage)
+}
+
+fn joint_action_effect_interval_validated(
+    bank: &JointActionSetSamples,
+    left_action_id: u64,
+    right_action_id: u64,
+    nominal_coverage: f64,
+) -> Result<ActionEffectInterval, IntervalError> {
     if left_action_id == right_action_id {
         return Err(IntervalError::SameActionRequested);
     }
@@ -401,7 +413,7 @@ pub fn all_joint_action_effect_intervals(
     let mut effects = Vec::with_capacity(ids.len() * (ids.len() - 1) / 2);
     for left in 0..ids.len() {
         for right in (left + 1)..ids.len() {
-            effects.push(joint_action_effect_interval(
+            effects.push(joint_action_effect_interval_validated(
                 bank, ids[left], ids[right], nominal_coverage
             )?);
         }
