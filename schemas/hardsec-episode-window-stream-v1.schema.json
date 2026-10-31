@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/hardsec-episode-window-stream-v1.schema.json",
+  "title": "HARDSEC fixed-length episode window stream v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_domain",
+    "stream_id",
+    "evaluation_group_id",
+    "score_artifact_sha256",
+    "context_assignment_policy_id",
+    "context_assignment_artifact_sha256",
+    "randomizer_source_sha256",
+    "records"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-episode-window-stream-v1"
+    },
+    "evidence_domain": {
+      "enum": [
+        "synthetic_fixture",
+        "simulator",
+        "physical_hardware"
+      ]
+    },
+    "stream_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_group_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "score_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "context_assignment_policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "context_assignment_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "randomizer_source_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence_index",
+          "episode_id",
+          "execution_group_id",
+          "source_trace_sha256",
+          "program_binary_sha256",
+          "device_config_id",
+          "randomizer_u",
+          "windows"
+        ],
+        "properties": {
+          "sequence_index": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "episode_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "execution_group_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_trace_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "program_binary_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "device_config_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "randomizer_u": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "exclusiveMaximum": 1
+          },
+          "windows": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "window_index",
+                "source_sequence_index",
+                "window_id",
+                "anomaly_score",
+                "sensor_state",
+                "pmu_qualification_result",
+                "source_offset_start",
+                "source_offset_end"
+              ],
+              "properties": {
+                "window_index": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "source_sequence_index": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "window_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "anomaly_score": {
+                  "type": "number"
+                },
+                "sensor_state": {
+                  "enum": [
+                    "valid",
+                    "missing",
+                    "stale",
+                    "misaligned",
+                    "multiplexed",
+                    "untrusted"
+                  ]
+                },
+                "pmu_qualification_result": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source_offset_start": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "source_offset_end": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
