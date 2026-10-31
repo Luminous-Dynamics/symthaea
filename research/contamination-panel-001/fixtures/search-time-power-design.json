@@ -1,0 +1,29 @@
+{
+  "schema": "symthaea.search_time_power_config.v1",
+  "design_id": "search-time-block-power-pilot-2026-10",
+  "primary_contrast": "allowlisted_minus_network_disabled",
+  "candidate_block_counts": [
+    20,
+    40,
+    60,
+    80,
+    100
+  ],
+  "monte_carlo_repetitions": 5000,
+  "baseline_score_permille": 700,
+  "smallest_effect_of_interest_permille": 30,
+  "shared_block_noise_sd_permille": 20,
+  "arm_residual_noise_sd_permille": 45,
+  "within_block_correlation_permille": 500,
+  "effect_heterogeneity_sd_permille": 10,
+  "run_order_effect_permille": 5,
+  "missing_block_rate_permille": 20,
+  "alpha_permille": 50,
+  "maximum_type_i_upper_permille": 60,
+  "minimum_power_lower_permille": 800,
+  "minimum_coverage_lower_permille": 930,
+  "maximum_coverage_upper_permille": 970,
+  "maximum_inconclusive_rate_permille": 1,
+  "maximum_clipped_score_fraction_permille": 50,
+  "simulation_seed_hex": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}
