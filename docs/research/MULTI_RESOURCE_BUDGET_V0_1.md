@@ -29,7 +29,7 @@ Each resource definition includes:
 - resource class (accelerator time, CPU time, target-device time, instrument time, energy, money, storage, operator time, concurrency slots, custom);
 - SHA-256 for the cost model/instrument accounting that produces quantities.
 
-The registry digest is canonicalized by resource ID. Changing a unit or cost model changes the digest. Registry identities are required by both action-cost and budget vectors.
+The registry digest is canonicalized by resource ID. A valid registry must also present resources in strictly sorted ID order, so action-cost and budget vectors have one canonical coordinate order. Changing a unit or cost model changes the digest. Registry identities are required by both action-cost and budget vectors.
 
 ## 3. Complete action-cost vectors
 
@@ -53,7 +53,7 @@ Remaining headroom is computed independently for every resource:
 
 `headroom_r = total_r - spent_r - reserve_r`
 
-Overflow in spent-plus-reserve or an amount exceeding the total budget is a hard error. An action is feasible only when its cost fits every headroom dimension. No borrowing across dimensions occurs, and the scheduler never assumes exchange rates.
+Overflow in spent-plus-reserve or an amount exceeding the total budget is a hard error. An action is resource-feasible only when its cost fits every headroom dimension. Separately, its conservative benefit lower bound must be positive to be benefit-eligible. The assessment reports both predicates independently; no borrowing across dimensions occurs, and the scheduler never assumes exchange rates.
 
 If the same instrument is exclusive or has a concurrency limit, model it as an additional resource with explicit integer capacity units. More advanced scheduling with overlapping intervals is a follow-on; v0.1 is an additive budget/capacity check.
 
@@ -78,7 +78,7 @@ All non-dominated actions are returned. When several incomparable actions remain
 
 ## 6. Tests and boundaries
 
-Fourteen authored Rust tests cover:
+Sixteen authored Rust tests cover:
 1. canonical registry digest under resource-order permutation;
 2. changed cost model / stale registry rejection;
 3. per-resource headroom after spent amounts and reserves;
