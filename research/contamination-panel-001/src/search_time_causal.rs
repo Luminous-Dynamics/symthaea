@@ -79,6 +79,7 @@ pub struct SearchTrialConditionRunV1 {
     pub state_reset_receipt_sha256: String,
     pub budget_spec_sha256: String,
     pub run_execution_receipt_sha256: String,
+    pub condition_policy_sha256: String,
     pub trace: SearchTimeExposureTraceV1,
     pub findings: SearchTimeExposureFindingsV1,
     pub score_report: FreshScoreReportV1,
@@ -365,7 +366,9 @@ fn validate_run(
     if !within_budget(run, &study.budget) {
         return Err(format!("run {} exceeded a declared inference budget", run.run_id));
     }
-    if run.trace.run_id != run.run_id
+    validate_digest(&run.condition_policy_sha256, "condition_policy_sha256")?;
+    if run.trace.network_policy_sha256 != run.condition_policy_sha256
+        || run.trace.run_id != run.run_id
         || run.trace.benchmark_id != study.benchmark_id
         || run.trace.benchmark_version != study.benchmark_version
         || run.trace.model_checkpoint_sha256 != study.model_checkpoint_sha256
@@ -530,15 +533,20 @@ pub fn analyze_search_time_access_trial(
             condition_answer[condition].push(finding_audit.answer_bearing_count as f64);
             condition_unknown[condition].push(finding_audit.unknown_count as f64);
         }
-        let offline_answer = f64::from(u32::try_from(
-            audit_search_time_findings(&offline.trace, &offline.findings)?.answer_bearing_count
-        ).unwrap_or(u32::MAX));
-        let allowlisted_answer = f64::from(u32::try_from(
-            audit_search_time_findings(&allowlisted.trace, &allowlisted.findings)?.answer_bearing_count
-        ).unwrap_or(u32::MAX));
-        let unrestricted_answer = f64::from(u32::try_from(
-            audit_search_time_findings(&unrestricted.trace, &unrestricted.findings)?.answer_bearing_count
-        ).unwrap_or(u32::MAX));
+        let offline_answer_count =
+            audit_search_time_findings(&offline.trace, &offline.findings)?.answer_bearing_count;
+        let allowlisted_answer_count =
+            audit_search_time_findings(&allowlisted.trace, &allowlisted.findings)?.answer_bearing_count;
+        let unrestricted_answer_count =
+            audit_search_time_findings(&unrestricted.trace, &unrestricted.findings)?.answer_bearing_count;
+        let offline_answer = offline_answer_count as f64;
+        let allowlisted_answer = allowlisted_answer_count as f64;
+        let unrestricted_answer = unrestricted_answer_count as f64;
+        let answer_count_difference = |left: u64, right: u64| -> Result<i64, String> {
+            let left = i64::try_from(left).map_err(|_| "answer-finding count exceeds i64")?;
+            let right = i64::try_from(right).map_err(|_| "answer-finding count exceeds i64")?;
+            left.checked_sub(right).ok_or_else(|| "answer-finding difference overflows i64".to_owned())
+        };
         allowlisted_disabled_accuracy.push(
             allowlisted.score_report.accuracy_over_all_permille
                 - offline.score_report.accuracy_over_all_permille
@@ -566,8 +574,8 @@ pub fn analyze_search_time_access_trial(
             unrestricted_minus_allowlisted_accuracy_permille: unrestricted.score_report.accuracy_over_all_permille - allowlisted.score_report.accuracy_over_all_permille,
             allowlisted_minus_disabled_coverage_permille: allowlisted.score_report.coverage_permille - offline.score_report.coverage_permille,
             unrestricted_minus_disabled_coverage_permille: unrestricted.score_report.coverage_permille - offline.score_report.coverage_permille,
-            allowlisted_answer_bearing_minus_disabled: i64::try_from(allowlisted_answer as u64).unwrap_or(i64::MAX) - i64::try_from(offline_answer as u64).unwrap_or(i64::MAX),
-            unrestricted_answer_bearing_minus_disabled: i64::try_from(unrestricted_answer as u64).unwrap_or(i64::MAX) - i64::try_from(offline_answer as u64).unwrap_or(i64::MAX),
+            allowlisted_answer_bearing_minus_disabled: answer_count_difference(allowlisted_answer_count, offline_answer_count)?,
+            unrestricted_answer_bearing_minus_disabled: answer_count_difference(unrestricted_answer_count, offline_answer_count)?,
         });
         every_run_completed &= runs.iter().all(|run| run.status == SearchTrialRunStatusV1::Completed);
         every_trace_valid &= runs.iter().all(|run| audit_search_time_trace(&run.trace).map(|a| a.valid).unwrap_or(false));
@@ -668,7 +676,7 @@ mod tests {
             benchmark_version: study.benchmark_version.clone(),
             model_checkpoint_sha256: study.model_checkpoint_sha256.clone(),
             challenge_packet_sha256: study.challenge_packet_sha256.clone(),
-            network_policy_sha256: digest(&format!("policy-{suffix}")),
+            network_policy_sha256: digest(&format!("policy-{condition:?}")),
             enforcement_build_sha256: study.enforcement_build_sha256.clone(),
             policy_id: format!("policy-{condition:?}"),
             access_mode: access,
@@ -764,6 +772,7 @@ mod tests {
             state_reset_receipt_sha256: digest(&format!("reset-{suffix}")),
             budget_spec_sha256: budget_digest(&study.budget).unwrap(),
             run_execution_receipt_sha256,
+            condition_policy_sha256: trace.network_policy_sha256.clone(),
             trace,
             findings,
             score_report,
@@ -960,7 +969,8 @@ mod tests {
                 run.state_reset_receipt_sha256 = digest(&format!("reset-{suffix}"));
                 run.run_execution_receipt_sha256 = digest(&format!("execution-{suffix}"));
                 run.trace.run_id = run.run_id.clone();
-                run.trace.network_policy_sha256 = digest(&format!("policy-{suffix}"));
+                run.trace.network_policy_sha256 = digest(&format!("policy-{:?}", run.condition));
+                run.condition_policy_sha256 = run.trace.network_policy_sha256.clone();
                 crate::search_time::seal_search_time_trace(&mut run.trace).unwrap();
                 run.findings.run_id = run.run_id.clone();
                 run.findings.trace_root_sha256 = run.trace.trace_root_sha256.clone();
@@ -1014,7 +1024,8 @@ mod tests {
                     run.order_position = (order.iter().position(|x| *x == condition).unwrap() + 1) as u8;
                     run.run_id.push_str("-extra");
                     run.trace.run_id = run.run_id.clone();
-                    run.trace.network_policy_sha256 = digest("extra-policy");
+                    run.trace.network_policy_sha256 = digest(&format!("extra-policy-{:?}", run.condition));
+                    run.condition_policy_sha256 = run.trace.network_policy_sha256.clone();
                     run.sandbox_namespace_sha256 = digest("extra-sandbox");
                     run.agent_memory_namespace_sha256 = digest("extra-memory");
                     run.cache_namespace_sha256 = digest("extra-cache");
