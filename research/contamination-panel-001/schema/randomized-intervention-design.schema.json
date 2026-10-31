@@ -15,6 +15,8 @@
     "training_stage",
     "exposure_mechanism",
     "target_exposure_fraction_permille",
+    "shared_training_corpus_sha256",
+    "shared_training_token_count",
     "total_training_token_budget",
     "training_steps",
     "training_hyperparameters_sha256",
@@ -108,6 +110,13 @@
       "items": {
         "$ref": "#/$defs/cluster"
       }
+    },
+    "shared_training_corpus_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "shared_training_token_count": {
+      "type": "integer",
+      "minimum": 1
     }
   },
   "$defs": {
