@@ -154,6 +154,7 @@ pub fn run(catalog_path: &Path, out_dir: &Path) -> anyhow::Result<MtimeFixtureRu
     let cargo_home = run_dir.join("cargo-home");
     fs::create_dir(&cargo_home)?;
 
+    let declared_baseline_mtime = fs::metadata(&declared_input)?.modified()?;
     let mtime_baseline_mtime = fs::metadata(&mtime_input)?.modified()?;
     let declared_baseline = run_cargo(
         &cargo, &rustc_binary, &cargo_home, &run_dir, &declared_dir,
@@ -525,6 +526,13 @@ mod tests {
     fn fixture_uses_different_package_ids_but_same_output_contract() {
         assert!(FIXTURE.iter().any(|(p,s)| *p=="declared/Cargo.toml" && s.contains("basalt-cargo-mtime-declared-control")));
         assert!(FIXTURE.iter().any(|(p,s)| *p=="mtime/Cargo.toml" && s.contains("basalt-cargo-mtime-adversary")));
+    }
+
+    #[test]
+    fn future_positive_control_mtime_is_strictly_newer_than_baseline() {
+        let baseline = UNIX_EPOCH + Duration::from_secs(100);
+        let advanced = baseline.checked_add(Duration::from_secs(60)).unwrap();
+        assert!(advanced > baseline);
     }
 
     #[test]
