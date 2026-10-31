@@ -157,3 +157,12 @@ This is an execution-fairness precondition, not a full confirmatory-science gate
 The AR-5B4 work now has implementation candidates for the event tape, executable cost models, cross-policy reconciliation, content-addressed offer-set manifests, and four-seat Coral round accounting. The source-state digest in an offer-set manifest remains a commitment until the underlying evaluator-owned state artifact is retained and independently rehashed. The Coral four-seat adapter preserves the published scheduler as advisory and verifies worker claims; it is not a reproduction of the complete Coral autonomous-agent runtime or a reproduction of the Coral paper's empirical results.
 
 No result is claimed as a verified compile/test pass or a benchmark win until exact-head validation and independent reproduction are available.
+
+
+## Paired inference tiers and composed execution-to-analysis path
+
+The `paired_inference` module now distinguishes `Pilot` from `Confirmatory` analysis. Pilot plans require at least six independent landscape clusters and four paired seeds per landscape. Confirmatory plans require at least 100 independent landscape clusters and four paired seeds per landscape. The cluster bootstrap and paired sign-flip test operate on landscape-level paired means; repeated seeds inside a landscape do not increase the independent-cluster count. These are floors, not a guarantee of adequate power: final sample sizes must still be justified by pilot variance, a preregistered minimum practical effect and endpoint multiplicity control.
+
+`event_tape_set_sha256` hashes the complete, strictly qualified policy tape set in sorted policy-ID order. `analyze_paired_metric_bound_to_tapes` rejects a plan whose preregistered digest differs from the exact supplied tapes and verifies that both named policies and campaign identity are present.
+
+The new `analyze_qualified_paired_metric` composes the pipeline: it requires `qualify_mechanism_matched_campaign` to pass common-contract reconciliation, exact offer-set matching/action eligibility, complete schedules, fully known raw meters, recomputed charges, and equal realized normalized spend; it then checks the tape-set digest and runs the preregistered inference. Its successful result means **matched execution plus statistical analysis** only. It does not certify evaluator independence, scientific novelty, causal mechanism, held-out transfer or SOTA.
