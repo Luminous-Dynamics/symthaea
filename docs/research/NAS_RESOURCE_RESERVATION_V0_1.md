@@ -68,7 +68,7 @@ Every transition records:
 - previous event digest;
 - domain-separated event digest.
 
-The record digest binds current reservation state and latest event pointer. The top-level ledger digest binds the full configuration, all records, events, and current epoch.
+The record digest binds current reservation state, complete preflight receipt, and latest event pointer. The top-level ledger digest binds the full configuration, all records, events, and current epoch.
 
 The verifier:
 1. validates resource registry and starting budget;
