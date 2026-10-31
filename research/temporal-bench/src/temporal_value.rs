@@ -499,7 +499,7 @@ mod tests {
         candidate_a.confidence_ppm = 900_000;
         candidate_a.relevance_ppm = 900_000;
         candidate_a.freshness_ppm = 900_000;
-        let candidate_b = candidate(2, 1, 10);
+        let candidate_b = candidate(2, 1, 9);
         let plan = select_retained_items(
             &[candidate_a, candidate_b],
             1,
@@ -508,7 +508,7 @@ mod tests {
             [0; 32],
         )
         .unwrap();
-        // 15 * 0.9^3 = 10.935, which exceeds candidate B's value of 10.
+        // 15 * 0.9^3 = 10.935, which exceeds candidate B's value of 9.
         assert_eq!(plan.selected_ids, vec![1]);
     }
 
