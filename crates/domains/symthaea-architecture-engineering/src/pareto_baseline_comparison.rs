@@ -261,8 +261,8 @@ pub fn compare_pareto_baselines(
                 "comparison contains a duplicate algorithm ID",
             ));
         }
-        if analysis_plan.objective_specs != objective_specs
-            || analysis_plan.reference_point_utility != reference_point_utility
+        if analysis_plan.objective_specs.as_slice() != objective_specs
+            || analysis_plan.reference_point_utility.as_slice() != reference_point_utility
         {
             return Err(BaselineComparisonError::new(
                 format!("runs[{index}].analysis_plan"),
