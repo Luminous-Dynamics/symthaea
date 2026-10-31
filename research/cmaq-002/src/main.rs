@@ -538,7 +538,14 @@ struct Summary {
     contradictions: usize,
 }
 
-fn evaluate_strategy(strategy: Strategy, seed: u64, probe_budget: usize, decision_horizon: usize, probe_cost: f64) -> Summary {
+fn evaluate_strategy(
+    strategy: Strategy,
+    seed: u64,
+    probe_budget: usize,
+    decision_horizon: usize,
+    probe_cost: f64,
+    allocator_cost_per_evaluation: f64,
+) -> Summary {
     let worlds = mechanisms();
     let all_indices: Vec<usize> = (0..worlds.len()).collect();
     let mut probe_count = 0usize;
@@ -547,7 +554,15 @@ fn evaluate_strategy(strategy: Strategy, seed: u64, probe_budget: usize, decisio
     let mut net_utility_total = 0.0;
     let mut regret_total = 0.0;
     let mut net_regret_total = 0.0;
+    let mut decision_gain_total = 0.0;
+    let mut decision_flip_total = 0usize;
+    let mut beneficial_flip_total = 0usize;
+    let mut harmful_flip_total = 0usize;
+    let mut allocator_score_evaluation_total = 0usize;
+    let mut allocator_cost_total = 0.0;
+    let mut safety_blocked_candidate_total = 0usize;
     let mut unsafe_actions = 0usize;
+    let mut unsafe_probes = 0usize;
     let mut contradictions = 0usize;
 
     for true_index in 0..worlds.len() {
@@ -557,11 +572,20 @@ fn evaluate_strategy(strategy: Strategy, seed: u64, probe_budget: usize, decisio
         } else {
             all_indices.clone()
         };
+        let initial_posterior = posterior.clone();
         let mut used = BTreeSet::new();
         let mut rng = SplitMix64::new(seed ^ ((true_index as u64 + 1) * 0x9E37_79B9));
 
-        if !matches!(strategy, Strategy::Oracle) {
+        if !matches!(strategy, Strategy::Oracle | Strategy::NoProbe) {
             for _ in 0..probe_budget {
+                let (safe_candidates, blocked_candidates) =
+                    available_probe_queries(&worlds, &posterior, &used);
+                safety_blocked_candidate_total += blocked_candidates;
+                let score_evaluations = allocator_score_evaluations(strategy, safe_candidates.len());
+                allocator_score_evaluation_total += score_evaluations;
+                let selection_cost = score_evaluations as f64 * allocator_cost_per_evaluation;
+                allocator_cost_total += selection_cost;
+
                 let Some(query) = select_probe(
                     strategy,
                     &worlds,
@@ -570,11 +594,16 @@ fn evaluate_strategy(strategy: Strategy, seed: u64, probe_budget: usize, decisio
                     &mut rng,
                     decision_horizon,
                     probe_cost,
+                    allocator_cost_per_evaluation,
                 ) else {
                     break;
                 };
                 used.insert(query);
+                probe_count += 1;
                 let observed = true_world.sense(query);
+                if !observed.safe {
+                    unsafe_probes += 1;
+                }
                 match update_posterior(&worlds, &posterior, query, observed) {
                     Ok(next) => posterior = next,
                     Err(_) => {
@@ -582,15 +611,37 @@ fn evaluate_strategy(strategy: Strategy, seed: u64, probe_budget: usize, decisio
                         break;
                     }
                 }
-                probe_count += 1;
             }
         }
 
         posterior_size_total += posterior.len();
+        let (baseline_utility, _) =
+            actual_decision_value(true_world, &worlds, &initial_posterior);
         let (utility, unsafe_count) = actual_decision_value(true_world, &worlds, &posterior);
         unsafe_actions += unsafe_count;
+        decision_gain_total += utility - baseline_utility;
+
+        for context in 0..CONTEXTS {
+            let before_action = candidate_action(&worlds, &initial_posterior, context);
+            let after_action = candidate_action(&worlds, &posterior, context);
+            if before_action != after_action {
+                decision_flip_total += 1;
+                let (before_value, _) =
+                    actual_context_utility(true_world, context, before_action);
+                let (after_value, _) =
+                    actual_context_utility(true_world, context, after_action);
+                if after_value > before_value {
+                    beneficial_flip_total += 1;
+                } else if after_value < before_value {
+                    harmful_flip_total += 1;
+                }
+            }
+        }
+
         let oracle_utility = oracle_decision_value(true_world);
-        let net_utility = utility - used.len() as f64 * probe_cost / decision_horizon as f64;
+        let total_declared_cost =
+            used.len() as f64 * probe_cost + allocator_cost_total;
+        let net_utility = utility - total_declared_cost / decision_horizon as f64;
         utility_total += utility;
         net_utility_total += net_utility;
         regret_total += (oracle_utility - utility).max(0.0);
@@ -606,7 +657,23 @@ fn evaluate_strategy(strategy: Strategy, seed: u64, probe_budget: usize, decisio
         mean_net_utility: net_utility_total / count,
         mean_regret: regret_total / count,
         mean_net_regret: net_regret_total / count,
+        mean_decision_gain_vs_no_probe: decision_gain_total / count,
+        mean_decision_flip_fraction: decision_flip_total as f64 / (count * CONTEXTS as f64),
+        beneficial_flip_fraction: if decision_flip_total == 0 {
+            0.0
+        } else {
+            beneficial_flip_total as f64 / decision_flip_total as f64
+        },
+        harmful_flip_fraction: if decision_flip_total == 0 {
+            0.0
+        } else {
+            harmful_flip_total as f64 / decision_flip_total as f64
+        },
+        mean_allocator_score_evaluations: allocator_score_evaluation_total as f64 / count,
+        mean_allocator_cost: allocator_cost_total / count,
+        mean_safety_blocked_candidates: safety_blocked_candidate_total as f64 / count,
         unsafe_actions,
+        unsafe_probes,
         contradictions,
     }
 }
