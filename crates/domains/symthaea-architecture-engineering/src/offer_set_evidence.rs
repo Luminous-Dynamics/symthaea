@@ -17,8 +17,8 @@ use sha2::{Digest, Sha256};
 use super::event_tape::EventTape;
 use super::offer_set::{verify_matched_offer_sets, OfferSetManifest, OfferSetMatchSummary, OfferSetSnapshot};
 use super::paired_inference::{
-    analyze_qualified_paired_metric, PairedInferenceError, PairedInferencePlan,
-    PairedMetricObservation, QualifiedPairedInference,
+    analyze_qualified_paired_metric, event_tape_set_sha256, PairedInferenceError,
+    PairedInferencePlan, PairedMetricObservation, QualifiedPairedInference,
 };
 
 const SCHEMA: &str = "symthaea.ar5b4.offer-set-evidence-bundle";
@@ -369,6 +369,33 @@ impl OfferSetEvidenceBoundPlan {
         bundles: &[OfferSetEvidenceBundle],
     ) -> Result<Self, OfferSetEvidenceError> {
         validate_evidence_for_tapes(tapes, bundles)?;
+        let actual_tape_set_sha256 = event_tape_set_sha256(tapes)
+            .map_err(|error| OfferSetEvidenceError::new("event_tape_set_sha256", error.to_string()))?;
+        if actual_tape_set_sha256 != paired_inference_plan.campaign_event_tape_set_sha256 {
+            return Err(OfferSetEvidenceError::new(
+                "paired_inference_plan.campaign_event_tape_set_sha256",
+                "paired-inference plan is not bound to the exact supplied EventTape set",
+            ));
+        }
+        let campaign_id = tapes[0].header().campaign_id.as_str();
+        if paired_inference_plan.campaign_id != campaign_id {
+            return Err(OfferSetEvidenceError::new(
+                "paired_inference_plan.campaign_id",
+                "paired-inference plan campaign differs from the EventTape set",
+            ));
+        }
+        let policy_ids = tapes.iter()
+            .map(|tape| tape.header().policy.policy_id.as_str())
+            .collect::<BTreeSet<_>>();
+        if paired_inference_plan.baseline_policy_id == paired_inference_plan.challenger_policy_id
+            || !policy_ids.contains(paired_inference_plan.baseline_policy_id.as_str())
+            || !policy_ids.contains(paired_inference_plan.challenger_policy_id.as_str())
+        {
+            return Err(OfferSetEvidenceError::new(
+                "paired_inference_plan.policy_ids",
+                "baseline and challenger must be distinct policies present in the EventTape set",
+            ));
+        }
         let offer_set_evidence_set_sha256 = evidence_set_digest(bundles)?;
         Ok(Self { paired_inference_plan, offer_set_evidence_set_sha256 })
     }
@@ -644,12 +671,12 @@ mod tests {
         tape
     }
 
-    fn paired_plan() -> PairedInferencePlan {
+    fn paired_plan(tapes: &[EventTape]) -> PairedInferencePlan {
         PairedInferencePlan {
             schema: "symthaea.architecture-engineering.paired-inference".to_owned(),
             version: "0.1.0".to_owned(),
             campaign_id: "campaign-1".to_owned(),
-            campaign_event_tape_set_sha256: "0".repeat(64),
+            campaign_event_tape_set_sha256: event_tape_set_sha256(tapes).unwrap(),
             analysis_tier: super::super::paired_inference::AnalysisTier::Pilot,
             baseline_policy_id: "board".to_owned(),
             challenger_policy_id: "thompson".to_owned(),
@@ -767,7 +794,7 @@ mod tests {
         let tapes = vec![left_tape.clone(), right_tape.clone()];
         let original_bundles = vec![left_bundle.clone(), right_bundle.clone()];
         let bound_plan = OfferSetEvidenceBoundPlan::new(
-            paired_plan(),
+            paired_plan(&tapes),
             &tapes,
             &original_bundles,
         ).unwrap();
