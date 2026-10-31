@@ -138,6 +138,83 @@ pub struct EvidenceIndexSnapshotReceipt {
     pub index_state_sha256: String,
 }
 
+pub const EXACT_LEXICAL_ENUMERATION_VERSION: &str =
+    "BROCA-EXACT-LEXICAL-ENUMERATION-V1";
+
+/// Speaker identity derived only from a trusted source-step convention.
+/// Unknown or non-AML source formats remain None; they are never treated as User.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceSpeakerRole {
+    User,
+    Assistant,
+}
+
+/// Derive the role from the canonical AML step ID format: user-N or assistant-N.
+/// The source step ID itself is separately bound to the immutable EvidenceIndex
+/// hit and source digest by proof admission.
+pub fn evidence_speaker_role_from_step_id(step_id: Option<&str>) -> Option<EvidenceSpeakerRole> {
+    let (role, index) = step_id?.split_once('-')?;
+    if index.is_empty() || !index.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    match role {
+        "user" => Some(EvidenceSpeakerRole::User),
+        "assistant" => Some(EvidenceSpeakerRole::Assistant),
+        _ => None,
+    }
+}
+
+/// One exact lexical match found by a full scan of the eligible EvidenceIndex.
+/// It carries provenance and digests, not answer text; source payloads are
+/// resolved separately through their source pointers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExactLexicalEnumerationMatch {
+    pub evidence_id: String,
+    pub hdc_id: u64,
+    pub trajectory_id: String,
+    pub source_step_id: Option<String>,
+    pub speaker_role: Option<EvidenceSpeakerRole>,
+    pub source_sha256: String,
+    pub source_pointer: String,
+    pub content_sha256: String,
+}
+
+/// Closed-world receipt for an exact all-query-terms lexical predicate over one
+/// immutable EvidenceIndex snapshot. Complete means complete for this normalized
+/// lexical predicate and snapshot, not semantic recall over raw natural language
+/// or facts the extractor never represented.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExactLexicalEnumerationReceipt {
+    pub algorithm_version: String,
+    pub scope_id: String,
+    pub valid_at_unix_ms: u64,
+    pub known_at_unix_ms: u64,
+    pub index_state_sha256: String,
+    pub query_terms: Vec<String>,
+    pub required_speaker_role: Option<EvidenceSpeakerRole>,
+    pub scanned_record_count: usize,
+    pub eligible_text_record_count: usize,
+    pub matching_record_count: usize,
+    pub distinct_session_count: usize,
+    pub user_authored_match_count: usize,
+    pub assistant_authored_match_count: usize,
+    pub unknown_speaker_match_count: usize,
+    pub matching_evidence_ids_sha256: String,
+    pub receipt_sha256: String,
+}
+
+/// Complete result of exact lexical enumeration. Results are sorted by
+/// evidence_id, independent of HDC ID or insertion order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExactLexicalEnumerationResult {
+    pub receipt: ExactLexicalEnumerationReceipt,
+    pub matches: Vec<ExactLexicalEnumerationMatch>,
+}
+
 /// A scored evidence candidate. Keep this metadata outside the reader context;
 /// the adapter should pass only `context` as a benchmark MemoryContextItem.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -691,6 +768,185 @@ impl EvidenceIndex {
             hit.snapshot_receipt = Some(receipt.clone());
         }
         Ok((receipt, hits))
+    }
+
+    /// Enumerate every eligible text record that contains all normalized
+    /// query terms. Unlike BM25 top-k, this path has no result cap or relevance
+    /// cutoff. The receipt binds the exact index state, temporal coordinates,
+    /// query predicate, speaker filter and complete matching ID set.
+    ///
+    /// This is an exact lexical predicate, not semantic recall. It is suitable
+    /// for count/coverage queries only when the query terms define the desired
+    /// event class or have been normalized by an independently validated
+    /// predicate planner. Synonyms, implicit paraphrases and missing extracted
+    /// facts remain outside its guarantee.
+    pub fn enumerate_exact_lexical_all_terms_at_snapshot(
+        &self,
+        query: &str,
+        scope_id: &str,
+        valid_at_unix_ms: u64,
+        known_at_unix_ms: u64,
+        required_speaker_role: Option<EvidenceSpeakerRole>,
+    ) -> Result<ExactLexicalEnumerationResult, String> {
+        let query_terms: Vec<String> = tokenize_lexical(query)
+            .into_iter()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        self.enumerate_exact_lexical_terms_at_snapshot(
+            &query_terms,
+            scope_id,
+            valid_at_unix_ms,
+            known_at_unix_ms,
+            required_speaker_role,
+        )
+    }
+
+    /// Verify an enumeration by rescanning the current exact index state.
+    /// Any omitted match, injected ID, changed speaker role, digest mutation,
+    /// query mutation or snapshot drift fails closed.
+    pub fn verify_exact_lexical_enumeration(
+        &self,
+        result: &ExactLexicalEnumerationResult,
+    ) -> Result<(), String> {
+        let expected = self.enumerate_exact_lexical_terms_at_snapshot(
+            &result.receipt.query_terms,
+            &result.receipt.scope_id,
+            result.receipt.valid_at_unix_ms,
+            result.receipt.known_at_unix_ms,
+            result.receipt.required_speaker_role,
+        )?;
+        if &expected != result {
+            return Err("exact lexical enumeration does not match a complete scan of the bound index snapshot".into());
+        }
+        Ok(())
+    }
+
+    fn enumerate_exact_lexical_terms_at_snapshot(
+        &self,
+        query_terms: &[String],
+        scope_id: &str,
+        valid_at_unix_ms: u64,
+        known_at_unix_ms: u64,
+        required_speaker_role: Option<EvidenceSpeakerRole>,
+    ) -> Result<ExactLexicalEnumerationResult, String> {
+        if scope_id.trim().is_empty() || scope_id.trim() != scope_id {
+            return Err("enumeration scope_id must be non-empty and trimmed".into());
+        }
+        if query_terms.is_empty() {
+            return Err("exact lexical enumeration requires at least one query term".into());
+        }
+        let normalized: Vec<String> =
+            query_terms.iter().map(|term| term.to_lowercase()).collect();
+        let canonical_terms: Vec<String> = normalized.iter().cloned()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        if canonical_terms != normalized
+            || normalized.iter().any(|term| {
+                term.is_empty() || !term.chars().all(|character| character.is_alphanumeric())
+            })
+        {
+            return Err("query_terms must be sorted, unique, lowercase alphanumeric tokens".into());
+        }
+
+        let snapshot = self.snapshot_receipt(known_at_unix_ms)?;
+        let mut eligible_text_record_count = 0usize;
+        let mut matches = Vec::new();
+
+        for (hdc_id, record) in &self.records {
+            if !record.is_eligible_for(scope_id, valid_at_unix_ms) {
+                continue;
+            }
+            let EvidencePayload::Text { value } = &record.payload else {
+                continue;
+            };
+            eligible_text_record_count += 1;
+
+            let terms: BTreeSet<String> = tokenize_lexical(value).into_iter().collect();
+            if !normalized.iter().all(|term| terms.contains(term)) {
+                continue;
+            }
+
+            let speaker_role =
+                evidence_speaker_role_from_step_id(record.source.step_id.as_deref());
+            if required_speaker_role.is_some_and(|required| speaker_role != Some(required)) {
+                continue;
+            }
+            matches.push(ExactLexicalEnumerationMatch {
+                evidence_id: record.evidence_id.clone(),
+                hdc_id: *hdc_id,
+                trajectory_id: record.source.trajectory_id.clone(),
+                source_step_id: record.source.step_id.clone(),
+                speaker_role,
+                source_sha256: record.source.source_sha256.clone(),
+                source_pointer: record.source.source_pointer.clone(),
+                content_sha256: record.content_sha256.clone(),
+            });
+        }
+
+        matches.sort_by(|left, right| left.evidence_id.cmp(&right.evidence_id));
+        let matching_evidence_ids: Vec<&str> =
+            matches.iter().map(|item| item.evidence_id.as_str()).collect();
+        let matching_evidence_ids_sha256 = sha256_hex(
+            &serde_json::to_vec(&matching_evidence_ids)
+                .map_err(|error| format!("cannot serialize enumerated evidence IDs: {error}"))?,
+        );
+        let distinct_session_count = matches
+            .iter()
+            .map(|item| item.trajectory_id.as_str())
+            .collect::<BTreeSet<_>>()
+            .len();
+        let user_authored_match_count = matches.iter()
+            .filter(|item| item.speaker_role == Some(EvidenceSpeakerRole::User))
+            .count();
+        let assistant_authored_match_count = matches.iter()
+            .filter(|item| item.speaker_role == Some(EvidenceSpeakerRole::Assistant))
+            .count();
+        let unknown_speaker_match_count = matches.iter()
+            .filter(|item| item.speaker_role.is_none())
+            .count();
+
+        let algorithm_version = EXACT_LEXICAL_ENUMERATION_VERSION.to_string();
+        let receipt_payload = (
+            algorithm_version.as_str(),
+            scope_id,
+            valid_at_unix_ms,
+            known_at_unix_ms,
+            snapshot.index_state_sha256.as_str(),
+            &normalized,
+            required_speaker_role,
+            self.records.len(),
+            eligible_text_record_count,
+            matches.len(),
+            distinct_session_count,
+            user_authored_match_count,
+            assistant_authored_match_count,
+            unknown_speaker_match_count,
+            matching_evidence_ids_sha256.as_str(),
+            &matches,
+        );
+        let receipt_bytes = serde_json::to_vec(&receipt_payload)
+            .map_err(|error| format!("cannot serialize exact lexical enumeration receipt: {error}"))?;
+        let receipt = ExactLexicalEnumerationReceipt {
+            algorithm_version,
+            scope_id: scope_id.to_string(),
+            valid_at_unix_ms,
+            known_at_unix_ms,
+            index_state_sha256: snapshot.index_state_sha256,
+            query_terms: normalized,
+            required_speaker_role,
+            scanned_record_count: self.records.len(),
+            eligible_text_record_count,
+            matching_record_count: matches.len(),
+            distinct_session_count,
+            user_authored_match_count,
+            assistant_authored_match_count,
+            unknown_speaker_match_count,
+            matching_evidence_ids_sha256,
+            receipt_sha256: sha256_hex(&receipt_bytes),
+        };
+        Ok(ExactLexicalEnumerationResult { receipt, matches })
     }
 
     /// Resolve ranked HDC IDs to safe context items. Missing IDs, duplicates,
