@@ -195,7 +195,7 @@ class RandomizedCommonDepthCRC:
 
     def verify(self, probabilities: np.ndarray, tolerance: float=1e-9) -> dict:
         P=np.asarray(probabilities,dtype=np.float64)
-        if P.shape!=(len(self.states),len(self.actions)) or np.any(~np.isfinite(P)) or np.any(P<-tolerance):
+        if P.shape!=(len(self.states),len(self.actions)) or np.any(~np.isfinite(P)) or np.any(P<-tolerance) or np.any(P>1.0+tolerance):
             raise ValueError("invalid randomized action table")
         row_sums=P.sum(axis=1)
         if np.max(np.abs(row_sums-1.0))>tolerance:
