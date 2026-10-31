@@ -1,0 +1,468 @@
+{
+  "schema": "symthaea.randomized_contamination_intervention_design.v1",
+  "experiment_id": "causal-contamination-pilot-001",
+  "replicate_id": "replicate-001",
+  "benchmark_id": "symthaea-contamination-panel",
+  "benchmark_version": "v1",
+  "benchmark_task_set_sha256": "00000000000000000000000000000000000000000000000000000000000000c9",
+  "model_base_checkpoint_sha256": "00000000000000000000000000000000000000000000000000000000000000ca",
+  "training_stage": "instruction_sft",
+  "exposure_mechanism": "semantic_variant",
+  "target_exposure_fraction_permille": 500,
+  "total_training_token_budget": 100000,
+  "training_steps": 5000,
+  "training_hyperparameters_sha256": "00000000000000000000000000000000000000000000000000000000000000cb",
+  "optimizer_schedule_sha256": "00000000000000000000000000000000000000000000000000000000000000cc",
+  "treatment_training_corpus_sha256": "00000000000000000000000000000000000000000000000000000000000000cd",
+  "placebo_training_corpus_sha256": "00000000000000000000000000000000000000000000000000000000000000ce",
+  "clusters": [
+    {
+      "cluster_id": "math-source-cluster-01",
+      "task_family": "math",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "item_ids": [
+        "math-source-cluster-01-item-01",
+        "math-source-cluster-01-item-02",
+        "math-source-cluster-01-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "exposure_token_count": 500,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+      "matched_placebo_token_count": 500
+    },
+    {
+      "cluster_id": "math-source-cluster-02",
+      "task_family": "math",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+      "item_ids": [
+        "math-source-cluster-02-item-01",
+        "math-source-cluster-02-item-02",
+        "math-source-cluster-02-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+      "exposure_token_count": 510,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
+      "matched_placebo_token_count": 510
+    },
+    {
+      "cluster_id": "math-source-cluster-03",
+      "task_family": "math",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000007",
+      "item_ids": [
+        "math-source-cluster-03-item-01",
+        "math-source-cluster-03-item-02",
+        "math-source-cluster-03-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000008",
+      "exposure_token_count": 520,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000009",
+      "matched_placebo_token_count": 520
+    },
+    {
+      "cluster_id": "math-source-cluster-04",
+      "task_family": "math",
+      "source_family_sha256": "000000000000000000000000000000000000000000000000000000000000000a",
+      "item_ids": [
+        "math-source-cluster-04-item-01",
+        "math-source-cluster-04-item-02",
+        "math-source-cluster-04-item-03"
+      ],
+      "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000000b",
+      "exposure_token_count": 530,
+      "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000000c",
+      "matched_placebo_token_count": 530
+    },
+    {
+      "cluster_id": "math-source-cluster-05",
+      "task_family": "math",
+      "source_family_sha256": "000000000000000000000000000000000000000000000000000000000000000d",
+      "item_ids": [
+        "math-source-cluster-05-item-01",
+        "math-source-cluster-05-item-02",
+        "math-source-cluster-05-item-03"
+      ],
+      "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000000e",
+      "exposure_token_count": 540,
+      "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000000f",
+      "matched_placebo_token_count": 540
+    },
+    {
+      "cluster_id": "math-source-cluster-06",
+      "task_family": "math",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000010",
+      "item_ids": [
+        "math-source-cluster-06-item-01",
+        "math-source-cluster-06-item-02",
+        "math-source-cluster-06-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000011",
+      "exposure_token_count": 550,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000012",
+      "matched_placebo_token_count": 550
+    },
+    {
+      "cluster_id": "math-source-cluster-07",
+      "task_family": "math",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000013",
+      "item_ids": [
+        "math-source-cluster-07-item-01",
+        "math-source-cluster-07-item-02",
+        "math-source-cluster-07-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000014",
+      "exposure_token_count": 560,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000015",
+      "matched_placebo_token_count": 560
+    },
+    {
+      "cluster_id": "math-source-cluster-08",
+      "task_family": "math",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000016",
+      "item_ids": [
+        "math-source-cluster-08-item-01",
+        "math-source-cluster-08-item-02",
+        "math-source-cluster-08-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000017",
+      "exposure_token_count": 570,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000018",
+      "matched_placebo_token_count": 570
+    },
+    {
+      "cluster_id": "code-source-cluster-01",
+      "task_family": "code",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000019",
+      "item_ids": [
+        "code-source-cluster-01-item-01",
+        "code-source-cluster-01-item-02",
+        "code-source-cluster-01-item-03"
+      ],
+      "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000001a",
+      "exposure_token_count": 500,
+      "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000001b",
+      "matched_placebo_token_count": 500
+    },
+    {
+      "cluster_id": "code-source-cluster-02",
+      "task_family": "code",
+      "source_family_sha256": "000000000000000000000000000000000000000000000000000000000000001c",
+      "item_ids": [
+        "code-source-cluster-02-item-01",
+        "code-source-cluster-02-item-02",
+        "code-source-cluster-02-item-03"
+      ],
+      "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000001d",
+      "exposure_token_count": 510,
+      "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000001e",
+      "matched_placebo_token_count": 510
+    },
+    {
+      "cluster_id": "code-source-cluster-03",
+      "task_family": "code",
+      "source_family_sha256": "000000000000000000000000000000000000000000000000000000000000001f",
+      "item_ids": [
+        "code-source-cluster-03-item-01",
+        "code-source-cluster-03-item-02",
+        "code-source-cluster-03-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000020",
+      "exposure_token_count": 520,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000021",
+      "matched_placebo_token_count": 520
+    },
+    {
+      "cluster_id": "code-source-cluster-04",
+      "task_family": "code",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000022",
+      "item_ids": [
+        "code-source-cluster-04-item-01",
+        "code-source-cluster-04-item-02",
+        "code-source-cluster-04-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000023",
+      "exposure_token_count": 530,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000024",
+      "matched_placebo_token_count": 530
+    },
+    {
+      "cluster_id": "code-source-cluster-05",
+      "task_family": "code",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000025",
+      "item_ids": [
+        "code-source-cluster-05-item-01",
+        "code-source-cluster-05-item-02",
+        "code-source-cluster-05-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000026",
+      "exposure_token_count": 540,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000027",
+      "matched_placebo_token_count": 540
+    },
+    {
+      "cluster_id": "code-source-cluster-06",
+      "task_family": "code",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000028",
+      "item_ids": [
+        "code-source-cluster-06-item-01",
+        "code-source-cluster-06-item-02",
+        "code-source-cluster-06-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000029",
+      "exposure_token_count": 550,
+      "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000002a",
+      "matched_placebo_token_count": 550
+    },
+    {
+      "cluster_id": "code-source-cluster-07",
+      "task_family": "code",
+      "source_family_sha256": "000000000000000000000000000000000000000000000000000000000000002b",
+      "item_ids": [
+        "code-source-cluster-07-item-01",
+        "code-source-cluster-07-item-02",
+        "code-source-cluster-07-item-03"
+      ],
+      "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000002c",
+      "exposure_token_count": 560,
+      "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000002d",
+      "matched_placebo_token_count": 560
+    },
+    {
+      "cluster_id": "code-source-cluster-08",
+      "task_family": "code",
+      "source_family_sha256": "000000000000000000000000000000000000000000000000000000000000002e",
+      "item_ids": [
+        "code-source-cluster-08-item-01",
+        "code-source-cluster-08-item-02",
+        "code-source-cluster-08-item-03"
+      ],
+      "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000002f",
+      "exposure_token_count": 570,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000030",
+      "matched_placebo_token_count": 570
+    },
+    {
+      "cluster_id": "science-source-cluster-01",
+      "task_family": "science",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000031",
+      "item_ids": [
+        "science-source-cluster-01-item-01",
+        "science-source-cluster-01-item-02",
+        "science-source-cluster-01-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000032",
+      "exposure_token_count": 500,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000033",
+      "matched_placebo_token_count": 500
+    },
+    {
+      "cluster_id": "science-source-cluster-02",
+      "task_family": "science",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000034",
+      "item_ids": [
+        "science-source-cluster-02-item-01",
+        "science-source-cluster-02-item-02",
+        "science-source-cluster-02-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000035",
+      "exposure_token_count": 510,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000036",
+      "matched_placebo_token_count": 510
+    },
+    {
+      "cluster_id": "science-source-cluster-03",
+      "task_family": "science",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000037",
+      "item_ids": [
+        "science-source-cluster-03-item-01",
+        "science-source-cluster-03-item-02",
+        "science-source-cluster-03-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000038",
+      "exposure_token_count": 520,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000039",
+      "matched_placebo_token_count": 520
+    },
+    {
+      "cluster_id": "science-source-cluster-04",
+      "task_family": "science",
+      "source_family_sha256": "000000000000000000000000000000000000000000000000000000000000003a",
+      "item_ids": [
+        "science-source-cluster-04-item-01",
+        "science-source-cluster-04-item-02",
+        "science-source-cluster-04-item-03"
+      ],
+      "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000003b",
+      "exposure_token_count": 530,
+      "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000003c",
+      "matched_placebo_token_count": 530
+    },
+    {
+      "cluster_id": "science-source-cluster-05",
+      "task_family": "science",
+      "source_family_sha256": "000000000000000000000000000000000000000000000000000000000000003d",
+      "item_ids": [
+        "science-source-cluster-05-item-01",
+        "science-source-cluster-05-item-02",
+        "science-source-cluster-05-item-03"
+      ],
+      "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000003e",
+      "exposure_token_count": 540,
+      "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000003f",
+      "matched_placebo_token_count": 540
+    },
+    {
+      "cluster_id": "science-source-cluster-06",
+      "task_family": "science",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000040",
+      "item_ids": [
+        "science-source-cluster-06-item-01",
+        "science-source-cluster-06-item-02",
+        "science-source-cluster-06-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000041",
+      "exposure_token_count": 550,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000042",
+      "matched_placebo_token_count": 550
+    },
+    {
+      "cluster_id": "science-source-cluster-07",
+      "task_family": "science",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000043",
+      "item_ids": [
+        "science-source-cluster-07-item-01",
+        "science-source-cluster-07-item-02",
+        "science-source-cluster-07-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000044",
+      "exposure_token_count": 560,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000045",
+      "matched_placebo_token_count": 560
+    },
+    {
+      "cluster_id": "science-source-cluster-08",
+      "task_family": "science",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000046",
+      "item_ids": [
+        "science-source-cluster-08-item-01",
+        "science-source-cluster-08-item-02",
+        "science-source-cluster-08-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000047",
+      "exposure_token_count": 570,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000048",
+      "matched_placebo_token_count": 570
+    },
+    {
+      "cluster_id": "logic-source-cluster-01",
+      "task_family": "logic",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000049",
+      "item_ids": [
+        "logic-source-cluster-01-item-01",
+        "logic-source-cluster-01-item-02",
+        "logic-source-cluster-01-item-03"
+      ],
+      "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000004a",
+      "exposure_token_count": 500,
+      "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000004b",
+      "matched_placebo_token_count": 500
+    },
+    {
+      "cluster_id": "logic-source-cluster-02",
+      "task_family": "logic",
+      "source_family_sha256": "000000000000000000000000000000000000000000000000000000000000004c",
+      "item_ids": [
+        "logic-source-cluster-02-item-01",
+        "logic-source-cluster-02-item-02",
+        "logic-source-cluster-02-item-03"
+      ],
+      "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000004d",
+      "exposure_token_count": 510,
+      "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000004e",
+      "matched_placebo_token_count": 510
+    },
+    {
+      "cluster_id": "logic-source-cluster-03",
+      "task_family": "logic",
+      "source_family_sha256": "000000000000000000000000000000000000000000000000000000000000004f",
+      "item_ids": [
+        "logic-source-cluster-03-item-01",
+        "logic-source-cluster-03-item-02",
+        "logic-source-cluster-03-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000050",
+      "exposure_token_count": 520,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000051",
+      "matched_placebo_token_count": 520
+    },
+    {
+      "cluster_id": "logic-source-cluster-04",
+      "task_family": "logic",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000052",
+      "item_ids": [
+        "logic-source-cluster-04-item-01",
+        "logic-source-cluster-04-item-02",
+        "logic-source-cluster-04-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000053",
+      "exposure_token_count": 530,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000054",
+      "matched_placebo_token_count": 530
+    },
+    {
+      "cluster_id": "logic-source-cluster-05",
+      "task_family": "logic",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000055",
+      "item_ids": [
+        "logic-source-cluster-05-item-01",
+        "logic-source-cluster-05-item-02",
+        "logic-source-cluster-05-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000056",
+      "exposure_token_count": 540,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000057",
+      "matched_placebo_token_count": 540
+    },
+    {
+      "cluster_id": "logic-source-cluster-06",
+      "task_family": "logic",
+      "source_family_sha256": "0000000000000000000000000000000000000000000000000000000000000058",
+      "item_ids": [
+        "logic-source-cluster-06-item-01",
+        "logic-source-cluster-06-item-02",
+        "logic-source-cluster-06-item-03"
+      ],
+      "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000059",
+      "exposure_token_count": 550,
+      "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000005a",
+      "matched_placebo_token_count": 550
+    },
+    {
+      "cluster_id": "logic-source-cluster-07",
+      "task_family": "logic",
+      "source_family_sha256": "000000000000000000000000000000000000000000000000000000000000005b",
+      "item_ids": [
+        "logic-source-cluster-07-item-01",
+        "logic-source-cluster-07-item-02",
+        "logic-source-cluster-07-item-03"
+      ],
+      "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000005c",
+      "exposure_token_count": 560,
+      "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000005d",
+      "matched_placebo_token_count": 560
+    },
+    {
+      "cluster_id": "logic-source-cluster-08",
+      "task_family": "logic",
+      "source_family_sha256": "000000000000000000000000000000000000000000000000000000000000005e",
+      "item_ids": [
+        "logic-source-cluster-08-item-01",
+        "logic-source-cluster-08-item-02",
+        "logic-source-cluster-08-item-03"
+      ],
+      "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000005f",
+      "exposure_token_count": 570,
+      "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000060",
+      "matched_placebo_token_count": 570
+    }
+  ]
+}
