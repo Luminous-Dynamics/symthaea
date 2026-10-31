@@ -281,6 +281,8 @@ Candidate sources:
 - **MAESTRO** (official dataset: https://magenta.tensorflow.org/datasets/maestro) provides aligned piano audio and MIDI useful for piano timing/expressive-performance experiments. Its published CC BY-NC-SA 4.0 terms are non-commercial; do not treat it as unrestricted commercial training data. It is not a multi-instrument coverage corpus.
 - Additional sample libraries must be reviewed asset-by-asset for license, provenance, instrument naming, articulation metadata and redistribution terms.
 
+The official VCSL instrument catalog also lists **Harmonica Special 20 (C/F) and Super 64**, plus dedicated Claves, Cowbells, Cabasa, Tambourines, Bongos, Conga/Quinto/Tumba, Cajon, Claps, Agogo, Guiro, Shaker and Frame Drum entries. These are concrete candidates for sample-backed expansion, not evidence that a local checkout has exact runtime coverage. The sample percussion adapter is tracked in #9406; the Blues harmonica instrument integration is tracked in #9409. See the [official VCSL catalog](https://versilian-studios.com/vcsl/).
+
 Keep source audio private and restricted where licenses or contributor permissions require it. A user uploading a recording does not automatically grant global training, derivative or redistribution rights.
 
 ## 10. Implementation order
@@ -304,6 +306,7 @@ Keep source audio private and restricted where licenses or contributor permissio
 - EVAL-035 #9337 / PR #9352 and #9381 / PR #9383 — topology-specific tail and replayable temporal support.
 - EVAL-036 #9355 — operation-specific symbolic counterfactual validation.
 - MEL-MR-SAMPLES-001 #9406 — sample-bank coverage, per-note replay receipts and sample-backed world percussion.
+- MEL-MR-INSTR-002 #9409 — sample-backed harmonica and a Blues lead option.
 
 MEL-MR-STYLE-001 consumes their verified evidence where relevant and does not weaken their gates.
 
