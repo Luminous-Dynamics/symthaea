@@ -490,7 +490,8 @@ enum ConditionStageV1 {
     Terminal,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct ExecutionCustodyReportFieldsV1 {
     pub schema: String,
     pub run_id: String,
@@ -616,7 +617,7 @@ pub fn analyze_execution_custody(
             *completed_condition_count
         }
         _ => return Err("last event must be run_finished".to_owned()),
-    }
+    };
     if receipt.events.iter().enumerate().any(|(index,event)| matches!(event.payload, ExecutionEventPayloadV1::RunStarted {..} if index != 0) || matches!(event.payload, ExecutionEventPayloadV1::RunFinished {..} if index+1 != receipt.events.len())) {
         return Err("run start/finish event is duplicated or misplaced".to_owned());
     }
