@@ -1,0 +1,87 @@
+{
+  "schema_version": "broca-exhaustive-enumeration-fixtures-v1",
+  "protocol_version": "BROCA-EXACT-LEXICAL-ENUMERATION-V1",
+  "guarantee": "Complete only for exact all-normalized-terms matching over the eligible records in the bound EvidenceIndex snapshot. This is not semantic recall.",
+  "records": [
+    {
+      "evidence_id": "user-1-a",
+      "hdc_id": 1,
+      "trajectory_id": "session-1",
+      "step_id": "user-0",
+      "text": "invoice paid in March"
+    },
+    {
+      "evidence_id": "assistant-1-a",
+      "hdc_id": 2,
+      "trajectory_id": "session-1",
+      "step_id": "assistant-1",
+      "text": "invoice paid suggestion from assistant"
+    },
+    {
+      "evidence_id": "user-2-a",
+      "hdc_id": 3,
+      "trajectory_id": "session-2",
+      "step_id": "user-0",
+      "text": "invoice paid in April"
+    },
+    {
+      "evidence_id": "legacy-a",
+      "hdc_id": 4,
+      "trajectory_id": "session-3",
+      "step_id": "turn-0",
+      "text": "invoice paid in legacy source"
+    },
+    {
+      "evidence_id": "user-3-b",
+      "hdc_id": 5,
+      "trajectory_id": "session-4",
+      "step_id": "user-2",
+      "text": "credit issued in May"
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "all-matches-across-sessions",
+      "query": "invoice paid",
+      "required_speaker_role": null,
+      "expected_evidence_ids": [
+        "assistant-1-a",
+        "legacy-a",
+        "user-1-a",
+        "user-2-a"
+      ],
+      "expected_matching_count": 4,
+      "expected_distinct_sessions": 3,
+      "expected_user_count": 2,
+      "expected_assistant_count": 1,
+      "expected_unknown_count": 1
+    },
+    {
+      "case_id": "user-authored-only",
+      "query": "invoice paid",
+      "required_speaker_role": "user",
+      "expected_evidence_ids": [
+        "user-1-a",
+        "user-2-a"
+      ],
+      "expected_matching_count": 2,
+      "expected_distinct_sessions": 2,
+      "expected_user_count": 2,
+      "expected_assistant_count": 0,
+      "expected_unknown_count": 0
+    },
+    {
+      "case_id": "assistant-authored-only",
+      "query": "invoice paid",
+      "required_speaker_role": "assistant",
+      "expected_evidence_ids": [
+        "assistant-1-a"
+      ],
+      "expected_matching_count": 1,
+      "expected_distinct_sessions": 1,
+      "expected_user_count": 0,
+      "expected_assistant_count": 1,
+      "expected_unknown_count": 0
+    }
+  ]
+}
