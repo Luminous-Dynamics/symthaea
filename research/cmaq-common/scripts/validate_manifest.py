@@ -4,21 +4,72 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+import tempfile
 
 from jsonschema import Draft202012Validator, FormatChecker
 
 ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = ROOT.parents[1]
 SCHEMA_PATH = ROOT / "frozen-run-manifest.schema.json"
 EXAMPLE_PATH = ROOT / "examples" / "cmaq-018-development-manifest.example.json"
 
 
-def semantic_errors(instance: dict) -> list[str]:
+def artifact_bytes(repo_root: Path, relative_path: str) -> tuple[bytes | None, str | None]:
+    relative = PurePosixPath(relative_path)
+    if relative.is_absolute() or relative.as_posix() != relative_path:
+        return None, "artifact path must be canonical and repository-relative"
+    if any(part in {"", ".", ".."} for part in relative.parts):
+        return None, "artifact path traversal is prohibited"
+
+    root = repo_root.resolve()
+    candidate = root.joinpath(*relative.parts)
+    current = root
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink():
+            return None, "symlink artifact paths are prohibited"
+    try:
+        resolved = candidate.resolve(strict=True)
+    except OSError:
+        return None, "referenced artifact is missing or unreadable"
+    if not resolved.is_relative_to(root):
+        return None, "artifact resolves outside the repository"
+    if not resolved.is_file():
+        return None, "artifact path does not identify a regular file"
+    try:
+        return resolved.read_bytes(), None
+    except OSError:
+        return None, "artifact bytes could not be read"
+
+
+def semantic_errors(instance: dict, repo_root: Path = REPO_ROOT) -> list[str]:
     errors: list[str] = []
     baseline_ids = [baseline["id"] for baseline in instance["baseline_registry"]]
     if len(baseline_ids) != len(set(baseline_ids)):
         errors.append("duplicate baseline IDs")
+
+    artifact_specs = [
+        (instance["candidate"]["config_path"], instance["candidate"]["config_sha256"], "candidate config"),
+        (instance["generator"]["config_path"], instance["generator"]["config_sha256"], "generator config"),
+        (instance["evaluator"]["metric_bundle_path"], instance["evaluator"]["metric_bundle_sha256"], "metric bundle"),
+        *[
+            (source["manifest_path"], source["manifest_sha256"], f"data manifest {source['id']}")
+            for source in instance["data_sources"]
+        ],
+        (instance["task_contract"]["observation_schema_path"], instance["task_contract"]["observation_schema_sha256"], "observation schema"),
+        (instance["task_contract"]["action_schema_path"], instance["task_contract"]["action_schema_sha256"], "action schema"),
+        (instance["task_contract"]["reward_definition_path"], instance["task_contract"]["reward_definition_sha256"], "reward definition"),
+        (instance["task_contract"]["wrapper_stack_path"], instance["task_contract"]["wrapper_stack_sha256"], "wrapper stack"),
+    ]
+    for relative_path, expected_digest, label in artifact_specs:
+        raw, path_error = artifact_bytes(repo_root, relative_path)
+        if path_error:
+            errors.append(f"{label}: {path_error}")
+        elif hashlib.sha256(raw).hexdigest() != expected_digest:
+            errors.append(f"{label}: SHA-256 does not match frozen manifest")
 
     baseline_set = set(baseline_ids)
     baseline_by_id = {baseline["id"]: baseline for baseline in instance["baseline_registry"]}
@@ -206,9 +257,27 @@ def main() -> None:
     mutated["comparisons"][0]["treatment_id"] = "unregistered_model"
     hostile_cases.append(("qualified comparison references unknown baseline", mutated))
 
-    for label, hostile in hostile_cases:
-        if fail_closed(validator, hostile):
-            raise SystemExit(f"hostile manifest was accepted: {label}")
+    mutated = copy.deepcopy(example)
+    mutated["candidate"]["config_path"] = "../README.md"
+    hostile_cases.append(("artifact path traversal", mutated))
+
+    with tempfile.TemporaryDirectory(prefix=".cmaq-manifest-hostile-", dir=ROOT) as temporary:
+        temporary_root = Path(temporary)
+        tampered = temporary_root / "tampered-config.json"
+        tampered.write_text('{"tampered":true}\n', encoding="utf-8")
+        mutated = copy.deepcopy(example)
+        mutated["candidate"]["config_path"] = tampered.relative_to(REPO_ROOT).as_posix()
+        hostile_cases.append(("artifact bytes do not match declared SHA-256", mutated))
+
+        symlink = temporary_root / "candidate-config-link.json"
+        symlink.symlink_to(REPO_ROOT / example["candidate"]["config_path"])
+        mutated = copy.deepcopy(example)
+        mutated["candidate"]["config_path"] = symlink.relative_to(REPO_ROOT).as_posix()
+        hostile_cases.append(("symlink artifact path", mutated))
+
+        for label, hostile in hostile_cases:
+            if fail_closed(validator, hostile):
+                raise SystemExit(f"hostile manifest was accepted: {label}")
 
     print(
         json.dumps(
@@ -216,6 +285,7 @@ def main() -> None:
                 "schema_version": schema["properties"]["schema_version"]["const"],
                 "example_valid": True,
                 "semantic_invariants_checked": "passed",
+                "content_addressed_artifacts_verified": len(artifact_specs),
                 "hostile_cases_rejected": len(hostile_cases),
                 "ci_only": True,
                 "performance_result_present": example["claim_boundary"]["performance_result_present"],
