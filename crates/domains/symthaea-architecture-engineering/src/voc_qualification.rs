@@ -550,7 +550,7 @@ fn validate_manifest(
     if manifest.target_k == 0 || manifest.candidate_ids.len() <= manifest.target_k {
         return Err(QualificationError::new(
             "candidate_ids",
-            "candidate count must be at least target_k and target_k must be positive",
+            "candidate count must be greater than target_k and target_k must be positive",
         ));
     }
     validate_unique_nonempty("candidate_ids", &manifest.candidate_ids)?;
@@ -1584,6 +1584,40 @@ mod tests {
         value.evaluation_task_ids = vec!["fit-1".into()];
         value.split_manifest_sha256 = compute_split_manifest_sha256(&value).unwrap();
         assert!(qualify_voc_model(&value, &[episode("ep-1")], &thresholds()).is_err());
+    }
+
+    #[test]
+    fn rejects_architecture_family_leakage() {
+        let mut value = manifest();
+        value.evaluation_architecture_families = vec!["fit-family".into()];
+        value.split_manifest_sha256 = compute_split_manifest_sha256(&value).unwrap();
+        assert!(qualify_voc_model(&value, &[episode("ep-1")], &thresholds()).is_err());
+    }
+
+    #[test]
+    fn rejects_seed_leakage() {
+        let mut value = manifest();
+        value.evaluation_seed_ids = vec!["fit-seed".into()];
+        value.split_manifest_sha256 = compute_split_manifest_sha256(&value).unwrap();
+        assert!(qualify_voc_model(&value, &[episode("ep-1")], &thresholds()).is_err());
+    }
+
+    #[test]
+    fn rejects_missing_declared_architecture_family_coverage() {
+        let mut value = manifest();
+        value.evaluation_architecture_families.push("eval-family-extra".into());
+        value.split_manifest_sha256 = compute_split_manifest_sha256(&value).unwrap();
+        assert!(qualify_voc_model(&value, &[episode("ep-1")], &thresholds()).is_err());
+    }
+
+    #[test]
+    fn rejects_degenerate_top_k_equal_to_candidate_count() {
+        let mut value = manifest();
+        value.target_k = value.candidate_ids.len();
+        value.split_manifest_sha256 = compute_split_manifest_sha256(&value).unwrap();
+        let error = qualify_voc_model(&value, &[episode("ep-1")], &thresholds())
+            .expect_err("top-K covering every candidate has no ranking resolution");
+        assert!(error.to_string().contains("greater than target_k"));
     }
 
     #[test]
