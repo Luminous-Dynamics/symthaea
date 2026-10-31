@@ -644,9 +644,9 @@ mod tests {
                         format!("{cluster_id}-item-2"),
                     ],
                     exposure_variant_sha256: digest(&format!("variant-{cluster_id}")),
-                    exposure_token_count: 500 + index * 10,
+                    exposure_token_count: 500,
                     matched_placebo_record_sha256: digest(&format!("placebo-{cluster_id}")),
-                    matched_placebo_token_count: 500 + index * 10,
+                    matched_placebo_token_count: 500,
                 });
             }
         }
