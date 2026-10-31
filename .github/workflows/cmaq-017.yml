@@ -66,13 +66,22 @@ jobs:
               assert row["execution_block"] <= row["horizon"]
               assert row["candidate_budget"] in (8, 32, 64)
               assert row["return_ci95_lower"] <= row["mean_return"] <= row["return_ci95_upper"]
+              assert row["worst_episode_return"] <= row["lower_decile_mean_return"] <= row["mean_return"]
               assert 0.0 <= row["mean_ood_visit_fraction"] <= 1.0
               assert 0.0 <= row["reference_model_false_safe_rate"] <= 1.0
               for key in ("mean_return", "mean_selected_one_step_state_rmse",
                           "mean_candidate_sequence_queries", "mean_model_head_evaluations",
-                          "mean_oracle_transition_evaluations", "mean_executed_steps"):
+                          "mean_model_transition_evaluations", "mean_oracle_transition_evaluations",
+                          "mean_evaluator_diagnostic_transition_evaluations", "mean_executed_steps"):
                   assert isinstance(row[key], (int, float))
                   assert abs(row[key]) < 1e8
+
+              assert row["mean_model_transition_evaluations"] == (
+                  row["mean_model_head_evaluations"] * row["horizon"]
+              )
+              assert row["mean_evaluator_diagnostic_transition_evaluations"] == (
+                  row["mean_executed_steps"]
+              )
 
               if row["policy"] == "direct_policy":
                   assert row["mean_candidate_sequence_queries"] == 0.0
