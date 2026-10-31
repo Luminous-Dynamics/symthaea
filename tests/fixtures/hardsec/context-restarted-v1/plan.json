@@ -2438,5 +2438,6 @@
   "context_assignment_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
   "restart_weight_schedule": "near_harmonic_c_over_k_log_e_plus_k_squared_v1",
   "restart_weight_scale": 0.3333333333333333,
-  "maximum_restart_age": 256
+  "maximum_restart_age": 256,
+  "accepted_observation_selection_assumption_status": "assumption_not_verified"
 }
