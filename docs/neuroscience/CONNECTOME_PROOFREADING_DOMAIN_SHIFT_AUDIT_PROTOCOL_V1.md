@@ -59,7 +59,7 @@ Each domain receives its own classification metrics, reliability bins, high-conf
 
 ### Novelty detection
 
-When every row carries `ood_score`, the report evaluates the score against the predeclared `is_ood_domain` flag using AUROC and tie-aware average precision. An optional `--ood-score-threshold` reports false-OOD rate on in-domain rows and held-out-domain recall at that frozen operating point.
+When every row carries `ood_score`, the run must supply `--ood-detector-id` and `--ood-detector-profile-sha256`. These identify the frozen novelty method and hash its representation, model and preprocessing. The report records both values and evaluates the score against the predeclared `is_ood_domain` flag using AUROC and tie-aware average precision. An optional `--ood-score-threshold` reports false-OOD rate on in-domain rows and held-out-domain recall at that frozen operating point.
 
 Do not choose the threshold using confirmatory/lockbox labels. Select it on a separate development/calibration partition, then freeze and digest that choice. AUROC does not establish an operating point; AUPRC depends on the declared OOD prevalence.
 
