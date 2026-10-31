@@ -311,11 +311,10 @@ pub struct GenomeObjectives {
     pub form_coverage: Option<f64>,
     /// Fraction of distinct family-native grammar-plan topologies observed
     /// across deterministic trials. Applicable to every qualified plan family.
-    pub grammar_topology_variation: f64,
+    pub grammar_topology_variation: Option<f64>,
     /// Mean pairwise Jaccard distance between each trial's named grammar
-    /// operations. This compares process/chorus/cycle/fugal/dramatic operations
-    /// without converting them into listener preference.
-    pub grammar_operation_diversity: f64,
+    /// operations. None means the plan family emitted no comparable operations.
+    pub grammar_operation_diversity: Option<f64>,
 }
 
 impl GenomeObjectives {
@@ -327,8 +326,8 @@ impl GenomeObjectives {
             Some(self.within_genome_diversity),
             self.motif_transformation_richness,
             self.form_coverage,
-            Some(self.grammar_topology_variation),
-            Some(self.grammar_operation_diversity),
+            self.grammar_topology_variation,
+            self.grammar_operation_diversity,
         ]
     }
 }
@@ -896,13 +895,23 @@ pub fn evaluate_genome(
     } else {
         None
     };
-    let grammar_topology_variation = pairwise_signature_diversity(
-        &trials
-            .iter()
-            .filter_map(|trial| trial.grammar_plan_signature.as_deref())
-            .collect::<Vec<_>>(),
-    );
-    let grammar_operation_diversity = mean_pairwise_operation_diversity(&trials);
+    let topology_signatures = trials
+        .iter()
+        .filter_map(|trial| trial.grammar_plan_signature.as_deref())
+        .collect::<Vec<_>>();
+    let grammar_topology_variation = if topology_signatures.is_empty() {
+        None
+    } else {
+        Some(pairwise_signature_diversity(&topology_signatures))
+    };
+    let grammar_operation_diversity = if trials
+        .iter()
+        .all(|trial| trial.grammar_transformations.is_empty())
+    {
+        None
+    } else {
+        Some(mean_pairwise_operation_diversity(&trials))
+    };
 
     let mut mean_fingerprint = vec![0.0; fingerprint::STRUCT_DIMS];
     if !trial_fingerprints.is_empty() {
@@ -1627,10 +1636,10 @@ impl GenomeEvaluation {
                 .is_none_or(|value| value.is_finite() && (0.0..=1.0).contains(&value))
             && self.objectives.form_coverage
                 .is_none_or(|value| value.is_finite() && (0.0..=1.0).contains(&value))
-            && self.objectives.grammar_topology_variation.is_finite()
-            && (0.0..=1.0).contains(&self.objectives.grammar_topology_variation)
-            && self.objectives.grammar_operation_diversity.is_finite()
-            && (0.0..=1.0).contains(&self.objectives.grammar_operation_diversity)
+            && self.objectives.grammar_topology_variation
+                .is_none_or(|value| value.is_finite() && (0.0..=1.0).contains(&value))
+            && self.objectives.grammar_operation_diversity
+                .is_none_or(|value| value.is_finite() && (0.0..=1.0).contains(&value))
             && self.objectives.novelty_distance.is_none_or(|value| value.is_finite() && value >= 0.0)
             && evaluation_digest(self).is_ok_and(|expected| expected == self.evaluation_sha256)
     }
@@ -1855,8 +1864,8 @@ mod tests {
             within_genome_diversity: 0.2,
             motif_transformation_richness: None,
             form_coverage: None,
-            grammar_topology_variation: 0.0,
-            grammar_operation_diversity: 0.0,
+            grammar_topology_variation: Some(0.0),
+            grammar_operation_diversity: Some(0.0),
         };
         assert_eq!(
             dedicated.axes(),
