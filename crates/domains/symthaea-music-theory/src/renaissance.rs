@@ -227,10 +227,33 @@ fn verify_renaissance_plan(score: &Score, plan: &RenaissancePlan) -> Renaissance
         note.pitch.midi() == scale.degree_pitch(plan.bass_final_degree as i32, 3).midi()
     });
 
+    let melody_parts: std::collections::BTreeSet<_> = score
+        .notes
+        .iter()
+        .filter(|note| note.role == VoiceRole::Melody)
+        .map(|note| note.part)
+        .collect();
+    let alto_parts: std::collections::BTreeSet<_> = score
+        .notes
+        .iter()
+        .filter(|note| note.role == VoiceRole::CounterMelody)
+        .map(|note| note.part)
+        .collect();
+    let bass_parts: std::collections::BTreeSet<_> = score
+        .notes
+        .iter()
+        .filter(|note| note.role == VoiceRole::Bass)
+        .map(|note| note.part)
+        .collect();
+    let three_independent_voices_present = has_role(VoiceRole::Melody)
+        && has_role(VoiceRole::CounterMelody)
+        && has_role(VoiceRole::Bass)
+        && melody_parts == [SUPERIUS].into_iter().collect()
+        && alto_parts == [ALTUS].into_iter().collect()
+        && bass_parts == [BASSUS].into_iter().collect();
+
     RenaissanceVerification {
-        three_independent_voices_present: has_role(VoiceRole::Melody)
-            && has_role(VoiceRole::CounterMelody)
-            && has_role(VoiceRole::Bass),
+        three_independent_voices_present,
         no_chordal_harmony_voice: !has_role(VoiceRole::Harmony),
         meter_and_duration_match: score.meter == plan.meter
             && (score.total_beats.beats() - plan.total_bars as f64 * meter).abs() <= 1e-7,
