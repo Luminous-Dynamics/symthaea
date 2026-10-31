@@ -1475,6 +1475,78 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn stored_topology_signature_is_rechecked_separately_from_profile_signature() {
+        let renderer_key = signing_key();
+        let profile_key = SigningKey::from_bytes(&[23_u8; 32]);
+        let attestation = topology_attestation("renderer-authority-v1", &renderer_key);
+        let mut profile = signed_test_profile(
+            attestation,
+            "profile-publisher-v1",
+            &profile_key,
+        );
+
+        // The profile publisher signs its profile after the topology body is
+        // altered. This must not replace the independent renderer authority.
+        profile.topology_attestation.route_graph_sha256 = digest("forged-route-graph");
+        let profile_sha = profile_digest(&profile).unwrap();
+        profile.profile_sha256 = profile_sha.clone();
+        profile.signature_ed25519_hex =
+            hex_encode(profile_key.sign(profile_sha.as_bytes()).to_bytes().as_ref());
+
+        let mut authorities = BTreeMap::new();
+        authorities.insert(
+            "renderer-authority-v1".to_owned(),
+            authority("renderer-authority-v1", &renderer_key),
+        );
+        authorities.insert(
+            "profile-publisher-v1".to_owned(),
+            authority("profile-publisher-v1", &profile_key),
+        );
+
+        assert_eq!(
+            verify_tail_profile(&profile, &authorities).unwrap_err(),
+            TailProfileError::InvalidSignature
+        );
+    }
+
+    #[test]
+    fn renderer_resigned_topology_change_still_breaks_profile_context_binding() {
+        let renderer_key = signing_key();
+        let profile_key = SigningKey::from_bytes(&[23_u8; 32]);
+        let mut attestation = topology_attestation("renderer-authority-v1", &renderer_key);
+        let mut profile = signed_test_profile(
+            attestation.clone(),
+            "profile-publisher-v1",
+            &profile_key,
+        );
+
+        attestation.route_graph_sha256 = digest("new-but-signed-route-graph");
+        sign_renderer_topology_attestation(&mut attestation, &renderer_key).unwrap();
+        profile.topology_attestation = attestation;
+
+        let profile_sha = profile_digest(&profile).unwrap();
+        profile.profile_sha256 = profile_sha.clone();
+        profile.signature_ed25519_hex =
+            hex_encode(profile_key.sign(profile_sha.as_bytes()).to_bytes().as_ref());
+
+        let mut authorities = BTreeMap::new();
+        authorities.insert(
+            "renderer-authority-v1".to_owned(),
+            authority("renderer-authority-v1", &renderer_key),
+        );
+        authorities.insert(
+            "profile-publisher-v1".to_owned(),
+            authority("profile-publisher-v1", &profile_key),
+        );
+
+        assert_eq!(
+            verify_tail_profile(&profile, &authorities).unwrap_err(),
+            TailProfileError::ProfileContextMismatch
+        );
+    }
+
     #[test]
     fn modified_profile_signature_or_context_cannot_resolve() {
         let key = signing_key();
