@@ -516,6 +516,8 @@ mod tests {
                 minimum_independent_families: 1,
                 minimum_distinct_sessions: 0,
                 minimum_user_authored_evidence: 0,
+                required_complete_evidence_ids: BTreeSet::new(),
+                enumeration_receipt_sha256: None,
                 selection_overhead_tokens: 2,
             }],
         }
