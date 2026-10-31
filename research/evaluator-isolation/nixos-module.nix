@@ -163,7 +163,7 @@ in
     };
 
     systemd.tmpfiles.rules = [
-      "d ${state} 0755 root root -"
+      "d ${state} 0711 root root -"
       # Task generator owns writes; candidate and evaluator can read public task files.
       "d ${state}/public 2750 symthaea-temporal-generator symthaea-temporal-public -"
       # Candidate has no oracle group membership; evaluator can read oracle files.
