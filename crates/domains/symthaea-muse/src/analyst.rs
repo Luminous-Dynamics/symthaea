@@ -270,45 +270,32 @@ fn plan_checks(plan: Option<&GrammarPlanEvidence>) -> Vec<AnalystCheck> {
                 ),
             ),
         ],
-        GrammarPlanEvidence::ProgSuite(plan) => vec![
-            observed_check(
-                "prog-suite-section-contract",
-                "ProgSuite declares its four-section 4/7/5/4 mixed-meter arc",
-                plan.sections.len() == 4
-                    && plan.sections.iter().map(|s| s.meter).collect::<Vec<_>>() == [4, 7, 5, 4]
-                    && plan.sections.windows(2).all(|pair| {
-                        (pair[0].end.beats() - pair[1].start.beats()).abs() <= 1e-7
-                    }),
-                "four contiguous sections with meters [4, 7, 5, 4]",
-                format!(
-                    "{} sections; meters {:?}; {} realized beats",
-                    plan.sections.len(),
-                    plan.sections.iter().map(|s| s.meter).collect::<Vec<_>>(),
-                    plan.expected_total_beats
+        GrammarPlanEvidence::ProgSuite(evidence) => {
+            let plan = &evidence.plan;
+            vec![
+                observed_check(
+                    "prog-suite-section-contract",
+                    "ProgSuite preserves the four-section 4/7/5/4 mixed-meter arc and contiguous timing",
+                    evidence.verification.meter_sequence_valid
+                        && evidence.verification.section_boundaries_contiguous
+                        && evidence.verification.total_duration_matches,
+                    "four contiguous sections with meters [4, 7, 5, 4] and matching score duration",
+                    format!(
+                        "{} sections; meters {:?}; {} realized beats",
+                        plan.sections.len(),
+                        plan.sections.iter().map(|s| s.meter).collect::<Vec<_>>(),
+                        plan.expected_total_beats
+                    ),
                 ),
-            ),
-            observed_check(
-                "prog-suite-theme-return",
-                "The final section is an untransformed return of the opening theme",
-                plan.sections.len() == 4
-                    && format!("{:?}", plan.sections[0].role) == "A"
-                    && format!("{:?}", plan.sections[3].role) == "ReturnA"
-                    && plan.sections[0].transform.is_none()
-                    && plan.sections[3].transform.is_none()
-                    && plan.sections[0].meter == plan.sections[3].meter
-                    && plan.sections[0].key == plan.sections[3].key,
-                "opening A and final ReturnA share home key, meter and identity transform",
-                format!(
-                    "opening {:?} {:?} {:?}; return {:?} {:?} {:?}",
-                    plan.sections.first().map(|s| s.role),
-                    plan.sections.first().map(|s| s.key),
-                    plan.sections.first().and_then(|s| s.transform),
-                    plan.sections.last().map(|s| s.role),
-                    plan.sections.last().map(|s| s.key),
-                    plan.sections.last().and_then(|s| s.transform)
+                observed_check(
+                    "prog-suite-theme-return",
+                    "The final section's emitted melody is an untransformed return of the opening theme",
+                    evidence.verification.theme_return_identical,
+                    "same pitch/duration sequence and relative onsets in opening A and ReturnA",
+                    format!("{:?}", evidence.verification),
                 ),
-            ),
-        ],
+            ]
+        },
         GrammarPlanEvidence::Sonata(evidence) => vec![
             observed_check(
                 "sonata-five-section-plan",
