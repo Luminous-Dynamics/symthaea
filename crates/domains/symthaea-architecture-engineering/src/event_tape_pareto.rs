@@ -484,7 +484,7 @@ pub fn event_tape_to_pareto(
             .unwrap_or(config.unverified_score_value);
         if accumulator.uncertainties.len() != accumulator.verified_attempts as usize
             && config.objective_mappings.iter().any(|mapping| matches!(
-                mapping.metric,
+                &mapping.metric,
                 CandidateObjectiveMetric::MeanReportedUncertainty
                     | CandidateObjectiveMetric::MaximumReportedUncertainty
             ))
@@ -901,6 +901,33 @@ mod tests {
         payload.resources.charged_budget_microunits = meter(10);
         tape.append(payload).unwrap();
         assert!(event_tape_to_pareto(&tape, &config()).is_err());
+    }
+
+    #[test]
+    fn uncertainty_objective_requires_uncertainty_for_every_verified_attempt() {
+        let mut tape = EventTape::new(header("direction-board", 100)).unwrap();
+        candidate_event(&mut tape, "a1", H2, "A", CandidateDisposition::Verified, Some(0.9), Some(H3), None, 10, 2, 2, 1024);
+        let mut payload = tape.events()[0].payload.clone();
+        payload.event_id = "a2".to_owned();
+        payload.round_id = 2;
+        payload.observed_through_sequence = 1;
+        if let ActionOutcome::CandidateEvaluation { uncertainty, .. } = &mut payload.outcome {
+            *uncertainty = None;
+        }
+        tape.append(payload).unwrap();
+
+        let mut uncertainty_config = config();
+        uncertainty_config.objective_specs[1] = ParetoObjectiveSpec {
+            objective_id: "uncertainty".to_owned(),
+            direction: ObjectiveDirection::Minimize,
+            scale_lower: 0.0,
+            scale_upper: 1.0,
+        };
+        uncertainty_config.objective_mappings[1] = CandidateObjectiveMapping {
+            objective_id: "uncertainty".to_owned(),
+            metric: CandidateObjectiveMetric::MeanReportedUncertainty,
+        };
+        assert!(event_tape_to_pareto(&tape, &uncertainty_config).is_err());
     }
 
     #[test]
