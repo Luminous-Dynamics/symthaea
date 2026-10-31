@@ -1018,7 +1018,7 @@ mod tests {
     fn explicit_uncovered_requirement_is_counted_not_silently_dropped() {
         let mut manifest = manifest();
         manifest.evaluator_checks[0].covered_requirement_ids.clear();
-        manifest.evaluator.check_ids = vec!["CHECK-002".to_owned()];
+        manifest.evaluation.check_ids = vec!["CHECK-002".to_owned()];
         manifest.manifest_sha256 = benchmark_component_manifest_digest(&manifest).unwrap();
         let report = audit_benchmark_components(&manifest).unwrap();
         assert!(!report.valid);
@@ -1154,7 +1154,6 @@ mod tests {
         let report = audit_benchmark_components(&manifest).unwrap();
         assert_eq!(report.model_triage_finding_count, 1);
         assert!(report.issues.iter().any(|issue| issue.contains("cannot self-assert human confirmation")));
-        assert!(!report.valid);
         assert!(!report.valid);
         assert!(!report.review_dispositions_valid);
         assert!(!report.reviewer_attestations_authenticated);
