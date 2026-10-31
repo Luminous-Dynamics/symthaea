@@ -58,6 +58,10 @@ struct Args {
     /// Optional deterministic JSON report path; stdout when omitted.
     #[arg(long)]
     output: Option<PathBuf>,
+
+    /// Optional content-addressed sample-ID cohort manifest. Emitted only when the audit status is PASS.
+    #[arg(long)]
+    cohort_manifest_output: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -227,6 +231,169 @@ fn modality_coverage_keys(row: &Row, split: &str) -> Vec<String> {
     keys.sort();
     keys.dedup();
     keys
+}
+
+#[derive(Debug, Serialize)]
+struct CohortManifest {
+    schema_version: u32,
+    dataset_id: &'static str,
+    dataset_revision: &'static str,
+    dataset_revision_commit_sha: String,
+    pinned_upstream_commit: &'static str,
+    source_sidecar_jsonl_sha256: String,
+    eligibility_policy_version: &'static str,
+    cohort_set_sha256: String,
+    cohorts: BTreeMap<String, CohortMembership>,
+    scope_note: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+struct CohortMembership {
+    membership_status: &'static str,
+    eligibility_rule: String,
+    sample_count: usize,
+    sample_ids_sha256: String,
+    sample_ids: Vec<String>,
+}
+
+fn hash_cohort_field(hasher: &mut Sha256, value: &str) {
+    hasher.update((value.len() as u64).to_be_bytes());
+    hasher.update(value.as_bytes());
+}
+
+fn cohort_membership_sha256(name: &str, sample_ids: &[String]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"connectomebench2-v2-cohort-members-v1");
+    hash_cohort_field(&mut hasher, name);
+    hasher.update((sample_ids.len() as u64).to_be_bytes());
+    for sample_id in sample_ids {
+        hash_cohort_field(&mut hasher, sample_id);
+    }
+    hex::encode(hasher.finalize())
+}
+
+fn cohort_set_sha256(
+    dataset_revision_commit_sha: &str,
+    source_sidecar_jsonl_sha256: &str,
+    cohorts: &BTreeMap<String, CohortMembership>,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"connectomebench2-v2-cohort-set-v1");
+    hash_cohort_field(&mut hasher, dataset_revision_commit_sha);
+    hash_cohort_field(&mut hasher, source_sidecar_jsonl_sha256);
+    hash_cohort_field(&mut hasher, "connectomebench2-v2-modality-cohorts-v1");
+    hasher.update((cohorts.len() as u64).to_be_bytes());
+    for (name, cohort) in cohorts {
+        hash_cohort_field(&mut hasher, name);
+        hash_cohort_field(&mut hasher, &cohort.eligibility_rule);
+        hasher.update((cohort.sample_count as u64).to_be_bytes());
+        hash_cohort_field(&mut hasher, &cohort.sample_ids_sha256);
+    }
+    hex::encode(hasher.finalize())
+}
+
+fn add_cohort_member(
+    cohorts: &mut BTreeMap<String, (String, BTreeSet<String>)>,
+    name: &str,
+    eligibility_rule: &str,
+    sample_id: &str,
+) {
+    cohorts
+        .entry(name.to_string())
+        .or_insert_with(|| (eligibility_rule.to_string(), BTreeSet::new()))
+        .1
+        .insert(sample_id.to_string());
+}
+
+fn build_cohort_manifest(
+    rows: &[ParsedRow],
+    dataset_revision_commit_sha: &str,
+    source_sidecar_jsonl_sha256: &str,
+) -> CohortManifest {
+    let mut members = BTreeMap::<String, (String, BTreeSet<String>)>::new();
+    let rules = [
+        ("geometry_all", "has_single_mask OR has_dual_mask"),
+        ("em_legal_any_view", "present_slots contains at least one of em_xy/em_xz/em_yz; excludes em_best"),
+        ("em_legal_full_triplet", "present_slots contains em_xy AND em_xz AND em_yz; excludes em_best"),
+        ("fused_geometry_legal_em", "geometry is present AND at least one of em_xy/em_xz/em_yz is present"),
+        ("paired_geometry_only", "exact same sample IDs as fused_geometry_legal_em; score geometry-only on this cohort"),
+        ("paired_em_legal_views", "exact same sample IDs as fused_geometry_legal_em; score legal EM views on this cohort"),
+        ("geometry_without_legal_em", "geometry is present AND none of em_xy/em_xz/em_yz is present"),
+        ("em_best_only_excluded", "em_best is present AND none of em_xy/em_xz/em_yz is present"),
+    ];
+    for (name, rule) in rules {
+        members.insert(name.to_string(), (rule.to_string(), BTreeSet::new()));
+    }
+
+    for parsed in rows {
+        let row = &parsed.row;
+        let slots = row.present_slots.iter().cloned().collect::<BTreeSet<_>>();
+        let has_geometry = row.has_single_mask || row.has_dual_mask;
+        let has_xy = slots.contains("em_xy");
+        let has_xz = slots.contains("em_xz");
+        let has_yz = slots.contains("em_yz");
+        let has_legal_em = has_xy || has_xz || has_yz;
+        let has_em_best = slots.contains("em_best");
+        let sample_id = row.combined_sample_hash.as_str();
+
+        if has_geometry {
+            add_cohort_member(&mut members, "geometry_all", rules[0].1, sample_id);
+        }
+        if has_legal_em {
+            add_cohort_member(&mut members, "em_legal_any_view", rules[1].1, sample_id);
+        }
+        if has_xy && has_xz && has_yz {
+            add_cohort_member(&mut members, "em_legal_full_triplet", rules[2].1, sample_id);
+        }
+        if has_geometry && has_legal_em {
+            add_cohort_member(&mut members, "fused_geometry_legal_em", rules[3].1, sample_id);
+            add_cohort_member(&mut members, "paired_geometry_only", rules[4].1, sample_id);
+            add_cohort_member(&mut members, "paired_em_legal_views", rules[5].1, sample_id);
+        }
+        if has_geometry && !has_legal_em {
+            add_cohort_member(&mut members, "geometry_without_legal_em", rules[6].1, sample_id);
+        }
+        if has_em_best && !has_legal_em {
+            add_cohort_member(&mut members, "em_best_only_excluded", rules[7].1, sample_id);
+        }
+    }
+
+    let cohorts = members
+        .into_iter()
+        .map(|(name, (eligibility_rule, ids))| {
+            let sample_ids = ids.into_iter().collect::<Vec<_>>();
+            let sample_count = sample_ids.len();
+            let sample_ids_sha256 = cohort_membership_sha256(&name, &sample_ids);
+            (
+                name,
+                CohortMembership {
+                    membership_status: if sample_count == 0 { "NOT_ESTIMABLE" } else { "ELIGIBLE" },
+                    eligibility_rule,
+                    sample_count,
+                    sample_ids_sha256,
+                    sample_ids,
+                },
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let cohort_set_digest = cohort_set_sha256(
+        dataset_revision_commit_sha,
+        source_sidecar_jsonl_sha256,
+        &cohorts,
+    );
+
+    CohortManifest {
+        schema_version: 1,
+        dataset_id: DATASET_ID,
+        dataset_revision: DATASET_REVISION,
+        dataset_revision_commit_sha: dataset_revision_commit_sha.to_string(),
+        pinned_upstream_commit: "5679b39aa2641d8d0afeed88b441e696f87a66df",
+        source_sidecar_jsonl_sha256: source_sidecar_jsonl_sha256.to_string(),
+        eligibility_policy_version: "connectomebench2-v2-modality-cohorts-v1",
+        cohort_set_sha256: cohort_set_digest,
+        cohorts,
+        scope_note: "Membership is derived from metadata-sidecar declared slots and masks only. It does not verify Parquet payload bytes, image readability, biological correctness, or population inclusion probabilities. paired_geometry_only and paired_em_legal_views contain exactly the same sample IDs. EM-best-only rows are diagnostic exclusions, not usable EM examples.",
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -721,8 +888,14 @@ fn run() -> Result<i32, String> {
     let bytes = fs::read(&args.input)
         .map_err(|error| format!("failed to read {}: {error}", args.input.display()))?;
     let input_hash = sha256(&bytes);
+    let dataset_revision_commit_sha = args.dataset_revision_commit_sha.clone();
     let rows = parse_rows(&bytes)?;
-    let report = audit_rows(&rows, input_hash, args.cube_edge_nm, args.dataset_revision_commit_sha);
+    let report = audit_rows(
+        &rows,
+        input_hash.clone(),
+        args.cube_edge_nm,
+        dataset_revision_commit_sha.clone(),
+    );
     let status = report.status;
     let json = serde_json::to_string_pretty(&report)
         .map_err(|error| format!("failed to serialize report: {error}"))? + "\n";
@@ -731,6 +904,23 @@ fn run() -> Result<i32, String> {
             .map_err(|error| format!("failed to write {}: {error}", path.display()))?;
     } else {
         print!("{json}");
+    }
+
+    if let Some(path) = args.cohort_manifest_output {
+        if status == "PASS" {
+            let manifest = build_cohort_manifest(
+                &rows,
+                &dataset_revision_commit_sha,
+                &input_hash,
+            );
+            let rendered = serde_json::to_string_pretty(&manifest)
+                .map_err(|error| format!("failed to serialize cohort manifest: {error}"))?
+                + "\n";
+            fs::write(&path, rendered.as_bytes())
+                .map_err(|error| format!("failed to write cohort manifest {}: {error}", path.display()))?;
+        } else {
+            eprintln!("cohort manifest withheld: metadata audit status is {status}, not PASS");
+        }
     }
     Ok(if status == "PASS" { 0 } else { 1 })
 }
