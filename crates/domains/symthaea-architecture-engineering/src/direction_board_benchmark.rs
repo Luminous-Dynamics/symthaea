@@ -76,6 +76,20 @@ pub struct DirectionCampaignAction {
     pub cost_units: u64,
 }
 
+/// Frozen parameter snapshot for policy interpretation and replay.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DirectionCampaignPolicyConfig {
+    pub target_score: f64,
+    pub board_exploration_coefficient: f64,
+    pub global_ucb_exploration_coefficient: f64,
+    pub new_direction_prior_credit: f64,
+    pub discounted_ucb_factor: f64,
+    pub thompson_prior_alpha: f64,
+    pub thompson_prior_beta: f64,
+    pub action_cost_units: u64,
+    pub oracle_uses_hidden_payoff_schedule: bool,
+}
+
 /// Full audit summary for one policy, landscape and seed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DirectionCampaignRun {
@@ -83,6 +97,8 @@ pub struct DirectionCampaignRun {
     pub version: String,
     pub landscape: DirectionLandscapeFamily,
     pub policy: DirectionCampaignPolicy,
+    pub policy_config: DirectionCampaignPolicyConfig,
+    pub policy_config_sha256: String,
     pub seed: u64,
     pub action_budget: usize,
     pub action_count: usize,
@@ -299,11 +315,27 @@ pub fn run_direction_campaign(
     let (final_best_direction, final_best_score) =
         best_observed_direction(&observations)?;
     let oracle_best_score = oracle_best_score(landscape);
+    let policy_config = DirectionCampaignPolicyConfig {
+        target_score: TARGET_SCORE,
+        board_exploration_coefficient: BOARD_EXPLORATION_COEFFICIENT,
+        global_ucb_exploration_coefficient: GLOBAL_UCB_EXPLORATION,
+        new_direction_prior_credit: NEW_DIRECTION_CREDIT,
+        discounted_ucb_factor: DISCOUNT_FACTOR,
+        thompson_prior_alpha: 1.0,
+        thompson_prior_beta: 1.0,
+        action_cost_units: 1,
+        oracle_uses_hidden_payoff_schedule: policy == DirectionCampaignPolicy::OracleUpperBound,
+    };
+    let policy_config_bytes = serde_json::to_vec(&policy_config)
+        .map_err(|error| format!("policy config serialization failed: {error}"))?;
+    let policy_config_sha256 = digest_bytes(&policy_config_bytes);
     Ok(DirectionCampaignRun {
         schema: "symthaea.direction-campaign.run".to_owned(),
         version: "0.1.0".to_owned(),
         landscape,
         policy,
+        policy_config,
+        policy_config_sha256,
         seed,
         action_budget,
         action_count: actions.len(),
@@ -975,7 +1007,11 @@ fn schedule(
 }
 
 fn digest(value: &str) -> String {
-    let bytes = Sha256::digest(value.as_bytes());
+    digest_bytes(value.as_bytes())
+}
+
+fn digest_bytes(value: &[u8]) -> String {
+    let bytes = Sha256::digest(value);
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
