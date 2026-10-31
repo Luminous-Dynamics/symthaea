@@ -1260,6 +1260,97 @@
       "evidence_grade": "peer-reviewed-primary-paper",
       "comparison_notes": "A benchmark profile, not an aggregate system score. Conversational framing exposes retrieval gaps missed by QA-style probing, especially for implicit and composed requests. Strong retrieval does not automatically translate to strong response quality.",
       "source": "https://aclanthology.org/2026.findings-emnlp.1289/"
+    },
+    {
+      "id": "memoryarena-icml-2026",
+      "system": "MemoryArena benchmark",
+      "category": "peer-reviewed-research-benchmark",
+      "benchmark": "MemoryArena",
+      "benchmark_revision": "ICML 2026; interdependent multi-session Memory-Agent-Environment loops",
+      "metric": "benchmark scope",
+      "value_percent": null,
+      "answer_model": null,
+      "judge": "Human-crafted tasks with explicit interdependent subtasks",
+      "reported_date": "2026-07",
+      "sample_size": null,
+      "secondary_metrics": {
+        "task_families": "web navigation; preference-constrained planning; progressive information search; sequential formal reasoning"
+      },
+      "evidence_grade": "peer-reviewed-primary-paper",
+      "comparison_notes": "Benchmark profile, not an aggregate score. Agents must learn from earlier actions and feedback, distill experience into memory and use it on later dependent tasks. The paper reports that systems near saturation on LoCoMo can still perform poorly in this agentic setting.",
+      "source": "https://proceedings.mlr.press/v306/he26am.html"
+    },
+    {
+      "id": "ama-bench-icml-2026",
+      "system": "AMA-Agent",
+      "category": "peer-reviewed-paper",
+      "benchmark": "AMA-Bench",
+      "benchmark_revision": "ICML 2026; real agent trajectories plus scalable synthetic trajectories",
+      "metric": "average accuracy",
+      "value_percent": 57.22,
+      "answer_model": null,
+      "judge": "Expert-curated QA and rule-based QA per benchmark track",
+      "reported_date": "2026-07",
+      "sample_size": null,
+      "secondary_metrics": {
+        "gain_over_strongest_baseline_percentage_points": 11.16,
+        "architecture": "causality graph; tool-augmented retrieval"
+      },
+      "evidence_grade": "peer-reviewed-primary-paper",
+      "comparison_notes": "AMA-Bench evaluates continuous agent-environment trajectories with states, actions, observations and tool outputs. The reported +11.16pp is the paper's strongest-baseline comparison on AMA-Bench, not a transferable LongMemEval or MemoryArena score. It motivates causal/objective-aware retrieval as a direct comparator for Broca.",
+      "source": "https://proceedings.mlr.press/v306/zhao26bs.html"
+    },
+    {
+      "id": "ultrahorizon-icml-2026",
+      "system": "UltraHorizon benchmark",
+      "category": "peer-reviewed-research-benchmark",
+      "benchmark": "UltraHorizon",
+      "benchmark_revision": "ICML 2026; three partially-observable exploration environments",
+      "metric": "trajectory scale",
+      "value_percent": null,
+      "answer_model": null,
+      "judge": "Environment-specific task scoring plus human comparison",
+      "reported_date": "2026-07",
+      "sample_size": null,
+      "secondary_metrics": {
+        "heavy_setting_average_tokens": "200K+",
+        "heavy_setting_average_tool_calls": "400+",
+        "standard_setting_average_tokens": "35K+",
+        "standard_setting_average_tool_calls": "60+",
+        "primary_diagnostic": "in-context locking and functional capability gaps"
+      },
+      "evidence_grade": "peer-reviewed-primary-paper",
+      "comparison_notes": "Benchmark profile, not a system accuracy score. It tests sustained exploration, planning, memory management and tool use in partially observed environments. The paper reports that scaling alone does not close the gap to human performance.",
+      "source": "https://proceedings.mlr.press/v306/luo26ai.html"
+    },
+    {
+      "id": "agent-memory-memoryarena-2026-10",
+      "system": "agent_memory state-packet system",
+      "category": "public-project-self-reported-benchmark-run",
+      "benchmark": "MemoryArena formal_reasoning_phys",
+      "benchmark_revision": "Public project report dated 14 Oct 2026; 20 physics papers / 86 subtasks / chains up to 12 steps",
+      "metric": "final-paper success",
+      "value_percent": 100,
+      "answer_model": "gpt-5.6-sol",
+      "judge": "Task answer correctness in project benchmark harness",
+      "reported_date": "2026-10-14",
+      "sample_size": 20,
+      "secondary_metrics": {
+        "state_packet_only_success_percent": 75,
+        "no_memory_success_percent": 35,
+        "one_full_lookup_memory_tokens": 968,
+        "state_packet_memory_tokens": 197,
+        "model_gpt_5_mini": {
+          "one_full_lookup_success_percent": 50,
+          "state_packet_only_success_percent": 50,
+          "bm25_success_percent": 25,
+          "mem0_style_facts_success_percent": 15,
+          "no_memory_success_percent": 5
+        }
+      },
+      "evidence_grade": "public-project-self-reported-small-sample",
+      "comparison_notes": "The public repository reports 20/20 final-paper success for one full lookup on gpt-5.6-sol; state-packet-only is 15/20 and no-memory is 7/20. This is an interesting small-sample comparator, not a peer-reviewed leaderboard result or evidence of general SOTA. The same report shows much weaker gpt-5-mini performance and only 20 independent paper clusters.",
+      "source": "https://github.com/dorianherle/agent_memory"
     }
   ],
   "broca_targets": {
