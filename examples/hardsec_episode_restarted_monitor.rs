@@ -485,9 +485,29 @@ fn parse_context_receipt(
     }
 
     let mut map = BTreeMap::new();
+    let mut mapped_source_sequences = BTreeSet::new();
     for (index, item) in assignment_values.iter().enumerate() {
         let context = format!("runtime_mapping.assignments[{index}]");
+        let object = item.as_object().ok_or_else(|| format!("{context} must be an object"))?;
+        let expected_keys: BTreeSet<&str> = [
+            "sequence_index",
+            "window_id",
+            "decision_status",
+            "decision_reason",
+            "selected_context_id",
+        ]
+        .into_iter()
+        .collect();
+        if object.len() != expected_keys.len()
+            || object.keys().any(|key| !expected_keys.contains(key.as_str())) {
+            return Err(format!(
+                "{context} must be a truth-free runtime mapping with exactly the five declared fields"
+            ));
+        }
         let source_sequence_index = count_field(item, "sequence_index", &context)?;
+        if source_sequence_index != index + 1 {
+            return Err(format!("{context}.sequence_index must be contiguous from one"));
+        }
         if !mapped_source_sequences.insert(source_sequence_index) {
             return Err(format!("duplicate context assignment source sequence index {source_sequence_index}"));
         }
