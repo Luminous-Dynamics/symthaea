@@ -132,10 +132,14 @@ struct SynapticCompletenessEvidence {
 
 impl SynapticCompletenessEvidence {
     fn fraction(&self) -> Option<f64> {
-        (self.total_synapse_count > 0).then_some(
-            self.synapses_with_both_partners_in_fully_proofread_cells as f64
-                / self.total_synapse_count as f64
-        )
+        if self.total_synapse_count == 0 {
+            None
+        } else {
+            Some(
+                self.synapses_with_both_partners_in_fully_proofread_cells as f64
+                    / self.total_synapse_count as f64
+            )
+        }
     }
 }
 
@@ -427,8 +431,29 @@ fn validate_series(snapshots: &[Snapshot]) -> Vec<String> {
         }
     }
 
+    let mut completeness_population: Option<(String, String)> = None;
     for (index, snapshot) in snapshots.iter().enumerate() {
         errors.extend(validate_snapshot(snapshot, index));
+        if let Some(completeness) = &snapshot.synaptic_completeness {
+            match &completeness_population {
+                Some((population_id, population_definition_sha256))
+                    if population_id != &completeness.population_id
+                        || population_definition_sha256 != &completeness.population_definition_sha256 =>
+                {
+                    errors.push(format!(
+                        "snapshot {:?}: synaptic completeness population identity/definition changed inside a series",
+                        snapshot.snapshot.snapshot_id
+                    ));
+                }
+                None => {
+                    completeness_population = Some((
+                        completeness.population_id.clone(),
+                        completeness.population_definition_sha256.clone(),
+                    ));
+                }
+                _ => {}
+            }
+        }
         if !ids.insert(snapshot.snapshot.snapshot_id.clone()) {
             errors.push(format!("duplicate snapshot_id {:?}", snapshot.snapshot.snapshot_id));
         }
@@ -479,20 +504,6 @@ fn validate_series(snapshots: &[Snapshot]) -> Vec<String> {
             || current.provenance.query_evaluation_profile_sha256 != previous.provenance.query_evaluation_profile_sha256
         {
             errors.push(format!("snapshot {:?}: graph/query computation profile changed inside a series", current.snapshot.snapshot_id));
-        }
-        if let (Some(current_completeness), Some(previous_completeness)) = (
-            current.synaptic_completeness.as_ref(),
-            previous.synaptic_completeness.as_ref(),
-        ) {
-            if current_completeness.population_id != previous_completeness.population_id
-                || current_completeness.population_definition_sha256
-                    != previous_completeness.population_definition_sha256
-            {
-                errors.push(format!(
-                    "snapshot {:?}: synaptic completeness population identity/definition changed inside a series",
-                    current.snapshot.snapshot_id
-                ));
-            }
         }
         if current.graph.directed != previous.graph.directed
             || current.graph.invariants.keys().ne(previous.graph.invariants.keys())
@@ -994,6 +1005,19 @@ mod tests {
             forecast_min_training_snapshots: 4,
             output: None,
         }
+    }
+
+    #[test]
+    fn population_definition_change_is_rejected_even_across_missing_completeness_snapshot() {
+        let mut a = snapshot(0, 0, &"1".repeat(64), None, 1.0, 12.0);
+        let mut gap = snapshot(1, 1, &"2".repeat(64), Some(&"1".repeat(64)), 1.0, 12.0);
+        let mut c = snapshot(2, 2, &"3".repeat(64), Some(&"2".repeat(64)), 1.0, 12.0);
+        a.synaptic_completeness = Some(completeness(0, 100, 20));
+        c.synaptic_completeness = Some(completeness(2, 100, 22));
+        c.synaptic_completeness.as_mut().unwrap().population_definition_sha256 = "9".repeat(64);
+        gap.synaptic_completeness = None;
+        let report = build_report(&jsonl(&[a.clone(), gap.clone(), c.clone()]), &[a, gap, c], &args(3));
+        assert!(report.errors.iter().any(|error| error.contains("population identity/definition changed")));
     }
 
     #[test]
