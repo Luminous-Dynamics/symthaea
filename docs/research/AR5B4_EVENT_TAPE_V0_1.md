@@ -34,7 +34,7 @@ A reading is either `Measured(value)` or `Unknown(reason)`. Measured zero is val
 
 Sequential events must use worker 0, have no batch ID, advance one round per event, and see the entire completed prefix.
 
-Batched events use a common batch ID and round. All events in the batch must have the same pre-batch visibility cutoff and the same visible-history digest. Each worker may contribute at most one action to a batch, and sibling results cannot become visible until a later batch. The declared seats-per-round count must be met before a batch can close or the tape can qualify; a partial final batch remains structurally inspectable but fails qualification. Worker count and claim caps and seats-per-round are part of the frozen header.
+Batched events use a common batch ID and round. All events in the batch must have the same pre-batch visibility cutoff and the same visible-history digest. Each worker may contribute at most one action to a batch, and sibling results cannot become visible until a later batch. The declared seats-per-round count must be met before a batch can close or the tape can qualify; a partial final batch remains structurally inspectable but fails qualification. Worker count, seats per round, and claim caps are part of the frozen header. An empty tape also fails qualification: a campaign must contain executed actions before it can be reported as an experiment.
 
 ## Integrity and replay
 
