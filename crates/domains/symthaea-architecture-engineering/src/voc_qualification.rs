@@ -976,6 +976,7 @@ fn compute_metrics(
     let episode_refs: Vec<&VoCReplayEpisode> = episodes.iter().collect();
     let global = summarize_episodes(manifest, &episode_refs, thresholds)?;
     let mut action_forecasts: BTreeMap<String, Vec<(Vec<f64>, usize)>> = BTreeMap::new();
+    let mut action_outcome_taxonomy: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut action_forecast_counts = BTreeMap::new();
     let mut voi_absolute_error = 0.0;
     let mut voi_signed_error = 0.0;
@@ -984,18 +985,45 @@ fn compute_metrics(
 
     for episode in episodes {
         for action in &episode.action_forecasts {
-            let actual_index = action
+            let key = action.kind.as_str().to_owned();
+            // Outcome labels have to mean the same thing across forecasts of one action class.
+            // Canonicalize label order, but reject a changed category set instead of silently
+            // comparing unrelated categories by vector position.
+            let mut labeled_probabilities: Vec<(String, f64)> = action
                 .outcome_ids
+                .iter()
+                .cloned()
+                .zip(action.predicted_outcome_probabilities.iter().copied())
+                .collect();
+            labeled_probabilities.sort_by(|left, right| left.0.cmp(&right.0));
+            let canonical_outcomes: Vec<String> = labeled_probabilities
+                .iter()
+                .map(|(outcome, _)| outcome.clone())
+                .collect();
+            if let Some(existing) = action_outcome_taxonomy.get(&key) {
+                if existing != &canonical_outcomes {
+                    return Err(QualificationError::new(
+                        "action_outcome_taxonomy",
+                        format!("inconsistent outcome categories for action class {key}"),
+                    ));
+                }
+            } else {
+                action_outcome_taxonomy.insert(key.clone(), canonical_outcomes.clone());
+            }
+            let actual_index = canonical_outcomes
                 .iter()
                 .position(|outcome| outcome == &action.realized_outcome_id)
                 .ok_or_else(|| {
                     QualificationError::new("action_forecasts", "realized outcome disappeared")
                 })?;
-            let key = action.kind.as_str().to_owned();
+            let canonical_probabilities: Vec<f64> = labeled_probabilities
+                .iter()
+                .map(|(_, probability)| *probability)
+                .collect();
             action_forecasts
                 .entry(key.clone())
                 .or_default()
-                .push((action.predicted_outcome_probabilities.clone(), actual_index));
+                .push((canonical_probabilities, actual_index));
             *action_forecast_counts.entry(key).or_insert(0usize) += 1;
             let signed_error = action.predicted_expected_regret_reduction
                 - action.realized_final_regret_reduction;
@@ -1588,6 +1616,45 @@ mod tests {
         replay.realized_final_values = vec![0.15, 0.85];
         let receipt = qualify_voc_model(&value, &[replay], &thresholds()).unwrap();
         assert_eq!(receipt.metrics.top1_accuracy, 1.0);
+    }
+
+    #[test]
+    fn rejects_inconsistent_outcome_categories_within_an_action_class() {
+        let manifest = manifest();
+        let mut first = episode("ep-1");
+        let mut second = episode("ep-2");
+        second.action_forecasts[0].outcome_ids = vec!["other".into(), "success".into()];
+        let error = qualify_voc_model(&manifest, &[first, second], &thresholds())
+            .expect_err("different category meanings cannot share one Brier score");
+        assert!(error.to_string().contains("inconsistent outcome categories"));
+    }
+
+    #[test]
+    fn accepts_reordered_but_semantically_identical_outcome_categories() {
+        let manifest = manifest();
+        let mut first = episode("ep-1");
+        let mut second = episode("ep-2");
+        second.action_forecasts[0].outcome_ids.reverse();
+        second.action_forecasts[0].predicted_outcome_probabilities.reverse();
+        let receipt = qualify_voc_model(&manifest, &[first, second], &thresholds()).unwrap();
+        assert_eq!(receipt.decision, QualificationDecision::Qualified);
+    }
+
+    #[test]
+    fn fidelity_order_is_part_of_the_split_manifest_digest() {
+        let first = manifest();
+        let mut second = first.clone();
+        second.fidelity_ids.reverse();
+        second.split_manifest_sha256 = compute_split_manifest_sha256(&second).unwrap();
+        assert_ne!(first.split_manifest_sha256, second.split_manifest_sha256);
+    }
+
+    #[test]
+    fn rejects_an_episode_outside_the_declared_evaluation_strata() {
+        let manifest = manifest();
+        let mut replay = episode("ep-1");
+        replay.noise_regime = "unlisted-noise".into();
+        assert!(qualify_voc_model(&manifest, &[replay], &thresholds()).is_err());
     }
 
     #[test]
