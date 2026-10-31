@@ -1,6 +1,6 @@
 # HARDSEC-017 — Matched Multi-Platform Hardware Attack Detection Benchmark
 
-**Status:** benchmark protocol and machine-readable plan drafted; no benchmark campaign or detector result is claimed  
+**Status:** benchmark protocol, machine-readable plan and executable Rust plan auditor authored; no benchmark campaign or detector result is claimed  
 **Issue:** [#9468](https://github.com/Luminous-Dynamics/symthaea/issues/9468)  
 **Related:** HARDSEC-004 (#9060 / #9063), HARDSEC-012 (#9346 / #9410), HARDSEC-014 (#9413 / #9416), HARDSEC-016 (#9463)
 
@@ -176,3 +176,27 @@ A missing artifact, unavailable physical platform, unsupported onset clock or in
 ## 13. Claim ceiling
 
 A successful campaign establishes measured performance for the named software, platform, event set, workloads, attack implementations, adaptations, sampling protocol and operating point. It does not prove universal evasion resistance, all-architecture transfer, causal prevention, hardware security, or certification.
+
+## 14. Executable plan contract
+
+The plan is represented in `tests/fixtures/hardsec/hardware-benchmark-plan-v1.json` and constrained by `schemas/hardsec-hardware-benchmark-plan-v1.schema.json`. The Rust plan auditor is `examples/hardsec_benchmark_plan_audit.rs`, built by the isolated `hardsec-adaptive-evasion-audit-harness` with feature `hardsec-benchmark-plan-audit`.
+
+Run it with:
+
+```bash
+cargo test --locked \
+  --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml \
+  --features hardsec-benchmark-plan-audit \
+  --example hardsec_benchmark_plan_audit
+
+cargo run --locked \
+  --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml \
+  --features hardsec-benchmark-plan-audit \
+  --example hardsec_benchmark_plan_audit -- \
+  --plan tests/fixtures/hardsec/hardware-benchmark-plan-v1.json \
+  --receipt /tmp/hardsec-017-plan-receipt.json
+```
+
+The auditor rejects missing required baseline arms, duplicate arm identities, an incomplete split ladder, domain pooling, insufficient platform targets, missing adversarial scenarios/negative controls, inconsistent Clopper–Pearson sample-size arithmetic, non-zero invalid-sensor silent-clear targets, and report rules that permit mixed-domain pooling or random-window confirmatory claims. It emits a SHA-256-bound, unsigned, no-overwrite receipt.
+
+Twelve Rust unit tests exercise the valid fixture and negative controls. The focused workflow pins the Rust toolchain, checks formatting, runs the exact example test suite and produces a receipt from the fixture. A valid receipt means only that the **plan** satisfies these structural commitments. It does not run or validate any detector experiment, nor prove that the planned targets are achieved.
