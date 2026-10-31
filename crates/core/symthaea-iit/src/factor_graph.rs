@@ -1926,6 +1926,53 @@ mod tests {
     }
 
     #[test]
+    fn cutset_plan_reuses_structure_across_numeric_factors_and_rejects_scope_drift() {
+        let scopes = vec![vec![0, 1], vec![1, 2]];
+        let eliminate = [0, 1];
+        let cutset = [1];
+        let plan = plan_min_fill_cutset_elimination(
+            &scopes,
+            &eliminate,
+            &cutset,
+            4,
+            2,
+        ).unwrap();
+
+        let first = vec![
+            BinaryLogFactor::new(vec![0, 1], vec![0.9_f64.ln(), 0.1_f64.ln(), 0.2_f64.ln(), 0.8_f64.ln()]).unwrap(),
+            BinaryLogFactor::new(vec![1, 2], vec![0.7_f64.ln(), 0.3_f64.ln(), 0.4_f64.ln(), 0.6_f64.ln()]).unwrap(),
+        ];
+        let second = vec![
+            BinaryLogFactor::new(vec![0, 1], vec![0.6_f64.ln(), 0.4_f64.ln(), 0.15_f64.ln(), 0.85_f64.ln()]).unwrap(),
+            BinaryLogFactor::new(vec![1, 2], vec![0.55_f64.ln(), 0.45_f64.ln(), 0.25_f64.ln(), 0.75_f64.ln()]).unwrap(),
+        ];
+
+        for factors in [&first, &second] {
+            let reused = min_fill_log_sum_product_with_cutset_plan(factors, &plan).unwrap();
+            let rebuilt = min_fill_log_sum_product_with_cutset(
+                factors,
+                &eliminate,
+                &cutset,
+                4,
+                2,
+            ).unwrap();
+            assert_eq!(reused.factor, rebuilt.factor);
+            assert_eq!(reused.cutset_variables, rebuilt.cutset_variables);
+            assert_eq!(reused.induced_width, rebuilt.induced_width);
+            assert_eq!(reused.predicted_peak_factor_entries, rebuilt.predicted_peak_factor_entries);
+        }
+
+        let wrong_scopes = vec![
+            BinaryLogFactor::new(vec![0, 2], vec![0.9_f64.ln(), 0.1_f64.ln(), 0.2_f64.ln(), 0.8_f64.ln()]).unwrap(),
+            BinaryLogFactor::new(vec![1, 2], vec![0.7_f64.ln(), 0.3_f64.ln(), 0.4_f64.ln(), 0.6_f64.ln()]).unwrap(),
+        ];
+        assert!(matches!(
+            min_fill_log_sum_product_with_cutset_plan(&wrong_scopes, &plan),
+            Err(FactorGraphError::FactorScopesDoNotMatchCutsetPlan)
+        ));
+    }
+
+    #[test]
     fn cutset_preflight_exposes_canonical_separator_and_residual_cost_before_execution() {
         const SIDE: usize = 4;
         let mut factors = Vec::new();
