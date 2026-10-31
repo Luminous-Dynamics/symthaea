@@ -160,3 +160,8 @@ CMAQ-018 now has a fail-closed interval-dominant action selector: it returns an 
 ### Executable net decision value
 
 A new matched-episode evaluator charges inference, information acquisition and failure/recovery costs against realized utility, comparing the world-model arm with D0 and D1. It reports gross advantage, net advantage and win rate for each baseline, rejecting negative costs and non-finite outcomes. The schema and synthetic arithmetic fixture are `net-decision-value.v0.1.schema.json` and `fixtures/net-decision-value.example.json`. This is metric plumbing—not a claim of real decision improvement.
+
+
+### VIS-005 source-backed architecture gap
+
+See [VIS005_ACTION_CONDITIONED_GAP_AUDIT_2026-11-01.md](VIS005_ACTION_CONDITIONED_GAP_AUDIT_2026-11-01.md). The current vision manifold delayed evaluator measures autonomous future-frame prediction against later observations, but it is not action-conditioned. The cross-manifold predictor maps vision to cognition. The current JEPA path uses the previous FEP action but its target is the CfC prediction approximation, not an independently encoded future frame. This distinction is now explicit in the benchmark claims and next-step plan.
