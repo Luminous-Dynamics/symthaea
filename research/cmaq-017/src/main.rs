@@ -1024,6 +1024,32 @@ mod tests {
         assert!(predicted.state.v > 0.0);
     }
 
+
+    #[test]
+    fn rollout_transition_count_stops_at_the_predicted_terminal() {
+        let (_, _, counted) = rollout_model(
+            State { x: 1.12, v: 0.5 },
+            &[1.0, 1.0, 1.0, 1.0],
+            0,
+            4,
+            Scenario::TerminationSeam,
+            1,
+            false,
+        );
+        assert_eq!(counted, 1);
+
+        let (_, _, full_horizon) = rollout_model(
+            State { x: -0.2, v: 0.0 },
+            &[0.0, 0.0, 0.0, 0.0],
+            0,
+            4,
+            Scenario::Benign,
+            1,
+            false,
+        );
+        assert_eq!(full_horizon, 4);
+    }
+
     #[test]
     fn direct_policy_has_no_candidate_or_model_query_cost() {
         let plan = plan_actions(
