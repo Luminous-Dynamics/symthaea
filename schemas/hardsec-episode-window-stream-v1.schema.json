@@ -13,7 +13,13 @@
     "context_assignment_policy_id",
     "context_assignment_artifact_sha256",
     "randomizer_source_sha256",
-    "records"
+    "records",
+    "pmu_metrology_protocol_id",
+    "pmu_platform_id",
+    "pmu_workload_id",
+    "pmu_workload_binary_sha256",
+    "pmu_acquisition_condition_id",
+    "pmu_event_ids"
   ],
   "properties": {
     "schema_version": {
@@ -64,7 +70,8 @@
           "program_binary_sha256",
           "device_config_id",
           "randomizer_u",
-          "windows"
+          "windows",
+          "pmu_acquisition_condition_id"
         ],
         "properties": {
           "sequence_index": {
@@ -152,8 +159,39 @@
                 }
               }
             }
+          },
+          "pmu_acquisition_condition_id": {
+            "const": "grouped_co_scheduled"
           }
         }
+      }
+    },
+    "pmu_metrology_protocol_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pmu_platform_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pmu_workload_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pmu_workload_binary_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "pmu_acquisition_condition_id": {
+      "const": "grouped_co_scheduled"
+    },
+    "pmu_event_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
       }
     }
   }
