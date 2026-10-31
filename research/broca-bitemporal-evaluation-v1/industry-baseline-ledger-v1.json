@@ -1176,6 +1176,90 @@
         "average_answer_context_tokens_10m": 6914
       },
       "comparison_notes": "Same evaluator setup across the OmniMemEval table: GPT-4.1-mini answers and GPT-4o-mini judge. This is more useful for relative comparison than separately published vendor runs, but the benchmark and harness are maintained by MemTensor, which also makes MemOS; treat that conflict transparently. Scores are BEAM nugget scores, not interchangeable with past.dev answer accuracy or LongMemEval Recall@20."
+    },
+    {
+      "id": "tshmem-emnlp-2026-longmemeval-s-star",
+      "system": "TSHMem",
+      "category": "peer-reviewed-paper",
+      "benchmark": "LongMemEval S*",
+      "benchmark_revision": "EMNLP 2026; paper-specific S* evaluation variant",
+      "metric": "accuracy",
+      "value_percent": 66.3,
+      "answer_model": null,
+      "judge": "Paper-specific evaluation protocol",
+      "reported_date": "2026-10",
+      "sample_size": null,
+      "secondary_metrics": {
+        "absolute_gain_over_strongest_baseline_percentage_points": 18.6,
+        "evidence_tokens": "Fewer than compared baselines; exact count not stated in ACL abstract"
+      },
+      "evidence_grade": "peer-reviewed-primary-paper",
+      "comparison_notes": "Temporal-semantic hierarchical memory graph using temporal intent, entity activation, event-referenced constraints and graph propagation. The ACL abstract reports 66.3% on LongMemEval S* and +18.6 percentage points over its strongest baseline. Do not compare directly with original LongMemEval, LongMemEval-V2, or other S* variants without matching split, answer model, judge and prompts.",
+      "source": "https://aclanthology.org/2026.emnlp-main.1034/"
+    },
+    {
+      "id": "timl-membench-findings-emnlp-2026",
+      "system": "TimlMemBench benchmark",
+      "category": "peer-reviewed-research-benchmark",
+      "benchmark": "TimlMemBench",
+      "benchmark_revision": "Findings of EMNLP 2026; canonical-pool LLM-QA control and raw-native ingestion",
+      "metric": "reviewed questions",
+      "value_percent": null,
+      "answer_model": null,
+      "judge": "Benchmark-specific QA / governance and activation evaluation",
+      "reported_date": "2026-10",
+      "sample_size": 1715,
+      "secondary_metrics": {
+        "reviewed_samples": 208,
+        "sessions": 1566,
+        "governance_or_activation_cases": 1821,
+        "languages": "Chinese and English",
+        "tracks": "canonical-pool QA control; raw-native memory ingestion"
+      },
+      "evidence_grade": "peer-reviewed-primary-paper",
+      "comparison_notes": "A benchmark profile, not a system leaderboard score. Raw-native evaluation exposes lifecycle-update, scope-boundary, provenance-recovery, activation and restraint failures that canonical-pool QA may hide. Keep the two tracks separate.",
+      "source": "https://aclanthology.org/2026.findings-emnlp.507/"
+    },
+    {
+      "id": "utilmem-emnlp-2026",
+      "system": "UTILMEM benchmark",
+      "category": "peer-reviewed-research-benchmark",
+      "benchmark": "UTILMEM",
+      "benchmark_revision": "EMNLP 2026; five domains",
+      "metric": "benchmark instances",
+      "value_percent": null,
+      "answer_model": null,
+      "judge": "Paper-specific evaluation protocol",
+      "reported_date": "2026-10",
+      "sample_size": 1717,
+      "secondary_metrics": {
+        "domains": 5,
+        "capabilities": "dense-history reasoning; implicit relevance; distributed evidence synthesis; semantically similar distractor resistance"
+      },
+      "evidence_grade": "peer-reviewed-primary-paper",
+      "comparison_notes": "A benchmark profile, not an aggregate system score. The paper finds conventional factual recall does not guarantee evidence utilization; retrieval alone may recover useful evidence while the system still fails to integrate it or reject plausible distractors.",
+      "source": "https://aclanthology.org/2026.emnlp-main.1639/"
+    },
+    {
+      "id": "locomo-conv-findings-emnlp-2026",
+      "system": "LOCOMO-CONV benchmark",
+      "category": "peer-reviewed-research-benchmark",
+      "benchmark": "LOCOMO-CONV",
+      "benchmark_revision": "Findings of EMNLP 2026; conversational query styles",
+      "metric": "query-style coverage",
+      "value_percent": null,
+      "answer_model": null,
+      "judge": "Paper-specific retrieval-recall and end-to-end response evaluation",
+      "reported_date": "2026-10",
+      "sample_size": null,
+      "secondary_metrics": {
+        "query_styles": "dialog; implicit; counterfactual; composed",
+        "dataset_origin": "LoCoMo",
+        "annotation": "supportive_memory annotations"
+      },
+      "evidence_grade": "peer-reviewed-primary-paper",
+      "comparison_notes": "A benchmark profile, not an aggregate system score. Conversational framing exposes retrieval gaps missed by QA-style probing, especially for implicit and composed requests. Strong retrieval does not automatically translate to strong response quality.",
+      "source": "https://aclanthology.org/2026.findings-emnlp.1289/"
     }
   ],
   "broca_targets": {
