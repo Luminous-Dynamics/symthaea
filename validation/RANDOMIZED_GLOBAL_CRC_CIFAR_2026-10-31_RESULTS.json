@@ -1,0 +1,375 @@
+{
+  "schema": "symthaea-randomized-global-common-depth-crc-v1",
+  "status": "LOCAL_FINITE_POPULATION_REFERENCE_EXECUTION_NOT_DEPLOYMENT_RESULT",
+  "protocol": {
+    "pool_counts": [
+      7300,
+      969,
+      1731
+    ],
+    "n_calibration": 50,
+    "alphas": [
+      0.02,
+      0.05,
+      0.1,
+      0.15
+    ],
+    "calibration_weights": "exact multivariate hypergeometric",
+    "test_type_weights": "residual population conditional on calibration count vector",
+    "action_support": [
+      0,
+      1,
+      2
+    ],
+    "policy": "draw one common depth per calibration sample from P(action|calibration counts), then reuse for its test batch",
+    "utility": "expected correct hierarchy specificity",
+    "validity": "all 1,378 augmented multiset expected-loss constraints checked for each alpha"
+  },
+  "results": [
+    {
+      "alpha": 0.02,
+      "envelope": {
+        "risk": 0.019993189285508674,
+        "specificity": 0.12417582615759053,
+        "node_size": 78.06773103740161
+      },
+      "recertified_500": {
+        "risk": 0.01999629344865259,
+        "specificity": 0.12418022567816557,
+        "node_size": 78.06763931840338
+      },
+      "randomized_global": {
+        "risk": 0.019996293448655274,
+        "specificity": 0.12418022567816572,
+        "node_size": 78.06763931840413
+      },
+      "max_augmented_violation": 3.33e-14,
+      "runtime_seconds": 0.028084677,
+      "support_histogram": {
+        "1": 635,
+        "2": 682,
+        "3": 9
+      },
+      "global_gain_vs_recertified": {
+        "risk": 2.6853519408120974e-15,
+        "specificity": 1.5265566588595902e-16,
+        "node_size": 7.531752999057062e-13
+      }
+    },
+    {
+      "alpha": 0.05,
+      "envelope": {
+        "risk": 0.04971003267338825,
+        "specificity": 0.30660292475285295,
+        "node_size": 45.94698766563294
+      },
+      "recertified_500": {
+        "risk": 0.04993339557210867,
+        "specificity": 0.3069199044825269,
+        "node_size": 45.940382159985255
+      },
+      "randomized_global": {
+        "risk": 0.04997805349757716,
+        "specificity": 0.3069832942831663,
+        "node_size": 45.93906113255066
+      },
+      "max_augmented_violation": 8.88e-15,
+      "runtime_seconds": 0.024629297,
+      "support_histogram": {
+        "1": 676,
+        "2": 644,
+        "3": 6
+      },
+      "global_gain_vs_recertified": {
+        "risk": 0.00004465792546849007,
+        "specificity": 0.00006338980063941291,
+        "node_size": -0.0013210274345922812
+      }
+    },
+    {
+      "alpha": 0.1,
+      "envelope": {
+        "risk": 0.0973810205128521,
+        "specificity": 0.5276077611934622,
+        "node_size": 10.395067033538206
+      },
+      "recertified_500": {
+        "risk": 0.09979405103348589,
+        "specificity": 0.5310382212595375,
+        "node_size": 10.3236197949113
+      },
+      "randomized_global": {
+        "risk": 0.09988545174891446,
+        "specificity": 0.5311683725558989,
+        "node_size": 10.320910868783072
+      },
+      "max_augmented_violation": 7.99e-15,
+      "runtime_seconds": 0.037176818,
+      "support_histogram": {
+        "1": 695,
+        "2": 628,
+        "3": 3
+      },
+      "global_gain_vs_recertified": {
+        "risk": 0.00009140071542856898,
+        "specificity": 0.00013015129636140266,
+        "node_size": -0.0027089261282284838
+      }
+    },
+    {
+      "alpha": 0.15,
+      "envelope": {
+        "risk": 0.14492535981395835,
+        "specificity": 0.6202610825371366,
+        "node_size": 3.4122402589730854
+      },
+      "recertified_500": {
+        "risk": 0.1480429968382174,
+        "specificity": 0.6246973389141381,
+        "node_size": 3.31987364771329
+      },
+      "randomized_global": {
+        "risk": 0.14804819036206493,
+        "specificity": 0.6247047542442163,
+        "node_size": 3.319719446725533
+      },
+      "max_augmented_violation": 4.44e-15,
+      "runtime_seconds": 0.025330936999921505,
+      "support_histogram": {
+        "1": 730,
+        "2": 595,
+        "3": 1
+      },
+      "global_gain_vs_recertified": {
+        "risk": 0.000005193523847535353,
+        "specificity": 0.000007415330078197613,
+        "node_size": -0.00015420098775686952
+      }
+    }
+  ],
+  "interpretation": [
+    "Global randomized LP is exactly feasible under all augmented-state constraints.",
+    "It yields only tiny increments over the 500-round equal-share common-depth controller: effectively 0 pp at alpha .02, +0.00634 pp at alpha .05, +0.01302 pp at alpha .10, and +0.00074 pp at alpha .15.",
+    "Equal-share recertification is already close to globally optimal for this common-depth action family and reference utility.",
+    "Roughly 45-52% of calibration-state policies randomize over 2 or 3 action support points."
+  ],
+  "limitations": [
+    "objective uses published full-pool aggregate type counts; this is an oracle benchmark and not deployable unless such weights are independently frozen",
+    "common-depth family only, not confidence-adaptive",
+    "expected-risk guarantee only, not a high-probability risk guarantee",
+    "no distribution-shift guarantee",
+    "local execution used an independent Python reference driver; exact committed module not executed from a clean checkout; no CI pass claimed"
+  ],
+  "local_validation": {
+    "tests_authored": 22,
+    "tests_executed_against_exact_committed_module": false,
+    "exact_committed_module_execution": "not run in a clean checkout; tests are authored only",
+    "independent_reference_checks": {
+      "corrected_randomized_lp_replay": true,
+      "corrected_500_round_equal_share_replay": true,
+      "four_alpha_lp_solutions": true,
+      "all_augmented_state_constraints": true,
+      "hypergeometric_weights": true,
+      "residual_test_weights": true,
+      "piecewise_convexification_interior_depths": 8,
+      "primal_dual_receipts_checked_for_all_four_alpha": true,
+      "certificate_mutation_tests": "authored; not executed against exact module"
+    },
+    "max_kkt_residuals": {
+      "primal_inequality": 3.3306690738754696e-14,
+      "primal_equality": 2.930988785010413e-14,
+      "dual_sign": 1.4111977136197375e-15,
+      "stationarity": 1.734723475976807e-18,
+      "complementarity": 1.3133141493130275e-18,
+      "duality_gap": 8.881784197001252e-16,
+      "action_row_normalization": 2.930988785010413e-14
+    },
+    "independent_full_replay_runtime_seconds": 4.004562895,
+    "remote_ci": "not run; draft PR currently has no passing CI evidence",
+    "committed_blobs": {
+      "source": "60784684550cd0727e4a638190ae6fbd6844ab15",
+      "tests": "b146697ba316b2d3f6c69f2ad8acda3facdda3d4"
+    }
+  },
+  "kkt_by_alpha": {
+    "0.02": {
+      "primal_ineq": 3.3306690738754696e-14,
+      "primal_eq": 8.770761894538737e-15,
+      "bound": 0,
+      "dual_ineq": 2.749007102732881e-16,
+      "dual_lower": 9.397661241101647e-16,
+      "dual_upper": 0,
+      "stationarity": 1.734723475976807e-18,
+      "complementarity": 7.291807771930162e-26,
+      "duality_gap": 1.3877787807814457e-17
+    },
+    "0.05": {
+      "primal_ineq": 8.881784197001252e-15,
+      "primal_eq": 2.930988785010413e-14,
+      "bound": 2.886579864025407e-15,
+      "dual_ineq": 1.8808705278832694e-16,
+      "dual_lower": 8.860178039988873e-16,
+      "dual_upper": 1.4111977136197945e-15,
+      "stationarity": 1.734723475976807e-18,
+      "complementarity": 1.3133141493127644e-18,
+      "duality_gap": 3.3306690738754696e-16
+    },
+    "0.1": {
+      "primal_ineq": 7.993605777301127e-15,
+      "primal_eq": 2.220446049250313e-16,
+      "bound": 0,
+      "dual_ineq": 8.664509291883991e-16,
+      "dual_lower": 9.397661241101647e-16,
+      "dual_upper": 0,
+      "stationarity": 1.734723475976807e-18,
+      "complementarity": 6.533794032495293e-19,
+      "duality_gap": 2.220446049250313e-16
+    },
+    "0.15": {
+      "primal_ineq": 4.440892098500626e-15,
+      "primal_eq": 6.661338147750939e-16,
+      "bound": 0,
+      "dual_ineq": 8.705845744639758e-16,
+      "dual_lower": 9.109567659443388e-16,
+      "dual_upper": 8.495045687455062e-16,
+      "stationarity": 1.734723475976807e-18,
+      "complementarity": 6.813356484056072e-19,
+      "duality_gap": 5.551115123125783e-16
+    }
+  },
+  "certificate_design": {
+    "schema": "symthaea-risk-certificate-v1",
+    "kind": "RandomizedFiniteExchangeabilityCRC",
+    "proof_lanes": [
+      "ExactFiniteExchangeability",
+      "ExactLPOptimalityKKT"
+    ],
+    "digests": [
+      "decision_output_sha256",
+      "constraint_domain_sha256",
+      "objective_reference_sha256"
+    ],
+    "verifier_checks": [
+      "all augmented state expected losses",
+      "risk target and assumption contract",
+      "action/state scope",
+      "dual signs",
+      "stationarity",
+      "complementarity",
+      "primal-dual gap"
+    ],
+    "tamper_controls_authored": [
+      "policy table",
+      "alpha/risk target",
+      "augmented state count",
+      "dual witness",
+      "assumption contract",
+      "verifier receipt"
+    ],
+    "signature": "not signed; hashes bind content but do not authenticate an issuer"
+  },
+  "independent_reference_replay": {
+    "status": "executed successfully with NumPy/SciPy in a separate scratch implementation of the committed equations",
+    "total_runtime_seconds": 4.004562895,
+    "exact_state_counts": {
+      "calibration": 1326,
+      "augmented": 1378
+    },
+    "results": [
+      {
+        "alpha": 0.02,
+        "risk": 0.019996293448656423,
+        "specificity": 0.12418022567817276,
+        "node_size": 78.06763931840294,
+        "gain_vs_equal_share_pp": 1.249e-14,
+        "gain_vs_envelope_pp": 0.00043995205752239697,
+        "primal_ineq": 3.3306690738754696e-14,
+        "primal_eq": 8.770761894538737e-15,
+        "dual_sign": 9.397661241060794e-16,
+        "stationarity": 1.734723475976807e-18,
+        "complementarity": 7.291807771891834e-26,
+        "duality_gap": 1.3877787807814457e-17,
+        "row_sum_error": 8.770761894538737e-15,
+        "support_histogram": {
+          "1": 635,
+          "2": 682,
+          "3": 9
+        }
+      },
+      {
+        "alpha": 0.05,
+        "risk": 0.049978053497580235,
+        "specificity": 0.30698329428317295,
+        "node_size": 45.93906113255009,
+        "gain_vs_equal_share_pp": 0.006338980063980149,
+        "gain_vs_envelope_pp": 0.03803695303151167,
+        "primal_ineq": 8.881784197001252e-15,
+        "primal_eq": 2.930988785010413e-14,
+        "dual_sign": 1.4111977136197375e-15,
+        "stationarity": 1.734723475976807e-18,
+        "complementarity": 1.3133141493130275e-18,
+        "duality_gap": 1.1102230246251565e-16,
+        "row_sum_error": 2.930988785010413e-14,
+        "support_histogram": {
+          "1": 676,
+          "2": 644,
+          "3": 6
+        }
+      },
+      {
+        "alpha": 0.1,
+        "risk": 0.09988545174891898,
+        "specificity": 0.5311683725558562,
+        "node_size": 10.320910868793854,
+        "gain_vs_equal_share_pp": 0.013015129636217981,
+        "gain_vs_envelope_pp": 0.35606113624379043,
+        "primal_ineq": 7.993605777301127e-15,
+        "primal_eq": 2.220446049250313e-16,
+        "dual_sign": 9.397661241060794e-16,
+        "stationarity": 1.734723475976807e-18,
+        "complementarity": 6.533794032534617e-19,
+        "duality_gap": 8.881784197001252e-16,
+        "row_sum_error": 2.220446049250313e-16,
+        "support_histogram": {
+          "1": 695,
+          "2": 628,
+          "3": 3
+        }
+      },
+      {
+        "alpha": 0.15,
+        "risk": 0.14804819036206596,
+        "specificity": 0.6247047542442142,
+        "node_size": 3.3197194467262388,
+        "gain_vs_equal_share_pp": 0.0007415330078197613,
+        "gain_vs_envelope_pp": 0.4443671707078267,
+        "primal_ineq": 4.440892098500626e-15,
+        "primal_eq": 6.661338147750939e-16,
+        "dual_sign": 9.10956765950321e-16,
+        "stationarity": 1.734723475976807e-18,
+        "complementarity": 6.813356484056072e-19,
+        "duality_gap": 3.3306690738754696e-16,
+        "row_sum_error": 6.661338147750939e-16,
+        "support_histogram": {
+          "1": 730,
+          "2": 595,
+          "3": 1
+        }
+      }
+    ],
+    "max_residuals": {
+      "primal_inequality": 3.3306690738754696e-14,
+      "primal_equality": 2.930988785010413e-14,
+      "dual_sign": 1.4111977136197375e-15,
+      "stationarity": 1.734723475976807e-18,
+      "complementarity": 1.3133141493130275e-18,
+      "duality_gap": 8.881784197001252e-16,
+      "normalization": 2.930988785010413e-14
+    },
+    "equal_share_replay": {
+      "method": "recomputed 500 equal-share updates from the common-depth CRC equations",
+      "maximum_augmented_budget_excess": 3.552713678800501e-15,
+      "all_four_alpha_levels": true
+    }
+  }
+}
