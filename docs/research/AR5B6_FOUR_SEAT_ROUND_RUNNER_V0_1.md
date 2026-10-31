@@ -20,6 +20,7 @@ AR-5B6 executes four seats in every round through the AR-5B4 contract. It fixes 
 - The first round is the same bootstrap for every policy: A, B, C and D receive one evaluation each.
 - All subsequent assignments are computed from the same pre-round history snapshot.
 - Candidate outcomes are calculated independently from that snapshot's per-direction evaluation count; no result changes the assignment of another seat in the same round.
+- Work-item hashes are policy-independent for the same seed/direction/evaluation-index tuple, while action IDs remain ledger-specific.
 - Every seat has a unique action ID, immutable work-item digest, result/verifier receipt reference and cost receipt.
 - Round close requires four valid results and four cost receipts. The ledger enforces contiguous rounds and a close-digest parent chain.
 
@@ -67,14 +68,15 @@ Verifier receipts in this simulator are deterministic content references. They a
 
 ## Authored tests
 
-Six tests are authored for:
+Eight tests are authored for:
 
 - four-seat conservation and the common per-direction cap across all policies and four landscapes;
-- identical bootstrap assignments for all policies;
+- identical bootstrap assignments and policy-independent work-item digests for all policies;
 - complete deterministic replay of the round/receipt chain for a fixed seed;
 - frozen pre-round snapshot binding on every result receipt;
 - fixed-set treatment of the high-payoff D arm without a free NEW proposal;
-- no-new-direction negative controls for DirectionBoard and Coral directions-only ablations.
+- no-new-direction negative controls for DirectionBoard and Coral directions-only ablations;
+- paired comparisons that reject incomplete/mismatched seed sets.
 
 The tests exercise the simulator and contract together, but they have **not** been compiled or executed in the authoring environment.
 
