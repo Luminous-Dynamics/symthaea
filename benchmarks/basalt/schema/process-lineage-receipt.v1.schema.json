@@ -108,7 +108,10 @@
           "kind",
           "process",
           "observed_at_monotonic_ns",
-          "evidence_digest"
+          "evidence_digest",
+          "exec_ordinal",
+          "exec_image_digest",
+          "clone_flags"
         ],
         "properties": {
           "source_id": {
@@ -140,8 +143,113 @@
           "evidence_digest": {
             "type": "string",
             "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "exec_ordinal": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "exec_image_digest": {
+            "type": "string",
+            "pattern": "^(|sha256:[a-f0-9]{64})$"
+          },
+          "clone_flags": {
+            "type": "integer",
+            "minimum": 0
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "exec"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "exec_ordinal": {
+                  "minimum": 1
+                },
+                "exec_image_digest": {
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                },
+                "clone_flags": {
+                  "const": 0
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "not": {
+                    "const": "exec"
+                  }
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "exec_ordinal": {
+                  "const": 0
+                },
+                "exec_image_digest": {
+                  "const": ""
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "clone"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "clone_flags": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "not": {
+                    "const": "clone"
+                  }
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "clone_flags": {
+                  "const": 0
+                }
+              }
+            }
+          }
+        ]
       }
     },
     "health": {

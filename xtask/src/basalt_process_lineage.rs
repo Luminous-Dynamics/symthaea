@@ -125,6 +125,9 @@ struct OracleEvent {
     kind: ProcessEventKind,
     process: ProcessIdentity,
     observed_at_monotonic_ns: u64,
+    exec_ordinal: u32,
+    exec_image_digest: String,
+    clone_flags: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -164,6 +167,9 @@ struct ObservedEvent {
     process: ProcessIdentity,
     observed_at_monotonic_ns: u64,
     evidence_digest: String,
+    exec_ordinal: u32,
+    exec_image_digest: String,
+    clone_flags: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -181,6 +187,9 @@ struct ObserverHealth {
 struct EventKey {
     kind: ProcessEventKind,
     process: ProcessIdentity,
+    exec_ordinal: u32,
+    exec_image_digest: String,
+    clone_flags: u64,
 }
 
 pub fn audit_files(oracle_path: &Path, receipt_path: &Path) -> anyhow::Result<ProcessLineageAuditReport> {
@@ -491,12 +500,21 @@ fn validate_oracle_events(
         if event.observed_at_monotonic_ns < oracle.capture_start_monotonic_ns || event.observed_at_monotonic_ns > oracle.capture_end_monotonic_ns {
             error(report, "E_EVENT_OUTSIDE_CAPTURE", &format!("oracle.events[{index}]"), "oracle event timestamp lies outside the declared capture interval");
         }
+        validate_event_semantics(
+            event.kind,
+            event.exec_ordinal,
+            &event.exec_image_digest,
+            event.clone_flags,
+            &format!("oracle.events[{index}]"),
+            report,
+        );
         *counts.entry(event_key_oracle(event)).or_default() += 1;
         times.entry((event.process.clone(), event.kind)).or_default().push(event.observed_at_monotonic_ns);
     }
+    validate_oracle_exec_ordinals(&oracle.events, report);
     for (key, count) in &counts {
-        if *count != 1 && key.kind != ProcessEventKind::Exec {
-            error(report, "E_ORACLE_EVENT_DUPLICATE", "oracle.events", &format!("non-exec lifecycle event {:?} for PID {} start {} appears {count} times", key.kind, key.process.pid, key.process.start_time_ticks));
+        if *count != 1 {
+            error(report, "E_ORACLE_EVENT_DUPLICATE", "oracle.events", &format!("semantic event {:?} for PID {} start {} appears {count} times", key.kind, key.process.pid, key.process.start_time_ticks));
         }
     }
     for identity in processes.keys() {
@@ -509,7 +527,13 @@ fn validate_oracle_events(
         if birth_count != 1 {
             error(report, "E_ORACLE_BIRTH_EVENT", "oracle.events", "each process must have exactly one root_start or child-creation event");
         }
-        let exit_count = counts.get(&EventKey { kind: ProcessEventKind::Exit, process: identity.clone() }).copied().unwrap_or(0);
+        let exit_count = counts.get(&EventKey {
+            kind: ProcessEventKind::Exit,
+            process: identity.clone(),
+            exec_ordinal: 0,
+            exec_image_digest: String::new(),
+            clone_flags: 0,
+        }).copied().unwrap_or(0);
         if oracle.expected_tree_closed && exit_count != 1 {
             error(report, "E_ORACLE_EXIT_EVENT", "oracle.events", "a closed process tree requires exactly one exit event per process instance");
         }
@@ -570,9 +594,24 @@ fn validate_observed_events(
         if event.observed_at_monotonic_ns < receipt.capture_start_monotonic_ns || event.observed_at_monotonic_ns > receipt.capture_end_monotonic_ns {
             error(report, "E_EVENT_OUTSIDE_CAPTURE", &format!("receipt.events[{index}]"), "observer event timestamp lies outside its capture interval");
         }
-        keys.push(EventKey { kind: event.kind, process: event.process.clone() });
+        validate_event_semantics(
+            event.kind,
+            event.exec_ordinal,
+            &event.exec_image_digest,
+            event.clone_flags,
+            &format!("receipt.events[{index}]"),
+            report,
+        );
+        keys.push(EventKey {
+            kind: event.kind,
+            process: event.process.clone(),
+            exec_ordinal: event.exec_ordinal,
+            exec_image_digest: event.exec_image_digest.clone(),
+            clone_flags: event.clone_flags,
+        });
         source_events.entry(event.source_id.as_str()).or_default().push((event.sequence,event.observed_at_monotonic_ns));
     }
+    validate_observed_exec_ordinals(&receipt.events, report);
 
     if receipt.health.event_count != receipt.events.len() as u64 {
         error(report, "E_EVENT_COUNT_COUNTER", "receipt.health.event_count", "reported event_count must equal the number of serialized observer events");
@@ -670,8 +709,95 @@ fn validate_observed_lifecycle_order(
     }
 }
 
+
+const CLONE_THREAD_FLAG: u64 = 0x0001_0000;
+
+fn validate_event_semantics(
+    kind: ProcessEventKind,
+    exec_ordinal: u32,
+    exec_image_digest: &str,
+    clone_flags: u64,
+    path: &str,
+    report: &mut ProcessLineageAuditReport,
+) {
+    if kind == ProcessEventKind::Exec {
+        if exec_ordinal == 0 || !valid_digest(exec_image_digest) {
+            error(report, "E_EXEC_IMAGE_IDENTITY", path, "exec events require a positive per-process ordinal and a lowercase SHA-256 executable-image digest");
+        }
+        if clone_flags != 0 {
+            error(report, "E_EXEC_CLONE_FLAGS", path, "exec events must use clone_flags=0");
+        }
+    } else if exec_ordinal != 0 || !exec_image_digest.is_empty() {
+        error(report, "E_NON_EXEC_IMAGE_FIELDS", path, "non-exec events must use exec_ordinal=0 and an empty exec_image_digest");
+    }
+
+    if kind == ProcessEventKind::Clone {
+        if clone_flags & CLONE_THREAD_FLAG != 0 {
+            error(report, "E_THREAD_CLONE_UNSUPPORTED", path, "CLONE_THREAD is outside the process-only v1 profile and must remain unresolved");
+        }
+    } else if clone_flags != 0 {
+        error(report, "E_NON_CLONE_FLAGS", path, "only clone events may carry non-zero clone_flags");
+    }
+}
+
+fn validate_oracle_exec_ordinals(events: &[OracleEvent], report: &mut ProcessLineageAuditReport) {
+    let mut by_process = BTreeMap::<ProcessIdentity, BTreeMap<u32, u64>>::new();
+    for (index, event) in events.iter().enumerate() {
+        if event.kind == ProcessEventKind::Exec {
+            if by_process.entry(event.process.clone()).or_default()
+                .insert(event.exec_ordinal, event.observed_at_monotonic_ns).is_some()
+            {
+                error(report, "E_ORACLE_EXEC_ORDINAL_DUPLICATE", &format!("oracle.events[{index}]"), "exec ordinal must be unique within a process instance");
+            }
+        }
+    }
+    for (process, ordinals) in by_process {
+        for (index, (ordinal, _)) in ordinals.iter().enumerate() {
+            if *ordinal != (index as u32) + 1 {
+                error(report, "E_ORACLE_EXEC_ORDINAL_GAP", "oracle.events", &format!("exec ordinals for PID {} start {} must be contiguous from one", process.pid, process.start_time_ticks));
+                break;
+            }
+        }
+        let ordered_times: Vec<u64> = ordinals.values().copied().collect();
+        if ordered_times.windows(2).any(|pair| pair[0] > pair[1]) {
+            error(report, "E_ORACLE_EXEC_TIME_ORDER", "oracle.events", "exec ordinal order must not regress in monotonic time");
+        }
+    }
+}
+
+fn validate_observed_exec_ordinals(events: &[ObservedEvent], report: &mut ProcessLineageAuditReport) {
+    let mut by_process = BTreeMap::<ProcessIdentity, BTreeMap<u32, u64>>::new();
+    for (index, event) in events.iter().enumerate() {
+        if event.kind == ProcessEventKind::Exec {
+            if by_process.entry(event.process.clone()).or_default()
+                .insert(event.exec_ordinal, event.observed_at_monotonic_ns).is_some()
+            {
+                error(report, "E_RECEIPT_EXEC_ORDINAL_DUPLICATE", &format!("receipt.events[{index}]"), "exec ordinal must be unique within a process instance");
+            }
+        }
+    }
+    for (process, ordinals) in by_process {
+        for (index, (ordinal, _)) in ordinals.iter().enumerate() {
+            if *ordinal != (index as u32) + 1 {
+                error(report, "E_RECEIPT_EXEC_ORDINAL_GAP", "receipt.events", &format!("exec ordinals for PID {} start {} must be contiguous from one", process.pid, process.start_time_ticks));
+                break;
+            }
+        }
+        let ordered_times: Vec<u64> = ordinals.values().copied().collect();
+        if ordered_times.windows(2).any(|pair| pair[0] > pair[1]) {
+            error(report, "E_RECEIPT_EXEC_TIME_ORDER", "receipt.events", "exec ordinal order must not regress in monotonic time");
+        }
+    }
+}
+
 fn event_key_oracle(event: &OracleEvent) -> EventKey {
-    EventKey { kind: event.kind, process: event.process.clone() }
+    EventKey {
+        kind: event.kind,
+        process: event.process.clone(),
+        exec_ordinal: event.exec_ordinal,
+        exec_image_digest: event.exec_image_digest.clone(),
+        clone_flags: event.clone_flags,
+    }
 }
 
 fn count_event_keys(keys: &[EventKey]) -> BTreeMap<EventKey, usize> {
@@ -807,7 +933,37 @@ mod tests {
         (oracle, receipt)
     }
 
+    fn prepare_semantic_fields(events: &mut Value) {
+        let records = events.as_array_mut().expect("events must be an array");
+        let mut ordinals = BTreeMap::<(u32, u64), u32>::new();
+        for event in records {
+            let kind = event["kind"].as_str().unwrap_or("");
+            let pid = event["process"]["pid"].as_u64().unwrap_or(0) as u32;
+            let start = event["process"]["start_time_ticks"].as_u64().unwrap_or(0);
+            let ordinal = if kind == "exec" {
+                let next = ordinals.entry((pid, start)).or_default();
+                *next += 1;
+                *next
+            } else { 0 };
+            if event.get("exec_ordinal").is_none() {
+                event["exec_ordinal"] = json!(ordinal);
+            }
+            if event.get("exec_image_digest").is_none() {
+                event["exec_image_digest"] = if kind == "exec" {
+                    json!(sha256_tagged(format!("exec-image:{pid}:{start}:{}", event["exec_ordinal"].as_u64().unwrap_or(0)).as_bytes()))
+                } else { json!("") };
+            }
+            if event.get("clone_flags").is_none() {
+                event["clone_flags"] = json!(0);
+            }
+        }
+    }
+
     fn audit(oracle: &Value, receipt: &Value) -> ProcessLineageAuditReport {
+        let mut oracle = oracle.clone();
+        let mut receipt = receipt.clone();
+        prepare_semantic_fields(&mut oracle["events"]);
+        prepare_semantic_fields(&mut receipt["events"]);
         audit_bytes(oracle.to_string().as_bytes(), receipt.to_string().as_bytes())
     }
 
@@ -824,6 +980,73 @@ mod tests {
         assert!(!report.oracle_authenticity_established);
     }
 
+
+
+    #[test]
+    fn exec_image_digest_is_part_of_semantic_event_identity() {
+        let (oracle, mut receipt) = fixtures();
+        receipt["events"][1]["exec_image_digest"] = json!(digest(99));
+        let report = audit(&oracle, &receipt);
+        assert!(!report.event_set_reconciled);
+        assert!(report.counts.missing_events > 0);
+        assert!(report.counts.unexpected_events > 0);
+    }
+
+    #[test]
+    fn exec_ordinal_must_be_contiguous_and_match_the_oracle() {
+        let (oracle, mut receipt) = fixtures();
+        receipt["events"][1]["exec_ordinal"] = json!(2);
+        let report = audit(&oracle, &receipt);
+        assert!(!report.event_set_reconciled);
+        assert!(report.errors.iter().any(|e| e.code == "E_RECEIPT_EXEC_ORDINAL_GAP"));
+    }
+
+    #[test]
+    fn clone_flags_are_part_of_event_identity() {
+        let (mut oracle, mut receipt) = fixtures();
+        oracle["events"][2]["kind"] = json!("clone");
+        oracle["events"][2]["clone_flags"] = json!(0x0000_0100u64);
+        receipt["events"][2]["kind"] = json!("clone");
+        receipt["events"][2]["clone_flags"] = json!(0x0000_0200u64);
+        let report = audit(&oracle, &receipt);
+        assert!(!report.event_set_reconciled);
+        assert!(report.counts.missing_events > 0);
+        assert!(report.counts.unexpected_events > 0);
+    }
+
+    #[test]
+    fn clone_thread_is_rejected_by_process_only_profile() {
+        let (mut oracle, mut receipt) = fixtures();
+        oracle["events"][2]["kind"] = json!("clone");
+        oracle["events"][2]["clone_flags"] = json!(CLONE_THREAD_FLAG);
+        receipt["events"][2]["kind"] = json!("clone");
+        receipt["events"][2]["clone_flags"] = json!(CLONE_THREAD_FLAG);
+        let report = audit(&oracle, &receipt);
+        assert!(!report.lineage_audit_passed);
+        assert!(report.errors.iter().any(|e| e.code == "E_THREAD_CLONE_UNSUPPORTED"));
+    }
+
+
+    #[test]
+    fn duplicate_exec_ordinal_is_rejected_even_with_two_exec_occurrences() {
+        let (mut oracle, mut receipt) = fixtures();
+        oracle["events"].as_array_mut().unwrap().push(json!({
+            "kind":"exec","process":{"pid":100,"start_time_ticks":1000},
+            "observed_at_monotonic_ns":125,"exec_ordinal":1,
+            "exec_image_digest":digest(21),"clone_flags":0
+        }));
+        receipt["events"].as_array_mut().unwrap().push(json!({
+            "source_id":"exec-extra","sequence":1,"kind":"exec",
+            "process":{"pid":100,"start_time_ticks":1000},
+            "observed_at_monotonic_ns":126,"evidence_digest":digest(22),
+            "exec_ordinal":1,"exec_image_digest":digest(21),"clone_flags":0
+        }));
+        receipt["health"]["event_count"]=json!(7);
+        let report=audit(&oracle,&receipt);
+        assert!(!report.lineage_audit_passed);
+        assert!(report.errors.iter().any(|e|e.code=="E_ORACLE_EXEC_ORDINAL_DUPLICATE"));
+        assert!(report.errors.iter().any(|e|e.code=="E_RECEIPT_EXEC_ORDINAL_DUPLICATE"));
+    }
 
     #[test]
     fn multiple_exec_events_within_one_process_instance_reconcile() {
