@@ -458,6 +458,7 @@ mod tests {
         let result = verify_checkpoint_quorum(
             &current,
             &evaluator_key.verifying_key(),
+            [99; 32],
             &attestations,
             &witnesses(&witness_keys),
             WitnessQuorumPolicy { total_witnesses: 3, threshold: 2 },
@@ -511,6 +512,7 @@ mod tests {
             verify_checkpoint_quorum(
                 &local,
                 &evaluator_key.verifying_key(),
+                [99; 32],
                 &attestations,
                 &witnesses(&witness_keys),
                 WitnessQuorumPolicy { total_witnesses: 3, threshold: 2 },
@@ -544,6 +546,7 @@ mod tests {
             verify_checkpoint_quorum(
                 &checkpoint,
                 &evaluator_key.verifying_key(),
+                [99; 32],
                 &one_attestation,
                 &witnesses(&witness_keys),
                 WitnessQuorumPolicy { total_witnesses: 3, threshold: 1 },
@@ -595,6 +598,7 @@ mod tests {
             verify_checkpoint_quorum(
                 &checkpoint,
                 &evaluator_key.verifying_key(),
+                [99; 32],
                 &duplicate,
                 &witnesses(&witness_keys),
                 WitnessQuorumPolicy { total_witnesses: 3, threshold: 2 },
@@ -607,6 +611,7 @@ mod tests {
             verify_checkpoint_quorum(
                 &checkpoint,
                 &evaluator_key.verifying_key(),
+                [99; 32],
                 &unknown_response,
                 &witnesses(&witness_keys),
                 WitnessQuorumPolicy { total_witnesses: 3, threshold: 2 },
