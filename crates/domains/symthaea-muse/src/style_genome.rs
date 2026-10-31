@@ -6,7 +6,9 @@
 //! intentionally absent from this module. A candidate is admitted only when
 //! universal score invariants pass, the grammar emits a non-empty trace, all
 //! trace references resolve against the exact score, and fingerprints are
-//! finite. Style-specific musical judgments remain reported separately;
+//! finite. Trace integrity in this v1 is referential/order integrity only;
+//! it does not elevate composer assertions into independently verified
+//! musical semantics. Style-specific musical judgments remain reported separately;
 //! this module does not force every tradition through common-practice tonal
 //! rules.
 //!
@@ -24,7 +26,7 @@ use symthaea_music_theory::{
     score_validation::{ValidationSeverity, is_universal_invariant, validate_score},
 };
 
-use crate::style_mixer::{StyleMixLayer, compile_hybrid_style};
+use crate::style_mixer::compile_hybrid_style;
 
 pub const STYLE_GENOME_SCHEMA: &str = "muse-style-genome-v1";
 pub const STYLE_GENOME_EVALUATION_SCHEMA: &str = "muse-style-genome-evaluation-v1";
@@ -43,18 +45,6 @@ pub enum GenomeAxis {
 }
 
 impl GenomeAxis {
-    fn layer(self) -> StyleMixLayer {
-        match self {
-            Self::Structure => StyleMixLayer::Structure,
-            Self::Melody => StyleMixLayer::Melody,
-            Self::Rhythm => StyleMixLayer::Rhythm,
-            Self::Harmony => StyleMixLayer::Harmony,
-            Self::Ensemble => StyleMixLayer::Ensemble,
-            Self::Performance => StyleMixLayer::Performance,
-            Self::Production => StyleMixLayer::Production,
-        }
-    }
-
     fn catalog_id(self, recipe: &HybridStyleSpec) -> Option<u16> {
         match self {
             Self::Structure => Some(recipe.structural_style_id),
@@ -287,9 +277,9 @@ pub struct GenomeObjectives {
     pub novelty_distance: Option<f64>,
     /// Mean pairwise structural distance between this genome's seeded trials.
     pub within_genome_diversity: f64,
-    /// Fraction of the seven known return-transformation labels observed in
-    /// composer motif assertions. This is coverage of trace labels, not proof
-    /// that a listener recognizes them.
+    /// Fraction of the four transformation labels currently emitted by the
+    /// PeriodSentence trace detector. This is trace-label diversity, not
+    /// proof that a listener recognizes the transformations.
     pub motif_transformation_richness: f64,
     /// Fraction of the three classical period-pipeline forms realized over
     /// the seed set. Structural form is reported independently of preference.
@@ -694,7 +684,7 @@ pub fn evaluate_genome(
     let motif_transformations = trials.iter()
         .flat_map(|trial| trial.motif_transformations.iter().cloned())
         .collect::<BTreeSet<_>>();
-    let motif_transformation_richness = motif_transformations.len() as f64 / 4.0;
+    let motif_transformation_richness = (motif_transformations.len() as f64 / 4.0).min(1.0);
     let form_variation = trials.iter()
         .filter_map(|trial| trial.form_signature.as_ref())
         .collect::<BTreeSet<_>>()
@@ -1080,6 +1070,48 @@ mod tests {
             .collect::<Vec<_>>();
         let evaluation = evaluate_genome(&genome, &MusicalIntent::default(), &config, &references).unwrap();
         assert!(evaluation.objectives.novelty_distance.is_some());
+    }
+
+    #[test]
+    fn evaluation_digest_binds_the_objectives_and_reference_population() {
+        let genome = classical_genome();
+        let config = GenomeEvaluationConfig {
+            seeds: vec![1, 2, 3],
+            ..GenomeEvaluationConfig::default()
+        };
+        let baseline = evaluate_genome(&genome, &MusicalIntent::default(), &config, &[]).unwrap();
+        assert!(baseline.verify_digest());
+        let mut tampered = baseline.clone();
+        tampered.objectives.within_genome_diversity += 0.1;
+        assert!(!tampered.verify_digest());
+    }
+
+    #[test]
+    fn archive_rejects_candidates_evaluated_against_a_different_reference_population() {
+        let genome = classical_genome();
+        let config = GenomeEvaluationConfig {
+            seeds: vec![1, 2, 3],
+            ..GenomeEvaluationConfig::default()
+        };
+        let without_reference = evaluate_genome(&genome, &MusicalIntent::default(), &config, &[]).unwrap();
+        let references = without_reference.trials.iter()
+            .map(|trial| mean_fingerprint_array(&trial.structural_fingerprint).unwrap())
+            .collect::<Vec<_>>();
+        let with_reference = evaluate_genome(
+            &genome.replace_gene(GenomeAxis::Melody, None).unwrap(),
+            &MusicalIntent::default(),
+            &config,
+            &references,
+        ).unwrap();
+        let mut archive = GenomeArchive::new(GenomeArchiveConfig::default()).unwrap();
+        assert_eq!(
+            archive.insert(without_reference).disposition,
+            ArchiveInsertDisposition::Accepted
+        );
+        assert_eq!(
+            archive.insert(with_reference).disposition,
+            ArchiveInsertDisposition::RejectedReferencePopulationMismatch
+        );
     }
 
     #[test]
