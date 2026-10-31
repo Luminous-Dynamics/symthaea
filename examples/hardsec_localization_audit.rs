@@ -831,6 +831,38 @@ mod tests {
     }
 
     #[test]
+    fn rejects_candidate_region_edge_with_endpoint_outside_region() {
+        let (mut e,g,o,_,gb,ob) = fixture_values();
+        e["candidate_regions"][0]["node_ids"] = json!(["g17"]);
+        let eb = serde_json::to_vec(&e).unwrap();
+        assert!(audit_values(&e,&g,&o,&eb,&gb,&ob).unwrap_err().contains("endpoint outside"));
+    }
+
+    #[test]
+    fn rejects_malformed_model_digest() {
+        let (mut e,g,o,_,gb,ob) = fixture_values();
+        e["model"]["model_sha256"] = json!("not-a-digest");
+        let eb = serde_json::to_vec(&e).unwrap();
+        assert!(audit_values(&e,&g,&o,&eb,&gb,&ob).unwrap_err().contains("lowercase SHA-256"));
+    }
+
+    #[test]
+    fn rejects_out_of_range_decision_score() {
+        let (mut e,g,o,_,gb,ob) = fixture_values();
+        e["decision"]["score"] = json!(1.5);
+        let eb = serde_json::to_vec(&e).unwrap();
+        assert!(audit_values(&e,&g,&o,&eb,&gb,&ob).unwrap_err().contains("finite and in [0, 1]"));
+    }
+
+    #[test]
+    fn rejects_unsupported_path_coverage_state() {
+        let (mut e,g,o,_,gb,ob) = fixture_values();
+        e["path_coverage"]["status"] = json!("probably_complete");
+        let eb = serde_json::to_vec(&e).unwrap();
+        assert!(audit_values(&e,&g,&o,&eb,&gb,&ob).unwrap_err().contains("unsupported explanation.path_coverage.status"));
+    }
+
+    #[test]
     fn empty_reference_path_set_does_not_divide_by_zero() {
         let (mut e,g,mut o,_,gb,_) = fixture_values();
         o["reference_paths"] = json!([]);
