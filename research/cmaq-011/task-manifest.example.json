@@ -14,7 +14,10 @@
     "observation_transform_digest": null,
     "action_transform_digest": null,
     "episode_horizon": null,
-    "reset_distribution_digest": null
+    "reset_distribution_digest": null,
+    "episode_horizon_base_simulator_steps": null,
+    "simulator_steps_per_action": null,
+    "reward_aggregation": "unknown"
   },
   "split": {
     "name": "qualification",
@@ -47,6 +50,10 @@
     {
       "id": "mrsq",
       "kind": "search_based_model_based_rl_external"
+    },
+    {
+      "id": "wimle",
+      "kind": "uncertainty_aware_stochastic_world_model_rl_external"
     },
     {
       "id": "drq",
@@ -105,7 +112,9 @@
     "selected_action_error_coverage",
     "verified_task_success_rate",
     "evaluation_shortcut_attempt_rate",
-    "probe_value_of_information"
+    "probe_value_of_information",
+    "base_simulator_transitions_per_episode",
+    "controller_decision_steps_per_episode"
   ],
   "claim_ceiling": "schema_template_only_no_results",
   "integrity": {
