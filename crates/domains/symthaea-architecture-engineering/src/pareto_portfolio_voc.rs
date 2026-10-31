@@ -444,10 +444,10 @@ fn validate_action(
             "must be positive",
         ));
     }
-    if action.outcomes.len() < 2 {
+    if action.outcomes.is_empty() {
         return Err(PortfolioVoCError::new(
             "outcomes",
-            "at least two mutually exclusive outcomes are required",
+            "at least one outcome is required",
         ));
     }
     if action.observation_likelihood_model_sha256.len() != 64
@@ -894,8 +894,8 @@ mod tests {
                     particle_id: "p1".into(),
                     probability: 0.5,
                     objective_values: vec![
-                        Some(vec![0.95, 0.3]),
-                        Some(vec![0.3, 0.95]),
+                        Some(vec![0.95, 0.95]),
+                        Some(vec![0.2, 0.2]),
                         Some(vec![0.4, 0.4]),
                     ],
                 },
@@ -903,8 +903,8 @@ mod tests {
                     particle_id: "p2".into(),
                     probability: 0.5,
                     objective_values: vec![
-                        Some(vec![0.3, 0.95]),
-                        Some(vec![0.95, 0.3]),
+                        Some(vec![0.2, 0.2]),
+                        Some(vec![0.95, 0.95]),
                         Some(vec![0.4, 0.4]),
                     ],
                 },
