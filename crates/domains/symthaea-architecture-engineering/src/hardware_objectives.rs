@@ -91,6 +91,8 @@ pub struct ObjectiveRegistry {
     pub benchmark_id: String,
     /// Unique objective IDs. Order is non-semantic and canonicalized for the registry digest.
     pub objectives: Vec<ObjectiveDefinition>,
+    /// Exact hardware profiles referenced by physical or imported device measurements.
+    pub hardware_profiles: Vec<HardwareProfileManifest>,
     /// Empty while constructing; set to compute_objective_registry_sha256 before use.
     pub registry_sha256: String,
 }
@@ -193,6 +195,7 @@ pub fn compute_objective_registry_sha256(
 ) -> Result<String, ObjectiveRegistryError> {
     let mut canonical = registry.clone();
     canonical.objectives.sort_by(|left, right| left.objective_id.cmp(&right.objective_id));
+    canonical.hardware_profiles.sort_by(|left, right| left.profile_sha256.cmp(&right.profile_sha256));
     canonical.registry_sha256.clear();
     let bytes = serde_json::to_vec(&canonical)
         .map_err(|error| ObjectiveRegistryError::new("registry", error.to_string()))?;
@@ -284,6 +287,25 @@ pub fn validate_objective_registry(
         ));
     }
 
+    let mut profile_ids = HashSet::with_capacity(registry.hardware_profiles.len());
+    let mut profile_digests = HashSet::with_capacity(registry.hardware_profiles.len());
+    for (index, profile) in registry.hardware_profiles.iter().enumerate() {
+        validate_hardware_profile(profile).map_err(|error| {
+            ObjectiveRegistryError::new(
+                format!("hardware_profiles[{index}].{}", error.field),
+                error.message,
+            )
+        })?;
+        if !profile_ids.insert(profile.profile_id.as_str())
+            || !profile_digests.insert(profile.profile_sha256.as_str())
+        {
+            return Err(ObjectiveRegistryError::new(
+                format!("hardware_profiles[{index}]"),
+                "profile IDs and profile digests must be unique",
+            ));
+        }
+    }
+
     let mut objective_ids = HashSet::with_capacity(registry.objectives.len());
     for (index, objective) in registry.objectives.iter().enumerate() {
         let field = format!("objectives[{index}]");
@@ -335,10 +357,46 @@ pub fn validate_objective_registry(
                     )
                 })?;
                 validate_digest(&format!("{field}.hardware_profile_sha256"), profile)?;
+                let profile_manifest = registry
+                    .hardware_profiles
+                    .iter()
+                    .find(|candidate| candidate.profile_sha256 == profile)
+                    .ok_or_else(|| {
+                        ObjectiveRegistryError::new(
+                            format!("{field}.hardware_profile_sha256"),
+                            "referenced hardware profile manifest is absent from the registry",
+                        )
+                    })?;
+                if profile_manifest.measurement_protocol_sha256
+                    != objective.measurement_protocol_sha256
+                {
+                    return Err(ObjectiveRegistryError::new(
+                        format!("{field}.measurement_protocol_sha256"),
+                        "objective protocol digest must match the referenced hardware profile",
+                    ));
+                }
             }
             ObjectiveSource::ImportedBenchmark => {
                 if let Some(profile) = objective.hardware_profile_sha256.as_deref() {
                     validate_digest(&format!("{field}.hardware_profile_sha256"), profile)?;
+                    let profile_manifest = registry
+                        .hardware_profiles
+                        .iter()
+                        .find(|candidate| candidate.profile_sha256 == profile)
+                        .ok_or_else(|| {
+                            ObjectiveRegistryError::new(
+                                format!("{field}.hardware_profile_sha256"),
+                                "referenced imported hardware profile is absent from the registry",
+                            )
+                        })?;
+                    if profile_manifest.measurement_protocol_sha256
+                        != objective.measurement_protocol_sha256
+                    {
+                        return Err(ObjectiveRegistryError::new(
+                            format!("{field}.measurement_protocol_sha256"),
+                            "objective protocol digest must match the referenced hardware profile",
+                        ));
+                    }
                 }
             }
             ObjectiveSource::StaticArchitectureMetadata | ObjectiveSource::TrainedEvaluation => {
@@ -601,7 +659,28 @@ mod tests {
         }
     }
 
+    fn hardware_profile() -> HardwareProfileManifest {
+        let mut profile = HardwareProfileManifest {
+            profile_id: "nrf5340-board-01".into(),
+            device_model: "Nordic nRF5340".into(),
+            board_id: "board-01".into(),
+            board_revision: "DK-rev-2".into(),
+            firmware_sha256: sha('1'),
+            runtime_sha256: sha('2'),
+            compiler_toolchain_sha256: sha('3'),
+            quantization_spec_sha256: sha('4'),
+            measurement_protocol_sha256: sha('a'),
+            instrument_model: "Nordic Power Profiler Kit II".into(),
+            instrument_id: "ppk2-01".into(),
+            sampling_frequency_hz: 100_000,
+            profile_sha256: String::new(),
+        };
+        profile.profile_sha256 = compute_hardware_profile_sha256(&profile).unwrap();
+        profile
+    }
+
     fn registry() -> ObjectiveRegistry {
+        let profile = hardware_profile();
         let mut value = ObjectiveRegistry {
             schema: REGISTRY_SCHEMA.into(),
             version: REGISTRY_VERSION.into(),
@@ -611,7 +690,7 @@ mod tests {
                     "latency",
                     ObjectiveDirection::Minimize,
                     ObjectiveSource::PhysicalDeviceMeasurement,
-                    Some(sha('c')),
+                    Some(profile.profile_sha256.clone()),
                 ),
                 objective(
                     "accuracy",
@@ -620,6 +699,7 @@ mod tests {
                     None,
                 ),
             ],
+            hardware_profiles: vec![profile],
             registry_sha256: String::new(),
         };
         value.registry_sha256 = compute_objective_registry_sha256(&value).unwrap();
@@ -634,7 +714,7 @@ mod tests {
             objective_id: "latency".into(),
             registry_sha256: registry.registry_sha256,
             measurement_protocol_sha256: sha('a'),
-            hardware_profile_sha256: Some(sha('c')),
+            hardware_profile_sha256: Some(hardware_profile().profile_sha256),
             outcome,
         }
     }
@@ -698,6 +778,14 @@ mod tests {
             first.registry_sha256,
             compute_objective_registry_sha256(&second).unwrap()
         );
+    }
+
+    #[test]
+    fn registry_rejects_a_device_hash_without_its_profile_manifest() {
+        let mut value = registry();
+        value.hardware_profiles.clear();
+        value.registry_sha256 = compute_objective_registry_sha256(&value).unwrap();
+        assert!(validate_objective_registry(&value).is_err());
     }
 
     #[test]
