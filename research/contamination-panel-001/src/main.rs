@@ -7,6 +7,13 @@ use contamination_panel_bench::{
         audit_fresh_challenge_bundle, generate_fresh_challenge_bundle,
     },
     fresh_scoring::{FreshScoreReportV1, score_fresh_submission, verify_fresh_score_report_integrity},
+    fresh_metamorphic::{
+        FreshMetamorphicBundleV1, FreshMetamorphicManifestV1,
+        FreshMetamorphicPublicPacketV1, FreshMetamorphicSealedOracleV1,
+        FreshMetamorphicScoreReportV1, generate_fresh_metamorphic_bundle,
+        audit_fresh_metamorphic_bundle, score_fresh_metamorphic_submission,
+        verify_fresh_metamorphic_score_report_integrity,
+    },
     DetectorSpecV1, PublicChallengePacketV1, SealedChallengeKeyV1,
     audit_blinded_adjudications, detectors::{evaluate_detector_run, score_public_packet},
     ftd::{
@@ -310,6 +317,128 @@ fn score_fresh_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn generate_fresh_metamorphic_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 7 {
+        return Err(
+            "usage: contamination-panel-bench generate-fresh-metamorphic <base-public.json> <base-sealed-oracle.json> <base-manifest.json> <metamorphic-public.json> <metamorphic-sealed-oracle.json> <metamorphic-manifest.json>"
+                .into(),
+        );
+    }
+    let base = FreshChallengeBundleV1 {
+        public_packet: serde_json::from_slice::<FreshPublicChallengePacketV1>(&fs::read(&args[1])?)?,
+        sealed_oracle_packet: serde_json::from_slice::<SealedFreshOraclePacketV1>(&fs::read(&args[2])?)?,
+        manifest: serde_json::from_slice::<FreshChallengeManifestV1>(&fs::read(&args[3])?)?,
+    };
+    let bundle = generate_fresh_metamorphic_bundle(&base).map_err(io::Error::other)?;
+    write_bytes(&args[4], &serde_json::to_vec_pretty(&bundle.public_packet)?)?;
+    write_bytes(&args[5], &serde_json::to_vec_pretty(&bundle.sealed_oracle)?)?;
+    write_bytes(&args[6], &serde_json::to_vec_pretty(&bundle.manifest)?)?;
+    println!(
+        "batch={} groups={} forms_per_group={} items={} public_sha256={} manifest_sha256={}",
+        bundle.manifest.batch_id,
+        bundle.manifest.group_count,
+        bundle.manifest.forms_per_group,
+        bundle.manifest.item_count,
+        bundle.public_packet.public_packet_sha256,
+        bundle.manifest.manifest_sha256
+    );
+    println!("The metamorphic sealed oracle is evaluator-only; do not publish it.");
+    Ok(())
+}
+
+fn audit_fresh_metamorphic_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 8 {
+        return Err(
+            "usage: contamination-panel-bench audit-fresh-metamorphic <base-public.json> <base-sealed-oracle.json> <base-manifest.json> <metamorphic-public.json> <metamorphic-sealed-oracle.json> <metamorphic-manifest.json> <audit.json>"
+                .into(),
+        );
+    }
+    let base = FreshChallengeBundleV1 {
+        public_packet: serde_json::from_slice::<FreshPublicChallengePacketV1>(&fs::read(&args[1])?)?,
+        sealed_oracle_packet: serde_json::from_slice::<SealedFreshOraclePacketV1>(&fs::read(&args[2])?)?,
+        manifest: serde_json::from_slice::<FreshChallengeManifestV1>(&fs::read(&args[3])?)?,
+    };
+    let bundle = FreshMetamorphicBundleV1 {
+        public_packet: serde_json::from_slice::<FreshMetamorphicPublicPacketV1>(&fs::read(&args[4])?)?,
+        sealed_oracle: serde_json::from_slice::<FreshMetamorphicSealedOracleV1>(&fs::read(&args[5])?)?,
+        manifest: serde_json::from_slice::<FreshMetamorphicManifestV1>(&fs::read(&args[6])?)?,
+    };
+    let audit = audit_fresh_metamorphic_bundle(&base, &bundle).map_err(io::Error::other)?;
+    write_bytes(&args[7], &serde_json::to_vec_pretty(&audit)?)?;
+    println!(
+        "valid={} base_validated={} exact_solution_preserved={} stability_preserved={} groups={} items={}",
+        audit.valid,
+        audit.base_bundle_validated,
+        audit.all_variants_preserve_exact_solution,
+        audit.all_variants_preserve_stability_margin,
+        audit.group_count,
+        audit.item_count
+    );
+    Ok(())
+}
+
+fn score_fresh_metamorphic_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 9 {
+        return Err(
+            "usage: contamination-panel-bench score-fresh-metamorphic <base-public.json> <base-sealed-oracle.json> <base-manifest.json> <metamorphic-public.json> <metamorphic-sealed-oracle.json> <metamorphic-manifest.json> <submission.json> <score-report.json>"
+                .into(),
+        );
+    }
+    let base = FreshChallengeBundleV1 {
+        public_packet: serde_json::from_slice::<FreshPublicChallengePacketV1>(&fs::read(&args[1])?)?,
+        sealed_oracle_packet: serde_json::from_slice::<SealedFreshOraclePacketV1>(&fs::read(&args[2])?)?,
+        manifest: serde_json::from_slice::<FreshChallengeManifestV1>(&fs::read(&args[3])?)?,
+    };
+    let bundle = FreshMetamorphicBundleV1 {
+        public_packet: serde_json::from_slice::<FreshMetamorphicPublicPacketV1>(&fs::read(&args[4])?)?,
+        sealed_oracle: serde_json::from_slice::<FreshMetamorphicSealedOracleV1>(&fs::read(&args[5])?)?,
+        manifest: serde_json::from_slice::<FreshMetamorphicManifestV1>(&fs::read(&args[6])?)?,
+    };
+    let submission_bytes = fs::read(&args[7])?;
+    let report = score_fresh_metamorphic_submission(&base, &bundle, &submission_bytes)
+        .map_err(io::Error::other)?;
+    write_bytes(&args[8], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "run={} exact={}/{} base_accuracy={:.1}% transformed_accuracy={:.1}% consistency={}",
+        report.run_id,
+        report.correct_count,
+        report.item_count,
+        report.accuracy_base_form_permille / 10.0,
+        report.accuracy_transformed_forms_permille / 10.0,
+        report.metamorphic_consistency_permille
+            .map(|value| format!("{:.1}%", value / 10.0))
+            .unwrap_or_else(|| "not-assessed".to_owned())
+    );
+    println!(
+        "fully_correct_consistent={} consistent_but_wrong={} base_correct_variant_inconsistent={} incomplete_groups={}",
+        report.fully_correct_and_consistent_group_count,
+        report.consistent_but_wrong_group_count,
+        report.base_correct_variant_inconsistent_group_count,
+        report.incomplete_group_count
+    );
+    Ok(())
+}
+
+fn verify_fresh_metamorphic_score_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 2 {
+        return Err(
+            "usage: contamination-panel-bench verify-fresh-metamorphic-score <score-report.json>"
+                .into(),
+        );
+    }
+    let report: FreshMetamorphicScoreReportV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
+    verify_fresh_metamorphic_score_report_integrity(&report).map_err(io::Error::other)?;
+    println!(
+        "report_integrity_valid=true run={} exact_accuracy={:.1}% consistency={}",
+        report.run_id,
+        report.accuracy_all_forms_permille / 10.0,
+        report.metamorphic_consistency_permille
+            .map(|value| format!("{:.1}%", value / 10.0))
+            .unwrap_or_else(|| "not-assessed".to_owned())
+    );
+    Ok(())
+}
+
 fn generate_fresh_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 6 {
         return Err(
@@ -469,11 +598,15 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
         Some("generate-fresh") => generate_fresh_cli(&args),
         Some("audit-fresh") => audit_fresh_cli(&args),
+        Some("generate-fresh-metamorphic") => generate_fresh_metamorphic_cli(&args),
+        Some("audit-fresh-metamorphic") => audit_fresh_metamorphic_cli(&args),
+        Some("score-fresh-metamorphic") => score_fresh_metamorphic_cli(&args),
+        Some("verify-fresh-metamorphic-score") => verify_fresh_metamorphic_score_cli(&args),
         Some("score-fresh") => score_fresh_cli(&args),
         Some("verify-fresh-score") => verify_fresh_score_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | verify-fresh-score | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | verify-fresh-score | generate-fresh-metamorphic | audit-fresh-metamorphic | score-fresh-metamorphic | verify-fresh-metamorphic-score | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
