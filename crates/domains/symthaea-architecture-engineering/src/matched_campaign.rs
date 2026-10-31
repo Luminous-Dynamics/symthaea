@@ -225,10 +225,10 @@ pub fn reconcile_mechanism_matched_campaign(
                             BTreeSet::new(),
                         )
                     });
-                    if record.0 != *direction_id
-                        || record.1 != *parent_candidate_sha256
-                        || record.2 != *semantic_delta_sha256
-                        || record.3 != *outcome
+                    if record.0.as_str() != direction_id.as_str()
+                        || record.1.as_ref() != parent_candidate_sha256.as_ref()
+                        || record.2.as_str() != semantic_delta_sha256.as_str()
+                        || &record.3 != outcome
                     {
                         return Err(MatchedCampaignError::new(
                             format!("tapes[{tape_index}].events[{event_index}]"),
@@ -253,9 +253,9 @@ pub fn reconcile_mechanism_matched_campaign(
                             BTreeSet::new(),
                         )
                     });
-                    if record.0 != *parent_direction_id
-                        || record.1 != *semantic_delta_sha256
-                        || record.2 != *outcome
+                    if record.0.as_ref() != parent_direction_id.as_ref()
+                        || record.1.as_str() != semantic_delta_sha256.as_str()
+                        || &record.2 != outcome
                     {
                         return Err(MatchedCampaignError::new(
                             format!("tapes[{tape_index}].events[{event_index}]"),
