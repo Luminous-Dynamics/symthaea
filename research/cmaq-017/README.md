@@ -38,7 +38,7 @@ The v0.1 candidate ceiling is deliberately 64 so the first mechanism slice remai
 - `pessimistic_ensemble_cem`: minimum predicted return across three heads.
 - `uncertainty_lcb_cem`: mean predicted return minus 1.25 times the three-head return standard deviation.
 - `shuffled_future_negative_control`: scores the time-reversed action sequence, then executes the original sequence; this deliberately breaks action/future alignment.
-- `oracle_cem`: evaluator-only known transition law, with the same candidate and planning horizon budgets. This is an upper-bound control, not a deployable policy.
+- `oracle_cem`: evaluator-only mean transition law, with the same candidate and planning horizon budgets. It does not reveal the fixed disturbance realization; treat it as an oracle-dynamics comparator, not a mathematical global upper bound or a deployable policy.
 
 The three ensemble heads have distinct local pocket centers in the pocket lane. They share the other misspecifications by construction. This is important: ensemble size is not treated as evidence of independent error. The LCB is a synthetic ablation, not a calibrated uncertainty method.
 
@@ -47,13 +47,14 @@ The three ensemble heads have distinct local pocket centers in the pocket lane. 
 Every row is keyed by scenario, horizon, execution block, candidate budget, and policy. No pooling across these dimensions is allowed.
 
 - Realized episode return and a paired-episode 95% normal-approximation interval.
+- Lower-decile mean and worst-episode return. Sixteen episodes are not enough to make a stable CVaR95 estimate; these are tail diagnostics, not a CVaR95 claim.
 - Paired return deltas versus the direct and compute-matched direct arms.
 - Paired return gap to the oracle arm.
 - Predicted-minus-realized return over the executed block, where the planner emitted a model prediction.
 - Fraction of visited states outside a declared rectangular training-support proxy.
 - Selected-trajectory one-step state RMSE against the reference point model.
 - Reference-model false-safe rate when the point model predicts nontermination but the environment terminates.
-- Candidate-sequence queries, model-head evaluations, and oracle transition evaluations, separately.
+- Candidate-sequence queries, model-head evaluations, learned-model transition evaluations, oracle transition evaluations, and evaluator-only diagnostic transitions, separately.
 
 The false-safe and one-step error fields are evaluator-side diagnostics applied to every policy trajectory. They are **not** claims about a policy's own alarm or calibration. The support box is a controlled synthetic proxy, not a learned density estimate or a formal OOD detector.
 
