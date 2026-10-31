@@ -6,21 +6,25 @@
   "pinned_upstream_commit": "5679b39aa2641d8d0afeed88b441e696f87a66df",
   "source_sidecar_jsonl_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "eligibility_policy_version": "connectomebench2-v2-modality-cohorts-v1",
-  "cohort_set_sha256": "47faf2b7c82c01d8f4e67954046b2d5ed477485e22e0c45d8047a4f4f11ed56a",
+  "cohort_set_sha256": "1fa86f447610d3f03091d86c28096f54c20c801b9547c9bc5ef6886a8468a17b",
   "cohorts": {
     "em_best_only_excluded": {
       "membership_status": "ELIGIBLE",
       "eligibility_rule": "em_best is present AND none of em_xy/em_xz/em_yz is present",
       "sample_count": 1,
       "sample_ids_sha256": "dd0726446b326da4e7b334f50ccd348f56a80a47a53343bc232bc698756afb67",
-      "sample_ids": ["de827f38b75edf34bf1809eb6f2c1792"]
+      "sample_ids": [
+        "de827f38b75edf34bf1809eb6f2c1792"
+      ]
     },
     "em_legal_any_view": {
       "membership_status": "ELIGIBLE",
       "eligibility_rule": "present_slots contains at least one of em_xy/em_xz/em_yz; excludes em_best",
       "sample_count": 1,
       "sample_ids_sha256": "6b04af2bc553e9d006853827c8f298f9ed9efb3405b61647d894d9f0c4995348",
-      "sample_ids": ["fb3d929f1c6abc735fb3e7972c1d45be"]
+      "sample_ids": [
+        "fb3d929f1c6abc735fb3e7972c1d45be"
+      ]
     },
     "em_legal_full_triplet": {
       "membership_status": "NOT_ESTIMABLE",
@@ -34,7 +38,9 @@
       "eligibility_rule": "geometry is present AND at least one of em_xy/em_xz/em_yz is present",
       "sample_count": 1,
       "sample_ids_sha256": "34bfb388139d7fa1047da7af0051aabdfd72179f09c4682e6d7b9628082ae1aa",
-      "sample_ids": ["fb3d929f1c6abc735fb3e7972c1d45be"]
+      "sample_ids": [
+        "fb3d929f1c6abc735fb3e7972c1d45be"
+      ]
     },
     "geometry_all": {
       "membership_status": "ELIGIBLE",
@@ -66,15 +72,65 @@
       "eligibility_rule": "exact same sample IDs as fused_geometry_legal_em; score legal EM views on this cohort",
       "sample_count": 1,
       "sample_ids_sha256": "48125c619883f082cb949ac95cfc10c108323329ca06440c86ecd2c5b99872d9",
-      "sample_ids": ["fb3d929f1c6abc735fb3e7972c1d45be"]
+      "sample_ids": [
+        "fb3d929f1c6abc735fb3e7972c1d45be"
+      ]
     },
     "paired_geometry_only": {
       "membership_status": "ELIGIBLE",
       "eligibility_rule": "exact same sample IDs as fused_geometry_legal_em; score geometry-only on this cohort",
       "sample_count": 1,
       "sample_ids_sha256": "2340c0e7af9ae1f38492bbe03381cf5baf5f30136b598b5eb79f829f3f6bcc88",
-      "sample_ids": ["fb3d929f1c6abc735fb3e7972c1d45be"]
+      "sample_ids": [
+        "fb3d929f1c6abc735fb3e7972c1d45be"
+      ]
+    },
+    "paired_false_split_correction_geometry_only": {
+      "membership_status": "ELIGIBLE",
+      "eligibility_rule": "task_routing contains false_split_correction AND task-appropriate geometry is present AND at least one legal EM view is present; score geometry-only",
+      "sample_count": 1,
+      "sample_ids_sha256": "d587f83b29cdb3d4def45e4217965f500fc7b6dd383c0f392fee6770da5df215",
+      "sample_ids": [
+        "fb3d929f1c6abc735fb3e7972c1d45be"
+      ]
+    },
+    "paired_false_split_correction_em_legal_views": {
+      "membership_status": "ELIGIBLE",
+      "eligibility_rule": "exact same sample IDs as paired_false_split_correction_geometry_only; score legal EM views after the task-required A/B mask transformation",
+      "sample_count": 1,
+      "sample_ids_sha256": "d1980c74ec47831ae4bf7b888b35e0d6157265239a33c2e7c84f6d9d4e5885aa",
+      "sample_ids": [
+        "fb3d929f1c6abc735fb3e7972c1d45be"
+      ]
+    },
+    "paired_false_merge_identification_geometry_only": {
+      "membership_status": "NOT_ESTIMABLE",
+      "eligibility_rule": "task_routing contains false_merge_identification AND task-appropriate geometry is present AND at least one legal EM view is present; score geometry-only",
+      "sample_count": 0,
+      "sample_ids_sha256": "5dbd77088c03fd9380f6277a0503c08b09556edb53a3e443a3938174651b0fcf",
+      "sample_ids": []
+    },
+    "paired_false_merge_identification_em_legal_views": {
+      "membership_status": "NOT_ESTIMABLE",
+      "eligibility_rule": "exact same sample IDs as paired_false_merge_identification_geometry_only; score legal EM views after the task-required A/B mask transformation",
+      "sample_count": 0,
+      "sample_ids_sha256": "164cd601a0129e8a396d822704810c7eb06e37be0040a56c19c89e4cca48f39f",
+      "sample_ids": []
+    },
+    "paired_split_mask_generation_geometry_only": {
+      "membership_status": "NOT_ESTIMABLE",
+      "eligibility_rule": "task_routing contains split_mask_generation AND task-appropriate geometry is present AND at least one legal EM view is present; score geometry-only",
+      "sample_count": 0,
+      "sample_ids_sha256": "607dbd4afa87c2e01b696ce0dda046b3f078839a3edd00170748eefd78eb95a7",
+      "sample_ids": []
+    },
+    "paired_split_mask_generation_em_legal_views": {
+      "membership_status": "NOT_ESTIMABLE",
+      "eligibility_rule": "exact same sample IDs as paired_split_mask_generation_geometry_only; score legal EM views after the task-required A/B mask transformation",
+      "sample_count": 0,
+      "sample_ids_sha256": "3b8320d3cdeb964edd81afedfb7b083098886f530461616eef2e3dba9e4e42a7",
+      "sample_ids": []
     }
   },
-  "scope_note": "Synthetic illustrative manifest only. Membership is based on the five-row metadata-sidecar fixture and does not verify Parquet image payloads or biological correctness. paired_geometry_only and paired_em_legal_views contain exactly the same sample IDs. em_best-only records are diagnostic exclusions."
+  "scope_note": "Membership is derived from metadata-sidecar declared slots, task routes and masks only. It does not verify Parquet payload bytes, image readability, biological correctness, or population inclusion probabilities. The overall paired_geometry_only/paired_em_legal_views IDs match exactly; each task-specific paired geometry/EM pair also has identical IDs and requires dual geometry for false_split_correction or single geometry for false_merge_identification/split_mask_generation. A/B EM mask fusion remains a model preprocessing contract, not a property proven by this membership manifest. EM-best-only rows are diagnostic exclusions, not usable EM examples."
 }
