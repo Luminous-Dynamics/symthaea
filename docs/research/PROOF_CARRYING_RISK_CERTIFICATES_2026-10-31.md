@@ -1,7 +1,7 @@
 # Proof-carrying risk certificate v1
 
 **Date:** 2026-10-31  
-**Status:** 12/12 local tests passed on an executable copy matching the committed validation logic. A concrete exact-CRC certificate was generated and verified. No Rust integration or remote CI pass is claimed.
+**Status:** 12/12 local tests passed on an executable copy matching the committed validation logic. The example certificate also passed independent JSON Schema structural validation and Python semantic validation. No Rust integration or remote CI pass is claimed.
 
 ## Paradigm
 
@@ -54,7 +54,7 @@ The standard-library Python prototype:
 - requires global filtration and optional stopping for a passing SupFDR receipt;
 - refuses simulation-only passes while preserving simulation-only outputs as explicitly inconclusive research records.
 
-The validator checks manifest structure and proof-receipt consistency. It does not prove external assumptions such as marginal e-value validity, the validity of a claimed theorem application, or that an input digest came from an independent trusted source. Those require independent provenance and assurance.
+The JSON Schema checks the portable envelope structure; guarantee-specific conditionals are enforced by the Python validator. The validator checks manifest structure and proof-receipt consistency. It does not prove external assumptions such as marginal e-value validity, the validity of a claimed theorem application, or that an input digest came from an independent trusted source. Those require independent provenance and assurance.
 
 ## Local tests
 
