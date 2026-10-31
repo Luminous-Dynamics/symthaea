@@ -232,7 +232,12 @@ impl JepaEngine {
     }
 
     /// Bind the FEP-selected action and create the action-conditioned latent
-    /// prediction before the environment can return the next observation.
+    /// prediction before the next observation arrives.
+    ///
+    /// The caller must ensure this index denotes the action actually issued
+    /// between the staged source and the next observation. In the cognitive-loop
+    /// integration it is the selected FEP action token; it is not evidence of a
+    /// physical actuator command unless an external adapter executes that token.
     ///
     /// Returns false when no source observation has been staged. The prediction
     /// is frozen until resolve_pending_transition receives the actual next input.
