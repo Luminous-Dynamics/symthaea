@@ -17,8 +17,8 @@
 //! known_at coordinate as the request or this adapter refuses the batch.
 
 use crate::memory_evidence::{
-    evidence_speaker_role_from_step_id, EvidenceIndexSnapshotReceipt, EvidenceLifecycle,
-    LexicalEvidenceHit, MemoryContextType,
+    evidence_speaker_role_from_step_id, EvidenceIndex, EvidenceIndexSnapshotReceipt,
+    EvidenceLifecycle, ExactLexicalEnumerationResult, LexicalEvidenceHit, MemoryContextType,
 };
 use crate::memory_proof_budget::{
     ProofBudgetRequest, ProofEvidenceCandidate,
@@ -328,6 +328,66 @@ pub fn admit_lexical_hits_for_proof_budget(
 
     request.candidates = candidates;
     Ok(request)
+}
+
+/// Admit every exact match from a verified enumeration and bind the complete
+/// match set to one required proof obligation. The index re-verifies the
+/// enumeration and materializes every hit; the existing trusted admission
+/// envelopes then bind source identity, authorization, lifecycle and token cost.
+///
+/// This is the supported path for count / all-instances questions. A zero-match
+/// enumeration is refused until the system has a dedicated proof-of-absence
+/// capability.
+pub fn admit_complete_enumeration_for_proof_budget(
+    request: ProofBudgetRequest,
+    index: &EvidenceIndex,
+    enumeration: &ExactLexicalEnumerationResult,
+    admissions: &[ProofCandidateAdmission],
+    payload_root: &std::path::Path,
+    conclusion_id: &str,
+    justification_id: &str,
+) -> Result<ProofBudgetRequest, String> {
+    if enumeration.matches.is_empty() {
+        return Err(
+            "empty enumeration cannot support an answer until proof-of-absence is implemented"
+                .into(),
+        );
+    }
+    if request.scope_id != enumeration.receipt.scope_id {
+        return Err("enumeration scope does not match proof request".into());
+    }
+    if request.valid_at_unix_ms != enumeration.receipt.valid_at_unix_ms {
+        return Err("enumeration valid_at does not match proof request".into());
+    }
+    if request.known_at_unix_ms != enumeration.receipt.known_at_unix_ms {
+        return Err("enumeration known_at does not match proof request".into());
+    }
+
+    let hits = index.materialize_exact_lexical_enumeration_hits(
+        enumeration,
+        payload_root,
+    )?;
+    let snapshot = hits
+        .first()
+        .and_then(|hit| hit.snapshot_receipt.as_ref())
+        .cloned()
+        .ok_or_else(|| "exact enumeration materialized no snapshot-bound evidence hits".to_string())?;
+
+    let mut admitted = admit_lexical_hits_for_proof_budget(
+        request,
+        &hits,
+        admissions,
+        &snapshot,
+    )?;
+    let obligation = admitted.obligations.iter_mut()
+        .find(|obligation| obligation.conclusion_id == conclusion_id)
+        .ok_or_else(|| format!("unknown proof conclusion {conclusion_id:?}"))?;
+    obligation.bind_verified_complete_enumeration(
+        index,
+        enumeration,
+        justification_id,
+    )?;
+    Ok(admitted)
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
