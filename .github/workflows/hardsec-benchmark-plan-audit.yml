@@ -48,6 +48,7 @@ jobs:
           with open(sys.argv[1], "r", encoding="utf-8") as handle:
               receipt = json.load(handle)
           assert receipt["result"] == "plan_validated"
+          assert receipt["coverage"]["dataset_source_count"] == 3
           assert receipt["coverage"]["baseline_arm_count"] == 10
           assert receipt["coverage"]["candidate_arm_count"] == 3
           assert receipt["coverage"]["split_count"] == 8
