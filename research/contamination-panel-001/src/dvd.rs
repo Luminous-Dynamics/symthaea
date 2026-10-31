@@ -393,8 +393,28 @@ fn two_component_fit(values: &[f64]) -> Result<GaussianFit, String> {
     let mut sorted = values.to_vec();
     sorted.sort_by(f64::total_cmp);
     let global_mean = mean(values)?;
-    let variance_floor =
-        (population_variance(values, global_mean)? * 1.0e-8).max(GMM_VARIANCE_FLOOR);
+    let global_variance = population_variance(values, global_mean)?;
+    let variance_floor = (global_variance * 1.0e-8).max(GMM_VARIANCE_FLOOR);
+    if global_variance <= f64::EPSILON {
+        let component = GaussianComponentV1 {
+            weight: 0.5,
+            mean: global_mean,
+            variance: GMM_VARIANCE_FLOOR,
+        };
+        let log_likelihood = values
+            .iter()
+            .map(|value| gaussian_log_density(*value, global_mean, GMM_VARIANCE_FLOOR))
+            .sum::<f64>();
+        let bic = -2.0 * log_likelihood + 5.0 * (values.len() as f64).ln();
+        return Ok(GaussianFit {
+            log_likelihood,
+            bic,
+            converged: true,
+            iterations: 0,
+            components: vec![component.clone(), component],
+            mean_posterior_entropy_nats: std::f64::consts::LN_2,
+        });
+    }
     let initializations = [(0.10, 0.90), (0.20, 0.80), (0.25, 0.75), (0.35, 0.65)];
     let mut best: Option<GaussianFit> = None;
     for (left_quantile, right_quantile) in initializations {
@@ -626,7 +646,7 @@ mod tests {
 
     #[test]
     fn paper_dvd_is_population_variance_over_n_generations() {
-        let difficulties: Vec<f64> = (0..50).map(|index| index as f64 / 10.0 - 2.0).collect();
+        let difficulties: Vec<f64> = (0..50).map(|index| index as f64 / 100.0 - 2.0).collect();
         let input = input_from_difficulties(&difficulties);
         let report = score_dvd_item(&input).unwrap();
         let center = difficulties.iter().sum::<f64>() / 50.0;
