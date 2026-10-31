@@ -59,6 +59,7 @@ jobs:
           assert integrity["invalid_sensor_clear_verdicts"] == 1, integrity
           assert integrity["integrity_outcome"] == "integrity_violation_observed", integrity
           assert receipt["resource_cost"]["end_to_end_ns_sum"] == 1080
+          assert receipt["generalization"]["attack_family_group_count"] == 1
           assert receipt["generalization"]["adaptation_family_level_group_count"] == 3
           assert receipt["generalization"]["adaptation_family_count"] == 2
           PY
