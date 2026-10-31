@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-temporal-bench"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Deterministic synthetic temporal benchmark controls for Symthaea research"
+
+[dependencies]
+sha2 = "0.10"
+
+[workspace]

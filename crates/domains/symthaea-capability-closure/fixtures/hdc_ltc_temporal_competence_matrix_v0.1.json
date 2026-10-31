@@ -1,0 +1,828 @@
+{
+  "schema": "symthaea.hdc_ltc_temporal_competence_matrix",
+  "version": "0.1.0",
+  "status": "preregistered_not_executed",
+  "tracking_issue": 9394,
+  "parent_research": {
+    "fast_slow_memory_issue": 9369,
+    "fast_slow_memory_pr": 9370,
+    "input_trajectory_issue": 9371,
+    "input_trajectory_pr": 9372,
+    "fourier_rk4_issue": 9373,
+    "architecture_issue": 7749
+  },
+  "source_motivation": {
+    "title": "Spiking Neural Networks for Temporal Processing: Status Quo and Future Prospects",
+    "publication_date": "2026-10-08",
+    "doi": "10.1109/TNNLS.2026.3736737",
+    "pubmed_id": "42848555",
+    "use": "Motivates multi-timescale temporal evaluation; this matrix does not claim to reproduce the paper's four tasks because their full definitions and implementation were not independently inspected."
+  },
+  "benchmark_alignment": {
+    "neurobench": "Separate hardware-independent algorithm results from deployed-system results.",
+    "mlperf_tiny_v1_4": "Use its continuous streaming/idle-listening and calibrated-energy measurement principles; the synthetic fast-event task is not the official audio workload or an MLPerf submission.",
+    "oaks_acl_2026": {
+      "name": "Online Adaptation to Continual Knowledge Streams",
+      "paper": "Kim et al., ACL 2026",
+      "doi": "10.18653/v1/2026.acl-long.1956",
+      "code_repository": "https://github.com/kaistAI/OAKS",
+      "code_commit": "c1a76e66b5b2276973ee8ee3de7063721e22a88f",
+      "code_readme_blob": "3f72afe9cb612c0a6d71f98101dcd94ad539ed6a",
+      "dataset_repository": "https://github.com/adobe-research/OAKS",
+      "dataset_commit": "0bbc4b3877eae5f9335f07c5e485aabf1d9136e9",
+      "dataset_readme_blob": "3132750f6b0f52aade75709e99274370f96b7d1a",
+      "license_blob": "b0def00fcdb416f7542ca07504b74687677f3104",
+      "license_scope": "Adobe Research License: noncommercial research/teaching only; excludes commercial product development or other commercial-gain activity.",
+      "dataset_summary": {
+        "oaks_babi": {
+          "questions": 1200,
+          "average_chunks": 65,
+          "average_answer_changes_per_question": 4.7,
+          "average_context_tokens": 128000
+        },
+        "oaks_novel": {
+          "source_novels": 19,
+          "average_chunks": 71,
+          "average_context_tokens": 140000,
+          "question_count_in_code_readme": 435,
+          "question_count_in_dataset_readme": 870
+        }
+      },
+      "caveat": "Reconcile OAKS-Novel question counts and exact current dataset manifest before paper-score reproduction. OAKS uses natural-language chunked contexts and per-chunk answer labels; T10 is a distinct structured bitemporal valid_at/known_at exact-oracle task. The two scores must remain separate.",
+      "scores_imported": false,
+      "dataset_downloaded": false,
+      "evaluation_executed": false
+    }
+  },
+  "execution_state": {
+    "protocol_authored": true,
+    "generator_implemented": true,
+    "runner_implemented": false,
+    "rust_tests_executed": false,
+    "benchmark_executed": false,
+    "hardware_energy_measured": false,
+    "result_values_present": false,
+    "generator_scope": "Implemented Rust task generators: T1 always-on sparse event/quiet idle; T2 delayed cue; T3/T4 multi-timescale forecasting/change-point; T5 irregular/missingness; T6 selective retention/invalidation; T7 phase prediction; T8 BrainTrace DMS task semantics; T9 BrainTrace evidence accumulation; T10 bitemporal continual-knowledge stream. All have deterministic generation, canonical SHA-256 digests, semantic verifiers and evaluator-held seed/config replay checks. The OAKS external adapter, streaming runner, OS-level oracle isolation, signed receipts, real-dataset adapter, model baselines and system measurements remain unimplemented.",
+    "rust_tests_authored": true,
+    "oracle_trace_verifier_implemented": true,
+    "oracle_process_isolation_implemented": false,
+    "rust_tests_authored_count": 176,
+    "rust_tests_by_file": {
+      "research/temporal-bench/src/digest.rs": 2,
+      "research/temporal-bench/src/lib.rs": 18,
+      "research/temporal-bench/src/temporal.rs": 23,
+      "research/temporal-bench/src/dms.rs": 18,
+      "research/temporal-bench/src/evidence.rs": 19,
+      "research/temporal-bench/src/irregular.rs": 14,
+      "research/temporal-bench/src/retention.rs": 16,
+      "research/temporal-bench/src/fast_event.rs": 22,
+      "research/temporal-bench/src/phase.rs": 24,
+      "research/temporal-bench/src/knowledge_stream.rs": 20
+    },
+    "cryptographic_stream_digest_implemented": true,
+    "reference_generators": {
+      "delayed_cue": true,
+      "multiscale_forecast_change_point": true,
+      "braintrace_dms_semantics": true,
+      "braintrace_evidence_accumulation_semantics": true,
+      "fast_event": true,
+      "irregular_missingness": true,
+      "selective_retention": true,
+      "phase_prediction": true,
+      "bitemporal_continual_knowledge_stream": true
+    },
+    "cryptographic_oracle_digest_implemented": true,
+    "signed_evaluator_receipt_implemented": false,
+    "seed_bound_regeneration": {
+      "delayed_cue": true,
+      "multiscale": true,
+      "braintrace_dms": true,
+      "evidence_accumulation": true,
+      "irregular_missingness": true,
+      "selective_retention": true,
+      "fast_event": true,
+      "phase_prediction": true,
+      "bitemporal_knowledge_stream": true,
+      "note": "Each verifier recomputes canonical SHA-256 and checks task semantics, then regenerates the expected task/oracle from evaluator-held seed/config metadata. The evaluator must protect those seeds/configurations; the candidate never receives them."
+    },
+    "oaks_dataset_adapter_implemented": false,
+    "knowledge_stream_scoring_implemented": true,
+    "knowledge_stream_seed_replay_implemented": true,
+    "phase_time_dilation_transform_implemented": true,
+    "phase_missing_prediction_accounting_implemented": true
+  },
+  "workload_contract": {
+    "sample_semantics": "Causal observations; no future samples; elapsed simulated time is explicit.",
+    "source_split_unit": "source_family_for_synthetic; subject_session_or_source_recording_for_real",
+    "pre_window_split_required": true,
+    "confirmatory_oracle_sealed": false,
+    "failed_invalid_timed_out_runs_counted": true,
+    "repeated_timesteps_are_independent_samples": false,
+    "confirmatory_oracle_sealed_required": true,
+    "oracle_separation": "Public task and oracle are still generated/returned in one process; digest verification detects content mutation only relative to a protected commitment and does not authenticate or isolate the oracle.",
+    "stream_id_semantics": "Deterministic 64-bit pairing identifier only; not cryptographic and not tamper evidence.",
+    "canonical_stream_digest_required": true,
+    "signed_evaluator_receipt_required": true,
+    "canonical_encoding": "Versioned little-endian encoding with domain separation; SHA-256 produced by the sha2 crate.",
+    "canonical_public_stream_digest_implemented": true,
+    "canonical_oracle_digest_implemented": true,
+    "signed_evaluator_receipt_implemented": false
+  },
+  "temporal_axes": {
+    "delayed_cue_steps": [
+      1,
+      4,
+      16,
+      64,
+      256,
+      1024
+    ],
+    "distractor_counts": [
+      0,
+      8,
+      64
+    ],
+    "distractor_similarity": [
+      "low",
+      "high"
+    ],
+    "time_scale_factors": [
+      0.5,
+      1,
+      2
+    ],
+    "timestamp_jitter_fraction": [
+      0,
+      0.1,
+      0.3,
+      0.5
+    ],
+    "missingness_fraction": [
+      0,
+      0.1,
+      0.3,
+      0.5
+    ],
+    "change_point_modes": [
+      "abrupt",
+      "gradual",
+      "recurring",
+      "false_change_control"
+    ],
+    "observation_patterns": [
+      "regular",
+      "irregular",
+      "long_gap",
+      "burst",
+      "quiet_idle"
+    ],
+    "invalid_timestamp_controls": [
+      "duplicate",
+      "out_of_order",
+      "non_monotonic",
+      "nan",
+      "infinite"
+    ]
+  },
+  "task_families": [
+    {
+      "id": "T1_FAST_EVENT",
+      "name": "Fast reaction and event timing",
+      "strata": [
+        "rare_target_events",
+        "high_similarity_distractors",
+        "low_similarity_distractors",
+        "quiet_idle_control"
+      ],
+      "primary_metrics": [
+        "target_event_precision",
+        "target_event_recall",
+        "target_event_misses",
+        "duplicate_target_activations",
+        "distractor_false_alarms",
+        "quiet_idle_false_alarms",
+        "quiet_exposure_us",
+        "idle_false_triggers_per_hour",
+        "detection_latency_p50_p95_p99_us"
+      ],
+      "oracle": "Exact event-time labels with causal emission bounds",
+      "implementation_status": "Rust always-on event stream generator, quiet-idle control, SHA-256 task/oracle digests, structural verifier, event scorer, false-alarm exposure and latency quantiles authored; not compiled or executed",
+      "generator": {
+        "path": "research/temporal-bench/src/fast_event.rs",
+        "reference_slots": 16384,
+        "sample_interval_us": 1000,
+        "target_events": 8,
+        "distractor_events": 16,
+        "event_width_samples": 8,
+        "block_size_samples": 64,
+        "background_noise_abs_max": 40,
+        "description": "Synthetic scalar event stream for always-on timing/false-alarm prequalification; not MLPerf audio or a wake-word reproduction."
+      }
+    },
+    {
+      "id": "T2_DELAYED_CUE",
+      "name": "Delayed-cue associative recall",
+      "factors": {
+        "delay_steps": [
+          1,
+          4,
+          16,
+          64,
+          256,
+          1024
+        ],
+        "distractor_count": [
+          0,
+          8,
+          64
+        ],
+        "cue_distractor_similarity": [
+          "low",
+          "high"
+        ]
+      },
+      "primary_metrics": [
+        "recall_by_delay",
+        "recall_by_interference",
+        "false_recall_rate"
+      ],
+      "oracle": "Exact cue-value binding and query answer"
+    },
+    {
+      "id": "T3_MULTI_TIMESCALE",
+      "name": "Interacting fast, medium, and slow latent processes",
+      "strata": [
+        "independent",
+        "phase_shift",
+        "amplitude_change",
+        "cross_coupled",
+        "regime_reversal"
+      ],
+      "primary_metrics": [
+        "classification_quality",
+        "forecast_error_by_horizon",
+        "phase_error",
+        "worst_timescale_error"
+      ],
+      "oracle": "Deterministic generator state and exact latent labels"
+    },
+    {
+      "id": "T4_ONLINE_CHANGE",
+      "name": "Online change-point adaptation",
+      "factors": {
+        "change_modes": [
+          "abrupt",
+          "gradual",
+          "recurring",
+          "false_change_control"
+        ],
+        "retraining_allowed": false,
+        "reset_allowed": false
+      },
+      "primary_metrics": [
+        "change_detection_delay",
+        "recovery_delay",
+        "cumulative_regret",
+        "false_alarm_rate",
+        "prior_regime_retention"
+      ],
+      "oracle": "Hidden change schedule and known post-change process"
+    },
+    {
+      "id": "T5_IRREGULAR_MISSING",
+      "name": "Irregular sampling and missing observations",
+      "factors": {
+        "jitter_fraction": [
+          0,
+          0.1,
+          0.3,
+          0.5
+        ],
+        "missingness_fraction": [
+          0,
+          0.1,
+          0.3,
+          0.5
+        ],
+        "patterns": [
+          "regular",
+          "irregular",
+          "long_gap",
+          "burst"
+        ]
+      },
+      "primary_metrics": [
+        "quality_by_gap",
+        "quality_by_missingness",
+        "calibration_error",
+        "invalid_timestamp_rejection"
+      ],
+      "oracle": "Underlying continuous-time synthetic process",
+      "implementation_status": "Fixed-point irregular-time/missingness Rust generator, latent oracle, schedule/noise verifier, and SHA-256 digests authored; not compiled or executed"
+    },
+    {
+      "id": "T6_SELECTIVE_RETENTION",
+      "name": "Memory interference and selective retention",
+      "strata": [
+        "no_memory",
+        "fixed_decay",
+        "learned_decay",
+        "fast_slow",
+        "novelty_event_refresh",
+        "invalidation_retraction"
+      ],
+      "primary_metrics": [
+        "target_recall",
+        "distractor_intrusion_rate",
+        "stale_memory_false_recall",
+        "retention_after_invalidation"
+      ],
+      "oracle": "Versioned trace validity and hidden target identities",
+      "implementation_status": "Rust target/distractor/query/invalidation generator, before/after oracle answers, semantic verifier and SHA-256 digests authored; not compiled or executed"
+    },
+    {
+      "id": "T7_PHASE_PREDICTION",
+      "name": "Periodic and phase-sensitive prediction",
+      "factors": {
+        "time_scale": [
+          0.5,
+          1,
+          2
+        ],
+        "strata": [
+          "steady_periodic",
+          "phase_shift",
+          "frequency_shift",
+          "mixed_period"
+        ],
+        "affine_time_dilation": {
+          "tested_exact_ratio": [
+            2,
+            1
+          ],
+          "contract": "Same normalized phase and signal values; all timestamps, periods, phase offsets, and crossing deadlines scale by the same exact rational factor.",
+          "integer_microsecond_only": true,
+          "non_integral_transform": "reject"
+        }
+      },
+      "primary_metrics": [
+        "circular_phase_error_p50_p95_p99_permille",
+        "next_rising_crossing_absolute_error_p50_p95_p99_us",
+        "worst_case_phase_error",
+        "worst_case_next_event_error_us",
+        "prediction_coverage_ppm_over_full_stream",
+        "missing_prediction_count",
+        "affine_time_dilation_phase_equivariance",
+        "affine_time_dilation_crossing_time_scaling_error"
+      ],
+      "oracle": "Exact oscillator phase and event times",
+      "implementation_status": "Rust fixed-point periodic/phase/frequency-shift generator, exact next-crossing oracle, SHA-256 task/oracle digests, semantic verifier, circular phase/absolute crossing-error scorer authored; not compiled or executed",
+      "generator": {
+        "path": "research/temporal-bench/src/phase.rs",
+        "reference_slots": 4096,
+        "sample_interval_us": 1000,
+        "base_period_us": 64000,
+        "modes": [
+          "stable",
+          "phase_shift",
+          "frequency_shift",
+          "mixed"
+        ],
+        "waveform": "fixed-point triangle oscillator",
+        "phase_target": "circular phase permille and exact next rising zero-crossing timestamp",
+        "description": "Synthetic deterministic phase/timing control; not a sinusoidal Fourier benchmark or external dataset reproduction."
+      }
+    },
+    {
+      "id": "T8_BRAINTRACE_DMS",
+      "name": "BrainTrace reference delayed match-to-sample",
+      "source": {
+        "repository": "https://github.com/chaobrain/braintrace-snn-experiments",
+        "commit": "81332436b3a0167bc83059878e43a0f0e2eb62c7",
+        "path": "task-rsnn-long-term-dependency.py",
+        "blob": "f219f53953cdca8465b00e962c7380ff025e0a0b"
+      },
+      "anchor": {
+        "directions": 8,
+        "dt_ms": 1,
+        "fixation_ms": 10,
+        "sample_ms": 500,
+        "delay_ms": 1000,
+        "test_ms": 500,
+        "input_channels": 100,
+        "recurrent_neurons": 200
+      },
+      "primary_metrics": [
+        "accuracy_by_delay",
+        "false_match_rate",
+        "time_to_decision",
+        "state_bytes",
+        "training_memory_bytes"
+      ],
+      "replication_controls": [
+        "pin_script_and_library",
+        "explicit_independent_seed_resets",
+        "new_source_family_holdout",
+        "one_shot_confirmatory_evaluation"
+      ],
+      "audit_status": "public_reference_script_inspected; no score imported; paper-to-script exact revision match unverified",
+      "implementation_status": "Rust generator, timing/oracle structural verifier, and SHA-256 public/oracle digests authored; not compiled or executed"
+    },
+    {
+      "id": "T9_BRAINTRACE_EVIDENCE_ACCUMULATION",
+      "name": "BrainTrace reference sequential evidence accumulation",
+      "source": {
+        "repository": "https://github.com/chaobrain/braintrace-snn-experiments",
+        "commit": "81332436b3a0167bc83059878e43a0f0e2eb62c7",
+        "data_path": "ei_coba_net_decision_making/data.py",
+        "data_blob": "2de7e924b458f51c2939653cf5e88fdff5fae349",
+        "training_path": "ei_coba_net_decision_making/training.py",
+        "training_blob": "a89a32bf18b520dba595d232dbbb153a4de64527",
+        "model_path": "ei_coba_net_decision_making/model.py",
+        "model_blob": "5f12e956afa64d3169430291e7e233c0cbf34a57"
+      },
+      "anchor": {
+        "cues": 7,
+        "cue_duration_ms": 100,
+        "inter_cue_interval_ms": 50,
+        "delay_ms": 1000,
+        "recall_ms": 150,
+        "neuron_groups": {
+          "left": 25,
+          "right": 25,
+          "recall": 25,
+          "noise": 25
+        }
+      },
+      "primary_metrics": [
+        "accuracy_by_evidence_strength",
+        "accuracy_by_delay",
+        "time_to_recovery",
+        "forgetting",
+        "state_and_trace_bytes"
+      ],
+      "replication_controls": [
+        "pass_explicit_seed",
+        "pin_key_schedule",
+        "source_family_holdout",
+        "separate_confirmatory_stream"
+      ],
+      "audit_status": "public_generator_and_trainer_inspected; training-only loop has no separate held-out test path; no score imported",
+      "implementation_status": "Rust generator, timing/oracle structural verifier, and SHA-256 public/oracle digests authored; not compiled or executed"
+    },
+    {
+      "id": "T10_BITEMPORAL_KNOWLEDGE_STREAM",
+      "name": "Continual facts with retroactive correction and bitemporal queries",
+      "implementation_status": "Rust event-stream generator, independent bitemporal answer verifier, SHA-256 content/oracle digests, and seed-bound replay authored; not compiled or executed",
+      "related_issues": [
+        9075,
+        9149,
+        9427
+      ],
+      "factors": {
+        "fact_revisions": [
+          "assert",
+          "late_correction",
+          "delayed_retraction"
+        ],
+        "query_coordinates": "(valid_at, known_at)",
+        "query_cases": [
+          "same_valid_time_before_and_after_correction_arrival",
+          "same_valid_time_before_and_after_retraction_arrival",
+          "historical_valid_time_after_all_updates"
+        ],
+        "distractor_similarity": [
+          "high"
+        ]
+      },
+      "primary_metrics": [
+        "bitemporal_exact_match_by_valid_at_known_at",
+        "future_knowledge_leakage_rate_over_eligible_pre_correction_queries",
+        "missed_correction_rate_over_eligible_post_correction_pre_retraction_queries",
+        "stale_answer_rate_over_eligible_post_retraction_queries",
+        "historical_as_known_preservation_rate_over_eligible_historical_queries",
+        "abstention_and_missing_prediction_rate",
+        "correction_propagation_latency"
+      ],
+      "oracle": "Independent symbolic scan over append-only source revisions, valid-time boundaries and transaction/knowledge-time cutoffs",
+      "paradigm": "Distinguishes what was valid in the modeled world at V from what the system had learned by T; a later correction must not rewrite an earlier as-known query.",
+      "oaks_alignment": {
+        "paper_doi": "10.18653/v1/2026.acl-long.1956",
+        "source_repositories": [
+          "https://github.com/kaistAI/OAKS",
+          "https://github.com/adobe-research/OAKS"
+        ],
+        "use": "T10 provides exact structured bitemporal controls; optional OAKS evaluation adds end-to-end language-level chunk tracking. Do not merge scores.",
+        "noncommercial_license_only": true,
+        "count_discrepancy": "code README 435 OAKS-Novel questions; dataset README 870; reconcile before comparison."
+      },
+      "candidate_output_contract": {
+        "answer_states": [
+          "value",
+          "no_fact",
+          "abstain"
+        ],
+        "missing_prediction": "Count separately; do not silently convert to a correct abstention.",
+        "duplicate_or_unknown_query": "Reject as invalid candidate output.",
+        "metrics": [
+          "exact_matches",
+          "wrong_answers",
+          "abstentions",
+          "missing_predictions",
+          "future_knowledge_eligible_queries",
+          "future_knowledge_leaks",
+          "missed_correction_eligible_queries",
+          "missed_corrections",
+          "stale_after_retraction_eligible_queries",
+          "stale_answers_after_retraction",
+          "historical_as_known_eligible_queries",
+          "historical_as_known_preserved",
+          "future_knowledge_leakage_rate",
+          "missed_correction_rate",
+          "stale_after_retraction_rate",
+          "historical_as_known_preservation_rate"
+        ],
+        "scorer": "score_knowledge_predictions in research/temporal-bench/src/knowledge_stream.rs"
+      },
+      "proposed_extensions": {
+        "temporal_error_debt": {
+          "tracking_issue": 9492,
+          "status": "specified_not_implemented",
+          "required_query_stream": "Repeated predictions for the same valid_at coordinate at every evidence/update checkpoint.",
+          "measures": [
+            "wrong_belief_exposure_time",
+            "abstention_exposure_time",
+            "missing_prediction_exposure_time",
+            "time_to_first_correct_state_after_correction",
+            "time_to_first_no_fact_after_retraction",
+            "area_under_per_chunk_error_curve"
+          ],
+          "boundary": "Not part of current T10 v0.1 scores or official OAKS scores; source timestamps required for seconds, otherwise use chunk-time units."
+        }
+      }
+    }
+  ],
+  "architecture_arms": [
+    "active_hdc_ltc_cfc_incumbent",
+    "static_hdc_sequence",
+    "memoryless_hdc",
+    "fast_only",
+    "slow_only",
+    "fast_plus_slow_fixed_cadence",
+    "fast_plus_slow_novelty_event_cadence",
+    "gru",
+    "lstm",
+    "gru_d_or_missingness_aware_recurrent",
+    "ode_rnn_or_latent_ode",
+    "adaptive_lif_or_alif_snn",
+    "temporal_convolution",
+    "braintrace_d_rtrl_online_snn",
+    "braintrace_pp_prop_online_snn",
+    "braintrace_eprop_online_snn",
+    "bptt_gradient_reference_small_scale",
+    "stdl_spatiotemporal_decoupled_snn",
+    "stdl_ell_local_learning_control",
+    "stdl_decolle_local_learning_control",
+    "append_only_bitemporal_fact_ledger",
+    "recency_decay_only_memory",
+    "current_state_key_value_memory",
+    "hybrid_hdc_bitemporal_retrieval"
+  ],
+  "fairness_controls": {
+    "paired_instances": true,
+    "matched_input_information": true,
+    "training_budget_pinned": true,
+    "parameter_and_state_budget_reported": true,
+    "precision_pinned": true,
+    "preprocessing_included_in_system_measurement": true,
+    "paper_scores_are_not_reproduction": true,
+    "baseline_commit_and_config_digest_required": true,
+    "spatio_temporal_local_baselines_required": true
+  },
+  "data_strata": {
+    "synthetic_exact": {
+      "use": "Deterministic analytical/exhaustive oracles for causality, delay, time warp, change points, and invalid input.",
+      "source_family_split": true
+    },
+    "real_candidates": [
+      "SHD",
+      "SSC",
+      "DVS Gesture",
+      "S-MNIST",
+      "PS-MNIST",
+      "MLPerf Tiny v1.4 streaming wake-word"
+    ],
+    "real_data_requirements": [
+      "license_and_provenance_pinned",
+      "split_by_subject_session_or_source_recording_before_windowing",
+      "no_overlapping_or_near_duplicate_source_windows_across_splits",
+      "timestamps_and_missingness_preserved",
+      "dataset_preprocessing_label_map_and_split_digests_recorded"
+    ],
+    "oaks_acl_2026": {
+      "code_repository": "kaistAI/OAKS",
+      "code_commit": "c1a76e66b5b2276973ee8ee3de7063721e22a88f",
+      "data_repository": "adobe-research/OAKS",
+      "data_commit": "0bbc4b3877eae5f9335f07c5e485aabf1d9136e9",
+      "data_license": "Adobe Research License, noncommercial research/teaching only",
+      "download_performed": false,
+      "reproduction_blockers": [
+        "OAKS-Novel question count differs between current code README (435) and dataset README (870); reconcile manifest/counting.",
+        "Use official per-chunk answer evaluator and exact source split/aggregation semantics.",
+        "Do not use restricted OAKS assets for commercial product development absent a separate license."
+      ]
+    }
+  },
+  "resource_metrics": [
+    "parameter_bytes",
+    "persistent_state_bytes",
+    "peak_working_set_bytes",
+    "temporary_and_copy_buffer_bytes",
+    "read_write_bytes_by_stage_and_memory_tier",
+    "hardware_counter_or_operation_estimates_with_provenance",
+    "batch1_event_latency_p50_p95_p99",
+    "burst_latency_p50_p95_p99",
+    "quiet_idle_energy",
+    "continuous_stream_latency_and_energy",
+    "joules_per_correct_decision",
+    "eligibility_trace_bytes_by_neuron_count",
+    "eligibility_trace_bytes_by_sequence_length",
+    "online_update_compute_time_by_sequence_length",
+    "pp_prop_gradient_or_learning_trajectory_deviation_from_d_rtrl_or_bptt",
+    "time_to_target_quality_under_equal_online_feedback_budget",
+    "stale_memory_false_recall_after_invalidation",
+    "selective_retention_quality_by_distractor_similarity",
+    "idle_false_triggers_per_monitored_hour_with_exposure",
+    "always_on_idle_power_w",
+    "energy_per_correct_event_detection",
+    "energy_per_hour_of_continuous_monitoring",
+    "auxiliary_subnetwork_parameter_and_buffer_bytes",
+    "local_partition_activation_bytes",
+    "training_peak_allocated_and_reserved_gpu_memory",
+    "training_peak_host_rss",
+    "training_joules_per_correct_update",
+    "wall_clock_to_fixed_confirmatory_quality",
+    "bitemporal_exact_match_by_valid_at_known_at",
+    "future_knowledge_leakage_rate",
+    "stale_claim_use_after_retraction",
+    "correction_propagation_latency",
+    "historical_as_known_answer_preservation",
+    "oaks_per_chunk_accuracy_trajectory",
+    "oaks_answer_change_precision_recall",
+    "phase_prediction_coverage_against_full_stream",
+    "missing_phase_prediction_count",
+    "affine_time_dilation_normalized_phase_error",
+    "affine_time_dilation_physical_crossing_time_error",
+    "temporal_error_debt_wrong_belief_exposure_time",
+    "temporal_error_debt_abstention_exposure_time",
+    "temporal_error_debt_missing_prediction_exposure_time",
+    "temporal_error_debt_area_under_error_curve"
+  ],
+  "statistical_design": {
+    "pilot_paired_seeds_min": 10,
+    "confirmatory_paired_seeds_min": 30,
+    "confirmatory_alternative": "Pre-registered power-based design",
+    "grouping_unit": "synthetic_source_family_or_real_subject_session",
+    "paired_comparison": true,
+    "confidence_intervals": true,
+    "multiple_comparison_control_required": true,
+    "preserve_failed_invalid_timed_out_runs": true,
+    "online_learning_controls": {
+      "paired_training_streams": true,
+      "explicit_independent_seed_resets": true,
+      "locked_confirmatory_trial_families": true,
+      "training_curve_separate_from_confirmatory_test": true,
+      "report_trace_decay_sensitivity": true,
+      "exact_gradient_reference_on_small_scale": true
+    }
+  },
+  "qualification_targets": [
+    "zero_future_sample_leakage_on_exhaustive_synthetic_controls",
+    "zero_silent_acceptance_of_invalid_time_inputs",
+    "scalar_analytic_controls_converge_under_step_refinement",
+    "publish_delay_and_interference_conditioned_recall",
+    "report_detection_recovery_regret_and_prior_regime_retention",
+    "account_for_persistent_peak_and_temporary_memory_plus_traffic",
+    "hardware_energy_claims_require_calibrated_measurement_and_declared_boundary",
+    "improvements_must_hold_on_source_family_held_out_data",
+    "null_controls_must_allow_simpler_baselines_to_win",
+    "no_production_default_change_before_exact_head_validation",
+    "zero_transaction_time_leakage_on_exhaustive_late_correction_fixtures",
+    "exact_bitemporal_answer_parity_at_all_preregistered_valid_at_known_at_coordinates",
+    "historical_as_known_answers_survive_later_corrections_and_retractions",
+    "official_oaks_evaluation_reproduced_only_under_compatible_license_and_pinned_manifest",
+    "phase_predictions_are_scored_against_the_full_public_stream_denominator",
+    "affine_time_dilation_preserves_normalized_phase_and_signal_and_scales_physical_times_exactly",
+    "temporal_error_debt_separates_wrong_belief_abstention_and_missing_exposure"
+  ],
+  "claim_ceiling": "Results apply only to declared workloads, splits, implementations, and hardware. They do not establish consciousness, general intelligence, universal superiority, or neuromorphic efficiency when measured only on conventional CPU/GPU.",
+  "baseline_registry": {
+    "BrainTrace": {
+      "publication": "Wang et al., Nature Communications 17, 1745 (2026-01-19)",
+      "doi": "10.1038/s41467-026-68453-w",
+      "package_repository": "https://github.com/chaobrain/braintrace",
+      "package_version": "0.2.8",
+      "package_commit": "4fd426e1ec58a61a11d47a8d95c32346778e8b11",
+      "experiments_repository": "https://github.com/chaobrain/braintrace-snn-experiments",
+      "experiments_commit": "81332436b3a0167bc83059878e43a0f0e2eb62c7",
+      "dms_script_path": "task-rsnn-long-term-dependency.py",
+      "dms_script_blob": "f219f53953cdca8465b00e962c7380ff025e0a0b",
+      "dms_task": "8-direction delayed match-to-sample with 1,000 ms delay and spiking population input.",
+      "methods": [
+        "D_RTRL",
+        "pp_prop_ES_D_RTRL",
+        "BPTT"
+      ],
+      "role": "Online-learning and long-horizon credit-assignment competitor; not a drop-in inference-only architecture.",
+      "code_audit_status": "Public DMS script inspected at pinned commit. Paper-to-script exact revision correspondence remains unverified.",
+      "known_replication_controls": [
+        "DMS script samples with NumPy global RNG and does not visibly reset a per-replicate seed in the inspected entry path.",
+        "The inspected training loop iterates generated batches until a training accuracy threshold and does not show a separate held-out confirmatory test split.",
+        "Reproduction must use independent seed resets, grouped/locked development and confirmatory trials, and one-shot confirmatory evaluation."
+      ],
+      "scores_imported": false,
+      "matched_reproduction_status": "not_executed",
+      "evidence_accumulation_data_blob": "2de7e924b458f51c2939653cf5e88fdff5fae349",
+      "evidence_accumulation_training_blob": "a89a32bf18b520dba595d232dbbb153a4de64527",
+      "paper_to_script_revision_verified": false,
+      "public_training_script_test_split_found": false,
+      "paper_reported_complexity": {
+        "pp_prop_trace_memory": "O(B*N) for batch size B and neuron count N according to the Nature Communications article.",
+        "d_rtrl_trace_memory": "O(B*P) for batch size B and parameter count P; dense recurrent P may scale quadratically with neuron count.",
+        "pp_prop_vs_d_rtrl_lif_gesture": {
+          "pp_prop_memory_gb": 0.5,
+          "d_rtrl_memory_gb": 17.5,
+          "paper_reported_memory_ratio": 35,
+          "paper_reported_speedup_vs_d_rtrl": 10,
+          "scope": "Paper-specific LIF Gesture experiment. Literature reference only; not Symthaea measurements."
+        },
+        "bptt_sequence_memory": "Paper reports memory increasing with sequence length and a GPU run failure at 400 steps for its specific experiment.",
+        "caveat": "pp-prop is a factorized/approximated trace; its approximation quality can depend on firing statistics and network depth. Do not report it as an exact D-RTRL/BPTT gradient."
+      }
+    },
+    "STDL": {
+      "publication": "Ma et al., IEEE Transactions on Neural Networks and Learning Systems 37(9), 4597-4611 (2026-09)",
+      "doi": "10.1109/TNNLS.2026.3671461",
+      "paper_pubmed": "https://pubmed.ncbi.nlm.nih.gov/41824348/",
+      "paper_repository": "https://github.com/ChenxiangMA/STDL",
+      "repository_commit": "e5e483332ade02c94d8354583ab46aa63e99ecf1",
+      "commit_date": "2025-06-27",
+      "paper_to_code_exact_revision_verified": false,
+      "source_blobs": {
+        "README.md": "af0b4b84da93abce506f04b88f12434b8fc641c7",
+        "run.sh": "87fd14f6db82bbe577ad6642f33306d74620183c",
+        "main_train.py": "e461fc6b0ae9c9bf090d9cace25ef815f8f4eef0",
+        "models/spk_model.py": "c30b88ffcd764ec0a38620c45d7238f53c70cfa0",
+        "models/spk_cifar_resnet_local.py": "0d5a0d42c33f45dfa61e1518722dd8e277097c9e",
+        "models/configs.py": "47222fbb04391e30a7f6a33b58d179fdfa00ebd6",
+        "spk_neuron/neuron.py": "fd941ee6c66c4bf0ab8ab3c4ba20072b45298dcb",
+        "load_dataset.py": "99a25f5c94ee772d7a70d45bbf3c6bc4c8777234",
+        "tools/utils.py": "e873effc8c7bb0e74886b2821ca381c5a56975aa"
+      },
+      "methods": [
+        "STDL_memory_constrained_auxiliary_subnetworks",
+        "ELL_local_learning_control",
+        "DECOLLE_local_learning_control"
+      ],
+      "task_scope": {
+        "direct_static_vision": [
+          "CIFAR10",
+          "CIFAR100",
+          "SVHN",
+          "ImageNet"
+        ],
+        "direct_event_vision": [
+          "CIFAR10DVS",
+          "HARDVS"
+        ],
+        "not_drop_in_for_synthetic_temporal_streams": true
+      },
+      "source_findings": {
+        "spatial_partition": "LocalResNet calls an auxiliary classifier at configured stage/block boundaries, backpropagates the local loss and detaches the backbone activation before later stages; final classifier loss is also backpropagated.",
+        "auxiliary_context": "mem-configured AuxNetwork can include selected downstream layers. ResNet18 mem_1800 selects [6,7,8] from local boundary 1 and [6,8] from boundary 3; config names must not be mistaken for measured byte budgets.",
+        "temporal_boundary": "SpkModel resets state per forward call, loops over time_window, and LIFNode supports detach_mem/detach_reset. Example run.sh STDL configs enable both detach flags.",
+        "training_hardware": "main_train.py asserts CUDA availability and wraps the model with DataParallel().cuda().",
+        "checkpoint_selection": "CIFAR10/CIFAR100/SVHN/CIFAR10DVS/HARDVS load test splits into val_loader; training loop evaluates loader every epoch and selects best checkpoint. Separate dev and one-shot confirmatory splits required.",
+        "imageNet": "ImageNet valdir also used for checkpoint selection; treat as dev for strict reproduction.",
+        "memory_reporting": "Allocated/peak CUDA allocated memory logging is present but not full peak host/device/system footprint or energy measurement.",
+        "seed_reporting": "Default seed 9 and Python/NumPy/PyTorch/CUDA seeding exists; multi-seed paper protocol still needs explicit verification.",
+        "framework_lock": "No complete dependency lock found in inspected repository snapshot; lock PyTorch/torchvision/CUDA/cuDNN/data transforms for reproduction."
+      },
+      "literature_claims": {
+        "paper_evaluates_seven_static_and_event_vision_datasets": true,
+        "paper_reports_comparable_accuracy_to_bptt": true,
+        "paper_reports_4x_lower_gpu_memory_on_imagenet": true,
+        "imported_as_symthaea_results": false,
+        "scope": "Literature claims only; no Symthaea measurements or STDL reproduction performed."
+      },
+      "reproduction_status": "static_code_audit_only_not_run",
+      "caveats": [
+        "Repository head commit predates journal publication; final-paper runner mapping is unverified.",
+        "Public test splits are used as per-epoch validation/model-selection data for CIFAR10/CIFAR100/SVHN/CIFAR10DVS/HARDVS.",
+        "CUDA-only entrypoint; no CPU-compatible reproduction was performed.",
+        "Peak allocated GPU memory logs do not measure joules or the full deployment boundary."
+      ],
+      "audit_document": "docs/research/STDL_REFERENCE_AUDIT_V0_1.md"
+    }
+  }
+}
