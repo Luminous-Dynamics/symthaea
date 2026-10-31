@@ -76,6 +76,30 @@ class DistributionallyRobustCRCTests(unittest.TestCase):
             places=8,
         )
 
+
+    def test_regular_finite_population_grid_cardinality_and_boundaries(self):
+        from robust_crc_cifar import make_composition_grid_scenarios
+        scenarios=make_composition_grid_scenarios(10000,500,500)
+        self.assertEqual(len(scenarios),171)
+        self.assertTrue(all(sum(v)==10000 for v in scenarios.values()))
+        self.assertTrue(all(min(v)>=500 for v in scenarios.values()))
+        self.assertIn("mix_500_500_9000",scenarios)
+        self.assertIn("mix_9000_500_500",scenarios)
+
+    def test_small_grid_robust_policy_remains_valid(self):
+        from robust_crc_cifar import run_grid_robustness_stress
+        result=run_grid_robustness_stress(
+            n=5,alpha=.2,population_total=21,
+            min_count_per_type=6,step=3,equal_share_rounds=20
+        )
+        self.assertEqual(result["protocol"]["scenario_count"],3)
+        self.assertTrue(result["robust_verification"]["valid"])
+        self.assertLessEqual(result["robust_verification"]["max_budget_excess"],1e-8)
+        self.assertGreaterEqual(
+            result["worst_case"]["robust_specificity"]+1e-7,
+            result["worst_case"]["equal_share_specificity"]
+        )
+
     def test_rejects_invalid_scenario_sets(self):
         with self.assertRaises(ValueError):
             DistributionallyRobustRandomizedCRC(5, .2, {"only_one": (70,20,10)})
