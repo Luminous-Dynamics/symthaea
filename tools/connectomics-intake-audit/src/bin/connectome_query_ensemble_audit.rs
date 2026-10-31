@@ -367,12 +367,16 @@ fn scenario_set_sha256(scenarios: &[Scenario]) -> Result<(String, usize), String
     rows.sort_by(|left, right| left.0.cmp(&right.0));
     let mut hasher = Sha256::new();
     hasher.update(b"connectome-query-finite-scenario-set-v1");
+    hasher.update((rows.len() as u64).to_be_bytes());
     let mut all_groups = BTreeSet::new();
     for (scenario_id, graph_sha, groups) in rows {
+        hasher.update(b"SCENARIO");
         hasher.update((scenario_id.len() as u64).to_be_bytes());
         hasher.update(scenario_id.as_bytes());
         hasher.update(graph_sha.as_bytes());
+        hasher.update((groups.len() as u64).to_be_bytes());
         for group in groups {
+            hasher.update(b"LINEAGE");
             hasher.update((group.len() as u64).to_be_bytes());
             hasher.update(group.as_bytes());
             all_groups.insert(group);
@@ -620,6 +624,9 @@ mod tests {
         let mut input = fixture();
         let before = scenario_set_sha256(&input.scenarios).unwrap().0;
         input.scenarios.reverse();
+        for scenario in &mut input.scenarios {
+            scenario.lineage_groups.reverse();
+        }
         let after = scenario_set_sha256(&input.scenarios).unwrap().0;
         assert_eq!(before, after);
     }
