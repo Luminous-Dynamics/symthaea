@@ -928,7 +928,8 @@ fn compute_metrics(
 ) -> Result<VoCQualificationMetrics, QualificationError> {
     let weights = &manifest.posterior_particle_weights;
     let ess = 1.0 / weights.iter().map(|weight| weight * weight).sum::<f64>();
-    let global = summarize_episodes(manifest, episodes, thresholds)?;
+    let episode_refs: Vec<&VoCReplayEpisode> = episodes.iter().collect();
+    let global = summarize_episodes(manifest, &episode_refs, thresholds)?;
     let mut action_forecasts: BTreeMap<String, Vec<(Vec<f64>, usize)>> = BTreeMap::new();
     let mut action_forecast_counts = BTreeMap::new();
     let mut voi_absolute_error = 0.0;
@@ -1009,7 +1010,7 @@ struct EpisodeSummary {
 
 fn summarize_episodes(
     manifest: &VoCQualificationManifest,
-    episodes: &[VoCReplayEpisode],
+    episodes: &[&VoCReplayEpisode],
     thresholds: &VoCQualificationThresholds,
 ) -> Result<EpisodeSummary, QualificationError> {
     let weights = &manifest.posterior_particle_weights;
@@ -1108,7 +1109,7 @@ fn compute_strata(
     episodes: &[VoCReplayEpisode],
     thresholds: &VoCQualificationThresholds,
 ) -> Result<Vec<StratumMetrics>, QualificationError> {
-    let mut groups: BTreeMap<String, Vec<VoCReplayEpisode>> = BTreeMap::new();
+    let mut groups: BTreeMap<String, Vec<&VoCReplayEpisode>> = BTreeMap::new();
     for episode in episodes {
         let keys = [
             format!("family={}", episode.architecture_family),
@@ -1118,7 +1119,7 @@ fn compute_strata(
             format!("noise={}", episode.noise_regime),
         ];
         for key in keys {
-            groups.entry(key).or_default().push(episode.clone());
+            groups.entry(key).or_default().push(episode);
         }
     }
     let mut output = Vec::with_capacity(groups.len());
@@ -1178,12 +1179,12 @@ fn categorical_metrics(
             ));
         }
         log_loss += -probabilities[*actual_index].max(1e-15).ln() / forecasts.len() as f64;
-        let predicted_index = probabilities
-            .iter()
-            .enumerate()
-            .max_by(|left, right| left.1.total_cmp(right.1).then_with(|| right.0.cmp(&left.0)))
-            .map(|(index, _)| index)
-            .unwrap_or(0);
+        let mut predicted_index = 0usize;
+        for index in 1..probabilities.len() {
+            if probabilities[index] > probabilities[predicted_index] {
+                predicted_index = index;
+            }
+        }
         let confidence = probabilities[predicted_index];
         let bin = ((confidence * ece_bins as f64).floor() as usize).min(ece_bins - 1);
         bin_confidence[bin] += confidence;
