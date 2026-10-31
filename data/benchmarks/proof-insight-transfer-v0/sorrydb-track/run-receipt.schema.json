@@ -398,6 +398,12 @@
           "cost_microusd": {
             "type": "integer",
             "minimum": 0
+          },
+          "axiom_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "allOf": [
@@ -424,7 +430,8 @@
                 "kernel_check_passed",
                 "proof_contains_sorry_axiom",
                 "new_axiom_names",
-                "trust_tier"
+                "trust_tier",
+                "axiom_names"
               ]
             }
           }

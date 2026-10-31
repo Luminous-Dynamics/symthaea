@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -48,48 +48,88 @@ jobs:
               raise SystemExit("synthetic receipt must not contain model outcomes")
           print("PITB_SORRYDB_FIXTURE_SHAPE_PASS: synthetic contract only; no model or Lean outcome")
 
-          def must_reject(label, value):
+          def schema_must_reject(label, value):
               try:
                   validator.validate(value)
               except ValidationError:
-                  print(f"PITB_SORRYDB_NEGATIVE_PASS: {label}")
+                  print(f"PITB_SORRYDB_SCHEMA_NEGATIVE_PASS: {label}")
                   return
               raise SystemExit(f"schema accepted invalid receipt: {label}")
 
+          def semantic_errors(value):
+              errors = []
+              budget = value["run"]["budget"]
+              actual = value["run"]["actual"]
+              for field in ("attempts", "tokens", "tool_calls", "wall_time_ms", "cost_microusd"):
+                  if actual[field] > budget[field]:
+                      errors.append(f"{field} exceeded budget")
+              executed = [row for row in value["attempts"] if row["status"] != "not_attempted"]
+              if actual["attempts"] != len(executed):
+                  errors.append("actual attempt count does not match attempt rows")
+              indices = [row["attempt_index"] for row in value["attempts"]]
+              if indices != list(range(1, len(indices) + 1)):
+                  errors.append("attempt indices are not contiguous and ordered")
+              seeds = [row["seed_sha256"] for row in value["attempts"]]
+              if len(seeds) != len(set(seeds)):
+                  errors.append("attempt seed digests are not unique")
+              if value["task"]["repository_commit"] != value["environment"]["repository_commit"]:
+                  errors.append("task and checkout commit differ")
+              if value["task"]["lean_version"] != value["environment"]["lean_version"]:
+                  errors.append("task and checkout Lean versions differ")
+              for row in value["attempts"]:
+                  if row["status"] == "verified_success":
+                      if row["target_type_sha256_before"] != row["target_type_sha256_after"]:
+                          errors.append("verified success changed target type")
+                      if row["patch_scope"] != "sorry-token-replacement-only":
+                          errors.append("verified success changed code outside target sorry span")
+                      if row["proof_contains_sorry_axiom"] or row["new_axiom_names"]:
+                          errors.append("verified success contains sorryAx or an unapproved new axiom")
+              return errors
+
           bad = copy.deepcopy(fixture)
           bad["task"]["source_path"] = "../outside.lean"
-          must_reject("path traversal", bad)
+          schema_must_reject("path traversal", bad)
 
           bad = copy.deepcopy(fixture)
           bad["attempts"][0]["status"] = "verified_success"
-          must_reject("success without proof/checker/type/axiom receipts", bad)
+          schema_must_reject("success without proof/checker/type/axiom receipts", bad)
 
           bad = copy.deepcopy(fixture)
           bad["run"]["actual"]["attempts"] = 2
-          if bad["run"]["actual"]["attempts"] <= bad["run"]["budget"]["attempts"]:
-              raise SystemExit("budget overrun control failed to construct")
-          if bad["run"]["actual"]["attempts"] <= bad["run"]["budget"]["attempts"]:
-              raise SystemExit("budget overrun control failed to construct")
-          print("PITB_SORRYDB_NEGATIVE_PASS: over-budget attempt count detected by consumer invariant")
+          if not semantic_errors(bad):
+              raise SystemExit("budget overrun control was not rejected by semantic audit")
+          print("PITB_SORRYDB_SEMANTIC_NEGATIVE_PASS: over-budget attempt count")
 
           success = copy.deepcopy(fixture)
+          success["run"]["actual"].update({"attempts":1,"tokens":100,"tool_calls":1,"wall_time_ms":1000,"cost_microusd":10})
           attempt = success["attempts"][0]
           attempt.update({
-              "status": "verified_success",
-              "proof_sha256": "a" * 64,
-              "source_patch_sha256": "b" * 64,
-              "verifier_id": "synthetic-independent-checker",
-              "verifier_receipt_sha256": "c" * 64,
-              "target_type_sha256_before": "d" * 64,
-              "target_type_sha256_after": "e" * 64,
-              "patch_scope": "sorry-token-replacement-only",
-              "kernel_check_passed": True,
-              "proof_contains_sorry_axiom": False,
-              "new_axiom_names": [],
-              "trust_tier": "kernel_only"
+              "status":"verified_success",
+              "proof_sha256":"a" * 64,
+              "source_patch_sha256":"b" * 64,
+              "verifier_id":"synthetic-independent-checker",
+              "verifier_receipt_sha256":"c" * 64,
+              "target_type_sha256_before":"d" * 64,
+              "target_type_sha256_after":"e" * 64,
+              "patch_scope":"sorry-token-replacement-only",
+              "kernel_check_passed":True,
+              "proof_contains_sorry_axiom":False,
+              "axiom_names":["propext"],
+              "new_axiom_names":[],
+              "trust_tier":"kernel_only",
+              "tokens":100,
+              "tool_calls":1,
+              "wall_time_ms":1000,
+              "cost_microusd":10
           })
           validator.validate(success)
-          if attempt["target_type_sha256_before"] == attempt["target_type_sha256_after"]:
-              raise SystemExit("type-digest mismatch control failed to construct")
-          print("PITB_SORRYDB_NEGATIVE_PASS: success-shaped receipt rejected by required type-digest equality invariant")
+          if not semantic_errors(success):
+              raise SystemExit("target-type mismatch control was not rejected by semantic audit")
+          print("PITB_SORRYDB_SEMANTIC_NEGATIVE_PASS: target-type digest mismatch")
+
+          success["attempts"][0]["target_type_sha256_after"] = "d" * 64
+          if semantic_errors(success):
+              raise SystemExit("matched, integrity-complete synthetic success receipt did not pass the semantic audit")
+          validator.validate(success)
+          print("PITB_SORRYDB_POSITIVE_PASS: synthetic integrity-complete receipt; not an evaluated proof")
           PY
