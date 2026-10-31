@@ -15,6 +15,8 @@
     "blueprint_sha256_before",
     "blueprint_sha256_after",
     "operation",
+    "pre_state_node_ids",
+    "post_state_node_ids",
     "affected_node_ids",
     "declared_support",
     "decision",
@@ -159,6 +161,22 @@
     },
     "review_receipt_sha256": {
       "$ref": "#/$defs/sha256"
+    },
+    "pre_state_node_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "post_state_node_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
     }
   },
   "allOf": [
