@@ -16,8 +16,9 @@ use std::fmt;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::fd::{AsRawFd, FromRawFd};
+use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::MetadataExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use zeroize::Zeroize;
 
 use super::{
@@ -377,6 +378,196 @@ pub fn load_signing_key_from_systemd_credential(
     Ok(signing_key)
 }
 
+/// Persistent evaluator-local replay ledger.
+///
+/// The ledger directory must be pre-created with mode 0700 and owned by the
+/// evaluator UID. It is intentionally not shared with the candidate. A
+/// receipt is consumed only after its Ed25519 signature verifies. Unique
+/// create-only markers bind nonce, run ID, and per-key monotonic counter;
+/// a flock-protected high-water file serializes concurrent evaluator workers.
+///
+/// If a crash occurs after marker creation but before counter update, the
+/// marker remains consumed. This can waste a run ID/counter but fails closed.
+pub struct ReplayLedger {
+    directory: PathBuf,
+}
+
+impl ReplayLedger {
+    pub fn new(directory: impl Into<PathBuf>) -> Self {
+        Self { directory: directory.into() }
+    }
+
+    /// Verify the signature, then atomically consume the run/nonce/counter.
+    /// The returned digest is the SHA-256 of the signed canonical envelope.
+    pub fn verify_and_consume(
+        &self,
+        receipt: &SignedReceipt,
+        verifying_key: &VerifyingKey,
+    ) -> Result<[u8; 32], ReplayError> {
+        verify_receipt(receipt, verifying_key).map_err(ReplayError::Receipt)?;
+        let payload = &receipt.payload;
+        let envelope_digest = receipt
+            .envelope_sha256()
+            .map_err(ReplayError::Receipt)?;
+
+        let directory = open_absolute_directory(&self.directory)
+            .map_err(ReplayError::Intake)?;
+        let key = key_id(verifying_key);
+        let counter_name = single_component(&format!("counter-{}.bin", hex(&key)))
+            .map_err(ReplayError::Intake)?;
+        let counter_fd = openat2_beneath(
+            directory.as_raw_fd(),
+            &counter_name,
+            libc::O_RDWR | libc::O_CREAT | libc::O_CLOEXEC | libc::O_NOFOLLOW,
+            0o600,
+            RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS,
+        )
+        .map_err(ReplayError::Intake)?;
+        // SAFETY: openat2 returned a new owned file descriptor.
+        let mut counter_file = unsafe { File::from_raw_fd(counter_fd) };
+        let counter_metadata = counter_file.metadata().map_err(ReplayError::Io)?;
+        if !counter_metadata.file_type().is_file()
+            || counter_metadata.nlink() != 1
+            || counter_metadata.mode() & 0o077 != 0
+            || counter_metadata.len() > 8
+        {
+            return Err(ReplayError::CounterLedgerCorrupt);
+        }
+
+        // SAFETY: flock is applied to the live counter-file descriptor. The
+        // lock is released when the descriptor is closed on every return path.
+        let lock_result = unsafe { libc::flock(counter_file.as_raw_fd(), libc::LOCK_EX) };
+        if lock_result != 0 {
+            return Err(ReplayError::Io(std::io::Error::last_os_error().kind()));
+        }
+
+        counter_file.seek(SeekFrom::Start(0)).map_err(ReplayError::Io)?;
+        let mut counter_bytes = Vec::new();
+        counter_file.read_to_end(&mut counter_bytes).map_err(ReplayError::Io)?;
+        let previous_counter = match counter_bytes.len() {
+            0 => 0,
+            8 => u64::from_le_bytes(
+                counter_bytes.as_slice().try_into().map_err(|_| ReplayError::CounterLedgerCorrupt)?,
+            ),
+            _ => return Err(ReplayError::CounterLedgerCorrupt),
+        };
+        if payload.monotonic_counter <= previous_counter {
+            return Err(ReplayError::CounterNotMonotonic {
+                previous: previous_counter,
+                supplied: payload.monotonic_counter,
+            });
+        }
+
+        let nonce_name = single_component(&format!("nonce-{}", hex(&payload.nonce)))
+            .map_err(ReplayError::Intake)?;
+        let run_name = single_component(&format!("run-{}", hex(&payload.run_id)))
+            .map_err(ReplayError::Intake)?;
+        let counter_marker = single_component(&format!(
+            "used-{}-{:020}",
+            hex(&key),
+            payload.monotonic_counter
+        ))
+        .map_err(ReplayError::Intake)?;
+
+        create_replay_marker(directory.as_raw_fd(), &nonce_name, &envelope_digest)?;
+        create_replay_marker(directory.as_raw_fd(), &run_name, &envelope_digest)?;
+        create_replay_marker(directory.as_raw_fd(), &counter_marker, &envelope_digest)?;
+
+        // Persist create-only markers before updating the counter. A crash in
+        // between leaves the run/nonce/counter consumed, never reusable.
+        sync_replay_directory(&self.directory)?;
+
+        counter_file.seek(SeekFrom::Start(0)).map_err(ReplayError::Io)?;
+        counter_file.set_len(0).map_err(ReplayError::Io)?;
+        counter_file
+            .write_all(&payload.monotonic_counter.to_le_bytes())
+            .map_err(ReplayError::Io)?;
+        counter_file.sync_all().map_err(ReplayError::Io)?;
+        sync_replay_directory(&self.directory)?;
+
+        Ok(envelope_digest)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ReplayError {
+    Receipt(ReceiptError),
+    Intake(IntakeError),
+    Io(std::io::ErrorKind),
+    CounterLedgerCorrupt,
+    CounterNotMonotonic { previous: u64, supplied: u64 },
+    AlreadyConsumed,
+}
+
+impl fmt::Display for ReplayError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Receipt(error) => write!(f, "receipt verification failed: {error}"),
+            Self::Intake(error) => write!(f, "replay ledger path operation failed: {error}"),
+            Self::Io(kind) => write!(f, "replay ledger I/O failed: {kind:?}"),
+            Self::CounterLedgerCorrupt => write!(f, "replay counter ledger is malformed or not private"),
+            Self::CounterNotMonotonic { previous, supplied } => write!(
+                f,
+                "receipt counter {supplied} is not greater than persisted counter {previous}"
+            ),
+            Self::AlreadyConsumed => write!(f, "receipt nonce, run ID or counter was already consumed"),
+        }
+    }
+}
+
+impl std::error::Error for ReplayError {}
+
+fn create_replay_marker(
+    directory_fd: i32,
+    name: &CString,
+    digest: &[u8; 32],
+) -> Result<(), ReplayError> {
+    let fd = match openat2_beneath(
+        directory_fd,
+        name,
+        libc::O_WRONLY | libc::O_CREAT | libc::O_EXCL | libc::O_CLOEXEC | libc::O_NOFOLLOW,
+        0o600,
+        RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS,
+    ) {
+        Ok(fd) => fd,
+        Err(IntakeError::OpenAt2(std::io::ErrorKind::AlreadyExists)) => {
+            return Err(ReplayError::AlreadyConsumed);
+        }
+        Err(error) => return Err(ReplayError::Intake(error)),
+    };
+    // SAFETY: openat2 returned a new owned file descriptor.
+    let mut marker = unsafe { File::from_raw_fd(fd) };
+    marker.write_all(digest).map_err(|error| ReplayError::Io(error.kind()))?;
+    marker.sync_all().map_err(|error| ReplayError::Io(error.kind()))?;
+    Ok(())
+}
+
+fn sync_replay_directory(directory: &Path) -> Result<(), ReplayError> {
+    let raw = CString::new(directory.as_os_str().as_bytes())
+        .map_err(|_| ReplayError::Intake(IntakeError::InvalidDirectoryPath))?;
+    let fd = openat2_raw(
+        libc::AT_FDCWD,
+        &raw,
+        libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC,
+        0,
+        RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS,
+    )
+    .map_err(ReplayError::Intake)?;
+    // SAFETY: openat2 returned a new owned directory descriptor.
+    let directory_file = unsafe { File::from_raw_fd(fd) };
+    directory_file.sync_all().map_err(|error| ReplayError::Io(error.kind()))
+}
+
+fn hex(bytes: &[u8]) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(char::from(DIGITS[usize::from(byte >> 4)]));
+        output.push(char::from(DIGITS[usize::from(byte & 0x0f)]));
+    }
+    output
+}
+
 fn key_id(key: &VerifyingKey) -> [u8; 16] {
     let digest = Sha256::digest(key.to_bytes());
     let mut id = [0_u8; 16];
@@ -543,6 +734,91 @@ mod tests {
         let mut no_energy = payload();
         no_energy.measured_energy_nj = None;
         assert_eq!(no_energy.validate(), Err(ReceiptError::EnergyMeasurementMissing));
+    }
+
+    #[test]
+    fn replay_ledger_consumes_receipt_once_and_checks_monotonic_counter() {
+        let temp = tempfile::tempdir().unwrap();
+        let ledger_dir = temp.path().join("ledger");
+        std::fs::create_dir(&ledger_dir).unwrap();
+        let signing_key = SigningKey::from_bytes(&[51_u8; 32]);
+        let verifier = signing_key.verifying_key();
+        let ledger = ReplayLedger::new(&ledger_dir);
+
+        let receipt = sign_receipt(payload(), &signing_key).unwrap();
+        let digest = ledger.verify_and_consume(&receipt, &verifier).unwrap();
+        assert_eq!(digest, receipt.envelope_sha256().unwrap());
+        assert_eq!(
+            ledger.verify_and_consume(&receipt, &verifier),
+            Err(ReplayError::CounterNotMonotonic { previous: 1, supplied: 1 })
+        );
+    }
+
+    #[test]
+    fn replay_ledger_rejects_nonce_reuse_even_with_a_higher_counter() {
+        let temp = tempfile::tempdir().unwrap();
+        let ledger_dir = temp.path().join("ledger");
+        std::fs::create_dir(&ledger_dir).unwrap();
+        let signing_key = SigningKey::from_bytes(&[52_u8; 32]);
+        let verifier = signing_key.verifying_key();
+        let ledger = ReplayLedger::new(&ledger_dir);
+
+        let first = sign_receipt(payload(), &signing_key).unwrap();
+        ledger.verify_and_consume(&first, &verifier).unwrap();
+
+        let mut second_payload = payload();
+        second_payload.monotonic_counter = 2;
+        second_payload.run_id = [9; 16];
+        let second = sign_receipt(second_payload, &signing_key).unwrap();
+        assert_eq!(
+            ledger.verify_and_consume(&second, &verifier),
+            Err(ReplayError::AlreadyConsumed)
+        );
+    }
+
+    #[test]
+    fn replay_ledger_rejects_counter_regression_and_run_reuse() {
+        let temp = tempfile::tempdir().unwrap();
+        let ledger_dir = temp.path().join("ledger");
+        std::fs::create_dir(&ledger_dir).unwrap();
+        let signing_key = SigningKey::from_bytes(&[53_u8; 32]);
+        let verifier = signing_key.verifying_key();
+        let ledger = ReplayLedger::new(&ledger_dir);
+
+        let first = sign_receipt(payload(), &signing_key).unwrap();
+        ledger.verify_and_consume(&first, &verifier).unwrap();
+
+        let mut regression_payload = payload();
+        regression_payload.monotonic_counter = 3;
+        regression_payload.run_id = [8; 16];
+        regression_payload.nonce = [7; 16];
+        let regression = sign_receipt(regression_payload, &signing_key).unwrap();
+        ledger.verify_and_consume(&regression, &verifier).unwrap();
+
+        let mut reused_run_payload = payload();
+        reused_run_payload.monotonic_counter = 4;
+        reused_run_payload.nonce = [6; 16];
+        let reused_run = sign_receipt(reused_run_payload, &signing_key).unwrap();
+        assert_eq!(
+            ledger.verify_and_consume(&reused_run, &verifier),
+            Err(ReplayError::AlreadyConsumed)
+        );
+    }
+
+    #[test]
+    fn invalid_signature_is_not_written_to_replay_ledger() {
+        let temp = tempfile::tempdir().unwrap();
+        let ledger_dir = temp.path().join("ledger");
+        std::fs::create_dir(&ledger_dir).unwrap();
+        let signing_key = SigningKey::from_bytes(&[54_u8; 32]);
+        let other_key = SigningKey::from_bytes(&[55_u8; 32]);
+        let receipt = sign_receipt(payload(), &signing_key).unwrap();
+        let ledger = ReplayLedger::new(&ledger_dir);
+        assert!(matches!(
+            ledger.verify_and_consume(&receipt, &other_key.verifying_key()),
+            Err(ReplayError::Receipt(ReceiptError::SigningKeyIdMismatch))
+        ));
+        assert_eq!(std::fs::read_dir(&ledger_dir).unwrap().count(), 0);
     }
 
     #[test]
