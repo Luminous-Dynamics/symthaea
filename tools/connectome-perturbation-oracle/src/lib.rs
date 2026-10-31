@@ -808,6 +808,84 @@ pub fn directed_path_exists(
     Ok(false)
 }
 
+/// Replay a network after removing an explicit set of indexed edges.
+///
+/// Edge indices refer to the exact frozen input order. Duplicates and
+/// out-of-range indices fail closed so an edit manifest cannot be ambiguous.
+pub fn simulate_without_edges(
+    network: &Network,
+    horizon: usize,
+    inputs: &[Injection],
+    removed_edge_indices: &[usize],
+) -> Result<Trajectory, OracleError> {
+    let mut removed = vec![false; network.edges.len()];
+    for &edge_index in removed_edge_indices {
+        if edge_index >= network.edges.len() {
+            return Err(OracleError::EdgeIndexOutOfRange {
+                edge_index,
+                edge_count: network.edges.len(),
+            });
+        }
+        if removed[edge_index] {
+            return Err(OracleError::DuplicateEdgeIndex);
+        }
+        removed[edge_index] = true;
+    }
+
+    let reduced = Network {
+        node_count: network.node_count,
+        edges: network.edges
+            .iter()
+            .enumerate()
+            .filter_map(|(index, edge)| if removed[index] { None } else { Some(*edge) })
+            .collect(),
+    };
+    simulate(&reduced, horizon, inputs)
+}
+
+/// Time-resolved pairwise interaction of two edge deletions on a declared
+/// node output: Y(G\\{a,b}) - Y(G\\{a}) - Y(G\\{b}) + Y(G).
+///
+/// This is a model-conditional dynamical sensitivity contrast. It is not
+/// evidence that an anatomical synapse is biologically dispensable or causal.
+pub fn edge_deletion_interaction_trace(
+    network: &Network,
+    horizon: usize,
+    inputs: &[Injection],
+    first_edge: usize,
+    second_edge: usize,
+    target: usize,
+) -> Result<Vec<f64>, OracleError> {
+    if first_edge == second_edge {
+        return Err(OracleError::DuplicateEdgeIndex);
+    }
+    if target >= network.node_count {
+        return Err(OracleError::TargetOutOfRange {
+            node: target,
+            node_count: network.node_count,
+        });
+    }
+
+    let baseline = simulate(network, horizon, inputs)?;
+    let without_first = simulate_without_edges(network, horizon, inputs, &[first_edge])?;
+    let without_second = simulate_without_edges(network, horizon, inputs, &[second_edge])?;
+    let without_both =
+        simulate_without_edges(network, horizon, inputs, &[first_edge, second_edge])?;
+
+    let mut interaction = Vec::with_capacity(horizon);
+    for epoch in 0..horizon {
+        let value = without_both.values[epoch][target]
+            - without_first.values[epoch][target]
+            - without_second.values[epoch][target]
+            + baseline.values[epoch][target];
+        if !value.is_finite() {
+            return Err(OracleError::NonFiniteParameter);
+        }
+        interaction.push(value);
+    }
+    Ok(interaction)
+}
+
 /// Exact pairwise interaction for a binary directed-reachability query.
 ///
 /// A true baseline query is required. This avoids reporting an interaction
@@ -1280,6 +1358,44 @@ mod tests {
                 edge_index: 1,
                 edge_count: 1
             })
+        );
+    }
+
+
+    #[test]
+    fn linear_parallel_path_output_has_zero_pairwise_deletion_interaction() {
+        let network = make_network(
+            4,
+            &[(0, 1, 1.0, 1), (1, 3, 1.0, 1), (0, 2, 1.0, 1), (2, 3, 1.0, 1)],
+        );
+        let input = [Injection { node: 0, epoch: 0, amplitude: 1.0 }];
+        let interaction = edge_deletion_interaction_trace(
+            &network, 4, &input, 0, 2, 3,
+        ).unwrap();
+        assert_eq!(interaction, trace(&[0.0, 0.0, 0.0, 0.0]));
+    }
+
+    #[test]
+    fn serial_bottleneck_output_has_positive_pairwise_deletion_interaction() {
+        let network = make_network(3, &[(0, 1, 1.0, 1), (1, 2, 1.0, 1)]);
+        let input = [Injection { node: 0, epoch: 0, amplitude: 1.0 }];
+        let interaction = edge_deletion_interaction_trace(
+            &network, 4, &input, 0, 1, 2,
+        ).unwrap();
+        assert_eq!(interaction, trace(&[0.0, 0.0, 1.0, 0.0]));
+    }
+
+    #[test]
+    fn edge_removal_rejects_duplicate_and_out_of_range_indices() {
+        let network = make_network(2, &[(0, 1, 1.0, 1)]);
+        let input = [Injection { node: 0, epoch: 0, amplitude: 1.0 }];
+        assert_eq!(
+            simulate_without_edges(&network, 3, &input, &[0, 0]),
+            Err(OracleError::DuplicateEdgeIndex)
+        );
+        assert_eq!(
+            simulate_without_edges(&network, 3, &input, &[1]),
+            Err(OracleError::EdgeIndexOutOfRange { edge_index: 1, edge_count: 1 })
         );
     }
 
