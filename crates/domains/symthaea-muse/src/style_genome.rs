@@ -327,6 +327,10 @@ pub struct GeneEffectPair {
     pub candidate_plan_signature: Option<String>,
     pub counterfactual_plan_signature: Option<String>,
     pub counterfactual_grammar_transformations: Vec<String>,
+    pub counterfactual_trace_integrity: TraceIntegrity,
+    pub counterfactual_semantic_trace_verified: bool,
+    pub counterfactual_semantic_trace_checked_records: usize,
+    pub counterfactual_semantic_trace_verified_records: usize,
     pub counterfactual_valid: bool,
     pub counterfactual_failure_codes: Vec<String>,
     /// Non-empty means the ablated gene changed at least one declared dimension:
@@ -1175,6 +1179,58 @@ fn audit_gene_effects(
             } else {
                 domain_sha256(b"symthaea:muse-style-genome-score:v1\n", &score_bytes)
             };
+            let counterfactual_trace_integrity =
+                audit_trace(&counterfactual.score, &counterfactual.trace);
+            let counterfactual_source_motif =
+                counterfactual_compiled.spec.motif(intent.arousal, intent.seed);
+            let counterfactual_source_motif = if counterfactual_compiled.spec.texture.hook_cell {
+                symthaea_music_theory::hook::graft_hook(
+                    &counterfactual_source_motif,
+                    &symthaea_music_theory::hook::HookCell::generate_with(
+                        &counterfactual_compiled.spec.melody,
+                        intent.seed,
+                        counterfactual_compiled.spec.meter as f64,
+                    ),
+                    counterfactual_compiled.spec.meter as f64,
+                )
+            } else {
+                counterfactual_source_motif
+            };
+            let counterfactual_semantic_bundle = listen_bundle_for_score(
+                &counterfactual.score,
+                &counterfactual_source_motif,
+                &counterfactual.plan,
+            );
+            let counterfactual_composer_trace = composer_trace_from_theory(
+                &counterfactual.trace,
+                &counterfactual_score_sha256,
+                0,
+                Some(("motif-primary", 1)),
+            );
+            let counterfactual_semantic_verification = verify_composer_trace(
+                &counterfactual_composer_trace,
+                &counterfactual_semantic_bundle,
+                &counterfactual_score_sha256,
+                0,
+            );
+            let counterfactual_semantic_trace_verified =
+                counterfactual_semantic_verification.issues.is_empty()
+                    && counterfactual_semantic_verification.checked_records
+                        == counterfactual_semantic_verification.verified_records
+                    && counterfactual_semantic_verification.checked_records > 0;
+            for issue in &counterfactual_semantic_verification.issues {
+                failure_codes.push(format!(
+                    "semantic_trace:{}:{}",
+                    issue.code,
+                    issue.record_id
+                ));
+            }
+            if !counterfactual_trace_integrity.is_complete() {
+                failure_codes.push("trace_reference_integrity_incomplete".into());
+            }
+            if !counterfactual_semantic_trace_verified {
+                failure_codes.push("independent_semantic_trace_verification_failed".into());
+            }
             let counterfactual_plan_signature =
                 grammar_plan_signature(&counterfactual.plan);
             let counterfactual_grammar_transformations =
@@ -1183,6 +1239,8 @@ fn audit_gene_effects(
             if !is_sha256_hex(&counterfactual_score_sha256)
                 || counterfactual_plan_signature.is_none()
                 || counterfactual_grammar_transformations.is_empty()
+                || counterfactual_trace_integrity.assertion_count == 0
+                || counterfactual_semantic_verification.checked_records == 0
             {
                 failure_codes.push("counterfactual_evidence_incomplete".into());
             }
@@ -1212,6 +1270,12 @@ fn audit_gene_effects(
                 candidate_plan_signature: trial.grammar_plan_signature.clone(),
                 counterfactual_plan_signature,
                 counterfactual_grammar_transformations,
+                counterfactual_trace_integrity,
+                counterfactual_semantic_trace_verified,
+                counterfactual_semantic_trace_checked_records:
+                    counterfactual_semantic_verification.checked_records,
+                counterfactual_semantic_trace_verified_records:
+                    counterfactual_semantic_verification.verified_records,
                 counterfactual_valid,
                 counterfactual_failure_codes: failure_codes,
                 changed_dimensions,
