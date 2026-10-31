@@ -487,6 +487,9 @@ pub struct CycleMetadata {
     pub jepa_total_energy: f64,
     /// Whether JEPA representation collapse has been detected. Feature: `jepa`.
     pub jepa_collapse_detected: bool,
+    /// Number of incomplete action-conditioned transitions dropped by JEPA. Feature: `jepa`.
+    #[serde(default)]
+    pub jepa_dropped_pending_transitions: u64,
 
     /// Muse telemetry: streaming consciousness-driven music synthesis.
     #[cfg(feature = "muse")]
