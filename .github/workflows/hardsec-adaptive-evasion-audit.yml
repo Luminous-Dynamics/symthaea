@@ -77,7 +77,7 @@ jobs:
           assert support["program_macro_recall"]["distribution_free_hoeffding_95"]["lower"] == 0.0
           assert support["program_macro_recall"]["distribution_free_hoeffding_95"]["upper"] == 1.0
           assert support["benign_program_macro_false_alert_rate"]["independent_group_count"] == 4
-          assert support["benign_program_macro_false_alert_rate"]["lower_95"] is None
+          assert support["benign_program_macro_false_alert_rate"]["lower_percentile_95"] is None
           assert support["benign_program_macro_false_alert_rate"]["distribution_free_hoeffding_95"]["status"] == "available_finite_sample_bound"
           assert math.isclose(support["benign_program_macro_false_alert_rate"]["distribution_free_hoeffding_95"]["upper"], 0.9290507578703098, rel_tol=0.0, abs_tol=1e-12)
           bounds = support["group_failure_bounds"]
