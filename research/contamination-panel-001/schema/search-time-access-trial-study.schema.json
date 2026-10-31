@@ -1,0 +1,495 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/search-time-access-trial-study-v1.json",
+  "title": "Randomized search-time access policy trial study v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "study_id",
+    "benchmark_id",
+    "benchmark_version",
+    "model_checkpoint_sha256",
+    "challenge_packet_sha256",
+    "inference_harness_sha256",
+    "prompt_and_decoding_sha256",
+    "metric_definition_sha256",
+    "enforcement_build_sha256",
+    "minimum_confirmatory_blocks",
+    "run_order_seed_hex",
+    "budget",
+    "blocks"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.search_time_access_trial_study.v1"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "challenge_packet_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "inference_harness_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "prompt_and_decoding_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "metric_definition_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "enforcement_build_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "minimum_confirmatory_blocks": {
+      "type": "integer",
+      "minimum": 20
+    },
+    "run_order_seed_hex": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{2}){32,}$"
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_model_calls",
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_wall_clock_millis",
+        "max_tool_calls",
+        "max_human_assistance_minutes",
+        "max_compute_cost_microusd"
+      ],
+      "properties": {
+        "max_model_calls": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_output_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_wall_clock_millis": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_tool_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_human_assistance_minutes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_compute_cost_microusd": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "blocks": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "block_id",
+          "randomized_condition_order",
+          "order_seed_commitment_sha256",
+          "runs"
+        ],
+        "properties": {
+          "block_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "randomized_condition_order": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "network_disabled",
+                "allowlisted",
+                "unrestricted"
+              ]
+            }
+          },
+          "order_seed_commitment_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "runs": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "condition",
+                "order_position",
+                "status",
+                "run_id",
+                "sandbox_namespace_sha256",
+                "agent_memory_namespace_sha256",
+                "cache_namespace_sha256",
+                "state_reset_receipt_sha256",
+                "budget_spec_sha256",
+                "run_execution_receipt_sha256",
+                "condition_policy_sha256",
+                "trace",
+                "findings",
+                "score_report"
+              ],
+              "properties": {
+                "condition": {
+                  "type": "string",
+                  "enum": [
+                    "network_disabled",
+                    "allowlisted",
+                    "unrestricted"
+                  ]
+                },
+                "order_position": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "completed",
+                    "partial",
+                    "failed"
+                  ]
+                },
+                "run_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sandbox_namespace_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "agent_memory_namespace_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "cache_namespace_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "state_reset_receipt_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "budget_spec_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "run_execution_receipt_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "condition_policy_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "trace": {
+                  "$ref": "https://luminousdynamics.org/schemas/search-time-exposure-trace-v1.json"
+                },
+                "findings": {
+                  "$ref": "https://luminousdynamics.org/schemas/search-time-exposure-findings-v1.json"
+                },
+                "score_report": {
+                  "$ref": "https://luminousdynamics.org/schemas/fresh-instance-score-report-v1.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_model_calls",
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_wall_clock_millis",
+        "max_tool_calls",
+        "max_human_assistance_minutes",
+        "max_compute_cost_microusd"
+      ],
+      "properties": {
+        "max_model_calls": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_output_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_wall_clock_millis": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_tool_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_human_assistance_minutes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_compute_cost_microusd": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "condition",
+        "order_position",
+        "status",
+        "run_id",
+        "sandbox_namespace_sha256",
+        "agent_memory_namespace_sha256",
+        "cache_namespace_sha256",
+        "state_reset_receipt_sha256",
+        "budget_spec_sha256",
+        "run_execution_receipt_sha256",
+        "condition_policy_sha256",
+        "trace",
+        "findings",
+        "score_report"
+      ],
+      "properties": {
+        "condition": {
+          "type": "string",
+          "enum": [
+            "network_disabled",
+            "allowlisted",
+            "unrestricted"
+          ]
+        },
+        "order_position": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "completed",
+            "partial",
+            "failed"
+          ]
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sandbox_namespace_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "agent_memory_namespace_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "cache_namespace_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "state_reset_receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "budget_spec_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "run_execution_receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "condition_policy_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "trace": {
+          "$ref": "https://luminousdynamics.org/schemas/search-time-exposure-trace-v1.json"
+        },
+        "findings": {
+          "$ref": "https://luminousdynamics.org/schemas/search-time-exposure-findings-v1.json"
+        },
+        "score_report": {
+          "$ref": "https://luminousdynamics.org/schemas/fresh-instance-score-report-v1.json"
+        }
+      }
+    },
+    "block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "block_id",
+        "randomized_condition_order",
+        "order_seed_commitment_sha256",
+        "runs"
+      ],
+      "properties": {
+        "block_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "randomized_condition_order": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "network_disabled",
+              "allowlisted",
+              "unrestricted"
+            ]
+          }
+        },
+        "order_seed_commitment_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "runs": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "condition",
+              "order_position",
+              "status",
+              "run_id",
+              "sandbox_namespace_sha256",
+              "agent_memory_namespace_sha256",
+              "cache_namespace_sha256",
+              "state_reset_receipt_sha256",
+              "budget_spec_sha256",
+              "run_execution_receipt_sha256",
+              "condition_policy_sha256",
+              "trace",
+              "findings",
+              "score_report"
+            ],
+            "properties": {
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "network_disabled",
+                  "allowlisted",
+                  "unrestricted"
+                ]
+              },
+              "order_position": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "completed",
+                  "partial",
+                  "failed"
+                ]
+              },
+              "run_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sandbox_namespace_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "agent_memory_namespace_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "cache_namespace_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "state_reset_receipt_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "budget_spec_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "run_execution_receipt_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "condition_policy_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "trace": {
+                "$ref": "https://luminousdynamics.org/schemas/search-time-exposure-trace-v1.json"
+              },
+              "findings": {
+                "$ref": "https://luminousdynamics.org/schemas/search-time-exposure-findings-v1.json"
+              },
+              "score_report": {
+                "$ref": "https://luminousdynamics.org/schemas/fresh-instance-score-report-v1.json"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
