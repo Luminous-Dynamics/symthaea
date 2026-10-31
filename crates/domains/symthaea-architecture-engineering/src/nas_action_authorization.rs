@@ -1087,6 +1087,74 @@ mod tests {
     }
 
     #[test]
+    fn measurement_stream_id_is_bound_to_the_entire_action_scope() {
+        let mut scope = NasMeasurementActionScope {
+            run_id: "run-1".into(),
+            target_commit_id: "a".repeat(40),
+            action_id: "measure-a".into(),
+            candidate_id: "candidate-a".into(),
+            candidate_config_sha256: sha('a'),
+            objective_id: "latency".into(),
+            objective_ids: vec!["accuracy".into(), "latency".into()],
+            objective_registry_sha256: sha('b'),
+            objective_order_sha256: sha('c'),
+            posterior_sha256: sha('d'),
+            portfolio_family_sha256: sha('e'),
+            qmc_sampling_design_sha256: sha('f'),
+            selection_replicates_sha256: sha('1'),
+            validation_replicates_sha256: sha('2'),
+            hardware_profile_sha256: sha('3'),
+            measurement_protocol_sha256: sha('4'),
+            instrument_identity_sha256: sha('5'),
+            observation_likelihood_model_sha256: sha('6'),
+            resource_registry_sha256: sha('7'),
+            resource_budget_sha256: sha('8'),
+            resource_cost_sha256: sha('9'),
+        };
+        let first = measurement_confidence_stream_id(&scope).unwrap();
+        scope.measurement_protocol_sha256 = sha('a');
+        let second = measurement_confidence_stream_id(&scope).unwrap();
+        assert_ne!(first, second);
+        assert!(first.starts_with(MEASUREMENT_STREAM_PREFIX));
+    }
+
+    #[test]
+    fn instrument_identity_binds_profile_instrument_and_sample_rate() {
+        let mut profile = crate::hardware_objectives::HardwareProfileManifest {
+            profile_id: "nrf5340-ppk2".into(),
+            device_model: "nRF5340".into(),
+            board_id: "board-01".into(),
+            board_revision: "rev-a".into(),
+            firmware_sha256: sha('a'),
+            runtime_sha256: sha('b'),
+            compiler_toolchain_sha256: sha('c'),
+            quantization_spec_sha256: sha('d'),
+            measurement_protocol_sha256: sha('e'),
+            instrument_model: "Power Profiler Kit II".into(),
+            instrument_id: "ppk2-001".into(),
+            sampling_frequency_hz: 100_000,
+            profile_sha256: String::new(),
+        };
+        profile.profile_sha256 =
+            compute_hardware_profile_sha256(&profile).unwrap();
+        let first = compute_instrument_identity_sha256(&profile).unwrap();
+        profile.instrument_id = "ppk2-002".into();
+        let second = compute_instrument_identity_sha256(&profile).unwrap();
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn objective_coordinate_order_digest_is_stable_and_order_sensitive() {
+        let ids = vec!["accuracy".to_owned(), "latency".to_owned(), "energy".to_owned()];
+        let first = compute_objective_order_sha256(&ids).unwrap();
+        let mut reordered = ids.clone();
+        reordered.swap(0, 1);
+        let second = compute_objective_order_sha256(&reordered).unwrap();
+        assert_ne!(first, second);
+        assert_eq!(first, compute_objective_order_sha256(&ids).unwrap());
+    }
+
+    #[test]
     fn rejects_malformed_scope_and_duplicate_replicate_split() {
         let mut invalid = prune_scope();
         invalid.target_commit_id = "not-a-git-sha".into();
