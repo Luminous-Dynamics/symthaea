@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT read-only Linux capability inventory v1",
+  "description": "A host interface inventory for selecting observer adapters. It never proves event capture or observer qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_version",
+    "suite_id",
+    "probe_id",
+    "observed_at_unix_ns",
+    "kernel",
+    "mounts",
+    "mount_inventory",
+    "capabilities",
+    "limitations",
+    "qualification_eligible",
+    "observer_attached",
+    "workload_executed"
+  ],
+  "properties": {
+    "report_version": {
+      "const": 1
+    },
+    "suite_id": {
+      "const": "basalt-linux-capability-inventory-v1"
+    },
+    "probe_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "observed_at_unix_ns": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "kernel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "release",
+        "architecture",
+        "active_lsm",
+        "btf_vmlinux",
+        "kernel_config"
+      ],
+      "properties": {
+        "release": {
+          "$ref": "#/$defs/evidence"
+        },
+        "architecture": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "active_lsm": {
+          "$ref": "#/$defs/evidence"
+        },
+        "btf_vmlinux": {
+          "$ref": "#/$defs/evidence"
+        },
+        "kernel_config": {
+          "$ref": "#/$defs/evidence"
+        }
+      }
+    },
+    "mounts": {
+      "type": "array",
+      "maxItems": 16384,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mount_id",
+          "root",
+          "mount_point",
+          "filesystem"
+        ],
+        "properties": {
+          "mount_id": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "root": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "mount_point": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "filesystem": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    "mount_inventory": {
+      "$ref": "#/$defs/evidence"
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "capability_id",
+          "status",
+          "evidence",
+          "limitations"
+        ],
+        "properties": {
+          "capability_id": {
+            "enum": [
+              "bpf_lsm",
+              "tracefs_process_events",
+              "fanotify_notifications",
+              "fanotify_access_permissions",
+              "landlock",
+              "cgroup_v2_process_scope"
+            ]
+          },
+          "status": {
+            "enum": [
+              "candidate_available",
+              "not_available",
+              "unknown",
+              "inaccessible"
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "$ref": "#/$defs/evidence"
+            }
+          },
+          "limitations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
+    },
+    "qualification_eligible": {
+      "const": false
+    },
+    "observer_attached": {
+      "const": false
+    },
+    "workload_executed": {
+      "const": false
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "status",
+        "value",
+        "content_digest",
+        "path"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "status": {
+          "enum": [
+            "collected",
+            "absent",
+            "inaccessible",
+            "disabled",
+            "not_probed"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 8192
+        },
+        "content_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 4096
+        }
+      }
+    }
+  }
+}
