@@ -256,6 +256,44 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "evaluator_relation_pass": {
+                "const": true
+              }
+            },
+            "required": [
+              "evaluator_relation_pass"
+            ]
+          },
+          "then": {
+            "properties": {
+              "failure_fingerprint_sha256": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "evaluator_relation_pass": {
+                "const": false
+              }
+            },
+            "required": [
+              "evaluator_relation_pass"
+            ]
+          },
+          "then": {
+            "properties": {
+              "failure_fingerprint_sha256": {
+                "$ref": "#/$defs/digest"
+              }
+            }
+          }
         }
       ]
     }
