@@ -11,6 +11,7 @@ use std::fmt;
 use serde_json::Value;
 
 pub mod paired_evaluation;
+pub mod paired_inference;
 pub mod synthetic_search;
 pub mod multi_fidelity;
 pub mod multi_fidelity_benchmark;
