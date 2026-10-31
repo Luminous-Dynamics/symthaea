@@ -1,0 +1,68 @@
+{
+  "format_version": 1,
+  "suite_id": "basalt-observer-coverage-profile-v1",
+  "profile_id": "linux-hermetic-candidate-v1",
+  "profile_status": "candidate_not_qualified",
+  "platform": {
+    "os": "linux",
+    "architectures": ["x86_64", "aarch64"],
+    "require_kernel_build_id": true,
+    "require_kernel_btf_digest": true
+  },
+  "allowed_controls": [
+    "read_only_workspace_snapshot",
+    "process_tree_supervision",
+    "filesystem_access_monitor",
+    "environment_capture",
+    "network_policy_enforcement",
+    "kernel_event_loss_counters",
+    "snapshot_consistency_check"
+  ],
+  "required_controls": [
+    "read_only_workspace_snapshot",
+    "process_tree_supervision",
+    "filesystem_access_monitor",
+    "environment_capture",
+    "network_policy_enforcement",
+    "kernel_event_loss_counters",
+    "snapshot_consistency_check"
+  ],
+  "channels": [
+    {
+      "channel_id": "filesystem",
+      "required_event_kinds": ["content_read", "metadata_read", "directory_enumeration", "symlink_target", "mmap_access", "namespace_mutation"]
+    },
+    {
+      "channel_id": "process",
+      "required_event_kinds": ["process_exec", "child_start", "child_exit", "argv_cwd", "inherited_fd"]
+    },
+    {
+      "channel_id": "environment",
+      "required_event_kinds": ["environment_read", "environment_commitment"]
+    },
+    {
+      "channel_id": "generated_artifact",
+      "required_event_kinds": ["generator_execution", "generated_output_write"]
+    },
+    {
+      "channel_id": "toolchain",
+      "required_event_kinds": ["compiler_identity", "linker_identity", "sysroot_identity", "target_configuration"]
+    },
+    {
+      "channel_id": "cache",
+      "required_event_kinds": ["cache_lookup", "cache_hit_provenance", "cache_miss"]
+    },
+    {
+      "channel_id": "network",
+      "required_event_kinds": ["network_attempt", "endpoint_identity", "response_artifact"]
+    },
+    {
+      "channel_id": "observer_integrity",
+      "required_event_kinds": ["event_loss_counter", "observer_lifecycle", "root_boundary"]
+    },
+    {
+      "channel_id": "snapshot_consistency",
+      "required_event_kinds": ["snapshot_start", "snapshot_end", "concurrent_mutation_check"]
+    }
+  ]
+}
