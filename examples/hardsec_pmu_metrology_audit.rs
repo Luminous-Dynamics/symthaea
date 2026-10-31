@@ -81,6 +81,8 @@ struct Plan {
     minimum_co_running_fraction: f64,
     maximum_co_deviation: f64,
     maximum_throughput_degradation: f64,
+    maximum_sample_loss_fraction: f64,
+    maximum_pmu_read_overhead_fraction: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -243,11 +245,15 @@ fn parse_plan(value: &Value) -> Result<Plan, String> {
     let minimum_co_running_fraction = f64_field(protocol, "minimum_co_scheduled_running_fraction", "plan.protocol")?;
     let maximum_co_deviation = f64_field(protocol, "maximum_co_scheduled_relative_deviation", "plan.protocol")?;
     let maximum_throughput_degradation = f64_field(protocol, "maximum_instrumentation_throughput_degradation", "plan.protocol")?;
+    let maximum_sample_loss_fraction = f64_field(protocol, "maximum_sample_loss_fraction", "plan.protocol")?;
+    let maximum_pmu_read_overhead_fraction = f64_field(protocol, "maximum_pmu_read_overhead_fraction", "plan.protocol")?;
     for (label, value) in [
         ("minimum_singleton_running_fraction", minimum_singleton_running_fraction),
         ("minimum_co_scheduled_running_fraction", minimum_co_running_fraction),
         ("maximum_co_scheduled_relative_deviation", maximum_co_deviation),
         ("maximum_instrumentation_throughput_degradation", maximum_throughput_degradation),
+        ("maximum_sample_loss_fraction", maximum_sample_loss_fraction),
+        ("maximum_pmu_read_overhead_fraction", maximum_pmu_read_overhead_fraction),
     ] {
         if !(0.0..=1.0).contains(&value) || (label.starts_with("minimum_") && value == 0.0) {
             return Err(format!("protocol.{label} must be within the supported (0,1] or [0,1] range"));
@@ -263,6 +269,7 @@ fn parse_plan(value: &Value) -> Result<Plan, String> {
         co_event_ids, over_event_ids, randomization_seed, minimum_blocks,
         minimum_singleton_running_fraction, minimum_co_running_fraction,
         maximum_co_deviation, maximum_throughput_degradation,
+        maximum_sample_loss_fraction, maximum_pmu_read_overhead_fraction,
     })
 }
 
@@ -353,6 +360,9 @@ fn parse_trials(value: &Value, plan: &Plan) -> Result<Vec<Trial>, String> {
         if trial.elapsed_ns == 0 {
             return Err(format!("{context}.elapsed_ns must be positive"));
         }
+        if trial.pmu_read_overhead_ns > trial.elapsed_ns {
+            return Err(format!("{context}.pmu_read_overhead_ns cannot exceed elapsed_ns"));
+        }
         trials.push(trial);
     }
     Ok(trials)
@@ -415,7 +425,7 @@ fn validate_blocks(trials: &[Trial], plan: &Plan) -> Result<BTreeMap<String, BTr
             by_condition.entry(trial.condition.clone()).or_default().push(trial);
         }
         for condition in CONDITIONS {
-            let expected = if *condition == plan.singleton_condition { plan.events.len() } else { 1 };
+            let expected = if *condition == plan.singleton_condition.as_str() { plan.events.len() } else { 1 };
             let actual = by_condition.get(*condition).map_or(0, Vec::len);
             if actual != expected {
                 return Err(format!("block {block_id} condition {condition} has {actual} trials; expected {expected}"));
@@ -517,11 +527,17 @@ fn audit_values(plan_value: &Value, observation_value: &Value, plan_bytes: &[u8]
         }
         let co_p95 = percentile(&co_deviation, 0.95);
         let is_co_scheduled = plan.co_event_ids.contains(&spec.id);
-        let co_pass = !is_co_scheduled || (
+        let total_samples: u64 = trials.iter().flat_map(|trial| trial.events.iter())
+            .filter(|event| event.id == spec.id).map(|event| event.sample_count).sum();
+        let lost_samples: u64 = trials.iter().flat_map(|trial| trial.events.iter())
+            .filter(|event| event.id == spec.id).map(|event| event.lost_samples).sum();
+        let loss_fraction = if total_samples == 0 { None } else { Some(lost_samples as f64 / total_samples as f64) };
+        let loss_pass = loss_fraction.is_none_or(|v| v <= plan.maximum_sample_loss_fraction);
+        let co_pass = loss_pass && (!is_co_scheduled || (
             co_p95.is_some_and(|v| v <= plan.maximum_co_deviation)
                 && co_running.iter().all(|v| *v >= plan.minimum_co_running_fraction)
                 && singleton_running.iter().all(|v| *v >= plan.minimum_singleton_running_fraction)
-        );
+        ));
         all_event_gates_pass &= co_pass;
         let co_status = if !is_co_scheduled {
             "not_in_co_scheduled_group_not_tested"
@@ -531,12 +547,6 @@ fn audit_values(plan_value: &Value, observation_value: &Value, plan_bytes: &[u8]
             "not_qualified_by_declared_thresholds"
         };
         let over_p95 = percentile(&over_deviation, 0.95);
-        let total_samples: u64 = trials.iter().flat_map(|trial| trial.events.iter())
-            .filter(|event| event.id == spec.id)
-            .map(|event| event.sample_count).sum();
-        let lost_samples: u64 = trials.iter().flat_map(|trial| trial.events.iter())
-            .filter(|event| event.id == spec.id)
-            .map(|event| event.lost_samples).sum();
         event_reports.push(json!({
             "event_id":spec.id,
             "encoding":spec.encoding,
@@ -564,7 +574,8 @@ fn audit_values(plan_value: &Value, observation_value: &Value, plan_bytes: &[u8]
             "sampling":{
                 "sample_count":total_samples,
                 "lost_samples":lost_samples,
-                "loss_fraction":if total_samples == 0 {Value::Null} else {json!(lost_samples as f64 / total_samples as f64)}
+                "loss_fraction":value_or_null(loss_fraction),
+                "status":if loss_pass {"within_declared_loss_threshold"} else {"exceeds_declared_loss_threshold"}
             }
         }));
     }
@@ -596,14 +607,20 @@ fn audit_values(plan_value: &Value, observation_value: &Value, plan_bytes: &[u8]
     for condition in CONDITIONS.iter().filter(|c| **c != plan.baseline_condition) {
         let degradations = observer_degradation_by_condition.get(*condition).ok_or("throughput condition invariant failed")?;
         let p95 = percentile(degradations, 0.95).unwrap_or(f64::INFINITY);
-        let pass = p95 <= plan.maximum_throughput_degradation;
+        let read_overheads = read_overhead_by_condition.get(*condition).ok_or("read overhead condition invariant failed")?;
+        let read_overhead_p95 = percentile(read_overheads, 0.95).unwrap_or(f64::INFINITY);
+        let pass = p95 <= plan.maximum_throughput_degradation
+            && read_overhead_p95 <= plan.maximum_pmu_read_overhead_fraction;
         throughput_gate_pass &= pass;
         throughput_reports.push(json!({
             "condition":condition,
             "relative_throughput_degradation_fraction_median":value_or_null(median(degradations)),
             "relative_throughput_degradation_fraction_p95":if p95.is_finite() {json!(p95)} else {Value::Null},
-            "pmu_read_overhead_fraction_median":value_or_null(read_overhead_by_condition.get(*condition).and_then(|v| median(v))),
-            "status":if pass {"within_declared_throughput_threshold"} else {"exceeds_declared_throughput_threshold"}
+            "pmu_read_overhead_fraction_median":value_or_null(median(read_overheads)),
+            "pmu_read_overhead_fraction_p95":if read_overhead_p95.is_finite() {json!(read_overhead_p95)} else {Value::Null},
+            "throughput_threshold_fraction":plan.maximum_throughput_degradation,
+            "read_overhead_threshold_fraction":plan.maximum_pmu_read_overhead_fraction,
+            "status":if pass {"within_declared_throughput_and_read_overhead_thresholds"} else {"exceeds_declared_observer_effect_thresholds"}
         }));
     }
 
