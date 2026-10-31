@@ -36,7 +36,26 @@ pub enum ObjectiveSource {
     StaticArchitectureMetadata,
     TrainedEvaluation,
     ImportedBenchmark,
+    ImportedPhysicalDeviceMeasurement,
     PhysicalDeviceMeasurement,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HardwareProfileManifest {
+    pub profile_id: String,
+    pub device_model: String,
+    pub board_id: String,
+    pub board_revision: String,
+    pub firmware_sha256: String,
+    pub runtime_sha256: String,
+    pub compiler_toolchain_sha256: String,
+    pub quantization_spec_sha256: String,
+    pub measurement_protocol_sha256: String,
+    pub instrument_model: String,
+    pub instrument_id: String,
+    pub sampling_frequency_hz: u64,
+    /// Empty while constructing; set to compute_hardware_profile_sha256 before use.
+    pub profile_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -180,6 +199,57 @@ pub fn compute_objective_registry_sha256(
     Ok(digest_bytes(DIGEST_DOMAIN, &bytes))
 }
 
+/// Hashes all hardware identity, software stack and measurement apparatus fields.
+pub fn compute_hardware_profile_sha256(
+    profile: &HardwareProfileManifest,
+) -> Result<String, ObjectiveRegistryError> {
+    let mut canonical = profile.clone();
+    canonical.profile_sha256.clear();
+    let bytes = serde_json::to_vec(&canonical)
+        .map_err(|error| ObjectiveRegistryError::new("hardware_profile", error.to_string()))?;
+    Ok(digest_bytes(b"symthaea.nas.hardware-profile.v0.1", &bytes))
+}
+
+pub fn validate_hardware_profile(
+    profile: &HardwareProfileManifest,
+) -> Result<(), ObjectiveRegistryError> {
+    for (field, value) in [
+        ("profile_id", profile.profile_id.as_str()),
+        ("device_model", profile.device_model.as_str()),
+        ("board_id", profile.board_id.as_str()),
+        ("board_revision", profile.board_revision.as_str()),
+        ("instrument_model", profile.instrument_model.as_str()),
+        ("instrument_id", profile.instrument_id.as_str()),
+    ] {
+        if value.trim().is_empty() {
+            return Err(ObjectiveRegistryError::new(field, "must be non-empty"));
+        }
+    }
+    for (field, value) in [
+        ("firmware_sha256", profile.firmware_sha256.as_str()),
+        ("runtime_sha256", profile.runtime_sha256.as_str()),
+        ("compiler_toolchain_sha256", profile.compiler_toolchain_sha256.as_str()),
+        ("quantization_spec_sha256", profile.quantization_spec_sha256.as_str()),
+        ("measurement_protocol_sha256", profile.measurement_protocol_sha256.as_str()),
+        ("profile_sha256", profile.profile_sha256.as_str()),
+    ] {
+        validate_digest(field, value)?;
+    }
+    if profile.sampling_frequency_hz == 0 {
+        return Err(ObjectiveRegistryError::new(
+            "sampling_frequency_hz",
+            "must be positive",
+        ));
+    }
+    if compute_hardware_profile_sha256(profile)? != profile.profile_sha256 {
+        return Err(ObjectiveRegistryError::new(
+            "profile_sha256",
+            "does not match the canonical hardware profile",
+        ));
+    }
+    Ok(())
+}
+
 pub fn validate_objective_registry(
     registry: &ObjectiveRegistry,
 ) -> Result<(), ObjectiveRegistryError> {
@@ -256,7 +326,8 @@ pub fn validate_objective_registry(
         )?;
 
         match objective.source {
-            ObjectiveSource::PhysicalDeviceMeasurement => {
+            ObjectiveSource::PhysicalDeviceMeasurement
+            | ObjectiveSource::ImportedPhysicalDeviceMeasurement => {
                 let profile = objective.hardware_profile_sha256.as_deref().ok_or_else(|| {
                     ObjectiveRegistryError::new(
                         format!("{field}.hardware_profile_sha256"),
@@ -579,6 +650,43 @@ mod tests {
                 units: 1,
             },
         }
+    }
+
+    #[test]
+    fn hardware_profile_digest_binds_software_and_instrumentation() {
+        let mut profile = HardwareProfileManifest {
+            profile_id: "nrf5340-board-01".into(),
+            device_model: "Nordic nRF5340".into(),
+            board_id: "board-01".into(),
+            board_revision: "DK-rev-2".into(),
+            firmware_sha256: sha('1'),
+            runtime_sha256: sha('2'),
+            compiler_toolchain_sha256: sha('3'),
+            quantization_spec_sha256: sha('4'),
+            measurement_protocol_sha256: sha('5'),
+            instrument_model: "Nordic Power Profiler Kit II".into(),
+            instrument_id: "ppk2-01".into(),
+            sampling_frequency_hz: 100_000,
+            profile_sha256: String::new(),
+        };
+        profile.profile_sha256 = compute_hardware_profile_sha256(&profile).unwrap();
+        validate_hardware_profile(&profile).unwrap();
+
+        let mut changed = profile.clone();
+        changed.compiler_toolchain_sha256 = sha('6');
+        assert_ne!(
+            profile.profile_sha256,
+            compute_hardware_profile_sha256(&changed).unwrap()
+        );
+    }
+
+    #[test]
+    fn imported_physical_objective_requires_profile_identity() {
+        let mut value = registry();
+        value.objectives[0].source = ObjectiveSource::ImportedPhysicalDeviceMeasurement;
+        value.objectives[0].hardware_profile_sha256 = None;
+        value.registry_sha256 = compute_objective_registry_sha256(&value).unwrap();
+        assert!(validate_objective_registry(&value).is_err());
     }
 
     #[test]
