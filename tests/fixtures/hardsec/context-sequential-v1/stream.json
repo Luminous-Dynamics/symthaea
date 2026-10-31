@@ -1,0 +1,64 @@
+{
+  "schema_version": "hardsec-context-sequential-stream-v1",
+  "evidence_domain": "synthetic_fixture",
+  "stream_id": "stream-demo-01",
+  "evaluation_group_id": "heldout-execution-01",
+  "records": [
+    {
+      "sequence_index": 1,
+      "window_id": "window-001",
+      "context_id": "compute",
+      "anomaly_score": 1,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 2,
+      "window_id": "window-002",
+      "context_id": "memory",
+      "anomaly_score": 1.2,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 3,
+      "window_id": "window-003",
+      "context_id": "compute",
+      "anomaly_score": 3,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 4,
+      "window_id": "window-004",
+      "context_id": "compute",
+      "anomaly_score": 3.2,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 5,
+      "window_id": "window-005",
+      "context_id": "compute",
+      "anomaly_score": 2.5,
+      "sensor_state": "stale",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 6,
+      "window_id": "window-006",
+      "context_id": "new-regime",
+      "anomaly_score": 2.7,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 7,
+      "window_id": "window-007",
+      "context_id": "memory",
+      "anomaly_score": 2.9,
+      "sensor_state": "untrusted",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    }
+  ]
+}
