@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb.lean-context-manifest.v0.schema.json",
+  "title": "PITB Lean-derived support-lattice manifest v0",
+  "description": "Mechanical dependency graph from verified Lean evidence, with typing prerequisites separated from assigned-value provenance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "study_id",
+    "target_id",
+    "source_evidence_sha256",
+    "role_plan_sha256",
+    "local_context_sha256",
+    "target_statement_sha256",
+    "toolchain_sha256",
+    "mutable_declarations",
+    "fixed_declarations",
+    "declaration_order",
+    "declaration_dependencies",
+    "assigned_value_provenance_dependencies",
+    "target_typed_dependency_closure",
+    "proof_term_direct_support",
+    "proof_term_typed_dependency_closure",
+    "proof_term_assigned_value_provenance_closure",
+    "interpretation_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.lean-context-manifest.v0"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_evidence_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "role_plan_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "local_context_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "target_statement_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "toolchain_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "mutable_declarations": {
+      "$ref": "#/$defs/ids"
+    },
+    "fixed_declarations": {
+      "$ref": "#/$defs/ids"
+    },
+    "declaration_order": {
+      "$ref": "#/$defs/ids"
+    },
+    "declaration_dependencies": {
+      "$ref": "#/$defs/graph"
+    },
+    "assigned_value_provenance_dependencies": {
+      "$ref": "#/$defs/graph"
+    },
+    "target_typed_dependency_closure": {
+      "$ref": "#/$defs/ids"
+    },
+    "proof_term_direct_support": {
+      "$ref": "#/$defs/ids"
+    },
+    "proof_term_typed_dependency_closure": {
+      "$ref": "#/$defs/ids"
+    },
+    "proof_term_assigned_value_provenance_closure": {
+      "$ref": "#/$defs/ids"
+    },
+    "interpretation_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "graph": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/ids"
+      }
+    }
+  }
+}
