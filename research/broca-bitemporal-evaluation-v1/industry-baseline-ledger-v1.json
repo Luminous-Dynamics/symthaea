@@ -1351,6 +1351,74 @@
       "evidence_grade": "public-project-self-reported-small-sample",
       "comparison_notes": "The public repository reports 20/20 final-paper success for one full lookup on gpt-5.6-sol; state-packet-only is 15/20 and no-memory is 7/20. This is an interesting small-sample comparator, not a peer-reviewed leaderboard result or evidence of general SOTA. The same report shows much weaker gpt-5-mini performance and only 20 independent paper clusters.",
       "source": "https://github.com/dorianherle/agent_memory"
+    },
+    {
+      "id": "continual-learning-exam-arxiv-2026-10",
+      "system": "Continual Learning Exam (CLE)",
+      "category": "arxiv-preprint-benchmark",
+      "benchmark": "Continual Learning Exam",
+      "benchmark_revision": "arXiv preprint submitted 2026-10-25; 120 task ladders, five levels each",
+      "metric": "best system level completion",
+      "value_percent": 47.7,
+      "answer_model": "17 harness-model configurations with frontier LLMs; best model/harness-specific result",
+      "judge": "Evaluation agent applying human-authored rubrics",
+      "reported_date": "2026-10-25",
+      "sample_size": 600,
+      "secondary_metrics": {
+        "tasks": 120,
+        "levels_per_task": 5,
+        "professional_roles": 89,
+        "occupational_domains": 12,
+        "all_five_levels_completed_percent": 23.3,
+        "median_completion_gain_from_diagnostic_feedback_and_one_revision_percentage_points": 5.3,
+        "contributors": "50+ domain experts"
+      },
+      "evidence_grade": "arxiv-preprint-primary-benchmark",
+      "comparison_notes": "Measures durable experience-driven improvement through progressive professional workflow ladders. The 47.7% is the best reported level-completion result across the paper's harness/model configurations; 23.3% of tasks complete all five levels. Diagnostic feedback plus one revision improves median completion by 5.3 percentage points. These are benchmark-specific preprint results, not a general workplace-success rate or a matched Broca comparison.",
+      "source": "https://arxiv.org/abs/2610.33956"
+    },
+    {
+      "id": "worldmemarena-arxiv-2026-05",
+      "system": "WorldMemArena benchmark",
+      "category": "arxiv-preprint-benchmark",
+      "benchmark": "WorldMemArena",
+      "benchmark_revision": "arXiv 2605.29341 v2; 400 multi-session multimodal tasks",
+      "metric": "benchmark task count",
+      "value_percent": null,
+      "answer_model": null,
+      "judge": "Checkpoint QA with gold memory points, updates, distractors and evidence chains",
+      "reported_date": "2026-05-28",
+      "sample_size": 400,
+      "secondary_metrics": {
+        "lifecycle_stages": "write; maintain; retrieve; use",
+        "regimes": "Lifelong Evolution (38 samples, 684 sessions, ~1.9K images); Agentic Execution (362 samples, ~7.8K sessions, ~13.7K images)",
+        "modalities": "text, visual observations, screenshots and agent-environment feedback"
+      },
+      "evidence_grade": "arxiv-preprint-primary-benchmark",
+      "comparison_notes": "Stage-resolved multimodal memory benchmark. Reports that stronger memory writing/storage does not guarantee improved QA, that visual evidence is frequently compressed to captions and loses spatial/procedural detail, and that performance degrades in realistic GUI/embodied trajectories. Dataset profile, not an aggregate system score.",
+      "source": "https://arxiv.org/abs/2605.29341"
+    },
+    {
+      "id": "memarena-on-device-personal-memory-2026",
+      "system": "MemArena-L benchmark",
+      "category": "arxiv-preprint-benchmark",
+      "benchmark": "MemArena",
+      "benchmark_revision": "NeurIPS 2026 Datasets & Benchmarks anonymous submission; 50 simulated agents over 15 days",
+      "metric": "dataset interaction scale",
+      "value_percent": null,
+      "answer_model": "Open-weight readers evaluated on device-style configurations",
+      "judge": "Benchmark ground-truth probes across six dimensions",
+      "reported_date": "2026-08",
+      "sample_size": 50,
+      "secondary_metrics": {
+        "dialog_text_tokens": "10.3M",
+        "ego_observed_tokens_per_agent_day": "24.1K",
+        "dimensions": "recall; reasoning; trustworthiness; permission-aware access; and related lifecycle probes",
+        "permission_aware_access_f1": "No evaluated backend-reader cell exceeded 50"
+      },
+      "evidence_grade": "benchmark-preprint-project-report",
+      "comparison_notes": "On-device, ego-centric personal memory benchmark. Its reported bottleneck is permission-aware access: systems either suppress too much (privacy-by-amnesia) or disclose despite access markers. Treat the benchmark's anonymous-submission status and project-reported result claims cautiously; this is not a finalized peer-reviewed leaderboard.",
+      "source": "https://github.com/memarena2026/MemArena-NeurIPS2026-anon"
     }
   ],
   "broca_targets": {
