@@ -99,31 +99,38 @@ This is a practical exact solver for instances with manageable Pareto frontiers,
 
 ## 3. New integration: capacity-aware Anchored e-BH
 
-Ramdas (2026), arXiv:2610.11279, proves Anchored e-BH strictly improves ordinary e-BH under arbitrary dependence while remaining incomparable to closed e-BH. Its local collection has the simple projective form
+Ramdas (2026), arXiv:2610.11279, proves that Anchored e-BH strictly improves ordinary e-BH under arbitrary dependence while remaining incomparable to mean closed e-BH. Its local collection is
 
-[
-E_S=1-rac{|S|}{m}+rac1msum_{iin S}e_i
-=1+sum_{iin S}rac1m(e_i-1).
-]
+    E_S = (sum_{i in S} e_i + m - |S|) / m
+        = 1 + sum_{i in S} (e_i - 1) / m.
 
-The ordinary e-BH rejection set (B) is always in this closure. Therefore the capacity optimizer can use the uniform global weights (w_i=1/m) and initialize its mandatory set with (B). It then selects a utility-maximizing certified superset while preserving every baseline e-BH discovery.
+The ordinary e-BH rejection set B is always certified by this collection. Therefore the capacity optimizer can use uniform global weights w_i = 1/m and initialize its mandatory set with B. It then selects a utility-maximizing certified superset while preserving every baseline e-BH discovery.
 
-The new module validation/anchored_capacity_e_bh.py implements:
-- exact e-BH baseline construction, including all ties at the rejection threshold;
-- the anchored local e-value (E_S);
-- exhaustive small-family checks of (B)'s intersection certificates;
-- capacity-aware optimization of a certified superset of (B);
-- independent replay of baseline retention, closure feasibility and Pareto optimality.
+### Maximum-cardinality Anchored e-BH baseline
+
+The paper gives an O(m log m)-time, O(m)-memory step-up algorithm for the largest-cardinality certified superset. The branch now implements that baseline explicitly in `anchored_e_bh_max_cardinality`.
+
+For h_i = alpha * (e_i - 1) / m, the closure load for a top-r candidate is
+
+    L_r = sum_i max(-h_i, 0)
+          + sum_{i=1}^r max(1/r - max(h_i, 0), 0).
+
+Sorting e-values in descending order also sorts h_i. For each r, the positive terms form a suffix, so one binary search plus a prefix sum evaluates L_r in O(log m). Scanning r = 1,...,m gives O(m log m) after sorting. The candidate top-r set retains B whenever r >= |B|; an exact O(m) separator independently checks the selected certificate.
+
+### Capacity-aware objective
+
+The new capacity-aware wrapper retains all baseline e-BH discoveries and optimizes a predeclared utility under operational capacity. Its output now includes the published maximum-cardinality Anchored e-BH result as an explicit comparator. The capacity-aware choice may differ from the maximum-cardinality result because it optimizes a different objective.
 
 Two exact fixtures:
-- (e=(30,14,6)), (alpha=0.1): ordinary e-BH returns ({1}); the anchored closure certifies ({1,2}). With utilities ((1,100,1)), unit costs and capacity 2, the capacity optimizer selects ({1,2}).
-- (e=(29,1,0)), (alpha=0.1): ordinary e-BH returns the empty set, but the anchored collection can still certify ({1}). This shows the extension need not be limited to adding discoveries to a nonempty baseline.
+- e = (30,14,6), alpha = 0.1: ordinary e-BH returns {1}; maximum-cardinality Anchored e-BH returns {1,2}. With utilities (1,100,1), unit costs and capacity 2, the capacity-aware optimizer also returns {1,2}.
+- e = (29,1,0), alpha = 0.1: ordinary e-BH returns the empty set, while Anchored e-BH certifies {1}.
+- The paper's strict example e = (39.5,1), alpha = 0.05: ordinary e-BH is empty, while maximum-cardinality Anchored e-BH returns {1}.
 
-The guarantee is fixed-family FDR under arbitrary dependence, conditional on each input (e_i) being a valid marginal e-value. It does not extend to sequential evidence or SupFDR by itself. The capacity must be sufficient to retain the full baseline e-BH set.
+The guarantee is fixed-family FDR under arbitrary dependence, conditional on each input e_i being a valid marginal e-value. It does not extend to sequential evidence or SupFDR by itself. Capacity must be sufficient to retain the full baseline e-BH set.
 
-This is a concrete operational generalization of Anchored e-BH, not an invention of the anchoring principle. Required comparisons now include ordinary e-BH, Anchored e-BH (maximum-cardinality certified superset), closed e-BH/RC-eBH, and capacity-aware Anchored e-BH.
+This is a capacity-aware operational extension of established Anchored e-BH, not an invention of the anchoring principle. Required comparisons include ordinary e-BH, maximum-cardinality Anchored e-BH, capacity-aware Anchored e-BH, and closed e-BH/RC-eBH. The paper shows Anchored e-BH and mean closed e-BH are pointwise incomparable, so neither should be described as a universal replacement for the other.
 
-## 3. Irrevocability and non-persistence warning
+## 4. Irrevocability and non-persistence warning
 
 The raw intersection e-processes are future-extension coherent but are not necessarily time-monotone. Their certified menus need not be nested.
 
@@ -135,7 +142,7 @@ A larger new set can sometimes restore certification because its larger cardinal
 
 For genuinely persistent/irrevocable decisions, use the separate time-monotone adjusted SupFDR construction in #9538, or define a different commitment contract. The raw branch retains simultaneous stopped-FDR scope only.
 
-## 4. Independent verification and negative controls
+## 5. Independent verification and negative controls
 
 The source module validation/stopped_eclosure_capacity_pareto.py provides:
 - exact rational charge decomposition;
@@ -160,7 +167,7 @@ Run from the repository root:
 
 The committed suite has not been executed in this environment. A separate private exact-rational prototype matched exhaustive subset search on 800 randomized instances with N=1..8. A 100-hypothesis sparse-strong-signal prototype completed with a maximum frontier of 48 states in approximately 0.6 seconds. Those are development measurements, not CI or a general runtime guarantee.
 
-## 5. Benchmarks and industry comparison
+## 6. Benchmarks and industry comparison
 
 Compare against:
 - exhaustive exact subset enumeration (small-N oracle);
@@ -183,7 +190,7 @@ Benchmark N=20, 50, 100, 250, 1,000, and 10,000 where frontier sizes permit. Rec
 
 For security alert triage or scientific candidate selection, compare analyst-hours per useful finding, precision@B, recall@B, wasted follow-up capacity and decision latency. Statistical validity, operational value and truth-labelled utility remain separate metrics. An ordinary severity score is not a valid e-value; upstream evidence generation must satisfy its own conditional e-process contract.
 
-## 6. Guarantee boundary
+## 7. Guarantee boundary
 
 The raw globally weighted projective e-collection is future-extension coherent. Under valid coordinate e-processes in a common global filtration, it gives simultaneous stopped-FDR under the dynamic e-closure theorem. It is not time-monotone by default, so this PR makes no SupFDR claim.
 
