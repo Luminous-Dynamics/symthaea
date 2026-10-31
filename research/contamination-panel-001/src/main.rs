@@ -97,7 +97,7 @@ fn score_builtins(args: &[String]) -> Result<(), Box<dyn Error>> {
 }
 
 fn evaluate_run(args: &[String]) -> Result<(), Box<dyn Error>> {
-    if args.len() != 5 {
+    if args.len() != 6 {
         return Err(
             "usage: contamination-panel-bench evaluate <public-packet.json> <sealed-key.json> <manifest.json> <detector-run.json> <evaluation-report.json>"
                 .into(),
@@ -105,10 +105,11 @@ fn evaluate_run(args: &[String]) -> Result<(), Box<dyn Error>> {
     }
     let packet: PublicChallengePacketV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
     let key: SealedChallengeKeyV1 = serde_json::from_slice(&fs::read(&args[2])?)?;
-    let run: DetectorRunV1 = serde_json::from_slice(&fs::read(&args[3])?)?;
-    let report = evaluate_detector_run(&packet, &key, &run).map_err(io::Error::other)?;
+    let manifest: ChallengeManifestV1 = serde_json::from_slice(&fs::read(&args[3])?)?;
+    let run: DetectorRunV1 = serde_json::from_slice(&fs::read(&args[4])?)?;
+    let report = evaluate_detector_run(&packet, &key, &manifest, &run).map_err(io::Error::other)?;
     let bytes = serde_json::to_vec_pretty(&report)?;
-    write_bytes(&args[4], &bytes)?;
+    write_bytes(&args[5], &bytes)?;
     println!(
         "detector_id={} tiers={} pairs={} report_schema={}",
         report.detector_id,
