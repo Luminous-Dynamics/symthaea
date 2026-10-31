@@ -252,3 +252,33 @@ Sources:
 - CodeEvolve, Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.1345/
 
 Claim ceiling: this is a research specification only. It does not add trajectory code, run tests, establish optimizer superiority, or constitute an SOTA result.
+
+
+### Updated end-to-end code-search competitors — October 2026
+
+Do not treat evolutionary algorithm benchmarks and LLM-driven code optimization as one undifferentiated leaderboard. Add a separate engineering/code-discovery stratum with pinned models, prompts, tools, repository snapshots, compiler images, tests, and measured resource receipts.
+
+- **CodeEvolve (Findings of EMNLP 2026):** combines LLMs with island-based evolutionary search, inspiration crossover, meta-prompting, depth-based refinement, a CVT-MAP-Elites archive, and a weighted LLM ensemble. The paper reports matching or exceeding reported AlphaEvolve results on 5/9 tasks and outperforming OpenEvolve/ShinkaEvolve on 6/9 under its reported matched conditions. Reproduce only on pinned versions and tasks; these findings do not transfer automatically to scientific MOO.
+- **Controlled Self-Evolution (Findings of EMNLP 2026):** emphasizes control over search routing, edit granularity, and experience reuse. Treat its generate–verify–refine control loop as a relevant system-level baseline, not just another mutation operator.
+- **OEISPerf (Findings of EMNLP 2026):** benchmarks code-to-code algorithmic performance optimization using alternative implementations of integer sequences. Its evaluation highlights that correctness and algorithmic efficiency must be measured together: the strongest evaluated model setting matched the fastest validated reference on 67.9% of the reported test instances.
+
+This suggests three distinct engineering subtracks:
+
+1. **Algorithmic discovery:** discover new algorithms or heuristics on AlphaEvolve-style tasks.
+2. **Correctness-preserving performance optimization:** optimize a known program against a validated fastest reference, preserving semantics.
+3. **Repository-level engineering optimization:** improve frozen Rust/Nix repositories under compiler, test, and resource constraints.
+
+For each subtrack, compare complete systems under pinned conditions. Record model and inference spend, proposal/search costs, build/test/runtime costs, failures, verifier calls, CPU/accelerator/energy/memory, and held-out correctness. Do not compare a model's nominal token price to measured all-in system cost without including the full execution pipeline.
+
+Sources:
+- CodeEvolve, Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.1345/
+- Controlled Self-Evolution for Algorithmic Code Optimization, Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.1036/
+- OEISPerf, Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp/
+- PlatEMO v4.16 release notes (2026-07-19; 360 algorithms, 630 problems): https://github.com/BIMK/PlatEMO/blob/master/Doc/releasenote.md
+- COCO official benchmark archive: https://coco-platform.org/data-archive/index.html
+
+### AR-5B5 anytime implementation checkpoint
+
+A shared sequential anytime history/target-receipt module is implemented in \`pareto_anytime.rs\`, exported by the crate, and documented in \`AR5B5_ANYTIME_IMPLEMENTATION_V0_1.md\`. It binds algorithm/evaluator/verifier build identities, execution environment, target plan, cost model, hash-chained evaluation/verification/auxiliary events, resource aggregation, archive-prefix HV/IGD+/epsilon, and explicit reached/not-reached outcomes.
+
+The next step is optimizer trace integration, tracked in Issue #9606. The module is committed but remains uncompiled/unexecuted; it records verifier assertions and digest references and does not yet independently resolve artifact bytes or authenticate verifier signatures. No benchmark result or SOTA claim is established.
