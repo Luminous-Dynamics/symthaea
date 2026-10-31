@@ -23,7 +23,11 @@
           "case_id",
           "family",
           "pair",
-          "evaluator_oracle"
+          "evaluator_oracle",
+          "expected_write",
+          "expected_maintain",
+          "expected_retrieve",
+          "expected_use"
         ],
         "properties": {
           "case_id": {
@@ -128,6 +132,39 @@
                 }
               }
             }
+          },
+          "expected_write": {
+            "enum": [
+              "store_association_only",
+              "store_qualified_transition",
+              "store_transition_with_regime",
+              "store_outcome_unknown"
+            ]
+          },
+          "expected_maintain": {
+            "enum": [
+              "preserve_uncertainty",
+              "retain_with_preconditions",
+              "mark_stale_on_regime_change",
+              "retain_unknown_until_reconciled"
+            ]
+          },
+          "expected_retrieve": {
+            "enum": [
+              "retrieve_association_evidence",
+              "retrieve_preconditioned_transition",
+              "retrieve_with_regime_warning",
+              "retrieve_execution_conflict",
+              "retrieve_more_evidence"
+            ]
+          },
+          "expected_use": {
+            "enum": [
+              "do_not_generalize_causal_effect",
+              "reuse_if_preconditions_hold",
+              "requalify_before_action",
+              "reconcile_before_retry"
+            ]
           }
         }
       }
