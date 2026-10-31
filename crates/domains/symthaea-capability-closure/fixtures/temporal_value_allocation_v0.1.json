@@ -202,6 +202,36 @@
     },
     "mlperf_tiny_v1_4": {
       "url": "https://mlcommons.org/2026/07/mlperf-tiny-v1-4-results/"
+    },
+    "wrapflow": {
+      "citation": "Shen et al., Enhancing Irregular Time Series Forecasting with Continuous-Time Modeling Framework, arXiv:2607.28035, 2026-07-30",
+      "url": "https://arxiv.org/abs/2607.28035",
+      "methods": [
+        "continuous_time_tokenization",
+        "gap_aware_tokens",
+        "simulation_free_residual_flow_matching"
+      ],
+      "reproduction_status": "literature_only_not_reproduced"
+    },
+    "quite_pp": {
+      "citation": "QuITE / QuITE++ (ICML 2026)",
+      "url": "https://meaningfull9502.github.io/QuITE/",
+      "reported_scope": "QuITE++ authors report best results in 20 of 24 settings across 4 datasets, 3 horizons, MSE and MAE",
+      "reproduction_status": "literature_only_not_reproduced"
+    },
+    "irregular_named_baselines": [
+      "HyperIMTS",
+      "GraFITi",
+      "tPatchGNN",
+      "Warpformer",
+      "Hi-Patch",
+      "mTAND",
+      "NeuralFlow"
+    ],
+    "dyh2_stgraph": {
+      "citation": "DyH2-STGraph, IJCAI 2026",
+      "url": "https://ijcai.org/proceedings/2026/573",
+      "reproduction_status": "literature_only_not_reproduced"
     }
   },
   "security": {
