@@ -1623,14 +1623,13 @@ mod tests {
     fn paired_candidate_baseline_uses_identical_groups_and_reports_positive_deltas() {
         let (candidate, manifest, truth, candidate_bytes, manifest_bytes, truth_bytes) = fixture_values();
         let mut baseline = candidate.clone();
-        baseline["model_id"] = json!("fixture-improved-detector");
+        baseline["model_id"] = json!("fixture-baseline-detector");
         baseline["model_sha256"] = json!("c".repeat(64));
         baseline["threshold_profile_sha256"] = json!("d".repeat(64));
-        baseline["cases"][1]["response"] = json!("alert");
-        baseline["cases"][2]["response"] = json!("alert");
-        baseline["cases"][6]["response"] = json!("clear");
-        baseline["cases"][7]["response"] = json!("sensor_invalid");
-        baseline["cases"][8]["response"] = json!("sensor_invalid");
+        baseline["cases"][0]["response"] = json!("clear");
+        baseline["cases"][2]["response"] = json!("clear");
+        baseline["cases"][5]["response"] = json!("alert");
+        baseline["cases"][8]["response"] = json!("clear");
         let baseline_bytes = serde_json::to_vec(&baseline).unwrap();
 
         let candidate_receipt = audit_values(
@@ -1660,12 +1659,14 @@ mod tests {
         let program = &groups["program_group_level"];
         assert_eq!(program["independent_group_count"], 3);
         assert!((program["candidate_macro_estimate"].as_f64().unwrap() - 1.0/3.0).abs() < 1e-12);
-        assert_eq!(program["baseline_macro_estimate"], 1.0);
-        assert!((program["improvement_point_estimate"].as_f64().unwrap() - 2.0/3.0).abs() < 1e-12);
+        assert_eq!(program["baseline_macro_estimate"], 0.0);
+        assert!((program["improvement_point_estimate"].as_f64().unwrap() - 1.0/3.0).abs() < 1e-12);
         assert_eq!(program["status"], "unavailable_insufficient_independent_groups");
 
         let benign = &groups["benign_false_alert_by_program"];
         assert_eq!(benign["independent_group_count"], 4);
+        assert!((benign["candidate_macro_estimate"].as_f64().unwrap() - 0.25).abs() < 1e-12);
+        assert_eq!(benign["baseline_macro_estimate"], 0.5);
         assert!((benign["improvement_point_estimate"].as_f64().unwrap() - 0.25).abs() < 1e-12);
         assert_eq!(benign["status"], "unavailable_insufficient_independent_groups");
     }
