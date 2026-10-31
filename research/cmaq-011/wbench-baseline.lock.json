@@ -161,6 +161,62 @@
         "rank": 4
       }
     ],
-    "provenance_note": "The table combines model interfaces; do not read overall Navi rank as an action-conditioned-only ranking. VWA-World's published report provenance records 16 submitter-evaluated metrics plus three organizer-evaluated VLM metrics."
-  }
+    "provenance_note": "The table combines model interfaces; do not read overall Navi rank as an action-conditioned-only ranking. VWA-World's published report provenance records 16 submitter-evaluated metrics plus three organizer-evaluated VLM metrics.",
+    "page_last_updated": "2026-10-12",
+    "all_types_table_top": [
+      {
+        "model": "Alaya-EVOKE-Turbo",
+        "average": 82,
+        "rank": 1
+      },
+      {
+        "model": "XGEN-Jing",
+        "average": 81.9,
+        "rank": 2
+      },
+      {
+        "model": "Enuma",
+        "average": 81.7,
+        "rank": 3
+      },
+      {
+        "model": "VWA-World",
+        "average": 81.7,
+        "rank": 4
+      },
+      {
+        "model": "JoyAI-Echo-1.5 (WM)",
+        "average": 81.6,
+        "rank": 5
+      }
+    ],
+    "caveat": "All-types Navi aggregate table mixes text, camera and action interfaces. It must not be presented as an action-only SOTA ranking. The page also lists some unranked entries separately; retain their status rather than assigning them a rank."
+  },
+  "published_findings": [
+    {
+      "id": "no_single_model_dominates_all_dimensions",
+      "source": "official live leaderboard key findings",
+      "details": "The benchmark reports different models leading different dimensions; the top aggregate score is not evidence of universal superiority."
+    },
+    {
+      "id": "navigation_and_interaction_are_partly_orthogonal",
+      "source": "official live leaderboard key findings",
+      "details": "YUME 1.5 has high navigation but weak event-edit/perspective-switch scores, while Wan 2.7 has strong event/subject action but lower navigation."
+    },
+    {
+      "id": "camera_control_is_not_subject_control",
+      "source": "official live leaderboard key findings",
+      "details": "Navigation accuracy and perspective consistency are separately measured and can diverge substantially."
+    },
+    {
+      "id": "physics_quality_not_control_proxy",
+      "source": "official live leaderboard key findings",
+      "details": "Reported video-quality/physical-plausibility correlation rho=0.82; control ability versus physics shows near-zero correlation."
+    },
+    {
+      "id": "multi_turn_error_compounds",
+      "source": "official live leaderboard key findings",
+      "details": "Navigation accuracy drops about 21 points from turn 1 to turn 4; dedicated geometric control degrades less than text-conditioned generation."
+    }
+  ]
 }
