@@ -48,6 +48,7 @@ impl CognitiveLoopService {
             metadata.jepa_latent_pe = telem.latent_pe;
             metadata.jepa_total_energy = telem.total_energy;
             metadata.jepa_collapse_detected = telem.collapse_detected;
+            metadata.jepa_dropped_pending_transitions = telem.dropped_pending_transitions;
         }
 
         #[cfg(feature = "neural_validation")]
