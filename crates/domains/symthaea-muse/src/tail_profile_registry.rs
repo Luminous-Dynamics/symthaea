@@ -13,6 +13,7 @@
 //! revocation distinct. A profile digest alone is not an authority or a proof
 //! that its renderer domain matches the current render.
 
+use crate::benchmark_lineage::{BenchmarkLineageAudit, BenchmarkLineageManifest, DatasetSplit, verify_benchmark_lineage_audit};
 use crate::counterfactual_influence::InfluenceSegmentationConfig;
 use crate::counterfactual_support_adapter::{
     CounterfactualSupportAdapterReport, VerifiedCounterfactualSupportAdapterReport,
@@ -41,14 +42,13 @@ pub enum TailProfileSplit {
     Qualification,
 }
 
-/// Maps one already replay-verified event scan to the source-composition
-/// lineage and the preregistered partition. One source may have many events,
-/// but one lineage cannot occur in both partitions.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TailProfileLineageAssignment {
-    pub source_event_index: usize,
-    pub source_lineage_sha256: String,
-    pub split: TailProfileSplit,
+/// One rendered source composition in the calibration or qualification
+/// partition. Its lineage and split are derived from the EVAL-031 audited
+/// benchmark manifest, never hand-entered by the profile caller.
+#[derive(Debug, Clone)]
+pub struct TailProfileSourceBundle<'a> {
+    pub benchmark_sample_id: String,
+    pub adapter_report: &'a VerifiedCounterfactualSupportAdapterReport,
 }
 
 /// A publisher-attested description of the actual renderer topology used by
