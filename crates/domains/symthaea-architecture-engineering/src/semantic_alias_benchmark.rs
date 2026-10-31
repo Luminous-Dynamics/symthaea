@@ -529,6 +529,25 @@ pub fn evaluate_alias_trial(
     })
 }
 
+/// Recompute every alias metric and digest from the policy-visible challenge, evaluator-only
+/// adjudication key and verifier decisions. This rejects altered confusion matrices or regret.
+pub fn verify_alias_benchmark_report(
+    challenge: &PolicyVisibleAliasChallenge,
+    adjudication: &AliasAdjudicationKey,
+    trial: &AliasVerifierTrial,
+    allocation_budget: usize,
+    report: &SemanticAliasBenchmarkReport,
+) -> Result<(), SemanticAliasError> {
+    let recomputed = evaluate_alias_trial(challenge, adjudication, trial, allocation_budget)?;
+    if &recomputed != report {
+        return Err(SemanticAliasError::new(
+            "report",
+            "stored semantic-alias report differs from deterministic adjudication",
+        ));
+    }
+    Ok(())
+}
+
 fn validate_trial_shape(
     challenge: &PolicyVisibleAliasChallenge,
     trial: &AliasVerifierTrial,
@@ -741,6 +760,18 @@ mod tests {
 
         assert_eq!(report.false_novelty_rejection_count, 1);
         assert!(report.discovery_regret > 0.0);
+    }
+
+    #[test]
+    fn alias_report_verifier_rejects_tampered_regret_or_confusion_counts() {
+        let (challenge, adjudication) = canonical_alias_fixture().unwrap();
+        let trial = clean_alias_trial(&challenge).unwrap();
+        let report = evaluate_alias_trial(&challenge, &adjudication, &trial, 2).unwrap();
+        verify_alias_benchmark_report(&challenge, &adjudication, &trial, 2, &report).unwrap();
+
+        let mut tampered = report.clone();
+        tampered.discovery_regret = 0.5;
+        assert!(verify_alias_benchmark_report(&challenge, &adjudication, &trial, 2, &tampered).is_err());
     }
 
     #[test]
