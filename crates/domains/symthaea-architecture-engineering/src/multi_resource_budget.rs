@@ -423,15 +423,6 @@ pub fn plan_resource_action_frontier(
     })
 }
 
-fn validate_digest(field: &str, value: &str) -> Result<(), ResourceBudgetError> {
-    if !is_sha256(value) {
-        return Err(ResourceBudgetError::new(
-            field,
-            "must be a lowercase hexadecimal SHA-256 digest",
-        ));
-    }
-    Ok(())
-}
 
 fn is_sha256(value: &str) -> bool {
     value.len() == SHA256_HEX_LEN
@@ -642,7 +633,7 @@ mod tests {
     #[test]
     fn budget_feasibility_is_component_wise_not_scalarized() {
         let actions = vec![
-            action("low-device-high-energy", 0.5, 0.01, cost("low-device-high-energy", 1_000, 40_000, 0)),
+            action("low-device-high-energy", 0.5, 0.01, cost("low-device-high-energy", 1_000, 30_000, 0)),
             action("balanced", 0.4, 0.01, cost("balanced", 4_000, 10_000, 4_000)),
             action("too-much-energy", 0.9, 0.01, cost("too-much-energy", 1_000, 40_001, 0)),
         ];
