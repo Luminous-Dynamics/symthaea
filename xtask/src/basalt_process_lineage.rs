@@ -377,19 +377,16 @@ pub fn audit_bytes(oracle_bytes: &[u8], receipt_bytes: &[u8]) -> ProcessLineageA
 
 fn validate_oracle_processes(oracle: &ProcessLineageOracle, report: &mut ProcessLineageAuditReport) -> BTreeMap<ProcessIdentity, Option<ProcessIdentity>> {
     let mut nodes = BTreeMap::new();
-    let mut pid_start = BTreeMap::<u32, BTreeSet<u64>>::new();
     for (index, process) in oracle.processes.iter().enumerate() {
         let identity = &process.identity;
         if identity.pid == 0 || identity.start_time_ticks == 0 {
             error(report, "E_PROCESS_IDENTITY", &format!("oracle.processes[{index}]"), "PID and start_time_ticks must be non-zero");
         }
-        pid_start.entry(identity.pid).or_default().insert(identity.start_time_ticks);
         if nodes.insert(identity.clone(), parent_identity(&process.parent)).is_some() {
             error(report, "E_PROCESS_DUPLICATE", &format!("oracle.processes[{index}]"), "process instance identity appears more than once");
         }
     }
     validate_process_graph(&nodes, &oracle.root_process, "oracle.processes", report);
-    let _ = pid_start;
     nodes
 }
 
@@ -604,7 +601,8 @@ fn validate_observed_lifecycle_order(
                     ProcessEventKind::Fork | ProcessEventKind::Clone | ProcessEventKind::Vfork)
             }).map(|event| event.observed_at_monotonic_ns).min();
             let parent_birth = receipt.events.iter().filter(|event| {
-                event.process == *parent && event.kind == ProcessEventKind::RootStart
+                event.process == *parent && matches!(event.kind,
+                    ProcessEventKind::RootStart | ProcessEventKind::Fork | ProcessEventKind::Clone | ProcessEventKind::Vfork)
             }).map(|event| event.observed_at_monotonic_ns).min();
             if child_birth.zip(parent_birth).is_none_or(|(child_time, parent_time)| child_time <= parent_time) {
                 error(report, "E_RECEIPT_PARENT_BIRTH_ORDER", "receipt.events", "observed child creation must follow observed parent creation");
