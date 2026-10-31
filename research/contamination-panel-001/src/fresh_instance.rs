@@ -516,11 +516,12 @@ pub fn generate_fresh_challenge_bundle(
             task_text: text,
             task_text_sha256: task_digest,
         });
+        let observed_margin = normalized_determinant_margin_permille(&parameters);
         entries.push(SealedFreshOracleEntryV1 {
             item_id,
             parameters,
             solution,
-            normalized_determinant_margin_permille: normalized_determinant_margin_permille(&parameters),
+            normalized_determinant_margin_permille: observed_margin,
             parameter_sha256,
             answer_sha256,
         });
@@ -895,10 +896,11 @@ mod tests {
     }
 
     #[test]
-    fn too_strict_stability_margin_exhausts_generation_and_is_reported() {
+    fn out_of_range_stability_margin_fails_closed() {
         let mut config = config();
-        config.minimum_normalized_determinant_margin_permille = 1_000;
-        assert!(generate_fresh_challenge_bundle(&config, &seed()).is_err());
+        config.minimum_normalized_determinant_margin_permille = 1_001;
+        assert!(generate_fresh_challenge_bundle(&config, &seed())
+            .unwrap_err().contains("invalid matrix/solution bounds"));
     }
 
     #[test]
