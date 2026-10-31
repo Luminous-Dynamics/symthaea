@@ -1039,8 +1039,6 @@ mod tests {
         compute_resource_registry_sha256, ResourceBudgetLimit, ResourceClass,
         ResourceDefinition, ResourceQuantity,
     };
-    use crate::nas_action_authorization::NasActionPreflightReceipt;
-    use crate::nas_action_authorization::compute_preflight_receipt_sha256;
 
     fn sha(byte: char) -> String {
         std::iter::repeat_n(byte, 64).collect()
