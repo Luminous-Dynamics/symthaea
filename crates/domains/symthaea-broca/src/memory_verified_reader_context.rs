@@ -15,7 +15,7 @@
 //! Source resolution, authorization, contradiction discovery, tokenization and
 //! rendering remain the responsibility of separately identified trusted adapters.
 
-use crate::memory_evidence::{MemoryContextItem, MemoryContextType};
+use crate::memory_evidence::{EvidenceSpeakerRole, MemoryContextItem, MemoryContextType};
 use crate::memory_proof_budget::{
     ProofBudgetRequest, ProofBudgetResult, ProofBudgetStatus, SelectedProof,
     verify_proof_budget_result,
@@ -35,6 +35,8 @@ pub struct VerifiedReaderEvidence {
     pub source_family_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_session_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_speaker: Option<EvidenceSpeakerRole>,
     pub payload_sha256: String,
     pub source_span_sha256: String,
     pub authorization_receipt_sha256: String,
@@ -392,6 +394,7 @@ pub fn build_verified_proof_reader_context(
             source_span_end: evidence.source_span_end,
             source_family_id: evidence.source_family_id.clone(),
             source_session_id: evidence.source_session_id.clone(),
+            source_speaker: evidence.source_speaker,
             payload_sha256: evidence.payload_sha256.clone(),
             source_span_sha256: evidence.source_span_sha256.clone(),
             authorization_receipt_sha256: evidence.authorization_receipt_sha256.clone(),
@@ -463,6 +466,7 @@ mod tests {
             source_span_end: excerpt.len() as u64,
             source_family_id: format!("family-{id}"),
             source_session_id: Some(format!("session-{id}")),
+            source_speaker: Some(EvidenceSpeakerRole::User),
             scope_id: "scope-1".into(),
             payload_sha256: digest("payload"),
             source_span_sha256: span_sha256.clone(),
@@ -511,6 +515,7 @@ mod tests {
                 ],
                 minimum_independent_families: 1,
                 minimum_distinct_sessions: 0,
+                minimum_user_authored_evidence: 0,
                 selection_overhead_tokens: 2,
             }],
         }
