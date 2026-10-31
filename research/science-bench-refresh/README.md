@@ -65,7 +65,7 @@ The fixture is synthetic and non-scoring. Panel labels are supplied declarations
 
 ## Verify intended target changes and collateral scope
 
-This second-stage audit composes with SCI-INTERVENTION-QUALITY-001. The parent panel judges global meaning-preserving / meaning-changing / ambiguous status. This layer separately checks whether the declared target claim/scope changed in the expected direction, whether the exact changed-claim set matches, and whether material collateral changes occurred.
+This second-stage audit composes with SCI-INTERVENTION-QUALITY-001. The parent panel judges global meaning-preserving / meaning-changing / ambiguous status. This layer separately checks whether the declared target claim/scope changed in the expected direction, whether the exact changed-claim set matches, and whether material collateral changes occurred. Every target-plan entry inherits the parent baseline/variant input digests, and each reviewer receipt must echo those digests and the target identity.
 
 ```sh
 python3 research/science-bench-refresh/tools/intervention_target_delta_fixture.py /tmp/target-delta
