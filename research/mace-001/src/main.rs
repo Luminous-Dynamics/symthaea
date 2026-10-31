@@ -861,6 +861,24 @@ mod tests {
         assert_eq!(report.unsupported_completion_claims, 0);
         assert_eq!(report.missing_prediction_receipts, 0);
         assert!(report.hard_gate_pass);
+        assert!(report.exact_case_matches == report.cases);
+    }
+
+    #[test]
+    fn safe_but_wrong_decisions_do_not_pass_full_conformance() {
+        let trace = REFERENCE_TRACE
+            .replace(
+                "MACE-104\\tnot_identified\\trecord_association_only\\tseek_intervention_or_preserve_uncertainty",
+                "MACE-104\\tnot_identified\\trecord_association_only\\tother_safe_action",
+            )
+            .replace(
+                "MACE-287\\tnot_identified\\trecord_association_only\\tseek_intervention_or_preserve_uncertainty",
+                "MACE-287\\tnot_identified\\trecord_association_only\\tother_safe_action",
+            );
+        let report = score_texts(AGENT_INPUT, ORACLE_INPUT, &trace, digests()).unwrap();
+        assert!(report.hard_gate_pass);
+        assert_eq!(report.exact_case_matches, 6);
+        assert!(!report.hard_gate_pass && report.exact_case_matches == report.cases);
     }
 
     #[test]
