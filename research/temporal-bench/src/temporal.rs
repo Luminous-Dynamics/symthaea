@@ -87,6 +87,7 @@ pub struct TemporalTarget {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MultiTimescaleOracle {
     pub stream_id: u64,
+    pub seed: u64,
     pub targets: Vec<TemporalTarget>,
     pub hidden_change_step: Option<u64>,
     pub hidden_periods: [u64; 3],
@@ -101,6 +102,7 @@ pub struct MultiTimescaleOracle {
 pub fn multiscale_oracle_digest(oracle: &MultiTimescaleOracle) -> [u8; 32] {
     let mut hash = CanonicalHasher::new(b"symthaea.temporal.multiscale.oracle.v1");
     hash.u64(oracle.stream_id);
+    hash.u64(oracle.seed);
     hash.usize(oracle.targets.len());
     for target in &oracle.targets {
         hash.u64(target.source_step);
@@ -320,6 +322,23 @@ pub fn verify_multiscale_trace(
     if cursor != task.events.len() {
         return Err(TemporalVerificationError::UnexpectedTrailingEvent);
     }
+
+    // Rebuild from the evaluator seed and public timing metadata. This catches
+    // semantically plausible but recommitted mutations to noisy observations,
+    // latent parameters, or delayed labels. It is generator consistency, not
+    // a substitute for process isolation or a protected oracle commitment.
+    let steps = usize::try_from(target_count).unwrap_or(usize::MAX);
+    let (expected_task, expected_oracle) = generate_multiscale_task(MultiTimescaleConfig {
+        seed: oracle.seed,
+        steps,
+        forecast_horizon: task.forecast_horizon,
+        feedback_delay: task.feedback_delay,
+        regime_shift: oracle.hidden_change_step.is_some(),
+    })
+    .map_err(|_| TemporalVerificationError::InvalidOracleModel)?;
+    if expected_task != *task || expected_oracle != *oracle {
+        return Err(TemporalVerificationError::InvalidOracleModel);
+    }
     Ok(())
 }
 
@@ -458,6 +477,7 @@ pub fn generate_multiscale_task(
         {
             let mut oracle = MultiTimescaleOracle {
                 stream_id,
+                seed: config.seed,
                 targets,
                 hidden_change_step,
                 hidden_periods: periods,
@@ -706,6 +726,23 @@ mod tests {
         assert_eq!(
             verify_multiscale_trace(&task, &oracle),
             Err(TemporalVerificationError::InvalidObservationValue { step: 0 })
+        );
+    }
+
+    #[test]
+    fn verifier_rejects_recommitted_seed_inconsistent_observation() {
+        let (mut task, oracle) = generate_multiscale_task(config(true)).unwrap();
+        if let Some(event) = task.events.iter_mut().find(|event| {
+            matches!(event.kind, TemporalEventKind::Observation { .. })
+        }) {
+            if let TemporalEventKind::Observation { fast, .. } = &mut event.kind {
+                *fast = fast.saturating_add(1);
+            }
+        }
+        task.content_sha256 = multiscale_content_digest(&task);
+        assert_eq!(
+            verify_multiscale_trace(&task, &oracle),
+            Err(TemporalVerificationError::InvalidOracleModel)
         );
     }
 
