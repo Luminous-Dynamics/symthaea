@@ -23,5 +23,7 @@ jobs:
           components: rustfmt
       - name: Format exact crate
         run: cargo fmt --manifest-path research/anytime-imperfect-judge-cert/Cargo.toml -- --check
+      - name: Independent Python reference checks
+        run: python3 research/anytime-imperfect-judge-cert/tools/reference_check.py
       - name: Run deterministic known-answer and sequential-null tests
         run: cargo test --locked --manifest-path research/anytime-imperfect-judge-cert/Cargo.toml
