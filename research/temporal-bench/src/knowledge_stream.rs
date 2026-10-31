@@ -196,6 +196,10 @@ impl KnowledgeScore {
 
 /// Score per-query outputs without collapsing the temporal failure modes.
 ///
+/// The evaluator must first call `verify_knowledge_stream_seeded` with
+/// evaluator-held seed/configuration. This function assumes the oracle has
+/// already passed structural and seed-replay verification.
+///
 /// A missing prediction is not silently converted into a correct abstention.
 /// Returning `NoFact` is distinct from abstaining: after a known retraction it
 /// is the correct result; for a still-valid fact it is an incorrect answer.
