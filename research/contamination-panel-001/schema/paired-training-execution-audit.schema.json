@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/paired-training-execution-audit-v1.json",
+  "title": "Paired training execution audit v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "valid",
+    "execution_consistent",
+    "treatment_completed",
+    "placebo_completed",
+    "paired_checkpoints_distinct",
+    "base_checkpoint_matched",
+    "training_configuration_matched",
+    "corpus_identities_matched_to_design",
+    "intervention_payloads_matched_to_assignment",
+    "treatment_token_budget_conserved",
+    "placebo_token_budget_conserved",
+    "observed_token_budgets_complete",
+    "observed_step_budgets_complete",
+    "runner_attestation_digests_present",
+    "checkpoint_custody_digests_present",
+    "external_attestation_verification",
+    "independently_verified",
+    "ready_for_independent_attestation_verification",
+    "experiment_id",
+    "replicate_id",
+    "design_sha256",
+    "intervention_manifest_sha256",
+    "treatment_run_id",
+    "placebo_run_id",
+    "treatment_checkpoint_sha256",
+    "placebo_checkpoint_sha256",
+    "treatment_observed_tokens",
+    "placebo_observed_tokens",
+    "treatment_observed_steps",
+    "placebo_observed_steps",
+    "claim_boundary",
+    "issues"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.paired_training_execution_audit.v1"
+    },
+    "valid": {
+      "type": "boolean"
+    },
+    "execution_consistent": {
+      "type": "boolean"
+    },
+    "treatment_completed": {
+      "type": "boolean"
+    },
+    "placebo_completed": {
+      "type": "boolean"
+    },
+    "paired_checkpoints_distinct": {
+      "type": "boolean"
+    },
+    "base_checkpoint_matched": {
+      "type": "boolean"
+    },
+    "training_configuration_matched": {
+      "type": "boolean"
+    },
+    "corpus_identities_matched_to_design": {
+      "type": "boolean"
+    },
+    "intervention_payloads_matched_to_assignment": {
+      "type": "boolean"
+    },
+    "treatment_token_budget_conserved": {
+      "type": "boolean"
+    },
+    "placebo_token_budget_conserved": {
+      "type": "boolean"
+    },
+    "observed_token_budgets_complete": {
+      "type": "boolean"
+    },
+    "observed_step_budgets_complete": {
+      "type": "boolean"
+    },
+    "runner_attestation_digests_present": {
+      "type": "boolean"
+    },
+    "checkpoint_custody_digests_present": {
+      "type": "boolean"
+    },
+    "external_attestation_verification": {
+      "type": "string",
+      "minLength": 1
+    },
+    "independently_verified": {
+      "type": "boolean"
+    },
+    "ready_for_independent_attestation_verification": {
+      "type": "boolean"
+    },
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "replicate_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "design_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "intervention_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "treatment_run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "placebo_run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "treatment_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "placebo_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "treatment_observed_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "placebo_observed_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "treatment_observed_steps": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "placebo_observed_steps": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
