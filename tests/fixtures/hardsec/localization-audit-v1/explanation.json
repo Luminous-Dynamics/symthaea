@@ -17,7 +17,7 @@
   "source": {
     "artifact_id": "fixture-netlist-001",
     "source_path": "fixtures/design-alpha.net.json",
-    "source_sha256": "f42cce69fba811f099fa28f8fe36e6cce257965bd0c5d8612abc4502c88ee05f",
+    "source_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
     "node_edge_map_sha256": "a93a0ea22b35edfec07a772d0790f64bb513d094116e57d82eba4062e54e7321"
   },
   "model": {
@@ -77,7 +77,7 @@
     {
       "path_id": "path-trigger-observe-01",
       "status": "retained",
-      "source_sha256": "f42cce69fba811f099fa28f8fe36e6cce257965bd0c5d8612abc4502c88ee05f",
+      "source_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
       "edge_ids": [
         "e17-18"
       ],
