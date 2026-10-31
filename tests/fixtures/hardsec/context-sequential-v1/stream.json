@@ -60,5 +60,6 @@
       "sensor_state": "untrusted",
       "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
     }
-  ]
+  ],
+  "scoring_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 }
