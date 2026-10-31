@@ -113,6 +113,18 @@ For each known fact change:
 - answer oscillation rate after the correct update;
 - performance on unchanged facts after nearby distractor updates.
 
+### Proposed Temporal Error Debt extension (not an official OAKS metric)
+
+Tracked separately in NEURO-SILICON-008 (#9492). For a given document/question, hold each answer state until the next declared chunk/checkpoint. Integrate the duration for which the emitted state is wrong after a fact change:
+
+- wrong-belief exposure: time with an explicit but incorrect answer/no-fact state;
+- abstention exposure: time with an explicit abstention;
+- missing exposure: time without a prediction by the checkpoint deadline.
+
+Use source timestamps where available. If only chunk order is available, use chunk-index units and do not convert these to seconds. Report the three exposure components independently, alongside time-to-first-correct-answer. A late answer, an incorrect answer, abstention, and missing output must remain distinguishable. This is a proposed extension to the adapter analysis, not part of the official OAKS score or a claim about OAKS authors' metric definitions.
+
+The required invariant is that equal aggregate per-chunk accuracy can still produce different wrong-belief exposure when one model updates faster. Never combine these into an opaque weighted score.
+
 ### Evidence/provenance
 
 Where the official evidence labels permit:
@@ -164,5 +176,6 @@ OAKS adds natural-language complexity, long context, distractors, bridge/countin
 - The OAKS-Novel question-count discrepancy is unresolved.
 - The code repository license was not found at the inspected path and must be confirmed before code reuse.
 - No OAKS/Symthaea comparative score is claimed.
+- Temporal Error Debt is proposed in #9492; no time-integrated stale-belief exposure scorer is implemented in this adapter contract yet.
 
 A future result can establish performance only for the exact OAKS release, licensed use, split, evaluator, model/runtime, prompt, budget, and hardware boundary. It does not establish general temporal reasoning or transaction-time correctness outside the measured benchmark.
