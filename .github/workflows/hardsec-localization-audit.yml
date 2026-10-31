@@ -5,6 +5,8 @@ on:
     paths:
       - "examples/hardsec_localization_audit.rs"
       - "schemas/hardsec-localization-explanation-v1.schema.json"
+      - "schemas/hardsec-source-graph-v1.schema.json"
+      - "schemas/hardsec-localization-oracle-v1.schema.json"
       - "tests/fixtures/hardsec/localization-audit-v1/**"
       - "tools/hardsec-localization-audit-harness/**"
       - ".github/workflows/hardsec-localization-audit.yml"
