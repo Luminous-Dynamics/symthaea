@@ -571,11 +571,9 @@ impl AnytimeHistory {
     /// than replaying every prior event. A deserialized history rebuilds that state once.
     /// Full independent replay remains available through validate()/analyze_anytime_history().
     pub fn append(&mut self, draft: AnytimeEventDraft) -> Result<String, AnytimeError> {
-        self.header.validate()?;
-        if self.header_sha256 != self.header.header_sha256()? {
-            return Err(AnytimeError::new("history.header_sha256", "header digest mismatch"));
-        }
         if self.validation_state.is_none() {
+            // A deserialized history has no trusted incremental cache. Rebuild it with a full
+            // replay once; new histories already carry state from validated construction.
             self.validation_state = Some(self.replay_state()?);
         }
         if draft.completed_elapsed_millis < draft.started_elapsed_millis {
@@ -1477,6 +1475,25 @@ mod tests {
                 failure_reason: None,
             },
         }).unwrap();
+    }
+
+    #[test]
+    fn deserialized_history_rebuilds_incremental_append_state() {
+        let mut original = AnytimeHistory::new(header()).unwrap();
+        append_candidate(&mut original, 1, "candidate-a", "eval-a", vec![0.0, 1.0]);
+
+        let encoded = serde_json::to_string(&original).unwrap();
+        let mut restored: AnytimeHistory = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(restored, original);
+
+        append_candidate(&mut original, 2, "candidate-b", "eval-b", vec![1.0, 0.0]);
+        append_candidate(&mut restored, 2, "candidate-b", "eval-b", vec![1.0, 0.0]);
+        assert_eq!(restored, original);
+        assert_eq!(
+            analyze_anytime_history(&restored).unwrap(),
+            analyze_anytime_history(&original).unwrap(),
+        );
+        restored.validate().unwrap();
     }
 
     #[test]
