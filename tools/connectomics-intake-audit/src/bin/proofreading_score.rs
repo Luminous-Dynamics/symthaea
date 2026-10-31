@@ -231,6 +231,8 @@ struct CalibrationDiagnostics {
     reliability_curve_bin_count_requested: usize,
     reliability_curve_bins: Vec<ConfidenceCalibrationBin>,
     reliability_curve_expected_calibration_error: Option<f64>,
+    /// Var(p_error) / (mean(p_error) * (1 - mean(p_error))); None when the denominator is zero.
+    normalized_sharpness: Option<f64>,
     brier_score: Option<f64>,
     log_loss: Option<f64>,
     expected_calibration_error: Option<f64>,
@@ -262,6 +264,7 @@ struct CalibrationClusterBootstrap {
     adaptive_confidence_ece_15_95: Option<Interval>,
     reliability_curve_ece_12_95: Option<Interval>,
     reliability_curve_observed_accuracy_95: Vec<ConfidenceBinClusterBootstrap>,
+    normalized_sharpness_95: Option<Interval>,
     brier_score_95: Option<Interval>,
 }
 
@@ -915,6 +918,7 @@ fn calibration_cluster_bootstrap(
             adaptive_confidence_ece_15_95: None,
             reliability_curve_ece_12_95: None,
             reliability_curve_observed_accuracy_95: Vec::new(),
+            normalized_sharpness_95: None,
             brier_score_95: None,
         };
     }
@@ -926,6 +930,7 @@ fn calibration_cluster_bootstrap(
     let mut mce = Vec::with_capacity(replicates);
     let mut adaptive_ece = Vec::with_capacity(replicates);
     let mut reliability_ece = Vec::with_capacity(replicates);
+    let mut normalized_sharpness = Vec::with_capacity(replicates);
     let reliability_reference = adaptive_confidence_bins(rows, 12);
     let mut reliability_accuracy_by_bin = vec![Vec::with_capacity(replicates); reliability_reference.len()];
     let mut reliability_confidence_by_bin = vec![Vec::with_capacity(replicates); reliability_reference.len()];
@@ -963,18 +968,22 @@ fn calibration_cluster_bootstrap(
                 }
             }
         }
-        if let (Some(e), Some(m), Some(a), Some(r), Some(b)) = (
+        if let (Some(e), Some(m), Some(a), Some(r), Some(sharpness), Some(b)) = (
             metrics.expected_calibration_error,
             metrics.maximum_calibration_error,
             metrics.adaptive_confidence_expected_calibration_error,
             metrics.reliability_curve_expected_calibration_error,
+            metrics.normalized_sharpness,
             metrics.brier_score,
         ) {
-            if e.is_finite() && m.is_finite() && a.is_finite() && r.is_finite() && b.is_finite() {
+            if e.is_finite() && m.is_finite() && a.is_finite() && r.is_finite()
+                && sharpness.is_finite() && b.is_finite()
+            {
                 ece.push(e);
                 mce.push(m);
                 adaptive_ece.push(a);
                 reliability_ece.push(r);
+                normalized_sharpness.push(sharpness);
                 brier.push(b);
             }
         }
@@ -1001,6 +1010,7 @@ fn calibration_cluster_bootstrap(
         adaptive_confidence_ece_15_95: scalar_percentile_interval(adaptive_ece, replicates),
         reliability_curve_ece_12_95: scalar_percentile_interval(reliability_ece, replicates),
         reliability_curve_observed_accuracy_95: per_bin_intervals,
+        normalized_sharpness_95: scalar_percentile_interval(normalized_sharpness, replicates),
         brier_score_95: scalar_percentile_interval(brier, replicates),
     }
 }
@@ -1534,6 +1544,22 @@ fn calibration_diagnostics(rows: &[&Prediction]) -> CalibrationDiagnostics {
         .map(|bin| bin.absolute_calibration_gap)
         .reduce(f64::max);
     let reliability_curve_ece = confidence_bins_ece(&reliability_curve_bins_12, rows.len());
+    let mean_probability = if rows.is_empty() {
+        None
+    } else {
+        Some(rows.iter().map(|row| row.p_error).sum::<f64>() / rows.len() as f64)
+    };
+    let normalized_sharpness = mean_probability.and_then(|mean| {
+        let denominator = mean * (1.0 - mean);
+        if denominator <= f64::EPSILON {
+            None
+        } else {
+            let variance = rows.iter()
+                .map(|row| (row.p_error - mean).powi(2))
+                .sum::<f64>() / rows.len() as f64;
+            Some(variance / denominator)
+        }
+    });
 
     let mut bins = Vec::with_capacity(BIN_COUNT);
     let mut ece = 0.0_f64;
@@ -1572,6 +1598,7 @@ fn calibration_diagnostics(rows: &[&Prediction]) -> CalibrationDiagnostics {
         reliability_curve_bin_count_requested: 12,
         reliability_curve_bins: reliability_curve_bins_12,
         reliability_curve_expected_calibration_error: reliability_curve_ece,
+        normalized_sharpness,
         brier_score: if rows.is_empty() { None } else { Some(brier_sum / rows.len() as f64) },
         log_loss: if rows.is_empty() { None } else { Some(log_loss_sum / rows.len() as f64) },
         expected_calibration_error: if rows.is_empty() { None } else { Some(ece) },
@@ -2469,6 +2496,31 @@ mod tests {
             first.iter().map(|bin| bin.mean_confidence).collect::<Vec<_>>(),
             second.iter().map(|bin| bin.mean_confidence).collect::<Vec<_>>()
         );
+    }
+
+    #[test]
+    fn normalized_sharpness_matches_connectomebench2_definition() {
+        let rows = vec![
+            row("sharp-high", true, 0.9, 0.5, 1.0, 1.0, "merge"),
+            row("sharp-low", false, 0.1, 0.5, 1.0, 1.0, "merge"),
+        ];
+        let refs = rows.iter().collect::<Vec<_>>();
+        let metrics = calibration_diagnostics(&refs);
+        assert_eq!(metrics.normalized_sharpness, Some(0.64));
+
+        let unsharp = vec![
+            row("flat-1", true, 0.5, 0.5, 1.0, 1.0, "merge"),
+            row("flat-2", false, 0.5, 0.5, 1.0, 1.0, "merge"),
+        ];
+        let unsharp_refs = unsharp.iter().collect::<Vec<_>>();
+        assert_eq!(calibration_diagnostics(&unsharp_refs).normalized_sharpness, Some(0.0));
+
+        let degenerate = vec![
+            row("deg-1", false, 0.0, 0.5, 1.0, 1.0, "merge"),
+            row("deg-2", false, 0.0, 0.5, 1.0, 1.0, "merge"),
+        ];
+        let degenerate_refs = degenerate.iter().collect::<Vec<_>>();
+        assert_eq!(calibration_diagnostics(&degenerate_refs).normalized_sharpness, None);
     }
 
     #[test]
