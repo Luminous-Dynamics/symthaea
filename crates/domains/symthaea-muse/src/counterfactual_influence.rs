@@ -1766,6 +1766,43 @@ mod tests {
         }
     }
 
+    fn support_window(
+        window_index: usize,
+        channel: usize,
+        enter: bool,
+        release: bool,
+    ) -> InfluenceWindowMeasurement {
+        InfluenceWindowMeasurement {
+            start_frame: window_index * 10,
+            end_frame: window_index * 10 + 10,
+            channel,
+            rms_delta: if enter { 2.0 } else if release { 0.8 } else { 0.1 },
+            peak_sample_delta: if enter { 2.0 } else if release { 0.8 } else { 0.1 },
+            spectral_magnitude_distance: if enter { 0.2 } else if release { 0.08 } else { 0.01 },
+            calibrated_rms_threshold: 1.0,
+            calibrated_spectral_threshold: 0.1,
+            release_rms_threshold: 0.5,
+            release_spectral_threshold: 0.05,
+            effect_detected: enter,
+            release_detected: release,
+            in_qualified_support: false,
+            bridged_gap: false,
+        }
+    }
+
+    fn support_policy(
+        minimum_active_windows: usize,
+        maximum_gap_windows: usize,
+        tail_extension_frames: u64,
+    ) -> InfluenceSupportPolicy {
+        InfluenceSupportPolicy {
+            minimum_active_windows,
+            maximum_gap_windows,
+            tail_extension_frames,
+            ..InfluenceSupportPolicy::default()
+        }
+    }
+
     fn audio(samples: &[f32]) -> AudioView<'_> {
         AudioView {
             interleaved_samples: samples,
@@ -2389,6 +2426,158 @@ mod tests {
             measure_counterfactual_influence(&experiment, &calibration).unwrap_err(),
             CounterfactualInfluenceError::RendererIdentityMismatch
         );
+    }
+
+    #[test]
+    fn hysteresis_retains_a_sustained_effect_below_the_enter_threshold() {
+        let mut measurements = vec![
+            support_window(0, 0, true, true),
+            support_window(1, 0, false, true),
+            support_window(2, 0, false, true),
+        ];
+        let (intervals, counts) = qualify_support_windows(
+            &mut measurements,
+            1,
+            30,
+            &support_policy(2, 0, 0),
+        )
+        .unwrap();
+        assert_eq!(intervals, vec![FrameInterval { start_frame: 0, end_frame: 30 }]);
+        assert_eq!(counts.qualified_channel_windows, 3);
+        assert!(measurements.iter().all(|window| window.in_qualified_support));
+    }
+
+    #[test]
+    fn isolated_spike_is_preserved_as_raw_evidence_but_not_qualified_support() {
+        let mut measurements = vec![
+            support_window(0, 0, true, true),
+            support_window(1, 0, false, false),
+            support_window(2, 0, false, false),
+        ];
+        assert!(measurements[0].effect_detected);
+        let (intervals, counts) = qualify_support_windows(
+            &mut measurements,
+            1,
+            30,
+            &support_policy(2, 1, 0),
+        )
+        .unwrap();
+        assert!(intervals.is_empty());
+        assert_eq!(counts.qualified_channel_windows, 0);
+        assert!(!measurements[0].in_qualified_support);
+    }
+
+    #[test]
+    fn bounded_single_window_gap_is_bridged_but_longer_gap_closes_episode() {
+        let mut bridged = vec![
+            support_window(0, 0, true, true),
+            support_window(1, 0, false, false),
+            support_window(2, 0, true, true),
+        ];
+        let (intervals, counts) = qualify_support_windows(
+            &mut bridged,
+            1,
+            30,
+            &support_policy(2, 1, 0),
+        )
+        .unwrap();
+        assert_eq!(intervals, vec![FrameInterval { start_frame: 0, end_frame: 30 }]);
+        assert_eq!(counts.bridged_channel_windows, 1);
+        assert!(bridged[1].bridged_gap);
+        assert!(bridged[1].in_qualified_support);
+
+        let mut long_gap = vec![
+            support_window(0, 0, true, true),
+            support_window(1, 0, false, false),
+            support_window(2, 0, false, false),
+            support_window(3, 0, true, true),
+        ];
+        let (intervals, counts) = qualify_support_windows(
+            &mut long_gap,
+            1,
+            40,
+            &support_policy(2, 1, 0),
+        )
+        .unwrap();
+        assert!(intervals.is_empty());
+        assert_eq!(counts.qualified_channel_windows, 0);
+    }
+
+    #[test]
+    fn explicit_tail_extension_is_clamped_to_rendered_output_horizon() {
+        let mut measurements = vec![
+            support_window(0, 0, true, true),
+            support_window(1, 0, false, true),
+        ];
+        let (intervals, counts) = qualify_support_windows(
+            &mut measurements,
+            1,
+            25,
+            &support_policy(2, 0, 20),
+        )
+        .unwrap();
+        assert_eq!(intervals, vec![FrameInterval { start_frame: 0, end_frame: 25 }]);
+        assert_eq!(counts.tail_extension_frames_applied, 5);
+    }
+
+    #[test]
+    fn measured_empty_scan_never_becomes_support_from_tail_policy() {
+        let mut measurements = vec![
+            support_window(0, 0, false, false),
+            support_window(1, 0, false, false),
+            support_window(2, 0, false, false),
+        ];
+        let (intervals, counts) = qualify_support_windows(
+            &mut measurements,
+            1,
+            30,
+            &support_policy(1, 1, 20),
+        )
+        .unwrap();
+        assert!(intervals.is_empty());
+        assert_eq!(counts.tail_extension_frames_applied, 0);
+        assert!(measurements.iter().all(|window| !window.in_qualified_support));
+    }
+
+    #[test]
+    fn channels_are_qualified_independently_before_interval_union() {
+        let mut measurements = vec![
+            support_window(0, 0, true, true),
+            support_window(0, 1, false, false),
+            support_window(1, 0, false, false),
+            support_window(1, 1, true, true),
+            support_window(2, 0, true, true),
+            support_window(2, 1, false, false),
+        ];
+        let (intervals, counts) = qualify_support_windows(
+            &mut measurements,
+            2,
+            30,
+            &support_policy(1, 0, 0),
+        )
+        .unwrap();
+        assert_eq!(
+            intervals,
+            vec![
+                FrameInterval { start_frame: 0, end_frame: 10 },
+                FrameInterval { start_frame: 10, end_frame: 20 },
+                FrameInterval { start_frame: 20, end_frame: 30 },
+            ],
+        );
+        assert_eq!(counts.qualified_channel_windows, 3);
+    }
+
+    #[test]
+    fn invalid_hysteresis_ratios_and_tail_bounds_fail_closed() {
+        let mut invalid_ratio = InfluenceSupportPolicy::default();
+        invalid_ratio.release_threshold_ratio_microunits = 1_000_000;
+        assert!(validate_support_policy(&invalid_ratio, 100, 4).is_err());
+        let mut invalid_tail = InfluenceSupportPolicy::default();
+        invalid_tail.tail_extension_frames = 101;
+        assert!(validate_support_policy(&invalid_tail, 100, 4).is_err());
+        let mut invalid_minimum = InfluenceSupportPolicy::default();
+        invalid_minimum.minimum_active_windows = 5;
+        assert!(validate_support_policy(&invalid_minimum, 100, 4).is_err());
     }
 
     #[test]
