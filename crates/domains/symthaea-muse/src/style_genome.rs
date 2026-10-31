@@ -342,6 +342,8 @@ pub struct GenomeGeneEffectAudit {
     pub status: GeneEffectStatus,
     /// Deterministic ID of the exact one-gene-ablated genotype, when created.
     pub counterfactual_genome_id: Option<String>,
+    /// Digest of the exact recipe after removing only this gene.
+    pub counterfactual_recipe_sha256: Option<String>,
     /// Digest of the exact compiled spec consumed by every paired seed.
     pub counterfactual_compiled_spec_sha256: Option<String>,
     pub seed_count: usize,
@@ -1066,6 +1068,7 @@ fn audit_gene_effects(
                 layer,
                 status: GeneEffectStatus::RendererPending,
                 counterfactual_genome_id: None,
+                counterfactual_recipe_sha256: None,
                 counterfactual_compiled_spec_sha256: None,
                 seed_count: trials.len(),
                 changed_seed_count: 0,
@@ -1089,6 +1092,7 @@ fn audit_gene_effects(
                     layer,
                     status: GeneEffectStatus::CounterfactualUnavailable,
                     counterfactual_genome_id: None,
+                    counterfactual_recipe_sha256: None,
                     counterfactual_compiled_spec_sha256: None,
                     seed_count: trials.len(),
                     changed_seed_count: 0,
@@ -1117,6 +1121,12 @@ fn audit_gene_effects(
                     layer,
                     status: GeneEffectStatus::CounterfactualUnavailable,
                     counterfactual_genome_id: Some(counterfactual_genome.genome_id.clone()),
+                    counterfactual_recipe_sha256: serde_json::to_vec(&counterfactual_genome.recipe)
+                        .ok()
+                        .map(|bytes| domain_sha256(
+                            b"symthaea:muse-style-genome-counterfactual-recipe:v1\\n",
+                            &bytes,
+                        )),
                     counterfactual_compiled_spec_sha256: None,
                     seed_count: trials.len(),
                     changed_seed_count: 0,
@@ -1239,6 +1249,12 @@ fn audit_gene_effects(
             layer,
             status,
             counterfactual_genome_id: Some(counterfactual_genome.genome_id.clone()),
+            counterfactual_recipe_sha256: serde_json::to_vec(&counterfactual_genome.recipe)
+                .ok()
+                .map(|bytes| domain_sha256(
+                    b"symthaea:muse-style-genome-counterfactual-recipe:v1\\n",
+                    &bytes,
+                )),
             counterfactual_compiled_spec_sha256: Some(
                 counterfactual_compiled.provenance.compiled_spec_sha256.clone()
             ),
@@ -1893,10 +1909,11 @@ pub fn reference_population_digest(
 }
 
 fn gene_effect_audits_well_formed(
-    recipe: &HybridStyleSpec,
+    genome: &StyleGenome,
     trials: &[GenomeTrial],
     audits: &[GenomeGeneEffectAudit],
 ) -> bool {
+    let recipe = &genome.recipe;
     let donor_axes = [
         GenomeAxis::Melody,
         GenomeAxis::Rhythm,
@@ -1930,6 +1947,7 @@ fn gene_effect_audits_well_formed(
             if audit.status != GeneEffectStatus::RendererPending
                 || audit.reason.as_ref().is_none_or(|reason| reason.trim().is_empty())
                 || audit.counterfactual_genome_id.is_some()
+                || audit.counterfactual_recipe_sha256.is_some()
                 || audit.counterfactual_compiled_spec_sha256.is_some()
                 || !audit.paired_trials.is_empty()
                 || audit.changed_seed_count != 0
@@ -1939,11 +1957,20 @@ fn gene_effect_audits_well_formed(
             continue;
         }
 
-        let counterfactual_genome_valid = audit
-            .counterfactual_genome_id
-            .as_deref()
-            .and_then(|id| id.strip_prefix("sha256:"))
-            .is_some_and(is_sha256_hex);
+        let expected_counterfactual_genome = genome.replace_gene(audit.axis, None).ok();
+        let expected_counterfactual_recipe_sha256 = expected_counterfactual_genome
+            .as_ref()
+            .and_then(|counterfactual| serde_json::to_vec(&counterfactual.recipe).ok())
+            .map(|bytes| domain_sha256(
+                b"symthaea:muse-style-genome-counterfactual-recipe:v1\\n",
+                &bytes,
+            ));
+        let counterfactual_genome_valid = expected_counterfactual_genome.as_ref().is_some_and(|expected| {
+            audit.counterfactual_genome_id.as_deref() == Some(expected.genome_id.as_str())
+                && audit.counterfactual_recipe_sha256 == expected_counterfactual_recipe_sha256
+                && audit.counterfactual_recipe_sha256.as_ref().is_some_and(is_sha256_hex)
+                && expected.verify_id()
+        });
         let counterfactual_spec_valid = audit
             .counterfactual_compiled_spec_sha256
             .as_deref()
@@ -2076,7 +2103,7 @@ impl GenomeEvaluation {
             && self.seed_count == self.evaluation_config.seeds.len()
             && self.seed_count == self.trials.len()
             && gene_effect_audits_well_formed(
-                &self.genome.recipe,
+                &self.genome,
                 &self.trials,
                 &self.gene_effect_audits,
             )
@@ -2405,6 +2432,9 @@ mod tests {
                 && audit.counterfactual_genome_id.as_ref().is_some_and(|id| {
                     id.strip_prefix("sha256:").is_some_and(is_sha256_hex)
                 })
+                && audit.counterfactual_recipe_sha256
+                    .as_ref()
+                    .is_some_and(is_sha256_hex)
                 && audit.counterfactual_compiled_spec_sha256
                     .as_ref()
                     .is_some_and(is_sha256_hex)
@@ -2415,6 +2445,11 @@ mod tests {
         corrupted.gene_effect_audits[0].paired_trials[0]
             .changed_dimensions
             .clear();
+        assert!(!corrupted.verify_digest());
+
+        let mut corrupted = evaluation.clone();
+        corrupted.gene_effect_audits[0].counterfactual_recipe_sha256 =
+            Some("f".repeat(64));
         assert!(!corrupted.verify_digest());
 
         let mut corrupted = evaluation.clone();
@@ -2446,6 +2481,7 @@ mod tests {
                 && audit.layer == GeneEffectLayer::Renderer
                 && audit.status == GeneEffectStatus::RendererPending
                 && audit.counterfactual_genome_id.is_none()
+                && audit.counterfactual_recipe_sha256.is_none()
                 && audit.counterfactual_compiled_spec_sha256.is_none()
                 && audit.paired_trials.is_empty()
         }));
