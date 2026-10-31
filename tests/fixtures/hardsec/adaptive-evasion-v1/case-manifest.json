@@ -1,0 +1,135 @@
+{
+  "schema_version": "hardsec-adaptive-case-manifest-v1",
+  "campaign_id": "hs012-synthetic-campaign-01",
+  "evidence_domain": "synthetic_fixture",
+  "platform_id": "synthetic-cpu-model-v1",
+  "holdout_axes": [
+    "program",
+    "execution",
+    "attack_family",
+    "adaptation_family"
+  ],
+  "cases": [
+    {
+      "case_id": "tr1",
+      "split": "train",
+      "program_group_id": "train-p",
+      "execution_group_id": "train-e",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "baseline-spectre-v1",
+      "adaptation_family_id": "none",
+      "adaptation_level": 0,
+      "sensor_state": "valid"
+    },
+    {
+      "case_id": "va1",
+      "split": "validation",
+      "program_group_id": "val-p",
+      "execution_group_id": "val-e",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "baseline-spectre-v2",
+      "adaptation_family_id": "none",
+      "adaptation_level": 0,
+      "sensor_state": "valid"
+    },
+    {
+      "case_id": "c1",
+      "split": "test",
+      "program_group_id": "p1",
+      "execution_group_id": "e1",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "evasive-spectre",
+      "adaptation_family_id": "timing",
+      "adaptation_level": 1,
+      "sensor_state": "valid"
+    },
+    {
+      "case_id": "c2",
+      "split": "test",
+      "program_group_id": "p2",
+      "execution_group_id": "e2",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "evasive-spectre",
+      "adaptation_family_id": "interleave",
+      "adaptation_level": 2,
+      "sensor_state": "valid"
+    },
+    {
+      "case_id": "c3",
+      "split": "test",
+      "program_group_id": "p3",
+      "execution_group_id": "e3",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "evasive-spectre",
+      "adaptation_family_id": "timing",
+      "adaptation_level": 2,
+      "sensor_state": "untrusted"
+    },
+    {
+      "case_id": "c4",
+      "split": "test",
+      "program_group_id": "p4",
+      "execution_group_id": "e4",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "evasive-spectre",
+      "adaptation_family_id": "timing",
+      "adaptation_level": 3,
+      "sensor_state": "valid"
+    },
+    {
+      "case_id": "c5",
+      "split": "test",
+      "program_group_id": "p5",
+      "execution_group_id": "e5",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "evasive-spectre",
+      "adaptation_family_id": "interleave",
+      "adaptation_level": 1,
+      "sensor_state": "valid"
+    },
+    {
+      "case_id": "c6",
+      "split": "test",
+      "program_group_id": "p6",
+      "execution_group_id": "e6",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "none",
+      "adaptation_family_id": "none",
+      "adaptation_level": 0,
+      "sensor_state": "valid"
+    },
+    {
+      "case_id": "c7",
+      "split": "test",
+      "program_group_id": "p7",
+      "execution_group_id": "e7",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "none",
+      "adaptation_family_id": "none",
+      "adaptation_level": 0,
+      "sensor_state": "valid"
+    },
+    {
+      "case_id": "c8",
+      "split": "test",
+      "program_group_id": "p8",
+      "execution_group_id": "e8",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "none",
+      "adaptation_family_id": "none",
+      "adaptation_level": 0,
+      "sensor_state": "misaligned"
+    },
+    {
+      "case_id": "c9",
+      "split": "test",
+      "program_group_id": "p9",
+      "execution_group_id": "e9",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "none",
+      "adaptation_family_id": "none",
+      "adaptation_level": 0,
+      "sensor_state": "missing"
+    }
+  ]
+}
