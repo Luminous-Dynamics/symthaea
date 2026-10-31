@@ -758,6 +758,7 @@ mod tests {
             profile.profile_sha256,
             compute_hardware_profile_sha256(&changed).unwrap()
         );
+        assert!(validate_hardware_profile(&changed).is_err());
     }
 
     #[test]
@@ -781,6 +782,14 @@ mod tests {
     }
 
     #[test]
+    fn objective_protocol_must_match_hardware_profile_protocol() {
+        let mut value = registry();
+        value.objectives[0].measurement_protocol_sha256 = sha('f');
+        value.registry_sha256 = compute_objective_registry_sha256(&value).unwrap();
+        assert!(validate_objective_registry(&value).is_err());
+    }
+
+    #[test]
     fn registry_rejects_a_device_hash_without_its_profile_manifest() {
         let mut value = registry();
         value.hardware_profiles.clear();
@@ -790,8 +799,7 @@ mod tests {
 
     #[test]
     fn registry_rejects_a_changed_objective_or_cost_model() {
-        let first = registry();
-        let mut second = first.clone();
+        let mut second = registry();
         second.objectives[0].measurement_cost_model_sha256 = sha('f');
         assert!(validate_objective_registry(&second).is_err());
     }
