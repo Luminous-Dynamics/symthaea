@@ -1152,6 +1152,171 @@ mod tests {
         }
     }
 
+    fn assert_fugue_plan_is_preserved(candidate: &HybridComposition) {
+        match &candidate.grammar_plan {
+            GrammarPlanEvidence::Contrapuntal(plan) => {
+                assert_eq!(plan.engine_version, "compact-fugue-engine-v1");
+                assert_eq!(plan.answer_class, "real_diatonic_fifth");
+                assert_eq!(
+                    plan.subject_entry_order,
+                    vec![
+                        "soprano_subject".to_string(),
+                        "alto_answer".to_string(),
+                        "bass_subject".to_string(),
+                    ]
+                );
+                assert!(plan.countersubject);
+                assert!(plan.inversion);
+                assert!(plan.augmentation);
+                assert!(plan.stretto);
+                assert!(plan.controlled_dissonance);
+                assert!(plan.final_combination);
+            }
+            other => panic!("wrong Fugue grammar plan: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn fugue_adapter_admits_only_hook_modal_and_tempo_fields_that_change_the_score() {
+        let cases = [
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("Fugue"),
+                    melodic_style_id: Some(id_for_composer_style("Blues")),
+                    rhythmic_style_id: None,
+                    harmonic_style_id: None,
+                    ensemble_style_id: None,
+                    performance_style_id: None,
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "melodic contour",
+            ),
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("Fugue"),
+                    melodic_style_id: None,
+                    rhythmic_style_id: Some(id_for_composer_style("Tango")),
+                    harmonic_style_id: None,
+                    ensemble_style_id: None,
+                    performance_style_id: None,
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "hook rhythm",
+            ),
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("Fugue"),
+                    melodic_style_id: None,
+                    rhythmic_style_id: None,
+                    harmonic_style_id: Some(id_for_composer_style("ModalFolk")),
+                    ensemble_style_id: None,
+                    performance_style_id: None,
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "modal pitch collection",
+            ),
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("Fugue"),
+                    melodic_style_id: None,
+                    rhythmic_style_id: None,
+                    harmonic_style_id: None,
+                    ensemble_style_id: None,
+                    performance_style_id: Some(id_for_composer_style("Lullaby")),
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "tempo and attitude",
+            ),
+        ];
+
+        for (hybrid, axis) in cases {
+            let mut changed_scores = 0usize;
+            for seed in 0..64 {
+                let intent = MusicalIntent {
+                    bars: 11,
+                    seed,
+                    ..MusicalIntent::default()
+                };
+                let baseline = symthaea_music_theory::compose_with_grammar_plan(
+                    Style::Fugue.grammar_profile(),
+                    &intent,
+                    &Style::Fugue.spec(),
+                );
+                let candidate = compose_hybrid_style(&intent, &hybrid)
+                    .unwrap_or_else(|issues| panic!("{axis} donor rejected: {issues:?}"));
+                assert!(!candidate.score.notes.is_empty());
+                assert_fugue_plan_is_preserved(&candidate);
+                assert!(!candidate.grammar_trace.structures.is_empty());
+                if baseline.score != candidate.score {
+                    changed_scores += 1;
+                }
+            }
+            assert!(
+                changed_scores > 0,
+                "{axis} donor never changed a same-owner/same-seed Fugue Score"
+            );
+        }
+    }
+
+    #[test]
+    fn fugue_adapter_rejects_non_fitting_or_no_effect_hook_donors() {
+        let no_melody = HybridStyleSpec {
+            structural_style_id: id_for_composer_style("Fugue"),
+            melodic_style_id: Some(id_for_composer_style("Fugue")),
+            rhythmic_style_id: None,
+            harmonic_style_id: None,
+            ensemble_style_id: None,
+            performance_style_id: None,
+            production_style_id: None,
+            culturally_qualified_sources_acknowledged: true,
+        };
+        let issues = compile_hybrid_style(&no_melody).unwrap_err();
+        assert!(issues.iter().any(|issue| issue.code == "fugue_melody_dna_has_no_effect"));
+
+        let no_rhythm = HybridStyleSpec {
+            structural_style_id: id_for_composer_style("Fugue"),
+            melodic_style_id: None,
+            rhythmic_style_id: Some(id_for_composer_style("Fugue")),
+            harmonic_style_id: None,
+            ensemble_style_id: None,
+            performance_style_id: None,
+            production_style_id: None,
+            culturally_qualified_sources_acknowledged: true,
+        };
+        let issues = compile_hybrid_style(&no_rhythm).unwrap_err();
+        assert!(issues.iter().any(|issue| issue.code == "fugue_rhythm_dna_has_no_effect"));
+
+        let wrong_meter = HybridStyleSpec {
+            structural_style_id: id_for_composer_style("Fugue"),
+            melodic_style_id: None,
+            rhythmic_style_id: Some(id_for_composer_style("Flamenco")),
+            harmonic_style_id: None,
+            ensemble_style_id: None,
+            performance_style_id: None,
+            production_style_id: None,
+            culturally_qualified_sources_acknowledged: true,
+        };
+        let issues = compile_hybrid_style(&wrong_meter).unwrap_err();
+        assert!(issues.iter().any(|issue| issue.code == "fugue_rhythm_meter_mismatch"));
+
+        let no_mode = HybridStyleSpec {
+            structural_style_id: id_for_composer_style("Fugue"),
+            melodic_style_id: None,
+            rhythmic_style_id: None,
+            harmonic_style_id: Some(id_for_composer_style("Classical")),
+            ensemble_style_id: None,
+            performance_style_id: None,
+            production_style_id: None,
+            culturally_qualified_sources_acknowledged: true,
+        };
+        let issues = compile_hybrid_style(&no_mode).unwrap_err();
+        assert!(issues.iter().any(|issue| issue.code == "fugue_harmony_requires_explicit_mode"));
+    }
+
     #[test]
     fn groove_cycle_adapter_rejects_generic_accompaniment_donors() {
         let hybrid = HybridStyleSpec {
