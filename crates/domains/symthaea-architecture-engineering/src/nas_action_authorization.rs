@@ -512,14 +512,8 @@ pub fn verify_measurement_preflight(
         ));
     }
 
-    let portfolio_decision_sha256 = digest_serde(
-        b"symthaea.nas.portfolio-voc-decision.v0.1",
-        &voc,
-    )?;
-    let resource_frontier_sha256 = digest_serde(
-        b"symthaea.nas.resource-frontier.v0.1",
-        &frontier,
-    )?;
+    let portfolio_decision_sha256 = compute_portfolio_decision_binding_sha256(&voc)?;
+    let resource_frontier_sha256 = compute_resource_frontier_binding_sha256(&frontier)?;
     let mut receipt = NasActionPreflightReceipt {
         schema: "symthaea.nas.action-preflight".to_owned(),
         version: "0.1.0".to_owned(),
@@ -786,6 +780,72 @@ fn validate_portfolio_decision_scope(
         ));
     }
     Ok(())
+}
+
+fn compute_portfolio_decision_binding_sha256(
+    voc: &PortfolioParetoVoC,
+) -> Result<String, NasAuthorizationError> {
+    let decision = &voc.current_decision;
+    let binding = (
+        voc.action_id.as_str(),
+        voc.expected_posterior_regret,
+        voc.expected_posterior_regret_standard_error,
+        voc.estimated_regret_reduction,
+        voc.estimated_regret_reduction_standard_error,
+        voc.estimated_regret_reduction_interval_95,
+        voc.regret_reduction_per_cost_unit,
+        voc.incremental_cost_units,
+        voc.resource_unit.as_str(),
+        voc.observation_likelihood_model_sha256.as_str(),
+        voc.objective_registry_sha256.as_str(),
+        decision.selected_portfolio_id.as_str(),
+        &decision.selected_candidate_ids,
+        decision.oracle_expected_hypervolume,
+        decision.selected_portfolio_expected_hypervolume,
+        decision.portfolio_class_regret,
+        decision.portfolio_class_regret_standard_error,
+        &decision.validation_regret_replicates,
+        &decision.selection_replicate_indices,
+        &decision.validation_replicate_indices,
+        decision.posterior_particle_count,
+        decision.posterior_sha256.as_str(),
+        decision.portfolio_family_sha256.as_str(),
+        decision.qmc_sampling_design_sha256.as_str(),
+        decision.selection_replicates_sha256.as_str(),
+        decision.validation_replicates_sha256.as_str(),
+    );
+    digest_serde(
+        b"symthaea.nas.portfolio-voc-decision-binding.v0.1",
+        &binding,
+    )
+}
+
+fn compute_resource_frontier_binding_sha256(
+    frontier: &crate::multi_resource_budget::ResourceActionFrontier,
+) -> Result<String, NasAuthorizationError> {
+    let assessments: Vec<_> = frontier
+        .assessments
+        .iter()
+        .map(|assessment| (
+            assessment.action_id.as_str(),
+            assessment.conservative_regret_reduction,
+            assessment.resource_feasible,
+            assessment.benefit_eligible,
+            &assessment.blocked_resources,
+        ))
+        .collect();
+    let binding = (
+        frontier.resource_registry_sha256.as_str(),
+        &assessments,
+        &frontier.frontier_action_ids,
+        &frontier.blocked_action_ids,
+        &frontier.resource_headroom,
+        frontier.lower_bound_z,
+    );
+    digest_serde(
+        b"symthaea.nas.resource-frontier-binding.v0.1",
+        &binding,
+    )
 }
 
 fn compute_instrument_identity_sha256(
