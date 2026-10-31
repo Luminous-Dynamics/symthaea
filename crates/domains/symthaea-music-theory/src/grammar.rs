@@ -612,13 +612,15 @@ mod tests {
         let prog_spec = Style::ProgFolk.spec();
         let prog = compose_with_grammar_plan(Style::ProgFolk.grammar_profile(), &intent, &prog_spec);
         match &prog.plan {
-            GrammarPlanEvidence::ProgSuite(plan) => {
+            GrammarPlanEvidence::ProgSuite(evidence) => {
+                let plan = &evidence.plan;
                 assert_eq!(plan.sections.len(), 4);
                 assert_eq!(
                     plan.sections.iter().map(|section| section.meter).collect::<Vec<_>>(),
                     vec![4, 7, 5, 4]
                 );
                 assert!((plan.expected_total_beats - 80.0).abs() < 1e-7);
+                assert!(evidence.verification.all_verified(), "{:?}", evidence.verification);
             }
             other => panic!("ProgFolk must expose ProgSuite plan, got {other:?}"),
         }
@@ -639,6 +641,7 @@ mod tests {
             GrammarPlanEvidence::Sonata(evidence) => {
                 assert_eq!(evidence.plan.sections.len(), 5);
                 assert!(!evidence.verification.is_empty());
+                assert!(evidence.verification.iter().all(|item| item.verified));
             }
             other => panic!("Sonata must expose its obligation receipt, got {other:?}"),
         }
