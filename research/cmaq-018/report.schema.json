@@ -120,7 +120,12 @@
           "top1_regret_ci95_lower",
           "top1_regret_ci95_upper",
           "terminal_false_safe_rate_ci95_lower",
-          "terminal_false_safe_rate_ci95_upper"
+          "terminal_false_safe_rate_ci95_upper",
+          "effect_sign_accuracy_episode_count",
+          "effect_magnitude_mae_episode_count",
+          "rank_tau_b_episode_count",
+          "top1_regret_episode_count",
+          "terminal_false_safe_rate_episode_count"
         ],
         "properties": {
           "scenario": {
@@ -306,6 +311,31 @@
             ],
             "minimum": 0,
             "maximum": 1
+          },
+          "effect_sign_accuracy_episode_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
+          },
+          "effect_magnitude_mae_episode_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
+          },
+          "rank_tau_b_episode_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
+          },
+          "top1_regret_episode_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
+          },
+          "terminal_false_safe_rate_episode_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
           }
         }
       }
