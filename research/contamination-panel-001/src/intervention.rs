@@ -454,12 +454,19 @@ pub fn randomize_intervention(
             })
         });
         let stratum_count = ranked.len();
-        let exposed_count = (stratum_count
+        let rounded_exposed_count = (stratum_count
             .checked_mul(usize::from(design.target_exposure_fraction_permille))
             .ok_or_else(|| "stratum exposure count overflows usize".to_owned())?
             + 500)
             / 1_000;
-        let exposed_count = exposed_count.min(stratum_count);
+        let exposed_count = if design.target_exposure_fraction_permille == 0 {
+            0
+        } else if design.target_exposure_fraction_permille == 1_000 {
+            stratum_count
+        } else {
+            // Any interior dose must contain both treatment and placebo clusters.
+            rounded_exposed_count.max(1).min(stratum_count - 1)
+        };
         allocation_strata.push(AllocationStratumV1 {
             task_family,
             size_bucket: bucket,
@@ -779,6 +786,25 @@ mod tests {
         );
         assert!(manifest.exposed_training_token_count > 0);
         assert!(manifest.actual_exposure_token_fraction_permille <= 1_000);
+    }
+
+    #[test]
+    fn extreme_interior_doses_still_leave_both_arms_in_every_stratum() {
+        let mut one_permille = design();
+        one_permille.target_exposure_fraction_permille = 1;
+        let low_manifest = randomize_intervention(&one_permille, &seed()).unwrap();
+        assert!(low_manifest.allocation_strata.iter().all(|stratum| {
+            stratum.exposed_cluster_count == 1
+                && stratum.exposed_cluster_count < stratum.cluster_count
+        }));
+
+        let mut nine_nine_nine = design();
+        nine_nine_nine.target_exposure_fraction_permille = 999;
+        let high_manifest = randomize_intervention(&nine_nine_nine, &seed()).unwrap();
+        assert!(high_manifest.allocation_strata.iter().all(|stratum| {
+            stratum.exposed_cluster_count == stratum.cluster_count - 1
+                && stratum.exposed_cluster_count > 0
+        }));
     }
 
     #[test]
