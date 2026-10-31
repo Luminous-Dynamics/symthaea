@@ -6,7 +6,6 @@
 //! This is a reference baseline, not a claim of state-of-the-art performance.
 
 use std::collections::BTreeMap;
-use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
 
@@ -14,10 +13,6 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use super::pareto_benchmarks::{dtlz2_three_objectives, zdt1_objectives};
-use super::pareto_objectives::{
-    analyze_pareto, ObjectiveDirection, ParetoAnalysisPlan, ParetoAnalysisSummary,
-    ParetoCandidate, ParetoError, ParetoObjectiveSpec,
-};
 use super::pareto_objectives::{
     analyze_pareto, ObjectiveDirection, ParetoAnalysisPlan, ParetoAnalysisSummary,
     ParetoCandidate, ParetoError, ParetoObjectiveSpec,
@@ -433,7 +428,6 @@ where
     let nondominated_front = front_indices.iter()
         .map(|index| to_candidate(&population[*index]))
         .collect::<Result<Vec<_>, _>>()?;
-    let final_population = final_population;
     let mut nondominated_front = nondominated_front;
     // Final population order is the subproblem/weight-vector order and must be preserved.
     nondominated_front.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
