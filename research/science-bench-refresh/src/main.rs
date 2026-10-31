@@ -23,6 +23,9 @@ use science_bench_refresh_validator::judge_robustness::{
 use science_bench_refresh_validator::intervention_quality::{
     analyze_intervention_quality, compute_intervention_quality_plan_commitment,
 };
+use science_bench_refresh_validator::intervention_target_delta::{
+    analyze_intervention_target_delta, compute_target_delta_plan_commitment,
+};
 use science_bench_refresh_validator::leakage_audit::audit_policy_input_overlap;
 use science_bench_refresh_validator::lineage_audit::audit_lineage_overlap;
 use science_bench_refresh_validator::paired_outcome_analysis::analyze_paired_evidence_outcomes;
@@ -64,6 +67,8 @@ fn usage(program: &str) {
             "  {program} verify-judge-robustness-report PLAN.json REPORT.json\n",
             "  {program} commit-intervention-quality-plan PLAN_FIELDS.json\n",
             "  {program} analyze-intervention-quality PLAN.json RECEIPT.json\n",
+            "  {program} commit-intervention-target-delta-plan PLAN_FIELDS.json QUALITY_PLAN.json\n",
+            "  {program} analyze-intervention-target-delta QUALITY_PLAN.json QUALITY_RECEIPT.json TARGET_PLAN.json TARGET_RECEIPT.json\n",
             "  {program} commit-judge-factorial-plan PLAN_FIELDS.json\n",
             "  {program} verify-judge-factorial-plan PLAN.json\n",
             "  {program} analyze-judge-factorial PLAN.json RECEIPT.json\n",
@@ -183,6 +188,78 @@ fn run(args: &[String]) -> ExitCode {
                         "{}",
                         serde_json::to_string_pretty(&report)
                             .expect("judge factorial analysis report serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "commit-intervention-target-delta-plan" => {
+            if args.len() != 3 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let fields_bytes = match read(&args[1], "target-delta plan fields") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let quality_plan_bytes = match read(&args[2], "parent intervention quality plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match compute_target_delta_plan_commitment(&fields_bytes, &quality_plan_bytes) {
+                Ok(commitment) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_intervention_target_delta_plan_commitment.v1",
+                            "plan_commitment_sha256": commitment
+                        }))
+                        .expect("target-delta plan commitment serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "analyze-intervention-target-delta" => {
+            if args.len() != 5 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let quality_plan_bytes = match read(&args[1], "parent intervention quality plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let quality_receipt_bytes = match read(&args[2], "parent intervention quality receipt") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let target_plan_bytes = match read(&args[3], "target-delta plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let target_receipt_bytes = match read(&args[4], "target-delta receipt") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match analyze_intervention_target_delta(
+                &quality_plan_bytes,
+                &quality_receipt_bytes,
+                &target_plan_bytes,
+                &target_receipt_bytes,
+            ) {
+                Ok(report) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&report)
+                            .expect("target-delta report serializes")
                     );
                     ExitCode::SUCCESS
                 }
