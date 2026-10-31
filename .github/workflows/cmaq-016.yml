@@ -39,6 +39,7 @@ jobs:
           report = json.loads(Path("/tmp/cmaq-016-report.json").read_text())
           assert report["schema_version"] == "cmaq-016-search-exploitability-v0.1"
           assert report["episode_count"] == 256
+          assert report["evaluator_diagnostic_grid_points"] == 201
           assert report["candidate_budgets"] == [8, 32, 128, 512]
           assert report["scenarios"] == ["benign_iid_noise", "narrow_optimism_pocket"]
           assert len(report["summary"]) == 2 * 4 * 5
