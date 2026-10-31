@@ -138,12 +138,6 @@ struct InterventionPayloadEntryV1<'a> {
     token_count: u64,
 }
 
-#[derive(Debug, Clone, Serialize)]
-struct DesignDigestPayloadV1<'a> {
-    schema: &'a str,
-    design: &'a RandomizedInterventionDesignV1,
-}
-
 fn valid_digest(value: &str) -> bool {
     value.len() == 64
         && value
@@ -182,12 +176,9 @@ fn validate_utc_timestamp(value: &str, label: &str) -> Result<(), String> {
 fn expected_design_sha256(
     design: &RandomizedInterventionDesignV1,
 ) -> Result<String, String> {
-    let payload = DesignDigestPayloadV1 {
-        schema: "symthaea.randomized_contamination_intervention_design_digest.v1",
-        design,
-    };
-    let bytes = serde_json::to_vec(&payload)
-        .map_err(|error| format!("cannot serialize design digest payload: {error}"))?;
+    // This must remain byte-for-byte consistent with randomize_intervention.
+    let bytes = serde_json::to_vec(design)
+        .map_err(|error| format!("cannot serialize intervention design: {error}"))?;
     Ok(hash_domain(b"randomized-intervention-design.v1", &bytes))
 }
 
@@ -510,7 +501,6 @@ mod tests {
         SourceClusterV1, TrainingStageV1,
     };
     use serde_json::Value;
-    use std::collections::BTreeSet;
 
     fn digest(label: &str) -> String {
         hash_domain(b"training-receipt-test", label.as_bytes())
@@ -662,6 +652,10 @@ mod tests {
     fn paired_complete_receipt_is_consistent_but_not_cryptographically_verified() {
         let report = validate_fixture().unwrap();
         assert!(report.valid);
+        assert_eq!(
+            report.design_sha256,
+            expected_design_sha256(&design()).unwrap()
+        );
         assert!(report.execution_consistent);
         assert!(report.treatment_completed && report.placebo_completed);
         assert!(report.paired_checkpoints_distinct);
@@ -692,7 +686,6 @@ mod tests {
         let design = design();
         let manifest = randomize_intervention(&design, &seed()).unwrap();
         let mut receipt = paired_receipt(&design, &manifest);
-        receipt.placebo.observed_intervention_token_count += 1;
         receipt.placebo.observed_total_training_token_count += 1;
         receipt.pair_receipt_sha256.clear();
         let bytes0 = serde_json::to_vec(&receipt).unwrap();
