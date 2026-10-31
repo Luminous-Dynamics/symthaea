@@ -117,6 +117,7 @@ pub enum PhaseVerificationError {
     StreamIdMismatch,
     PublicDigestMismatch,
     OracleDigestMismatch,
+    SeedReplayMismatch,
     InvalidTaskContract,
     InvalidOracleMode,
     InvalidShiftSchedule,
@@ -132,6 +133,7 @@ impl fmt::Display for PhaseVerificationError {
             Self::StreamIdMismatch => write!(f, "phase task and oracle stream IDs differ"),
             Self::PublicDigestMismatch => write!(f, "phase public stream SHA-256 digest mismatch"),
             Self::OracleDigestMismatch => write!(f, "phase oracle SHA-256 digest mismatch"),
+            Self::SeedReplayMismatch => write!(f, "phase task/oracle do not match the supplied seed and configuration"),
             Self::InvalidTaskContract => write!(f, "phase task timing or stream length is invalid"),
             Self::InvalidOracleMode => write!(f, "phase oracle fields do not match the declared mode"),
             Self::InvalidShiftSchedule => write!(f, "phase/frequency shift time is outside the allowed range"),
@@ -512,6 +514,24 @@ pub fn score_phase_predictions(
     Ok(score)
 }
 
+/// Verify a phase stream by rebuilding it from evaluator-held seed/configuration.
+///
+/// This rejects a recommitted but seed-inconsistent stream, beyond the
+/// semantic and SHA-256 checks performed by verify_phase_trace.
+pub fn verify_phase_trace_seeded(
+    task: &PhaseTask,
+    oracle: &PhaseOracle,
+    config: PhaseConfig,
+) -> Result<(), PhaseVerificationError> {
+    verify_phase_trace(task, oracle)?;
+    let (expected_task, expected_oracle) = generate_phase_task(config)
+        .map_err(|_| PhaseVerificationError::SeedReplayMismatch)?;
+    if task != &expected_task || oracle != &expected_oracle {
+        return Err(PhaseVerificationError::SeedReplayMismatch);
+    }
+    Ok(())
+}
+
 fn validate_config(config: PhaseConfig) -> Result<(), PhaseGenerationError> {
     if config.slots < 3 {
         return Err(PhaseGenerationError::TooFewSlots {
@@ -707,6 +727,18 @@ mod tests {
         assert_ne!(oracle.period_before_us, oracle.period_after_us);
         assert!(oracle.phase_jump_us > 0);
         assert_eq!(verify_phase_trace(&task, &oracle), Ok(()));
+    }
+
+    #[test]
+    fn seeded_verifier_rejects_recommitted_phase_sample_mutation() {
+        let config = PhaseConfig::reference(2_026, PhaseMode::Mixed);
+        let (mut task, oracle) = generate_phase_task(config).unwrap();
+        task.observations[0].sample ^= 1;
+        task.content_sha256 = phase_content_digest(&task);
+        assert_eq!(
+            verify_phase_trace_seeded(&task, &oracle, config),
+            Err(PhaseVerificationError::SeedReplayMismatch)
+        );
     }
 
     #[test]
