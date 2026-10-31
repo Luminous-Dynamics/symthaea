@@ -67,6 +67,116 @@ pub struct MultiTimescaleOracle {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TemporalVerificationError {
+    StreamIdMismatch,
+    OracleLengthMismatch,
+    InvalidOracleTarget { source_step: u64 },
+    MissingObservation { step: u64 },
+    InvalidObservationOrder { step: u64 },
+    MissingFeedback { source_step: u64 },
+    InvalidFeedback { source_step: u64 },
+    UnexpectedTrailingEvent,
+}
+
+impl fmt::Display for TemporalVerificationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::StreamIdMismatch => write!(f, "public task and oracle stream IDs differ"),
+            Self::OracleLengthMismatch => write!(f, "oracle target count differs from observation count"),
+            Self::InvalidOracleTarget { source_step } => {
+                write!(f, "oracle target record is invalid at source step {source_step}")
+            }
+            Self::MissingObservation { step } => {
+                write!(f, "missing observation event at step {step}")
+            }
+            Self::InvalidObservationOrder { step } => {
+                write!(f, "observation event has invalid time or ordinal at step {step}")
+            }
+            Self::MissingFeedback { source_step } => {
+                write!(f, "missing delayed feedback for source step {source_step}")
+            }
+            Self::InvalidFeedback { source_step } => {
+                write!(f, "delayed feedback is early, reordered, or has an invalid label for source step {source_step}")
+            }
+            Self::UnexpectedTrailingEvent => write!(f, "public task has unexpected trailing events"),
+        }
+    }
+}
+
+impl std::error::Error for TemporalVerificationError {}
+
+/// Verify the public event trace against the evaluator-owned oracle.
+///
+/// Run this only inside the evaluator process, never in the candidate model's
+/// execution process. The function checks stream identity, complete ordered
+/// observations, target-horizon binding, feedback timing, feedback labels,
+/// and absence of extra events. It does not itself create process isolation.
+pub fn verify_multiscale_trace(
+    task: &MultiTimescaleTask,
+    oracle: &MultiTimescaleOracle,
+) -> Result<(), TemporalVerificationError> {
+    if task.stream_id != oracle.stream_id {
+        return Err(TemporalVerificationError::StreamIdMismatch);
+    }
+
+    let target_count = u64::try_from(oracle.targets.len()).unwrap_or(u64::MAX);
+    if target_count != oracle.targets.len() as u64 {
+        return Err(TemporalVerificationError::OracleLengthMismatch);
+    }
+
+    for (index, target) in oracle.targets.iter().enumerate() {
+        let source_step = u64::try_from(index).unwrap_or(u64::MAX);
+        if target.source_step != source_step
+            || target.target_step != source_step.saturating_add(task.forecast_horizon)
+            || !(-1..=1).contains(&target.label)
+            || target.label == 0
+        {
+            return Err(TemporalVerificationError::InvalidOracleTarget { source_step });
+        }
+    }
+
+    let mut cursor = 0_usize;
+    for step in 0..target_count {
+        let observation = task.events.get(cursor).ok_or(
+            TemporalVerificationError::MissingObservation { step },
+        )?;
+        if observation.step != step
+            || observation.ordinal != 0
+            || !matches!(&observation.kind, TemporalEventKind::Observation { .. })
+        {
+            return Err(TemporalVerificationError::InvalidObservationOrder { step });
+        }
+        cursor = cursor.saturating_add(1);
+
+        if step >= task.feedback_delay {
+            let source_step = step - task.feedback_delay;
+            let feedback = task.events.get(cursor).ok_or(
+                TemporalVerificationError::MissingFeedback { source_step },
+            )?;
+            let expected_label = oracle.targets[
+                usize::try_from(source_step).unwrap_or(usize::MAX)
+            ].label;
+            match &feedback.kind {
+                TemporalEventKind::Feedback { source_step: actual_source, label }
+                    if feedback.step == step
+                        && feedback.ordinal == 1
+                        && *actual_source == source_step
+                        && *label == expected_label => {}
+                _ => {
+                    return Err(TemporalVerificationError::InvalidFeedback { source_step });
+                }
+            }
+            cursor = cursor.saturating_add(1);
+        }
+    }
+
+    if cursor != task.events.len() {
+        return Err(TemporalVerificationError::UnexpectedTrailingEvent);
+    }
+    Ok(())
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TemporalGenerationError {
     ZeroSteps,
     TooManySteps { requested: usize, maximum: usize },
@@ -366,6 +476,69 @@ mod tests {
         for target in oracle.targets {
             assert_eq!(target.target_step - target.source_step, 7);
         }
+    }
+
+    #[test]
+    fn generated_trace_passes_independent_oracle_verifier() {
+        let (task, oracle) = generate_multiscale_task(config(true)).unwrap();
+        assert_eq!(verify_multiscale_trace(&task, &oracle), Ok(()));
+    }
+
+    #[test]
+    fn verifier_rejects_mutated_feedback_label() {
+        let (mut task, oracle) = generate_multiscale_task(config(true)).unwrap();
+        let event = task
+            .events
+            .iter_mut()
+            .find(|event| matches!(&event.kind, TemporalEventKind::Feedback { .. }))
+            .unwrap();
+        if let TemporalEventKind::Feedback { label, .. } = &mut event.kind {
+            *label = -*label;
+        }
+        assert!(matches!(
+            verify_multiscale_trace(&task, &oracle),
+            Err(TemporalVerificationError::InvalidFeedback { .. })
+        ));
+    }
+
+    #[test]
+    fn verifier_rejects_early_feedback() {
+        let (mut task, oracle) = generate_multiscale_task(config(true)).unwrap();
+        let event = task
+            .events
+            .iter_mut()
+            .find(|event| matches!(&event.kind, TemporalEventKind::Feedback { .. }))
+            .unwrap();
+        event.step = event.step.saturating_sub(1);
+        assert!(matches!(
+            verify_multiscale_trace(&task, &oracle),
+            Err(TemporalVerificationError::InvalidFeedback { .. })
+        ));
+    }
+
+    #[test]
+    fn verifier_rejects_missing_feedback() {
+        let (mut task, oracle) = generate_multiscale_task(config(true)).unwrap();
+        let index = task
+            .events
+            .iter()
+            .position(|event| matches!(&event.kind, TemporalEventKind::Feedback { .. }))
+            .unwrap();
+        task.events.remove(index);
+        assert!(matches!(
+            verify_multiscale_trace(&task, &oracle),
+            Err(TemporalVerificationError::MissingFeedback { .. })
+        ));
+    }
+
+    #[test]
+    fn verifier_rejects_oracle_mismatch() {
+        let (task, mut oracle) = generate_multiscale_task(config(true)).unwrap();
+        oracle.stream_id ^= 1;
+        assert_eq!(
+            verify_multiscale_trace(&task, &oracle),
+            Err(TemporalVerificationError::StreamIdMismatch)
+        );
     }
 
     #[test]
