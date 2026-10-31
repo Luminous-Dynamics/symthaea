@@ -125,7 +125,10 @@
           "effect_magnitude_mae_episode_count",
           "rank_tau_b_episode_count",
           "top1_regret_episode_count",
-          "terminal_false_safe_rate_episode_count"
+          "terminal_false_safe_rate_episode_count",
+          "null_false_effect_episode_count",
+          "null_false_effect_rate_ci95_lower",
+          "null_false_effect_rate_ci95_upper"
         ],
         "properties": {
           "scenario": {
@@ -336,6 +339,27 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 64
+          },
+          "null_false_effect_episode_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
+          },
+          "null_false_effect_rate_ci95_lower": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "null_false_effect_rate_ci95_upper": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
           }
         }
       }
