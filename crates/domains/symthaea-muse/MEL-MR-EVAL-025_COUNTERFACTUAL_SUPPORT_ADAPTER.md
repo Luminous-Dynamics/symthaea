@@ -59,6 +59,8 @@ Eleven adapter tests cover:
 - Aggregate output sorts events canonically, preserves the output frame horizon and marks the route graph incomplete.
 - Missing/duplicate source event records reject.
 - Mixed renderer configuration/effects topology across per-event scans rejects.
+- Trailing quiet windows count only when all channels are quiet and each window begins after the final note-off.
+- A live final-channel window, truncated window trace or malformed channel layout rejects tail-clearance evidence.
 - An existing renderer receipt replay test now asserts that effects-group count is recovered from the exact argv.
 
 ## Current EVAL-017 limitation
