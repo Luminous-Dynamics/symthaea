@@ -75,6 +75,44 @@ Proposed targets (not results or external standards):
 - p95 preflight below 250 ms on a warm host;
 - deterministic stable-field report digest for repeated inventories on the same boot and namespace.
 
+## Industry observer comparison
+
+BASALT should not pretend to replace established kernel telemetry engines. It should use them as candidate observation adapters and benchmark the evidence they actually provide.
+
+| Engine | Documented strength | BASALT comparison target |
+|---|---|---|
+| Falco Modern eBPF | CO-RE/BTF-based syscall event capture, configurable ring-buffer transport, and kernel-event rules | Compare event completeness, buffer-loss reporting, and task-to-resource identity on the same workload. Falco's event-source model currently does not correlate events across separate sources. |
+| Tetragon | Process exec/exit visibility by default; custom policies can add tracepoint and kprobe observations and enforcement | Compare process lineage, file/network event coverage, task-scoped capture boundaries, and evidence needed to bind a build result to consumed inputs. |
+| fanotify | Filesystem notification and permission-event interfaces | Keep as an independent filesystem lane, with explicit mmap, remote filesystem, recursion-race and queue-overflow exclusions. |
+| Linux BPF LSM / tracepoints | Hooks selected kernel security operations and process lifecycle points | Pin exact hook set, kernel/BTF identity, attachment links, privilege requirements, and every loss counter. |
+| BASALT composed observer (target) | Independent oracle, per-profile coverage envelope, root-class manifest, and evidence-retention adjudication | Demonstrate that independently observed inputs match the challenge oracle and that a changed dependency cannot leave stale evidence reusable. |
+
+Falco documents its modern eBPF probe requirements (BTF and ring-buffer support), configurable buffer arrangements and kernel-event source architecture. Its event-source documentation says that event sources are processed separately and events from different sources are not correlated. Tetragon's documentation describes default process exec/exit events and custom tracepoint/kprobe policies. These are strong production baselines for telemetry, but their primary objectives are runtime security visibility and enforcement, not proving the dependency closure of an individual build/test execution.
+
+Primary references:
+- Falco kernel event source: https://falco.org/docs/concepts/event-sources/kernel/
+- Falco event source correlation model: https://falco.org/docs/concepts/event-sources/
+- Falco supported events: https://falco.org/docs/reference/rules/supported-events/
+- Tetragon events: https://tetragon.io/docs/concepts/events/
+- Tetragon use cases and tracing policies: https://tetragon.io/docs/use-cases/
+- Tetragon observability metrics: https://tetragon.io/docs/reference/metrics/
+
+**How BASALT could do better:** do not compete on alert throughput alone. Run Falco, Tetragon, fanotify, and a BASALT-specific BPF/tracepoint adapter against the same controlled task lineages and mutation oracle. Score each lane on seeded dependency recall, event-loss disclosure, stable resource identity, unsupported-channel honesty, and stale-evidence false acceptance. Then compose lanes without majority voting: one credible conflict or a missing required source downgrades coverage. A 100% event count is not enough if the events cannot be bound to the exact task, root snapshot and resource versions.
+
+## Capability-inventory benchmark protocol
+
+The machine-readable protocol is `benchmarks/basalt/linux-capability-inventory-benchmark.v1.json`, with strict schema `benchmarks/basalt/schema/linux-capability-inventory-benchmark.v1.schema.json`. It defines five comparison arms (config-only, sysfs/procfs/mount inventory, bpftool feature probe, runtime smoke tests, and BASALT preflight), eight metrics and five mandatory safety gates.
+
+Targets include:
+- at least 99% capability-status accuracy against independently established host support;
+- zero false promotions when supporting evidence is unknown or inaccessible;
+- 100% report/schema conformance and host-identity binding;
+- zero host-side effects from the preflight;
+- at least 99.9% reproducibility for stable report fields on the same boot and mount namespace;
+- p95 preflight latency no more than 250 ms and p95 report size no more than 64 KiB.
+
+These are proposed targets, not measured results or industry standards. Hosts, kernel boots and mount namespaces are the independent units; repeated reads from one host do not inflate sample size. Candidate availability remains weaker than successful runtime attach or capture.
+
 ## Next step after this inventory
 
 The next implementation should add **explicit, opt-in runtime smoke tests** as a separate command, not silently extend this read-only command. Each smoke test must have its own privilege declaration, resource limits, teardown verification, syscall/attach evidence and failure cleanup. The smoke-test report must still be distinct from a capture receipt: a feature can pass a simple attach/permission test and still fail to cover every relevant event under workload pressure.
