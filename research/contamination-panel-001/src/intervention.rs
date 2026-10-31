@@ -842,6 +842,7 @@ mod tests {
     fn extreme_interior_doses_still_leave_both_arms_in_every_stratum() {
         let mut one_permille = design();
         one_permille.target_exposure_fraction_permille = 1;
+        one_permille.shared_training_token_count = 1_998_000;
         let low_manifest = randomize_intervention(&one_permille, &seed()).unwrap();
         assert!(low_manifest.allocation_strata.iter().all(|stratum| {
             stratum.exposed_cluster_count == 1
@@ -850,6 +851,7 @@ mod tests {
 
         let mut nine_nine_nine = design();
         nine_nine_nine.target_exposure_fraction_permille = 999;
+        nine_nine_nine.shared_training_token_count = 1_986_000;
         let high_manifest = randomize_intervention(&nine_nine_nine, &seed()).unwrap();
         assert!(high_manifest.allocation_strata.iter().all(|stratum| {
             stratum.exposed_cluster_count == stratum.cluster_count - 1
