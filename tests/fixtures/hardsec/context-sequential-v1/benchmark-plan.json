@@ -30,7 +30,8 @@
     "adaptive_interleaving",
     "unseen_context",
     "invalid_sensor",
-    "persistent_attack_effect"
+    "persistent_attack_effect",
+    "perfectly_dependent_shared_latent_null"
   ],
   "holdout_axes": [
     "execution",
