@@ -17,7 +17,7 @@ Likewise, distinct latent processes can produce identical values at every schedu
 ## 2. Transient observability scorer
 
 The evaluator module consumes:
-- episode duration and maximum-gap/observation/energy budgets;
+- episode duration, maximum gap, observation/energy budgets and an evaluator-declared minimum detectable amplitude;
 - candidate observation timestamps;
 - evaluator-owned hidden transient intervals and amplitudes;
 - candidate event decisions and decision timestamps;
@@ -91,7 +91,7 @@ Compare both fixed observation/energy budget and fixed decision quality. Do not 
 
 ## 5. Source-level implementation
 
-The package exports `pub mod sensing` from the evaluator-only binary crate. Ten authored tests cover:
+The package exports `pub mod sensing` from the evaluator-only binary crate. Twelve authored tests cover:
 - directly observed transient detection and latency;
 - observable-but-missed event;
 - transient entirely between samples;
