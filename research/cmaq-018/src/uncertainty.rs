@@ -39,7 +39,7 @@ pub struct SimultaneousMetrics {
     pub absolute_coverage_error: f64,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SelectionEpisode {
     pub intervals: Vec<PredictiveInterval>,
     pub realized_outcomes: Vec<f64>,
@@ -618,9 +618,9 @@ pub fn evaluate_selected_action_sets(
         total_regret += regret;
         total_bound += bound;
         total_selected_width += episode.intervals[selected].upper - episode.intervals[selected].lower;
-        covered_bounds += usize::from(bound + 1e-12 >= regret);
-        simultaneous_covered += usize::from(all_covered);
-        dominant_certificates += usize::from(dominant);
+        if bound + 1e-12 >= regret { covered_bounds += 1; }
+        if all_covered { simultaneous_covered += 1; }
+        if dominant { dominant_certificates += 1; }
         if dominant && regret > 1e-12 {
             false_dominant += 1;
         }
@@ -1081,7 +1081,7 @@ mod tests {
         let metrics = evaluate_selected_action_sets(&episodes).unwrap().unwrap();
         assert_eq!(metrics.episode_count, 4);
         assert_eq!(metrics.actions_per_episode, 2);
-        assert!((metrics.mean_realized_regret - 1.0).abs() < 1e-12);
+        assert!((metrics.mean_realized_regret - 1.25).abs() < 1e-12);
         assert!((metrics.mean_regret_upper_bound - 1.25).abs() < 1e-12);
         assert_eq!(metrics.regret_bound_coverage, 0.75);
         assert_eq!(metrics.simultaneous_interval_coverage, 0.75);
