@@ -246,10 +246,10 @@ def select_capacity_aware_sequence(
             "time": t,
             "rejection_mask": best_mask,
             "rejections": [i + 1 for i in range(t) if (best_mask >> i) & 1],
-            "utility": best_value,
-            "cumulative_cost": best_cost,
-            "cumulative_capacity": capacity[t - 1],
-            "minimum_closure_slack": selected_check["minimum_closure_slack"],
+            "utility": _fraction_pair(best_value),
+            "cumulative_cost": _fraction_pair(best_cost),
+            "cumulative_capacity": _fraction_pair(capacity[t - 1]),
+            "minimum_closure_slack": _fraction_pair(selected_check["minimum_closure_slack"]),
             "worst_intersection_mask": selected_check["worst_intersection_mask"],
             "intersections_checked_for_selected_set": selected_check["intersections_checked"],
             "candidate_sets_considered": candidate_count,
@@ -270,8 +270,8 @@ def select_capacity_aware_sequence(
             "SupFDR <= delta conditional on valid marginal e-values, the "
             "increasing e-collection and the online e-closure theorem assumptions"
         ),
-        "delta": level,
-        "gamma": g,
+        "delta": _fraction_pair(level),
+        "gamma": [_fraction_pair(x) for x in g],
         "decisions": decisions,
         "verification": verification,
         "limitations": [
@@ -319,6 +319,13 @@ def verify_decision_sequence(
         if actual_cost < previous_cost:
             # Costs are nonnegative and sets nested; this is a consistency guard.
             failures.append(("cumulative_cost_decreased", t))
+        actual_value = _mask_value(mask, v, t)
+        if decision.get("utility") != _fraction_pair(actual_value):
+            failures.append(("utility_receipt_mismatch", t))
+        if decision.get("cumulative_cost") != _fraction_pair(actual_cost):
+            failures.append(("cost_receipt_mismatch", t))
+        if decision.get("cumulative_capacity") != _fraction_pair(capacity[index]):
+            failures.append(("capacity_receipt_mismatch", t))
         closure = verify_certified_set(mask, t, e, g, level)
         checked += closure["intersections_checked"]
         if not closure["certified"]:
@@ -329,8 +336,12 @@ def verify_decision_sequence(
         expected_digest = _prefix_digest(e, g, level, v, c, capacity, t)
         if decision.get("prefix_sha256") != expected_digest:
             failures.append(("prefix_digest_mismatch", t))
-        if decision.get("minimum_closure_slack") != closure["minimum_closure_slack"]:
+        if decision.get("minimum_closure_slack") != _fraction_pair(closure["minimum_closure_slack"]):
             failures.append(("closure_slack_receipt_mismatch", t))
+        if decision.get("worst_intersection_mask") != closure["worst_intersection_mask"]:
+            failures.append(("worst_intersection_receipt_mismatch", t))
+        if decision.get("intersections_checked_for_selected_set") != closure["intersections_checked"]:
+            failures.append(("intersection_count_receipt_mismatch", t))
         previous_mask = mask
         previous_cost = actual_cost
 
