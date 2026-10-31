@@ -55,7 +55,7 @@ jobs:
           assert profile_example["claim_ceiling"] == (
               "measurement_profile_contract_only_receipt_bytes_must_be_independently_verified"
           )
-          assert receipt_example["resource_profile_sha256"] == "a" * 64
+          assert receipt_example["resource_profile_sha256"] == "387121ab0b8792f166c5acf3efce961f90c9edea48d2c2387cd0ccd0fd318d47"
           assert receipt_example["claim_ceiling"] == (
               "artifact_content_integrity_verified_profiler_and_hardware_origin_unattested"
           )
