@@ -811,6 +811,11 @@ mod tests {
 
         let first_oracle = &bundle.sealed_oracle_packet.entries[0];
         let oracle_entry_schema = &oracle_schema["properties"]["entries"]["items"]["properties"];
+        let actual_entry: BTreeSet<String> = serde_json::to_value(first_oracle)
+            .unwrap().as_object().unwrap().keys().cloned().collect();
+        let expected_entry: BTreeSet<String> = oracle_entry_schema.as_object()
+            .unwrap().keys().cloned().collect();
+        assert_eq!(actual_entry, expected_entry);
         let actual_parameters: BTreeSet<String> = serde_json::to_value(&first_oracle.parameters)
             .unwrap().as_object().unwrap().keys().cloned().collect();
         let expected_parameters: BTreeSet<String> = oracle_entry_schema["parameters"]["properties"]
