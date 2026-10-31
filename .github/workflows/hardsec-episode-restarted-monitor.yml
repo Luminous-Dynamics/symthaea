@@ -5,9 +5,12 @@ on:
     paths:
       - "examples/hardsec_episode_restarted_monitor.rs"
       - "examples/hardsec_pmu_metrology_audit.rs"
+      - "examples/hardsec_context_assignment_audit.rs"
       - "docs/research/HARDSEC_021_EPISODE_RESTARTED_CONFORMAL.md"
       - "schemas/hardsec-episode-*.schema.json"
       - "schemas/hardsec-pmu-metrology-plan-v1.schema.json"
+      - "schemas/hardsec-context-assignment-*.schema.json"
+      - "tests/fixtures/hardsec/context-assignment-v1/**"
       - "tests/fixtures/hardsec/episode-restarted-v1/**"
       - "tests/fixtures/hardsec/pmu-metrology-v1/**"
       - "tools/hardsec-adaptive-evasion-audit-harness/**"
@@ -35,16 +38,44 @@ jobs:
         with:
           components: rustfmt
       - name: Check formatting
-        run: rustfmt --edition 2024 --check examples/hardsec_pmu_metrology_audit.rs examples/hardsec_episode_restarted_monitor.rs
+        run: rustfmt --edition 2024 --check examples/hardsec_context_assignment_audit.rs examples/hardsec_pmu_metrology_audit.rs examples/hardsec_episode_restarted_monitor.rs
+      - name: Run HARDSEC-020 context assignment unit suite
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-assignment-audit --example hardsec_context_assignment_audit
       - name: Run HARDSEC-018 PMU metrology unit suite
         run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-pmu-metrology-audit --example hardsec_pmu_metrology_audit
       - name: Run HARDSEC-021 episode packer and restarted conformal unit suite
         run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-episode-restarted-monitor --example hardsec_episode_restarted_monitor
-      - name: Qualify PMU acquisition with HARDSEC-018
+      - name: Generate HARDSEC-020 truth-free episode context receipt
         shell: bash
         run: |
           set -euo pipefail
           out_dir="$(mktemp -d)"
+          cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-assignment-audit --example hardsec_context_assignment_audit -- \
+            --policy tests/fixtures/hardsec/episode-restarted-v1/context-policy.json \
+            --assignments tests/fixtures/hardsec/episode-restarted-v1/context-assignments.json \
+            --truth tests/fixtures/hardsec/episode-restarted-v1/context-truth-oracle.json \
+            --receipt "$out_dir/context-assignment-receipt.json"
+          python3 - "$out_dir/context-assignment-receipt.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          metrics = receipt["assignment_integrity"]
+          assert receipt["result"] == "audited"
+          assert metrics["assignment_record_count"] == 528
+          assert metrics["accepted_count"] == 528
+          assert metrics["abstained_count"] == 0
+          assert metrics["accepted_accuracy_denominator"] == 528
+          assert abs(metrics["accepted_accuracy"] - 1.0) < 1e-12
+          assert abs(metrics["accepted_coverage"] - 1.0) < 1e-12
+          assert receipt["runtime_mapping"]["contains_truth_labels"] is False
+          assert len(receipt["runtime_mapping"]["assignments"]) == 528
+          PY
+          echo "$out_dir" > "$RUNNER_TEMP/hardsec-021-output-dir"
+      - name: Qualify PMU acquisition with HARDSEC-018
+        shell: bash
+        run: |
+          set -euo pipefail
+          out_dir="$(cat "$RUNNER_TEMP/hardsec-021-output-dir")"
           cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-pmu-metrology-audit --example hardsec_pmu_metrology_audit -- \
             --plan tests/fixtures/hardsec/pmu-metrology-v1/plan.json \
             --observations tests/fixtures/hardsec/pmu-metrology-v1/observations.json \
@@ -69,7 +100,6 @@ jobs:
           assert receipt["support"]["trial_count"] == len(json.load(open("tests/fixtures/hardsec/pmu-metrology-v1/observations.json", encoding="utf-8"))["trials"])
           assert receipt["support"]["matched_block_count"] == 2
           PY
-          echo "$out_dir" > "$RUNNER_TEMP/hardsec-021-output-dir"
       - name: Run episode packer and restarted detector using qualified PMU receipt
         shell: bash
         run: |
@@ -78,7 +108,7 @@ jobs:
           cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-episode-restarted-monitor --example hardsec_episode_restarted_monitor -- \
             --plan tests/fixtures/hardsec/episode-restarted-v1/plan.json \
             --episodes tests/fixtures/hardsec/episode-restarted-v1/episodes.json \
-            --context-receipt tests/fixtures/hardsec/episode-restarted-v1/context-assignment-receipt.json \
+            --context-receipt "$out_dir/context-assignment-receipt.json" \
             --pmu-plan tests/fixtures/hardsec/pmu-metrology-v1/plan.json \
             --pmu-observations tests/fixtures/hardsec/pmu-metrology-v1/observations.json \
             --pmu-receipt "$out_dir/pmu-metrology-receipt.json" \
@@ -121,6 +151,8 @@ jobs:
           assert guarantees["theorem_guarantee_status"] == "not_established_from_input_receipts"
           assert guarantees["effective_sample_size_estimate"] is None
           assert receipt["context_assignment"]["truth_labels_in_runtime_mapping"] is False
+          assert receipt["context_assignment"]["accepted_count"] == 528
+          assert receipt["context_assignment"]["abstained_count"] == 0
           PY
       - name: Check preregistered late-change benchmark contract
         shell: bash
