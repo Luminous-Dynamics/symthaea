@@ -111,7 +111,7 @@ Targets include:
 - at least 99.9% reproducibility for stable report fields on the same boot and mount namespace;
 - p95 preflight latency no more than 250 ms and p95 report size no more than 64 KiB.
 
-These are proposed targets, not measured results or industry standards. The Linux inventory module currently has 17 authored Rust tests, including a host preflight test and a truncation downgrade test; none has been compiled or executed here. Hosts, kernel boots and mount namespaces are the independent units; repeated reads from one host do not inflate sample size. Candidate availability remains weaker than successful runtime attach or capture.
+These are proposed targets, not measured results or industry standards. The Linux inventory module currently has 18 authored Rust tests, including a host preflight test and a truncation downgrade test; none has been compiled or executed here. Hosts, kernel boots and mount namespaces are the independent units; repeated reads from one host do not inflate sample size. Candidate availability remains weaker than successful runtime attach or capture.
 
 ## Next step after this inventory
 
