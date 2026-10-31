@@ -248,3 +248,83 @@ The reported p-value direction in the ACL paper's Eq. (4) appears to be a lower-
 
 This is not a full FTD reproduction: model scoring for PPL, Min-K and Min-K++ is not implemented here. Nor does running BH or a Cauchy combination alone establish an FDR guarantee. The null reference must be representative, p-values must be super-uniform under contamination, and the multiple-hypothesis dependence assumptions must be justified on the actual evaluation population.
 
+
+
+## Randomized causal exposure interventions
+
+The module src/intervention.rs adds a preregistered randomized assignment layer for estimating causal contamination effects. The randomization unit is an indivisible source/task cluster, not a question. All items from one source-family digest remain together; duplicate source-family digests across nominal clusters are rejected to prevent source leakage disguised as separate IDs.
+
+### Design and exact budget conservation
+
+A design binds:
+- experiment and replicate IDs;
+- benchmark/version and task-set digest;
+- base model checkpoint digest;
+- training stage and exposure mechanism;
+- treatment and placebo training-corpus digests;
+- optimizer/hyperparameter and schedule digests;
+- common/shared training corpus digest and token count;
+- total training token budget and training-step count;
+- per-source-cluster item membership, exposure-variant digest/token count and matched placebo-record digest/token count.
+
+The same design fixes the base checkpoint, common corpus, stage, optimizer schedule, hyperparameters, training steps and total budget across treatment and placebo arms. For assigned clusters, benchmark-derived treatment records are replaced by unrelated placebo records with equal token counts.
+
+The validator enforces:
+- per-cluster exposure and placebo token counts are exactly equal and positive;
+- treatment and placebo records have distinct, non-reused digests;
+- all clusters within a task-family / cluster-size stratum use the same exposure token count, making the assigned token total invariant to which cluster IDs are selected;
+- shared_training_token_count + exposed_training_token_count equals total_training_token_budget;
+- shared_training_token_count + matched_placebo_token_count equals total_training_token_budget;
+- all item IDs are globally unique and no source family is split across clusters;
+- each interior-dose task-family / cluster-size stratum has enough clusters to include treatment and placebo;
+- source-cluster allocation is deterministic and replayable from the committed seed and replicate ID.
+
+### Randomization and replay
+
+The allocator builds strata from task family and cluster-size bucket, computes HMAC-derived cluster priorities using experiment and replicate identity, and assigns the predeclared fraction within each stratum. Interior doses require at least two clusters per stratum and retain at least one cluster in both treatment and placebo groups, even for extreme 1‰/999‰ targets. Token counts are homogeneous within each stratum so the fixed total training budget does not depend on which random clusters are selected. The manifest records exact assignments, treatment/placebo token totals, strata, assignment digest, design digest and seed commitment.
+
+The reviewer/evaluator retains the seed and assignment key. Model/detector teams receive only the information approved by the preregistered protocol; do not disclose hidden assignment labels before the confirmatory run is locked.
+
+Example:
+
+~~~sh
+seed_hex="$(openssl rand -hex 32)"
+
+cargo run --locked -- randomize-intervention \
+  research/contamination-panel-001/fixtures/intervention-semantic-variant-design.json \
+  "$seed_hex" \
+  /secure/evaluator/intervention-manifest.json \
+  /secure/evaluator/intervention-audit.json
+~~~
+
+Replay a supplied manifest independently:
+
+~~~sh
+cargo run --locked -- audit-intervention \
+  research/contamination-panel-001/fixtures/intervention-semantic-variant-design.json \
+  /secure/evaluator/intervention-manifest.json \
+  "$seed_hex" \
+  /secure/evaluator/intervention-replay-report.json
+~~~
+
+Strict input/output schemas:
+- schema/randomized-intervention-design.schema.json
+- schema/randomized-intervention-manifest.schema.json
+
+The included fixtures/intervention-semantic-variant-design.json has 32 source clusters (8 each for math, code, science and logic), 3 items per cluster, 50% treatment assignment, 8,000 exposure tokens, 8,000 matched placebo tokens, 92,000 shared-corpus tokens, and a 100,000-token total budget. It is a synthetic allocation fixture, not an executed training experiment.
+
+### Causal estimands and required training receipts
+
+The manifest validates assignment intent, not actual model training. A future trainer adapter must append independently captured receipts for:
+- treatment and placebo checkpoint digests;
+- exact corpus shard and post-tokenization digests;
+- observed token counts and optimizer steps;
+- job/container/runtime identity;
+- training code and hyperparameter digest;
+- checkpoint parent lineage and artifact custody;
+- evidence that treatment clusters entered only the intended treatment arm and placebo records only the placebo arm.
+
+Primary estimands should include intent-to-treat score inflation, dose-response, exposure-mechanism effects, training-stage interactions, detector sensitivity on treatment and false positives on matched placebo, and family-held-out transport. Analyze at the randomized source-cluster level using randomization inference and cluster-aware uncertainty; individual items within a cluster are not independent experimental units.
+
+The current code does not train models or attest checkpoint provenance. It is the deterministic randomization, budget-matching and replay-validation layer. A valid allocation manifest is not evidence that the declared corpus was actually consumed by a trainer.
+

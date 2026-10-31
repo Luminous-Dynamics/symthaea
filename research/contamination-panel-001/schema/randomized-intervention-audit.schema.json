@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/randomized-contamination-intervention-audit-v1.json",
+  "title": "Randomized contamination intervention audit v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "valid",
+    "randomization_replayed",
+    "experiment_id",
+    "replicate_id",
+    "design_sha256",
+    "manifest_sha256",
+    "seed_commitment_sha256",
+    "cluster_count",
+    "item_count",
+    "exposed_cluster_count",
+    "exposed_item_count",
+    "exposed_training_token_count",
+    "matched_placebo_token_count",
+    "shared_training_token_count",
+    "total_training_token_budget",
+    "treatment_token_budget_conserved",
+    "placebo_token_budget_conserved",
+    "token_budget_match",
+    "task_family_stratification_complete",
+    "source_cluster_integrity",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.randomized_contamination_intervention_audit.v1"
+    },
+    "valid": {
+      "type": "boolean"
+    },
+    "randomization_replayed": {
+      "type": "boolean"
+    },
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "replicate_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "design_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "seed_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "cluster_count": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "item_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "exposed_cluster_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "exposed_item_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "exposed_training_token_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "matched_placebo_token_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "shared_training_token_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "total_training_token_budget": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "treatment_token_budget_conserved": {
+      "type": "boolean"
+    },
+    "placebo_token_budget_conserved": {
+      "type": "boolean"
+    },
+    "token_budget_match": {
+      "type": "boolean"
+    },
+    "task_family_stratification_complete": {
+      "type": "boolean"
+    },
+    "source_cluster_integrity": {
+      "type": "boolean"
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/randomized-contamination-intervention-design-v1.json",
+  "title": "Randomized contamination intervention design v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "experiment_id",
+    "replicate_id",
+    "benchmark_id",
+    "benchmark_version",
+    "benchmark_task_set_sha256",
+    "model_base_checkpoint_sha256",
+    "training_stage",
+    "exposure_mechanism",
+    "target_exposure_fraction_permille",
+    "shared_training_corpus_sha256",
+    "shared_training_token_count",
+    "total_training_token_budget",
+    "training_steps",
+    "training_hyperparameters_sha256",
+    "optimizer_schedule_sha256",
+    "treatment_training_corpus_sha256",
+    "placebo_training_corpus_sha256",
+    "clusters"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.randomized_contamination_intervention_design.v1"
+    },
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "replicate_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_task_set_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "model_base_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "training_stage": {
+      "type": "string",
+      "enum": [
+        "continued_pretraining",
+        "instruction_sft",
+        "answer_augmented_sft",
+        "preference_optimization"
+      ]
+    },
+    "exposure_mechanism": {
+      "type": "string",
+      "enum": [
+        "exact_instance",
+        "syntactic_variant",
+        "semantic_variant",
+        "shared_task_recipe",
+        "answer_only"
+      ]
+    },
+    "target_exposure_fraction_permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "total_training_token_budget": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "training_steps": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "training_hyperparameters_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "optimizer_schedule_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "treatment_training_corpus_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "placebo_training_corpus_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "clusters": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/cluster"
+      }
+    },
+    "shared_training_corpus_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "shared_training_token_count": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "$defs": {
+    "cluster": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cluster_id",
+        "task_family",
+        "source_family_sha256",
+        "item_ids",
+        "exposure_variant_sha256",
+        "exposure_token_count",
+        "matched_placebo_record_sha256",
+        "matched_placebo_token_count"
+      ],
+      "properties": {
+        "cluster_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "task_family": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "source_family_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "item_ids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10000,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "uniqueItems": true
+        },
+        "exposure_variant_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "exposure_token_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "matched_placebo_record_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "matched_placebo_token_count": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}
