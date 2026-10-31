@@ -1373,3 +1373,932 @@ mod tests {
         assert_eq!(report.unknown_prediction_packets,1);
     }
 }
+
+
+// ---------------------------------------------------------------------------
+// POAR frozen-artifact parser and evaluator. This runs after inference: the
+// planner emits predictions, then a separate process consumes these bytes.
+// Parsing validates canonical form and cross-artifact identity before scoring.
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PoarPredictionIdentityV1 {
+    pub planner_sha256: String,
+    pub model_id: String,
+    pub checkpoint_sha256: String,
+    pub prompt_sha256: String,
+    pub run_config_sha256: String,
+    pub seed: u64,
+    pub split: DatasetSplit,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PoarArtifactEvaluationV1 {
+    pub prediction_identity: PoarPredictionIdentityV1,
+    pub report: GraphEvaluationReport,
+}
+
+#[derive(Debug, Clone)]
+struct ParsedPlannerV1 {
+    generator_revision: String,
+    seed: u64,
+    split: DatasetSplit,
+    config: GraphGenerationConfig,
+    cases: Vec<PlannerCase>,
+}
+
+#[derive(Debug, Default)]
+struct PlannerCaseBuilderV1 {
+    query: Option<QueryProfile>,
+    targets: BTreeSet<String>,
+    declared_claims: BTreeSet<String>,
+    alternatives: BTreeMap<(String, String), ProofAlternative>,
+    evidence: BTreeMap<String, EvidenceRevision>,
+}
+
+#[derive(Debug)]
+struct ParsedOracleV1 {
+    planner_sha256: String,
+    generator_revision: String,
+    seed: u64,
+    split: DatasetSplit,
+    truths: BTreeMap<String, BTreeMap<String, HiddenTruth>>,
+    gold_claims: BTreeMap<(String, String), OracleState>,
+    gold_paths: BTreeMap<(String, String, Polarity, String), BTreeSet<String>>,
+}
+
+#[derive(Debug, Default)]
+struct PredictionCaseBuilderV1 {
+    dispositions: BTreeMap<String, ClaimDisposition>,
+    retrieval: BTreeMap<u64, String>,
+    retrieval_ids: BTreeSet<String>,
+    citations: BTreeSet<String>,
+}
+
+#[derive(Debug)]
+struct ParsedPredictionsV1 {
+    identity: PoarPredictionIdentityV1,
+    packets: Vec<ProofPacket>,
+}
+
+fn canonical_lines_v1(bytes: &[u8], label: &str) -> Result<Vec<String>, String> {
+    let text = std::str::from_utf8(bytes)
+        .map_err(|error| format!("{label}: artifact is not UTF-8: {error}"))?;
+    if text.is_empty()
+        || !text.ends_with('\n')
+        || text.ends_with("\n\n")
+        || text.starts_with('\u{feff}')
+        || text.contains('\r')
+        || text.contains('\0')
+    {
+        return Err(format!(
+            "{label}: non-canonical byte stream (requires UTF-8, no BOM/CR/NUL, and exactly one terminal LF)"
+        ));
+    }
+    let lines = text[..text.len() - 1]
+        .split('\n')
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    if lines.iter().any(String::is_empty) {
+        return Err(format!("{label}: empty records are not permitted"));
+    }
+    if lines.len() > 2_000_000 {
+        return Err(format!("{label}: record limit exceeded"));
+    }
+    if lines.len() > 2
+        && lines[1..].windows(2).any(|pair| pair[0] >= pair[1])
+    {
+        return Err(format!("{label}: records must be strictly lexicographically sorted and unique"));
+    }
+    Ok(lines)
+}
+
+fn expect_fields_v1<'a>(
+    fields: &'a [&'a str],
+    expected: usize,
+    label: &str,
+    line_number: usize,
+) -> Result<(), String> {
+    if fields.len() != expected {
+        return Err(format!(
+            "{label}: record at line {line_number} has {} fields; expected {expected}",
+            fields.len()
+        ));
+    }
+    Ok(())
+}
+
+fn decode_hex_field_v1(value: &str, label: &str) -> Result<String, String> {
+    if value.is_empty() || value.len() % 2 != 0 {
+        return Err(format!("{label}: hex field must be non-empty and have even length"));
+    }
+    let mut bytes = Vec::with_capacity(value.len() / 2);
+    for pair in value.as_bytes().chunks_exact(2) {
+        let digit = |byte: u8| -> Option<u8> {
+            match byte {
+                b'0'..=b'9' => Some(byte - b'0'),
+                b'a'..=b'f' => Some(byte - b'a' + 10),
+                _ => None,
+            }
+        };
+        let high = digit(pair[0]).ok_or_else(|| format!("{label}: hex must be lowercase canonical hexadecimal"))?;
+        let low = digit(pair[1]).ok_or_else(|| format!("{label}: hex must be lowercase canonical hexadecimal"))?;
+        bytes.push((high << 4) | low);
+    }
+    let decoded = String::from_utf8(bytes)
+        .map_err(|error| format!("{label}: hex does not decode to UTF-8: {error}"))?;
+    if decoded.is_empty()
+        || decoded.contains('\0')
+        || decoded.contains('\t')
+        || decoded.contains('\r')
+        || decoded.contains('\n')
+        || hex_field(&decoded) != value
+    {
+        return Err(format!("{label}: decoded string is empty, contains a forbidden control, or is non-canonical"));
+    }
+    Ok(decoded)
+}
+
+fn parse_u64_canonical_v1(value: &str, label: &str) -> Result<u64, String> {
+    let parsed = value
+        .parse::<u64>()
+        .map_err(|error| format!("{label}: invalid unsigned integer {value:?}: {error}"))?;
+    if parsed.to_string() != value {
+        return Err(format!("{label}: integer is not in canonical base-10 form"));
+    }
+    Ok(parsed)
+}
+
+fn parse_usize_canonical_v1(value: &str, label: &str) -> Result<usize, String> {
+    let parsed = value
+        .parse::<usize>()
+        .map_err(|error| format!("{label}: invalid unsigned integer {value:?}: {error}"))?;
+    if parsed.to_string() != value {
+        return Err(format!("{label}: integer is not in canonical base-10 form"));
+    }
+    Ok(parsed)
+}
+
+fn parse_optional_u64_v1(value: &str, label: &str) -> Result<Option<u64>, String> {
+    if value == "-" {
+        Ok(None)
+    } else {
+        parse_u64_canonical_v1(value, label).map(Some)
+    }
+}
+
+fn parse_split_v1(value: &str, label: &str) -> Result<DatasetSplit, String> {
+    match value {
+        "dev" => Ok(DatasetSplit::Development),
+        "cal" => Ok(DatasetSplit::Calibration),
+        "test" => Ok(DatasetSplit::Test),
+        _ => Err(format!("{label}: unknown split {value:?}")),
+    }
+}
+
+fn parse_polarity_v1(value: &str, label: &str) -> Result<Polarity, String> {
+    match value {
+        "supports" => Ok(Polarity::Supports),
+        "refutes" => Ok(Polarity::Refutes),
+        _ => Err(format!("{label}: unknown polarity {value:?}")),
+    }
+}
+
+fn valid_sha256_v1(value: &str) -> bool {
+    value.len() == 64
+        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn parse_planner_artifact_v1(bytes: &[u8]) -> Result<ParsedPlannerV1, String> {
+    let lines = canonical_lines_v1(bytes, "planner")?;
+    let header = lines[0].split('\t').collect::<Vec<_>>();
+    expect_fields_v1(&header, 6, "planner header", 1)?;
+    if header[0] != "HEADER" || header[1] != "POAR-TSV/1" {
+        return Err("planner: unsupported or missing POAR-TSV/1 header".into());
+    }
+    let generator_revision = decode_hex_field_v1(header[2], "planner generator revision")?;
+    let seed = parse_u64_canonical_v1(header[3], "planner seed")?;
+    let split = parse_split_v1(header[4], "planner split")?;
+    let chain_depth = parse_usize_canonical_v1(header[5], "planner chain depth")?;
+    if !(1..=256).contains(&chain_depth) {
+        return Err("planner: chain depth must be in 1..=256".into());
+    }
+
+    let mut builders = BTreeMap::<String, PlannerCaseBuilderV1>::new();
+    let mut requirements_seen = BTreeSet::<(String, String, String, String, String)>::new();
+    for (offset, line) in lines.iter().enumerate().skip(1) {
+        let line_number = offset + 1;
+        let fields = line.split('\t').collect::<Vec<_>>();
+        let tag = fields.first().copied().unwrap_or("");
+        if tag == "HEADER" {
+            return Err(format!("planner: duplicate header at line {line_number}"));
+        }
+        let case_id = fields
+            .get(1)
+            .ok_or_else(|| format!("planner: missing case ID at line {line_number}"))?;
+        let case_id = decode_hex_field_v1(case_id, "planner case ID")?;
+        let builder = builders.entry(case_id.clone()).or_default();
+
+        match tag {
+            "CASE" => {
+                expect_fields_v1(&fields, 6, "CASE", line_number)?;
+                if builder.query.is_some() {
+                    return Err(format!("planner: duplicate CASE identity {case_id:?}"));
+                }
+                builder.query = Some(QueryProfile {
+                    valid_at: parse_u64_canonical_v1(fields[2], "valid_at")?,
+                    known_at: parse_u64_canonical_v1(fields[3], "known_at")?,
+                    required_scope: decode_hex_field_v1(fields[4], "required scope")?,
+                    required_authority: decode_hex_field_v1(fields[5], "required authority")?,
+                });
+            }
+            "TARGET" => {
+                expect_fields_v1(&fields, 3, "TARGET", line_number)?;
+                let target = decode_hex_field_v1(fields[2], "target claim ID")?;
+                if !builder.targets.insert(target.clone()) {
+                    return Err(format!("planner: duplicate target {target:?} in {case_id:?}"));
+                }
+            }
+            "CLAIM" => {
+                expect_fields_v1(&fields, 3, "CLAIM", line_number)?;
+                let claim = decode_hex_field_v1(fields[2], "claim ID")?;
+                if !builder.declared_claims.insert(claim.clone()) {
+                    return Err(format!("planner: duplicate claim {claim:?} in {case_id:?}"));
+                }
+            }
+            "ALT" => {
+                expect_fields_v1(&fields, 6, "ALT", line_number)?;
+                let claim = decode_hex_field_v1(fields[2], "alternative claim ID")?;
+                let alternative_id = decode_hex_field_v1(fields[3], "alternative ID")?;
+                let alternative = ProofAlternative {
+                    id: alternative_id.clone(),
+                    conclusion: parse_polarity_v1(fields[4], "alternative conclusion")?,
+                    requirements: Vec::new(),
+                    min_independent_groups: parse_usize_canonical_v1(fields[5], "minimum independent groups")?,
+                };
+                if builder.alternatives.insert((claim.clone(), alternative_id.clone()), alternative).is_some() {
+                    return Err(format!("planner: duplicate alternative {alternative_id:?} for {claim:?}"));
+                }
+            }
+            "REQ_E" => {
+                expect_fields_v1(&fields, 5, "REQ_E", line_number)?;
+                let claim = decode_hex_field_v1(fields[2], "requirement claim ID")?;
+                let alternative = decode_hex_field_v1(fields[3], "requirement alternative ID")?;
+                let evidence = decode_hex_field_v1(fields[4], "requirement evidence ID")?;
+                let key = (case_id.clone(), claim.clone(), alternative.clone(), "E".into(), evidence.clone());
+                if !requirements_seen.insert(key) {
+                    return Err(format!("planner: duplicate evidence requirement {evidence:?}"));
+                }
+                let target = builder.alternatives.get_mut(&(claim, alternative))
+                    .ok_or_else(|| format!("planner: REQ_E references an undeclared alternative at line {line_number}"))?;
+                target.requirements.push(ProofRequirement::Evidence(evidence));
+            }
+            "REQ_C" => {
+                expect_fields_v1(&fields, 6, "REQ_C", line_number)?;
+                let claim = decode_hex_field_v1(fields[2], "requirement claim ID")?;
+                let alternative = decode_hex_field_v1(fields[3], "requirement alternative ID")?;
+                let child = decode_hex_field_v1(fields[4], "child claim ID")?;
+                let polarity = parse_polarity_v1(fields[5], "child claim polarity")?;
+                let key = (case_id.clone(), claim.clone(), alternative.clone(), "C".into(), format!("{child}:{polarity:?}"));
+                if !requirements_seen.insert(key) {
+                    return Err(format!("planner: duplicate claim requirement {child:?}"));
+                }
+                let target = builder.alternatives.get_mut(&(claim, alternative))
+                    .ok_or_else(|| format!("planner: REQ_C references an undeclared alternative at line {line_number}"))?;
+                target.requirements.push(ProofRequirement::Claim { claim_id: child, polarity });
+            }
+            "EVIDENCE" => {
+                expect_fields_v1(&fields, 16, "EVIDENCE", line_number)?;
+                let evidence_id = decode_hex_field_v1(fields[2], "evidence ID")?;
+                let evidence = EvidenceRevision {
+                    id: evidence_id.clone(),
+                    source_id: decode_hex_field_v1(fields[3], "source ID")?,
+                    source_family_id: decode_hex_field_v1(fields[4], "source family ID")?,
+                    independence_group_id: decode_hex_field_v1(fields[5], "independence group ID")?,
+                    subject_claim_id: decode_hex_field_v1(fields[6], "evidence subject claim ID")?,
+                    asserted_polarity: parse_polarity_v1(fields[7], "asserted polarity")?,
+                    valid_from: parse_u64_canonical_v1(fields[8], "valid_from")?,
+                    valid_until: parse_optional_u64_v1(fields[9], "valid_until")?,
+                    known_from: parse_u64_canonical_v1(fields[10], "known_from")?,
+                    known_until: parse_optional_u64_v1(fields[11], "known_until")?,
+                    scope_id: decode_hex_field_v1(fields[12], "evidence scope")?,
+                    authority_id: decode_hex_field_v1(fields[13], "evidence authority")?,
+                    integrity: match fields[14] {
+                        "verified" => SourceIntegrity::Verified,
+                        "unverified" => SourceIntegrity::Unverified,
+                        "invalid" => SourceIntegrity::Invalid,
+                        other => return Err(format!("planner: unknown source integrity {other:?}")),
+                    },
+                    lifecycle: match fields[15] {
+                        "active" => EvidenceLifecycle::Active,
+                        "retracted" => EvidenceLifecycle::Retracted,
+                        other => return Err(format!("planner: unknown evidence lifecycle {other:?}")),
+                    },
+                };
+                if builder.evidence.insert(evidence_id.clone(), evidence).is_some() {
+                    return Err(format!("planner: duplicate evidence ID {evidence_id:?} in {case_id:?}"));
+                }
+            }
+            other => return Err(format!("planner: unknown record type {other:?} at line {line_number}")),
+        }
+    }
+
+    if builders.is_empty() {
+        return Err("planner: no cases found".into());
+    }
+    let mut cases = Vec::with_capacity(builders.len());
+    for (case_id, builder) in builders {
+        let query = builder.query.ok_or_else(|| format!("planner: case {case_id:?} has no CASE record"))?;
+        if builder.targets.is_empty() || builder.declared_claims.is_empty() {
+            return Err(format!("planner: case {case_id:?} must declare at least one target and claim"));
+        }
+        for target in &builder.targets {
+            if !builder.declared_claims.contains(target) {
+                return Err(format!("planner: target {target:?} is not a declared claim"));
+            }
+        }
+        let mut claims = builder.declared_claims.iter()
+            .map(|id| (id.clone(), Vec::<ProofAlternative>::new()))
+            .collect::<BTreeMap<_, _>>();
+        for ((claim_id, _), alternative) in builder.alternatives {
+            let alternatives = claims.get_mut(&claim_id)
+                .ok_or_else(|| format!("planner: alternative belongs to undeclared claim {claim_id:?}"))?;
+            for requirement in &alternative.requirements {
+                if let ProofRequirement::Claim { claim_id: child, .. } = requirement {
+                    if !builder.declared_claims.contains(child) {
+                        return Err(format!("planner: alternative references unknown child claim {child:?}"));
+                    }
+                }
+            }
+            alternatives.push(alternative);
+        }
+        for evidence in builder.evidence.values() {
+            if !builder.declared_claims.contains(&evidence.subject_claim_id) {
+                return Err(format!(
+                    "planner: evidence {:?} references unknown subject claim {:?}",
+                    evidence.id, evidence.subject_claim_id
+                ));
+            }
+        }
+        cases.push(PlannerCase {
+            id: case_id,
+            query,
+            target_claim_ids: builder.targets.into_iter().collect(),
+            claims: claims.into_iter().map(|(id, alternatives)| ClaimNode { id, alternatives }).collect(),
+            evidence: builder.evidence.into_values().collect(),
+        });
+    }
+
+    Ok(ParsedPlannerV1 {
+        generator_revision,
+        seed,
+        split,
+        config: GraphGenerationConfig { chain_depth },
+        cases,
+    })
+}
+
+fn parse_oracle_artifact_v1(bytes: &[u8]) -> Result<ParsedOracleV1, String> {
+    let lines = canonical_lines_v1(bytes, "oracle")?;
+    let header = lines[0].split('\t').collect::<Vec<_>>();
+    expect_fields_v1(&header, 6, "oracle header", 1)?;
+    if header[0] != "ORACLE_HEADER" || header[1] != "POAR-TSV/1" {
+        return Err("oracle: unsupported or missing POAR-TSV/1 header".into());
+    }
+    if !valid_sha256_v1(header[2]) {
+        return Err("oracle: planner digest is not canonical lowercase SHA-256".into());
+    }
+    let planner_sha256 = header[2].to_owned();
+    let generator_revision = decode_hex_field_v1(header[3], "oracle generator revision")?;
+    let seed = parse_u64_canonical_v1(header[4], "oracle seed")?;
+    let split = parse_split_v1(header[5], "oracle split")?;
+
+    let mut truths = BTreeMap::<String, BTreeMap<String, HiddenTruth>>::new();
+    let mut gold_claims = BTreeMap::<(String, String), OracleState>::new();
+    let mut gold_paths = BTreeMap::<(String, String, Polarity, String), BTreeSet<String>>::new();
+    for (offset, line) in lines.iter().enumerate().skip(1) {
+        let line_number = offset + 1;
+        let fields = line.split('\t').collect::<Vec<_>>();
+        let tag = fields.first().copied().unwrap_or("");
+        if tag == "ORACLE_HEADER" {
+            return Err(format!("oracle: duplicate header at line {line_number}"));
+        }
+        match tag {
+            "TRUTH" => {
+                expect_fields_v1(&fields, 4, "TRUTH", line_number)?;
+                let case_id = decode_hex_field_v1(fields[1], "truth case ID")?;
+                let evidence_id = decode_hex_field_v1(fields[2], "truth evidence ID")?;
+                let truth = match fields[3] {
+                    "supports_assertion" => HiddenTruth::SupportsAssertion,
+                    "refutes_assertion" => HiddenTruth::RefutesAssertion,
+                    "irrelevant" => HiddenTruth::Irrelevant,
+                    other => return Err(format!("oracle: unknown truth label {other:?}")),
+                };
+                if truths.entry(case_id).or_default().insert(evidence_id.clone(), truth).is_some() {
+                    return Err(format!("oracle: duplicate truth label for evidence {evidence_id:?}"));
+                }
+            }
+            "GOLD_CLAIM" => {
+                expect_fields_v1(&fields, 4, "GOLD_CLAIM", line_number)?;
+                let key = (
+                    decode_hex_field_v1(fields[1], "gold claim case ID")?,
+                    decode_hex_field_v1(fields[2], "gold claim ID")?,
+                );
+                let state = match fields[3] {
+                    "supported" => OracleState::Supported,
+                    "refuted" => OracleState::Refuted,
+                    "contested" => OracleState::Contested,
+                    "unknown" => OracleState::Unknown,
+                    other => return Err(format!("oracle: unknown gold claim state {other:?}")),
+                };
+                if gold_claims.insert(key, state).is_some() {
+                    return Err("oracle: duplicate GOLD_CLAIM identity".into());
+                }
+            }
+            "GOLD_PATH" => {
+                if fields.len() < 6 {
+                    return Err(format!("oracle: GOLD_PATH has too few fields at line {line_number}"));
+                }
+                let case_id = decode_hex_field_v1(fields[1], "gold path case ID")?;
+                let claim_id = decode_hex_field_v1(fields[2], "gold path claim ID")?;
+                let polarity = parse_polarity_v1(fields[3], "gold path polarity")?;
+                let alternative_id = decode_hex_field_v1(fields[4], "gold path alternative ID")?;
+                let count = parse_usize_canonical_v1(fields[5], "gold path evidence count")?;
+                if fields.len() != 6 + count {
+                    return Err(format!("oracle: GOLD_PATH count does not match its evidence fields at line {line_number}"));
+                }
+                let mut evidence_ids = BTreeSet::new();
+                for encoded in &fields[6..] {
+                    let evidence_id = decode_hex_field_v1(encoded, "gold path evidence ID")?;
+                    if !evidence_ids.insert(evidence_id.clone()) {
+                        return Err(format!("oracle: duplicate evidence {evidence_id:?} in GOLD_PATH"));
+                    }
+                }
+                if gold_paths.insert((case_id, claim_id, polarity, alternative_id), evidence_ids).is_some() {
+                    return Err("oracle: duplicate GOLD_PATH identity".into());
+                }
+            }
+            other => return Err(format!("oracle: unknown record type {other:?} at line {line_number}")),
+        }
+    }
+    if truths.is_empty() || gold_claims.is_empty() {
+        return Err("oracle: truth and gold claim records are required".into());
+    }
+    Ok(ParsedOracleV1 {
+        planner_sha256,
+        generator_revision,
+        seed,
+        split,
+        truths,
+        gold_claims,
+        gold_paths,
+    })
+}
+
+pub fn encode_prediction_artifact_v1(
+    identity: &PoarPredictionIdentityV1,
+    packets: &[ProofPacket],
+) -> Result<String, String> {
+    if !valid_sha256_v1(&identity.planner_sha256)
+        || !valid_sha256_v1(&identity.checkpoint_sha256)
+        || !valid_sha256_v1(&identity.prompt_sha256)
+        || !valid_sha256_v1(&identity.run_config_sha256)
+        || identity.model_id.is_empty()
+    {
+        return Err("prediction identity requires non-empty model ID and four canonical lowercase SHA-256 digests".into());
+    }
+    let mut case_ids = BTreeSet::new();
+    let mut records = Vec::<String>::new();
+    for packet in packets {
+        if packet.case_id.is_empty() || !case_ids.insert(packet.case_id.as_str()) {
+            return Err("prediction packets must have unique, non-empty case IDs".into());
+        }
+        let case_id = hex_field(&packet.case_id);
+        for (claim_id, disposition) in &packet.claim_dispositions {
+            if claim_id.is_empty() {
+                return Err("prediction claim ID must not be empty".into());
+            }
+            let (label, alternative) = match disposition {
+                ClaimDisposition::Supported { alternative_id } => ("supported", hex_field(alternative_id)),
+                ClaimDisposition::Refuted { alternative_id } => ("refuted", hex_field(alternative_id)),
+                ClaimDisposition::Contested => ("contested", "-".into()),
+                ClaimDisposition::Abstain => ("abstain", "-".into()),
+            };
+            records.push(format!(
+                "DISPOSITION\t{}\t{}\t{}\t{}\n",
+                case_id, hex_field(claim_id), label, alternative
+            ).trim_end_matches('\n').to_owned());
+        }
+        let mut seen_retrieval = BTreeSet::new();
+        for (index, evidence_id) in packet.retrieval_ranking.iter().enumerate() {
+            if evidence_id.is_empty() || !seen_retrieval.insert(evidence_id) {
+                return Err("retrieval ranking must contain unique, non-empty evidence IDs".into());
+            }
+            records.push(format!(
+                "RETRIEVED\t{}\t{}\t{}",
+                case_id, index + 1, hex_field(evidence_id)
+            ));
+        }
+        for evidence_id in &packet.cited_evidence_ids {
+            if evidence_id.is_empty() {
+                return Err("citation evidence ID must not be empty".into());
+            }
+            records.push(format!("CITATION\t{}\t{}", case_id, hex_field(evidence_id)));
+        }
+    }
+    records.sort_unstable();
+    let mut output = format!(
+        "PRED_HEADER\tPOAR-PRED/1\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+        identity.planner_sha256,
+        hex_field(&identity.model_id),
+        identity.checkpoint_sha256,
+        identity.prompt_sha256,
+        identity.run_config_sha256,
+        identity.seed,
+        identity.split.label()
+    );
+    for record in records {
+        output.push_str(&record);
+        output.push('\n');
+    }
+    Ok(output)
+}
+
+fn parse_predictions_v1(
+    bytes: &[u8],
+    planner: &ParsedPlannerV1,
+    planner_sha256: &str,
+) -> Result<ParsedPredictionsV1, String> {
+    let lines = canonical_lines_v1(bytes, "predictions")?;
+    let header = lines[0].split('\t').collect::<Vec<_>>();
+    expect_fields_v1(&header, 9, "prediction header", 1)?;
+    if header[0] != "PRED_HEADER" || header[1] != "POAR-PRED/1" {
+        return Err("predictions: unsupported or missing POAR-PRED/1 header".into());
+    }
+    if !valid_sha256_v1(header[2]) || header[2] != planner_sha256 {
+        return Err("predictions: planner digest does not match exact planner bytes".into());
+    }
+    for (index, label) in [(4, "checkpoint"), (5, "prompt"), (6, "run config")] {
+        if !valid_sha256_v1(header[index]) {
+            return Err(format!("predictions: {label} digest is not canonical lowercase SHA-256"));
+        }
+    }
+    let identity = PoarPredictionIdentityV1 {
+        planner_sha256: header[2].to_owned(),
+        model_id: decode_hex_field_v1(header[3], "prediction model ID")?,
+        checkpoint_sha256: header[4].to_owned(),
+        prompt_sha256: header[5].to_owned(),
+        run_config_sha256: header[6].to_owned(),
+        seed: parse_u64_canonical_v1(header[7], "prediction seed")?,
+        split: parse_split_v1(header[8], "prediction split")?,
+    };
+    if identity.seed != planner.seed || identity.split != planner.split {
+        return Err("predictions: seed/split identity does not match planner artifact".into());
+    }
+
+    let case_map = planner.cases.iter().map(|case| (case.id.as_str(), case)).collect::<BTreeMap<_, _>>();
+    let mut builders = BTreeMap::<String, PredictionCaseBuilderV1>::new();
+    for (offset, line) in lines.iter().enumerate().skip(1) {
+        let line_number = offset + 1;
+        let fields = line.split('\t').collect::<Vec<_>>();
+        let tag = fields.first().copied().unwrap_or("");
+        if tag == "PRED_HEADER" {
+            return Err(format!("predictions: duplicate header at line {line_number}"));
+        }
+        let case_id = decode_hex_field_v1(
+            fields.get(1).ok_or_else(|| format!("predictions: missing case ID at line {line_number}"))?,
+            "prediction case ID"
+        )?;
+        let case = case_map.get(case_id.as_str()).copied()
+            .ok_or_else(|| format!("predictions: unknown case {case_id:?}"))?;
+        let builder = builders.entry(case_id.clone()).or_default();
+
+        match tag {
+            "DISPOSITION" => {
+                expect_fields_v1(&fields, 5, "DISPOSITION", line_number)?;
+                let claim_id = decode_hex_field_v1(fields[2], "prediction claim ID")?;
+                if !case.target_claim_ids.contains(&claim_id) {
+                    return Err(format!("predictions: claim {claim_id:?} is not a target of case {case_id:?}"));
+                }
+                let disposition = match fields[3] {
+                    "supported" | "refuted" => {
+                        let alternative_id = decode_hex_field_v1(fields[4], "prediction alternative ID")?;
+                        let claim = case.claims.iter().find(|node| node.id == claim_id)
+                            .ok_or_else(|| format!("predictions: unknown claim {claim_id:?}"))?;
+                        let alternative = claim.alternatives.iter().find(|alt| alt.id == alternative_id)
+                            .ok_or_else(|| format!("predictions: unknown alternative {alternative_id:?}"))?;
+                        if fields[3] == "supported" {
+                            if alternative.conclusion != Polarity::Supports {
+                                return Err(format!("predictions: supported disposition references refuting alternative {alternative_id:?}"));
+                            }
+                            ClaimDisposition::Supported { alternative_id }
+                        } else {
+                            if alternative.conclusion != Polarity::Refutes {
+                                return Err(format!("predictions: refuted disposition references supporting alternative {alternative_id:?}"));
+                            }
+                            ClaimDisposition::Refuted { alternative_id }
+                        }
+                    }
+                    "contested" => {
+                        if fields[4] != "-" {
+                            return Err("predictions: contested disposition must use '-' for alternative".into());
+                        }
+                        ClaimDisposition::Contested
+                    }
+                    "abstain" => {
+                        if fields[4] != "-" {
+                            return Err("predictions: abstain disposition must use '-' for alternative".into());
+                        }
+                        ClaimDisposition::Abstain
+                    }
+                    other => return Err(format!("predictions: unknown disposition {other:?}")),
+                };
+                if builder.dispositions.insert(claim_id.clone(), disposition).is_some() {
+                    return Err(format!("predictions: duplicate disposition for {claim_id:?}"));
+                }
+            }
+            "RETRIEVED" => {
+                expect_fields_v1(&fields, 4, "RETRIEVED", line_number)?;
+                let rank = parse_u64_canonical_v1(fields[2], "retrieval rank")?;
+                if rank == 0 {
+                    return Err("predictions: retrieval ranks start at 1".into());
+                }
+                let evidence_id = decode_hex_field_v1(fields[3], "retrieved evidence ID")?;
+                if !case.evidence.iter().any(|evidence| evidence.id == evidence_id) {
+                    return Err(format!("predictions: retrieval references unknown evidence {evidence_id:?}"));
+                }
+                if !builder.retrieval_ids.insert(evidence_id.clone())
+                    || builder.retrieval.insert(rank, evidence_id).is_some()
+                {
+                    return Err(format!("predictions: duplicate retrieval ID or rank in case {case_id:?}"));
+                }
+            }
+            "CITATION" => {
+                expect_fields_v1(&fields, 3, "CITATION", line_number)?;
+                let evidence_id = decode_hex_field_v1(fields[2], "citation evidence ID")?;
+                if !case.evidence.iter().any(|evidence| evidence.id == evidence_id) {
+                    return Err(format!("predictions: citation references unknown evidence {evidence_id:?}"));
+                }
+                if !builder.citations.insert(evidence_id.clone()) {
+                    return Err(format!("predictions: duplicate citation {evidence_id:?}"));
+                }
+            }
+            other => return Err(format!("predictions: unknown record type {other:?} at line {line_number}")),
+        }
+    }
+
+    let mut packets = Vec::with_capacity(planner.cases.len());
+    for case in &planner.cases {
+        let builder = builders.remove(&case.id)
+            .ok_or_else(|| format!("predictions: no records for case {:?}", case.id))?;
+        if builder.dispositions.len() != case.target_claim_ids.len()
+            || case.target_claim_ids.iter().any(|target| !builder.dispositions.contains_key(target))
+        {
+            return Err(format!("predictions: every target in case {:?} needs exactly one disposition", case.id));
+        }
+        for (expected, actual) in (1_u64..).zip(builder.retrieval.keys().copied()) {
+            if expected != actual {
+                return Err(format!("predictions: retrieval ranks in case {:?} must be contiguous from 1", case.id));
+            }
+        }
+        packets.push(ProofPacket {
+            case_id: case.id.clone(),
+            claim_dispositions: builder.dispositions,
+            retrieval_ranking: builder.retrieval.into_values().collect(),
+            cited_evidence_ids: builder.citations,
+        });
+    }
+    if !builders.is_empty() {
+        return Err("predictions: unconsumed or unknown case records".into());
+    }
+    Ok(ParsedPredictionsV1 { identity, packets })
+}
+
+fn validate_oracle_labels_v1(
+    planner: &ParsedPlannerV1,
+    oracle: &ParsedOracleV1,
+) -> Result<(), String> {
+    let mut expected_truths = BTreeMap::<String, BTreeSet<String>>::new();
+    for case in &planner.cases {
+        expected_truths.insert(
+            case.id.clone(),
+            case.evidence.iter().map(|evidence| evidence.id.clone()).collect()
+        );
+    }
+    if oracle.truths.len() != expected_truths.len() {
+        return Err("oracle: case coverage does not match planner".into());
+    }
+    for (case_id, expected_ids) in &expected_truths {
+        let labels = oracle.truths.get(case_id)
+            .ok_or_else(|| format!("oracle: missing truth labels for case {case_id:?}"))?;
+        let actual_ids = labels.keys().cloned().collect::<BTreeSet<_>>();
+        if &actual_ids != expected_ids {
+            return Err(format!("oracle: truth evidence IDs do not exactly match planner case {case_id:?}"));
+        }
+    }
+
+    let mut expected_claims = BTreeMap::<(String, String), OracleState>::new();
+    let mut expected_paths = BTreeMap::<(String, String, Polarity, String), BTreeSet<String>>::new();
+    for case in &planner.cases {
+        let labels = oracle.truths.get(&case.id).expect("truth map validated above");
+        let mut memo = BTreeMap::new();
+        for claim_id in &case.target_claim_ids {
+            let evaluation = resolve_claim(case, labels, claim_id, &mut BTreeSet::new(), &mut memo);
+            expected_claims.insert((case.id.clone(), claim_id.clone()), evaluation.state());
+            for (alternative_id, witness) in &evaluation.support {
+                expected_paths.insert(
+                    (case.id.clone(), claim_id.clone(), Polarity::Supports, alternative_id.clone()),
+                    witness.evidence_ids.clone()
+                );
+            }
+            for (alternative_id, witness) in &evaluation.refute {
+                expected_paths.insert(
+                    (case.id.clone(), claim_id.clone(), Polarity::Refutes, alternative_id.clone()),
+                    witness.evidence_ids.clone()
+                );
+            }
+        }
+    }
+    if expected_claims != oracle.gold_claims {
+        return Err("oracle: GOLD_CLAIM labels are incomplete or inconsistent with its truth records".into());
+    }
+    if expected_paths != oracle.gold_paths {
+        return Err("oracle: GOLD_PATH witnesses are incomplete or inconsistent with its truth records".into());
+    }
+    Ok(())
+}
+
+/// Evaluate three frozen artifacts after inference. The caller supplies the
+/// SHA-256 computed from the exact planner bytes (the CLI uses sha256sum).
+/// This function validates byte-format, digest, schema, references, and oracle
+/// consistency before invoking the graph scorer.
+pub fn evaluate_poar_artifacts_v1(
+    planner_bytes: &[u8],
+    oracle_bytes: &[u8],
+    prediction_bytes: &[u8],
+    actual_planner_sha256: &str,
+) -> Result<PoarArtifactEvaluationV1, String> {
+    if !valid_sha256_v1(actual_planner_sha256) {
+        return Err("evaluator: supplied planner digest is not canonical lowercase SHA-256".into());
+    }
+    let planner = parse_planner_artifact_v1(planner_bytes)?;
+    let oracle = parse_oracle_artifact_v1(oracle_bytes)?;
+    if oracle.planner_sha256 != actual_planner_sha256 {
+        return Err("oracle: planner digest does not match exact planner bytes".into());
+    }
+    if oracle.generator_revision != planner.generator_revision
+        || oracle.seed != planner.seed
+        || oracle.split != planner.split
+    {
+        return Err("oracle: generator, seed, or split identity does not match planner".into());
+    }
+    validate_oracle_labels_v1(&planner, &oracle)?;
+    let predictions = parse_predictions_v1(prediction_bytes, &planner, actual_planner_sha256)?;
+    let suite = GraphSuite {
+        planner_cases: planner.cases,
+        seed: planner.seed,
+        split: planner.split,
+        config: planner.config,
+        oracle: oracle.truths,
+    };
+    let report = suite.evaluate(&predictions.packets);
+    if report.duplicate_prediction_packets != 0 || report.unknown_prediction_packets != 0 {
+        return Err("evaluator: parser/scorer disagreement on prediction packet identities".into());
+    }
+    Ok(PoarArtifactEvaluationV1 {
+        prediction_identity: predictions.identity,
+        report,
+    })
+}
+
+#[cfg(test)]
+mod artifact_evaluator_tests_v1 {
+    use super::*;
+
+    const DIGEST: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    fn artifacts() -> (String, String, String, String) {
+        let suite = generate_poar_graph_suite(1729, DatasetSplit::Test);
+        let generator = "test-generator-revision";
+        let planner = encode_planner_artifact_v1(&suite, generator).expect("planner encode");
+        let oracle = encode_oracle_artifact_v1(&suite, generator, DIGEST).expect("oracle encode");
+        let packets = suite.planner_cases().iter().map(ProofPacket::abstain_all).collect::<Vec<_>>();
+        let identity = PoarPredictionIdentityV1 {
+            planner_sha256: DIGEST.into(),
+            model_id: "test-model".into(),
+            checkpoint_sha256: DIGEST.into(),
+            prompt_sha256: DIGEST.into(),
+            run_config_sha256: DIGEST.into(),
+            seed: 1729,
+            split: DatasetSplit::Test,
+        };
+        let predictions = encode_prediction_artifact_v1(&identity, &packets).expect("prediction encode");
+        (planner, oracle, predictions, DIGEST.into())
+    }
+
+    #[test]
+    fn frozen_artifacts_round_trip_and_score_in_a_fresh_evaluator_api() {
+        let (planner, oracle, predictions, digest) = artifacts();
+        let evaluated = evaluate_poar_artifacts_v1(
+            planner.as_bytes(), oracle.as_bytes(), predictions.as_bytes(), &digest
+        ).expect("valid frozen artifacts");
+        assert_eq!(evaluated.report.case_count(), 16);
+        assert_eq!(evaluated.report.duplicate_prediction_packets, 0);
+        assert_eq!(evaluated.report.unknown_prediction_packets, 0);
+        assert_eq!(evaluated.prediction_identity.model_id, "test-model");
+        assert_eq!(evaluated.report.case_scores.iter().map(|score| score.target_claims).sum::<usize>(), 18);
+    }
+
+    #[test]
+    fn parser_rejects_missing_final_lf_crlf_bom_and_empty_records() {
+        let (planner, oracle, predictions, digest) = artifacts();
+        let no_lf = planner.trim_end_matches('\n').as_bytes().to_vec();
+        assert!(evaluate_poar_artifacts_v1(&no_lf, oracle.as_bytes(), predictions.as_bytes(), &digest).is_err());
+        let crlf = planner.replace('\n', "\r\n");
+        assert!(evaluate_poar_artifacts_v1(crlf.as_bytes(), oracle.as_bytes(), predictions.as_bytes(), &digest).is_err());
+        let bom = format!("\u{feff}{planner}");
+        assert!(evaluate_poar_artifacts_v1(bom.as_bytes(), oracle.as_bytes(), predictions.as_bytes(), &digest).is_err());
+        let blank = planner.replacen('\n', "\n\n", 1);
+        assert!(evaluate_poar_artifacts_v1(blank.as_bytes(), oracle.as_bytes(), predictions.as_bytes(), &digest).is_err());
+    }
+
+    #[test]
+    fn planner_oracle_and_prediction_digest_bindings_fail_closed() {
+        let (planner, oracle, predictions, digest) = artifacts();
+        let wrong = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        assert!(evaluate_poar_artifacts_v1(planner.as_bytes(), oracle.as_bytes(), predictions.as_bytes(), wrong).is_err());
+        let wrong_pred = predictions.replace(&digest, wrong);
+        assert!(evaluate_poar_artifacts_v1(planner.as_bytes(), oracle.as_bytes(), wrong_pred.as_bytes(), &digest).is_err());
+        let wrong_oracle = oracle.replace(&digest, wrong);
+        assert!(evaluate_poar_artifacts_v1(planner.as_bytes(), wrong_oracle.as_bytes(), predictions.as_bytes(), &digest).is_err());
+    }
+
+    #[test]
+    fn prediction_parser_rejects_missing_or_duplicate_target_dispositions() {
+        let (planner, oracle, predictions, digest) = artifacts();
+        let without_first = predictions.lines().enumerate()
+            .filter(|(index, _)| *index != 1)
+            .map(|(_, line)| line).collect::<Vec<_>>().join("\n") + "\n";
+        assert!(evaluate_poar_artifacts_v1(planner.as_bytes(), oracle.as_bytes(), without_first.as_bytes(), &digest).is_err());
+        let first_record = predictions.lines().nth(1).expect("first prediction record");
+        let duplicate = format!("{predictions}{first_record}\n");
+        assert!(evaluate_poar_artifacts_v1(planner.as_bytes(), oracle.as_bytes(), duplicate.as_bytes(), &digest).is_err());
+    }
+
+    #[test]
+    fn prediction_parser_rejects_retrieval_rank_gaps_and_unknown_evidence() {
+        let (planner, oracle, predictions, digest) = artifacts();
+        let case_id = hex_field("and-chain-1729-test");
+        let rank_gap = format!("{predictions}RETRIEVED\t{case_id}\t2\t{}\n", hex_field("e-leaf"));
+        assert!(evaluate_poar_artifacts_v1(planner.as_bytes(), oracle.as_bytes(), rank_gap.as_bytes(), &digest).is_err());
+        let unknown = format!("{predictions}CITATION\t{case_id}\t{}\n", hex_field("not-in-planner"));
+        assert!(evaluate_poar_artifacts_v1(planner.as_bytes(), oracle.as_bytes(), unknown.as_bytes(), &digest).is_err());
+    }
+
+    #[test]
+    fn tampered_gold_claim_and_gold_path_artifacts_are_rejected() {
+        let (planner, oracle, predictions, digest) = artifacts();
+        let tampered_claim = oracle.replacen("GOLD_CLAIM", "GOLD_CLAIM", 1)
+            .replacen("\tsupported\n", "\tunknown\n", 1);
+        assert!(evaluate_poar_artifacts_v1(planner.as_bytes(), tampered_claim.as_bytes(), predictions.as_bytes(), &digest).is_err());
+        let tampered_path = oracle.replacen("GOLD_PATH", "GOLD_PATH", 1)
+            .replace("GOLD_PATH\t", "GOLD_PATH\t");
+        let malformed_path = tampered_path.lines().map(|line| {
+            if line.starts_with("GOLD_PATH\t") { line.trim_end().to_owned() + "\t00" } else { line.to_owned() }
+        }).collect::<Vec<_>>().join("\n") + "\n";
+        assert!(evaluate_poar_artifacts_v1(planner.as_bytes(), malformed_path.as_bytes(), predictions.as_bytes(), &digest).is_err());
+    }
+
+    #[test]
+    fn frozen_predictions_are_scored_for_false_support_and_missing_proof_citations() {
+        let suite = generate_poar_graph_suite(1729, DatasetSplit::Test);
+        let planner = encode_planner_artifact_v1(&suite, "test-generator-revision").expect("planner");
+        let oracle = encode_oracle_artifact_v1(&suite, "test-generator-revision", DIGEST).expect("oracle");
+        let case = suite.planner_cases().iter().find(|case| case.id.ends_with("or-current-alternative")).expect("case");
+        let packet = ProofPacket {
+            case_id: case.id.clone(),
+            claim_dispositions: BTreeMap::from([(
+                "claim".into(),
+                ClaimDisposition::Supported { alternative_id: "current-path".into() }
+            )]),
+            retrieval_ranking: vec![],
+            cited_evidence_ids: BTreeSet::new(),
+        };
+        let mut packets = suite.planner_cases().iter().map(ProofPacket::abstain_all).collect::<Vec<_>>();
+        let target = packets.iter_mut().find(|packet| packet.case_id == case.id).expect("packet");
+        *target = packet;
+        let identity = PoarPredictionIdentityV1 {
+            planner_sha256: DIGEST.into(), model_id: "test-model".into(),
+            checkpoint_sha256: DIGEST.into(), prompt_sha256: DIGEST.into(),
+            run_config_sha256: DIGEST.into(), seed: 1729, split: DatasetSplit::Test,
+        };
+        let predictions = encode_prediction_artifact_v1(&identity, &packets).expect("predictions");
+        let result = evaluate_poar_artifacts_v1(
+            planner.as_bytes(), oracle.as_bytes(), predictions.as_bytes(), DIGEST
+        ).expect("evaluation");
+        let score = result.report.case_scores.iter().find(|score| score.case_id == case.id).expect("case score");
+        assert_eq!(score.correct_dispositions, 1);
+        assert_eq!(score.missing_required_citations, 1);
+        assert!(!result.report.all_hard_invariants_hold());
+    }
+}
