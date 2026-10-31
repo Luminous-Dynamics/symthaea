@@ -1157,6 +1157,8 @@ mod tests {
                 required_confidence_micros: 950_000,
                 independent_lineage_count: 299,
                 empirical_quantile_frames: 100,
+                empirical_raw_tail_quantile_frames: 90,
+                empirical_hysteresis_tail_quantile_frames: 100,
                 upper_confidence_bound_frames: 120,
                 confidence_coverage_lower_bound_micros: 950_000,
                 maximum_observed_tail_frames: 120,
@@ -1210,6 +1212,8 @@ mod tests {
             version: PROFILE_VERSION.to_owned(),
             profile_id: "test".to_owned(),
             dataset_revision: "test".to_owned(),
+            benchmark_manifest_sha256: digest("manifest"),
+            benchmark_audit_sha256: digest("audit"),
             context: context(&topology_attestation("profile-publisher-v1", &key)),
             statistics: TailProfileStatistics {
                 selected_quantile_micros: 990_000,
