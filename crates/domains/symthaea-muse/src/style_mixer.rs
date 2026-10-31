@@ -53,6 +53,9 @@ pub struct StyleMixProvenance {
     pub schema: String,
     pub compiler_version: String,
     pub source_recipe_sha256: String,
+    /// Digest of the fully compiled CompositionSpec, including every donor
+    /// field that survives compilation.
+    pub compiled_spec_sha256: String,
     pub display_label: String,
     pub sources: Vec<StyleMixSource>,
     pub unapplied_layers: Vec<UnappliedStyleLayer>,
@@ -81,6 +84,8 @@ pub struct StyleMixIssue {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HybridComposition {
     pub score: Score,
+    /// Domain-separated digest of the exact generated symbolic Score.
+    pub score_sha256: String,
     pub compiled: CompiledHybridStyle,
 }
 
@@ -299,10 +304,22 @@ pub fn compile_hybrid_style(
             message: error.to_string(),
         }]
     })?;
-    let mut hasher = Sha256::new();
-    hasher.update(b"symthaea:muse-hybrid-style-recipe:v1\n");
-    hasher.update(recipe_bytes);
-    let source_recipe_sha256 = format!("{:x}", hasher.finalize());
+    let compiled_spec_bytes = serde_json::to_vec(&spec).map_err(|error| {
+        vec![StyleMixIssue {
+            code: "compiled_spec_serialization_failed".into(),
+            layer: None,
+            catalog_id: None,
+            message: error.to_string(),
+        }]
+    })?;
+    let source_recipe_sha256 = domain_sha256(
+        b"symthaea:muse-hybrid-style-recipe:v1\n",
+        &recipe_bytes,
+    );
+    let compiled_spec_sha256 = domain_sha256(
+        b"symthaea:muse-hybrid-style-compiled-spec:v1\n",
+        &compiled_spec_bytes,
+    );
 
     Ok(CompiledHybridStyle {
         structural_style,
@@ -311,6 +328,7 @@ pub fn compile_hybrid_style(
             schema: HYBRID_STYLE_COMPILER_SCHEMA.into(),
             compiler_version: MUSIC_THEORY_ENGINE_VERSION.into(),
             source_recipe_sha256,
+            compiled_spec_sha256,
             display_label: hybrid.honest_label(),
             sources,
             unapplied_layers,
@@ -335,7 +353,30 @@ pub fn compose_hybrid_style(
         &compiled.spec,
     )
     .score;
-    Ok(HybridComposition { score, compiled })
+    let score_bytes = serde_json::to_vec(&score).map_err(|error| {
+        vec![StyleMixIssue {
+            code: "generated_score_serialization_failed".into(),
+            layer: Some(StyleMixLayer::Structure),
+            catalog_id: Some(compiled.provenance.sources[0].catalog_id),
+            message: error.to_string(),
+        }]
+    })?;
+    let score_sha256 = domain_sha256(
+        b"symthaea:muse-hybrid-generated-score:v1\n",
+        &score_bytes,
+    );
+    Ok(HybridComposition {
+        score,
+        score_sha256,
+        compiled,
+    })
+}
+
+fn domain_sha256(domain: &[u8], bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(domain);
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
 }
 
 fn resolve_executable_style(
@@ -463,6 +504,7 @@ mod tests {
             "renderer_adapter_not_implemented"
         );
         assert_eq!(compiled.provenance.source_recipe_sha256.len(), 64);
+        assert_eq!(compiled.provenance.compiled_spec_sha256.len(), 64);
         assert!(compiled.provenance.display_label.starts_with("Hybrid — "));
     }
 
@@ -553,6 +595,7 @@ mod tests {
         let output = compose_hybrid_style(&intent, &hybrid).expect("valid hybrid composition");
         assert!(!output.score.notes.is_empty());
         assert_eq!(output.compiled.spec.name, hybrid.honest_label());
+        assert_eq!(output.score_sha256.len(), 64);
         assert!(!output.compiled.provenance.historical_genre_claim);
     }
 
