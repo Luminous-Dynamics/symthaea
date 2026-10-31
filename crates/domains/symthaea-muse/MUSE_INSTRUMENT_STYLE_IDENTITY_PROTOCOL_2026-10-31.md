@@ -303,6 +303,7 @@ Keep source audio private and restricted where licenses or contributor permissio
 - EVAL-034 #9375 / PR #9380 — realized Score contract verification.
 - EVAL-035 #9337 / PR #9352 and #9381 / PR #9383 — topology-specific tail and replayable temporal support.
 - EVAL-036 #9355 — operation-specific symbolic counterfactual validation.
+- MEL-MR-SAMPLES-001 #9406 — sample-bank coverage, per-note replay receipts and sample-backed world percussion.
 
 MEL-MR-STYLE-001 consumes their verified evidence where relevant and does not weaken their gates.
 
