@@ -13,7 +13,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use symthaea_iit::{
-    plan_min_fill_cutset_elimination, BinaryLogFactor, CutsetFactorEliminationPlan,
+    plan_min_fill_cutset_frontier, BinaryLogFactor,
 };
 
 const FACTOR_ENTRY_BUDGET: usize = 1 << 16;
@@ -72,6 +72,7 @@ const GRID_FIXTURES: [GridFixture; 4] = [
 
 #[derive(Debug, Clone)]
 struct PlannedCutset {
+    candidate_index: usize,
     label: String,
     variables: Vec<usize>,
     branch_count: usize,
@@ -185,91 +186,6 @@ fn candidate_cutsets(side: usize, retained: usize) -> Vec<(String, Vec<usize>)> 
         .collect()
 }
 
-fn preflight_candidate(
-    factor_scopes: &[Vec<usize>],
-    eliminate: &[usize],
-    label: String,
-    variables: Vec<usize>,
-) -> Result<PlannedCutset, String> {
-    let plan: CutsetFactorEliminationPlan = plan_min_fill_cutset_elimination(
-        factor_scopes,
-        eliminate,
-        &variables,
-        FACTOR_ENTRY_BUDGET,
-        CUTSET_ASSIGNMENT_BUDGET,
-    )
-    .map_err(|error| error.to_string())?;
-
-    Ok(PlannedCutset {
-        label,
-        variables,
-        branch_count: plan.cutset_assignments(),
-        residual_induced_width: plan.remaining_elimination_plan().induced_width,
-        predicted_peak_factor_entries: plan.predicted_peak_factor_entries(),
-    })
-}
-
-// A dominates B only when it is no worse on all three resources and strictly
-// better on at least one. Exact metric ties use the lexical label as a stable
-// representative so symmetric separators do not flood the frontier.
-fn dominates(left: &PlannedCutset, right: &PlannedCutset) -> bool {
-    let no_worse = left.branch_count <= right.branch_count
-        && left.residual_induced_width <= right.residual_induced_width
-        && left.predicted_peak_factor_entries <= right.predicted_peak_factor_entries;
-    let strictly_better = left.branch_count < right.branch_count
-        || left.residual_induced_width < right.residual_induced_width
-        || left.predicted_peak_factor_entries < right.predicted_peak_factor_entries;
-    let exact_tie_precedes = left.branch_count == right.branch_count
-        && left.residual_induced_width == right.residual_induced_width
-        && left.predicted_peak_factor_entries == right.predicted_peak_factor_entries
-        && left.label < right.label;
-    no_worse && (strictly_better || exact_tie_precedes)
-}
-
-fn pareto_frontier(plans: &[PlannedCutset]) -> Vec<usize> {
-    plans
-        .iter()
-        .enumerate()
-        .filter(|(index, candidate)| {
-            !plans
-                .iter()
-                .enumerate()
-                .any(|(other_index, other)| other_index != *index && dominates(other, candidate))
-        })
-        .map(|(index, _)| index)
-        .collect()
-}
-
-fn validate_frontier(plans: &[PlannedCutset], frontier: &[usize]) -> Result<(), String> {
-    let frontier_set = frontier.iter().copied().collect::<BTreeSet<_>>();
-    for (index, candidate) in plans.iter().enumerate() {
-        let represented = if frontier_set.contains(&index) {
-            true
-        } else {
-            frontier.iter().any(|frontier_index| {
-                dominates(&plans[*frontier_index], candidate)
-            })
-        };
-        if !represented {
-            return Err(format!(
-                "candidate {} is neither on the frontier nor dominated by it",
-                candidate.label
-            ));
-        }
-    }
-    for index in frontier {
-        if plans.iter().enumerate().any(|(other_index, other)| {
-            other_index != *index && dominates(other, &plans[*index])
-        }) {
-            return Err(format!(
-                "frontier candidate {} is dominated",
-                plans[*index].label
-            ));
-        }
-    }
-    Ok(())
-}
-
 fn run() -> Result<(), String> {
     println!(
         "side,candidate_count,feasible_count,rejected_count,frontier_count,label,cutset_size,cutset_variables,branch_count,residual_induced_width,predicted_peak_factor_entries,on_pareto_frontier"
@@ -296,14 +212,29 @@ fn run() -> Result<(), String> {
                 fixture.expected_candidates
             ));
         }
-        let mut plans = Vec::new();
-        let mut rejected_count = 0usize;
-        for (label, variables) in candidates {
-            match preflight_candidate(&scopes, &eliminate, label, variables) {
-                Ok(plan) => plans.push(plan),
-                Err(_) => rejected_count += 1,
+        let candidate_cutsets = candidates
+            .iter()
+            .map(|(_, variables)| variables.clone())
+            .collect::<Vec<_>>();
+        let report = plan_min_fill_cutset_frontier(
+            &scopes,
+            &eliminate,
+            &candidate_cutsets,
+            FACTOR_ENTRY_BUDGET,
+            CUTSET_ASSIGNMENT_BUDGET,
+        ).map_err(|error| format!("frontier preflight failed for {side}x{side}: {error}"))?;
+        let rejected_count = report.rejected_candidates.len();
+        let mut plans = report.candidates.iter().map(|candidate| {
+            let (label, _) = &candidates[candidate.candidate_index];
+            PlannedCutset {
+                candidate_index: candidate.candidate_index,
+                label: label.clone(),
+                variables: candidate.plan.cutset_variables().to_vec(),
+                branch_count: candidate.plan.cutset_assignments(),
+                residual_induced_width: candidate.plan.remaining_elimination_plan().induced_width,
+                predicted_peak_factor_entries: candidate.plan.predicted_peak_factor_entries(),
             }
-        }
+        }).collect::<Vec<_>>();
         if plans.is_empty() {
             return Err(format!("no feasible cutset candidates for {side}x{side}"));
         }
@@ -315,17 +246,20 @@ fn run() -> Result<(), String> {
                 .then(left.residual_induced_width.cmp(&right.residual_induced_width))
                 .then(left.label.cmp(&right.label))
         });
-        let frontier = pareto_frontier(&plans);
-        validate_frontier(&plans, &frontier)?;
-        if frontier.len() != fixture.expected_frontier.len() {
+        let frontier_set = report.frontier_candidate_indices
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+        if frontier_set.len() != fixture.expected_frontier.len() {
             return Err(format!(
                 "Pareto frontier count changed for {side}x{side}: expected {}, got {}",
                 fixture.expected_frontier.len(),
-                frontier.len()
+                frontier_set.len()
             ));
         }
-        for (actual_index, expected) in frontier.iter().zip(fixture.expected_frontier) {
-            let actual = &plans[*actual_index];
+        let actual_frontier = plans.iter()
+            .filter(|plan| frontier_set.contains(&plan.candidate_index))
+            .collect::<Vec<_>>();
+        for (actual, expected) in actual_frontier.iter().zip(fixture.expected_frontier) {
             if actual.label != expected.label
                 || actual.branch_count != expected.branches
                 || actual.residual_induced_width != expected.residual_width
@@ -344,7 +278,6 @@ fn run() -> Result<(), String> {
                 ));
             }
         }
-        let frontier_set = frontier.into_iter().collect::<BTreeSet<_>>();
 
         for (index, plan) in plans.iter().enumerate() {
             let variables = plan
@@ -366,7 +299,7 @@ fn run() -> Result<(), String> {
                 plan.branch_count,
                 plan.residual_induced_width,
                 plan.predicted_peak_factor_entries,
-                frontier_set.contains(&index),
+                frontier_set.contains(&plan.candidate_index),
             );
         }
     }
