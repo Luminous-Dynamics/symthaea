@@ -210,3 +210,9 @@ cargo run --locked \
   --stream tests/fixtures/hardsec/context-cctm-v1/stream.json \
   --receipt /tmp/hardsec-019-cctm-receipt.json
 ```
+
+### Dependence negative control
+
+A dedicated Rust test constructs 10,000 equally weighted latent scores (U\in(0,1)), maps each to a null score (X=6U) under the fixture's uniform-score reference grid, and repeats each latent score for 100 consecutive observations. Each time position has the correct marginal null score distribution, but all observations within a stream are perfectly dependent. The fixed reference grid's ECDF is within the declared DKW band for the uniform CDF, isolating the failure of the test-stream i.i.d. assumption in this constructed diagnostic.
+
+A private numerical cross-check of this exact deterministic grid gives 7,983 threshold crossings out of 10,000 latent paths (79.83%) at nominal (alpha=5%). The Rust test asserts a broad 75–85% range to avoid a fragile exact floating-point count. This is a deterministic grid stress test, not a Monte Carlo confidence interval, measured PMU false-alarm probability, or claim about real hardware. Its purpose is to prevent this implementation from being represented as valid for arbitrary dependent telemetry.
