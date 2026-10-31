@@ -1,0 +1,63 @@
+name: HARDSEC-012 adaptive-evasion campaign audit
+
+on:
+  pull_request:
+    paths:
+      - "examples/hardsec_adaptive_evasion_audit.rs"
+      - "schemas/hardsec-adaptive-*.schema.json"
+      - "tests/fixtures/hardsec/adaptive-evasion-v1/**"
+      - "tools/hardsec-adaptive-evasion-audit-harness/**"
+      - ".github/workflows/hardsec-adaptive-evasion-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-adaptive-evasion-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  adaptive-evasion-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact pull request revision
+        uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_adaptive_evasion_audit.rs
+      - name: Run focused unit suite
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-adaptive-evasion-audit --example hardsec_adaptive_evasion_audit
+      - name: Run known-answer fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          out_dir="$(mktemp -d)"
+          cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-adaptive-evasion-audit --example hardsec_adaptive_evasion_audit -- \
+            --predictions tests/fixtures/hardsec/adaptive-evasion-v1/predictions.json \
+            --manifest tests/fixtures/hardsec/adaptive-evasion-v1/case-manifest.json \
+            --truth tests/fixtures/hardsec/adaptive-evasion-v1/evaluator-truth.json \
+            --receipt "$out_dir/receipt.json"
+          python3 - "$out_dir/receipt.json" <<'PY'
+          import json, math, sys
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          assert receipt["result"] == "evaluated"
+          metrics = receipt["primary_metrics"]
+          assert metrics["successful_attack_effect_cases"] == 3, metrics
+          assert metrics["successful_attack_alerts"] == 1, metrics
+          assert math.isclose(metrics["attack_effect_conditioned_recall"], 1.0 / 3.0, rel_tol=0.0, abs_tol=1e-12), metrics
+          assert metrics["failed_attack_attempts_excluded_from_success_recall"] == 1, metrics
+          assert metrics["unknown_attack_effect_attempts_excluded"] == 1, metrics
+          assert math.isclose(metrics["benign_false_alert_rate"], 0.25, rel_tol=0.0, abs_tol=1e-12), metrics
+          integrity = receipt["sensor_integrity"]
+          assert integrity["invalid_sensor_cases"] == 3, integrity
+          assert integrity["invalid_sensor_clear_verdicts"] == 1, integrity
+          assert integrity["integrity_outcome"] == "integrity_violation_observed", integrity
+          assert receipt["resource_cost"]["end_to_end_ns_sum"] == 1080
+          assert receipt["generalization"]["adaptation_group_count"] == 3
+          PY
