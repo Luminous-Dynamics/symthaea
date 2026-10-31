@@ -1242,28 +1242,28 @@ mod tests {
     fn net_decision_value_charges_inference_acquisition_and_failure_costs() {
         let episodes = vec![
             DecisionValueEpisode {
-                world_model: costed(10.0, 2.0, 1.0, 0.0),
+                world_model: costed(10.0, 1.0, 0.5, 0.0),
                 direct_d0: costed(8.0, 0.0, 0.0, 0.0),
                 direct_d1: costed(9.0, 0.5, 0.0, 0.0),
             },
             DecisionValueEpisode {
                 world_model: costed(12.0, 2.0, 0.0, 1.0),
-                direct_d0: costed(9.0, 0.0, 0.0, 0.0),
-                direct_d1: costed(10.0, 0.5, 0.0, 0.0),
+                direct_d0: costed(8.0, 0.0, 0.0, 0.0),
+                direct_d1: costed(8.5, 0.5, 0.0, 0.0),
             },
             DecisionValueEpisode {
-                world_model: costed(7.0, 1.0, 1.0, 0.0),
+                world_model: costed(9.0, 1.0, 0.5, 0.0),
                 direct_d0: costed(8.0, 0.0, 0.0, 0.0),
                 direct_d1: costed(8.5, 0.5, 0.0, 0.0),
             },
         ];
         let metrics = evaluate_net_decision_value(&episodes).unwrap().unwrap();
         assert_eq!(metrics.episode_count, 3);
-        assert!((metrics.mean_gross_advantage_vs_d0 - (5.0 / 3.0)).abs() < 1e-12);
+        assert!((metrics.mean_gross_advantage_vs_d0 - (7.0 / 3.0)).abs() < 1e-12);
         assert!((metrics.mean_net_advantage_vs_d0 - (1.0 / 3.0)).abs() < 1e-12);
         assert!((metrics.net_win_rate_vs_d0 - (2.0 / 3.0)).abs() < 1e-12);
-        assert!((metrics.mean_gross_advantage_vs_d1 - (0.5 / 3.0)).abs() < 1e-12);
-        assert!((metrics.mean_net_advantage_vs_d1 - (-1.0 / 3.0)).abs() < 1e-12);
+        assert!((metrics.mean_gross_advantage_vs_d1 - 1.5).abs() < 1e-12);
+        assert!((metrics.mean_net_advantage_vs_d1 - (0.5 / 3.0)).abs() < 1e-12);
         assert!((metrics.net_win_rate_vs_d1 - (1.0 / 3.0)).abs() < 1e-12);
     }
 
