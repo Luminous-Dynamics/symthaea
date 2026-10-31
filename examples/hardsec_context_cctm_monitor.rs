@@ -901,7 +901,7 @@ mod tests {
 
     #[test]
     fn invalid_and_unseen_context_assignments_abstain_without_wealth_update() {
-        let (p, mut s, pb, sb) = fixture();
+        let (p, mut s, _, _) = fixture();
         s["records"][0]["sensor_state"] = json!("stale");
         s["records"][1]["context_id"] = json!("new-regime");
         let bytes = include_bytes!("../tests/fixtures/hardsec/context-assignment-v1/runtime-receipt.json");
@@ -909,12 +909,19 @@ mod tests {
         assignment_receipt["runtime_mapping"]["assignments"][1]["decision_status"] = json!("abstained");
         assignment_receipt["runtime_mapping"]["assignments"][1]["decision_reason"] = json!("unknown_context");
         assignment_receipt["runtime_mapping"]["assignments"][1]["selected_context_id"] = Value::Null;
+        assignment_receipt["assignment_integrity"]["accepted_count"] = json!(15);
+        assignment_receipt["assignment_integrity"]["abstained_count"] = json!(4);
+        assignment_receipt["assignment_integrity"]["accepted_accuracy_denominator"] = json!(15);
+        assignment_receipt["assignment_integrity"]["accepted_coverage"] = json!(15.0/19.0);
+        assignment_receipt["assignment_integrity"]["end_to_end_correct_context_coverage"] = json!(15.0/19.0);
+        let pb = encode(&p);
+        let sb = encode(&s);
         let rb = encode(&assignment_receipt);
         let r = audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
-        assert_eq!(r["sequential_monitor"]["valid_observation_count"], 0);
-        assert_eq!(r["sequential_monitor"]["abstention_count"], 2);
-        assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["invalid_sensor_state"], 1);
-        assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["context_assignment_not_accepted"], 1);
+        assert_eq!(r["sequential_monitor"]["valid_observation_count"], 14);
+        assert_eq!(r["sequential_monitor"]["abstention_count"], 5);
+        assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["invalid_sensor_state"], 2);
+        assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["context_assignment_not_accepted"], 2);
         assert_eq!(r["reference_policy"]["contexts"][0]["final_log_wealth"], 0.0);
     }
 
