@@ -313,6 +313,11 @@ impl DirectionCampaignRun {
                             self.landscape, self.seed, action.arm_id, eval_index
                         )),
                         direction_id: action.arm_id.clone(),
+                        parent_score: self.actions[..index].iter()
+                            .filter(|previous| !previous.is_new_proposal && previous.arm_id == action.arm_id)
+                            .filter_map(|previous| previous.observed_score)
+                            .max_by(f64::total_cmp),
+                        inspired_by_scores: Vec::new(),
                         disposition: CandidateDisposition::Verified,
                         score: action.observed_score,
                     },
