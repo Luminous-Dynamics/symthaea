@@ -1020,6 +1020,7 @@ fn calibration_cluster_bootstrap(
 
 fn ood_cluster_bootstrap(
     rows: &[&Prediction],
+    threshold: Option<f64>,
     replicates: usize,
     seed_material: &str,
 ) -> OodClusterBootstrap {
@@ -1064,21 +1065,23 @@ fn ood_cluster_bootstrap(
                 average_precision.push(ap);
             }
         }
-        let in_domain = sample.iter()
-            .filter(|row| row.is_ood_domain == Some(false))
-            .collect::<Vec<_>>();
-        let held_out = sample.iter()
-            .filter(|row| row.is_ood_domain == Some(true))
-            .collect::<Vec<_>>();
-        if !in_domain.is_empty() && !held_out.is_empty() {
-            let false_ood = in_domain.iter()
-                .filter(|row| row.ood_score.unwrap_or(0.0) >= 0.5)
-                .count();
-            let detected_ood = held_out.iter()
-                .filter(|row| row.ood_score.unwrap_or(0.0) >= 0.5)
-                .count();
-            false_ood_rates.push(false_ood as f64 / in_domain.len() as f64);
-            held_out_recalls.push(detected_ood as f64 / held_out.len() as f64);
+        if let Some(cutoff) = threshold {
+            let in_domain = sample.iter()
+                .filter(|row| row.is_ood_domain == Some(false))
+                .collect::<Vec<_>>();
+            let held_out = sample.iter()
+                .filter(|row| row.is_ood_domain == Some(true))
+                .collect::<Vec<_>>();
+            if !in_domain.is_empty() && !held_out.is_empty() {
+                let false_ood = in_domain.iter()
+                    .filter(|row| row.ood_score.unwrap_or(0.0) >= cutoff)
+                    .count();
+                let detected_ood = held_out.iter()
+                    .filter(|row| row.ood_score.unwrap_or(0.0) >= cutoff)
+                    .count();
+                false_ood_rates.push(false_ood as f64 / in_domain.len() as f64);
+                held_out_recalls.push(detected_ood as f64 / held_out.len() as f64);
+            }
         }
     }
     OodClusterBootstrap {
@@ -1087,8 +1090,16 @@ fn ood_cluster_bootstrap(
         minimum_valid_replicates_for_interval: minimum_valid,
         roc_auc_95: scalar_percentile_interval(auc, replicates),
         average_precision_95: scalar_percentile_interval(average_precision, replicates),
-        false_ood_rate_on_in_domain_95: scalar_percentile_interval(false_ood_rates, replicates),
-        held_out_domain_recall_95: scalar_percentile_interval(held_out_recalls, replicates),
+        false_ood_rate_on_in_domain_95: if threshold.is_some() {
+            scalar_percentile_interval(false_ood_rates, replicates)
+        } else {
+            None
+        },
+        held_out_domain_recall_95: if threshold.is_some() {
+            scalar_percentile_interval(held_out_recalls, replicates)
+        } else {
+            None
+        },
     }
 }
 
@@ -1735,6 +1746,7 @@ fn ood_detection_metrics(
         average_precision,
         cluster_bootstrap_95: ood_cluster_bootstrap(
             rows,
+            threshold,
             bootstrap_replicates,
             seed_material,
         ),
@@ -2492,6 +2504,33 @@ mod tests {
     }
 
     #[test]
+    fn ood_rate_bootstrap_uses_selected_threshold_not_default_half() {
+        let rows = vec![
+            tagged_row("threshold-in", false, 0.1, "mouse", false, 0.8),
+            tagged_row("threshold-out", true, 0.9, "zebrafish", true, 0.7),
+        ];
+        let refs = rows.iter().collect::<Vec<_>>();
+        let below_selected = ood_cluster_bootstrap(&refs, Some(0.75), 100, "threshold-cutoff");
+        let above_selected = ood_cluster_bootstrap(&refs, Some(0.85), 100, "threshold-cutoff");
+        assert_eq!(below_selected.false_ood_rate_on_in_domain_95, Some(Interval { lower: 1.0, upper: 1.0 }));
+        assert_eq!(below_selected.held_out_domain_recall_95, Some(Interval { lower: 0.0, upper: 0.0 }));
+        assert_eq!(above_selected.false_ood_rate_on_in_domain_95, Some(Interval { lower: 0.0, upper: 0.0 }));
+        assert_eq!(above_selected.held_out_domain_recall_95, Some(Interval { lower: 0.0, upper: 0.0 }));
+    }
+
+    #[test]
+    fn no_selected_ood_threshold_means_no_operating_rate_intervals() {
+        let rows = vec![
+            tagged_row("no-threshold-in", false, 0.1, "mouse", false, 0.1),
+            tagged_row("no-threshold-out", true, 0.9, "zebrafish", true, 0.9),
+        ];
+        let refs = rows.iter().collect::<Vec<_>>();
+        let result = ood_cluster_bootstrap(&refs, None, 100, "no-threshold");
+        assert_eq!(result.false_ood_rate_on_in_domain_95, None);
+        assert_eq!(result.held_out_domain_recall_95, None);
+    }
+
+    #[test]
     fn ood_cluster_bootstrap_reports_uncertainty_for_operating_point_rates() {
         let mut rows = Vec::new();
         for cluster in 0..3 {
@@ -2519,8 +2558,8 @@ mod tests {
             }
         }
         let refs = rows.iter().collect::<Vec<_>>();
-        let first = ood_cluster_bootstrap(&refs, 500, "ood-operating-point");
-        let second = ood_cluster_bootstrap(&refs, 500, "ood-operating-point");
+        let first = ood_cluster_bootstrap(&refs, Some(0.5), 500, "ood-operating-point");
+        let second = ood_cluster_bootstrap(&refs, Some(0.5), 500, "ood-operating-point");
         assert!(first.valid_replicates >= 400);
         assert_eq!(
             first.false_ood_rate_on_in_domain_95.map(|x| (x.lower, x.upper)),
@@ -2550,7 +2589,7 @@ mod tests {
         ood.shift_axis = Some("species".into());
         ood.is_ood_domain = Some(true);
         ood.ood_score = Some(0.9);
-        let interval = ood_cluster_bootstrap(&[&in_domain, &ood], 500, "sparse-ood");
+        let interval = ood_cluster_bootstrap(&[&in_domain, &ood], Some(0.5), 500, "sparse-ood");
         assert!(interval.valid_replicates < 400);
         assert_eq!(interval.roc_auc_95, None);
         assert_eq!(interval.average_precision_95, None);
