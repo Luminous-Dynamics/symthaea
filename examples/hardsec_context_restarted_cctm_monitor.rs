@@ -763,8 +763,9 @@ fn audit_values_with_context_receipt(
         let state = plan.contexts.get_mut(&record.context_id).ok_or("context state invariant failed")?;
         let p_value = empirical_cdf(&state.scores, record.anomaly_score);
         let eta_used = state.eta;
-        let (beta, g, g_prime) = cctm_bet(p_value, eta_used, state.epsilon, smoothing_k, state.scale);
-        let (beta, g, g_prime) = (beta?, g, g_prime?);
+        let epsilon = state.epsilon;
+        let score_scale = state.scale;
+        let (beta, g, g_prime) = cctm_bet(p_value, eta_used, epsilon, smoothing_k, score_scale)?;
         let (eta_next, next_accumulator) = if beta > 0.0 {
             ons_next_eta(eta_used, state.ons_accumulator, g_prime, beta)?
         } else {
@@ -790,7 +791,7 @@ fn audit_values_with_context_receipt(
         }
 
         let restarted = update_restarted_processes(
-            state, p_value, state.epsilon, smoothing_k, restart_weight_scale,
+            state, p_value, epsilon, smoothing_k, restart_weight_scale,
             maximum_restart_age, record.sequence_index
         )?;
         let restart_crossing_now = state.restart_first_alarm_sequence_index.is_none()
@@ -1180,7 +1181,7 @@ mod tests {
         let (p, mut s, _, _) = fixture();
         s["records"][0]["sensor_state"] = json!("stale");
         s["records"][1]["context_id"] = json!("new-regime");
-        let bytes = include_bytes!("../tests/fixtures/hardsec/context-assignment-v1/runtime-receipt.json");
+        let bytes = include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
         let mut assignment_receipt: Value = serde_json::from_slice(bytes).unwrap();
         assignment_receipt["runtime_mapping"]["assignments"][1]["decision_status"] = json!("abstained");
         assignment_receipt["runtime_mapping"]["assignments"][1]["decision_reason"] = json!("unknown_context");
@@ -1316,7 +1317,7 @@ mod tests {
     #[test]
     fn rejects_context_assignment_receipt_with_wrong_policy_artifact() {
         let (p, s, _, _) = fixture();
-        let bytes = include_bytes!("../tests/fixtures/hardsec/context-assignment-v1/runtime-receipt.json");
+        let bytes = include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
         let mut assignment_receipt: Value = serde_json::from_slice(bytes).unwrap();
         assignment_receipt["assignment_artifact_sha256"] = json!("e".repeat(64));
         let pb = encode(&p);
@@ -1329,7 +1330,7 @@ mod tests {
     #[test]
     fn abstained_context_assignment_never_updates_wealth() {
         let (p, s, pb, sb) = fixture();
-        let bytes = include_bytes!("../tests/fixtures/hardsec/context-assignment-v1/runtime-receipt.json");
+        let bytes = include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
         let assignment_receipt: Value = serde_json::from_slice(bytes).unwrap();
         let rb = bytes.to_vec();
         let r = audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
@@ -1343,7 +1344,7 @@ mod tests {
     #[test]
     fn rejects_context_assignment_receipt_aggregate_count_mismatch() {
         let (p, s, _, _) = fixture();
-        let bytes = include_bytes!("../tests/fixtures/hardsec/context-assignment-v1/runtime-receipt.json");
+        let bytes = include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
         let mut assignment_receipt: Value = serde_json::from_slice(bytes).unwrap();
         assignment_receipt["assignment_integrity"]["accepted_count"] = json!(15);
         let pb = encode(&p);
@@ -1357,7 +1358,7 @@ mod tests {
     #[test]
     fn fully_abstained_assignment_stream_is_valid_and_updates_no_wealth() {
         let (p, s, pb, sb) = fixture();
-        let bytes = include_bytes!("../tests/fixtures/hardsec/context-assignment-v1/runtime-receipt.json");
+        let bytes = include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
         let mut assignment_receipt: Value = serde_json::from_slice(bytes).unwrap();
         let mapping = assignment_receipt["runtime_mapping"]["assignments"].as_array_mut().unwrap();
         for row in mapping.iter_mut() {
