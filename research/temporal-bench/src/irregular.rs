@@ -119,6 +119,7 @@ pub enum IrregularVerificationError {
     StreamIdMismatch,
     PublicDigestMismatch,
     OracleDigestMismatch,
+    SeedReplayMismatch,
     LengthMismatch,
     DroppedSlotManifestInvalid,
     InvalidTaskContract,
@@ -135,6 +136,7 @@ impl fmt::Display for IrregularVerificationError {
             Self::StreamIdMismatch => write!(f, "irregular task and oracle stream IDs differ"),
             Self::PublicDigestMismatch => write!(f, "irregular public stream SHA-256 digest mismatch"),
             Self::OracleDigestMismatch => write!(f, "irregular oracle SHA-256 digest mismatch"),
+            Self::SeedReplayMismatch => write!(f, "irregular task/oracle do not match the supplied seed and configuration"),
             Self::LengthMismatch => write!(f, "irregular public/oracle point count is inconsistent"),
             Self::DroppedSlotManifestInvalid => write!(f, "dropped-slot manifest is invalid"),
             Self::InvalidTaskContract => write!(f, "irregular task timing or missingness contract is invalid"),
@@ -416,6 +418,25 @@ pub fn verify_irregular_trace(
     Ok(())
 }
 
+/// Verify a task against an evaluator-held seed and complete generator configuration.
+///
+/// This is stronger than digest checking: it rejects a semantically valid but
+/// seed-inconsistent stream, even when an attacker recomputes both SHA-256
+/// digests. The seed/configuration must itself be protected by the evaluator.
+pub fn verify_irregular_trace_seeded(
+    task: &IrregularTask,
+    oracle: &IrregularOracle,
+    config: IrregularConfig,
+) -> Result<(), IrregularVerificationError> {
+    verify_irregular_trace(task, oracle)?;
+    let (expected_task, expected_oracle) = generate_irregular_task(config)
+        .map_err(|_| IrregularVerificationError::SeedReplayMismatch)?;
+    if task != &expected_task || oracle != &expected_oracle {
+        return Err(IrregularVerificationError::SeedReplayMismatch);
+    }
+    Ok(())
+}
+
 fn validate_config(config: IrregularConfig) -> Result<(), IrregularGenerationError> {
     if config.slots < 2 {
         return Err(IrregularGenerationError::TooFewSlots {
@@ -561,6 +582,18 @@ mod tests {
         let (task, oracle) = generate_irregular_task(config).unwrap();
         assert_eq!(task.content_sha256, irregular_content_digest(&task));
         assert_eq!(oracle.content_sha256, irregular_oracle_digest(&oracle));
+    }
+
+    #[test]
+    fn seeded_verifier_rejects_recommitted_but_seed_inconsistent_stream() {
+        let config = IrregularConfig::reference(2_026);
+        let (mut task, oracle) = generate_irregular_task(config).unwrap();
+        task.observations[0].fast ^= 1;
+        task.content_sha256 = irregular_content_digest(&task);
+        assert_eq!(
+            verify_irregular_trace_seeded(&task, &oracle, config),
+            Err(IrregularVerificationError::SeedReplayMismatch)
+        );
     }
 
     #[test]
