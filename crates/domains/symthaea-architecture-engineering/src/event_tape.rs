@@ -213,6 +213,9 @@ pub enum ActionOutcome {
         task_recipe_sha256: String,
         comparison_profile_sha256: String,
         evaluator_sha256: String,
+        verifier_sha256: String,
+        /// Independent verifier receipt for this evaluation, including failures.
+        verifier_receipt_sha256: String,
         disposition: CandidateDisposition,
         score: Option<f64>,
         uncertainty: Option<f64>,
@@ -525,6 +528,8 @@ impl EventTape {
                         task_recipe_sha256,
                         comparison_profile_sha256,
                         evaluator_sha256,
+                        verifier_sha256,
+                        verifier_receipt_sha256,
                         disposition,
                         score,
                         uncertainty,
@@ -549,6 +554,20 @@ impl EventTape {
                         &path,
                         false,
                     )?;
+                    validate_sha256(
+                        verifier_sha256,
+                        &format!("{path}.outcome.verifier_sha256"),
+                    )?;
+                    validate_sha256(
+                        verifier_receipt_sha256,
+                        &format!("{path}.outcome.verifier_receipt_sha256"),
+                    )?;
+                    if verifier_sha256 != &self.header.verifier_sha256 {
+                        return Err(EventTapeError::new(
+                            format!("{path}.outcome.verifier_sha256"),
+                            "candidate verifier digest differs from the frozen header",
+                        ));
+                    }
                     match disposition {
                         CandidateDisposition::Verified => {
                             let value = score.ok_or_else(|| {
@@ -756,6 +775,12 @@ impl EventTape {
                 "replay adapter policy ID differs from the frozen tape policy",
             ));
         }
+        if adapter.algorithm_id() != self.header.policy.algorithm_id {
+            return Err(EventTapeError::new(
+                "replay.algorithm_id",
+                "replay adapter algorithm/build identity differs from the frozen tape policy",
+            ));
+        }
         if adapter.config_sha256() != self.header.policy.config_sha256 {
             return Err(EventTapeError::new(
                 "replay.config_sha256",
@@ -821,6 +846,9 @@ pub struct DecisionContext {
 pub trait PolicyReplay {
     /// Exact policy identifier from the frozen tape header.
     fn policy_id(&self) -> &str;
+
+    /// Exact algorithm/build identity from the frozen tape header.
+    fn algorithm_id(&self) -> &str;
 
     /// SHA-256 of the policy's frozen serialized configuration.
     fn config_sha256(&self) -> &str;
@@ -1318,6 +1346,8 @@ mod tests {
                 task_recipe_sha256: H1.to_owned(),
                 comparison_profile_sha256: H2.to_owned(),
                 evaluator_sha256: H3.to_owned(),
+                verifier_sha256: H4.to_owned(),
+                verifier_receipt_sha256: H5.to_owned(),
                 disposition: CandidateDisposition::Verified,
                 score: Some(0.91),
                 uncertainty: Some(0.01),
@@ -1536,6 +1566,10 @@ mod tests {
     impl PolicyReplay for AlwaysEvaluateA {
         fn policy_id(&self) -> &str {
             "direction-board"
+        }
+
+        fn algorithm_id(&self) -> &str {
+            "symthaea-direction-board-v0.1"
         }
 
         fn config_sha256(&self) -> &str {
