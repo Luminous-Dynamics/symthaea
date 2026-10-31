@@ -470,8 +470,8 @@ pub fn build_grammar_trace(
                 }
             }
         }
-        GrammarPlanEvidence::ProgSuite(plan) => {
-            for (index, section) in plan.sections.iter().enumerate() {
+        GrammarPlanEvidence::ProgSuite(evidence) => {
+            for (index, section) in evidence.plan.sections.iter().enumerate() {
                 if let Some(assertion) = structure_for_region(
                     score,
                     format!("prog-suite-section-{index}"),
@@ -695,29 +695,8 @@ pub fn build_grammar_trace(
                 transformation: Some("role-transformed-theme-per-chorus".into()),
             });
         }
-        GrammarPlanEvidence::ProgSuite(plan) => {
-            let expected_roles = [
-                crate::form::SectionRole::A,
-                crate::form::SectionRole::B,
-                crate::form::SectionRole::C,
-                crate::form::SectionRole::ReturnA,
-            ];
-            let expected_meters = [4, 7, 5, 4];
-            let plan_valid = plan.sections.len() == 4
-                && plan
-                    .sections
-                    .iter()
-                    .zip(expected_roles)
-                    .all(|(section, role)| section.role == role)
-                && plan
-                    .sections
-                    .iter()
-                    .zip(expected_meters)
-                    .all(|(section, meter)| section.meter == meter)
-                && plan.sections.windows(2).all(|pair| {
-                    (pair[0].end.beats() - pair[1].start.beats()).abs() <= 1e-7
-                })
-                && (score.total_beats.beats() - plan.expected_total_beats).abs() <= 1e-7;
+        GrammarPlanEvidence::ProgSuite(evidence) => {
+            let plan_valid = evidence.verification.all_verified();
             obligations.push(ObligationAssertion {
                 obligation_id: "prog-suite-meter-and-theme-return".into(),
                 from: None,
