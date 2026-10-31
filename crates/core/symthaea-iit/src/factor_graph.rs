@@ -1634,7 +1634,7 @@ mod tests {
                 let retained = variable_count - 1;
                 let eliminate = (0..retained).collect::<Vec<_>>();
                 let mut cutset = eliminate.iter().copied()
-                    .filter(|variable| (variable + seed) % 3 == 0)
+                    .filter(|variable| (*variable + seed) % 3 == 0)
                     .collect::<Vec<_>>();
                 if cutset.is_empty() {
                     cutset.push(seed % retained);
