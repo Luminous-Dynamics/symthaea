@@ -357,7 +357,7 @@ fn compute_rhs(
     Ok((b1, b2))
 }
 
-fn task_text(parameters: &LinearSystemParametersV1) -> String {
+pub(crate) fn task_text(parameters: &LinearSystemParametersV1) -> String {
     format!(
         "Find the integer values of x and y that satisfy both equations:\n{}x + {}y = {}\n{}x + {}y = {}\nReturn exactly one JSON object with integer fields x and y.",
         parameters.a11,
