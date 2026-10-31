@@ -284,9 +284,14 @@ The crate now includes a standalone binary sum-product engine:
 sorted variable scope and a dense table local to that scope. The deterministic
 min-fill heuristic selects the next variable by (fewest fill edges, lowest
 degree, lowest variable id), then performs exact multiplication and summation.
-The report exposes elimination order, induced width, peak factor-table entries,
-multiplication count, and variables eliminated. Every intermediate allocation
-is checked against a caller-supplied entry budget and fails closed when exceeded.
+The public `plan_min_fill_elimination` API computes the elimination order,
+induced width, exact predicted peak bucket-table entries, and final retained
+output-table size before any factor multiplication. It rejects an over-budget
+plan before contraction begins. Both ordinary and log-domain execution consume
+the same planner, and their reports expose predicted versus observed peak entries,
+output size, multiplication count, and variables eliminated. Each actual
+intermediate allocation is still independently checked against the caller's
+entry budget as a second line of defence.
 
 This is the architectural direction for scaling IIT 4.0 Eq. 4 background
 marginalization: contract the causal factor graph with cost governed by induced
@@ -320,8 +325,13 @@ Run the topology sweep:
     cargo run --release --locked -p symthaea-iit --example factor_elimination_sweep
 
 It emits CSV rows for chains (32–2,048 variables), rings (32–512), and
-grids (4×4 through 14×14), including induced width, peak entries,
-multiplication count, median/minimum latency, and a deterministic-output check.
+grids (4×4 through 14×14), including a separate preflight-planning latency,
+induced width, predicted output and peak entries, observed peak entries,
+multiplication count, end-to-end median/minimum latency, and a deterministic
+plan/output check. The preflight estimate also accounts for the final product
+over all retained variables, including disconnected retained components; its
+memory ceiling therefore covers the complete return factor, not only elimination
+buckets.
 The same bucketed, log-domain kernel is used by the system-level Eq. 4 cause
 path; end-to-end system-search timing must still be measured separately.
 
@@ -354,7 +364,8 @@ on a pinned PyPhi artifact.
   bounded as node count increases; grids should track separator width rather
   than total state count.
 - **Memory safety:** 100% of cases exceeding the configured factor-entry budget
-  must fail before allocating the oversized intermediate.
+  must fail during preflight before contraction, including oversized final
+  retained-scope products; actual table constructors retain independent guards.
 - **Competitive scale:** report the largest exact proper subsystem and substrate
   solved under fixed memory/time budgets, alongside induced width and boundary
   size. Compare with PyPhi only after matching its exact TPM, formalism,
