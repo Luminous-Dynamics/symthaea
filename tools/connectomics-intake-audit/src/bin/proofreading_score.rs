@@ -2382,18 +2382,149 @@ mod tests {
     }
 
     #[test]
-    fn domain_metadata_requires_predeclared_split_manifest_digest() {
+    fn domain_metadata_requires_real_split_manifest_and_hashes_exact_bytes() {
         let rows = vec![tagged_row("split-1", true, 0.9, "mouse", false, 0.1)];
-        assert!(validate_domain_split_provenance(&rows, None).unwrap_err().contains("requires --domain-split-manifest-sha256"));
-        assert!(validate_domain_split_provenance(&rows, Some(&"a".repeat(64))).is_ok());
-        assert!(validate_domain_split_provenance(&rows, Some("not-a-digest")).is_err());
+        let bytes = synthetic_domain_manifest(&rows, EvaluationPartition::Development);
+        assert!(validate_domain_split_provenance(
+            &rows,
+            None,
+            &"c".repeat(40),
+            EvaluationPartition::Development,
+        ).unwrap_err().contains("requires --domain-split-manifest"));
+        let digest = validate_domain_split_provenance(
+            &rows,
+            Some(&bytes),
+            &"c".repeat(40),
+            EvaluationPartition::Development,
+        ).unwrap().unwrap();
+        assert_eq!(digest, sha256(&bytes));
+        assert!(validate_domain_split_provenance(
+            &rows,
+            Some(&bytes),
+            &"d".repeat(40),
+            EvaluationPartition::Development,
+        ).unwrap_err().contains("does not match"));
     }
 
     #[test]
-    fn split_manifest_digest_without_domain_metadata_is_rejected() {
+    fn split_manifest_without_domain_metadata_is_rejected() {
         let rows = vec![row("split-2", true, 0.9, 0.9, 1.0, 1.0, "merge")];
-        assert!(validate_domain_split_provenance(&rows, Some(&"a".repeat(64))).is_err());
-        assert!(validate_domain_split_provenance(&rows, None).is_ok());
+        let manifest_bytes = synthetic_domain_manifest(
+            &[tagged_row("manifest-row", true, 0.9, "mouse", false, 0.1)],
+            EvaluationPartition::Development,
+        );
+        assert!(validate_domain_split_provenance(
+            &rows,
+            Some(&manifest_bytes),
+            &"c".repeat(40),
+            EvaluationPartition::Development,
+        ).is_err());
+        assert_eq!(
+            validate_domain_split_provenance(
+                &rows, None, &"c".repeat(40), EvaluationPartition::Development
+            ).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn split_manifest_binds_each_prediction_to_exact_domain_cluster_and_ood_role() {
+        let rows = vec![
+            tagged_row("split-seen", true, 0.9, "mouse", false, 0.1),
+            tagged_row("split-heldout", false, 0.1, "zebrafish", true, 0.9),
+        ];
+        let bytes = synthetic_domain_manifest(&rows, EvaluationPartition::Development);
+        assert!(validate_domain_split_provenance(
+            &rows, Some(&bytes), &"c".repeat(40), EvaluationPartition::Development
+        ).is_ok());
+
+        let mut wrong_domain = rows.clone();
+        wrong_domain[0].domain_id = Some("zebrafish".into());
+        assert!(validate_domain_split_provenance(
+            &wrong_domain, Some(&bytes), &"c".repeat(40), EvaluationPartition::Development
+        ).unwrap_err().contains("domain_id does not match"));
+
+        let mut wrong_cluster = rows.clone();
+        wrong_cluster[0].cluster_id = "unbound-cluster".into();
+        assert!(validate_domain_split_provenance(
+            &wrong_cluster, Some(&bytes), &"c".repeat(40), EvaluationPartition::Development
+        ).unwrap_err().contains("cluster_id does not match"));
+
+        let mut wrong_ood = rows.clone();
+        wrong_ood[0].is_ood_domain = Some(true);
+        assert!(validate_domain_split_provenance(
+            &wrong_ood, Some(&bytes), &"c".repeat(40), EvaluationPartition::Development
+        ).unwrap_err().contains("is_ood_domain does not match"));
+    }
+
+    #[test]
+    fn split_manifest_requires_exact_partition_membership() {
+        let rows = vec![
+            tagged_row("partition-a", true, 0.9, "mouse", false, 0.1),
+            tagged_row("partition-b", false, 0.1, "zebrafish", true, 0.9),
+        ];
+        let bytes = synthetic_domain_manifest(&rows, EvaluationPartition::Development);
+        assert!(validate_domain_split_provenance(
+            &rows[..1], Some(&bytes), &"c".repeat(40), EvaluationPartition::Development
+        ).unwrap_err().contains("exactly match"));
+
+        let lockbox_bytes = synthetic_domain_manifest(&rows, EvaluationPartition::Lockbox);
+        assert!(validate_domain_split_provenance(
+            &rows, Some(&lockbox_bytes), &"c".repeat(40), EvaluationPartition::Development
+        ).unwrap_err().contains("does not match"));
+    }
+
+    #[test]
+    fn split_manifest_rejects_heldout_training_and_cluster_partition_leakage() {
+        let rows = vec![
+            tagged_row("leak-seen", true, 0.9, "mouse", false, 0.1),
+            tagged_row("leak-heldout", false, 0.1, "zebrafish", true, 0.9),
+        ];
+        let bytes = synthetic_domain_manifest(&rows, EvaluationPartition::Development);
+        let mut manifest: DomainSplitManifest = serde_json::from_slice(&bytes).unwrap();
+        let heldout_train = manifest.entries.iter_mut()
+            .find(|entry| entry.domain_id == "zebrafish")
+            .unwrap();
+        heldout_train.partition = ManifestPartition::Train;
+        let heldout_bytes = serde_json::to_vec(&manifest).unwrap();
+        assert!(validate_domain_split_provenance(
+            &rows, Some(&heldout_bytes), &"c".repeat(40), EvaluationPartition::Development
+        ).unwrap_err().contains("held-out domain"));
+
+        let mut manifest: DomainSplitManifest = serde_json::from_slice(&bytes).unwrap();
+        let eval_cluster = manifest.entries.iter()
+            .find(|entry| entry.sample_id == "leak-seen")
+            .unwrap().cluster_id.clone();
+        let train_entry = manifest.entries.iter_mut()
+            .find(|entry| entry.partition == ManifestPartition::Train)
+            .unwrap();
+        train_entry.cluster_id = eval_cluster;
+        let leak_bytes = serde_json::to_vec(&manifest).unwrap();
+        assert!(validate_domain_split_provenance(
+            &rows, Some(&leak_bytes), &"c".repeat(40), EvaluationPartition::Development
+        ).unwrap_err().contains("crosses domain or split partition"));
+    }
+
+    #[test]
+    fn split_manifest_rejects_duplicate_membership_and_unknown_domains() {
+        let rows = vec![
+            tagged_row("manifest-dup", true, 0.9, "mouse", false, 0.1),
+            tagged_row("manifest-other", false, 0.1, "zebrafish", true, 0.9),
+        ];
+        let bytes = synthetic_domain_manifest(&rows, EvaluationPartition::Development);
+        let mut manifest: DomainSplitManifest = serde_json::from_slice(&bytes).unwrap();
+        manifest.entries.push(manifest.entries[0].clone());
+        let duplicate_bytes = serde_json::to_vec(&manifest).unwrap();
+        assert!(validate_domain_split_provenance(
+            &rows, Some(&duplicate_bytes), &"c".repeat(40), EvaluationPartition::Development
+        ).unwrap_err().contains("duplicate sample_id"));
+
+        let mut manifest: DomainSplitManifest = serde_json::from_slice(&bytes).unwrap();
+        manifest.entries[0].domain_id = "undeclared-domain".into();
+        let unknown_bytes = serde_json::to_vec(&manifest).unwrap();
+        assert!(validate_domain_split_provenance(
+            &rows, Some(&unknown_bytes), &"c".repeat(40), EvaluationPartition::Development
+        ).unwrap_err().contains("not declared"));
     }
 
     #[test]
@@ -2531,6 +2662,76 @@ mod tests {
         item.ood_score = Some(1.1);
         let input = serde_json::to_string(&item).unwrap();
         assert!(parse_jsonl(input.as_bytes()).unwrap_err().contains("ood_score must be finite"));
+    }
+
+    fn synthetic_domain_manifest(
+        rows: &[Prediction],
+        evaluation_partition: EvaluationPartition,
+    ) -> Vec<u8> {
+        let manifest_partition = match evaluation_partition {
+            EvaluationPartition::Development => ManifestPartition::Development,
+            EvaluationPartition::Confirmatory => ManifestPartition::Confirmatory,
+            EvaluationPartition::Lockbox => ManifestPartition::Lockbox,
+        };
+        let mut seen = rows.iter()
+            .filter(|row| row.is_ood_domain == Some(false))
+            .filter_map(|row| row.domain_id.clone())
+            .collect::<BTreeSet<_>>();
+        if seen.is_empty() {
+            seen.insert("mouse-seen".into());
+        }
+        let mut held_out = rows.iter()
+            .filter(|row| row.is_ood_domain == Some(true))
+            .filter_map(|row| row.domain_id.clone())
+            .collect::<BTreeSet<_>>();
+        if held_out.is_empty() {
+            held_out.insert("zebrafish-heldout".into());
+        }
+
+        let mut entries = rows.iter().map(|row| DomainSplitEntry {
+            sample_id: row.sample_id.clone(),
+            cluster_id: row.cluster_id.clone(),
+            domain_id: row.domain_id.clone().unwrap(),
+            partition: manifest_partition,
+        }).collect::<Vec<_>>();
+        for domain in &seen {
+            entries.push(DomainSplitEntry {
+                sample_id: format!("train-{domain}"),
+                cluster_id: format!("train-cluster-{domain}"),
+                domain_id: domain.clone(),
+                partition: ManifestPartition::Train,
+            });
+            entries.push(DomainSplitEntry {
+                sample_id: format!("calibration-{domain}"),
+                cluster_id: format!("calibration-cluster-{domain}"),
+                domain_id: domain.clone(),
+                partition: ManifestPartition::Calibration,
+            });
+        }
+        let held_out_has_evaluation_membership = entries.iter().any(|entry| {
+            held_out.contains(&entry.domain_id) && !entry.partition.is_training_or_calibration()
+        });
+        if !held_out_has_evaluation_membership {
+            let domain = held_out.iter().next().unwrap().clone();
+            entries.push(DomainSplitEntry {
+                sample_id: format!("lockbox-{domain}"),
+                cluster_id: format!("lockbox-cluster-{domain}"),
+                domain_id: domain,
+                partition: ManifestPartition::Lockbox,
+            });
+        }
+        let manifest = DomainSplitManifest {
+            schema_version: 1,
+            manifest_id: "synthetic-domain-split-v1".into(),
+            dataset_revision_commit_sha: "c".repeat(40),
+            shift_axis: rows.first()
+                .and_then(|row| row.shift_axis.clone())
+                .unwrap_or_else(|| "species".into()),
+            seen_domain_ids: seen.into_iter().collect(),
+            held_out_domain_ids: held_out.into_iter().collect(),
+            entries,
+        };
+        serde_json::to_vec(&manifest).unwrap()
     }
 
     #[test]
