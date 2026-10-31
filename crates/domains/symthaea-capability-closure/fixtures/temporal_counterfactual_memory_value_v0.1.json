@@ -52,7 +52,8 @@
     "observations_used",
     "read_bytes",
     "write_bytes",
-    "measured_energy_nj"
+    "measured_energy_nj",
+    "retained_byte_us"
   ],
   "exact_subset_oracle": {
     "maximum_items": 16,
@@ -65,7 +66,22 @@
       "candidate_componentwise_regret"
     ],
     "claim_ceiling": "evaluator_only_clairvoyant_upper_bound_not_a_candidate_policy",
-    "exponential": true
+    "exponential": true,
+    "pareto_frontier_dimensions": [
+      "wrong_belief_us",
+      "abstention_us",
+      "missing_output_us"
+    ],
+    "costs_reported_but_not_in_exposure_frontier": [
+      "bytes_used",
+      "retained_byte_us",
+      "compute_used",
+      "refreshes_used",
+      "observations_used",
+      "read_bytes",
+      "write_bytes",
+      "measured_energy_nj"
+    ]
   },
   "implementation": {
     "source": "research/temporal-evaluator/src/main.rs",
@@ -84,7 +100,10 @@
     "replay_and_toctou_controls"
   ],
   "qualification_targets_not_results": {
-    "calibration_slope": [0.9, 1.1],
+    "calibration_slope": [
+      0.9,
+      1.1
+    ],
     "realized_ted_relative_reduction_target": 0.2,
     "alternative_byte_seconds_reduction_at_equal_ted_target": 0.3,
     "stale_memory_false_recall_increase_allowed": 0,
