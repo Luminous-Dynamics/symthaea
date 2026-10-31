@@ -630,6 +630,8 @@ fn create_profile_unsigned(
     spec: &TailProfileBuildSpec,
     context: TailProfileContext,
     observations: &[TailProfileEventObservation],
+    benchmark_manifest_sha256: &str,
+    benchmark_audit_sha256: &str,
     signer_key_id: &str,
 ) -> Result<TailProfile, TailProfileError> {
     if !valid_label(&spec.profile_id)
@@ -643,6 +645,9 @@ fn create_profile_unsigned(
     }
     if observations.is_empty() {
         return Err(TailProfileError::EventCountMismatch);
+    }
+    if !is_sha256(benchmark_manifest_sha256) || !is_sha256(benchmark_audit_sha256) {
+        return Err(TailProfileError::InvalidDigest("benchmark lineage audit"));
     }
     let required_lineages = minimum_lineages_for_upper_quantile_bound(
         spec.quantile_micros,
@@ -733,6 +738,8 @@ fn create_profile_unsigned(
         version: PROFILE_VERSION.to_owned(),
         profile_id: spec.profile_id.clone(),
         dataset_revision: spec.dataset_revision.clone(),
+        benchmark_manifest_sha256: benchmark_manifest_sha256.to_owned(),
+        benchmark_audit_sha256: benchmark_audit_sha256.to_owned(),
         context,
         statistics,
         qualification,
@@ -783,6 +790,8 @@ pub fn verify_tail_profile(
         || !is_sha256(&profile.qualification_lineage_set_sha256)
         || !is_sha256(&profile.event_evidence_set_sha256)
         || !is_sha256(&profile.builder_spec_sha256)
+        || !is_sha256(&profile.benchmark_manifest_sha256)
+        || !is_sha256(&profile.benchmark_audit_sha256)
         || !is_sha256(&profile.context.renderer_identity_sha256)
         || !is_sha256(&profile.context.renderer_executable_sha256)
         || !is_sha256(&profile.context.soundfont_sha256)
