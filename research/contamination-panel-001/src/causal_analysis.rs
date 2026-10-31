@@ -256,7 +256,7 @@ fn t_critical_975(df: usize) -> f64 {
         (16, 2.120), (17, 2.110), (18, 2.101), (19, 2.093), (20, 2.086),
         (21, 2.080), (22, 2.074), (23, 2.069), (24, 2.064), (25, 2.060),
         (26, 2.056), (27, 2.052), (28, 2.048), (29, 2.045), (30, 2.042),
-        (40, 2.021), (60, 2.000), (120, 1.980), (usize::MAX, 1.960),
+        (40, 2.042), (60, 2.021), (120, 2.000), (usize::MAX, 1.980),
     ];
     TABLE.iter()
         .find(|(upper_df, _)| df <= *upper_df)
@@ -687,6 +687,7 @@ pub fn analyze_replicated_causal_study(
     }
 
     let first = &study.replicates[0].design;
+    let first_evaluation = &study.replicates[0].evaluation_evidence;
     let mut replicate_ids = BTreeSet::new();
     let mut seed_commitments = BTreeSet::new();
     let mut all_checkpoint_digests = BTreeSet::new();
@@ -706,6 +707,15 @@ pub fn analyze_replicated_causal_study(
             &study.benchmark_version,
             &study.primary_metric_definition_sha256,
         )?;
+        if replicate.evaluation_evidence.oracle_or_adjudication_sha256
+                != first_evaluation.oracle_or_adjudication_sha256
+            || replicate.evaluation_evidence.evaluation_harness_sha256
+                != first_evaluation.evaluation_harness_sha256
+            || replicate.evaluation_evidence.prompt_and_decoding_sha256
+                != first_evaluation.prompt_and_decoding_sha256
+        {
+            return Err("evaluation oracle, harness and prompt/decoding conditions must match across replicates".to_owned());
+        }
         if !replicate_ids.insert(replicate.design.replicate_id.as_str()) {
             return Err("replicate IDs must be unique".to_owned());
         }
@@ -872,7 +882,10 @@ mod tests {
         assert_eq!(t_critical_975(1), 12.706);
         assert_eq!(t_critical_975(9), 2.262);
         assert_eq!(t_critical_975(29), 2.045);
-        assert_eq!(t_critical_975(200), 1.96);
+        assert_eq!(t_critical_975(30), 2.042);
+        assert_eq!(t_critical_975(31), 2.042);
+        assert_eq!(t_critical_975(50), 2.021);
+        assert_eq!(t_critical_975(200), 1.98);
     }
 
     #[test]
