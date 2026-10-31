@@ -260,8 +260,6 @@ pub fn run_coral_batch_campaign(
         let global_best_at_batch_start = board.global_best_score.or(Some(0.0));
         let mut round_actions = Vec::new();
         let mut staged_events = Vec::new();
-        let mut round_eval_offsets: BTreeMap<String, usize> = BTreeMap::new();
-        let mut round_new_eval_offsets = 0usize;
 
         for (seat_index, assigned_arm) in selected_arms.iter().enumerate() {
             let worker_id = format!("coral-round-{scheduled_round}-worker-{}", seat_index + 1);
@@ -277,15 +275,14 @@ pub fn run_coral_batch_campaign(
                         continue;
                     }
                     *direction_claims.entry(direction_id.clone()).or_default() += 1;
-                    let state = board.directions.get(direction_id)
-                        .ok_or_else(|| format!("Coral recommended unregistered direction {direction_id}"))?;
+                    if !board.directions.contains_key(direction_id) {
+                        return Err(format!("Coral recommended unregistered direction {direction_id}"));
+                    }
                     let parent_score = round_parent_scores.get(direction_id)
                         .copied()
                         .flatten()
                         .or(Some(0.0));
-                    let offset = round_eval_offsets.entry(direction_id.clone()).or_default();
-                    let eval_index = direction_eval_counts.get(direction_id).copied().unwrap_or(0) + *offset;
-                    *offset += 1;
+                    let eval_index = direction_eval_counts.get(direction_id).copied().unwrap_or(0);
                     let score = payoff(landscape, direction_id, eval_index);
                     let attempt_id = format!("{action_id}-evaluation");
                     board.record_evaluation(
@@ -339,9 +336,7 @@ pub fn run_coral_batch_campaign(
                                 .copied()
                                 .flatten()
                                 .or(global_best_at_batch_start);
-                            let eval_index = direction_eval_counts.get(direction_id).copied().unwrap_or(0)
-                                + round_new_eval_offsets;
-                            round_new_eval_offsets += 1;
+                            let eval_index = direction_eval_counts.get(direction_id).copied().unwrap_or(0);
                             let score = payoff(landscape, direction_id, eval_index);
                             (
                                 DirectionProposalDisposition::Duplicate {
