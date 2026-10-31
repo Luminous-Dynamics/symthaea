@@ -2,7 +2,8 @@
   "schema_version": "mace-evaluator-oracles-v0.1",
   "oracles": [
     {
-      "case_id": "MACE-A01",
+      "case_id": "MACE-104",
+      "family": "observational_confounding",
       "pair": {
         "pair_id": "PAIR-OBS-01",
         "role": "anchor"
@@ -19,7 +20,8 @@
       }
     },
     {
-      "case_id": "MACE-A02",
+      "case_id": "MACE-287",
+      "family": "observational_confounding",
       "pair": {
         "pair_id": "PAIR-OBS-01",
         "role": "irrelevant_control"
@@ -36,7 +38,8 @@
       }
     },
     {
-      "case_id": "MACE-B01",
+      "case_id": "MACE-319",
+      "family": "controlled_intervention",
       "pair": {
         "pair_id": "PAIR-INT-01",
         "role": "anchor"
@@ -61,7 +64,8 @@
       }
     },
     {
-      "case_id": "MACE-B02",
+      "case_id": "MACE-604",
+      "family": "controlled_intervention",
       "pair": {
         "pair_id": "PAIR-INT-01",
         "role": "irrelevant_control"
@@ -86,7 +90,8 @@
       }
     },
     {
-      "case_id": "MACE-C01",
+      "case_id": "MACE-622",
+      "family": "regime_shift",
       "pair": {
         "pair_id": "PAIR-REGIME-01",
         "role": "anchor"
@@ -103,7 +108,8 @@
       }
     },
     {
-      "case_id": "MACE-C02",
+      "case_id": "MACE-731",
+      "family": "regime_shift",
       "pair": {
         "pair_id": "PAIR-REGIME-01",
         "role": "irrelevant_control"
@@ -120,7 +126,8 @@
       }
     },
     {
-      "case_id": "MACE-D01",
+      "case_id": "MACE-845",
+      "family": "outcome_misattribution",
       "pair": {
         "pair_id": "PAIR-OUTCOME-01",
         "role": "anchor"
@@ -137,7 +144,8 @@
       }
     },
     {
-      "case_id": "MACE-D02",
+      "case_id": "MACE-902",
+      "family": "outcome_misattribution",
       "pair": {
         "pair_id": "PAIR-OUTCOME-01",
         "role": "irrelevant_control"
