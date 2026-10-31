@@ -826,8 +826,8 @@ mod tests {
             "platform_id":"synthetic-cpu-model-v1",
             "holdout_axes":["program","execution","attack_family","adaptation_family"],
             "cases":[
-                {"case_id":"tr1","split":"train","program_group_id":"train-p","execution_group_id":"train-e","device_config_id":"cpu-a","attack_family_id":"spectre-base","adaptation_family_id":"none","adaptation_level":0,"sensor_state":"valid"},
-                {"case_id":"va1","split":"validation","program_group_id":"val-p","execution_group_id":"val-e","device_config_id":"cpu-a","attack_family_id":"spectre-base","adaptation_family_id":"none","adaptation_level":0,"sensor_state":"valid"},
+                {"case_id":"tr1","split":"train","program_group_id":"train-p","execution_group_id":"train-e","device_config_id":"cpu-a","attack_family_id":"spectre-baseline-train","adaptation_family_id":"none","adaptation_level":0,"sensor_state":"valid"},
+                {"case_id":"va1","split":"validation","program_group_id":"val-p","execution_group_id":"val-e","device_config_id":"cpu-a","attack_family_id":"spectre-baseline-validation","adaptation_family_id":"none","adaptation_level":0,"sensor_state":"valid"},
                 {"case_id":"c1","split":"test","program_group_id":"p1","execution_group_id":"e1","device_config_id":"cpu-a","attack_family_id":"spectre-evasive","adaptation_family_id":"timing","adaptation_level":1,"sensor_state":"valid"},
                 {"case_id":"c2","split":"test","program_group_id":"p2","execution_group_id":"e2","device_config_id":"cpu-a","attack_family_id":"spectre-evasive","adaptation_family_id":"interleave","adaptation_level":2,"sensor_state":"valid"},
                 {"case_id":"c3","split":"test","program_group_id":"p3","execution_group_id":"e3","device_config_id":"cpu-a","attack_family_id":"spectre-evasive","adaptation_family_id":"timing","adaptation_level":2,"sensor_state":"untrusted"},
@@ -898,6 +898,23 @@ mod tests {
         m["cases"][0]["program_group_id"] = json!("p1");
         let mb = serde_json::to_vec(&m).unwrap();
         assert!(audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap_err().contains("crosses"));
+    }
+
+    #[test]
+    fn rejects_attack_family_holdout_leakage() {
+        let (p,mut m,t,pb,_,tb) = fixture_values();
+        m["cases"][0]["attack_family_id"] = json!("spectre-evasive");
+        let mb = serde_json::to_vec(&m).unwrap();
+        assert!(audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap_err().contains("attack_family holdout"));
+    }
+
+    #[test]
+    fn rejects_adaptation_family_holdout_leakage() {
+        let (p,mut m,t,pb,_,tb) = fixture_values();
+        m["cases"][0]["adaptation_family_id"] = json!("timing");
+        m["cases"][0]["adaptation_level"] = json!(1);
+        let mb = serde_json::to_vec(&m).unwrap();
+        assert!(audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap_err().contains("adaptation_family holdout"));
     }
 
     #[test]
