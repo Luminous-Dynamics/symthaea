@@ -112,7 +112,12 @@ pub fn run_four_seat_campaign_matrix(
     {
         return Err("landscape, policy and seed inputs must not contain duplicates".to_owned());
     }
-    let mut runs = Vec::with_capacity(landscapes.len() * policies.len() * seeds.len());
+    let capacity = landscapes
+        .len()
+        .checked_mul(policies.len())
+        .and_then(|value| value.checked_mul(seeds.len()))
+        .ok_or_else(|| "campaign matrix size overflow".to_owned())?;
+    let mut runs = Vec::with_capacity(capacity);
     for landscape in landscapes {
         for policy in policies {
             for seed in seeds {
@@ -279,6 +284,9 @@ pub fn run_four_seat_campaign(
     if round_count == 0 {
         return Err("round_count must be positive".to_owned());
     }
+    let expected_action_count = round_count
+        .checked_mul(SEATS_PER_ROUND)
+        .ok_or_else(|| "round action count overflow".to_owned())?;
 
     let campaign_id = format!("ar5b6-{}-{seed:016x}", policy.id());
     let cost_profile_sha256 = digest_bytes(
@@ -430,13 +438,13 @@ pub fn run_four_seat_campaign(
                 evaluation_index,
             );
             let result_digest = digest(&format!(
-                "result:{}:{direction_id}:{evaluation_index}:{:016x}",
-                seat.action_id,
+                "result:{}:{:016x}",
+                seat.work_item_sha256,
                 score.to_bits()
             ));
             let verifier_receipt = digest(&format!(
                 "synthetic-independent-verifier-receipt:{}:{result_digest}",
-                seat.action_id
+                seat.work_item_sha256
             ));
             results.push(ActionResultReceipt {
                 round_id: plan.round_id.clone(),
@@ -505,16 +513,13 @@ pub fn run_four_seat_campaign(
             let attempt = DirectionAttempt {
                 attempt_id: result.action_id.clone(),
                 direction_sha256: direction_digest.clone(),
-                method_id: format!("round-{round_index}-{}", result.action_id),
+                method_id: format!("method-{resolved_direction_id}-{}", history[resolved_direction_id].len()),
                 parent_candidate_sha256: digest(&format!(
                     "parent:{seed}:{resolved_direction_id}:{}",
                     pre_round_history_counts[resolved_direction_id]
                 )),
                 candidate_sha256: seat.work_item_sha256.clone(),
-                semantic_delta_sha256: digest(&format!(
-                    "semantic-delta:{}",
-                    seat.work_item_sha256
-                )),
+                semantic_delta_sha256: digest(&format!("semantic-delta:{}", seat.work_item_sha256)),
                 comparison_profile_sha256: PROFILE_SHA256.to_owned(),
                 metric_id: METRIC_ID.to_owned(),
                 evaluation_cost_units: 1,
@@ -580,7 +585,7 @@ pub fn run_four_seat_campaign(
         })
         .ok_or_else(|| "campaign produced no evaluated scores".to_owned())?;
     let oracle_best_score = direction_board_benchmark::oracle_best_score(landscape);
-    let action_count = round_count * SEATS_PER_ROUND;
+    let action_count = expected_action_count;
 
     Ok(FourSeatCampaignRun {
         schema: RUN_SCHEMA.to_owned(),
@@ -615,7 +620,9 @@ fn allocate_round(
 ) -> Result<Vec<String>, String> {
     let mut ranked: Vec<(String, f64)> = match policy {
         RoundSchedulerPolicy::FixedRoundRobin => {
-            return Ok(DIRECTIONS.iter().map(|id| (*id).to_owned()).collect());
+            return Ok((0..DIRECTIONS.len())
+                .map(|offset| DIRECTIONS[(round_index + offset) % DIRECTIONS.len()].to_owned())
+                .collect());
         }
         RoundSchedulerPolicy::Random => {
             let mut arms: Vec<String> = DIRECTIONS.iter().map(|id| (*id).to_owned()).collect();
