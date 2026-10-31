@@ -330,7 +330,10 @@ pub(crate) fn verify_opera_plan(score: &Score, home_key: Key, plan: &OperaPlan) 
                     && section.key_context == key_context
             },
         );
-    let timeline_matches = score.meter == plan.meter
+    let timeline_matches = plan.engine_version == "two-theme-dialogue-v1"
+        && plan.statement_a_role == VoiceRole::Melody
+        && plan.statement_b_role == VoiceRole::CounterMelody
+        && score.meter == plan.meter
         && (score.total_beats.beats() - expected_total).abs() <= 1e-7
         && plan.total_bars == 9
         && section_layout_matches;
@@ -676,6 +679,29 @@ mod tests {
         });
         let verification = verify_opera_plan(&corrupted, home, &realized.plan);
         assert!(!verification.dialogue_alternates_one_bar_at_a_time);
+        assert!(!verification.all_verified());
+    }
+
+    #[test]
+    fn opera_plan_verifier_rejects_statement_b_pitched_as_home_key_degrees() {
+        let home = Key::major(PitchClass::C);
+        let realized = realize_opera_with_plan(home, 100.0, 4.0, 3, &intent());
+        let mut corrupted = realized.score.clone();
+        let first_statement_b = corrupted
+            .notes
+            .iter_mut()
+            .find(|note| {
+                note.role == VoiceRole::CounterMelody
+                    && note.onset.beats() >= 8.0
+                    && note.onset.beats() < 16.0
+            })
+            .expect("Statement B must have a first theme event");
+        // B's first note is scale degree 7 of the relative minor. Replace it
+        // with scale degree 7 of the home major: still diatonic to the shared
+        // key signature, but not the declared relative-key realization.
+        first_statement_b.pitch = home.scale().degree_pitch(7, 4);
+        let verification = verify_opera_plan(&corrupted, home, &realized.plan);
+        assert!(!verification.statement_b_uses_relative_key);
         assert!(!verification.all_verified());
     }
 
