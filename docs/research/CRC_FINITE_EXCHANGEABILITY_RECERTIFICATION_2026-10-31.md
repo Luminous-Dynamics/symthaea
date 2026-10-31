@@ -85,26 +85,45 @@ No IID assumption is used in the finite-state certificate. The verifier checks t
 
 ## Exact development results
 
-### Two observation types, n=2
+### Exact reproduction of Bai & Ramdas, Section 3.4, Table 1
 
-Parameters:
+The implementation now reproduces the paper's two-type example exactly:
 
-- \(\alpha=1/2\);
-- baseline action \(A(D)=1\) for every calibration multiset;
-- intercept losses \(b=(1/2,1/4)\);
-- slopes \(d=(3/10,3/10)\).
+\[
+\ell(H,\lambda)=1-\lambda,\qquad
+\ell(L,\lambda)=\tfrac12(1-\lambda),\qquad
+n=2,\quad\alpha=\tfrac12.
+\]
 
-The baseline is valid on all 4 augmented multisets, with minimum slack exactly zero. One recertification gives:
+The starting controller is the paper's envelope-CRC table, not an artificial constant baseline:
 
-| Calibration counts \(D\) | Baseline action | Recertified action |
+| Calibration multiset | Envelope CRC \(A^{(0)}\) | One equal-share recertification \(A^{(1)}\) |
 |---|---:|---:|
-| (0,2) | 1 | \(4/9\) |
-| (1,1) | 1 | \(13/18\) |
-| (2,0) | 1 | 1 |
+| HH | \(1/2\) | \(1/2\) |
+| HL | \(2/5\) | \(23/60\) |
+| LL | \(1/4\) | \(1/5\) |
 
-The independent step verifier checks every held-out type, pointwise dominance, and the full augmented state space. The recertified controller remains valid with minimum slack exactly zero.
+The baseline is valid on every augmented multiset, with exact minimum slack zero. The independent verifier checks all four augmented multisets and every held-out constraint, and the recertified controller remains valid with exact minimum slack zero.
 
-Eight successive exact-rational iterations also remained valid and nonincreasing. In this deliberately small affine fixture, successive sup-action changes shrink by a factor of \(1/3\); each observed ratio is below the paper's general geometric-rate benchmark \(n/(n+1)=2/3\). This is one finite example, not an independent proof of the general convergence theorem.
+Eight repeated exact-rational iterations are also checked against the paper's pointwise admissible limit \((1/2,3/8,1/8)\), using the theorem's error bound \(\rho^k\) with \(\rho=n/(n+1)=2/3\). This tests the actual convergence statement, rather than comparing consecutive step sizes.
+
+### New allocation experiment: loss-proportional slack
+
+Appendix B.2 of the paper proves that any permutation-equivariant nonnegative allocation summing to one across held-out positions preserves validity. It specifically identifies allocation proportional to baseline held-out losses as an alternative to equal sharing.
+
+The prototype now supports both:
+- equal sharing: \(w_i(S)=1/(n+1)\);
+- loss-proportional sharing: \(w_i(S)=r_i^A(S)/T_A(S)\), with equal fallback if \(T_A(S)=0\).
+
+For the exact two-type example, the one-step loss-proportional controller is:
+
+| Calibration multiset | Equal sharing | Loss-proportional |
+|---|---:|---:|
+| HH | \(1/2\) | \(1/2\) |
+| HL | \(23/60\) | \(11/29\) |
+| LL | \(1/5\) | \(1/6\) |
+
+The loss-proportional controller is pointwise no more conservative than the equal-share controller in this example. The exact step verifier independently checks its allocation inequalities and every augmented-multiset risk constraint. This is a finite example, not a universal dominance result for loss-proportional allocation.
 
 ### Three observation types, n=50
 
