@@ -181,8 +181,10 @@ pub struct SparseEq4Report {
     /// True when this report reused the original model/state posterior prepared by
     /// a surrounding multi-partition analysis instead of contracting it again.
     pub posterior_contraction_reused: bool,
-    /// Factor multiplications performed to build the reusable posterior. This is
-    /// reported even when reused, but is not added to this report's work counter.
+    /// Factor multiplications attributable to preparing the original posterior.
+    /// They are included in `factor_multiplications` when this report prepares
+    /// its own posterior, and reported separately (without double-counting) when
+    /// the prepared posterior is reused.
     pub posterior_factor_multiplications: usize,
     /// Largest preflight bucket table for the observed-state posterior contraction.
     pub posterior_predicted_peak_factor_entries: usize,
