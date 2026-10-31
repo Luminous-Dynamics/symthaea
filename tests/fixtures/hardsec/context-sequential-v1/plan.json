@@ -444,5 +444,7 @@
         2
       ]
     }
-  ]
+  ],
+  "scoring_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "anomaly_score_direction": "higher_is_more_anomalous"
 }
