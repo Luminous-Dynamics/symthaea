@@ -480,8 +480,9 @@ mod tests {
         mismatch_first_arm: bool,
     ) -> EventTape {
         use crate::event_tape::{
-            ActionEvent, ActionOutcome, CandidateDisposition, EventTapeHeader, MeterValue,
-            PolicySnapshot, ProposalDisposition, ResourceReceipt,
+            ActionEvent, ActionOutcome, BudgetModel, CandidateDisposition, EventTapeHeader,
+            MeterValue, PolicySnapshot, ProposalDisposition, ResourceCostWeights,
+            ResourceReceipt,
         };
 
         const H1: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -491,6 +492,22 @@ mod tests {
         const H5: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
         let config = serde_json::to_value(&board.config).unwrap();
+        let budget_model = BudgetModel::WeightedResources {
+            weights: ResourceCostWeights {
+                host_cpu_millis: 10,
+                wall_millis: 0,
+                accelerator_millis: 0,
+                host_memory_byte_millis: 0,
+                accelerator_memory_byte_millis: 0,
+                energy_millijoules: 0,
+                input_tokens: 0,
+                output_tokens: 0,
+                tool_calls: 0,
+                evaluator_calls: 0,
+                verifier_calls: 0,
+            },
+        };
+        let budget_model_sha256 = digest_serializable(&budget_model).unwrap();
         let header = EventTapeHeader {
             schema: "symthaea.ar5b4.event-tape".to_owned(),
             version: "0.1.0".to_owned(),
@@ -505,7 +522,8 @@ mod tests {
             evaluator_sha256: H5.to_owned(),
             verifier_sha256: H1.to_owned(),
             budget_model_id: "coral-seat-test-budget-v1".to_owned(),
-            budget_model_sha256: H2.to_owned(),
+            budget_model_sha256,
+            budget_model,
             budget_limit_microunits: 1000,
             initial_direction_ids: vec![
                 "A".to_owned(),
