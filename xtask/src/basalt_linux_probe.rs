@@ -144,13 +144,23 @@ pub fn probe_linux() -> anyhow::Result<LinuxProbeReport> {
     let btf_vmlinux = digest_file_evidence("btf_vmlinux", Path::new("/sys/kernel/btf/vmlinux"));
     let config = read_kernel_config(release.value.as_deref().unwrap_or("unknown"));
     let mountinfo_raw = read_text_evidence("mountinfo_raw", Path::new("/proc/self/mountinfo"));
-    let mounts = mountinfo_raw.value.as_deref().map(parse_relevant_mounts).unwrap_or_default();
+    let mountinfo_truncated = mountinfo_raw.value.as_deref().is_some_and(mount_inventory_exceeds_limit);
+    let mounts = if mountinfo_truncated {
+        Vec::new()
+    } else {
+        mountinfo_raw.value.as_deref().map(parse_relevant_mounts).unwrap_or_default()
+    };
     // Keep only a digest and bounded summary in the report; raw mountinfo can
     // contain unrelated host paths and is not needed for profile selection.
+    // A truncated inventory is explicitly downgraded to NotProbed.
     let mount_text = ProbeEvidence {
         key: "mount_inventory".to_string(),
-        status: mountinfo_raw.status,
-        value: Some(format!("relevant_mounts={}", mounts.len())),
+        status: if mountinfo_truncated { EvidenceStatus::NotProbed } else { mountinfo_raw.status },
+        value: Some(if mountinfo_truncated {
+            format!("truncated_over_{MAX_MOUNT_ENTRIES}_lines")
+        } else {
+            format!("relevant_mounts={}", mounts.len())
+        }),
         content_digest: mountinfo_raw.content_digest.clone(),
         path: mountinfo_raw.path.clone(),
     };
@@ -559,6 +569,10 @@ fn not_probed_evidence(key: &str, reason: &str) -> ProbeEvidence {
     }
 }
 
+fn mount_inventory_exceeds_limit(mountinfo: &str) -> bool {
+    mountinfo.lines().count() > MAX_MOUNT_ENTRIES
+}
+
 fn parse_relevant_mounts(mountinfo: &str) -> Vec<MountEntry> {
     let mut mounts = Vec::new();
     for line in mountinfo.lines().take(MAX_MOUNT_ENTRIES) {
@@ -815,6 +829,17 @@ mod tests {
         };
         assert_eq!(evidence.value.as_deref(), Some("relevant_mounts=0"));
         assert_ne!(evidence.content_digest.as_deref(), Some(raw));
+    }
+
+    #[test]
+    fn truncated_mount_inventory_is_explicitly_unknown() {
+        let input = (0..=MAX_MOUNT_ENTRIES)
+            .map(|index| format!("{index} 1 0:20 / /mnt/{index} rw - ext4 /dev/x rw"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(mount_inventory_exceeds_limit(&input));
+        let complete = "1 0 0:1 / /workspace rw - ext4 /dev/root rw\n";
+        assert!(!mount_inventory_exceeds_limit(complete));
     }
 
     #[test]
