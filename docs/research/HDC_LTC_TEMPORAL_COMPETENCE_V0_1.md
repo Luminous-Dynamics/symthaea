@@ -23,11 +23,20 @@ The suite is an evaluation layer, not a new neuron implementation. It does not c
 
 An October 8, 2026 IEEE TNNLS review of SNN temporal processing identifies limitations in commonly used neuromorphic benchmarks for multi-timescale dependencies. Its abstract describes a four-task suite and reports remaining challenges in online learning and long-range dependency modeling relative to non-spiking sequence models (Ma et al., DOI: 10.1109/TNNLS.2026.3736737; PubMed PMID 42848555). The full task definitions and implementation have not yet been inspected; v0.1 does not claim to reproduce those tasks.
 
-NeuroBench separates hardware-independent algorithm qualification from deployed-system qualification. MLPerf Tiny v1.4 fixes workloads and quality targets, and evaluates latency and energy under declared measurement methods. This suite should map to those conventions:
+NeuroBench has two explicit tracks: its algorithm track evaluates correctness and static complexity independent of deployment target, while its system track measures deployment-aware timing and efficiency. MLPerf Tiny v1.4 offers a complementary edge-deployment standard: accuracy, latency, and calibrated energy per inference at fixed task-quality targets. Its five workloads include keyword spotting, visual wake words, image classification, anomaly detection, and continuous streaming wake-word detection. Streaming wake-word is particularly relevant because it measures idle listening as well as detection events.
 
+Use the divisions correctly:
+- **MLPerf Tiny Closed Division:** fixed reference model, dataset, and processing pipeline; useful for apples-to-apples hardware/runtime comparison.
+- **MLPerf Tiny Open Division:** allows different models, training methods, and optimizations while retaining the same task and quality target; the right comparison path for a new HDC-LTC architecture.
+- **NeuroBench Algorithm Track:** task correctness, temporal integrity, and static complexity under hardware-independent conditions.
+- **NeuroBench System Track:** actual deployment timing, memory, power, and energy with the full system boundary.
+
+The 2026 v1.4 round reported nine organizations and 25 configurations across Closed and Open divisions. MLPerf's own results show why we must distinguish latency from energy and include idle duty cycle: Syntiant reported a 3.3% duty cycle on streaming wake-word, while Qualcomm reported sub-0.30 ms on several legacy sensing workloads. Those figures are workload/platform-specific external reference points, not Symthaea comparisons. Use the official streaming wake-word workload as a deployment anchor where compatible; do not claim that our custom delayed-recall suite is itself an MLPerf submission.
+
+This suite should align to these conventions without collapsing them into one score:
 - **Algorithm track:** task quality, temporal integrity, state/compute complexity, and reproducible seeds;
 - **System track:** measured end-to-end latency, persistent and peak memory, memory traffic, and calibrated energy on named hardware;
-- **No blended score:** publish a Pareto frontier and task-specific metrics rather than weighting correctness, safety, and efficiency into one number.
+- **No blended score:** publish task-specific metrics and capability/resource Pareto frontiers rather than weighting correctness, safety, and efficiency into one number.
 
 ## 3. Core hypothesis
 
@@ -180,17 +189,29 @@ These are targets, not measured results:
 
 ## 10. Execution ladder
 
-1. Validate the JSON matrix and deterministic generator contract.
-2. Implement small Rust synthetic generators plus an independent scalar oracle.
-3. Add the runner adapter without modifying active neuron code.
-4. Execute causal/invalid-input negative controls and delay/interference sweeps.
-5. Add recurrent/SNN baselines under matched interfaces and resource budgets.
-6. Add real datasets only after split/provenance qualification.
-7. Add measured device/energy campaigns after algorithm-track evidence is stable.
+1. Validate the JSON matrix and deterministic generator contracts.
+2. Complete the remaining T1 fast-event, T6 selective-retention, and T7 phase-prediction synthetic generators.
+3. Implement the isolated taskgen/candidate/evaluator runner in #9437; verify SHA-256 content binding and signed receipt/replay semantics before any confirmatory claim.
+4. Compile and run the standalone Rust tests and negative controls.
+5. Add the runner adapter without modifying active neuron code.
+6. Execute causal/invalid-input negative controls and delay/interference sweeps.
+7. Add recurrent/SNN baselines under matched interfaces and resource budgets.
+8. Add real datasets only after split/provenance qualification.
+9. Add measured device/energy campaigns after algorithm-track evidence is stable.
+
+When a Rust toolchain is available, the local verification sequence is:
+
+```sh
+cargo fmt --manifest-path research/temporal-bench/Cargo.toml -- --check
+cargo test --manifest-path research/temporal-bench/Cargo.toml
+cargo clippy --manifest-path research/temporal-bench/Cargo.toml --all-targets -- -D warnings
+```
+
+These commands are a runbook, not evidence that checks have passed.
 
 ## 11. Evidence and claim boundary
 
-The repository contains an isolated, dependency-free Rust prototype under research/temporal-bench:
+The repository contains an isolated Rust research crate under research/temporal-bench (using the standard sha2 crate, not a dependency-free implementation):
 - a delayed-cue generator with controlled key similarity and distractor interference;
 - a multi-timescale forecasting generator with hidden periods/phases, a hidden middle-third regime boundary, delayed online feedback, and labels recomputed by the verifier from the hidden process;
 - a DMS generator/verifier matching the pinned eight-direction task timing and population-tuned spike input;
@@ -198,4 +219,4 @@ The repository contains an isolated, dependency-free Rust prototype under resear
 - an irregular-time/missingness generator with jittered microsecond timestamps, explicit dropped-slot manifests, bounded noise, and latent oracle points;
 - canonical SHA-256 digests for public streams and oracle records, with mutation negative controls.
 
-The generated public event stream and oracle remain returned in one process. The verifier has been implemented, but the confirmatory oracle is **not yet sealed by process or permission isolation**. Rust unit tests are authored but unrun in this environment. The full nine-family generator (including the DMS and evidence-accumulation adapters), streaming runner, real-dataset adapters, separate evaluator service, benchmark execution, model comparison, hardware measurement, and energy result are not yet included. A passing benchmark would establish a result only for the declared tasks, splits, model versions, and hardware. It would not establish consciousness, general intelligence, universal superiority, or neuromorphic hardware efficiency if measured only on conventional CPU/GPU execution.
+The generated public event stream and oracle remain returned in one process. The verifier has been implemented, but the confirmatory oracle is **not yet sealed by process or permission isolation**. 86 Rust unit tests are authored but unrun in this environment; the environment used for this work has no cargo, rustc, or rustfmt. The full nine-family generator (including the DMS and evidence-accumulation adapters), streaming runner, real-dataset adapters, separate evaluator service, benchmark execution, model comparison, hardware measurement, and energy result are not yet included. A passing benchmark would establish a result only for the declared tasks, splits, model versions, and hardware. It would not establish consciousness, general intelligence, universal superiority, or neuromorphic hardware efficiency if measured only on conventional CPU/GPU execution.
