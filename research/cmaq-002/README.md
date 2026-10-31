@@ -143,3 +143,8 @@ The focused workflow schema-validates this lock and asserts that the dataset, as
 The ActiveArena bridge now includes a metadata-only adapter contract in [activearena-adapter-contract.schema.json](activearena-adapter-contract.schema.json) and [fixtures/activearena-adapter-contract.example.json](fixtures/activearena-adapter-contract.example.json). The focused workflow validates the fixture and rejects side-camera candidate access, evaluator-label leakage, predicted futures inserted as observations, forecast-to-observation-memory promotion, and qualification claims made before dataset/checkpoint/license gates are resolved.
 
 The custody schema is intentionally separate from the finite-mechanism CMAQ-002 probe schema. It makes actual acquired head-camera observations distinct from model forecasts and sealed evaluator-only side/front views and success labels. The fixture is metadata-only with synthetic digests; no dataset, simulator assets or policy weights have been downloaded.
+
+
+### Ownership of the full visual adapter
+
+The full DEEP/ActiveArena visual perception adapter is owned by [VIS-DVPC issue #8156](https://github.com/Luminous-Dynamics/symthaea/issues/8156), which already distinguishes current-frame compute escalation from physically acquiring a new viewpoint. The ActiveArena source lock and observation-custody schema in this PR are reusable provenance/qualification inputs for #8156, not a duplicate visual benchmark. CMAQ-002 continues to own the finite-mechanism causal-intervention/EVoI benchmark; its synthetic probe allowlist is not a camera or robot-action authorization policy.
