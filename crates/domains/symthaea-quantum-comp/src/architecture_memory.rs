@@ -574,7 +574,7 @@ pub fn validate_memory_topology(
     }
 
     let mut edge_ids = HashSet::new();
-    let mut boundary_ids = HashSet::new();
+    let mut boundary_edges: HashMap<&str, &MemoryTransferEdge> = HashMap::new();
     let mut edge_by_id = HashMap::new();
     for edge in &topology.transfer_edges {
         for value in [
@@ -590,8 +590,20 @@ pub fn validate_memory_topology(
         if !edge_ids.insert(edge.edge_id.as_str()) {
             return Err(MemoryTopologyError::DuplicateTransferEdgeId);
         }
-        if !boundary_ids.insert(edge.communication_boundary_id.as_str()) {
-            return Err(MemoryTopologyError::DuplicateBoundaryAccounting);
+        if let Some(existing) = boundary_edges.get(edge.communication_boundary_id.as_str()) {
+            let opposite_full_duplex_pair =
+                existing.source_region_id == edge.destination_region_id
+                    && existing.destination_region_id == edge.source_region_id
+                    && matches!(
+                        (existing.direction, edge.direction),
+                        (MemoryTransferDirection::Read, MemoryTransferDirection::Write)
+                            | (MemoryTransferDirection::Write, MemoryTransferDirection::Read)
+                    );
+            if !opposite_full_duplex_pair {
+                return Err(MemoryTopologyError::DuplicateBoundaryAccounting);
+            }
+        } else {
+            boundary_edges.insert(edge.communication_boundary_id.as_str(), edge);
         }
         if !region_by_id.contains_key(edge.source_region_id.as_str())
             || !region_by_id.contains_key(edge.destination_region_id.as_str())
