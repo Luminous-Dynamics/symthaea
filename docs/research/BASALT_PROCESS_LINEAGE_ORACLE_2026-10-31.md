@@ -122,3 +122,12 @@ Executable image digests are a strong requirement. A sensor that cannot bind the
 The benchmark adds three non-compensatory safety metrics: executable-image identity recall, exec-occurrence order integrity, and clone-flag semantic integrity. New negative controls inject a wrong image digest, reordered/duplicate exec ordinals, altered clone flags and attempted `CLONE_THREAD` normalization.
 
 These additions strengthen semantic reconciliation but do not authenticate the oracle or observer. The digest still binds bytes; it does not prove who authored the observation or that the underlying event sensor was complete.
+
+
+### Semantic-field trust boundary
+
+The auditor itself does not open executable files, recompute `exec_image_digest`, inspect the kernel's `bprm->file`, or prove that a supplied `clone_flags` word came from the actual syscall. It validates field shape, per-process ordinal invariants and exact semantic equality between the supplied oracle and receipt.
+
+The independent supervisor/oracle work must bind executable digests to the actual executed object through a stable file handle or an immutable snapshot, record interpreter resolution for scripts, and explicitly handle memfd/anonymous executables. If the image bytes cannot be bound, the source must be unresolved; a path-only hash made after the fact is not a substitute. The clone-flags field likewise must come from a source that captures the actual syscall flags, not a workload-provided assertion.
+
+Therefore a passing semantic event comparison is only a reconciliation result over supplied claims. It does not authenticate either producer, prove the executable digest's origin, or qualify a kernel observer. The #9519 supervisor fixture is responsible for establishing those independent bindings.
