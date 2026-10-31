@@ -17,7 +17,7 @@ use crate::{
     FactorGraphError, FormalismProfile, Iit4IntrinsicSpecificationResult,
     Iit4SystemIntrinsicSpecification, Iit4SystemPhiAnalysis,
     Iit4SystemPhiPartitionSummary, Iit4SystemPhiSearchConfig,
-    Iit4SystemPhiStatePairResult, Iit4SystemPhiStatus, Iit4SystemState,
+    Iit4SystemPhiStatePairResult, Iit4SystemPhiStatus,
     ModelError, PartitionApplyError, SystemPhiDirectionScore, SystemPhiError,
     SystemPhiPartitionScore, MAX_DENSE_UNITS,
 };
@@ -1170,8 +1170,9 @@ impl SparseBinaryCausalModel {
                     &system_state,
                     max_factor_entries,
                 )?;
+                // Validate receipt serialization before moving the score out.
+                let _receipt_sha256 = report.receipt_sha256()?;
                 let score = report.score;
-                report.receipt_sha256()?;
                 if !score.signed_phi.is_finite()
                     || !score.phi.is_finite()
                     || !score.normalized_phi.is_finite()
@@ -1843,9 +1844,13 @@ mod tests {
                 )
                 .unwrap();
             let sparse_cause = sparse_cut
-                .forward_cause_likelihood_iit4(&candidate, &current_state, 1 << 16)
-                .unwrap()
-                .forward_likelihood;
+                .forward_cause_likelihood_iit4(
+                    &candidate,
+                    &candidate,
+                    &current_state,
+                    &candidate,
+                )
+                .unwrap();
             for (index, (dense_value, sparse_value)) in
                 dense_cause.iter().zip(&sparse_cause).enumerate()
             {
