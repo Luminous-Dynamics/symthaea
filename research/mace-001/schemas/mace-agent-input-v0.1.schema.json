@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luminousdynamics.io/schemas/mace-agent-input-v0.1.schema.json",
   "title": "MACE Agent Input v0.1",
-  "description": "Agent-visible inputs only. Contains no evaluator outcome, pair role or intervention label.",
+  "description": "Agent-visible inputs only. Contains opaque case IDs and task input; no benchmark family, pair role or evaluator label.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -21,21 +21,12 @@
         "additionalProperties": false,
         "required": [
           "case_id",
-          "family",
           "agent_view"
         ],
         "properties": {
           "case_id": {
             "type": "string",
-            "pattern": "^MACE-[A-Z][0-9]{2}$"
-          },
-          "family": {
-            "enum": [
-              "observational_confounding",
-              "controlled_intervention",
-              "regime_shift",
-              "outcome_misattribution"
-            ]
+            "pattern": "^MACE-[0-9]{3}$"
           },
           "agent_view": {
             "type": "object",
