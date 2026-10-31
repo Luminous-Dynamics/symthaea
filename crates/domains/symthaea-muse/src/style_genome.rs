@@ -1322,7 +1322,7 @@ mod tests {
             .map(|trial| mean_fingerprint_array(&trial.structural_fingerprint).unwrap())
             .collect::<Vec<_>>();
         let with_reference = evaluate_genome(
-            &genome.replace_gene(GenomeAxis::Melody, None).unwrap(),
+            &genome,
             &MusicalIntent::default(),
             &config,
             &references,
