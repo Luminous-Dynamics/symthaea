@@ -2,13 +2,14 @@ use pod_meta_efficiency_lab::{run_matrix, Policy};
 
 fn main() {
     println!(
-        "task_id\tpolicy\tbudget\tspent\toperations\tverified_obligations\trequired_obligations\treported_complete\tcompletion_verified\tfalse_completion\tfalse_support_count\tmandatory_required_mask\tmandatory_verified_mask\tmissed_mandatory_count\trejected_candidates\trejected_candidate_cost\tredundant_operations\twasted_operation_cost\tcorrect_abstention\tcost_to_first_sufficient_proof\toracle_min_cost\tcost_regret"
+        "task_id\tseed\tpolicy\tbudget\tspent\toperations\tverified_obligations\trequired_obligations\treported_complete\tcompletion_verified\tfalse_completion\tfalse_support_count\tmandatory_required_mask\tmandatory_verified_mask\tmissed_mandatory_count\trejected_candidates\trejected_candidate_cost\tredundant_operations\twasted_operation_cost\tcorrect_abstention\tcost_to_first_sufficient_proof\toracle_min_cost\tcost_regret"
     );
 
     for row in run_matrix(1729) {
         println!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             row.task_id,
+            row.seed,
             row.policy.as_str(),
             row.budget,
             row.spent,
