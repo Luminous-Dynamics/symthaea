@@ -18,7 +18,7 @@
 //!
 //! Optional:
 //! --repeats N       Number of measured repetitions (default 5, range 1..=25)
-//! --max-units N     Largest sparse substrate in the fixed ring sweep (default 128)
+//! --max-units N     Largest sparse substrate in the fixed ring sweep (default 2048)
 
 use std::time::{Duration, Instant};
 
@@ -28,7 +28,7 @@ use symthaea_iit::{
 };
 
 const CANDIDATE: [usize; 4] = [0, 1, 2, 3];
-const SUBSTRATE_SIZES: [usize; 5] = [8, 16, 32, 64, 128];
+const SUBSTRATE_SIZES: [usize; 9] = [8, 16, 32, 64, 128, 256, 512, 1_024, 2_048];
 const MAX_FACTOR_ENTRIES: usize = 1 << 16;
 
 #[derive(Debug)]
@@ -382,8 +382,8 @@ fn parse_args() -> Result<(usize, usize), String> {
             "--max-units" => {
                 let value = args.next().ok_or("--max-units requires a positive integer")?;
                 max_units = value.parse().map_err(|_| format!("invalid max units: {value}"))?;
-                if ![8, 16, 32, 64, 128].contains(&max_units) {
-                    return Err("--max-units must be one of 8, 16, 32, 64, 128".to_string());
+                if ![8, 16, 32, 64, 128, 256, 512, 1_024, 2_048].contains(&max_units) {
+                    return Err("--max-units must be one of 8, 16, 32, 64, 128, 256, 512, 1024, 2048".to_string());
                 }
             }
             "--help" | "-h" => {
