@@ -21,6 +21,7 @@ use super::pareto_objectives::{
 const SCHEMA: &str = "symthaea.architecture-engineering.pareto-nsga2";
 const VERSION: &str = "0.1.0";
 const ALGORITHM_ID: &str = "nsga-ii-reference-v0.1";
+const MAX_POPULATION_SIZE: usize = 2_048;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Nsga2Error {
@@ -60,10 +61,10 @@ pub struct Nsga2Config {
 
 impl Nsga2Config {
     pub fn validate(&self) -> Result<(), Nsga2Error> {
-        if self.population_size < 4 {
+        if self.population_size < 4 || self.population_size > MAX_POPULATION_SIZE {
             return Err(Nsga2Error::new(
                 "config.population_size",
-                "NSGA-II population size must be at least four",
+                format!("NSGA-II population size must be between four and {MAX_POPULATION_SIZE}"),
             ));
         }
         if self.generations == 0 {
@@ -803,6 +804,13 @@ mod tests {
                 && candidate.objective_values.len() == 3
                 && candidate.objective_values.iter().all(|value| value.is_finite())
         }));
+    }
+
+    #[test]
+    fn optimizer_rejects_population_beyond_quadratic_archive_guard() {
+        let mut bad = config(1);
+        bad.population_size = MAX_POPULATION_SIZE + 1;
+        assert!(run_nsga2_zdt1(&bad, 10).is_err());
     }
 
     #[test]
