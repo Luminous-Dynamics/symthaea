@@ -257,10 +257,10 @@ class RandomizedCommonDepthCRC:
             float(np.max(np.abs(y_upper*(upper-x)))),
         )
         receipt={
-            "primal_inequality_violation":float(np.max(np.maximum(-inequality_slack,0.0))),
-            "primal_equality_residual":float(np.max(np.abs(equality_residual))),
-            "primal_bound_violation":float(max(np.max(np.maximum(lower-x,0.0)),
-                                               np.max(np.maximum(x-upper,0.0)))),
+            "primal_max_inequality_violation":float(np.max(np.maximum(-inequality_slack,0.0))),
+            "primal_max_equality_residual":float(np.max(np.abs(equality_residual))),
+            "primal_max_bound_violation":float(max(np.max(np.maximum(lower-x,0.0)),
+                                                   np.max(np.maximum(x-upper,0.0)))),
             "dual_inequality_sign_violation":float(np.max(np.maximum(y_ub,0.0))),
             "dual_lower_sign_violation":float(np.max(np.maximum(-y_lower,0.0))),
             "dual_upper_sign_violation":float(np.max(np.maximum(y_upper,0.0))),
@@ -301,12 +301,22 @@ class RandomizedCommonDepthCRC:
         for name,value in expected_digests.items():
             if actual_digests.get(name)!=value:
                 return {"valid":False,"reason":f"evidence digest mismatch: {name}"}
-        if certificate.get("scope")!=expected["scope"]:
-            return {"valid":False,"reason":"scope/action-domain mismatch"}
+        for field in ("risk_target","assumption_contract","scope","verifier_receipt"):
+            if certificate.get(field)!=expected.get(field):
+                return {"valid":False,"reason":f"certificate field mismatch: {field}"}
+        optimization=certificate.get("optimization_receipt",{})
+        if optimization.get("status")!="pass":
+            return {"valid":False,"reason":"optimization receipt is not marked pass"}
         dual=self.verify_optimality_witness(
-            certificate.get("optimization_receipt",{}).get("dual_witness",{}),
-            probabilities,tolerance
+            optimization.get("dual_witness",{}),probabilities,tolerance
         )
+        reported_kkt=optimization.get("kkt_summary",{})
+        for name,value in dual.items():
+            if name=="valid":continue
+            if name not in reported_kkt or not np.isclose(
+                float(reported_kkt[name]),float(value),atol=tolerance,rtol=0.0
+            ):
+                return {"valid":False,"reason":f"KKT summary mismatch: {name}"}
         return {
             "valid":bool(dual.get("valid",False)),
             "reason":None if dual.get("valid",False) else "LP dual witness failed KKT checks",
