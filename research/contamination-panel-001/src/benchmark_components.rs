@@ -543,7 +543,6 @@ pub fn audit_benchmark_components(
                 known_preconditions_for_check.push(precondition_id.as_str());
             } else {
                 no_unknown_precondition_refs = false;
-                all_requirement_preconditions_covered = false;
                 unknown_precondition_reference_count += 1;
                 issues.push(format!("evaluator check {} references unknown environment precondition {}", check.check_id, precondition_id));
             }
@@ -710,8 +709,7 @@ pub fn verify_benchmark_component_audit_integrity(
         report.all_explicit_requirements_covered
             == (report.uncovered_explicit_requirement_count == 0)
         && report.all_requirement_preconditions_covered
-            == (report.uncovered_precondition_count == 0
-                && report.unknown_precondition_reference_count == 0)
+            == (report.uncovered_precondition_count == 0)
         && report.required_capabilities_available
             == (report.missing_capability_count == 0)
         && report.prohibited_capabilities_absent
@@ -1060,8 +1058,10 @@ mod tests {
         manifest.manifest_sha256 = benchmark_component_manifest_digest(&manifest).unwrap();
         let report = audit_benchmark_components(&manifest).unwrap();
         assert!(!report.no_unknown_requirement_references);
-        assert!(!report.all_requirement_preconditions_covered);
+        assert!(!report.no_unknown_precondition_references);
+        assert!(report.all_requirement_preconditions_covered);
         assert_eq!(report.unknown_requirement_reference_count, 1);
+        assert_eq!(report.unknown_precondition_reference_count, 1);
     }
 
     #[test]
