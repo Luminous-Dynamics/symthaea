@@ -38,8 +38,8 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "head_sha=${GITHUB_SHA}"
-            echo "event_name=${GITHUB_EVENT_NAME}"
+            echo "head_sha=\${GITHUB_SHA}"
+            echo "event_name=\${GITHUB_EVENT_NAME}"
             echo "rust_toolchain=1.96.0"
             echo "manifest=research/pod-meta-lab/Cargo.toml"
           } | tee pod-meta-qualification-receipt.txt
@@ -70,22 +70,8 @@ jobs:
           oracle_bound_sha256="$(head -n 1 "$workdir/oracle.poar.sealed" | cut -f 3)"
           test "$planner_sha256" = "$oracle_bound_sha256"
           awk -F '\t' '$1 == "TRUTH" || $1 == "GOLD_CLAIM" || $1 == "GOLD_PATH" { exit 1 }' "$workdir/planner.poar"
-          grep -q 
-        uses: actions/upload-artifact@v4
-        with:
-          name: pod-meta-qualification-${{ github.sha }}
-          path: pod-meta-qualification-receipt.txt
-          if-no-files-found: error
-          retention-days: 90
-^TRUTH\t' "$workdir/oracle.poar.sealed"
-          grep -q 
-        uses: actions/upload-artifact@v4
-        with:
-          name: pod-meta-qualification-${{ github.sha }}
-          path: pod-meta-qualification-receipt.txt
-          if-no-files-found: error
-          retention-days: 90
-^GOLD_CLAIM\t' "$workdir/oracle.poar.sealed"
+          awk -F '\t' '$1 == "TRUTH" { found=1 } END { exit !found }' "$workdir/oracle.poar.sealed"
+          awk -F '\t' '$1 == "GOLD_CLAIM" { found=1 } END { exit !found }' "$workdir/oracle.poar.sealed"
           printf 'planner_sha256=%s\n' "$planner_sha256"
           printf 'oracle_sha256=%s\n' "$(sha256sum "$workdir/oracle.poar.sealed" | awk '{print $1}')"
           # The oracle is intentionally not uploaded as a public artifact.
