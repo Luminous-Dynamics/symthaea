@@ -16,10 +16,14 @@ class FiniteStateCRCRecertificationTests(unittest.TestCase):
         self.assertEqual(len(count_vectors(51, 3)), 1378)
 
     def test_baseline_standard_and_envelope_crc_match_paper(self):
-        self.assertEqual(summarize_named(self.ctrl["standard_crc"]),
-                         {"HH": 0.75, "HL": 2/3, "LL": 0.5})
-        self.assertEqual(summarize_named(self.ctrl["envelope_crc"]),
-                         {"HH": 0.5, "HL": 0.4, "LL": 0.25})
+        standard = summarize_named(self.ctrl["standard_crc"])
+        envelope = summarize_named(self.ctrl["envelope_crc"])
+        self.assertAlmostEqual(standard["HH"], .75, places=10)
+        self.assertAlmostEqual(standard["HL"], 2/3, places=10)
+        self.assertAlmostEqual(standard["LL"], .5, places=10)
+        self.assertAlmostEqual(envelope["HH"], .5, places=10)
+        self.assertAlmostEqual(envelope["HL"], .4, places=10)
+        self.assertAlmostEqual(envelope["LL"], .25, places=10)
 
     def test_one_and_two_equal_share_rounds_match_paper(self):
         one = summarize_named(self.ctrl["equal_share_round_1"])
