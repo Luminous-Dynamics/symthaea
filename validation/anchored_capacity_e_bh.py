@@ -315,31 +315,99 @@ def verify_anchored_capacity_e_bh(
     values: Sequence[int | float | str | Fraction],
     costs: Sequence[int | float | str | Fraction],
 ) -> dict:
-    """Independent replay of anchor identity, e-BH baseline and Pareto optimality."""
+    """Independently replay anchor identity, receipts and Pareto optimality."""
+    failures = []
     e = tuple(as_fraction(x) for x in evalues)
     a = as_fraction(alpha)
     v = tuple(as_fraction(x) for x in values)
     c = tuple(as_fraction(x) for x in costs)
     m = len(e)
+    if m < 1 or len(v) != m or len(c) != m:
+        return {"valid": False, "failures": ["input_dimension_mismatch"]}
+    if not isinstance(result, dict):
+        return {"valid": False, "failures": ["invalid_result_receipt"]}
+    if result.get("schema") != "symthaea-anchored-capacity-ehb-v1":
+        failures.append("unsupported_result_schema")
+
     anchor = verify_anchored_baseline(e, a)
     if not anchor["valid"]:
         return {"valid": False, "failures": anchor["failures"]}
     baseline_mask = anchor["baseline"]["rejection_mask"]
+
     maximum_cardinality = anchored_e_bh_max_cardinality(e, a)
     if result.get("anchored_max_cardinality") != maximum_cardinality:
+        failures.append("anchored_max_cardinality_baseline_mismatch")
+
+    if result.get("baseline") != anchor["baseline"]:
+        failures.append("baseline_receipt_mismatch")
+    if result.get("baseline_retained") is not True:
+        failures.append("baseline_retention_flag_mismatch")
+    if result.get("local_evalue_collection") != (
+        "E_S = 1 - |S|/m + sum_{i in S} e_i/m"
+    ):
+        failures.append("local_evalue_formula_receipt_mismatch")
+
+    cap_pair = result.get("capacity")
+    if (
+        not isinstance(cap_pair, list)
+        or len(cap_pair) != 2
+        or any(isinstance(x, bool) or not isinstance(x, int) for x in cap_pair)
+        or cap_pair[1] <= 0
+    ):
         return {
             "valid": False,
-            "failures": ["anchored_max_cardinality_baseline_mismatch"],
+            "failures": failures + ["invalid_capacity_receipt"],
         }
+    capacity = Fraction(cap_pair[0], cap_pair[1])
+    if capacity < 0:
+        failures.append("negative_capacity_receipt")
+
+    baseline_cost = sum(
+        (c[i] for i in range(m) if (baseline_mask >> i) & 1),
+        Fraction(0),
+    )
+    if result.get("baseline_cost") != fraction_pair(baseline_cost):
+        failures.append("baseline_cost_receipt_mismatch")
+    if baseline_cost > capacity:
+        failures.append("capacity_below_mandatory_baseline_cost")
+
     selected = result.get("selected")
     if not isinstance(selected, dict):
-        return {"valid": False, "failures": ["missing_optimizer_receipt"]}
-    cap_pair = result.get("capacity", [0, 1])
-    if not isinstance(cap_pair, list) or len(cap_pair) != 2 or cap_pair[1] == 0:
-        return {"valid": False, "failures": ["invalid_capacity_receipt"]}
-    capacity = Fraction(cap_pair[0], cap_pair[1])
+        return {
+            "valid": False,
+            "failures": failures + ["missing_optimizer_receipt"],
+        }
+    if selected.get("schema") != "symthaea-stopped-fdr-capacity-pareto-v1":
+        failures.append("optimizer_schema_mismatch")
+    if selected.get("initial_mandatory_mask") != baseline_mask:
+        failures.append("optimizer_mandatory_mask_mismatch")
+    expected_weights = [fraction_pair(Fraction(1, m)) for _ in range(m)]
+    if selected.get("weights") != expected_weights:
+        failures.append("optimizer_weight_receipt_mismatch")
+    if selected.get("alpha") != fraction_pair(a):
+        failures.append("optimizer_alpha_receipt_mismatch")
+
+    decisions = selected.get("decisions")
+    if not isinstance(decisions, list) or len(decisions) != 1:
+        return {
+            "valid": False,
+            "failures": failures + ["optimizer_decision_count_mismatch"],
+        }
+    first = decisions[0]
+    if not isinstance(first, dict):
+        return {
+            "valid": False,
+            "failures": failures + ["invalid_optimizer_decision"],
+        }
+    mask = first.get("rejection_mask")
+    if isinstance(mask, bool) or not isinstance(mask, int) or mask < 0 or mask >= (1 << m):
+        return {
+            "valid": False,
+            "failures": failures + ["invalid_selected_rejection_mask"],
+        }
+
     replay = verify_capacity_aware_pareto(
-        selected["decisions"],
+        decisions,
         tuple((x,) for x in e),
         tuple(Fraction(1, m) for _ in range(m)),
         ((1 << m) - 1,),
@@ -350,18 +418,19 @@ def verify_anchored_capacity_e_bh(
         initial_mandatory_mask=baseline_mask,
         independent=True,
     )
-    failures = list(replay["failures"])
-    mask = selected["decisions"][0]["rejection_mask"]
+    failures.extend(replay["failures"])
     if mask & baseline_mask != baseline_mask:
-        failures.append("baseline_not_retained")
-    if result.get("baseline") != anchor["baseline"]:
-        failures.append("baseline_receipt_mismatch")
-    if result.get("baseline_retained") is not True:
-        failures.append("baseline_retention_flag_mismatch")
+        failures.append("baseline_not_retained_by_selected_mask")
+    if selected.get("verification", {}).get("valid") is not True:
+        failures.append("optimizer_self_verification_flag_mismatch")
+    if selected.get("verification", {}).get("independent_optimality_verified") is not True:
+        failures.append("optimizer_self_optimality_flag_mismatch")
+
     return {
         "valid": not failures,
         "failures": failures,
         "baseline_intersections_checked": anchor["intersections_checked"],
+        "anchored_max_cardinality": maximum_cardinality["rejection_count"],
         "pareto_optimality_verified": replay["independent_optimality_verified"],
         "selected_rejections": [i + 1 for i in range(m) if (mask >> i) & 1],
     }
