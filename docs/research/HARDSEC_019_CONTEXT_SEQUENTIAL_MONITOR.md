@@ -192,7 +192,7 @@ CCTM fixture:
 - Fixtures: `tests/fixtures/hardsec/context-cctm-v1/plan.json` and `stream.json`
 - 600 declared reference rows per context; two contexts; 18 total stream records.
 - Synthetic sequence crosses the compute-context alpha boundary at stream index 15; stale telemetry, unseen context and untrusted sensor records abstain.
-- Fifteen authored Rust tests cover DKW width, (alpha/delta) allocation, ONS bounds, reference-group separation, invalid inputs and the known answer.
+- Sixteen authored Rust tests cover DKW width, (alpha/delta) allocation, ONS bounds, reference-group separation, invalid inputs and the known answer.
 
 Run:
 
