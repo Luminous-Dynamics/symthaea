@@ -249,7 +249,7 @@ fn sample_sd(values: &[f64], center: f64) -> Result<f64, String> {
     }
 }
 
-fn t_critical_975(df: usize) -> f64 {
+pub(crate) fn t_critical_975(df: usize) -> f64 {
     // Conservative upper-df table for two-sided 95% Student-t intervals.
     const TABLE: &[(usize, f64)] = &[
         (1, 12.706), (2, 4.303), (3, 3.182), (4, 2.776), (5, 2.571),
