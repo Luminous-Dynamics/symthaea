@@ -27,7 +27,7 @@ The manifest binds:
 
 All three split dimensions must be pairwise disjoint. Candidate IDs are strictly sorted to make particle-matrix column identity unambiguous. Fidelity IDs remain in their declared order: sorting the fidelity ladder would change its semantics and is forbidden by the split digest.
 
-The evaluation episodes must belong only to declared evaluation task, architecture-family, seed and fidelity IDs. Every declared evaluation task must contribute evidence. Raw model scores and realized scores are normalized to [0,1] before metric-direction transformation; minimization is converted to maximize-is-better utility inside the scorer.
+The evaluation episodes must belong only to declared evaluation task, architecture-family, seed and fidelity IDs. The manifest also predeclares the expected rank regimes, learning-curve shapes and noise regimes. Every declared evaluation task, architecture family, fidelity rung and declared regime must contribute evidence; an absent regime is a hard error rather than a silent omission. Raw model scores and realized scores are normalized to [0,1] before metric-direction transformation; minimization is converted to maximize-is-better utility inside the scorer.
 
 The split digest binds the complete manifest, including all model/artifact digests and posterior weights. The replay-evidence digest binds the exact held-out episodes, joint particle matrices, outcomes and costs. The receipt binds those digests, threshold digest, measured metrics and qualification decision.
 
@@ -57,7 +57,7 @@ The PIT histogram is diagnostic rather than an automatic uniformity test. Discre
 
 ### Action likelihood calibration and decision value
 
-For each replayed fidelity query, dormant reactivation and sentinel audit, the scorer evaluates the forecast distribution over the action's mutually exclusive outcomes using log loss, multiclass Brier score and top-label ECE. It requires evidence for all three action classes.
+For each replayed fidelity query, dormant reactivation and sentinel audit, the scorer evaluates the forecast distribution over the action's mutually exclusive outcomes using log loss, multiclass Brier score and top-label ECE. Outcome labels are canonicalized by name, and each action class must use one identical category set across its episodes; changing a label set or silently reordering probabilities is rejected. It requires evidence for all three action classes.
 
 Each action record also contains predicted expected regret reduction, realized final-fidelity regret reduction, planned cost and measured cost. The gate measures absolute/signed VOI error and relative cost error. Realized regret reduction is permitted to be negative: an action can have positive predicted value and turn out badly on a particular replay.
 
@@ -104,7 +104,7 @@ A benchmark harness should prove that the gate abstains under at least these con
 9. Omit late learners, high-noise cases, failed runs or dormant-candidate reactivations.
 10. Edit a replay episode, threshold or receipt field after scoring.
 
-The current Rust tests cover basic pass/replay, receipt tampering, split leakage, invalid categorical probabilities, likelihood misspecification, ESS degeneration, minimize-is-better semantics and order-invariant replay evidence. They are test declarations only until compiled and run.
+The current twelve Rust tests cover basic pass/replay, receipt tampering, split leakage, invalid categorical probabilities, likelihood misspecification, ESS degeneration, minimize-is-better semantics, order-invariant replay evidence, consistent action-category semantics, reordered equivalent outcomes, fidelity-order digest binding, and rejection of undeclared evaluation strata. They are test declarations only until compiled and run.
 
 ## 7. Benchmark campaign and competitive baselines
 
