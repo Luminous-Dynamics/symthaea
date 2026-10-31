@@ -555,6 +555,28 @@ mod tests {
     }
 
     #[test]
+    fn observed_target_changes_the_training_update_after_prediction_is_frozen() {
+        let source = random_hv(915);
+        let next_a = random_hv(916);
+        let next_b = random_hv(917);
+        let mut engine_a = make_engine();
+        let mut engine_b = make_engine();
+
+        engine_a.stage_transition_source(&source).unwrap();
+        engine_b.stage_transition_source(&source).unwrap();
+        engine_a.condition_pending_transition(4).unwrap();
+        engine_b.condition_pending_transition(4).unwrap();
+        assert_eq!(
+            engine_a.pending_prediction().unwrap(),
+            engine_b.pending_prediction().unwrap()
+        );
+
+        engine_a.resolve_pending_transition(&next_a, 0.001).unwrap().unwrap();
+        engine_b.resolve_pending_transition(&next_b, 0.001).unwrap().unwrap();
+        assert_ne!(engine_a.context.weights, engine_b.context.weights);
+    }
+
+    #[test]
     fn missing_action_is_counted_as_a_dropped_transition_not_trained() {
         let mut engine = make_engine();
         engine.stage_transition_source(&random_hv(920)).unwrap();
