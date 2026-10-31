@@ -98,11 +98,12 @@ The optional `--cohort-manifest-output` writes a deterministic sample-ID manifes
 - `em_legal_any_view` (at least one of `em_xy`, `em_xz`, `em_yz`);
 - `em_legal_full_triplet` (all three legal EM views);
 - `fused_geometry_legal_em`;
-- `paired_geometry_only` and `paired_em_legal_views`, which have exactly identical sorted sample IDs;
+- `paired_geometry_only` and `paired_em_legal_views`, which have exactly identical sorted sample IDs across the broad geometry+EM intersection;
+- three additional task-specific paired pairs: `paired_false_split_correction_geometry_only` / `_em_legal_views` (requires dual geometry), `paired_false_merge_identification_geometry_only` / `_em_legal_views` (requires single geometry), and `paired_split_mask_generation_geometry_only` / `_em_legal_views` (requires single geometry);
 - `geometry_without_legal_em`;
 - `em_best_only_excluded`.
 
-Each membership has a sorted unique ID list, count, SHA-256, explicit eligibility rule and `NOT_ESTIMABLE` status for empty cohorts. The cohort-set digest binds the exact dataset revision SHA, source sidecar JSONL SHA-256, policy version, cohort names/rules/counts and membership digests. It proves the identity of the declared sidecar-derived cohort manifest, not that image payloads exist or are readable. Paired comparisons must still verify the exact transformation/labels and actual Parquet bytes in the next qualification tier. The output path must differ from `--output`.
+Each membership has a sorted unique ID list, count, SHA-256, explicit eligibility rule and `NOT_ESTIMABLE` status for empty cohorts. The cohort-set digest binds the exact dataset revision SHA, source sidecar JSONL SHA-256, policy version, cohort names/rules/counts and membership digests. The route-specific pairs prevent a dual-segment false-split correction cohort from being pooled with single-segment false-merge identification or split-mask-generation cohorts. The geometry and EM members of each task-specific pair have exactly identical sorted IDs. The manifest records eligibility, but does not prove that image payloads exist or are readable. Paired comparisons must still verify the exact task label, A/B mask fusion, preprocessing transforms and actual Parquet bytes in the next qualification tier. The output path must differ from `--output`.
 
 ## Frozen prediction scorer
 
