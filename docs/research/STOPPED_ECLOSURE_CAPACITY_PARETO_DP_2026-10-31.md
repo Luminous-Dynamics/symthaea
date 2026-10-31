@@ -165,7 +165,7 @@ Run from the repository root:
     PYTHONPATH=validation python -m unittest -v test_stopped_eclosure_capacity_pareto.py
     PYTHONPATH=validation python -m unittest -v test_anchored_capacity_e_bh.py
 
-The committed suite has not been executed in this environment. A separate private exact-rational prototype matched exhaustive subset search on 800 randomized instances with N=1..8. A 100-hypothesis sparse-strong-signal prototype completed with a maximum frontier of 48 states in approximately 0.6 seconds. Those are development measurements, not CI or a general runtime guarantee.
+The committed suite has not been executed in this environment. Separate private exact-rational prototypes matched exhaustive subset search on 800 randomized Pareto-DP instances with N=1..8 and checked the anchored step-up maximum-cardinality output against exhaustive candidate-set search on 640 randomized exact-rational families with N=1..8. A 100-hypothesis sparse-strong-signal Pareto prototype completed with a maximum frontier of 48 states in approximately 0.6 seconds. These are development measurements, not CI or general runtime guarantees.
 
 ## 6. Benchmarks and industry comparison
 
