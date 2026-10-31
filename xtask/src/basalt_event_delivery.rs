@@ -515,6 +515,423 @@ pub fn audit_bytes(bytes: &[u8]) -> DeliveryAuditReport {
     report
 }
 
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct SourceEpochSeal {
+    format_version: u32,
+    suite_id: String,
+    source_id: String,
+    epoch_id: String,
+    partition_id: String,
+    observer_binary_digest: String,
+    observer_configuration_digest: String,
+    first_attempted_sequence: u64,
+    last_attempted_sequence: u64,
+    published_event_count: u64,
+    published_event_chain_root: String,
+    classified_range_count: u64,
+    classified_range_chain_root: String,
+    close_fence_digest: String,
+    producer_quiescence_evidence_digest: String,
+    producer_quiesced_at_monotonic_ns: u64,
+    consumer_drain_evidence_digest: String,
+    consumer_drained_at_monotonic_ns: u64,
+    generation: u64,
+    previous_seal_digest: Option<String>,
+    ledger_digest: String,
+    commitment_digest: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EpochSealReport {
+    pub report_version: u32,
+    pub ledger_digest: String,
+    pub seal_commitment: Option<String>,
+    pub source_id: Option<String>,
+    pub epoch_id: Option<String>,
+    pub partition_id: Option<String>,
+    pub ledger_reconciled: bool,
+    pub seal_well_formed: bool,
+    pub ledger_binding_matches: bool,
+    pub event_chain_matches: bool,
+    pub classified_range_chain_matches: bool,
+    pub source_close_claims_match: bool,
+    pub commitment_matches: bool,
+    pub integrity_passed: bool,
+    pub signature_verified: bool,
+    pub signer_authorized: bool,
+    pub anti_rollback_verified: bool,
+    pub close_coordinator_qualified: bool,
+    pub observer_delivery_qualified: bool,
+    pub qualification_eligible: bool,
+    pub errors: Vec<DeliveryAuditError>,
+}
+
+pub fn audit_seal_files(ledger_path: &Path, seal_path: &Path) -> anyhow::Result<EpochSealReport> {
+    let ledger_bytes = read_bounded(ledger_path)?;
+    let seal_bytes = read_bounded(seal_path)?;
+    Ok(audit_seal_bytes(&ledger_bytes, &seal_bytes))
+}
+
+fn audit_seal_bytes(ledger_bytes: &[u8], seal_bytes: &[u8]) -> EpochSealReport {
+    let mut report = EpochSealReport {
+        report_version: 1,
+        ledger_digest: sha256_tagged(ledger_bytes),
+        seal_commitment: None,
+        source_id: None,
+        epoch_id: None,
+        partition_id: None,
+        ledger_reconciled: false,
+        seal_well_formed: false,
+        ledger_binding_matches: false,
+        event_chain_matches: false,
+        classified_range_chain_matches: false,
+        source_close_claims_match: false,
+        commitment_matches: false,
+        integrity_passed: false,
+        signature_verified: false,
+        signer_authorized: false,
+        anti_rollback_verified: false,
+        close_coordinator_qualified: false,
+        observer_delivery_qualified: false,
+        qualification_eligible: false,
+        errors: Vec::new(),
+    };
+
+    let ledger_audit = audit_bytes(ledger_bytes);
+    report.ledger_reconciled = ledger_audit.ledger_well_formed
+        && ledger_audit.sequence_accounting_reconciled
+        && ledger_audit.counters_consistent
+        && ledger_audit.sources_closed;
+    if !report.ledger_reconciled {
+        report.errors.push(DeliveryAuditError {
+            code: "E_SEAL_LEDGER_NOT_RECONCILED".to_string(),
+            path: "$.ledger".to_string(),
+            message: "source-epoch seal requires a structurally valid, sequence-reconciled ledger with consistent counters and closed sources".to_string(),
+        });
+    }
+
+    let ledger: DeliveryLedger = match serde_json::from_slice(ledger_bytes) {
+        Ok(value) => value,
+        Err(error) => {
+            report.errors.push(DeliveryAuditError {
+                code: "E_SEAL_LEDGER_JSON".to_string(),
+                path: "$.ledger".to_string(),
+                message: format!("cannot parse delivery ledger: {error}"),
+            });
+            return report;
+        }
+    };
+    let seal: SourceEpochSeal = match serde_json::from_slice(seal_bytes) {
+        Ok(value) => value,
+        Err(error) => {
+            report.errors.push(DeliveryAuditError {
+                code: "E_SEAL_JSON".to_string(),
+                path: "$.seal".to_string(),
+                message: format!("invalid or non-strict source-epoch seal: {error}"),
+            });
+            return report;
+        }
+    };
+
+    report.source_id = Some(seal.source_id.clone());
+    report.epoch_id = Some(seal.epoch_id.clone());
+    report.partition_id = Some(seal.partition_id.clone());
+    report.seal_commitment = Some(seal.commitment_digest.clone());
+
+    let mut seal_well_formed = true;
+    if seal.format_version != 1 || seal.suite_id != "basalt-source-epoch-seal-v1" {
+        report.errors.push(DeliveryAuditError {
+            code: "E_SEAL_VERSION".to_string(),
+            path: "$.seal".to_string(),
+            message: "unsupported source-epoch seal version or suite_id".to_string(),
+        });
+        seal_well_formed = false;
+    }
+    for (field, digest) in [
+        ("observer_binary_digest", seal.observer_binary_digest.as_str()),
+        ("observer_configuration_digest", seal.observer_configuration_digest.as_str()),
+        ("published_event_chain_root", seal.published_event_chain_root.as_str()),
+        ("classified_range_chain_root", seal.classified_range_chain_root.as_str()),
+        ("close_fence_digest", seal.close_fence_digest.as_str()),
+        ("producer_quiescence_evidence_digest", seal.producer_quiescence_evidence_digest.as_str()),
+        ("consumer_drain_evidence_digest", seal.consumer_drain_evidence_digest.as_str()),
+        ("ledger_digest", seal.ledger_digest.as_str()),
+        ("commitment_digest", seal.commitment_digest.as_str()),
+    ] {
+        if !valid_digest(digest) {
+            report.errors.push(DeliveryAuditError {
+                code: "E_SEAL_DIGEST".to_string(),
+                path: format!("$.seal.{field}"),
+                message: "expected a lowercase sha256:<64-hex> digest".to_string(),
+            });
+            seal_well_formed = false;
+        }
+    }
+    match (&seal.previous_seal_digest, seal.generation) {
+        (None, 1) => {}
+        (Some(previous), generation) if generation > 1 && valid_digest(previous) => {}
+        _ => {
+            report.errors.push(DeliveryAuditError {
+                code: "E_SEAL_GENERATION_LINK".to_string(),
+                path: "$.seal.generation".to_string(),
+                message: "generation 1 must have no predecessor; later generations require a valid previous_seal_digest".to_string(),
+            });
+            seal_well_formed = false;
+        }
+    }
+    if seal.first_attempted_sequence == 0
+        || seal.last_attempted_sequence < seal.first_attempted_sequence
+        || seal.generation == 0
+        || seal.producer_quiesced_at_monotonic_ns == 0
+        || seal.consumer_drained_at_monotonic_ns == 0
+    {
+        report.errors.push(DeliveryAuditError {
+            code: "E_SEAL_BOUNDS".to_string(),
+            path: "$.seal".to_string(),
+            message: "seal sequence bounds, generation and monotonic close timestamps must be positive and ordered".to_string(),
+        });
+        seal_well_formed = false;
+    }
+
+    let key = SourceEpochKey {
+        source_id: seal.source_id.clone(),
+        epoch_id: seal.epoch_id.clone(),
+        partition_id: seal.partition_id.clone(),
+    };
+    let source = ledger.source_epochs.iter().find(|source| source.key() == key);
+    let Some(source) = source else {
+        report.errors.push(DeliveryAuditError {
+            code: "E_SEAL_SOURCE_UNKNOWN".to_string(),
+            path: "$.seal.source_id".to_string(),
+            message: "seal does not identify a source epoch in the ledger".to_string(),
+        });
+        report.seal_well_formed = seal_well_formed;
+        return report;
+    };
+
+    let events: Vec<&DeliveryEvent> = ledger.events.iter().filter(|event| event.key() == key).collect();
+    let ranges: Vec<&ClassifiedRange> = ledger.classified_ranges.iter().filter(|range| range.key() == key).collect();
+    let event_root = event_chain_root(&key, &events);
+    let range_root = classified_range_chain_root(&key, &ranges);
+
+    report.ledger_binding_matches = seal.ledger_digest == report.ledger_digest
+        && seal.observer_binary_digest == ledger.observer_binary_digest
+        && seal.observer_configuration_digest == ledger.observer_configuration_digest
+        && seal.first_attempted_sequence == source.first_attempted_sequence
+        && seal.last_attempted_sequence == source.last_attempted_sequence
+        && seal.published_event_count == events.len() as u64
+        && seal.classified_range_count == ranges.len() as u64
+        && seal.close_fence_digest == source.close_fence_digest;
+    if !report.ledger_binding_matches {
+        report.errors.push(DeliveryAuditError {
+            code: "E_SEAL_LEDGER_BINDING".to_string(),
+            path: "$.seal".to_string(),
+            message: "seal ledger digest, observer identity, sequence bounds, record counts or close-fence digest do not match the supplied ledger".to_string(),
+        });
+    }
+
+    report.event_chain_matches = event_root.as_deref() == Some(seal.published_event_chain_root.as_str());
+    if !report.event_chain_matches {
+        report.errors.push(DeliveryAuditError {
+            code: "E_SEAL_EVENT_CHAIN".to_string(),
+            path: "$.seal.published_event_chain_root".to_string(),
+            message: "published-event chain root does not match the ordered source-epoch event records".to_string(),
+        });
+    }
+    report.classified_range_chain_matches =
+        range_root.as_deref() == Some(seal.classified_range_chain_root.as_str());
+    if !report.classified_range_chain_matches {
+        report.errors.push(DeliveryAuditError {
+            code: "E_SEAL_RANGE_CHAIN".to_string(),
+            path: "$.seal.classified_range_chain_root".to_string(),
+            message: "classified-range chain root does not match the ordered source-epoch loss/discard records".to_string(),
+        });
+    }
+
+    let capture_window_valid = seal.producer_quiesced_at_monotonic_ns >= ledger.capture_start_monotonic_ns
+        && seal.consumer_drained_at_monotonic_ns >= seal.producer_quiesced_at_monotonic_ns
+        && seal.consumer_drained_at_monotonic_ns <= ledger.capture_end_monotonic_ns;
+    report.source_close_claims_match = source.producer_quiesced
+        && source.consumer_drained
+        && source.restart_count == 0
+        && source.unmonitored_producer_count == 0
+        && capture_window_valid;
+    if !report.source_close_claims_match {
+        report.errors.push(DeliveryAuditError {
+            code: "E_SEAL_CLOSE_CLAIMS".to_string(),
+            path: "$.seal".to_string(),
+            message: "ledger close assertions or monotonic quiescence/drain ordering do not support this seal".to_string(),
+        });
+    }
+
+    if let Some(commitment) = compute_seal_commitment(&seal) {
+        report.commitment_matches = commitment == seal.commitment_digest;
+    } else {
+        report.commitment_matches = false;
+    }
+    if !report.commitment_matches {
+        report.errors.push(DeliveryAuditError {
+            code: "E_SEAL_COMMITMENT".to_string(),
+            path: "$.seal.commitment_digest".to_string(),
+            message: "domain-separated source-epoch commitment does not match the supplied seal fields".to_string(),
+        });
+    }
+
+    report.seal_well_formed = seal_well_formed;
+    report.integrity_passed = report.ledger_reconciled
+        && report.seal_well_formed
+        && report.ledger_binding_matches
+        && report.event_chain_matches
+        && report.classified_range_chain_matches
+        && report.source_close_claims_match
+        && report.commitment_matches;
+    report
+}
+
+fn event_chain_root(key: &SourceEpochKey, events: &[&DeliveryEvent]) -> Option<String> {
+    let mut ordered = events.to_vec();
+    ordered.sort_by_key(|event| (event.sequence, event.observed_at_monotonic_ns, event.event_digest.clone()));
+    let mut state = Sha256::digest(b"BASALT/EVENT-CHAIN-INIT/v1\0").to_vec();
+    for event in &ordered {
+        let mut leaf = b"BASALT/EVENT-LEAF/v1\0".to_vec();
+        append_string(&mut leaf, &key.source_id)?;
+        append_string(&mut leaf, &key.epoch_id)?;
+        append_string(&mut leaf, &key.partition_id)?;
+        append_u64(&mut leaf, event.sequence);
+        append_u64(&mut leaf, event.observed_at_monotonic_ns);
+        append_digest_bytes(&mut leaf, &event.event_digest)?;
+        let leaf_digest = Sha256::digest(&leaf);
+        let mut step = Sha256::new();
+        step.update(b"BASALT/EVENT-CHAIN-STEP/v1\0");
+        step.update(&state);
+        step.update(leaf_digest);
+        state = step.finalize().to_vec();
+    }
+    let mut root = Sha256::new();
+    root.update(b"BASALT/EVENT-CHAIN-ROOT/v1\0");
+    root.update(&state);
+    root.update((ordered.len() as u64).to_be_bytes());
+    Some(sha256_from_bytes(root.finalize().as_slice()))
+}
+
+fn classified_range_chain_root(key: &SourceEpochKey, ranges: &[&ClassifiedRange]) -> Option<String> {
+    let mut ordered = ranges.to_vec();
+    ordered.sort_by_key(|range| (range.first_sequence, range.last_sequence));
+    let mut state = Sha256::digest(b"BASALT/RANGE-CHAIN-INIT/v1\0").to_vec();
+    for range in &ordered {
+        let mut leaf = b"BASALT/RANGE-LEAF/v1\0".to_vec();
+        append_string(&mut leaf, &key.source_id)?;
+        append_string(&mut leaf, &key.epoch_id)?;
+        append_string(&mut leaf, &key.partition_id)?;
+        append_u64(&mut leaf, range.first_sequence);
+        append_u64(&mut leaf, range.last_sequence);
+        leaf.push(match range.disposition {
+            RangeDisposition::Lost => 1,
+            RangeDisposition::DiscardedRequired => 2,
+            RangeDisposition::DiscardedExcluded => 3,
+        });
+        leaf.push(match range.reason {
+            RangeReason::RingbufReservationFailureUnknown => 1,
+            RangeReason::PerfBufferLostSample => 2,
+            RangeReason::ConsumerQueueOverrun => 3,
+            RangeReason::ExporterDrop => 4,
+            RangeReason::DecoderRejection => 5,
+            RangeReason::ObserverRestart => 6,
+            RangeReason::IntentionalPolicySuppression => 7,
+            RangeReason::Unknown => 8,
+        });
+        let leaf_digest = Sha256::digest(&leaf);
+        let mut step = Sha256::new();
+        step.update(b"BASALT/RANGE-CHAIN-STEP/v1\0");
+        step.update(&state);
+        step.update(leaf_digest);
+        state = step.finalize().to_vec();
+    }
+    let mut root = Sha256::new();
+    root.update(b"BASALT/RANGE-CHAIN-ROOT/v1\0");
+    root.update(&state);
+    root.update((ordered.len() as u64).to_be_bytes());
+    Some(sha256_from_bytes(root.finalize().as_slice()))
+}
+
+fn compute_seal_commitment(seal: &SourceEpochSeal) -> Option<String> {
+    let mut bytes = b"BASALT/SOURCE-EPOCH-SEAL/v1\0".to_vec();
+    bytes.extend_from_slice(&seal.format_version.to_be_bytes());
+    append_string(&mut bytes, &seal.suite_id)?;
+    append_string(&mut bytes, &seal.source_id)?;
+    append_string(&mut bytes, &seal.epoch_id)?;
+    append_string(&mut bytes, &seal.partition_id)?;
+    append_digest_bytes(&mut bytes, &seal.observer_binary_digest)?;
+    append_digest_bytes(&mut bytes, &seal.observer_configuration_digest)?;
+    append_u64(&mut bytes, seal.first_attempted_sequence);
+    append_u64(&mut bytes, seal.last_attempted_sequence);
+    append_u64(&mut bytes, seal.published_event_count);
+    append_digest_bytes(&mut bytes, &seal.published_event_chain_root)?;
+    append_u64(&mut bytes, seal.classified_range_count);
+    append_digest_bytes(&mut bytes, &seal.classified_range_chain_root)?;
+    append_digest_bytes(&mut bytes, &seal.close_fence_digest)?;
+    append_digest_bytes(&mut bytes, &seal.producer_quiescence_evidence_digest)?;
+    append_u64(&mut bytes, seal.producer_quiesced_at_monotonic_ns);
+    append_digest_bytes(&mut bytes, &seal.consumer_drain_evidence_digest)?;
+    append_u64(&mut bytes, seal.consumer_drained_at_monotonic_ns);
+    append_u64(&mut bytes, seal.generation);
+    match &seal.previous_seal_digest {
+        Some(previous) => {
+            bytes.push(1);
+            append_digest_bytes(&mut bytes, previous)?;
+        }
+        None => bytes.push(0),
+    }
+    append_digest_bytes(&mut bytes, &seal.ledger_digest)?;
+    Some(sha256_tagged(&bytes))
+}
+
+fn append_string(bytes: &mut Vec<u8>, value: &str) -> Option<()> {
+    let length = u32::try_from(value.len()).ok()?;
+    bytes.extend_from_slice(&length.to_be_bytes());
+    bytes.extend_from_slice(value.as_bytes());
+    Some(())
+}
+
+fn append_u64(bytes: &mut Vec<u8>, value: u64) {
+    bytes.extend_from_slice(&value.to_be_bytes());
+}
+
+fn append_digest_bytes(bytes: &mut Vec<u8>, value: &str) -> Option<()> {
+    bytes.extend_from_slice(&decode_digest(value)?);
+    Some(())
+}
+
+fn decode_digest(value: &str) -> Option<[u8; 32]> {
+    let hex = value.strip_prefix("sha256:")?;
+    if hex.len() != 64 {
+        return None;
+    }
+    let mut output = [0u8; 32];
+    for (index, byte) in output.iter_mut().enumerate() {
+        let high = hex.as_bytes()[index * 2];
+        let low = hex.as_bytes()[index * 2 + 1];
+        let nibble = |value: u8| match value {
+            b'0'..=b'9' => Some(value - b'0'),
+            b'a'..=b'f' => Some(value - b'a' + 10),
+            _ => None,
+        };
+        *byte = (nibble(high)? << 4) | nibble(low)?;
+    }
+    Some(output)
+}
+
+fn sha256_from_bytes(digest: &[u8]) -> String {
+    let mut encoded = String::with_capacity(64);
+    for byte in digest {
+        use std::fmt::Write as _;
+        let _ = write!(&mut encoded, "{byte:02x}");
+    }
+    format!("sha256:{encoded}")
+}
+
 fn checked_accumulate(total: &mut u64, increment: u64) -> bool {
     match total.checked_add(increment) {
         Some(value) => {
