@@ -553,17 +553,22 @@ fn in_training_support(state: State) -> bool {
     state.x.abs() <= TRAINING_X_SUPPORT && state.v.abs() <= TRAINING_V_SUPPORT
 }
 
+fn structured_probe_indices(index: usize) -> (usize, usize, usize) {
+    const PROBE_COUNT: usize = 201;
+    assert!(index < PROBE_COUNT);
+    (index, (index * 37) % PROBE_COUNT, (index * 73) % PROBE_COUNT)
+}
+
 fn structured_probe_one_step_state_rmse(scenario: Scenario) -> f64 {
-    const GRID_POINTS: usize = 201;
+    const PROBE_COUNT: usize = 201;
     let mut squared_error = 0.0;
-    for index in 0..GRID_POINTS {
+    for index in 0..PROBE_COUNT {
         let x = -TRAINING_X_SUPPORT
-            + 2.0 * TRAINING_X_SUPPORT * index as f64 / (GRID_POINTS - 1) as f64;
-        let v_index = (index * 37) % GRID_POINTS;
-        let action_index = (index * 73) % GRID_POINTS;
+            + 2.0 * TRAINING_X_SUPPORT * index as f64 / (PROBE_COUNT - 1) as f64;
+        let (_, v_index, action_index) = structured_probe_indices(index);
         let v = -TRAINING_V_SUPPORT
-            + 2.0 * TRAINING_V_SUPPORT * v_index as f64 / (GRID_POINTS - 1) as f64;
-        let action = -1.0 + 2.0 * action_index as f64 / (GRID_POINTS - 1) as f64;
+            + 2.0 * TRAINING_V_SUPPORT * v_index as f64 / (PROBE_COUNT - 1) as f64;
+        let action = -1.0 + 2.0 * action_index as f64 / (PROBE_COUNT - 1) as f64;
         let step = [0usize, 6, 8][index % 3];
         let state = State { x, v };
         let actual = true_step(state, action, step, scenario, BASE_SEED);
@@ -571,7 +576,7 @@ fn structured_probe_one_step_state_rmse(scenario: Scenario) -> f64 {
         squared_error += (actual.state.x - predicted.state.x).powi(2)
             + (actual.state.v - predicted.state.v).powi(2);
     }
-    (squared_error / GRID_POINTS as f64).sqrt()
+    (squared_error / PROBE_COUNT as f64).sqrt()
 }
 
 
@@ -941,6 +946,22 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+
+    #[test]
+    fn structured_probe_design_has_uniform_marginal_coverage() {
+        use std::collections::BTreeSet;
+
+        let probes: Vec<_> = (0..201).map(structured_probe_indices).collect();
+        let x: BTreeSet<_> = probes.iter().map(|probe| probe.0).collect();
+        let v: BTreeSet<_> = probes.iter().map(|probe| probe.1).collect();
+        let action: BTreeSet<_> = probes.iter().map(|probe| probe.2).collect();
+        assert_eq!(x.len(), 201);
+        assert_eq!(v.len(), 201);
+        assert_eq!(action.len(), 201);
+        assert_eq!(probes.first(), Some(&(0, 0, 0)));
+        assert_eq!(probes.last(), Some(&(200, 126, 8)));
+    }
 
     #[test]
     fn benign_model_matches_the_deterministic_environment() {
