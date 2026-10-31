@@ -6,7 +6,7 @@ use contamination_panel_bench::{
         FreshPublicChallengePacketV1, SealedFreshOraclePacketV1,
         audit_fresh_challenge_bundle, generate_fresh_challenge_bundle,
     },
-    fresh_scoring::score_fresh_submission,
+    fresh_scoring::{FreshScoreReportV1, score_fresh_submission, verify_fresh_score_report_integrity},
     DetectorSpecV1, PublicChallengePacketV1, SealedChallengeKeyV1,
     audit_blinded_adjudications, detectors::{evaluate_detector_run, score_public_packet},
     ftd::{
@@ -259,6 +259,25 @@ fn audit_intervention_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn verify_fresh_score_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 2 {
+        return Err(
+            "usage: contamination-panel-bench verify-fresh-score <score-report.json>"
+                .into(),
+        );
+    }
+    let report: FreshScoreReportV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
+    verify_fresh_score_report_integrity(&report).map_err(io::Error::other)?;
+    println!(
+        "report_valid=true run={} accuracy={:.1}% coverage={:.1}% independently_verified={}",
+        report.run_id,
+        report.accuracy_over_all_permille / 10.0,
+        report.coverage_permille / 10.0,
+        report.independently_verified
+    );
+    Ok(())
+}
+
 fn score_fresh_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 6 {
         return Err(
@@ -451,9 +470,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("generate-fresh") => generate_fresh_cli(&args),
         Some("audit-fresh") => audit_fresh_cli(&args),
         Some("score-fresh") => score_fresh_cli(&args),
+        Some("verify-fresh-score") => verify_fresh_score_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | verify-fresh-score | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
