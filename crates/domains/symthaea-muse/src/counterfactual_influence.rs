@@ -28,7 +28,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 pub const COUNTERFACTUAL_INFLUENCE_VERSION: &str =
-    "mel-mr-eval-017-counterfactual-influence-v0.1";
+    "mel-mr-eval-017-counterfactual-influence-v0.2";
+pub const INFLUENCE_SUPPORT_POLICY_VERSION: &str =
+    "mel-mr-eval-017-support-policy-v1";
 pub const REPEATABILITY_CALIBRATION_VERSION: &str =
     "mel-mr-eval-017-repeatability-calibration-v0.1";
 const CALIBRATION_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-repeatability-v1\0";
@@ -37,6 +39,35 @@ const MINIMUM_NOOP_RENDERS: usize = 3;
 const MAX_EVENT_ID_BYTES: usize = 256;
 const MAX_ARTIFACT_BYTES: usize = 64 * 1024 * 1024;
 const MAX_RECORDED_EFFECTS_GROUPS: u8 = 128;
+const MAX_SUPPORT_GAP_WINDOWS: usize = 1024;
+const MICROS_PER_RATIO_UNIT: u32 = 1_000_000;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InfluenceSupportPolicy {
+    pub version: String,
+    /// Exit threshold as a fraction of the enter threshold, in millionths.
+    /// Must be strictly between zero and 1_000_000.
+    pub release_threshold_ratio_microunits: u32,
+    /// Minimum number of release-positive windows required to accept an episode.
+    pub minimum_active_windows: usize,
+    /// Maximum consecutive sub-release windows bridged inside an episode.
+    pub maximum_gap_windows: usize,
+    /// Conservative frame extension after the final sustained window.
+    /// It is never applied to a measured-empty or rejected episode.
+    pub tail_extension_frames: u64,
+}
+
+impl Default for InfluenceSupportPolicy {
+    fn default() -> Self {
+        Self {
+            version: INFLUENCE_SUPPORT_POLICY_VERSION.to_owned(),
+            release_threshold_ratio_microunits: 750_000,
+            minimum_active_windows: 1,
+            maximum_gap_windows: 1,
+            tail_extension_frames: 0,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InfluenceAnalysisConfig {
@@ -571,7 +602,17 @@ pub struct InfluenceWindowMeasurement {
     pub spectral_magnitude_distance: f32,
     pub calibrated_rms_threshold: f32,
     pub calibrated_spectral_threshold: f32,
+    pub release_rms_threshold: f32,
+    pub release_spectral_threshold: f32,
+    /// Raw entry-threshold decision, before temporal qualification.
     pub effect_detected: bool,
+    /// Lower hysteresis threshold decision. Considered only after an episode
+    /// has already entered on an effect_detected window.
+    pub release_detected: bool,
+    /// Included in an accepted episode's qualified support mask.
+    pub in_qualified_support: bool,
+    /// A below-release gap bridged between two release-positive windows.
+    pub bridged_gap: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -600,10 +641,23 @@ pub struct CounterfactualInfluenceReport {
     pub total_frames: usize,
     pub analysis: InfluenceAnalysisConfig,
     pub total_channel_windows: usize,
+    /// Number of channel/windows crossing the raw enter threshold.
     pub affected_channel_windows: usize,
-    /// Merged frame intervals where at least one channel/window exceeded its
-    /// calibrated threshold. These are measured support regions, not ownership.
+    /// Versioned policy used to qualify temporal support episodes.
+    pub support_policy: InfluenceSupportPolicy,
+    /// Complete ordered per-window/per-channel trace, including raw and release
+    /// thresholds and the final hysteresis/bridge classification.
+    pub window_measurements: Vec<InfluenceWindowMeasurement>,
+    /// Merged intervals from raw enter-threshold crossings, before smoothing.
+    pub raw_threshold_intervals: Vec<FrameInterval>,
+    /// Historical field retained with its raw measured meaning for audit.
     pub measured_influence_intervals: Vec<FrameInterval>,
+    /// Hysteresis/gap/minimum-duration qualified support plus bounded tail hold.
+    /// This is the only interval set downstream planners should consume.
+    pub qualified_support_intervals: Vec<FrameInterval>,
+    pub qualified_channel_windows: usize,
+    pub bridged_channel_windows: usize,
+    pub tail_extension_frames_applied: u64,
     pub disposition: InfluenceDisposition,
     pub receipt_sha256: String,
 }
