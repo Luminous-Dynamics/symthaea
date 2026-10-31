@@ -23,6 +23,25 @@ class PrimalDualReceiptTests(unittest.TestCase):
         self.assertGreaterEqual(result["minimum_dual_slack"], -1e-8)
         self.assertLessEqual(abs(result["duality_gap"]), 1e-8)
 
+    def test_randomized_small_instances(self):
+        rng = np.random.default_rng(20261031)
+        for k in range(2, 9):
+            for _ in range(4):
+                e = np.exp(rng.normal(0.0, 1.5, size=k))
+                u = rng.lognormal(0.0, 0.8, size=k)
+                solution = solve_utility_recertification(e, u, self.alpha)
+                result = verify_primal_dual_certificate(
+                    e, u, self.alpha, solution
+                )
+                self.assertTrue(result["valid"], result)
+
+    def test_tied_and_zero_evalues_with_zero_utility(self):
+        e = np.array([2.0, 2.0, 0.0, 0.0])
+        u = np.zeros_like(e)
+        solution = solve_utility_recertification(e, u, self.alpha)
+        result = verify_primal_dual_certificate(e, u, self.alpha, solution)
+        self.assertTrue(result["valid"], result)
+
     def test_input_mutation_invalidates_digest(self):
         changed = self.e.copy()
         changed[0] += 0.01
