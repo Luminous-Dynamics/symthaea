@@ -229,7 +229,7 @@ class DistributionallyRobustRandomizedCRC:
         complementarity = max(
             float(np.max(np.abs(y_ub*inequality_slack))),
             float(np.max(np.abs(y_lower*(x-lower)))),
-            float(np.max(np.abs(y_upper*(upper-x))),
+            float(np.max(np.abs(y_upper*(upper-x)))),
         )
         kkt = {
             "primal_inequality_violation": float(np.max(np.maximum(-inequality_slack, 0.0))),
