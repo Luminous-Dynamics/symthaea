@@ -358,6 +358,8 @@ mod tests {
 
     const PROMPT_BANK_JSON: &str =
         include_str!("../MUSE_INSTRUMENTAL_ARENA_PROMPTS_2026-10-31.json");
+    const DURATION_MATCHED_PROMPT_BANK_JSON: &str =
+        include_str!("../MUSE_INSTRUMENTAL_ARENA_PROMPTS_180S_2026-10-31.json");
 
     #[test]
     fn checked_in_prompt_bank_is_balanced_and_pilot_only() {
@@ -370,6 +372,22 @@ mod tests {
         );
         assert_eq!(bank.cards.len(), 150);
         assert_eq!(bank.design.strata_count, 10);
+        assert_eq!(bank.design.cards_per_style, 15);
+        assert_eq!(bank.design.cards_per_density, 50);
+        assert_eq!(bank.status, INSTRUMENTAL_ARENA_PROMPT_BANK_STATUS);
+    }
+
+    #[test]
+    fn checked_in_180_second_prompt_bank_is_balanced_and_pilot_only() {
+        let bank = InstrumentalArenaPromptBank::parse(DURATION_MATCHED_PROMPT_BANK_JSON)
+            .expect("checked-in 180-second prompt bank must be valid JSON");
+        assert_eq!(
+            bank.validate(),
+            Vec::<PromptBankIssue>::new(),
+            "duration-matched prompt-bank contract must remain exact"
+        );
+        assert_eq!(bank.cards.len(), 150);
+        assert_eq!(bank.design.target_duration_seconds, 180);
         assert_eq!(bank.design.cards_per_style, 15);
         assert_eq!(bank.design.cards_per_density, 50);
         assert_eq!(bank.status, INSTRUMENTAL_ARENA_PROMPT_BANK_STATUS);
