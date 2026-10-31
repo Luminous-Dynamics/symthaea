@@ -75,6 +75,57 @@ fn midi_time_signature_meter(numerator: u8, denominator_exponent: u8) -> Result<
     quarter_note_meter(numerator, denominator, "MIDI")
 }
 
+/// The legacy Score carries one global major/minor key. Do not apply the
+/// last key signature in a changing-key work to every note in the piece.
+fn musicxml_key_signature(document: &roxmltree::Document<'_>) -> Result<(i8, bool), String> {
+    let mut signatures = BTreeSet::<(i8, bool)>::new();
+    for key in document
+        .descendants()
+        .filter(|node| node.has_tag_name("key"))
+    {
+        let fifths_nodes: Vec<_> = key
+            .children()
+            .filter(|node| node.has_tag_name("fifths"))
+            .collect();
+        let mode_nodes: Vec<_> = key
+            .children()
+            .filter(|node| node.has_tag_name("mode"))
+            .collect();
+        if fifths_nodes.len() != 1 || mode_nodes.len() > 1 {
+            return Err(
+                "MusicXML nonstandard, missing, or ambiguous key signatures are not representable by the legacy major/minor Score key"
+                    .into(),
+            );
+        }
+        let fifths_value = fifths_nodes[0]
+            .text()
+            .and_then(|value| value.trim().parse::<i8>().ok())
+            .filter(|value| (-7..=7).contains(value))
+            .ok_or_else(|| {
+                "MusicXML fifths value must be an integer in -7..=7".to_string()
+            })?;
+        let minor = match mode_nodes.first().and_then(|node| node.text()) {
+            None => false,
+            Some(value) if value.trim() == "major" => false,
+            Some(value) if value.trim() == "minor" => true,
+            Some(value) => {
+                return Err(format!(
+                    "MusicXML mode {:?} is not representable by the legacy major/minor Score key",
+                    value.trim()
+                ));
+            }
+        };
+        signatures.insert((fifths_value, minor));
+    }
+    if signatures.len() > 1 {
+        return Err(
+            "MusicXML key-signature changes are not representable by the legacy single-key Score"
+                .into(),
+        );
+    }
+    Ok(signatures.into_iter().next().unwrap_or((0, false)))
+}
+
 /// The legacy Score carries one constant tempo. Preserve repeated identical
 /// declarations, but do not flatten a changing tempo map to the last value.
 fn musicxml_tempo_bpm(document: &roxmltree::Document<'_>) -> Result<f32, String> {
@@ -177,8 +228,7 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
     let mut tempo_microseconds_per_beat = None::<u32>;
     let mut meter = 4_u8;
     let mut midi_time_signature = None::<(u8, u8)>;
-    let mut fifths = 0_i8;
-    let mut minor = false;
+    let mut midi_key_signature = None::<(i8, bool)>;
     let mut notes = Vec::new();
 
     for (track_index, track) in smf.tracks.iter().enumerate() {
@@ -221,8 +271,19 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                     meter = midi_time_signature_meter(numerator, denominator_exponent)?;
                 }
                 TrackEventKind::Meta(MetaMessage::KeySignature(sf, is_minor)) => {
-                    fifths = sf;
-                    minor = is_minor;
+                    if !(-7..=7).contains(&sf) {
+                        return Err(format!(
+                            "MIDI key-signature fifths value {sf} is outside -7..=7"
+                        ));
+                    }
+                    let signature = (sf, is_minor);
+                    if midi_key_signature.is_some_and(|previous| previous != signature) {
+                        return Err(
+                            "MIDI key-signature changes are not representable by the legacy single-key Score"
+                                .into(),
+                        );
+                    }
+                    midi_key_signature = Some(signature);
                 }
                 TrackEventKind::Midi { channel, message } if channel.as_int() != 9 => {
                     let channel = channel.as_int();
@@ -280,6 +341,7 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
     }
 
     let roles = roles_by_track(&notes);
+    let (fifths, minor) = midi_key_signature.unwrap_or((0, false));
     let tonic = PitchClass::new(i32::from(fifths) * 7 + if minor { 9 } else { 0 });
     let key = if minor {
         Key::minor(tonic)
@@ -368,8 +430,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
         return Err("MusicXML contains no score parts".into());
     }
     let mut divisions = 1_i64;
-    let mut fifths = 0_i32;
-    let mut minor = false;
+    let (fifths, minor) = musicxml_key_signature(&document)?;
     let meter = musicxml_time_signature_meter(&document)?;
     let tempo = musicxml_tempo_bpm(&document)?;
     let mut raw = Vec::<(usize, u8, i64, i64)>::new();
@@ -380,10 +441,6 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
         for child in part.descendants().filter(|node| node.is_element()) {
             if child.has_tag_name("divisions") {
                 divisions = node_i64(child).unwrap_or(divisions).max(1);
-            } else if child.has_tag_name("fifths") {
-                fifths = node_i64(child).unwrap_or(i64::from(fifths)) as i32;
-            } else if child.has_tag_name("mode") {
-                minor = child.text().is_some_and(|value| value.trim() == "minor");
             } else if child.has_tag_name("backup") {
                 let amount = child
                     .children()
@@ -421,7 +478,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
     if raw.is_empty() {
         return Err("MusicXML contains no pitched notes".into());
     }
-    let tonic = PitchClass::new(fifths * 7 + if minor { 9 } else { 0 });
+    let tonic = PitchClass::new(i32::from(fifths) * 7 + if minor { 9 } else { 0 });
     let key = if minor {
         Key::minor(tonic)
     } else {
@@ -706,6 +763,41 @@ mod tests {
             0x00, 0xff, 0x2f, 0x00,
         ];
         assert!(parse_midi(&midi).is_err());
+    }
+
+    #[test]
+    fn midi_key_signature_change_is_rejected_instead_of_applying_last_key_globally() {
+        let midi = [
+            0x4d, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06,
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x60,
+            0x4d, 0x54, 0x72, 0x6b, 0x00, 0x00, 0x00, 0x18,
+            0x00, 0xff, 0x59, 0x02, 0x00, 0x00,
+            0x00, 0x90, 0x3c, 0x64,
+            0x3c, 0xff, 0x59, 0x02, 0x02, 0x00,
+            0x3c, 0x80, 0x3c, 0x00,
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        assert!(parse_midi(&midi).is_err());
+    }
+
+    #[test]
+    fn musicxml_key_signature_change_is_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions><key><fifths>0</fifths><mode>major</mode></key></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            <attributes><key><fifths>2</fifths><mode>major</mode></key></attributes>
+            <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        assert!(parse_musicxml(xml).is_err());
+    }
+
+    #[test]
+    fn musicxml_unsupported_mode_is_rejected_instead_of_treated_as_major() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions><key><fifths>0</fifths><mode>dorian</mode></key></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        assert!(parse_musicxml(xml).is_err());
     }
 
     #[test]
