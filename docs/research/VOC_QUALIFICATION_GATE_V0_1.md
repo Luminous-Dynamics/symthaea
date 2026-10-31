@@ -134,6 +134,20 @@ Pinned literature/benchmark references:
 
 For proxy-ranking baselines, the current NAS-Bench-201 CIFAR-10 SOTA2 leaderboard reports ParZC at 90.4 Spearman / 70.6 Kendall and AZ-NAS at 89.2 / 71.2. This makes metric choice consequential: the leading method changes depending on Spearman versus Kendall. These scores are contextual references only; our primary comparison must reproduce the exact split, task, architecture population, preprocessing and correlation definition.
 
+### Reported result anchors (not directly interchangeable)
+
+| Method | Published/maintainer-reported reference | Correct interpretation for our comparison |
+|---|---|---|
+| ParZC / AZ-NAS | NAS-Bench-201 CIFAR-10: ParZC 90.4 Spearman / 70.6 Kendall; AZ-NAS 89.2 / 71.2 | Proxy rank correlation over a fixed benchmark population. It is not top-100 retrieval under a search budget. The leaderboard is a community-maintained secondary source; reproduce the primary implementation and protocol. |
+| CoRA-Rank / CoRA-Refine | CoRA reports Spearman 0.927 for its zero-cost ranker and 0.946 after early-curve residual refinement, with the refinement costing approximately 1% of full-training-all-candidates cost; reported mean correlations across NB201, NB101, TransNAS and NATS-SSS are 0.946, 0.715, 0.786 and 0.894 | Ranking-correlation and selected-architecture quality track. CoRA's anchor sample is trained briefly (about 6.4% of the space); count all anchor training. Do not compare its correlation score directly to ZAPS P@100. |
+| ZAPS | At B=200 evaluated architectures on NB201, P@100 = 52.3% CIFAR-10 / 65.8% CIFAR-100 | Search-retrieval track: how much of the true top-100 lies among architectures actually evaluated. Also report simple regret of the best evaluated candidate. Do not conflate this with a model's predicted top-100 precision. |
+| R-MF-NAS | Author repository reports mean ± SD selected test accuracy: NB101-CIFAR10 92.95 ± 0.84; NB201-CIFAR10 93.70 ± 0.35; NB201-CIFAR100 71.46 ± 1.05; NB201-ImageNet16 45.06 ± 0.89 | Multi-fidelity final-architecture quality and cross-seed robustness. The public NB201 config samples up to 2,000 SynFlow-scored candidates, starts from 32 candidates and uses training rungs 12/25/50/100/200 epochs; compare under the same total metered budget rather than copying rung labels alone. |
+
+ZAPS has a protocol nuance that must be replicated transparently: its paper describes offline ProxyFit selection using target-space proxy/accuracy correlations, then reports that transferred proxy subsets preserve performance within 5.2 percentage points at budgets of at least 200. Our benchmark must report both target-calibrated reproduction and a genuinely task-disjoint transferred-proxy condition; only the latter is eligible for a no-target-label leakage claim. This is an evaluation protocol distinction, not an accusation about the authors' reported experiments.
+
+CoRA is an especially strong comparator because it combines proxy complementarity with early learning dynamics rather than using one signal family. Our opportunity is not to repeat that combination; it is to add a calibrated joint posterior, adaptive next-measurement choice by expected top-K regret reduction, dormant recovery, and run-wide audited pruning while matching the same cost frontier.
+
+
 ## 8. Primary outcome metrics
 
 Report all of the following, not only correlation:
@@ -150,6 +164,16 @@ Report all of the following, not only correlation:
 - quality/resource Pareto frontiers.
 
 Use at least 30 independent search seeds per benchmark/task configuration for initial engineering estimates and report confidence intervals across seeds. Increase the number when power analysis shows the desired effect cannot be distinguished. Do not treat individual architectures from one search run as independent replicates.
+
+### Pre-registered engineering targets (aspirations, not results)
+
+- **ZAPS search-retrieval track:** at B=200, target P@100 of at least 60% on NB201-CIFAR10 and 73% on NB201-CIFAR100, compared against the reported 52.3% and 65.8% ZAPS references under the same eligible target-label protocol. Require a paired-seed 95% confidence interval for the P@100 difference above zero; if the target-calibrated proxy track is used, the result is not a transfer claim.
+- **CoRA ranking track:** retain Spearman within 0.01 of CoRA on NB201 while improving the worst of NB101/TransNAS/NATS by at least 0.05 at no more than 1.25% of all-candidate full-training cost. Report Kendall as well; one correlation alone can hide top-of-list failures.
+- **R-MF-NAS final-quality track:** at equal total metered cost, match or exceed its reported mean final quality on each comparable task and improve the worst-decile seed result by at least one percentage point where the task metric allows that interpretation. Do not use the paper's reported accuracy table as a pass/fail gate until its exact hardware, dataset version, test protocol and 500-run script are reproduced.
+- **Decision/calibration track:** top-1 ECE ≤0.05 on sufficiently populated held-out strata; 90% interval coverage within ±5 percentage points; no declared stratum below its preregistered top-K coverage floor; action-outcome log loss/Brier/ECE within frozen limits; VOI MAE ≤0.05 regret units. Any underpowered stratum remains NOT_ESTIMABLE and forces abstention for that deployment slice.
+- **Risk/anytime track:** the empirical run-wide false-prune undercoverage must remain within the declared run-level delta under preregistered stress tests; publish quality versus elapsed cost at every rung and include catastrophic late-learner recoveries as explicit failure cases.
+
+These thresholds are intentionally hard targets and must be frozen before final test labels are opened. They are not universal theoretical guarantees.
 
 ## 9. Claim ceiling
 
