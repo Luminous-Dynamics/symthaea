@@ -25,6 +25,7 @@ The following were checked on the default branch while preparing this protocol:
 |---|---|---|
 | Instrument vocabulary | 42 `Instrument` enum variants in `symthaea-muse/src/instruments.rs` | A vocabulary of timbre models, not 42 equally complete sampled instruments |
 | Instrument realization | Partial spectra, velocity response, sustain/decay classification, attack noise, vibrato, inharmonicity, FM / Karplus–Strong routing, GM programs and name mapping | Several tables are derived/estimated or fall back to shared tables; each model needs an evidence label |
+| Sampled instrument path | `vcsl.rs` indexes VCSL and VSCO2-CE, with lazy decode/cache, velocity-layer selection and deterministic round-robin; `synth.rs` tries sampled playback before synthesis fallback | Current source maps 19 enum variants to sustain banks (Piano/PianoPP share one bank) and nine variants to short-articulation banks; activation is optional and installed file/pitch/velocity coverage is not yet proven by a runtime receipt |
 | Ensemble selection | Seeded, style-specific pools in `theory_realize.rs::instruments_for` | Deterministic variety exists, but it is not yet a complete score-conditioned orchestration decision |
 | Style vocabulary | 29 currently composer-backed `Style` variants | These are the actual engine routes to qualify first |
 | Style catalog | 152 target entries, 19 constellations; 29 composer-backed and 123 research-only according to the catalog document | Research-only entries must remain unavailable for composition until implemented and qualified |
@@ -62,9 +63,11 @@ Minimum fields:
 - implemented articulation/technique set, with each technique linked to its implementation;
 - synthesis method: additive measured / additive derived / estimated, FM, Karplus–Strong, SoundFont program, SFZ or mapped sample;
 - renderer-specific program, bank, keyswitch, controller and effect support;
-- sample coverage by pitch, velocity layer, articulation, round-robin and release sample where applicable;
+- declared sample-bank mapping, exact installed-asset availability, and sample coverage by pitch, velocity layer, articulation, round-robin and release sample where applicable;
 - source URI, license, acquisition version, content digest and attribution;
-- evidence status: measured, source-cited model, derived, estimated or unverified.
+- evidence status: measured, source-cited model, derived, estimated, code-declared mapping, runtime-verified or unverified.
+
+A source-code mapping to a sample directory is not itself a coverage claim. Runtime receipts must distinguish a selected recording from a synthesis fallback, and must state pitch/velocity window fallbacks explicitly.
 
 Do not fill unknown ranges or techniques with plausible-looking defaults. Unknown must remain unknown. A fallback instrument may be offered, but its use must be visible in the orchestration decision and render receipt.
 
@@ -83,6 +86,8 @@ A `RendererPatchCapability` should bind:
 - supported articulations and any patch-specific restrictions.
 
 CC1, CC2, CC11 and CC64 are candidates for experiments, not universal guarantees. CC7 and CC10 are already emitted by current theory MIDI export. Validate a proposed controller through paired renders and retain the measured result. A controller that does nothing on a patch must not be treated as expressive capability.
+
+For compatible targets, add an optional **MPE** export profile for per-note pitch, timbre and pressure/expression. MPE uses per-note MIDI channels to avoid applying channel-wide controls to every note in a chord (MIDI Association, https://midi.org/mpe-midi-polyphonic-expression). Keep ordinary GM MIDI as a compatible fallback; never claim MPE support without an explicit target-device/renderer profile.
 
 ### 4.3 Style contract
 
@@ -270,7 +275,9 @@ Use asset manifests, SHA-256 digests, provenance and license records before samp
 
 Candidate sources:
 
-- **VCSL** (official project: https://github.com/sgossner/VCSL) describes its sample library as CC0. It is a promising instrument/articulation source; verify the exact acquired release, all included assets, metadata and license notices before redistribution or training.
+- **VCSL** (official project: https://github.com/sgossner/VCSL) declares CC0. Its upstream README documents readable instrument/articulation/velocity/round-robin naming and notes that most articulations have only one round-robin and two to three velocity layers. It is suitable for sample-backed instrument and percussion coverage, but does not imply a deep commercial-library level of round-robin or dynamic sampling. Pin the acquired release and digest every file.
+- **VSCO 2 Community Edition** (official project: https://github.com/sgossner/VSCO-2-CE) is already used by the current Muse sample mapper. Its upstream README permits use for any purpose but asks users not to sell the raw samples directly and encourages credit/sharing improvements. Verify the exact license file/package terms at the pinned revision before bundling or redistribution.
+- **NSynth** (official dataset: https://magenta.tensorflow.org/datasets/nsynth) contains 305,979 four-second, monophonic, 16 kHz notes from 1,006 instruments, with pitch/velocity sweeps and source/family/sonic-quality annotations under CC BY 4.0. Use it for instrument-family recognition, timbre descriptors and pitch/velocity-response probes; it is not a polyphonic arrangement, phrase-performance or genre-grammar corpus.
 - **MAESTRO** (official dataset: https://magenta.tensorflow.org/datasets/maestro) provides aligned piano audio and MIDI useful for piano timing/expressive-performance experiments. Its published CC BY-NC-SA 4.0 terms are non-commercial; do not treat it as unrestricted commercial training data. It is not a multi-instrument coverage corpus.
 - Additional sample libraries must be reviewed asset-by-asset for license, provenance, instrument naming, articulation metadata and redistribution terms.
 
