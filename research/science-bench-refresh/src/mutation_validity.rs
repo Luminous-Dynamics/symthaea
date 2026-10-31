@@ -245,7 +245,8 @@ pub struct MutationValiditySummaryV1 {
     pub failure_fingerprint_sha256: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct MutationValidityReportV1 {
     pub report_commitment_sha256: String,
     pub schema: String,
@@ -478,6 +479,26 @@ pub fn verify_mutation_validity_plan(
         return Err("mutation validity plan commitment mismatch".to_owned());
     }
     Ok((plan, sha256_hex(plan_bytes)))
+}
+
+pub fn verify_mutation_validity_report(
+    report_bytes: &[u8],
+) -> Result<MutationValidityReportV1, String> {
+    let mut report: MutationValidityReportV1 = serde_json::from_slice(report_bytes)
+        .map_err(|error| format!("mutation validity report invalid: {error}"))?;
+    let supplied = report.report_commitment_sha256.clone();
+    if !valid_digest(&supplied, false) {
+        return Err("mutation validity report commitment must be a nonzero SHA-256 digest".to_owned());
+    }
+    report.report_commitment_sha256.clear();
+    let payload = serde_json::to_vec(&report)
+        .map_err(|error| format!("cannot serialize mutation validity report: {error}"))?;
+    let expected = digest_domain(REPORT_DOMAIN, &payload)?;
+    if expected != supplied {
+        return Err("mutation validity report commitment mismatch".to_owned());
+    }
+    report.report_commitment_sha256 = supplied;
+    Ok(report)
 }
 
 fn derive_review_status(
