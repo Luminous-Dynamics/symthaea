@@ -1,6 +1,11 @@
 use contamination_panel_bench::{
     ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, DetectorRunV1,
     causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
+    fresh_instance::{
+        FreshChallengeBundleV1, FreshChallengeConfigV1, FreshChallengeManifestV1,
+        FreshPublicChallengePacketV1, SealedFreshOraclePacketV1,
+        audit_fresh_challenge_bundle, generate_fresh_challenge_bundle,
+    },
     DetectorSpecV1, PublicChallengePacketV1, SealedChallengeKeyV1,
     audit_blinded_adjudications, detectors::{evaluate_detector_run, score_public_packet},
     ftd::{
@@ -253,6 +258,58 @@ fn audit_intervention_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn generate_fresh_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 6 {
+        return Err(
+            "usage: contamination-panel-bench generate-fresh <config.json> <seed-hex> <public-packet.json> <sealed-oracle.json> <manifest.json>"
+                .into(),
+        );
+    }
+    let config: FreshChallengeConfigV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
+    let seed = decode_hex(&args[2]).map_err(io::Error::other)?;
+    let bundle = generate_fresh_challenge_bundle(&config, &seed).map_err(io::Error::other)?;
+    write_bytes(&args[3], &serde_json::to_vec_pretty(&bundle.public_packet)?)?;
+    write_bytes(&args[4], &serde_json::to_vec_pretty(&bundle.sealed_oracle_packet)?)?;
+    write_bytes(&args[5], &serde_json::to_vec_pretty(&bundle.manifest)?)?;
+    println!(
+        "batch={} items={} public_sha256={} manifest_sha256={}",
+        bundle.manifest.batch_id,
+        bundle.manifest.item_count,
+        bundle.manifest.public_packet_sha256,
+        bundle.manifest.manifest_sha256
+    );
+    println!("The sealed oracle and seed are evaluator-only; do not publish them.");
+    Ok(())
+}
+
+fn audit_fresh_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 7 {
+        return Err(
+            "usage: contamination-panel-bench audit-fresh <config.json> <seed-hex> <public-packet.json> <sealed-oracle.json> <manifest.json> <audit.json>"
+                .into(),
+        );
+    }
+    let config: FreshChallengeConfigV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
+    let seed = decode_hex(&args[2]).map_err(io::Error::other)?;
+    let bundle = FreshChallengeBundleV1 {
+        public_packet: serde_json::from_slice::<FreshPublicChallengePacketV1>(&fs::read(&args[3])?)?,
+        sealed_oracle_packet: serde_json::from_slice::<SealedFreshOraclePacketV1>(&fs::read(&args[4])?)?,
+        manifest: serde_json::from_slice::<FreshChallengeManifestV1>(&fs::read(&args[5])?)?,
+    };
+    let report = audit_fresh_challenge_bundle(&config, &seed, &bundle).map_err(io::Error::other)?;
+    write_bytes(&args[6], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "valid={} regenerated={} nonsingular={} answers_exact={} freeze_authenticated={}",
+        report.valid,
+        report.deterministic_regeneration_matches,
+        report.all_matrices_are_nonsingular,
+        report.all_answers_recompute_exactly,
+        report.independently_verified_checkpoint_freeze
+    );
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
+}
+
 fn analyze_causal_study_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 3 {
         return Err(
@@ -358,9 +415,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("audit-intervention") => audit_intervention_cli(&args),
         Some("audit-training-receipt") => audit_training_receipt_cli(&args),
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
+        Some("generate-fresh") => generate_fresh_cli(&args),
+        Some("audit-fresh") => audit_fresh_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }

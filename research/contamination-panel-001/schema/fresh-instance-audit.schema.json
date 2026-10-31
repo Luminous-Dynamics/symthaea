@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/fresh-instance-audit-v1.json",
+  "title": "Fresh inference-time challenge regeneration audit v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "valid",
+    "deterministic_regeneration_matches",
+    "checkpoint_freeze_precedes_generation",
+    "public_packet_contains_no_seed_or_oracle_answers",
+    "all_matrices_are_nonsingular",
+    "all_answers_recompute_exactly",
+    "item_count",
+    "batch_id",
+    "manifest_sha256",
+    "generation_seed_commitment_sha256",
+    "independently_verified_checkpoint_freeze",
+    "claim_boundary",
+    "issues"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.fresh_instance_audit.v1"
+    },
+    "valid": {
+      "type": "boolean"
+    },
+    "deterministic_regeneration_matches": {
+      "type": "boolean"
+    },
+    "checkpoint_freeze_precedes_generation": {
+      "type": "boolean"
+    },
+    "public_packet_contains_no_seed_or_oracle_answers": {
+      "type": "boolean"
+    },
+    "all_matrices_are_nonsingular": {
+      "type": "boolean"
+    },
+    "all_answers_recompute_exactly": {
+      "type": "boolean"
+    },
+    "item_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "batch_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "generation_seed_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "independently_verified_checkpoint_freeze": {
+      "type": "boolean"
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

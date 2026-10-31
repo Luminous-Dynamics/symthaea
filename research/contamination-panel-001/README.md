@@ -469,3 +469,92 @@ The analysis report includes a SHA-256 digest of the exact serialized study inpu
 
 
 The intervention design also binds a per-replicate training RNG commitment: treatment and placebo use the same committed RNG schedule within a pair, while independent model-pair replicates must use distinct training RNG commitments. This is checked by the paired receipt validator and repeated-replicate analysis.
+
+
+## Secret-seeded inference-time fresh benchmark instances
+
+The module src/fresh_instance.rs adds an independent benchmark lane whose exact instances are generated after the evaluated checkpoint freeze time.
+
+This is complementary to contamination detection:
+- the static lane supports stable public regression and construct-validity comparisons;
+- the fresh lane tests whether a model can apply the task-generating rule to post-freeze instances it could not have memorized as exact benchmark items.
+
+A fresh item is not proof of task-recipe novelty. A model may have learned the general underlying method. Freshness also does not prove that the model has never encountered related training data.
+
+### Current executable fixture: exact 2x2 integer linear systems
+
+The initial generator:
+- samples bounded integer 2x2 matrix coefficients;
+- rejects matrices whose absolute determinant falls below the configured minimum;
+- samples a hidden integer solution vector;
+- constructs the right-hand side with checked exact integer arithmetic;
+- exposes only the resulting equations and response format to the evaluated model;
+- stores matrix parameters and exact solution in an evaluator-only sealed oracle packet.
+
+This is a deterministic protocol fixture, not a broad reasoning benchmark. Future task generators should cover mathematics, code, logic, science, tools and multi-step procedural tasks.
+
+### Evidence and artifact split
+
+The strict config binds:
+- benchmark/task family and version;
+- checkpoint digest and checkpoint-freeze receipt digest;
+- freeze timestamp and challenge-generation timestamp;
+- generator source, binary and runtime image digests;
+- exact numeric generation bounds and item count;
+- a canonical generator-config digest.
+
+The generator-config digest is calculated over the config after clearing its own digest field. The validator recomputes this digest, so changing a parameter range or item count without updating the commitment fails closed.
+
+Three output artifacts are produced:
+
+1. Public challenge packet — model-facing task text, item IDs, hashes and generator/checkpoint metadata only.
+2. Sealed oracle packet — evaluator-only random seed, hidden matrix parameters, exact answer and per-item parameter/answer digests.
+3. Manifest — commitments to the checkpoint-freeze receipt, generator/config, seed, public packet, sealed oracle and exact item set.
+
+Never distribute the sealed oracle packet or generation seed to model-serving, prompting or scoring agents before evaluation is complete. Store them separately with evaluator-only access controls.
+
+### Generate and independently regenerate
+
+Use a cryptographically random evaluator-held seed of at least 256 bits:
+
+~~~sh
+seed_hex="$(openssl rand -hex 32)"
+
+cargo run --locked -- generate-fresh \
+  research/contamination-panel-001/fixtures/fresh-instance-linear-system-config.json \
+  "$seed_hex" \
+  /secure/evaluator/fresh-public-packet.json \
+  /secure/evaluator/fresh-sealed-oracle.json \
+  /secure/evaluator/fresh-manifest.json
+~~~
+
+Audit by regenerating all artifacts from the original config and evaluator-held seed:
+
+~~~sh
+cargo run --locked -- audit-fresh \
+  research/contamination-panel-001/fixtures/fresh-instance-linear-system-config.json \
+  "$seed_hex" \
+  /secure/evaluator/fresh-public-packet.json \
+  /secure/evaluator/fresh-sealed-oracle.json \
+  /secure/evaluator/fresh-manifest.json \
+  /secure/evaluator/fresh-audit.json
+~~~
+
+The auditor verifies exact deterministic regeneration, manifest/artifact digests, unique item/text digests, nonsingular matrices, exact answer recomputation, and the public/oracle field boundary.
+
+Schemas:
+- schema/fresh-instance-config.schema.json
+- schema/fresh-instance-public-packet.schema.json
+- schema/fresh-instance-sealed-oracle.schema.json
+- schema/fresh-instance-manifest.schema.json
+- schema/fresh-instance-audit.schema.json
+
+Fixture:
+- fixtures/fresh-instance-linear-system-config.json (32 tasks, 2x2 systems, fixed checkpoint/freeze and generation times).
+
+### Trust boundary
+
+The module does not cryptographically authenticate the checkpoint-freeze receipt, prove the checkpoint was truly frozen when declared, authenticate the generator binary publisher, or prevent a compromised evaluator from leaking the sealed oracle. The audit always returns independently_verified_checkpoint_freeze=false.
+
+Trusted checkpoint-time signatures, key rotation/revocation, evaluator custody and independent generation execution receipts are separate requirements. A manifest with valid digests is not proof of a trusted timestamp or recipe novelty.
+

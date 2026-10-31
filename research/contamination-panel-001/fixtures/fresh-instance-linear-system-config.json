@@ -1,0 +1,21 @@
+{
+  "schema": "symthaea.fresh_instance_config.v1",
+  "batch_id": "fresh-pilot-linear-001",
+  "benchmark_id": "symthaea-fresh-instances",
+  "benchmark_version": "v1",
+  "task_family": "linear-system-2x2",
+  "requested_item_count": 32,
+  "matrix_coefficient_min": -9,
+  "matrix_coefficient_max": 9,
+  "solution_component_min": -9,
+  "solution_component_max": 9,
+  "minimum_absolute_determinant": 1,
+  "model_checkpoint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "checkpoint_freeze_receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "checkpoint_frozen_at_utc": "2026-10-31T18:00:00Z",
+  "challenge_generated_at_utc": "2026-10-31T19:00:00Z",
+  "generator_source_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "generator_binary_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "runtime_image_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+  "generator_config_sha256": "18a3100676e34c2fb2f8663ebdc62efc3e75408de04ef41872e39d77d7be197d"
+}
