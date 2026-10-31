@@ -1304,9 +1304,11 @@ impl DirectionCampaignRun {
         }
 
         let summary = tape.validate_integrity().map_err(|error| error.to_string())?;
-        if summary.total_charged_budget_microunits
-            != Some(self.total_cost_units.saturating_mul(1_000_000))
-        {
+        let expected_total_charge = self
+            .total_cost_units
+            .checked_mul(1_000_000)
+            .ok_or_else(|| "synthetic campaign normalized cost overflow".to_owned())?;
+        if summary.total_charged_budget_microunits != Some(expected_total_charge) {
             return Err("event-tape charge does not reconcile to the campaign cost".to_owned());
         }
         Ok(tape)
