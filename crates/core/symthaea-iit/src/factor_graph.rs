@@ -1600,6 +1600,111 @@ mod tests {
     }
 
     #[test]
+    fn cutset_conditioning_matches_bruteforce_on_randomized_sparse_graphs() {
+        for variable_count in 2..=7 {
+            for seed in 0..12usize {
+                let mut factors = Vec::new();
+                for left in 0..variable_count - 1 {
+                    let right = left + 1;
+                    let values = (0..4).map(|entry| {
+                        let code = (seed * 31 + left * 17 + entry * 7 + 1) % 23;
+                        if code == 0 {
+                            f64::NEG_INFINITY
+                        } else {
+                            (code as f64 / 24.0).ln()
+                        }
+                    }).collect();
+                    factors.push(BinaryLogFactor::new(vec![left, right], values).unwrap());
+                }
+                for left in 0..variable_count.saturating_sub(2) {
+                    if (left + seed) % 2 == 0 {
+                        let right = left + 2;
+                        let values = (0..4).map(|entry| {
+                            let code = (seed * 13 + left * 11 + entry * 5 + 3) % 29;
+                            if code == 0 {
+                                f64::NEG_INFINITY
+                            } else {
+                                (code as f64 / 30.0).ln()
+                            }
+                        }).collect();
+                        factors.push(BinaryLogFactor::new(vec![left, right], values).unwrap());
+                    }
+                }
+
+                let retained = variable_count - 1;
+                let eliminate = (0..retained).collect::<Vec<_>>();
+                let mut cutset = eliminate.iter().copied()
+                    .filter(|variable| (variable + seed) % 3 == 0)
+                    .collect::<Vec<_>>();
+                if cutset.is_empty() {
+                    cutset.push(seed % retained);
+                }
+                let max_entries = 1usize << variable_count;
+                let baseline = min_fill_log_sum_product(
+                    &factors,
+                    &eliminate,
+                    max_entries,
+                ).unwrap_or_else(|error| {
+                    panic!("baseline failed: n={variable_count}, seed={seed}: {error}")
+                });
+                let report = min_fill_log_sum_product_with_cutset(
+                    &factors,
+                    &eliminate,
+                    &cutset,
+                    max_entries,
+                    1usize << cutset.len(),
+                ).unwrap_or_else(|error| {
+                    panic!("cutset failed: n={variable_count}, seed={seed}, cutset={cutset:?}: {error}")
+                });
+
+                let mut expected = vec![f64::NEG_INFINITY; 2];
+                for assignment in 0..(1usize << variable_count) {
+                    let mut log_weight = 0.0;
+                    for factor in &factors {
+                        let local_index = factor.variables().iter().copied().enumerate().fold(
+                            0usize,
+                            |index, (slot, variable)| {
+                                index | (((assignment >> variable) & 1) << slot)
+                            },
+                        );
+                        log_weight += factor.log_values()[local_index];
+                    }
+                    let retained_state = (assignment >> retained) & 1;
+                    expected[retained_state] = log_add_exp(expected[retained_state], log_weight);
+                }
+
+                assert_eq!(baseline.factor.variables(), &[retained]);
+                assert_eq!(report.factor.variables(), &[retained]);
+                assert_eq!(report.cutset_assignments_evaluated, 1usize << cutset.len());
+                assert_eq!(
+                    report.predicted_peak_factor_entries,
+                    report.peak_factor_entries,
+                    "preflight peak differs: n={variable_count}, seed={seed}"
+                );
+                for state in 0..2 {
+                    let baseline_value = baseline.factor.log_values()[state];
+                    let cutset_value = report.factor.log_values()[state];
+                    let expected_value = expected[state];
+                    assert!(
+                        (baseline_value == expected_value)
+                            || (baseline_value.is_finite()
+                                && expected_value.is_finite()
+                                && (baseline_value - expected_value).abs() <= 1e-11),
+                        "baseline/oracle mismatch: n={variable_count}, seed={seed}, state={state}, baseline={baseline_value}, expected={expected_value}"
+                    );
+                    assert!(
+                        (cutset_value == expected_value)
+                            || (cutset_value.is_finite()
+                                && expected_value.is_finite()
+                                && (cutset_value - expected_value).abs() <= 1e-11),
+                        "cutset/oracle mismatch: n={variable_count}, seed={seed}, state={state}, cutset={cutset_value}, expected={expected_value}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn cutset_conditioning_counts_absent_variables_and_rejects_invalid_budgets() {
         let factor = BinaryLogFactor::new(vec![0], vec![0.25_f64.ln(), 0.75_f64.ln()]).unwrap();
         let ordinary = min_fill_log_sum_product(&[factor.clone()], &[1], 2).unwrap();
