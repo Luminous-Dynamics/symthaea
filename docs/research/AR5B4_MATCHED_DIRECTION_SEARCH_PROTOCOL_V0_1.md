@@ -251,3 +251,11 @@ Do not compare reported scores from different task sets, models, budgets, judge 
 The current policy harness demonstrates deterministic policy discrimination on four handcrafted payoff schedules. The two added policies are controls authored for the next comparison, not demonstrated improvements. The authored unit tests have not been compiled or executed yet.
 
 Even after the harness passes, only a matched synthetic campaign can support statements about scheduler behavior on those synthetic landscapes. A claim that Symthaea beats SOTA in scientific discovery or code optimization requires independent, held-out, budget-matched reproduction against the external systems and separate scientific integrity qualification.
+
+## Evidence-backed offer-set source state
+
+The event-tape/manifest path now has a stronger evidence-bundle option in `offer_set_evidence.rs`. For each decision boundary, the bundle must retain the complete evaluator-owned state object, not only a source-state digest. Validation recomputes the state digest, re-derives the offer snapshot, checks its boundary and visible-prefix cutoff, and binds the artifact to the EventTape's campaign, policy, and source commit. The bundle set is then matched across policies before paired inference.
+
+Use `analyze_qualified_paired_metric_with_state_evidence` for the strongest current end-to-end qualification path. The older `analyze_qualified_paired_metric` remains useful for compatibility but proves only that the supplied manifests are internally consistent with their declared state digests; it cannot independently rehash source-state bytes that were not retained.
+
+The new path raises the artifact-retention bar: the evaluator must preserve the state needed to explain eligibility, including the rule/data needed to derive available directions and NEW permission. If this cannot be exported, the run must remain unqualified for the stronger evidence-backed track. Hash validity is not source authentication or evaluator independence.
