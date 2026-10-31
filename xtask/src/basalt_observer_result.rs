@@ -1755,6 +1755,8 @@ mod tests {
         oracle_value["records"][0]["semantic_effect"] = json!("demonstrated");
         oracle_value["records"][1]["ground_truth"] = json!("consumed");
         oracle_value["records"][1]["witness_kind"] = json!("controlled_read");
+        oracle_value["records"][1]["execution_witness"]["worker_binary_digest"] =
+            json!(format!("sha256:{}", "f".repeat(64)));
         oracle_value["records"][1]["semantic_effect"] =
             json!("not_demonstrated_in_tested_domain");
         let constant_output = json!(format!("sha256:{}", "d".repeat(64)));
