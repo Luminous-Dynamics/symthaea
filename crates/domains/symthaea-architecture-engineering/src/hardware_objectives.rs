@@ -41,6 +41,7 @@ pub enum ObjectiveSource {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct HardwareProfileManifest {
     pub profile_id: String,
     pub device_model: String,
@@ -59,6 +60,7 @@ pub struct HardwareProfileManifest {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ObjectiveNormalization {
     /// Fixed lower bound from a pre-registered benchmark scale.
     pub raw_min: f64,
@@ -67,6 +69,7 @@ pub struct ObjectiveNormalization {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ObjectiveDefinition {
     pub objective_id: String,
     /// Unit of the raw objective value, e.g. milliseconds per inference or KiB.
@@ -85,6 +88,7 @@ pub struct ObjectiveDefinition {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ObjectiveRegistry {
     pub schema: String,
     pub version: String,
@@ -98,12 +102,14 @@ pub struct ObjectiveRegistry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MeasurementCost {
     pub resource_unit: String,
     pub units: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum MeasurementOutcome {
     Measured {
@@ -131,6 +137,7 @@ pub enum MeasurementOutcome {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ObjectiveObservation {
     pub candidate_id: String,
     pub candidate_config_sha256: String,
