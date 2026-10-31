@@ -246,3 +246,5 @@ This is a research specification plus a first executable conformance evaluator. 
 - AMA-Bench, ICML 2026: https://proceedings.mlr.press/v306/zhao26bs.html
 - AMA-Bench project: https://ama-bench.github.io/
 - UltraHorizon, ICML 2026: https://proceedings.mlr.press/v306/luo26ai.html
+- WorldMemArena, arXiv 2026: https://arxiv.org/abs/2605.29341
+- Continual Learning Exam (CLE), arXiv 2026: https://arxiv.org/abs/2610.33956
