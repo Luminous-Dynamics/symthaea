@@ -527,9 +527,9 @@ pub fn plan_min_fill_cutset_elimination(
     check_budget(predicted_peak_factor_entries, max_factor_entries)?;
 
     Ok(CutsetFactorEliminationPlan {
-        cutset_variables: canonical_cutset.to_vec(),
+        cutset_variables: canonical_cutset,
         cutset_assignments,
-        max_cutset_assignments: plan.max_cutset_assignments,
+        max_cutset_assignments,
         largest_input_factor_entries,
         predicted_peak_factor_entries,
         remaining_elimination_plan,
