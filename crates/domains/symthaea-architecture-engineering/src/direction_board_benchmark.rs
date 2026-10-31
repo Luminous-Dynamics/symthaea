@@ -26,6 +26,9 @@ const TARGET_SCORE: f64 = 0.90;
 const BOARD_EXPLORATION_COEFFICIENT: f64 = 0.55;
 const NEW_DIRECTION_CREDIT: f64 = 0.20;
 const GLOBAL_UCB_EXPLORATION: f64 = 0.55;
+const DISCOUNTED_UCB_GAMMA: f64 = 0.90;
+const GAUSSIAN_THOMPSON_PRIOR_VARIANCE: f64 = 0.25;
+const GAUSSIAN_THOMPSON_OBSERVATION_VARIANCE: f64 = 0.25;
 
 /// Independent payoff families. The no-new-direction family is a null control.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -53,6 +56,10 @@ pub enum DirectionCampaignPolicy {
     Random,
     /// Standard UCB over global mean score, with an explicit NEW-arm prior.
     GlobalUcb,
+    /// Exponential-discount UCB for changing or rank-reversing payoff landscapes.
+    DiscountedUcb,
+    /// Gaussian Thompson sampling with a frozen Normal-Normal reward model.
+    GaussianThompsonSampling,
     /// The implementation under test: verifier-grounded, local-record UCB board.
     VerifierGroundedDirectionBoard,
     /// Sees the complete payoff schedule. This is an upper bound, never deployable.
@@ -204,6 +211,12 @@ pub fn run_direction_campaign(
                 admitted_new_directions,
                 actions.len(),
             ),
+            DirectionCampaignPolicy::DiscountedUcb => {
+                select_discounted_ucb(&observations, &actions, DISCOUNTED_UCB_GAMMA)
+            }
+            DirectionCampaignPolicy::GaussianThompsonSampling => {
+                select_gaussian_thompson(&observations, &actions, &mut random_state)
+            }
             DirectionCampaignPolicy::VerifierGroundedDirectionBoard => {
                 select_direction_board(&board, &direction_digests)?
             }
@@ -663,6 +676,131 @@ fn select_global_ucb(
     best_arm
 }
 
+fn action_reward(action: &DirectionCampaignAction) -> f64 {
+    if action.is_new_proposal {
+        if action.proposal_disposition == Some(NewDirectionDisposition::Admitted) {
+            1.0
+        } else {
+            0.0
+        }
+    } else {
+        action.observed_score.unwrap_or(0.0).clamp(0.0, 1.0)
+    }
+}
+
+/// Weighted reward sum and effective count for an arm under exponential recency discount.
+fn discounted_arm_statistics(
+    arm_id: &str,
+    actions: &[DirectionCampaignAction],
+    discount: f64,
+) -> (f64, f64) {
+    let mut weighted_reward = 0.0;
+    let mut weighted_count = 0.0;
+    for (index, action) in actions.iter().enumerate() {
+        if action.arm_id != arm_id {
+            continue;
+        }
+        let age = actions.len().saturating_sub(index + 1) as f64;
+        let weight = discount.powf(age);
+        weighted_reward += weight * action_reward(action);
+        weighted_count += weight;
+    }
+    (weighted_reward, weighted_count)
+}
+
+/// Discounted UCB uses only past receipts and exponentially forgets older rewards.
+/// A single frozen pseudo-count prior prevents zero-denominator startup behavior.
+fn select_discounted_ucb(
+    observations: &BTreeMap<String, Vec<f64>>,
+    actions: &[DirectionCampaignAction],
+    discount: f64,
+) -> String {
+    let mut arms: Vec<String> = observations.keys().cloned().collect();
+    arms.push("NEW".to_owned());
+    let log_total = ((actions.len() as f64) + 2.0).ln();
+    let mut best: Option<(String, f64)> = None;
+    for arm_id in arms {
+        let (weighted_reward, weighted_count) =
+            discounted_arm_statistics(&arm_id, actions, discount);
+        let prior_reward = if arm_id == "NEW" { NEW_DIRECTION_CREDIT } else { 0.5 };
+        let mean = (weighted_reward + prior_reward) / (weighted_count + 1.0);
+        let bonus = GLOBAL_UCB_EXPLORATION
+            * (2.0 * log_total / (weighted_count + 1.0)).sqrt();
+        let potential = mean + bonus;
+        let replace = match &best {
+            None => true,
+            Some((best_id, best_value)) => {
+                potential.total_cmp(best_value).is_gt()
+                    || (potential.total_cmp(best_value).is_eq() && arm_id < *best_id)
+            }
+        };
+        if replace {
+            best = Some((arm_id, potential));
+        }
+    }
+    best.map(|(arm_id, _)| arm_id).unwrap_or_else(|| "NEW".to_owned())
+}
+
+/// Normal-Normal posterior for normalized continuous rewards. The variance assumptions
+/// are fixed constants in this baseline, not fitted on the hidden landscape.
+fn gaussian_thompson_posterior(
+    arm_id: &str,
+    actions: &[DirectionCampaignAction],
+) -> (f64, f64) {
+    let prior_mean = if arm_id == "NEW" { NEW_DIRECTION_CREDIT } else { 0.5 };
+    let prior_precision = 1.0 / GAUSSIAN_THOMPSON_PRIOR_VARIANCE;
+    let observation_precision = 1.0 / GAUSSIAN_THOMPSON_OBSERVATION_VARIANCE;
+    let mut reward_sum = 0.0;
+    let mut observation_count = 0.0;
+    for action in actions.iter().filter(|action| action.arm_id == arm_id) {
+        reward_sum += action_reward(action);
+        observation_count += 1.0;
+    }
+    let posterior_precision = prior_precision + observation_count * observation_precision;
+    let posterior_mean =
+        (prior_mean * prior_precision + reward_sum * observation_precision) / posterior_precision;
+    (posterior_mean, 1.0 / posterior_precision)
+}
+
+fn open_unit_interval(state: &mut u64) -> f64 {
+    let mantissa = next_random(state) >> 11;
+    (mantissa as f64 + 0.5) / ((1_u64 << 53) as f64)
+}
+
+fn sample_standard_normal(state: &mut u64) -> f64 {
+    let u1 = open_unit_interval(state);
+    let u2 = open_unit_interval(state);
+    (-2.0 * u1.ln()).sqrt() * (std::f64::consts::TAU * u2).cos()
+}
+
+/// Seeded Gaussian Thompson sampling over the same normalized reward history.
+fn select_gaussian_thompson(
+    observations: &BTreeMap<String, Vec<f64>>,
+    actions: &[DirectionCampaignAction],
+    random_state: &mut u64,
+) -> String {
+    let mut arms: Vec<String> = observations.keys().cloned().collect();
+    arms.push("NEW".to_owned());
+    let mut best: Option<(String, f64)> = None;
+    for arm_id in arms {
+        let (posterior_mean, posterior_variance) =
+            gaussian_thompson_posterior(&arm_id, actions);
+        let sample =
+            posterior_mean + posterior_variance.sqrt() * sample_standard_normal(random_state);
+        let replace = match &best {
+            None => true,
+            Some((best_id, best_value)) => {
+                sample.total_cmp(best_value).is_gt()
+                    || (sample.total_cmp(best_value).is_eq() && arm_id < *best_id)
+            }
+        };
+        if replace {
+            best = Some((arm_id, sample));
+        }
+    }
+    best.map(|(arm_id, _)| arm_id).unwrap_or_else(|| "NEW".to_owned())
+}
+
 fn select_oracle(
     landscape: DirectionLandscapeFamily,
     observations: &BTreeMap<String, Vec<f64>>,
@@ -830,11 +968,13 @@ fn splitmix64(mut value: u64) -> u64 {
 mod tests {
     use super::*;
 
-    const POLICIES: [DirectionCampaignPolicy; 6] = [
+    const POLICIES: [DirectionCampaignPolicy; 8] = [
         DirectionCampaignPolicy::ScoreOnlyWinnerTakesAll,
         DirectionCampaignPolicy::FixedRoundRobin,
         DirectionCampaignPolicy::Random,
         DirectionCampaignPolicy::GlobalUcb,
+        DirectionCampaignPolicy::DiscountedUcb,
+        DirectionCampaignPolicy::GaussianThompsonSampling,
         DirectionCampaignPolicy::VerifierGroundedDirectionBoard,
         DirectionCampaignPolicy::OracleUpperBound,
     ];
@@ -865,6 +1005,8 @@ mod tests {
     fn random_and_board_policies_are_reproducible_for_the_same_seed() {
         for policy in [
             DirectionCampaignPolicy::Random,
+            DirectionCampaignPolicy::DiscountedUcb,
+            DirectionCampaignPolicy::GaussianThompsonSampling,
             DirectionCampaignPolicy::VerifierGroundedDirectionBoard,
         ] {
             let first = run_direction_campaign(
