@@ -14,7 +14,8 @@ use symthaea_muse_protocol::catalog::{
     CanonicalStyle, HybridStyleSpec, StyleStatus, catalog_entry,
 };
 use symthaea_music_theory::{
-    CompositionSpec, FormKind, GrammarFamily, MusicalIntent, Score, Style,
+    Accompaniment, CompositionSpec, FormKind, GrammarFamily, GrammarPlanEvidence,
+    GrammarStructuralTrace, MusicalIntent, Score, Style,
     MUSIC_THEORY_ENGINE_VERSION, compose_with_grammar_plan,
 };
 
@@ -86,15 +87,20 @@ pub struct HybridComposition {
     pub score: Score,
     /// Domain-separated digest of the exact generated symbolic Score.
     pub score_sha256: String,
+    /// The exact family plan that generated this score, retained for audit.
+    pub grammar_plan: GrammarPlanEvidence,
+    /// Event references and structural assertions for independent checking.
+    pub grammar_trace: GrammarStructuralTrace,
     pub compiled: CompiledHybridStyle,
 }
 
 /// Compile an explicit catalogue-layer recipe to the actual composer's
-/// declarative spec. V1 intentionally supports only PeriodSentence structural
-/// owners using Ternary/Rondo/Variations and rejects dedicated-engine owners
-/// until family-specific donor-consumption adapters exist. Every applied
-/// layer is copied from an executable source style; unsupported meter
-/// transfers or unknown/unimplemented composer routes fail closed.
+/// declarative spec. V1 supports PeriodSentence owners using
+/// Ternary/Rondo/Variations and GrooveCycle owners with cycle-safe
+/// accompaniment pools. Other dedicated engines remain fail-closed until
+/// family-specific donor-consumption adapters exist. Unsupported meter
+/// transfers, cycle incompatibilities and unknown/unimplemented routes fail
+/// closed.
 pub fn compile_hybrid_style(
     hybrid: &HybridStyleSpec,
 ) -> Result<CompiledHybridStyle, Vec<StyleMixIssue>> {
@@ -145,35 +151,49 @@ pub fn compile_hybrid_style(
         return Err(issues);
     };
 
-    // v1 deliberately compiles only the general period/sentence engine.
-    // Dedicated engines have different contracts: GrooveCycle panics unless
-    // the selected accompaniment is a cycle type; Fugue/Process/Raga/Opera
-    // consume only subsets of CompositionSpec. Until each has a family-aware
-    // adapter and a tested donor-consumption matrix, reject them rather than
-    // silently claiming every layer reached the score.
-    if structural_style.grammar_family() != GrammarFamily::PeriodSentence {
-        issues.push(StyleMixIssue {
-            code: "structural_engine_adapter_required".into(),
-            layer: Some(StyleMixLayer::Structure),
-            catalog_id: Some(structural_entry.id),
-            message: format!(
-                "the {} structural grammar ({:?}) requires its own hybrid donor adapter; compiler v1 supports only PeriodSentence",
-                structural_entry.display_name,
-                structural_style.grammar_family()
-            ),
-        });
-    }
-
+    // Dedicated engines consume different subsets of CompositionSpec. The
+    // first additional adapter is GrooveCycle: it is safe only when every
+    // selectable accompaniment is a cycle-bearing cell, because the engine
+    // chooses from the whole pool by seed and its resolver rejects ordinary
+    // textures. Validate the full pool, not the one item a fixture happens to
+    // select. Other dedicated engines remain fail-closed until their own
+    // consumption contracts and negative fixtures exist.
     let mut spec = structural_style.spec();
-    if !spec.form_pool.iter().all(|form| {
-        matches!(form, FormKind::Ternary | FormKind::Rondo | FormKind::Variations)
-    }) {
-        issues.push(StyleMixIssue {
-            code: "structural_form_adapter_required".into(),
-            layer: Some(StyleMixLayer::Structure),
-            catalog_id: Some(structural_entry.id),
-            message: "compiler v1 only supports Ternary/Rondo/Variations form realization".into(),
-        });
+    let structural_family = structural_style.grammar_family();
+    match structural_family {
+        GrammarFamily::PeriodSentence => {
+            if !spec.form_pool.iter().all(|form| {
+                matches!(form, FormKind::Ternary | FormKind::Rondo | FormKind::Variations)
+            }) {
+                issues.push(StyleMixIssue {
+                    code: "structural_form_adapter_required".into(),
+                    layer: Some(StyleMixLayer::Structure),
+                    catalog_id: Some(structural_entry.id),
+                    message: "compiler v1 PeriodSentence adapters only support Ternary/Rondo/Variations form realization".into(),
+                });
+            }
+        }
+        GrammarFamily::GrooveCycle => {
+            if !groove_cycle_pool_is_supported(&spec.accompaniment_pool) {
+                issues.push(StyleMixIssue {
+                    code: "groove_cycle_structural_accompaniment_incompatible".into(),
+                    layer: Some(StyleMixLayer::Structure),
+                    catalog_id: Some(structural_entry.id),
+                    message: "every structural-owner accompaniment must be Montuno, CompasGait, BossaComp or Habanera; the GrooveCycle engine chooses from the entire pool".into(),
+                });
+            }
+        }
+        family => {
+            issues.push(StyleMixIssue {
+                code: "structural_engine_adapter_required".into(),
+                layer: Some(StyleMixLayer::Structure),
+                catalog_id: Some(structural_entry.id),
+                message: format!(
+                    "the {} structural grammar ({family:?}) requires its own hybrid donor adapter; compiler v1 supports PeriodSentence and GrooveCycle",
+                    structural_entry.display_name
+                ),
+            });
+        }
     }
 
     // The melodic donor is realized through HookCell. Do not silently copy
@@ -189,9 +209,9 @@ pub fn compile_hybrid_style(
 
     // A rhythm donor can contribute its accompaniment/cycle engine only
     // when its bar length is compatible with the structural owner's score.
-    // The owner retains meter and its exact motif-duration contract. A future
-    // meter adapter may support cross-meter hybrids; this v1 compiler does not
-    // silently stretch or truncate rhythmic cells.
+    // GrooveCycle adds a stronger condition: every selectable donor cell must
+    // resolve to a known cycle kind, or a later seed could panic. The owner
+    // retains meter; no silent stretching, truncation or generic fallback.
     if let Some((entry, style)) = rhythm {
         let donor = style.spec();
         if donor.meter != spec.meter {
@@ -203,6 +223,15 @@ pub fn compile_hybrid_style(
                     "rhythm donor {} uses {}/4-style quarter-note beats per bar, but structural owner {} uses {}; an explicit meter/cycle adapter is required",
                     entry.display_name, donor.meter, structural_entry.display_name, spec.meter
                 ),
+            });
+        } else if structural_family == GrammarFamily::GrooveCycle
+            && !groove_cycle_pool_is_supported(&donor.accompaniment_pool)
+        {
+            issues.push(StyleMixIssue {
+                code: "groove_cycle_rhythm_donor_incompatible".into(),
+                layer: Some(StyleMixLayer::Rhythm),
+                catalog_id: Some(entry.id),
+                message: "every rhythm-donor accompaniment must be Montuno, CompasGait, BossaComp or Habanera; generic accompaniment textures are not valid GrooveCycle cells".into(),
             });
         } else {
             spec.accompaniment_pool = donor.accompaniment_pool;
@@ -347,13 +376,12 @@ pub fn compose_hybrid_style(
     // Keep the structural owner's grammar-family dispatch. In particular,
     // dedicated engines must not be bypassed merely because the recipe is a
     // hybrid CompositionSpec.
-    let score = compose_with_grammar_plan(
+    let realization = compose_with_grammar_plan(
         compiled.structural_style.grammar_profile(),
         intent,
         &compiled.spec,
-    )
-    .score;
-    let score_bytes = serde_json::to_vec(&score).map_err(|error| {
+    );
+    let score_bytes = serde_json::to_vec(&realization.score).map_err(|error| {
         vec![StyleMixIssue {
             code: "generated_score_serialization_failed".into(),
             layer: Some(StyleMixLayer::Structure),
@@ -366,10 +394,25 @@ pub fn compose_hybrid_style(
         &score_bytes,
     );
     Ok(HybridComposition {
-        score,
+        score: realization.score,
         score_sha256,
+        grammar_plan: realization.plan,
+        grammar_trace: realization.trace,
         compiled,
     })
+}
+
+fn groove_cycle_pool_is_supported(pool: &[Accompaniment]) -> bool {
+    !pool.is_empty()
+        && pool.iter().all(|accompaniment| {
+            matches!(
+                accompaniment,
+                Accompaniment::Montuno
+                    | Accompaniment::CompasGait
+                    | Accompaniment::BossaComp
+                    | Accompaniment::Habanera
+            )
+        })
 }
 
 fn domain_sha256(domain: &[u8], bytes: &[u8]) -> String {
@@ -544,9 +587,84 @@ mod tests {
     }
 
     #[test]
-    fn dedicated_structural_engines_are_rejected_until_family_adapter_exists() {
+    fn groove_cycle_adapter_accepts_a_cycle_donor_and_changes_the_score() {
         let hybrid = HybridStyleSpec {
             structural_style_id: id_for_composer_style("AfroCuban"),
+            melodic_style_id: None,
+            rhythmic_style_id: Some(id_for_composer_style("Tango")),
+            harmonic_style_id: None,
+            ensemble_style_id: None,
+            performance_style_id: None,
+            production_style_id: None,
+            culturally_qualified_sources_acknowledged: true,
+        };
+        let compiled = compile_hybrid_style(&hybrid).expect("cycle-compatible hybrid");
+        assert_eq!(compiled.structural_style.grammar_family(), GrammarFamily::GrooveCycle);
+        assert_eq!(
+            compiled.spec.accompaniment_pool,
+            Style::Tango.spec().accompaniment_pool
+        );
+        assert!(groove_cycle_pool_is_supported(&compiled.spec.accompaniment_pool));
+
+        // Same structural owner and seed, only the rhythm gene changes. The
+        // generated symbolic score must change; field transfer alone is not
+        // evidence of a consumed gene.
+        for seed in 0..8 {
+            let intent = MusicalIntent {
+                bars: 8,
+                seed,
+                ..MusicalIntent::default()
+            };
+            let baseline = symthaea_music_theory::compose_with_grammar_plan(
+                Style::AfroCuban.grammar_profile(),
+                &intent,
+                &Style::AfroCuban.spec(),
+            )
+            .score;
+            let candidate = compose_hybrid_style(&intent, &hybrid)
+                .expect("GrooveCycle adapter must not panic for any seed");
+            assert!(!candidate.score.notes.is_empty());
+            assert_ne!(baseline, candidate.score, "rhythm donor was not consumed for seed {seed}");
+            match &candidate.grammar_plan {
+                GrammarPlanEvidence::GrooveCycle(plan) => {
+                    assert!(plan.phase_continuous, "cycle phase failed for seed {seed}");
+                    assert!(plan.obligations.iter().all(|item| item.fulfilled));
+                }
+                other => panic!("wrong grammar plan for GrooveCycle: {other:?}"),
+            }
+            assert!(!candidate.grammar_trace.structures.is_empty());
+        }
+    }
+
+    #[test]
+    fn groove_cycle_adapter_rejects_generic_accompaniment_donors() {
+        let hybrid = HybridStyleSpec {
+            structural_style_id: id_for_composer_style("AfroCuban"),
+            melodic_style_id: None,
+            rhythmic_style_id: Some(id_for_composer_style("Classical")),
+            harmonic_style_id: None,
+            ensemble_style_id: None,
+            performance_style_id: None,
+            production_style_id: None,
+            culturally_qualified_sources_acknowledged: true,
+        };
+        let issues = compile_hybrid_style(&hybrid).unwrap_err();
+        assert!(issues.iter().any(|issue| {
+            issue.code == "groove_cycle_rhythm_donor_incompatible"
+        }));
+    }
+
+    #[test]
+    fn groove_cycle_structural_pool_is_checked_for_every_selectable_member() {
+        let mut spec = Style::AfroCuban.spec();
+        spec.accompaniment_pool = vec![Accompaniment::Montuno, Accompaniment::Block];
+        assert!(!groove_cycle_pool_is_supported(&spec.accompaniment_pool));
+    }
+
+    #[test]
+    fn non_groove_dedicated_structural_engines_remain_fail_closed() {
+        let hybrid = HybridStyleSpec {
+            structural_style_id: id_for_composer_style("HindustaniInspired"),
             melodic_style_id: None,
             rhythmic_style_id: Some(id_for_composer_style("Tango")),
             harmonic_style_id: None,
