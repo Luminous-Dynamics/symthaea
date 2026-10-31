@@ -1372,6 +1372,13 @@ mod tests {
         let mut changed_record = ledger.clone();
         changed_record.reservations[0].expires_at_epoch += 1;
         assert!(changed_record.verify_integrity().is_err());
+
+        let mut changed_preflight = ledger.clone();
+        changed_preflight.reservations[0].preflight_receipt.target_commit_id = "b".repeat(40);
+        changed_preflight.reservations[0].record_sha256 =
+            compute_record_sha256(&changed_preflight.reservations[0]).unwrap();
+        changed_preflight.ledger_sha256 = compute_ledger_sha256(&changed_preflight).unwrap();
+        assert!(changed_preflight.verify_integrity().is_err());
     }
 
     #[test]
