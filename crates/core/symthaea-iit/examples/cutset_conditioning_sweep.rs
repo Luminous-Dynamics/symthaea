@@ -7,7 +7,7 @@
 //!
 //! The comparison uses identical log factors and checks the complete retained
 //! factor before reporting timing. The baseline is allowed a much larger factor
-//! table; the cutset path is constrained to eight entries per table and therefore
+//! table; the cutset path uses per-topology budgets (8, 8, 16, and 32 entries) and therefore
 //! reports a time-for-peak-table-width tradeoff, not a speedup.
 
 use std::time::{Duration, Instant};
@@ -91,7 +91,7 @@ fn equivalent(left: &[f64], right: &[f64]) -> bool {
 fn run() -> Result<(), String> {
     let repeats = parse_repeats()?;
     println!(
-        "side,variables,factors,cutset_variables,cutset_assignments,cutset_factor_entry_budget,baseline_induced_width,baseline_peak_entries,cutset_induced_width,cutset_peak_entries,baseline_median_ns,cutset_median_ns,cutset_over_baseline_time_ratio,exact_output_parity,within_cutset_budget"
+        "side,variables,factors,cutset_variables,cutset_assignments,cutset_factor_entry_budget,standard_minfill_fits_same_budget,baseline_induced_width,baseline_peak_entries,cutset_induced_width,cutset_peak_entries,baseline_median_ns,cutset_median_ns,cutset_over_baseline_time_ratio,exact_output_parity,within_cutset_budget"
     );
 
     for fixture in FIXTURES {
@@ -106,6 +106,19 @@ fn run() -> Result<(), String> {
         let cutset = (cutset_start..cutset_start + side).collect::<Vec<_>>();
         let branch_budget = 1usize << cutset.len();
         let cutset_factor_entry_budget = fixture.cutset_factor_entry_budget;
+        let standard_rejects_budget = matches!(
+            min_fill_log_sum_product(
+                &factors,
+                &eliminate,
+                cutset_factor_entry_budget,
+            ),
+            Err(symthaea_iit::FactorGraphError::IntermediateTooLarge { .. })
+        );
+        if !standard_rejects_budget {
+            return Err(format!(
+                "unconditioned min-fill did not exceed the configured table budget for {side}x{side}"
+            ));
+        }
 
         let baseline = min_fill_log_sum_product(
             &factors,
@@ -173,13 +186,14 @@ fn run() -> Result<(), String> {
             cutset_median as f64 / baseline_median as f64
         };
         println!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{:.4},{},{}",
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{:.4},{},{}",
             side,
             variables,
             factors.len(),
             cutset.len(),
             branch_budget,
             cutset_factor_entry_budget,
+            standard_rejects_budget,
             baseline.induced_width,
             baseline.peak_factor_entries,
             cutset_report.induced_width,
