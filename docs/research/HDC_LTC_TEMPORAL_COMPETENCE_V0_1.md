@@ -80,6 +80,8 @@ Vary timestamp jitter, inter-observation gaps, bursts, and missingness. Elapsed 
 
 A fixed-point synthetic generator now exists in `research/temporal-bench/src/irregular.rs`: three latent triangle-wave processes with independent periods/phases are observed on a jittered microsecond schedule; a declared fraction of scheduled observations are dropped; bounded integer noise is added to retained samples. The oracle stores exact latent values and the dropped-slot manifest. Its verifier checks both canonical digests, strict timestamp monotonicity, schedule bounds across missing slots, and observed-vs-latent noise limits. This is a synthetic T5 control, not yet a production dataset adapter or model benchmark.
 
+T5 now also has a separate sampling-aware metric module, `research/temporal-bench/src/irregular_metrics.rs`. It reports ordinary observation-weighted MSE/MAE alongside continuous-time squared/absolute error estimates (CSE/CAE) using leave-one-out Gaussian KDE and self-normalized inverse-density weights. The bandwidth is an explicit evaluator parameter; the score reports effective sample size so unstable weighting is visible. The method follows Li et al., *Beyond MSE: Rethinking the Evaluation Metric and Benchmarking for Irregular Time Series Forecasting* (2026, [arXiv:2608.17293](https://arxiv.org/abs/2608.17293)). These are estimates, not exact continuous-time integrals. MSE/MAE remain reported, and bandwidth must be fixed before confirmatory runs.
+
 ### T6 — Memory interference and selective retention
 
 Insert distractor traces that compete with a relevant cue. Compare no memory, fixed decay, learned decay, fast/slow state, and event/novelty-triggered refresh. Include explicit invalidation/retraction: a stale trace must not persist as a correct answer after its validity ends.
@@ -128,7 +130,7 @@ The query suite includes same-valid-time queries before and after correction arr
 
 This task is an executable synthetic adapter to the existing bitemporal source-event and proof-DAG work (#9075, #9149, #9427), not a replacement for those runtime/persistence implementations. It adds no production ledger or proof-DAG code.
 
-A further proposed metric, **Temporal Error Debt**, is tracked separately in #9492. It integrates wrong-belief exposure over time after each correction/retraction and reports abstention exposure and missing-prediction exposure separately. The current T10 v0.1 generator has five anchor queries and does not yet provide the repeated query checkpoints needed to calculate a full exposure integral; no TED result is claimed.
+**Temporal Error Debt (TED)** is now implemented as a separate repeated-checkpoint extension in `knowledge_trajectory.rs` and `temporal_error_debt.rs` (tracked in #9492). The generator preserves the five T10 anchor queries and adds current-valid-time plus historical-as-known query lanes at every checkpoint. For a 16-step source update interval, it emits a checkpoint every four steps, so one-checkpoint correction/retraction delays create four units of measurable exposure. The scorer reports wrong-belief, abstention, missing-output, future-leak, missed-correction, stale-after-retraction, correction/retraction latency, and unsupported answer oscillations separately. Thirteen scorer tests and eight trajectory tests are authored but unrun; no TED performance result is claimed.
 
 ### OAKS continual-knowledge benchmark alignment
 
@@ -234,7 +236,7 @@ These are targets, not measured results:
 ## 10. Execution ladder
 
 1. Validate the JSON matrix and deterministic generator contracts.
-2. Add burst-cluster variants to T1 and sinusoidal/frequency-sweep variants to T7.
+2. Add burst-cluster variants to T1 and sinusoidal/frequency-sweep variants to T7; validate CSE bandwidth sensitivity on T5 and keep MSE/MAE in parallel.
 3. Implement the isolated taskgen/candidate/evaluator runner in #9437; verify SHA-256 content binding and signed receipt/replay semantics before any confirmatory claim.
 4. Compile and run the standalone Rust tests and negative controls.
 5. Add the runner adapter without modifying active neuron code.
@@ -270,6 +272,6 @@ The repository contains a standalone Rust research crate under research/temporal
 
 Seed-bound replay checks regenerate expected tasks and oracles from evaluator-held seed/configuration and reject recommitted but seed-inconsistent event streams. The seed/configuration remains evaluator-owned and is not given to the candidate. These checks improve reproducibility; they are not a cryptographic security boundary.
 
-The public task and oracle are still returned together in one process. The confirmatory oracle is **not yet sealed by process or permission isolation**; there is no candidate sandbox, evaluator-owned signature, replay-resistant receipt, or secure taskgen/evaluator runner. **176 Rust unit tests are authored but unrun** in this environment; cargo, rustc, and rustfmt are unavailable here.
+The public task and oracle are still returned together in one process. The confirmatory oracle is **not yet sealed by process or permission isolation**; there is no candidate sandbox, evaluator-owned signature, replay-resistant receipt, or secure taskgen/evaluator runner. The repeated-checkpoint TED schedule is generated in the Rust research crate, but it is not yet wired into that isolated evaluator. Rust unit tests are authored but unrun in this environment; cargo, rustc, and rustfmt are unavailable here.
 
-No dataset adapter, baseline training run, model comparison, hardware measurement, or energy result has been executed. The ten synthetic/reference-task generators are authored, but burst-cluster T1 and sinusoidal/frequency-sweep T7 extensions remain open. The optional OAKS external dataset adapter is specified but not implemented. The evaluator runner, real-dataset adapters, independent process isolation, signed receipts, benchmark execution, system measurements, and energy result are not yet included. A passing benchmark would establish a result only for the declared tasks, splits, model versions, and hardware. It would not establish consciousness, general intelligence, universal superiority, or neuromorphic hardware efficiency if measured only on conventional CPU/GPU execution.
+No dataset adapter, baseline training run, model comparison, hardware measurement, or energy result has been executed. The ten synthetic/reference-task generators are authored, and T10 now has a repeated-checkpoint TED extension. Burst-cluster T1 and sinusoidal/frequency-sweep T7 extensions remain open. The optional OAKS external dataset adapter is specified but not implemented. The evaluator runner, real-dataset adapters, independent process isolation, signed receipts, benchmark execution, system measurements, and energy result are not yet included. A passing benchmark would establish a result only for the declared tasks, splits, model versions, and hardware. It would not establish consciousness, general intelligence, universal superiority, or neuromorphic hardware efficiency if measured only on conventional CPU/GPU execution.
