@@ -31,6 +31,12 @@ This is now an observed-transition objective:
 
 The prediction is computed at action-selection time; the target is an independently acquired next-cycle input. It is not the current CfC prediction approximation.
 
+## Explicit activation
+
+The cognitive-loop engine previously declared `jepa_engine: Option<JepaEngine>` but the constructor always initialized it to `None`, with no other construction path. The staged transition path would therefore have remained dormant in normal cognitive-loop operation.
+
+This PR adds `CognitiveLoopConfig::enable_jepa`, gated by the `jepa` feature, serde-defaulted and false by default. When explicitly enabled, the constructor creates the engine using `cfc_config.input_dim` and a seed derived from the configured genesis phrase under the `cognitive_loop::jepa` domain; without a genesis phrase it uses a stable fallback seed. Existing serialized configs lacking this field deserialize with JEPA disabled. Constructor and config tests cover the off/on paths, dimension match, serialized opt-in and older-config compatibility.
+
 ## Implementation
 
 JEPA engine API:
