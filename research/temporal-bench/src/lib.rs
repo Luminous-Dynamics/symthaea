@@ -145,9 +145,14 @@ impl fmt::Display for DelayedCueVerificationError {
             Self::StreamIdMismatch => write!(f, "delayed-cue task and oracle stream IDs differ"),
             Self::PublicDigestMismatch => write!(f, "delayed-cue public SHA-256 digest mismatch"),
             Self::OracleDigestMismatch => write!(f, "delayed-cue oracle SHA-256 digest mismatch"),
-            Self::SeedReplayMismatch => write!(f, "delayed-cue task/oracle do not match the supplied seed and configuration"),
+            Self::SeedReplayMismatch => write!(
+                f,
+                "delayed-cue task/oracle do not match the supplied seed and configuration"
+            ),
             Self::InvalidEventCount => write!(f, "delayed-cue event count is inconsistent"),
-            Self::InvalidTargetBinding => write!(f, "target cue binding is missing or inconsistent"),
+            Self::InvalidTargetBinding => {
+                write!(f, "target cue binding is missing or inconsistent")
+            }
             Self::InvalidProbe => write!(f, "delayed-cue probe is invalid"),
             Self::InvalidDistractor { index } => {
                 write!(f, "distractor {index} violates the declared schedule or similarity band")
