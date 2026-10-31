@@ -24,7 +24,7 @@ A response at a neuron with no direct edge from the stimulated neuron may arise 
 
 The current structure-to-function protocol tests paired prediction gains from independently verified reconstruction changes against held-out neural activity. A further step is to evaluate whether anatomy constrains responses to controlled perturbations rather than merely describing observational co-variation.
 
-A useful external baseline exists in C. elegans. Creamer, Leifer and Pillow's study has multiple preprint versions: v3 (2025) reported 92%, while the later v4 (posted 18 May 2026) reports 82% capture of measured causal interaction structure relative to the reproducibility of the perturbation data. Use v4 as the primary reproduction target and preserve v3 as a historical sensitivity analysis; never quote 92% as the current v4 result. The v4 model is a latent linear dynamical system whose nonzero neuron-to-neuron weights are restricted to anatomical chemical/electrical connections; it accounts for responses in unconnected pairs through multi-hop propagation. Pin the exact v4 data/code, animal partitions, cell eligibility, preprocessing and metric before scoring. This is an external reproduction/falsification target, not a result from Symthaea.
+A useful external baseline exists in C. elegans, but its public version records contain a material discrepancy. The bioRxiv v4 page posted 18 May 2026 reports 82% capture of measured causal interaction structure relative to the reproducibility of the perturbation data, while the PubMed/PMC preprint record and indexed full text still display 92%. The currently available records do not, by themselves, establish the exact version mapping of the two figures. Do not label them definitively as v3-versus-v4 without checking archived PDFs/supplements; preserve 82% and 92% as separate source-version claims pending reconciliation. The public code is Nondairy-Creamer/Creamer_LDS_2026, latest located commit bba43302d50a4947804d98b01779856e648237cc. Its README describes an LDS whose learned W matrix is masked by an anatomical connectome, with stimulation filters, and says the connectome was assembled from four NemaNode files downloaded 1 November 2025. It points to the Randi et al. OSF recordings, reports an 80-animal training set and 154 neurons for its fit, and estimates approximately 40 hours for a local fit. This is an external reproduction/falsification target, not a result from Symthaea. Pin the exact paper PDF/version, source commit, four connectome CSV digests, OSF file digests, cell mapping, train/test partitions, STAM calculation and reproducibility-ceiling calculation before scoring.
 
 The zebrafish resources offer complementary tiers:
 - Fish1.5 aligns EM and two-photon calcium imaging at single-cell resolution in the same specimen.
@@ -33,7 +33,7 @@ The zebrafish resources offer complementary tiers:
 
 These tiers must remain separate because they support different estimands.
 
-## 2. Direct anatomical connectivity is not effective connectivity
+## 3. Direct anatomical connectivity is not effective connectivity
 
 ### Required peer-reviewed effective-connectivity baseline
 
@@ -76,7 +76,7 @@ Any non-anatomical channel must retain its own evidence class and provenance. It
 
 The Randi et al. atlas has limits that must remain visible: its animals were immobilized and awake, stimulation/recording were performed under the study's transgenic configuration, and its functional map is an effective lower bound conditioned on its sampling and response-detection procedure. It is an external perturbation benchmark, not a perfect census of all physiological interactions.
 
-## 3. Pairwise versus combinatorial perturbation evidence
+## 4. Pairwise versus combinatorial perturbation evidence
 
 A single-target perturbation atlas estimates pairwise effective responses under its particular intervention and observation protocol. It does not identify arbitrary nonlinear interactions among simultaneous inputs.
 
@@ -111,7 +111,7 @@ For each neuron pair or intervention combination, preserve three evidence states
 Failure to reject a response is not evidence of no response. The equivalence margin, multiplicity procedure and independent experimental unit must be preregistered.
 
 
-## 4. Dataset tiers and evidence eligibility
+## 5. Dataset tiers and evidence eligibility
 
 ### Tier A — C. elegans optogenetic perturbation
 
@@ -165,7 +165,7 @@ ZAPBench provides whole-brain zebrafish activity forecasting data for more than 
 
 A version identifier is meaningful only within its named datastack and source product. The MICrONS tutorial currently lists materialization version 1926 for the minnie65_public datastack (timestamp 2026-09-28T22:44:42.598563Z). This must not be transplanted to Fish1.5, Phase 1 or Fish Fire&Wire. Every adapter must pin its own dataset/datastack, segmentation, annotation, registration, activity and transformation revisions.
 
-## 5. Formal prediction contract
+## 6. Formal prediction contract
 
 For a declared biological system and context, define a finite-horizon dynamical model:
 
@@ -182,7 +182,7 @@ The model report must identify which terms are constrained by anatomy and which 
 
 Synapse counts are not synaptic conductances. Anatomical polarity is not automatically physiological sign. A structural edge is not proof of transmission in every context. Keep synapse, cell identity, structural path, perturbation response and model parameter evidence as distinct typed objects.
 
-## 6. Frozen evaluation tasks
+## 7. Frozen evaluation tasks
 
 ### P1 — Perturbation impulse-response prediction
 
@@ -208,7 +208,7 @@ Where inputs, neural state, anatomy and motor/behavior outputs are aligned in th
 
 Only for same-specimen, same-cell paired cohorts, compare baseline and independently proofread reconstruction versions using identical eligible cells, intervention trials, model capacity, train/test partitions and training budgets. When the connectome is a canonical template from another animal, this paired edit estimand is NOT_ESTIMABLE.
 
-## 7. Baseline matrix
+## 8. Baseline matrix
 
 All comparable arms receive identical eligible observations, split manifests, training budgets and evaluation targets.
 
@@ -227,7 +227,7 @@ All comparable arms receive identical eligible observations, split manifests, tr
 
 A candidate may win one task and lose another. Do not pool species, measurement modalities, intervention designs or response variables into one leaderboard score.
 
-## 8. Leakage and statistical contract
+## 9. Leakage and statistical contract
 
 - Split by animal for cross-animal claims; by intervention target/session for held-out-target claims; keep related trials and cell lineages within their declared partitions.
 - Pin preprocessing, registration, cell identity, connectome version, intervention protocol and exclusions in immutable manifests.
@@ -240,7 +240,7 @@ A candidate may win one task and lose another. Do not pool species, measurement 
 - Unsupported strata, inaccessible artifacts, insufficient independent clusters and unidentifiable effects return NOT_ESTIMABLE.
 - Direct-edge, necessity, sufficiency or synaptic-mechanism claims require a separate design that identifies that estimand.
 
-## 9. Adversarial fixtures
+## 10. Adversarial fixtures
 
 At minimum, include:
 - strong observational correlation with no measured intervention response;
@@ -258,7 +258,7 @@ At minimum, include:
 - strong neural-response prediction but failed motor/behavior prediction;
 - missing modalities or intervention dose silently treated as valid evidence.
 
-## 10. Primary metrics
+## 11. Primary metrics
 
 - Held-out perturbation-response negative log likelihood where the observation model is appropriate.
 - Noise-normalized trajectory error/explained variance with an explicit noise-ceiling estimator.
@@ -271,7 +271,7 @@ At minimum, include:
 - Query/decision value and cost per verified predictive improvement.
 - Runtime, memory, energy and data-access/annotation cost under matched hardware and policies.
 
-## 11. Promotion gates (research goals, not results)
+## 12. Promotion gates (research goals, not results)
 
 - Reproduce the published C. elegans baseline on its exact versioned data, split and metric before claiming improvement.
 - Demonstrate structural value over activity-only, spatial-only and matched-capacity unconstrained models on preregistered held-out targets/animals, with cluster-aware intervals and a predeclared practical-effect threshold.
@@ -282,7 +282,7 @@ At minimum, include:
 - No biological SOTA claim from synthetic fixtures, one-species reproduction or controlled-access unpublished data.
 - Reconstruction-change claims require same-specimen pairing and independent anatomical adjudication.
 
-## 12. Implementation sequence
+## 13. Implementation sequence
 
 1. Define a versioned dataset/task eligibility manifest and run-record schema.
 2. Build exact synthetic fixtures for direct, delayed, indirect, recurrent and confounded perturbation effects.
@@ -293,7 +293,7 @@ At minimum, include:
 7. Pursue Fish Fire&Wire only through its official collaboration process and obey snapshot, access, authorship and publication restrictions.
 8. After retrospective reproduction, preregister a prospective perturbation/behavior evaluation where technically and ethically feasible.
 
-## 13. Integration and claim ceiling
+## 14. Integration and claim ceiling
 
 Related work:
 - #9501 / PR #9503 — held-out observational structure-to-function validation.
