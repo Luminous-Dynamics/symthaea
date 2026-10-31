@@ -189,7 +189,7 @@ pub fn run_four_seat_campaign_matrix(
     policies: &[RoundSchedulerPolicy],
     round_count: usize,
     seeds: &[u64],
-) -> Result<Vec<FourSeatCampaignRun>, String> {
+) -> Result<FourSeatCampaignMatrix, String> {
     if landscapes.is_empty() || policies.is_empty() || seeds.is_empty() {
         return Err("landscapes, policies and seeds must all be non-empty".to_owned());
     }
@@ -198,6 +198,9 @@ pub fn run_four_seat_campaign_matrix(
         || seeds.iter().copied().collect::<BTreeSet<_>>().len() != seeds.len()
     {
         return Err("landscape, policy and seed inputs must not contain duplicates".to_owned());
+    }
+    if round_count == 0 {
+        return Err("round_count must be positive".to_owned());
     }
     let capacity = landscapes
         .len()
@@ -217,76 +220,73 @@ pub fn run_four_seat_campaign_matrix(
             }
         }
     }
-    Ok(runs)
+    let mut matrix = FourSeatCampaignMatrix {
+        schema: RUN_SCHEMA.to_owned(),
+        version: RUN_VERSION.to_owned(),
+        landscapes: landscapes.to_vec(),
+        policies: policies.to_vec(),
+        round_count,
+        seeds: seeds.to_vec(),
+        runs,
+        matrix_sha256: String::new(),
+    };
+    matrix.matrix_sha256 = matrix.compute_digest()?;
+    matrix.validate_integrity()?;
+    Ok(matrix)
 }
 
-/// Compare one candidate policy against every represented baseline using exact paired seeds.
-/// Missing or duplicated runs are errors; the function never silently drops unmatched trials.
+/// Compare one candidate policy against every manifest-declared baseline using exact paired
+/// landscape/seed/round sets. The manifest is checked before comparisons are calculated.
 pub fn compare_four_seat_campaign_runs(
-    runs: &[FourSeatCampaignRun],
+    matrix: &FourSeatCampaignMatrix,
     candidate_policy: RoundSchedulerPolicy,
 ) -> Result<Vec<FourSeatPairedComparison>, String> {
-    let mut index = BTreeMap::new();
-    let mut landscapes = BTreeSet::new();
-    let mut policies = BTreeSet::new();
-    let mut common_round_count: Option<usize> = None;
-    for run in runs {
-        if run.schema != RUN_SCHEMA || run.version != RUN_VERSION {
-            return Err("run schema/version mismatch".to_owned());
-        }
-        match common_round_count {
-            None => common_round_count = Some(run.round_count),
-            Some(count) if count == run.round_count => {}
-            Some(_) => return Err("runs have different round budgets".to_owned()),
-        }
-        let key = (run.landscape, run.policy, run.seed);
-        if index.insert(key, run).is_some() {
-            return Err("duplicate landscape/policy/seed run".to_owned());
-        }
-        landscapes.insert(run.landscape);
-        policies.insert(run.policy);
-    }
-    if !policies.contains(&candidate_policy) {
+    matrix.validate_integrity()?;
+    if !matrix.policies.contains(&candidate_policy) {
         return Err("candidate policy is absent from the run matrix".to_owned());
     }
 
     let mut comparisons = Vec::new();
-    for landscape in landscapes {
-        let candidate_runs: BTreeMap<u64, &FourSeatCampaignRun> = index
+    for landscape in &matrix.landscapes {
+        let candidate_runs: BTreeMap<u64, &FourSeatCampaignRun> = matrix
+            .runs
             .iter()
-            .filter_map(|((run_landscape, policy, seed), run)| {
-                (*run_landscape == landscape && *policy == candidate_policy)
-                    .then_some((*seed, *run))
-            })
+            .filter(|run| run.landscape == *landscape && run.policy == candidate_policy)
+            .map(|run| (run.seed, run))
             .collect();
-        if candidate_runs.is_empty() {
-            return Err(format!("candidate policy has no runs for {landscape:?}"));
+        if candidate_runs.len() != matrix.seeds.len() {
+            return Err(format!("candidate policy has incomplete runs for {landscape:?}"));
         }
-        let candidate_seeds: BTreeSet<u64> = candidate_runs.keys().copied().collect();
-        for baseline_policy in policies.iter().copied() {
+        for baseline_policy in matrix.policies.iter().copied() {
             if baseline_policy == candidate_policy {
                 continue;
             }
-            let baseline_runs: BTreeMap<u64, &FourSeatCampaignRun> = index
+            let baseline_runs: BTreeMap<u64, &FourSeatCampaignRun> = matrix
+                .runs
                 .iter()
-                .filter_map(|((run_landscape, policy, seed), run)| {
-                    (*run_landscape == landscape && *policy == baseline_policy)
-                        .then_some((*seed, *run))
-                })
+                .filter(|run| run.landscape == *landscape && run.policy == baseline_policy)
+                .map(|run| (run.seed, run))
                 .collect();
-            let baseline_seeds: BTreeSet<u64> = baseline_runs.keys().copied().collect();
-            if baseline_seeds != candidate_seeds {
+            if baseline_runs.len() != matrix.seeds.len()
+                || baseline_runs.keys().copied().collect::<BTreeSet<_>>()
+                    != candidate_runs.keys().copied().collect::<BTreeSet<_>>()
+            {
                 return Err(format!(
                     "unpaired seed sets for {landscape:?}: {candidate_policy:?} vs {baseline_policy:?}"
                 ));
             }
-            let mut score_deltas = Vec::with_capacity(candidate_seeds.len());
-            let mut regret_reductions = Vec::with_capacity(candidate_seeds.len());
+
+            let mut score_deltas = Vec::with_capacity(matrix.seeds.len());
+            let mut regret_reductions = Vec::with_capacity(matrix.seeds.len());
             let mut wins = 0usize;
             let mut ties = 0usize;
-            for seed in &candidate_seeds {
-                let candidate = candidate_runs[seed];
-                let baseline = baseline_runs[seed];
+            for seed in &matrix.seeds {
+                let candidate = candidate_runs
+                    .get(seed)
+                    .ok_or_else(|| format!("missing candidate seed {seed}"))?;
+                let baseline = baseline_runs
+                    .get(seed)
+                    .ok_or_else(|| format!("missing baseline seed {seed}"))?;
                 let delta = candidate.final_best_score - baseline.final_best_score;
                 score_deltas.push(delta);
                 regret_reductions.push(baseline.simple_regret - candidate.simple_regret);
@@ -296,7 +296,7 @@ pub fn compare_four_seat_campaign_runs(
                     ties += 1;
                 }
             }
-            let pair_count = candidate_seeds.len();
+            let pair_count = matrix.seeds.len();
             let mean_final_score_delta =
                 score_deltas.iter().sum::<f64>() / pair_count as f64;
             let final_score_delta_sample_sd = if pair_count > 1 {
@@ -310,10 +310,10 @@ pub fn compare_four_seat_campaign_runs(
                 0.0
             };
             comparisons.push(FourSeatPairedComparison {
-                landscape,
+                landscape: *landscape,
                 candidate_policy,
                 baseline_policy,
-                round_count: common_round_count.unwrap_or(0),
+                round_count: matrix.round_count,
                 pair_count,
                 mean_final_score_delta,
                 final_score_delta_sample_sd,
@@ -325,374 +325,6 @@ pub fn compare_four_seat_campaign_runs(
         }
     }
     Ok(comparisons)
-}
-
-/// A plan and close receipt pair retained as the executable evidence for one round.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RoundExecutionRecord {
-    pub plan: RoundPlan,
-    pub close: RoundCloseReceipt,
-}
-
-/// Compact result summary plus the complete plan/receipt history.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct FourSeatCampaignRun {
-    pub schema: String,
-    pub version: String,
-    pub landscape: DirectionLandscapeFamily,
-    pub policy: RoundSchedulerPolicy,
-    pub seed: u64,
-    pub round_count: usize,
-    pub seats_per_round: usize,
-    pub action_count: usize,
-    pub total_charged_budget_units: u64,
-    pub target_score: f64,
-    pub actions_to_target: Option<usize>,
-    pub final_best_score: f64,
-    pub final_best_direction: String,
-    pub oracle_best_score: f64,
-    pub simple_regret: f64,
-    pub ledger: RoundLedger,
-    pub executions: Vec<RoundExecutionRecord>,
-}
-
-/// Run a fixed-set scheduler comparison under four synchronous seats per round.
-///
-/// Every policy receives the same initial bootstrap round (A, B, C, D). For later rounds,
-/// assignments are computed once from the pre-round snapshot. Each selected direction gets
-/// at most two seats. Results are generated independently from the frozen payoff schedule
-/// and committed only after the whole round has a valid close receipt.
-pub fn run_four_seat_campaign(
-    landscape: DirectionLandscapeFamily,
-    policy: RoundSchedulerPolicy,
-    round_count: usize,
-    seed: u64,
-) -> Result<FourSeatCampaignRun, String> {
-    if round_count == 0 {
-        return Err("round_count must be positive".to_owned());
-    }
-    let expected_action_count = round_count
-        .checked_mul(SEATS_PER_ROUND)
-        .ok_or_else(|| "round action count overflow".to_owned())?;
-
-    let campaign_id = format!("ar5b6-{}-{seed:016x}", policy.id());
-    let cost_profile_sha256 = digest_bytes(
-        COST_PROFILE_DOMAIN,
-        b"unit-evaluation;wall=100ms;cpu=80ms;candidate-executions=1",
-    );
-    let required_cost_dimensions: BTreeSet<CostDimension> =
-        REQUIRED_COSTS.into_iter().collect();
-
-    let mut ledger =
-        RoundLedger::new(&campaign_id).map_err(|error| error.to_string())?;
-    let mut history: BTreeMap<String, Vec<f64>> = DIRECTIONS
-        .iter()
-        .map(|direction| ((*direction).to_owned(), Vec::new()))
-        .collect();
-    let mut action_history: Vec<DirectionCampaignAction> = Vec::new();
-    let mut random_state = seed ^ 0x510e_527f_ade6_82d1;
-    let mut actions_to_target = None;
-    let target_score = 0.90;
-
-    let board_config = DirectionBoardConfig {
-        comparison_profile_sha256: PROFILE_SHA256.to_owned(),
-        metric_id: METRIC_ID.to_owned(),
-        exploration_coefficient: EXPLORATION_COEFFICIENT,
-        new_direction_prior_yield: 0.20,
-        new_direction_admission_credit: 0.20,
-        minimum_initial_evaluations: 1,
-    };
-    let mut direction_board =
-        DirectionBoard::new(board_config).map_err(|error| error.to_string())?;
-    let mut direction_digests = BTreeMap::new();
-
-    let mut coral_config = CoralBaselineConfig::default();
-    coral_config.agent_count = SEATS_PER_ROUND;
-    // Track A fixes the same cap for all policies. The paper-native first-round cap
-    // is a separate Coral-system ablation, not applied only to this matched comparison.
-    coral_config.max_agents_per_direction = CLAIM_CAP_PER_DIRECTION;
-    coral_config.first_round_agents_per_direction = CLAIM_CAP_PER_DIRECTION;
-    let mut coral_board =
-        CoralDirectionBoard::new(coral_config).map_err(|error| error.to_string())?;
-
-    for direction in DIRECTIONS {
-        let descriptor = fixed_direction_descriptor(direction);
-        let receipt = digest(&format!("fixed-direction-admission:{campaign_id}:{direction}"));
-        let direction_digest = direction_board
-            .register_verified_direction(descriptor, &receipt)
-            .map_err(|error| error.to_string())?;
-        direction_digests.insert(direction.to_owned(), direction_digest);
-        coral_board
-            .register_direction(direction)
-            .map_err(|error| error.to_string())?;
-    }
-
-    let mut executions = Vec::with_capacity(round_count);
-
-    for round_index in 0..round_count {
-        // All policies make the first four assignments identically. Later rounds use
-        // only evidence committed before this round began.
-        let pre_round_snapshot_sha256 = snapshot_digest(&history)?;
-        let assignments = if round_index == 0 {
-            DIRECTIONS.iter().map(|value| (*value).to_owned()).collect()
-        } else {
-            allocate_round(
-                landscape,
-                policy,
-                round_index,
-                &history,
-                &action_history,
-                &direction_board,
-                &coral_board,
-                &mut random_state,
-            )?
-        };
-        if assignments.len() != SEATS_PER_ROUND {
-            return Err(format!(
-                "policy {} generated {} seats, expected {}",
-                policy.id(),
-                assignments.len(),
-                SEATS_PER_ROUND
-            ));
-        }
-
-        let mut planned_offsets: BTreeMap<String, usize> = BTreeMap::new();
-        let seats: Vec<RoundSeat> = assignments
-            .iter()
-            .enumerate()
-            .map(|(seat_index, direction_id)| {
-                let action_id = format!("r{round_index:04}-s{seat_index:02}");
-                let offset = planned_offsets.entry(direction_id.clone()).or_default();
-                let evaluation_index = history[direction_id].len() + *offset;
-                *offset += 1;
-                RoundSeat {
-                    // The same direction/seed/evaluation-index work item hashes identically
-                    // across policies, enabling honest paired comparisons.
-                    work_item_sha256: digest(&format!(
-                        "candidate:{seed}:{direction_id}:{evaluation_index}"
-                    )),
-                    action_id,
-                    action: RoundAction::EvaluateDirection(direction_id.clone()),
-                }
-            })
-            .collect();
-
-        let plan = RoundPlan::new(
-            &campaign_id,
-            format!("round-{round_index:04}"),
-            round_index as u64,
-            policy.id(),
-            seed,
-            ledger.last_close_sha256.clone(),
-            pre_round_snapshot_sha256.clone(),
-            cost_profile_sha256.clone(),
-            required_cost_dimensions.clone(),
-            ClaimCapProfile {
-                max_evaluations_per_direction_per_round: CLAIM_CAP_PER_DIRECTION,
-                max_new_proposals_per_round: 0,
-            },
-            seats,
-        )
-        .map_err(|error| error.to_string())?;
-
-        let pre_round_parent_scores: BTreeMap<String, Option<f64>> = history
-            .iter()
-            .map(|(direction, values)| {
-                (
-                    direction.clone(),
-                    values.iter().copied().max_by(f64::total_cmp),
-                )
-            })
-            .collect();
-        let pre_round_history_counts: BTreeMap<String, usize> = history
-            .iter()
-            .map(|(direction, values)| (direction.clone(), values.len()))
-            .collect();
-        let mut within_round_offsets: BTreeMap<String, usize> = BTreeMap::new();
-        let mut results = Vec::with_capacity(SEATS_PER_ROUND);
-        let mut costs = Vec::with_capacity(SEATS_PER_ROUND);
-
-        for seat in &plan.seats {
-            let RoundAction::EvaluateDirection(direction_id) = &seat.action else {
-                return Err("Track A cannot contain direction-proposal actions".to_owned());
-            };
-            let offset = within_round_offsets.entry(direction_id.clone()).or_default();
-            let evaluation_index = history[direction_id].len() + *offset;
-            *offset += 1;
-            let score = direction_board_benchmark::payoff(
-                landscape,
-                direction_id,
-                evaluation_index,
-            );
-            let result_digest = digest(&format!(
-                "result:{}:{:016x}",
-                seat.work_item_sha256,
-                score.to_bits()
-            ));
-            let verifier_receipt = digest(&format!(
-                "synthetic-independent-verifier-receipt:{}:{result_digest}",
-                seat.work_item_sha256
-            ));
-            results.push(ActionResultReceipt {
-                round_id: plan.round_id.clone(),
-                action_id: seat.action_id.clone(),
-                observed_snapshot_sha256: pre_round_snapshot_sha256.clone(),
-                result_digest_sha256: result_digest,
-                verifier_receipt_sha256: verifier_receipt,
-                outcome: ActionOutcome::Evaluation {
-                    disposition: EvaluationDisposition::Verified,
-                    score: Some(score),
-                    resolved_direction_id: direction_id.clone(),
-                },
-            });
-            costs.push(ActionCostReceipt {
-                round_id: plan.round_id.clone(),
-                action_id: seat.action_id.clone(),
-                cost_profile_sha256: cost_profile_sha256.clone(),
-                charged_budget_units: 1,
-                resource_costs: [
-                    (CostDimension::WallTimeMillis, 100),
-                    (CostDimension::CpuTimeMillis, 80),
-                    (CostDimension::CandidateExecutions, 1),
-                ]
-                .into_iter()
-                .collect(),
-            });
-        }
-
-        let close = RoundCloseReceipt {
-            round_id: plan.round_id.clone(),
-            plan_sha256: plan.plan_sha256.clone(),
-            results,
-            costs,
-        };
-        let summary = close
-            .validate_against(&plan)
-            .map_err(|error| error.to_string())?;
-        if summary.action_count != SEATS_PER_ROUND
-            || summary.charged_budget_units != SEATS_PER_ROUND as u64
-        {
-            return Err("round did not conserve the four-seat unit budget".to_owned());
-        }
-        ledger
-            .append(&plan, &close)
-            .map_err(|error| error.to_string())?;
-
-        // Commit the complete result batch only after the round close validates.
-        for result in &close.results {
-            let ActionOutcome::Evaluation {
-                disposition: EvaluationDisposition::Verified,
-                score: Some(score),
-                resolved_direction_id,
-            } = &result.outcome
-            else {
-                return Err("synthetic Track A expected verified evaluation outcomes".to_owned());
-            };
-            let parent_score = pre_round_parent_scores[resolved_direction_id];
-            let direction_digest = direction_digests
-                .get(resolved_direction_id)
-                .ok_or_else(|| format!("missing direction digest for {resolved_direction_id}"))?;
-            let seat = plan
-                .seats
-                .iter()
-                .find(|seat| seat.action_id == result.action_id)
-                .ok_or_else(|| "result receipt has no corresponding planned seat".to_owned())?;
-            let attempt = DirectionAttempt {
-                attempt_id: result.action_id.clone(),
-                direction_sha256: direction_digest.clone(),
-                method_id: format!("method-{resolved_direction_id}-{}", history[resolved_direction_id].len()),
-                parent_candidate_sha256: digest(&format!(
-                    "parent:{seed}:{resolved_direction_id}:{}",
-                    pre_round_history_counts[resolved_direction_id]
-                )),
-                candidate_sha256: seat.work_item_sha256.clone(),
-                semantic_delta_sha256: digest(&format!("semantic-delta:{}", seat.work_item_sha256)),
-                comparison_profile_sha256: PROFILE_SHA256.to_owned(),
-                metric_id: METRIC_ID.to_owned(),
-                evaluation_cost_units: 1,
-                disposition: AttemptDisposition::Verified,
-                score: Some(*score),
-                verifier_receipt_sha256: result.verifier_receipt_sha256.clone(),
-            };
-            direction_board
-                .record_attempt(attempt)
-                .map_err(|error| error.to_string())?;
-            coral_board
-                .record_evaluation(
-                    &result.action_id,
-                    resolved_direction_id,
-                    Some(*score),
-                    parent_score,
-                    Vec::new(),
-                    1,
-                )
-                .map_err(|error| error.to_string())?;
-            history
-                .get_mut(resolved_direction_id)
-                .ok_or_else(|| format!("unknown direction {resolved_direction_id}"))?
-                .push(*score);
-            action_history.push(DirectionCampaignAction {
-                slot: action_history.len() + 1,
-                arm_id: resolved_direction_id.clone(),
-                is_new_proposal: false,
-                observed_score: Some(*score),
-                proposal_disposition: None,
-                cost_units: 1,
-            });
-            if actions_to_target.is_none() && *score >= target_score {
-                actions_to_target = Some(action_history.len());
-            }
-        }
-
-        direction_board
-            .validate_integrity()
-            .map_err(|error| error.to_string())?;
-        coral_board
-            .validate_integrity()
-            .map_err(|error| error.to_string())?;
-        ledger
-            .validate_integrity()
-            .map_err(|error| error.to_string())?;
-        executions.push(RoundExecutionRecord { plan, close });
-    }
-
-    let (final_best_direction, final_best_score) = history
-        .iter()
-        .filter_map(|(direction, values)| {
-            values
-                .iter()
-                .copied()
-                .max_by(f64::total_cmp)
-                .map(|score| (direction.clone(), score))
-        })
-        .max_by(|(left_id, left_score), (right_id, right_score)| {
-            left_score
-                .total_cmp(right_score)
-                .then_with(|| right_id.cmp(left_id))
-        })
-        .ok_or_else(|| "campaign produced no evaluated scores".to_owned())?;
-    let oracle_best_score = direction_board_benchmark::oracle_best_score(landscape);
-    let action_count = expected_action_count;
-
-    Ok(FourSeatCampaignRun {
-        schema: RUN_SCHEMA.to_owned(),
-        version: RUN_VERSION.to_owned(),
-        landscape,
-        policy,
-        seed,
-        round_count,
-        seats_per_round: SEATS_PER_ROUND,
-        action_count,
-        total_charged_budget_units: ledger.total_charged_budget_units,
-        target_score,
-        actions_to_target,
-        final_best_score,
-        final_best_direction,
-        oracle_best_score,
-        simple_regret: (oracle_best_score - final_best_score).max(0.0),
-        ledger,
-        executions,
-    })
 }
 
 fn allocate_round(
