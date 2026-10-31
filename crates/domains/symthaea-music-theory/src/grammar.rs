@@ -808,4 +808,164 @@ mod tests {
             GrammarFamily::RagaModalArc
         );
     }
+
+    #[test]
+    fn fugue_tonic_and_seed_grid_never_emits_out_of_range_notes() {
+        use crate::composer::MusicalIntent;
+        use crate::pitch::PitchClass;
+        use crate::score_validation::{
+            ScoreValidationConfig, ValidationSeverity, is_universal_invariant, validate_score,
+        };
+        use crate::style::Style;
+
+        let style = Style::Fugue;
+        let mut saw_rebalance = false;
+        for tonic in [0, 3, 4, 7, 10] {
+            for seed in [90_210u64, 130_363, 222_731, 918_273] {
+                let intent = MusicalIntent {
+                    tonic: PitchClass::new(tonic),
+                    seed,
+                    ..MusicalIntent::default()
+                };
+                let realization = compose_with_grammar_plan(
+                    style.grammar_profile(),
+                    &intent,
+                    &style.spec(),
+                );
+                let receipt = realization
+                    .register_placement
+                    .as_ref()
+                    .expect("canonical grammar composition must include placement evidence");
+                if receipt.disposition == RegisterPlacementDisposition::OctaveRebalanced {
+                    saw_rebalance = true;
+                }
+
+                let report = validate_score(
+                    &realization.score,
+                    &ScoreValidationConfig::default(),
+                );
+                let fatal_universal: Vec<_> = report
+                    .issues
+                    .iter()
+                    .filter(|issue| {
+                        issue.severity == ValidationSeverity::Fatal
+                            && is_universal_invariant(issue.rule)
+                    })
+                    .collect();
+                assert!(
+                    fatal_universal.is_empty(),
+                    "Fugue tonic={tonic} seed={seed} has fatal universal issues: {fatal_universal:?}; receipt={receipt:?}"
+                );
+                for note in &realization.score.notes {
+                    assert!(
+                        (24..=108).contains(&note.pitch.midi()),
+                        "Fugue tonic={tonic} seed={seed} escaped MIDI bounds: {note:?}"
+                    );
+                }
+            }
+        }
+        assert!(
+            saw_rebalance,
+            "the frozen regression grid must exercise at least one octave repair"
+        );
+    }
+
+    #[test]
+    fn octave_placement_preserves_pitch_classes_intervals_and_rhythm() {
+        use crate::harmony::Key;
+        use crate::pitch::{Pitch, PitchClass};
+        use crate::rhythm::Duration;
+        use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
+
+        let mut score = Score::new(Key::major(PitchClass::new(0)), 90.0, 4);
+        for (part, midi, onset, role) in [
+            (PartId(0), 110u8, 0i64, VoiceRole::Melody),
+            (PartId(0), 106u8, 1i64, VoiceRole::Melody),
+            (PartId(1), 48u8, 0i64, VoiceRole::Bass),
+        ] {
+            score.push(ScoreNote {
+                part,
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new(onset, 1),
+                duration: Duration::new(1, 1),
+                velocity: 0.7,
+                role,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        let original: Vec<_> = score.notes.iter().map(|note| {
+            (note.part, note.pitch, note.onset, note.duration, note.velocity, note.emphasis)
+        }).collect();
+
+        let receipt = place_parts_within_validation_range(&mut score);
+        assert_eq!(receipt.disposition, RegisterPlacementDisposition::OctaveRebalanced);
+        let melody_shift = receipt
+            .part_placements
+            .iter()
+            .find(|placement| placement.part_id == 0)
+            .expect("melody part placement")
+            .semitone_shift;
+        assert_eq!(melody_shift % 12, 0);
+        assert_ne!(melody_shift, 0);
+
+        for (before, after) in original.iter().zip(&score.notes) {
+            assert_eq!(before.0, after.part);
+            assert_eq!(before.1.midi() % 12, after.pitch.midi() % 12);
+            assert_eq!(before.2, after.onset);
+            assert_eq!(before.3, after.duration);
+            assert_eq!(before.4, after.velocity);
+            assert_eq!(before.5, after.emphasis);
+            assert_eq!(
+                i16::from(after.pitch.midi()) - i16::from(before.1.midi()),
+                i16::from(melody_shift) * i16::from(before.0.0 == 0),
+                "each part must receive its own uniform octave offset"
+            );
+        }
+        let before_interval = i16::from(original[0].1.midi()) - i16::from(original[1].1.midi());
+        let after_interval = i16::from(score.notes[0].pitch.midi())
+            - i16::from(score.notes[1].pitch.midi());
+        assert_eq!(before_interval, after_interval);
+        let after_report = crate::score_validation::validate_score(
+            &score,
+            &crate::score_validation::ScoreValidationConfig::default(),
+        );
+        assert!(
+            !after_report.issues.iter().any(|issue| {
+                issue.severity == crate::score_validation::ValidationSeverity::Fatal
+                    && crate::score_validation::is_universal_invariant(issue.rule)
+            }),
+            "rebalanced score must pass universal structural validation"
+        );
+    }
+
+    #[test]
+    fn octave_placement_refuses_parts_that_cannot_fit_without_note_warping() {
+        use crate::harmony::Key;
+        use crate::pitch::{Pitch, PitchClass};
+        use crate::rhythm::Duration;
+        use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
+
+        let mut score = Score::new(Key::major(PitchClass::new(0)), 90.0, 4);
+        for (midi, onset) in [(24u8, 0i64), (120u8, 1i64)] {
+            score.push(ScoreNote {
+                part: PartId(7),
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new(onset, 1),
+                duration: Duration::new(1, 1),
+                velocity: 0.5,
+                role: VoiceRole::Melody,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        let original = score.clone();
+        let receipt = place_parts_within_validation_range(&mut score);
+        assert_eq!(
+            receipt.disposition,
+            RegisterPlacementDisposition::NoLegalOctavePlacement
+        );
+        assert_eq!(score, original, "unrepairable scores must remain unchanged");
+    }
+
 }
