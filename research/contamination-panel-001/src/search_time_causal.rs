@@ -718,7 +718,6 @@ mod tests {
 
     fn make_run(
         study: &SearchTimeAccessTrialStudyV1,
-        block_id: &str,
         condition: SearchTrialConditionV1,
         order_position: u8,
         suffix: &str,
@@ -939,7 +938,6 @@ mod tests {
             let answers = if *condition == SearchTrialConditionV1::NetworkDisabled { 0 } else { 1 };
             runs.push(make_run(
                 &study,
-                block_id,
                 *condition,
                 (position + 1) as u8,
                 &suffix,
