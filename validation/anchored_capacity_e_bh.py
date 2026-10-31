@@ -325,6 +325,12 @@ def verify_anchored_capacity_e_bh(
     if not anchor["valid"]:
         return {"valid": False, "failures": anchor["failures"]}
     baseline_mask = anchor["baseline"]["rejection_mask"]
+    maximum_cardinality = anchored_e_bh_max_cardinality(e, a)
+    if result.get("anchored_max_cardinality") != maximum_cardinality:
+        return {
+            "valid": False,
+            "failures": ["anchored_max_cardinality_baseline_mismatch"],
+        }
     selected = result.get("selected")
     if not isinstance(selected, dict):
         return {"valid": False, "failures": ["missing_optimizer_receipt"]}
