@@ -1,0 +1,96 @@
+name: HARDSEC-021 episode-level restarted conformal monitor
+
+on:
+  pull_request:
+    paths:
+      - "examples/hardsec_episode_restarted_monitor.rs"
+      - "docs/research/HARDSEC_021_EPISODE_RESTARTED_CONFORMAL.md"
+      - "schemas/hardsec-episode-*.schema.json"
+      - "tests/fixtures/hardsec/episode-restarted-v1/**"
+      - "tools/hardsec-adaptive-evasion-audit-harness/**"
+      - ".github/workflows/hardsec-episode-restarted-monitor.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-episode-restarted-monitor-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  episode-restarted-monitor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact pull request revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_episode_restarted_monitor.rs
+      - name: Run episode packer and restarted conformal unit suite
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-episode-restarted-monitor --example hardsec_episode_restarted_monitor
+      - name: Run synthetic episode monitor receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          out_dir="$(mktemp -d)"
+          cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-episode-restarted-monitor --example hardsec_episode_restarted_monitor -- \
+            --plan tests/fixtures/hardsec/episode-restarted-v1/plan.json \
+            --episodes tests/fixtures/hardsec/episode-restarted-v1/episodes.json \
+            --context-receipt tests/fixtures/hardsec/episode-restarted-v1/context-assignment-receipt.json \
+            --receipt "$out_dir/episode-restarted-receipt.json"
+          python3 - "$out_dir/episode-restarted-receipt.json" <<'PY'
+          import json, sys, math
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          assert receipt["result"] == "restarted_alarm_threshold_crossed"
+          integrity = receipt["episode_integrity"]
+          assert integrity["episode_count"] == 132
+          assert integrity["accepted_episode_count"] == 132
+          assert integrity["abstained_episode_count"] == 0
+          assert integrity["source_window_count"] == 528
+          assert integrity["windows_per_accepted_episode"] == 4
+          assert integrity["one_episode_per_unique_execution_group"] is True
+          monitor = receipt["sequential_monitor"]
+          assert monitor["overall_first_alarm_sequence_index"] == 65
+          assert monitor["overall_first_alarm_context_id"] == "compute"
+          assert len(monitor["episode_decisions"]) == 132
+          assert monitor["episode_decisions"][64]["action"] == "restarted_alarm_crossing"
+          contexts = {item["context_id"]: item for item in monitor["context_results"]}
+          assert contexts["compute"]["valid_episode_count"] == 72
+          assert contexts["memory"]["valid_episode_count"] == 60
+          assert abs(contexts["compute"]["alpha_allocation"] - 0.025) < 1e-12
+          assert abs(contexts["memory"]["alpha_allocation"] - 0.025) < 1e-12
+          guarantees = receipt["statistical_guarantees"]
+          assert abs(guarantees["pfa_bound_if_all_theorem_assumptions_hold"] - 0.05) < 1e-12
+          assert guarantees["episode_score_exchangeability_status"] == "assumption_not_verified"
+          assert guarantees["cross_execution_independence_status"] == "not_established"
+          assert guarantees["randomizer_independence_status"] == "assumption_not_verified"
+          assert guarantees["theorem_guarantee_status"] == "not_established_from_input_receipts"
+          assert guarantees["effective_sample_size_estimate"] is None
+          assert receipt["context_assignment"]["truth_labels_in_runtime_mapping"] is False
+          PY
+      - name: Check preregistered late-change benchmark contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          with open("tests/fixtures/hardsec/episode-restarted-v1/benchmark-plan.json", "r", encoding="utf-8") as handle:
+              plan = json.load(handle)
+          assert plan["status"] == "planned"
+          assert "fixed_start_power_mixture_cmm" in plan["baselines"]
+          assert "weighted_restarted_sum_near_harmonic" in plan["baselines"]
+          assert "dependent_ar1_episode_null" in plan["scenarios"]
+          assert "shared_latent_episode_null" in plan["scenarios"]
+          assert "iid_episode_shift_at_1000" in plan["scenarios"]
+          assert plan["claim_rules"]["episode_independence_is_assumption_not_proven"] is True
+          assert plan["claim_rules"]["randomizer_independence_is_assumption_not_proven"] is True
+          assert plan["claim_rules"]["delay_units_are_episodes"] is True
+          PY
