@@ -1537,6 +1537,32 @@ mod tests {
     }
 
     #[test]
+    fn restart_receipt_exposes_start_weight_age_wealth_and_expiry_status() {
+        let (p, s, _, _) = fixture();
+        let receipt = audit(&p, &s).unwrap();
+        let rows = receipt["sequential_monitor"]["window_decisions"].as_array().unwrap();
+        let first_start = rows[0]["restarted"]["candidate_starts"].as_array().unwrap();
+        assert_eq!(first_start.len(), 1);
+        assert_eq!(first_start[0]["start_index"], 1);
+        assert_eq!(first_start[0]["age"], 1);
+        assert_eq!(first_start[0]["status"], "active");
+        let expected_weight = restart_weight(1, 1.0/3.0);
+        assert!((first_start[0]["weight"].as_f64().unwrap() - expected_weight).abs() < 1e-12);
+        assert!(first_start[0]["local_log_wealth"].as_f64().is_some());
+
+        let mut short_plan = p.clone();
+        short_plan["maximum_restart_age"] = json!(2);
+        let short_receipt = audit(&short_plan, &s).unwrap();
+        let short_rows = short_receipt["sequential_monitor"]["window_decisions"].as_array().unwrap();
+        let second_compute_obs = short_rows[2]["restarted"]["candidate_starts"].as_array().unwrap();
+        assert!(second_compute_obs.iter().any(|entry| {
+            entry["start_index"] == 1 && entry["age"] == 2
+                && entry["status"] == "expires_after_current_update"
+        }));
+        assert!(short_rows[2]["restarted"]["live_state_count_after_expiry"].as_u64().unwrap() < 2);
+    }
+
+    #[test]
     fn restart_processes_do_not_advance_on_context_assignment_abstentions() {
         let (p, s, pb, sb) = fixture();
         let bytes = include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
