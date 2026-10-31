@@ -1124,6 +1124,10 @@ pub fn verify_fresh_metamorphic_score_report_integrity(
     }
 
     let mut group_ids = BTreeSet::new();
+    let mut items_by_group: BTreeMap<&str, Vec<&FreshMetamorphicItemScoreV1>> = BTreeMap::new();
+    for item in &report.items {
+        items_by_group.entry(item.group_id.as_str()).or_default().push(item);
+    }
     let mut group_item_total = 0_u64;
     let mut complete = 0_u64;
     let mut incomplete = 0_u64;
@@ -1149,13 +1153,16 @@ pub fn verify_fresh_metamorphic_score_report_integrity(
                 && !(group.complete_valid_group
                     && group.outputs_agree == Some(true)
                     && group.correct_count == 0))
+            || (group.outputs_agree == Some(true)
+                && group.correct_count != 0
+                && group.correct_count != group.item_count)
             || (group.base_correct_variant_inconsistent
                 && !(group.complete_valid_group && group.outputs_agree == Some(false)))
         {
             return Err(format!("metamorphic group {} has inconsistent summary fields", group.group_id));
         }
-        let group_items: Vec<&FreshMetamorphicItemScoreV1> =
-            report.items.iter().filter(|item| item.group_id == group.group_id).collect();
+        let group_items = items_by_group.get(group.group_id.as_str())
+            .ok_or_else(|| format!("metamorphic group {} has no item records", group.group_id))?;
         if group_items.len() as u64 != group.item_count {
             return Err(format!("metamorphic group {} item membership count mismatch", group.group_id));
         }
@@ -1191,9 +1198,10 @@ pub fn verify_fresh_metamorphic_score_report_integrity(
         } else {
             incomplete += 1;
         }
-        consistent_wrong += u64::from(group.consistent_but_wrong);
-        fully_correct_consistent += u64::from(group.fully_correct_and_consistent);
-        base_correct_variant_inconsistent += u64::from(group.base_correct_variant_inconsistent);
+        consistent_wrong += if group.consistent_but_wrong { 1 } else { 0 };
+        fully_correct_consistent += if group.fully_correct_and_consistent { 1 } else { 0 };
+        base_correct_variant_inconsistent +=
+            if group.base_correct_variant_inconsistent { 1 } else { 0 };
     }
     if group_item_total != report.item_count
         || group_ids.len() as u64 != report.group_count
@@ -1331,6 +1339,28 @@ mod tests {
     ) -> FreshMetamorphicScoreReportV1 {
         let submission = make_submission(bundle, responses);
         score_fresh_metamorphic_submission(base, bundle, &serde_json::to_vec(&submission).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn metamorphic_score_report_verifier_checks_group_and_accuracy_partitions() {
+        let base = base_bundle();
+        let bundle = generate_fresh_metamorphic_bundle(&base).unwrap();
+        let report = score_all(&base, &bundle, exact_responses(&bundle));
+        assert!(verify_fresh_metamorphic_score_report_integrity(&report).is_ok());
+
+        let mut tampered = report.clone();
+        tampered.base_correct_count -= 1;
+        tampered.report_sha256.clear();
+        tampered.report_sha256 = report_digest(&tampered).unwrap();
+        assert!(verify_fresh_metamorphic_score_report_integrity(&tampered)
+            .unwrap_err().contains("item statuses and summary counts"));
+
+        let mut tampered = report;
+        tampered.consistent_group_count -= 1;
+        tampered.report_sha256.clear();
+        tampered.report_sha256 = report_digest(&tampered).unwrap();
+        assert!(verify_fresh_metamorphic_score_report_integrity(&tampered)
+            .unwrap_err().contains("group totals disagree"));
     }
 
     #[test]
