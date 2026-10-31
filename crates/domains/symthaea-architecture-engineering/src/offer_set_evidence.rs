@@ -644,6 +644,28 @@ mod tests {
         tape
     }
 
+    fn paired_plan() -> PairedInferencePlan {
+        PairedInferencePlan {
+            schema: "symthaea.architecture-engineering.paired-inference".to_owned(),
+            version: "0.1.0".to_owned(),
+            campaign_id: "campaign-1".to_owned(),
+            campaign_event_tape_set_sha256: "0".repeat(64),
+            analysis_tier: super::super::paired_inference::AnalysisTier::Pilot,
+            baseline_policy_id: "board".to_owned(),
+            challenger_policy_id: "thompson".to_owned(),
+            metric_id: "target_score".to_owned(),
+            metric_direction: super::super::paired_inference::MetricDirection::HigherIsBetter,
+            minimum_practical_effect: 0.01,
+            alpha: 0.05,
+            bootstrap_replicates: 1_000,
+            randomization_replicates: 10_000,
+            exact_randomization_max_clusters: 16,
+            minimum_landscape_clusters: 6,
+            minimum_paired_seeds_per_landscape: 4,
+            analysis_seed: 42,
+        }
+    }
+
     fn source_state(ids: Vec<String>, evaluator_state: Value) -> OfferSetSourceState {
         OfferSetSourceState::new(
             "campaign-1",
@@ -724,6 +746,54 @@ mod tests {
         ).unwrap();
         assert_eq!(summary.offer_sets.shared_decision_boundaries, 1);
         assert_eq!(summary.retained_state_artifact_count, 2);
+    }
+
+    #[test]
+    fn paired_plan_binds_the_exact_policy_bundle_set() {
+        let left_tape = tape("board");
+        let right_tape = tape("thompson");
+        let shared_state = OfferSetSourceState::new(
+            "campaign-1",
+            "0123456789abcdef0123456789abcdef01234567",
+            1,
+            None,
+            0,
+            vec!["A".into()],
+            true,
+            json!({"available_direction_ids": ["A"], "new_proposal_allowed": true, "state": {"verifier_epoch": 3}}),
+        ).unwrap();
+        let left_bundle = OfferSetEvidenceBundle::new(&left_tape, vec![shared_state.clone()]).unwrap();
+        let right_bundle = OfferSetEvidenceBundle::new(&right_tape, vec![shared_state]).unwrap();
+        let tapes = vec![left_tape.clone(), right_tape.clone()];
+        let original_bundles = vec![left_bundle.clone(), right_bundle.clone()];
+        let bound_plan = OfferSetEvidenceBoundPlan::new(
+            paired_plan(),
+            &tapes,
+            &original_bundles,
+        ).unwrap();
+
+        let replacement_state = OfferSetSourceState::new(
+            "campaign-1",
+            "0123456789abcdef0123456789abcdef01234567",
+            1,
+            None,
+            0,
+            vec!["A".into()],
+            true,
+            json!({"available_direction_ids": ["A"], "new_proposal_allowed": true, "state": {"verifier_epoch": 4}}),
+        ).unwrap();
+        let replacement_bundles = vec![
+            OfferSetEvidenceBundle::new(&left_tape, vec![replacement_state.clone()]).unwrap(),
+            OfferSetEvidenceBundle::new(&right_tape, vec![replacement_state]).unwrap(),
+        ];
+
+        let error = analyze_qualified_paired_metric_with_state_evidence(
+            &bound_plan,
+            &[],
+            &tapes,
+            &replacement_bundles,
+        ).unwrap_err();
+        assert!(error.message.contains("not bound to the exact supplied"));
     }
 
     #[test]
