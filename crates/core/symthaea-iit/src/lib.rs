@@ -663,7 +663,10 @@ pub fn estimate_iit4_system_partition_work(
 
     // In-place Stirling-number recurrence. Descending k preserves the
     // previous row: S(m,k) = k*S(m-1,k) + S(m-1,k-1).
-    let mut stirling = vec![0usize; n + 1];
+    let counter_len = n
+        .checked_add(1)
+        .ok_or(PartitionEnumerationError::CounterOverflow)?;
+    let mut stirling = vec![0usize; counter_len];
     stirling[0] = 1;
     for current_size in 1..=n {
         for block_count in (1..=current_size).rev() {
@@ -3611,6 +3614,11 @@ mod tests {
             .analyze_iit4_2023_system_phi_s(&[0, 1], &[true, false], config)
             .unwrap();
         assert_eq!(result.receipt_sha256().unwrap(), repeated.receipt_sha256().unwrap());
+        assert_eq!(result.certified_upper_bound, Some(2));
+
+        let mut changed_bound = result.clone();
+        changed_bound.certified_upper_bound = Some(3);
+        assert_ne!(result.receipt_sha256().unwrap(), changed_bound.receipt_sha256().unwrap());
 
         let other_precision = model
             .analyze_iit4_2023_system_phi_s(
@@ -4359,6 +4367,28 @@ mod tests {
         assert!(matches!(
             estimate_iit4_system_partition_work(&[0, 0], 2, false),
             Err(PartitionEnumerationError::DuplicateUnit { unit: 0 })
+        ));
+
+        let include_total_cut =
+            estimate_iit4_system_partition_work(&[0, 1, 2], 3, true).unwrap();
+        let without_total_cut =
+            estimate_iit4_system_partition_work(&[0, 1, 2], 3, false).unwrap();
+        assert_eq!(include_total_cut.total_partition_candidates,
+            without_total_cut.total_partition_candidates + 1);
+        assert!(include_total_cut.total_cut_included);
+
+        let one_unit = estimate_iit4_system_partition_work(&[0], 1, false).unwrap();
+        assert!(one_unit.total_cut_included);
+        assert_eq!(one_unit.total_partition_candidates, 1);
+
+        let overflow_candidate = (0..usize::BITS as usize).collect::<Vec<_>>();
+        assert!(matches!(
+            estimate_iit4_system_partition_work(
+                &overflow_candidate,
+                overflow_candidate.len(),
+                false
+            ),
+            Err(PartitionEnumerationError::CounterOverflow)
         ));
     }
 
