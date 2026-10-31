@@ -1440,13 +1440,17 @@ mod tests {
     #[test]
     fn independent_restart_cost_is_not_charged_as_a_resumable_delta() {
         let p = posterior();
-        let mut actions = vec![high_cost_query_action("query", "A")];
-        let mut manifest = bind_manifest(&p, &mut actions, MetricDirection::Maximize);
-        manifest.fidelity_cost_model = FidelityCostModel::IndependentRuns;
-        // Rebind the likelihood model after the fidelity-model manifest change is not needed:
-        // the action likelihood digest contains the action cost and rung, not the cost-model enum.
-        actions[0].incremental_cost_units = 8;
-        assert!(plan_decision_focused_voc(&manifest, &p, &actions, &config()).is_err());
+        let mut actions = vec![query_action("query", "A", 3)];
+        let manifest = bind_manifest(&p, &mut actions, MetricDirection::Maximize);
+        let mut independent_manifest = manifest;
+        independent_manifest.fidelity_cost_model = FidelityCostModel::IndependentRuns;
+        let plan = plan_decision_focused_voc(
+            &independent_manifest,
+            &p,
+            &actions,
+            &config(),
+        ).unwrap();
+        assert_eq!(plan.action_evaluations[0].incremental_cost_units, 3);
     }
 
     #[test]
