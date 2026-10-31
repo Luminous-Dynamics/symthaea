@@ -10,6 +10,8 @@
     "benchmark_id",
     "benchmark_version",
     "primary_metric_id",
+    "study_sha256",
+    "randomization_test_seed_commitment_sha256",
     "independent_model_pair_replicate_count",
     "minimum_confirmatory_replicates",
     "replicate_count_meets_minimum",
@@ -508,6 +510,14 @@
     "claim_boundary": {
       "type": "string",
       "minLength": 1
+    },
+    "study_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "randomization_test_seed_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     }
   }
 }
