@@ -593,10 +593,7 @@ pub fn score_fast_event_predictions(
 
     let event_slots: u64 = oracle.events
         .iter()
-        .map(|event| {
-            u64::from(event.end_step.saturating_sub(event.start_step))
-                .saturating_add(if event.is_target { 1 } else { 0 })
-        })
+        .map(|event| u64::from(event.end_step.saturating_sub(event.start_step)))
         .sum();
     let total_slots = u64::try_from(task.slots).unwrap_or(u64::MAX);
     score.quiet_exposure_us = total_slots
@@ -806,6 +803,19 @@ mod tests {
         assert_eq!(
             verify_fast_event_trace(&task, &oracle),
             Err(FastEventVerificationError::OracleDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn quiet_exposure_excludes_exactly_all_target_and_distractor_windows() {
+        let config = FastEventConfig::reference(2_040);
+        let (task, oracle) = generate_fast_event_task(config).unwrap();
+        let score = score_fast_event_predictions(&task, &oracle, &[]).unwrap();
+        let event_slots = (oracle.events.len() as u64)
+            * u64::try_from(EVENT_WIDTH).unwrap_or(8);
+        assert_eq!(
+            score.quiet_exposure_us,
+            (task.slots as u64 - event_slots) * task.sample_interval_us
         );
     }
 
