@@ -1,0 +1,341 @@
+{
+  "schema": "symthaea.hdc_ltc_temporal_competence_matrix",
+  "version": "0.1.0",
+  "status": "preregistered_not_executed",
+  "tracking_issue": 9394,
+  "parent_research": {
+    "fast_slow_memory_issue": 9369,
+    "fast_slow_memory_pr": 9370,
+    "input_trajectory_issue": 9371,
+    "input_trajectory_pr": 9372,
+    "fourier_rk4_issue": 9373,
+    "architecture_issue": 7749
+  },
+  "source_motivation": {
+    "title": "Spiking Neural Networks for Temporal Processing: Status Quo and Future Prospects",
+    "publication_date": "2026-10-08",
+    "doi": "10.1109/TNNLS.2026.3736737",
+    "pubmed_id": "42848555",
+    "use": "Motivates multi-timescale temporal evaluation; this matrix does not claim to reproduce the paper's four tasks because their full definitions and implementation were not independently inspected."
+  },
+  "benchmark_alignment": {
+    "neurobench": "Separate hardware-independent algorithm results from deployed-system results.",
+    "mlperf_tiny_v1_4": "Use fixed workloads/quality targets and explicit latency/energy boundaries where a compatible workload exists."
+  },
+  "execution_state": {
+    "protocol_authored": true,
+    "generator_implemented": false,
+    "runner_implemented": false,
+    "rust_tests_executed": false,
+    "benchmark_executed": false,
+    "hardware_energy_measured": false,
+    "result_values_present": false
+  },
+  "workload_contract": {
+    "sample_semantics": "Causal observations; no future samples; elapsed simulated time is explicit.",
+    "source_split_unit": "source_family_for_synthetic; subject_session_or_source_recording_for_real",
+    "pre_window_split_required": true,
+    "confirmatory_oracle_sealed": true,
+    "failed_invalid_timed_out_runs_counted": true,
+    "repeated_timesteps_are_independent_samples": false
+  },
+  "temporal_axes": {
+    "delayed_cue_steps": [
+      1,
+      4,
+      16,
+      64,
+      256,
+      1024
+    ],
+    "distractor_counts": [
+      0,
+      8,
+      64
+    ],
+    "distractor_similarity": [
+      "low",
+      "high"
+    ],
+    "time_scale_factors": [
+      0.5,
+      1,
+      2
+    ],
+    "timestamp_jitter_fraction": [
+      0,
+      0.1,
+      0.3,
+      0.5
+    ],
+    "missingness_fraction": [
+      0,
+      0.1,
+      0.3,
+      0.5
+    ],
+    "change_point_modes": [
+      "abrupt",
+      "gradual",
+      "recurring",
+      "false_change_control"
+    ],
+    "observation_patterns": [
+      "regular",
+      "irregular",
+      "long_gap",
+      "burst",
+      "quiet_idle"
+    ],
+    "invalid_timestamp_controls": [
+      "duplicate",
+      "out_of_order",
+      "non_monotonic",
+      "nan",
+      "infinite"
+    ]
+  },
+  "task_families": [
+    {
+      "id": "T1_FAST_EVENT",
+      "name": "Fast reaction and event timing",
+      "strata": [
+        "isolated_event",
+        "burst",
+        "quiet_idle",
+        "distractor_noise"
+      ],
+      "primary_metrics": [
+        "event_precision",
+        "event_recall",
+        "false_triggers_per_idle_hour",
+        "event_to_decision_latency_p50_p95_p99"
+      ],
+      "oracle": "Exact event-time labels with causal emission bounds"
+    },
+    {
+      "id": "T2_DELAYED_CUE",
+      "name": "Delayed-cue associative recall",
+      "factors": {
+        "delay_steps": [
+          1,
+          4,
+          16,
+          64,
+          256,
+          1024
+        ],
+        "distractor_count": [
+          0,
+          8,
+          64
+        ],
+        "cue_distractor_similarity": [
+          "low",
+          "high"
+        ]
+      },
+      "primary_metrics": [
+        "recall_by_delay",
+        "recall_by_interference",
+        "false_recall_rate"
+      ],
+      "oracle": "Exact cue-value binding and query answer"
+    },
+    {
+      "id": "T3_MULTI_TIMESCALE",
+      "name": "Interacting fast, medium, and slow latent processes",
+      "strata": [
+        "independent",
+        "phase_shift",
+        "amplitude_change",
+        "cross_coupled",
+        "regime_reversal"
+      ],
+      "primary_metrics": [
+        "classification_quality",
+        "forecast_error_by_horizon",
+        "phase_error",
+        "worst_timescale_error"
+      ],
+      "oracle": "Deterministic generator state and exact latent labels"
+    },
+    {
+      "id": "T4_ONLINE_CHANGE",
+      "name": "Online change-point adaptation",
+      "factors": {
+        "change_modes": [
+          "abrupt",
+          "gradual",
+          "recurring",
+          "false_change_control"
+        ],
+        "retraining_allowed": false,
+        "reset_allowed": false
+      },
+      "primary_metrics": [
+        "change_detection_delay",
+        "recovery_delay",
+        "cumulative_regret",
+        "false_alarm_rate",
+        "prior_regime_retention"
+      ],
+      "oracle": "Hidden change schedule and known post-change process"
+    },
+    {
+      "id": "T5_IRREGULAR_MISSING",
+      "name": "Irregular sampling and missing observations",
+      "factors": {
+        "jitter_fraction": [
+          0,
+          0.1,
+          0.3,
+          0.5
+        ],
+        "missingness_fraction": [
+          0,
+          0.1,
+          0.3,
+          0.5
+        ],
+        "patterns": [
+          "regular",
+          "irregular",
+          "long_gap",
+          "burst"
+        ]
+      },
+      "primary_metrics": [
+        "quality_by_gap",
+        "quality_by_missingness",
+        "calibration_error",
+        "invalid_timestamp_rejection"
+      ],
+      "oracle": "Underlying continuous-time synthetic process"
+    },
+    {
+      "id": "T6_SELECTIVE_RETENTION",
+      "name": "Memory interference and selective retention",
+      "strata": [
+        "no_memory",
+        "fixed_decay",
+        "learned_decay",
+        "fast_slow",
+        "novelty_event_refresh",
+        "invalidation_retraction"
+      ],
+      "primary_metrics": [
+        "target_recall",
+        "distractor_intrusion_rate",
+        "stale_memory_false_recall",
+        "retention_after_invalidation"
+      ],
+      "oracle": "Versioned trace validity and hidden target identities"
+    },
+    {
+      "id": "T7_PHASE_PREDICTION",
+      "name": "Periodic and phase-sensitive prediction",
+      "factors": {
+        "time_scale": [
+          0.5,
+          1,
+          2
+        ],
+        "strata": [
+          "steady_periodic",
+          "phase_shift",
+          "frequency_shift",
+          "mixed_period"
+        ]
+      },
+      "primary_metrics": [
+        "phase_error",
+        "next_event_error",
+        "forecast_error_by_horizon"
+      ],
+      "oracle": "Exact oscillator phase and event times"
+    }
+  ],
+  "architecture_arms": [
+    "active_hdc_ltc_cfc_incumbent",
+    "static_hdc_sequence",
+    "memoryless_hdc",
+    "fast_only",
+    "slow_only",
+    "fast_plus_slow_fixed_cadence",
+    "fast_plus_slow_novelty_event_cadence",
+    "gru",
+    "lstm",
+    "gru_d_or_missingness_aware_recurrent",
+    "ode_rnn_or_latent_ode",
+    "adaptive_lif_or_alif_snn",
+    "temporal_convolution"
+  ],
+  "fairness_controls": {
+    "paired_instances": true,
+    "matched_input_information": true,
+    "training_budget_pinned": true,
+    "parameter_and_state_budget_reported": true,
+    "precision_pinned": true,
+    "preprocessing_included_in_system_measurement": true,
+    "paper_scores_are_not_reproduction": true,
+    "baseline_commit_and_config_digest_required": true
+  },
+  "data_strata": {
+    "synthetic_exact": {
+      "use": "Deterministic analytical/exhaustive oracles for causality, delay, time warp, change points, and invalid input.",
+      "source_family_split": true
+    },
+    "real_candidates": [
+      "SHD",
+      "SSC",
+      "DVS Gesture",
+      "S-MNIST",
+      "PS-MNIST",
+      "MLPerf Tiny v1.4 streaming wake-word"
+    ],
+    "real_data_requirements": [
+      "license_and_provenance_pinned",
+      "split_by_subject_session_or_source_recording_before_windowing",
+      "no_overlapping_or_near_duplicate_source_windows_across_splits",
+      "timestamps_and_missingness_preserved",
+      "dataset_preprocessing_label_map_and_split_digests_recorded"
+    ]
+  },
+  "resource_metrics": [
+    "parameter_bytes",
+    "persistent_state_bytes",
+    "peak_working_set_bytes",
+    "temporary_and_copy_buffer_bytes",
+    "read_write_bytes_by_stage_and_memory_tier",
+    "hardware_counter_or_operation_estimates_with_provenance",
+    "batch1_event_latency_p50_p95_p99",
+    "burst_latency_p50_p95_p99",
+    "quiet_idle_energy",
+    "continuous_stream_latency_and_energy",
+    "joules_per_correct_decision"
+  ],
+  "statistical_design": {
+    "pilot_paired_seeds_min": 10,
+    "confirmatory_paired_seeds_min": 30,
+    "confirmatory_alternative": "Pre-registered power-based design",
+    "grouping_unit": "synthetic_source_family_or_real_subject_session",
+    "paired_comparison": true,
+    "confidence_intervals": true,
+    "multiple_comparison_control_required": true,
+    "preserve_failed_invalid_timed_out_runs": true
+  },
+  "qualification_targets": [
+    "zero_future_sample_leakage_on_exhaustive_synthetic_controls",
+    "zero_silent_acceptance_of_invalid_time_inputs",
+    "scalar_analytic_controls_converge_under_step_refinement",
+    "publish_delay_and_interference_conditioned_recall",
+    "report_detection_recovery_regret_and_prior_regime_retention",
+    "account_for_persistent_peak_and_temporary_memory_plus_traffic",
+    "hardware_energy_claims_require_calibrated_measurement_and_declared_boundary",
+    "improvements_must_hold_on_source_family_held_out_data",
+    "null_controls_must_allow_simpler_baselines_to_win",
+    "no_production_default_change_before_exact_head_validation"
+  ],
+  "claim_ceiling": "Results apply only to declared workloads, splits, implementations, and hardware. They do not establish consciousness, general intelligence, universal superiority, or neuromorphic efficiency when measured only on conventional CPU/GPU."
+}
