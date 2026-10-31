@@ -45,7 +45,7 @@ Brier and log loss are strictly proper scoring rules for probabilistic forecasts
 
 Each episode has one unresolved logical proof obligation and four alternative operation families. Each family has a synthetic cost and an independently sampled success outcome. Policies rank operations by predicted probability divided by cost, then attempt only actions that fit in the 3-unit hard budget. A success is counted only when the simulator outcome is true; a forecast alone cannot create progress.
 
-The same episode outcomes are reused across all policies. The report includes verified proof rate, proofs per work unit, work units per verified proof, total work, and budget violations. Fixed-order and random are controls. The oracle uses the simulator's true probability table and is an unattainable diagnostic upper bound, not a deployable baseline.
+The same episode outcomes are reused across all policies. The report includes verified proof rate, proofs per work unit, work units per verified proof, total work, and budget violations. Fixed-order and random are controls. The evaluator-only oracle ranks candidates using the simulator's true success probability per work unit. It is diagnostic only, not an exact knapsack optimum or a deployable baseline.
 
 ## 6. Relationship to external work
 
