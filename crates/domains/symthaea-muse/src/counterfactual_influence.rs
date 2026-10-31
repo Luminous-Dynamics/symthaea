@@ -1143,7 +1143,7 @@ fn qualify_support_windows(
                             measurements[*member_index].in_qualified_support = true;
                         }
                         for gap_index in episode_indices.iter().copied() {
-                            if measurements[gap_index].release_detected == false
+                            if !measurements[gap_index].release_detected
                                 && !measurements[gap_index].effect_detected
                             {
                                 measurements[gap_index].bridged_gap = true;
