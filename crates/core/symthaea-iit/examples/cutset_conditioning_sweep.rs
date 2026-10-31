@@ -20,13 +20,45 @@ use symthaea_iit::{
 struct Fixture {
     side: usize,
     cutset_factor_entry_budget: usize,
+    expected_baseline_width: usize,
+    expected_baseline_peak_entries: usize,
+    expected_cutset_width: usize,
+    expected_cutset_peak_entries: usize,
 }
 
 const FIXTURES: [Fixture; 4] = [
-    Fixture { side: 4, cutset_factor_entry_budget: 8 },
-    Fixture { side: 5, cutset_factor_entry_budget: 8 },
-    Fixture { side: 6, cutset_factor_entry_budget: 16 },
-    Fixture { side: 8, cutset_factor_entry_budget: 32 },
+    Fixture {
+        side: 4,
+        cutset_factor_entry_budget: 8,
+        expected_baseline_width: 4,
+        expected_baseline_peak_entries: 32,
+        expected_cutset_width: 2,
+        expected_cutset_peak_entries: 8,
+    },
+    Fixture {
+        side: 5,
+        cutset_factor_entry_budget: 8,
+        expected_baseline_width: 5,
+        expected_baseline_peak_entries: 64,
+        expected_cutset_width: 2,
+        expected_cutset_peak_entries: 8,
+    },
+    Fixture {
+        side: 6,
+        cutset_factor_entry_budget: 16,
+        expected_baseline_width: 6,
+        expected_baseline_peak_entries: 128,
+        expected_cutset_width: 3,
+        expected_cutset_peak_entries: 16,
+    },
+    Fixture {
+        side: 8,
+        cutset_factor_entry_budget: 32,
+        expected_baseline_width: 9,
+        expected_baseline_peak_entries: 1_024,
+        expected_cutset_width: 4,
+        expected_cutset_peak_entries: 32,
+    },
 ];
 
 const PAIR_POTENTIAL: [f64; 4] = [0.83, 0.17, 0.29, 0.71];
@@ -141,6 +173,19 @@ fn run() -> Result<(), String> {
             )
         {
             return Err(format!("complete retained-factor parity failed for {side}x{side}"));
+        }
+        if baseline.induced_width != fixture.expected_baseline_width
+            || baseline.peak_factor_entries != fixture.expected_baseline_peak_entries
+            || cutset_report.induced_width != fixture.expected_cutset_width
+            || cutset_report.peak_factor_entries != fixture.expected_cutset_peak_entries
+        {
+            return Err(format!(
+                "width/peak regression for {side}x{side}: baseline=({}, {}), cutset=({}, {})",
+                baseline.induced_width,
+                baseline.peak_factor_entries,
+                cutset_report.induced_width,
+                cutset_report.peak_factor_entries,
+            ));
         }
         if cutset_report.peak_factor_entries > cutset_factor_entry_budget
             || cutset_report.predicted_peak_factor_entries != cutset_report.peak_factor_entries
