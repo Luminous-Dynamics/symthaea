@@ -803,8 +803,12 @@ pub fn evaluate_genome(
             let role_sequence = form.sections.iter()
                 .map(|section| format!("{:?}", section.role))
                 .collect::<Vec<_>>();
-            let topology = serde_json::to_vec(&(realization.score.meter, role_sequence))
-                .unwrap_or_default();
+            let topology = serde_json::to_vec(&(
+                realization.score.meter,
+                format!("{:?}", compiled.spec.form_kind(intent.seed)),
+                role_sequence,
+            ))
+            .unwrap_or_default();
             domain_sha256(b"symthaea:muse-style-genome-form-topology:v1\n", &topology)
         });
         let motif_transformations = realization.trace.motif_occurrences.iter()
