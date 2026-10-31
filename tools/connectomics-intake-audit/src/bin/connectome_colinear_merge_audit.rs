@@ -1021,7 +1021,7 @@ mod tests {
             if x < 5_000.0 { (80.0, 4.0, 0.95, 0.2) } else { (48.0, 5.0, 0.80, 0.7) }
         });
         let mut input = base_input(vec![track]);
-        enable_physical_mode(&mut input, 1.0, (usize::MAX / 2) as f64 + 1.0);
+        enable_physical_mode(&mut input, 1.0, (usize::MAX / 2) as f64 + 4096.0);
         assert!(validate_input(&input).unwrap_err().contains("safe index arithmetic"));
     }
 
