@@ -1,0 +1,77 @@
+{
+  "schema_version": "hardsec-pmu-metrology-plan-v1",
+  "protocol_id": "hs018-pmu-counterfactual-acquisition-v1",
+  "evidence_domain": "synthetic_fixture",
+  "platform": {
+    "platform_id": "riscv-sim-pmu-v1",
+    "architecture": "riscv64",
+    "cpu_model": "synthetic-o3",
+    "pmu_model": "synthetic-pmu",
+    "firmware_id": "synthetic-sbi-v1",
+    "kernel_id": "linux-synthetic-v1",
+    "perf_id": "perf-synthetic-v1",
+    "programmable_counter_capacity": 3
+  },
+  "workload": {
+    "workload_id": "fixed-workload-v1",
+    "binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "work_unit": "committed_instructions",
+    "fixed_work_units": 1000000
+  },
+  "events": [
+    {
+      "event_id": "instret",
+      "encoding": "0x00000002",
+      "semantic": "instructions_retired",
+      "unit": "count"
+    },
+    {
+      "event_id": "cycles",
+      "encoding": "0x00000001",
+      "semantic": "core_cycles",
+      "unit": "count"
+    },
+    {
+      "event_id": "l1_miss",
+      "encoding": "0x00010003",
+      "semantic": "l1_data_cache_miss",
+      "unit": "count"
+    },
+    {
+      "event_id": "branch_miss",
+      "encoding": "0x00020004",
+      "semantic": "branch_misprediction",
+      "unit": "count"
+    }
+  ],
+  "acquisition_conditions": {
+    "baseline_condition": "baseline_no_pmu",
+    "singleton_condition": "singleton_per_event",
+    "co_scheduled_condition": "grouped_co_scheduled",
+    "overcommitted_condition": "grouped_overcommitted",
+    "co_scheduled_event_ids": [
+      "instret",
+      "cycles",
+      "l1_miss"
+    ],
+    "overcommitted_event_ids": [
+      "instret",
+      "cycles",
+      "l1_miss",
+      "branch_miss"
+    ]
+  },
+  "protocol": {
+    "randomized_order_required": true,
+    "randomization_seed": "fixture-seed-018",
+    "matched_blocks_required": true,
+    "minimum_blocks_for_descriptive_quantiles": 2,
+    "minimum_singleton_running_fraction": 0.99,
+    "minimum_co_scheduled_running_fraction": 0.95,
+    "maximum_co_scheduled_relative_deviation": 0.05,
+    "maximum_instrumentation_throughput_degradation": 0.02,
+    "maximum_sample_loss_fraction": 0,
+    "maximum_pmu_read_overhead_fraction": 0.01
+  },
+  "claim_scope": "measurement_configuration_and_declared_trial_record_qualification_only"
+}

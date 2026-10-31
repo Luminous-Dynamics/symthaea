@@ -1,0 +1,65 @@
+name: HARDSEC-018 PMU metrology audit
+
+on:
+  pull_request:
+    paths:
+      - "examples/hardsec_pmu_metrology_audit.rs"
+      - "docs/research/HARDSEC_018_PMU_METROLOGY_AUDITOR.md"
+      - "schemas/hardsec-pmu-*.schema.json"
+      - "tests/fixtures/hardsec/pmu-metrology-v1/**"
+      - "tools/hardsec-adaptive-evasion-audit-harness/**"
+      - ".github/workflows/hardsec-pmu-metrology-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-pmu-metrology-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pmu-metrology-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact pull request revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_pmu_metrology_audit.rs
+      - name: Run focused PMU metrology unit suite
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-pmu-metrology-audit --example hardsec_pmu_metrology_audit
+      - name: Audit synthetic matched-trial fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          out_dir="$(mktemp -d)"
+          cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-pmu-metrology-audit --example hardsec_pmu_metrology_audit -- \
+            --plan tests/fixtures/hardsec/pmu-metrology-v1/plan.json \
+            --observations tests/fixtures/hardsec/pmu-metrology-v1/observations.json \
+            --receipt "$out_dir/pmu-receipt.json"
+          python3 - "$out_dir/pmu-receipt.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          assert receipt["result"] == "qualified_for_named_acquisition_conditions", receipt
+          assert receipt["support"]["matched_block_count"] == 2
+          assert receipt["support"]["trial_count"] == 14
+          assert receipt["support"]["independence_status"] == "not_established"
+          assert receipt["support"]["effective_sample_size_estimate"] is None
+          assert receipt["measurement_semantics"]["multiplex_scaled_values_are_estimates"] is True
+          assert receipt["measurement_semantics"]["multiplex_scaled_values_confirmatory"] is False
+          assert receipt["observer_effect"]["overall_status"] == "within_declared_thresholds"
+          assert all(e["sampling"]["status"] == "not_applicable_no_sampling_records" for e in receipt["event_qualification"])
+          assert all(c["status"] == "within_declared_throughput_and_read_overhead_thresholds" for c in receipt["observer_effect"]["condition_reports"])
+          assert len(receipt["event_qualification"]) == 4
+          assert receipt["event_qualification"][0]["co_scheduled"]["status"] == "confirmatory_eligible_under_declared_thresholds"
+          assert receipt["event_qualification"][3]["co_scheduled"]["status"] == "not_in_co_scheduled_group_not_tested"
+          assert receipt["event_qualification"][0]["overcommitted"]["confirmatory_eligible"] is False
+          PY

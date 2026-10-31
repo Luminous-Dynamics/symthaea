@@ -1,0 +1,413 @@
+{
+  "schema_version": "hardsec-pmu-observations-v1",
+  "protocol_id": "hs018-pmu-counterfactual-acquisition-v1",
+  "evidence_domain": "synthetic_fixture",
+  "trials": [
+    {
+      "trial_id": "block-1-trial-1",
+      "block_id": "block-1",
+      "order_index": 1,
+      "randomization_seed": "fixture-seed-018",
+      "platform_id": "riscv-sim-pmu-v1",
+      "workload_id": "fixed-workload-v1",
+      "protocol_id": "hs018-pmu-counterfactual-acquisition-v1",
+      "condition": "singleton_per_event",
+      "work_units": 1000000,
+      "elapsed_ns": 1001000,
+      "pmu_read_overhead_ns": 1000,
+      "events": [
+        {
+          "event_id": "instret",
+          "encoding": "0x00000002",
+          "raw_count": 1000,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 1000000,
+          "sample_count": 0,
+          "lost_samples": 0
+        }
+      ]
+    },
+    {
+      "trial_id": "block-1-trial-2",
+      "block_id": "block-1",
+      "order_index": 2,
+      "randomization_seed": "fixture-seed-018",
+      "platform_id": "riscv-sim-pmu-v1",
+      "workload_id": "fixed-workload-v1",
+      "protocol_id": "hs018-pmu-counterfactual-acquisition-v1",
+      "condition": "singleton_per_event",
+      "work_units": 1000000,
+      "elapsed_ns": 1001000,
+      "pmu_read_overhead_ns": 1000,
+      "events": [
+        {
+          "event_id": "cycles",
+          "encoding": "0x00000001",
+          "raw_count": 2000,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 1000000,
+          "sample_count": 0,
+          "lost_samples": 0
+        }
+      ]
+    },
+    {
+      "trial_id": "block-1-trial-3",
+      "block_id": "block-1",
+      "order_index": 3,
+      "randomization_seed": "fixture-seed-018",
+      "platform_id": "riscv-sim-pmu-v1",
+      "workload_id": "fixed-workload-v1",
+      "protocol_id": "hs018-pmu-counterfactual-acquisition-v1",
+      "condition": "singleton_per_event",
+      "work_units": 1000000,
+      "elapsed_ns": 1001000,
+      "pmu_read_overhead_ns": 1000,
+      "events": [
+        {
+          "event_id": "l1_miss",
+          "encoding": "0x00010003",
+          "raw_count": 3000,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 1000000,
+          "sample_count": 0,
+          "lost_samples": 0
+        }
+      ]
+    },
+    {
+      "trial_id": "block-1-trial-4",
+      "block_id": "block-1",
+      "order_index": 4,
+      "randomization_seed": "fixture-seed-018",
+      "platform_id": "riscv-sim-pmu-v1",
+      "workload_id": "fixed-workload-v1",
+      "protocol_id": "hs018-pmu-counterfactual-acquisition-v1",
+      "condition": "singleton_per_event",
+      "work_units": 1000000,
+      "elapsed_ns": 1001000,
+      "pmu_read_overhead_ns": 1000,
+      "events": [
+        {
+          "event_id": "branch_miss",
+          "encoding": "0x00020004",
+          "raw_count": 4000,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 1000000,
+          "sample_count": 0,
+          "lost_samples": 0
+        }
+      ]
+    },
+    {
+      "trial_id": "block-1-trial-5",
+      "block_id": "block-1",
+      "order_index": 5,
+      "randomization_seed": "fixture-seed-018",
+      "platform_id": "riscv-sim-pmu-v1",
+      "workload_id": "fixed-workload-v1",
+      "protocol_id": "hs018-pmu-counterfactual-acquisition-v1",
+      "condition": "baseline_no_pmu",
+      "work_units": 1000000,
+      "elapsed_ns": 1000000,
+      "pmu_read_overhead_ns": 0,
+      "events": []
+    },
+    {
+      "trial_id": "block-1-trial-6",
+      "block_id": "block-1",
+      "order_index": 6,
+      "randomization_seed": "fixture-seed-018",
+      "platform_id": "riscv-sim-pmu-v1",
+      "workload_id": "fixed-workload-v1",
+      "protocol_id": "hs018-pmu-counterfactual-acquisition-v1",
+      "condition": "grouped_co_scheduled",
+      "work_units": 1000000,
+      "elapsed_ns": 1010000,
+      "pmu_read_overhead_ns": 5000,
+      "events": [
+        {
+          "event_id": "instret",
+          "encoding": "0x00000002",
+          "raw_count": 1005,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 1000000,
+          "sample_count": 0,
+          "lost_samples": 0
+        },
+        {
+          "event_id": "cycles",
+          "encoding": "0x00000001",
+          "raw_count": 2005,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 1000000,
+          "sample_count": 0,
+          "lost_samples": 0
+        },
+        {
+          "event_id": "l1_miss",
+          "encoding": "0x00010003",
+          "raw_count": 3010,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 1000000,
+          "sample_count": 0,
+          "lost_samples": 0
+        }
+      ]
+    },
+    {
+      "trial_id": "block-1-trial-7",
+      "block_id": "block-1",
+      "order_index": 7,
+      "randomization_seed": "fixture-seed-018",
+      "platform_id": "riscv-sim-pmu-v1",
+      "workload_id": "fixed-workload-v1",
+      "protocol_id": "hs018-pmu-counterfactual-acquisition-v1",
+      "condition": "grouped_overcommitted",
+      "work_units": 1000000,
+      "elapsed_ns": 1020000,
+      "pmu_read_overhead_ns": 8000,
+      "events": [
+        {
+          "event_id": "instret",
+          "encoding": "0x00000002",
+          "raw_count": 500,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 500000,
+          "sample_count": 0,
+          "lost_samples": 0
+        },
+        {
+          "event_id": "cycles",
+          "encoding": "0x00000001",
+          "raw_count": 1000,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 500000,
+          "sample_count": 0,
+          "lost_samples": 0
+        },
+        {
+          "event_id": "l1_miss",
+          "encoding": "0x00010003",
+          "raw_count": 1500,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 500000,
+          "sample_count": 0,
+          "lost_samples": 0
+        },
+        {
+          "event_id": "branch_miss",
+          "encoding": "0x00020004",
+          "raw_count": 2000,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 500000,
+          "sample_count": 0,
+          "lost_samples": 0
+        }
+      ]
+    },
+    {
+      "trial_id": "block-2-trial-1",
+      "block_id": "block-2",
+      "order_index": 1,
+      "randomization_seed": "fixture-seed-018",
+      "platform_id": "riscv-sim-pmu-v1",
+      "workload_id": "fixed-workload-v1",
+      "protocol_id": "hs018-pmu-counterfactual-acquisition-v1",
+      "condition": "grouped_overcommitted",
+      "work_units": 1000000,
+      "elapsed_ns": 1020000,
+      "pmu_read_overhead_ns": 8000,
+      "events": [
+        {
+          "event_id": "instret",
+          "encoding": "0x00000002",
+          "raw_count": 505,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 500000,
+          "sample_count": 0,
+          "lost_samples": 0
+        },
+        {
+          "event_id": "cycles",
+          "encoding": "0x00000001",
+          "raw_count": 1005,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 500000,
+          "sample_count": 0,
+          "lost_samples": 0
+        },
+        {
+          "event_id": "l1_miss",
+          "encoding": "0x00010003",
+          "raw_count": 1505,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 500000,
+          "sample_count": 0,
+          "lost_samples": 0
+        },
+        {
+          "event_id": "branch_miss",
+          "encoding": "0x00020004",
+          "raw_count": 2005,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 500000,
+          "sample_count": 0,
+          "lost_samples": 0
+        }
+      ]
+    },
+    {
+      "trial_id": "block-2-trial-2",
+      "block_id": "block-2",
+      "order_index": 2,
+      "randomization_seed": "fixture-seed-018",
+      "platform_id": "riscv-sim-pmu-v1",
+      "workload_id": "fixed-workload-v1",
+      "protocol_id": "hs018-pmu-counterfactual-acquisition-v1",
+      "condition": "grouped_co_scheduled",
+      "work_units": 1000000,
+      "elapsed_ns": 1010000,
+      "pmu_read_overhead_ns": 5000,
+      "events": [
+        {
+          "event_id": "instret",
+          "encoding": "0x00000002",
+          "raw_count": 1015,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 1000000,
+          "sample_count": 0,
+          "lost_samples": 0
+        },
+        {
+          "event_id": "cycles",
+          "encoding": "0x00000001",
+          "raw_count": 2015,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 1000000,
+          "sample_count": 0,
+          "lost_samples": 0
+        },
+        {
+          "event_id": "l1_miss",
+          "encoding": "0x00010003",
+          "raw_count": 3020,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 1000000,
+          "sample_count": 0,
+          "lost_samples": 0
+        }
+      ]
+    },
+    {
+      "trial_id": "block-2-trial-3",
+      "block_id": "block-2",
+      "order_index": 3,
+      "randomization_seed": "fixture-seed-018",
+      "platform_id": "riscv-sim-pmu-v1",
+      "workload_id": "fixed-workload-v1",
+      "protocol_id": "hs018-pmu-counterfactual-acquisition-v1",
+      "condition": "baseline_no_pmu",
+      "work_units": 1000000,
+      "elapsed_ns": 1000000,
+      "pmu_read_overhead_ns": 0,
+      "events": []
+    },
+    {
+      "trial_id": "block-2-trial-4",
+      "block_id": "block-2",
+      "order_index": 4,
+      "randomization_seed": "fixture-seed-018",
+      "platform_id": "riscv-sim-pmu-v1",
+      "workload_id": "fixed-workload-v1",
+      "protocol_id": "hs018-pmu-counterfactual-acquisition-v1",
+      "condition": "singleton_per_event",
+      "work_units": 1000000,
+      "elapsed_ns": 1001000,
+      "pmu_read_overhead_ns": 1000,
+      "events": [
+        {
+          "event_id": "instret",
+          "encoding": "0x00000002",
+          "raw_count": 1010,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 1000000,
+          "sample_count": 0,
+          "lost_samples": 0
+        }
+      ]
+    },
+    {
+      "trial_id": "block-2-trial-5",
+      "block_id": "block-2",
+      "order_index": 5,
+      "randomization_seed": "fixture-seed-018",
+      "platform_id": "riscv-sim-pmu-v1",
+      "workload_id": "fixed-workload-v1",
+      "protocol_id": "hs018-pmu-counterfactual-acquisition-v1",
+      "condition": "singleton_per_event",
+      "work_units": 1000000,
+      "elapsed_ns": 1001000,
+      "pmu_read_overhead_ns": 1000,
+      "events": [
+        {
+          "event_id": "cycles",
+          "encoding": "0x00000001",
+          "raw_count": 2010,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 1000000,
+          "sample_count": 0,
+          "lost_samples": 0
+        }
+      ]
+    },
+    {
+      "trial_id": "block-2-trial-6",
+      "block_id": "block-2",
+      "order_index": 6,
+      "randomization_seed": "fixture-seed-018",
+      "platform_id": "riscv-sim-pmu-v1",
+      "workload_id": "fixed-workload-v1",
+      "protocol_id": "hs018-pmu-counterfactual-acquisition-v1",
+      "condition": "singleton_per_event",
+      "work_units": 1000000,
+      "elapsed_ns": 1001000,
+      "pmu_read_overhead_ns": 1000,
+      "events": [
+        {
+          "event_id": "l1_miss",
+          "encoding": "0x00010003",
+          "raw_count": 3010,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 1000000,
+          "sample_count": 0,
+          "lost_samples": 0
+        }
+      ]
+    },
+    {
+      "trial_id": "block-2-trial-7",
+      "block_id": "block-2",
+      "order_index": 7,
+      "randomization_seed": "fixture-seed-018",
+      "platform_id": "riscv-sim-pmu-v1",
+      "workload_id": "fixed-workload-v1",
+      "protocol_id": "hs018-pmu-counterfactual-acquisition-v1",
+      "condition": "singleton_per_event",
+      "work_units": 1000000,
+      "elapsed_ns": 1001000,
+      "pmu_read_overhead_ns": 1000,
+      "events": [
+        {
+          "event_id": "branch_miss",
+          "encoding": "0x00020004",
+          "raw_count": 4010,
+          "time_enabled_ns": 1000000,
+          "time_running_ns": 1000000,
+          "sample_count": 0,
+          "lost_samples": 0
+        }
+      ]
+    }
+  ]
+}
