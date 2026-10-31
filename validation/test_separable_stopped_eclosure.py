@@ -43,11 +43,18 @@ class SeparableStoppedEclosureTests(unittest.TestCase):
                 )
                 self.assertEqual(fast["certified"], slow["certified"])
                 self.assertEqual(fast["minimum_slack"], slow["minimum_slack"])
-                witness = exhaustive_intersection_certificate(
-                    fast["worst_intersection_mask"], evalues, weights, active, alpha
+                witness = fast["worst_intersection_mask"]
+                rejection_count = rejection.bit_count()
+                witness_fdp = Fraction((witness & rejection).bit_count(), rejection_count)
+                witness_evalue = Fraction(1) + sum(
+                    (
+                        weights[i] * (evalues[i] - 1)
+                        for i in range(n) if (witness >> i) & 1
+                    ),
+                    Fraction(0),
                 )
                 self.assertEqual(
-                    witness["minimum_slack"],
+                    alpha * witness_evalue - witness_fdp,
                     fast["minimum_slack"],
                 )
 
@@ -83,7 +90,7 @@ class SeparableStoppedEclosureTests(unittest.TestCase):
             result["guarantee_scope"].split(";")[0],
             "simultaneous stopped-FDR via future-extension-coherent intersection e-processes",
         )
-        self.assertNotIn("SupFDR", result["guarantee_scope"].split("NOT ")[-1])
+        self.assertIn("NOT SupFDR", result["guarantee_scope"])
         self.assertTrue(result["verification"]["valid"])
         self.assertTrue(result["verification"]["optimality_verified"])
         json.dumps(result, sort_keys=True, separators=(",", ":"))
@@ -132,7 +139,7 @@ class SeparableStoppedEclosureTests(unittest.TestCase):
         tampered[1]["rejections"] = [1]
         tampered[1]["utility"] = [10, 1]
         tampered[1]["cost"] = [1, 1]
-        tampered[1]["minimum_stopped_fdr_slack"] = [1, 1]
+        tampered[1]["minimum_stopped_fdr_slack"] = [1, 4]
         tampered[1]["worst_intersection_mask"] = 0b01
         check = verify_raw_projective_sequence(
             tampered,
