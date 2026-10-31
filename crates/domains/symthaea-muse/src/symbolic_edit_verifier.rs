@@ -164,9 +164,13 @@ fn push_failure(
 }
 
 fn non_pitch_note_equal(source: ScoreNote, target: ScoreNote) -> bool {
-    let mut expected = target;
-    expected.pitch = source.pitch;
-    expected == source
+    source.part == target.part
+        && source.onset == target.onset
+        && source.duration == target.duration
+        && source.velocity.to_bits() == target.velocity.to_bits()
+        && source.role == target.role
+        && source.emphasis == target.emphasis
+        && source.section_intensity.to_bits() == target.section_intensity.to_bits()
 }
 
 fn score_metadata_valid(score: &Score) -> bool {
