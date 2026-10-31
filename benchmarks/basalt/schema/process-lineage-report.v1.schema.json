@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT process lineage audit report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_version",
+    "oracle_digest",
+    "receipt_digest",
+    "run_id",
+    "task_id",
+    "attempt_id",
+    "oracle_well_formed",
+    "receipt_well_formed",
+    "identity_context_match",
+    "process_graph_reconciled",
+    "event_set_reconciled",
+    "event_sequence_integral",
+    "event_loss_free",
+    "process_tree_closed",
+    "lineage_audit_passed",
+    "oracle_authenticity_established",
+    "observer_receipt_authenticity_established",
+    "qualification_eligible",
+    "counts",
+    "errors"
+  ],
+  "properties": {
+    "report_version": {
+      "const": 1
+    },
+    "oracle_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "receipt_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "run_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "task_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "attempt_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "oracle_well_formed": {
+      "type": "boolean"
+    },
+    "receipt_well_formed": {
+      "type": "boolean"
+    },
+    "identity_context_match": {
+      "type": "boolean"
+    },
+    "process_graph_reconciled": {
+      "type": "boolean"
+    },
+    "event_set_reconciled": {
+      "type": "boolean"
+    },
+    "event_sequence_integral": {
+      "type": "boolean"
+    },
+    "event_loss_free": {
+      "type": "boolean"
+    },
+    "process_tree_closed": {
+      "type": "boolean"
+    },
+    "lineage_audit_passed": {
+      "type": "boolean"
+    },
+    "oracle_authenticity_established": {
+      "const": false
+    },
+    "observer_receipt_authenticity_established": {
+      "const": false
+    },
+    "qualification_eligible": {
+      "const": false
+    },
+    "counts": {
+      "$ref": "#/$defs/counts"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "path",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "oracle_processes",
+        "observed_processes",
+        "oracle_events",
+        "observed_events",
+        "pid_values_reused",
+        "missing_processes",
+        "unexpected_processes",
+        "missing_events",
+        "unexpected_events",
+        "duplicate_events",
+        "computed_sequence_gaps",
+        "reported_dropped_events",
+        "reported_overflows",
+        "reported_restarts",
+        "reported_unmonitored_processes"
+      ],
+      "properties": {
+        "oracle_processes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observed_processes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "oracle_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observed_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pid_values_reused": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing_processes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unexpected_processes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unexpected_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duplicate_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "computed_sequence_gaps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reported_dropped_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reported_overflows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reported_restarts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reported_unmonitored_processes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
