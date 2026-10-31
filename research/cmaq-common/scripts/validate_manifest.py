@@ -14,8 +14,54 @@ SCHEMA_PATH = ROOT / "frozen-run-manifest.schema.json"
 EXAMPLE_PATH = ROOT / "examples" / "cmaq-018-development-manifest.example.json"
 
 
+def semantic_errors(instance: dict) -> list[str]:
+    errors: list[str] = []
+    baseline_ids = [baseline["id"] for baseline in instance["baseline_registry"]]
+    if len(baseline_ids) != len(set(baseline_ids)):
+        errors.append("duplicate baseline IDs")
+
+    baseline_set = set(baseline_ids)
+    for comparison in instance["comparisons"]:
+        if comparison["treatment_id"] not in baseline_set:
+            errors.append("comparison treatment ID is not registered")
+        if comparison["control_id"] not in baseline_set:
+            errors.append("comparison control ID is not registered")
+
+    if instance["candidate"]["source_commit"] != instance["repository"]["commit"]:
+        errors.append("candidate source commit differs from frozen repository commit")
+    if instance["generator"]["source_commit"] != instance["repository"]["commit"]:
+        errors.append("generator source commit differs from frozen repository commit")
+    if instance["metrics"]["bundle_sha256"] != instance["evaluator"]["metric_bundle_sha256"]:
+        errors.append("metric bundle digest differs between metrics and evaluator")
+    if (
+        instance["budgets"]["matching_method"] == "candidate_budget_only"
+        and instance["budgets"]["measurement_status"] == "measured_hardware_costs"
+    ):
+        errors.append("candidate-count-only matching cannot claim measured hardware matching")
+    if instance["qualification"]["candidate_truth_access"] is not False:
+        errors.append("candidate truth access must remain disabled")
+    if instance["metrics"]["cross_track_pooling"] is not False:
+        errors.append("cross-track pooling must remain disabled")
+
+    for baseline in instance["baseline_registry"]:
+        if (
+            baseline["cost_accounting"] == "candidate_count_only"
+            and baseline["eligibility"] == "eligible_for_primary_contrast"
+        ):
+            errors.append("candidate-count-only baseline cannot be eligible as compute matched")
+        if baseline["kind"] == "oracle" and baseline["eligibility"] != "oracle_only":
+            errors.append("oracle baseline must remain oracle-only")
+        if (
+            baseline["eligibility"] == "eligible_for_primary_contrast"
+            and baseline.get("ineligibility_reason") is not None
+        ):
+            errors.append("eligible baseline cannot carry an ineligibility reason")
+
+    return errors
+
+
 def fail_closed(validator: Draft202012Validator, instance: dict) -> bool:
-    return not list(validator.iter_errors(instance))
+    return not list(validator.iter_errors(instance)) and not semantic_errors(instance)
 
 
 def main() -> None:
@@ -31,41 +77,9 @@ def main() -> None:
             + "\n".join(f"  {error.json_path}: {error.message}" for error in errors)
         )
 
-    baseline_ids = [baseline["id"] for baseline in example["baseline_registry"]]
-    if len(baseline_ids) != len(set(baseline_ids)):
-        raise SystemExit("duplicate baseline IDs")
-
-    baseline_set = set(baseline_ids)
-    for comparison in example["comparisons"]:
-        if comparison["treatment_id"] not in baseline_set:
-            raise SystemExit("comparison treatment ID is not registered")
-        if comparison["control_id"] not in baseline_set:
-            raise SystemExit("comparison control ID is not registered")
-
-    for baseline in example["baseline_registry"]:
-        if (
-            baseline["cost_accounting"] == "candidate_count_only"
-            and baseline["eligibility"] == "eligible_for_primary_contrast"
-        ):
-            raise SystemExit("candidate-count-only baseline cannot be eligible as compute matched")
-        if baseline["kind"] == "oracle" and baseline["eligibility"] != "oracle_only":
-            raise SystemExit("oracle baseline must remain oracle-only")
-        if baseline["eligibility"] == "eligible_for_primary_contrast" and baseline["ineligibility_reason"] is not None:
-            raise SystemExit("eligible baseline cannot carry an ineligibility reason")
-
-    if example["candidate"]["source_commit"] != example["repository"]["commit"]:
-        raise SystemExit("candidate source commit differs from frozen repository commit")
-    if example["generator"]["source_commit"] != example["repository"]["commit"]:
-        raise SystemExit("generator source commit differs from frozen repository commit")
-    if example["metrics"]["bundle_sha256"] != example["evaluator"]["metric_bundle_sha256"]:
-        raise SystemExit("metric bundle digest differs between metrics and evaluator")
-    if example["budgets"]["matching_method"] == "candidate_budget_only":
-        if example["budgets"]["measurement_status"] == "measured_hardware_costs":
-            raise SystemExit("candidate-count-only matching cannot claim measured hardware matching")
-    if example["qualification"]["candidate_truth_access"] is not False:
-        raise SystemExit("candidate truth access must remain disabled")
-    if example["metrics"]["cross_track_pooling"] is not False:
-        raise SystemExit("cross-track pooling must remain disabled")
+    semantic_failures = semantic_errors(example)
+    if semantic_failures:
+        raise SystemExit("example failed semantic checks: " + "; ".join(semantic_failures))
 
     hostile_cases = []
 
@@ -117,7 +131,7 @@ def main() -> None:
             {
                 "schema_version": schema["properties"]["schema_version"]["const"],
                 "example_valid": True,
-                "cross_reference_checks": 7,
+                "semantic_invariants_checked": "passed",
                 "hostile_cases_rejected": len(hostile_cases),
                 "ci_only": True,
                 "performance_result_present": example["claim_boundary"]["performance_result_present"],
