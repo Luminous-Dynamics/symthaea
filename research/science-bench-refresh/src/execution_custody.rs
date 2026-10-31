@@ -229,7 +229,8 @@ pub struct ExecutionCustodyReceiptV1 {
     pub external_checkpoint: Option<ExternalCheckpointStatementV1>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct ConditionCustodySummaryV1 {
     pub condition_id: String,
     pub planned_ordinal: u32,
@@ -243,44 +244,11 @@ pub struct ConditionCustodySummaryV1 {
     pub evaluator_token_count: u64,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct ExecutionCustodyReportV1 {
+    pub fields: ExecutionCustodyReportFieldsV1,
     pub report_commitment_sha256: String,
-    pub schema: String,
-    pub run_id: String,
-    pub analyzer_source_revision: String,
-    pub plan_sha256: String,
-    pub receipt_sha256: String,
-    pub plan_commitment_sha256: String,
-    pub event_count: u64,
-    pub event_chain_valid: bool,
-    pub event_sequence_contiguous: bool,
-    pub timestamps_monotonic: bool,
-    pub planned_condition_count: u64,
-    pub observed_condition_count: u64,
-    pub completed_condition_count: u64,
-    pub timed_out_condition_count: u64,
-    pub blocked_condition_count: u64,
-    pub invalid_receipt_condition_count: u64,
-    pub not_started_condition_count: u64,
-    pub failed_condition_count: u64,
-    pub total_tool_call_count: u64,
-    pub total_evaluator_call_count: u64,
-    pub total_evaluator_token_count: u64,
-    pub event_merkle_root_sha256: String,
-    pub execution_bundle_sha256: String,
-    pub external_checkpoint_present: bool,
-    pub external_checkpoint_matches_bundle: bool,
-    pub external_inclusion_proof_valid: bool,
-    pub external_checkpoint_authenticity_proven: bool,
-    pub runner_identity_authenticated: bool,
-    pub raw_prompt_custody_proven: bool,
-    pub evaluator_execution_proven: bool,
-    pub wall_clock_authenticity_proven: bool,
-    pub external_anchor_required: bool,
-    pub scoring_eligible_declared: bool,
-    pub conditions: Vec<ConditionCustodySummaryV1>,
-    pub claim_boundary: String,
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -336,7 +304,7 @@ pub fn validate_execution_custody_plan_fields(
     if fields.purpose.qualified() && crate::BUILT_GENERATOR_WORKTREE_CLEAN != "true" {
         issues.push("qualified custody plan requires clean analyzer worktree".to_owned());
     }
-    if !nonempty(&fields.run_id, 128) || !nonempty(&fields.run_id, 128) {
+    if !nonempty(&fields.run_id, 128) {
         issues.push("run_id must be non-empty and at most 128 bytes".to_owned());
     }
     for (label, digest) in [
@@ -545,6 +513,8 @@ pub struct ExecutionCustodyReportFieldsV1 {
     pub tool_call_count: u64,
     pub total_evaluator_call_count: u64,
     pub total_evaluator_token_count: u64,
+    pub total_rendered_input_bytes: u64,
+    pub total_output_bytes: u64,
     pub timestamps_monotonic: bool,
     pub event_sequence_contiguous: bool,
     pub event_chain_valid: bool,
@@ -634,14 +604,16 @@ pub fn analyze_execution_custody(
         }
         _ => return Err("first event must be run_started".to_owned()),
     }
-    match &last.payload {
-        ExecutionEventPayloadV1::RunFinished {run_id, planned_condition_count, terminal_condition_count, ..} => {
+    let run_finished_completed_count = match &last.payload {
+        ExecutionEventPayloadV1::RunFinished {run_id, planned_condition_count, completed_condition_count, terminal_condition_count, run_status} => {
             if run_id != &plan.run_id
                 || *planned_condition_count != plan.conditions.len() as u64
                 || *terminal_condition_count != plan.conditions.len() as u64
+                || !nonempty(run_status, 64)
             {
                 return Err("run-finished event does not account for all planned conditions".to_owned());
             }
+            *completed_condition_count
         }
         _ => return Err("last event must be run_finished".to_owned()),
     }
@@ -672,6 +644,8 @@ pub fn analyze_execution_custody(
     let mut total_tool_calls = 0u64;
     let mut total_evaluator_calls = 0u64;
     let mut total_evaluator_tokens = 0u64;
+    let mut total_rendered_input_bytes = 0u64;
+    let mut total_output_bytes = 0u64;
     for event in receipt.events.iter().skip(1).take(receipt.events.len().saturating_sub(2)) {
         match &event.payload {
             ExecutionEventPayloadV1::InputRendered {condition_id,planned_ordinal,input_sha256,input_bytes} => {
@@ -686,6 +660,8 @@ pub fn analyze_execution_custody(
                     return Err(format!("condition {condition_id} rendered input differs from plan commitment"));
                 }
                 stages.insert(condition_id.clone(), ConditionStageV1::InputRendered);
+                total_rendered_input_bytes = total_rendered_input_bytes.checked_add(*input_bytes)
+                    .ok_or_else(|| "rendered input byte count overflow".to_owned())?;
                 let row=summary.get_mut(condition_id).unwrap();row.input_rendered=true;row.input_sha256=Some(input_sha256.clone());
             }
             ExecutionEventPayloadV1::EvaluationStarted {condition_id,planned_ordinal,evaluator_source_revision,evaluator_prompt_sha256} => {
@@ -751,6 +727,8 @@ pub fn analyze_execution_custody(
                 if output_sha256.as_ref().is_some_and(|value| !valid_digest(value, false)) {
                     return Err(format!("condition {condition_id} has malformed output digest"));
                 }
+                total_output_bytes = total_output_bytes.checked_add(*output_bytes)
+                    .ok_or_else(|| "output byte count overflow".to_owned())?;
                 let row=summary.get_mut(condition_id).unwrap();
                 row.terminal_status=*status;row.output_sha256=output_sha256.clone();
                 row.evaluator_call_count=*evaluator_call_count;row.evaluator_token_count=*evaluator_token_count;
@@ -777,6 +755,9 @@ pub fn analyze_execution_custody(
     if completed+timed_out+blocked+invalid+not_started+failed != plan.conditions.len() as u64 {
         return Err("terminal status counts do not sum to planned conditions".to_owned());
     }
+    if run_finished_completed_count != completed {
+        return Err("run-finished completed count differs from terminal event accounting".to_owned());
+    }
     let event_hashes:Vec<String>=receipt.events.iter().map(|event|event.event_sha256.clone()).collect();
     let event_root=compute_execution_merkle_root(&event_hashes)?;
     let bundle_payload=serde_json::to_vec(&(
@@ -792,8 +773,12 @@ pub fn analyze_execution_custody(
         if !nonempty(&anchor.provider,128)||!nonempty(&anchor.log_id,256)||!nonempty(&anchor.record_id,256) {
             return Err("external checkpoint provider/log/record identifiers must be non-empty".to_owned());
         }
-        if anchor.bundle_sha256!=bundle_sha256 || anchor.tree_size==0 {
-            return Err("external checkpoint does not bind execution bundle".to_owned());
+        if anchor.bundle_sha256!=bundle_sha256
+            || anchor.tree_size==0
+            || anchor.tree_size!=anchor.inclusion_proof.tree_size
+            || anchor.anchored_at_unix_milliseconds==0
+        {
+            return Err("external checkpoint does not bind execution bundle/tree size/time".to_owned());
         }
         let proof_valid=verify_merkle_inclusion_proof(&anchor.bundle_sha256,&anchor.inclusion_proof,&anchor.checkpoint_root_sha256)?;
         if !proof_valid {
@@ -823,6 +808,8 @@ pub fn analyze_execution_custody(
         tool_call_count:total_tool_calls,
         total_evaluator_call_count:total_evaluator_calls,
         total_evaluator_token_count:total_evaluator_tokens,
+        total_rendered_input_bytes,
+        total_output_bytes,
         timestamps_monotonic,
         event_sequence_contiguous:sequence_valid,
         event_chain_valid:chain_valid,
@@ -841,5 +828,22 @@ pub fn analyze_execution_custody(
     };
     let payload=serde_json::to_vec(&fields).map_err(|error| format!("cannot serialize execution custody report: {error}"))?;
     let commitment=digest_domain(REPORT_DOMAIN,&payload)?;
-    Ok(ExecutionCustodyReportV1 {report_commitment_sha256:commitment,..fields})
+    Ok(ExecutionCustodyReportV1 {fields,report_commitment_sha256:commitment})
+}
+
+pub fn verify_execution_custody_report(
+    report_bytes: &[u8],
+) -> Result<ExecutionCustodyReportV1, String> {
+    let report: ExecutionCustodyReportV1 = serde_json::from_slice(report_bytes)
+        .map_err(|error| format!("execution custody report invalid: {error}"))?;
+    if !valid_digest(&report.report_commitment_sha256, false) {
+        return Err("execution custody report commitment must be a nonzero SHA-256 digest".to_owned());
+    }
+    let payload = serde_json::to_vec(&report.fields)
+        .map_err(|error| format!("cannot serialize execution custody report fields: {error}"))?;
+    let expected = digest_domain(REPORT_DOMAIN, &payload)?;
+    if expected != report.report_commitment_sha256 {
+        return Err("execution custody report commitment mismatch".to_owned());
+    }
+    Ok(report)
 }
