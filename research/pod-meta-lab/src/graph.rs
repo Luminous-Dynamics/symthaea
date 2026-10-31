@@ -737,6 +737,16 @@ mod tests {
     }
 
     #[test]
+    fn same_seed_and_split_reproduce_identical_planner_cases() {
+        let first=generate_poar_graph_suite(2026,DatasetSplit::Development);
+        let second=generate_poar_graph_suite(2026,DatasetSplit::Development);
+        assert_eq!(first.planner_cases(),second.planner_cases());
+        let first_predictions=first.planner_cases().iter().map(ProofPacket::abstain_all).collect::<Vec<_>>();
+        let second_predictions=second.planner_cases().iter().map(ProofPacket::abstain_all).collect::<Vec<_>>();
+        assert_eq!(first.evaluate(&first_predictions),second.evaluate(&second_predictions));
+    }
+
+    #[test]
     fn oracle_accepts_and_or_and_current_paths_but_rejects_stale_revision() {
         let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
         let and=find(&suite,"and-chain");
@@ -917,6 +927,36 @@ mod tests {
         let correlation_score=correlation_suite.evaluate(&[correlation_packet]);
         assert_eq!(correlation_score.case_scores[14].correlation_violations,1);
         assert_eq!(correlation_score.case_scores[14].false_supported_claims,1);
+    }
+
+    #[test]
+    fn valid_time_scope_and_authority_mutations_are_detected() {
+        // valid_from moves beyond the query's valid_at coordinate.
+        let mut valid_suite=generate_poar_graph_suite(7,DatasetSplit::Test);
+        let valid_case=find(&valid_suite,"or-current-alternative");
+        let valid_id=valid_case.id.clone();
+        let valid_packet=packet(valid_case,"claim",ClaimDisposition::Supported{alternative_id:"current-path".into()},&["e-current"]);
+        assert!(valid_suite.mutate_evidence(&valid_id,"e-current",EvidenceMutation::SetValidFrom(9_999)));
+        let valid_report=valid_suite.evaluate(&[valid_packet]);
+        assert_eq!(valid_report.case_scores[1].temporal_violations,1);
+
+        // A source can retain truthful content while leaving the required scope.
+        let mut scope_suite=generate_poar_graph_suite(7,DatasetSplit::Test);
+        let scope_case=find(&scope_suite,"or-current-alternative");
+        let scope_id=scope_case.id.clone();
+        let scope_packet=packet(scope_case,"claim",ClaimDisposition::Supported{alternative_id:"current-path".into()},&["e-current"]);
+        assert!(scope_suite.mutate_evidence(&scope_id,"e-current",EvidenceMutation::SetScope("scope-outside".into())));
+        let scope_report=scope_suite.evaluate(&[scope_packet]);
+        assert_eq!(scope_report.case_scores[1].scope_violations,1);
+
+        // Authority is independent of scope and content truth.
+        let mut authority_suite=generate_poar_graph_suite(7,DatasetSplit::Test);
+        let authority_case=find(&authority_suite,"or-current-alternative");
+        let authority_id=authority_case.id.clone();
+        let authority_packet=packet(authority_case,"claim",ClaimDisposition::Supported{alternative_id:"current-path".into()},&["e-current"]);
+        assert!(authority_suite.mutate_evidence(&authority_id,"e-current",EvidenceMutation::SetAuthority("authority-revoked".into())));
+        let authority_report=authority_suite.evaluate(&[authority_packet]);
+        assert_eq!(authority_report.case_scores[1].authority_violations,1);
     }
 
     #[test]
