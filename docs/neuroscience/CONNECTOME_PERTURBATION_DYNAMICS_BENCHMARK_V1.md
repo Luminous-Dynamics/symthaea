@@ -33,6 +33,37 @@ The zebrafish resources offer complementary tiers:
 
 These tiers must remain separate because they support different estimands.
 
+## 2. Direct anatomical connectivity is not effective connectivity
+
+A crucial peer-reviewed C. elegans reference must be part of the benchmark:
+
+Randi et al., *Neural signal propagation atlas of Caenorhabditis elegans*, Nature 623, 406–414 (1 November 2023): https://www.nature.com/articles/s41586-023-06683-4
+
+The study directly optogenetically stimulated individual neurons while recording whole-brain calcium responses. It surveyed 23,433 neuron pairs across 113 animals, covering 186 of 188 head neurons. The authors reported 1,310 pairs (6%) meeting their stringent functional-connection criterion and classified 11% of those significant functional connections as inhibitory. Their statistical framework distinguishes:
+- a functionally connected pair under its criterion;
+- a pair supported as functionally non-connected within a prespecified equivalence bound;
+- a pair for which evidence is insufficient to make either determination.
+
+The key semantic point is that the paper's functional connections are **effective connections**: signal propagation over all available paths, not just direct monosynaptic anatomical edges. The study also reports rapid extrasynaptic dense-core-vesicle/neuropeptide signalling that is invisible to a conventional synaptic wiring diagram, and that its measured signal-propagation atlas better predicted spontaneous activity than anatomy-only predictions in the reported setting.
+
+This changes the evaluation contract. Keep at least four distinct evidence objects:
+1. **Direct structural edge:** a synapse/gap junction supported by anatomical evidence, with polarity/partner/version uncertainty.
+2. **Indirect structural route:** one or more paths through the versioned graph.
+3. **Measured effective response:** a finite-horizon population response after a controlled intervention; it aggregates every pathway and may include extrasynaptic signalling.
+4. **Mechanistic attribution:** a stronger claim identifying direct synaptic, polysynaptic, extrasynaptic or state-mediated mechanisms; requires a separately identified design.
+
+A structurally absent direct edge does not imply zero effective response. A measured response does not prove a direct synapse. A graph path does not guarantee a measurable response in every state. A statistically unresolved response is not evidence of zero effect.
+
+Model architecture should therefore permit separate, explicitly typed channels for:
+- anatomically supported synaptic/gap-junction routes;
+- polysynaptic propagation through those routes;
+- declared extrasynaptic/neuromodulatory or latent coupling terms;
+- context/state-dependent gain and intrinsic dynamics.
+
+Any non-anatomical channel must retain its own evidence class and provenance. It must never be silently materialized as an EM synapse or graph edge. Conversely, a channel learned from perturbation outcomes must not be allowed to leak held-out functional targets into structure reconstruction or confirmatory evaluation.
+
+The Randi et al. atlas has limits that must remain visible: its animals were immobilized and awake, stimulation/recording were performed under the study's transgenic configuration, and its functional map is an effective lower bound conditioned on its sampling and response-detection procedure. It is an external perturbation benchmark, not a perfect census of all physiological interactions.
+
 ## 3. Dataset tiers and evidence eligibility
 
 ### Tier A — C. elegans optogenetic perturbation
