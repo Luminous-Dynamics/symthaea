@@ -78,15 +78,19 @@ The cost columns are carried into the receipt for future matched runs. In the bu
 
 ## Rust tests authored
 
-The unit suite covers:
+The Rust unit suite contains 17 main-evaluator tests and 5 SCM tests. It covers:
 - bundled input/oracle audit and synthetic perfect-control scoring;
 - false causal claim, unsafe transfer reuse and unsupported completion mutations;
-- anchor/control policy inconsistency;
+- anchor/control policy inconsistency and mutation of a relevant current-state field;
+- missing controlled-intervention replication and answer-key / SCM disagreement;
+- exact context and event-history delta validation for all four irrelevant-control pairs;
 - missing, duplicate and unknown candidate cases;
 - missing prediction record;
 - evaluator-label leakage and prompt-pair mutation;
 - malformed boolean / negative cost data;
 - SHA-256 known test vectors.
+
+The SCM tests execute the four toy mechanisms directly: common-cause confounding with a zero valve intervention effect; four deterministic control/treatment replications; a cooling-induced regime change; and an accepted-but-unrealized relay command.
 
 These tests are authored but have **not** been compiled or executed in this environment. Rust 1.96.0 is pinned and Cargo.lock is checked in; exact-head compilation and test evidence remain outstanding.
 
