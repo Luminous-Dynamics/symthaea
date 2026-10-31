@@ -687,7 +687,7 @@ mod tests {
                 {"region_id":"region-r2","rank":2,"score":0.31,"node_ids":["g99","g100"],"edge_ids":["e99-100"],"support_claim_ids":["fixture-claim-2"]}
             ],
             "paths":[
-                {"path_id":"path-trigger-observe-01","status":"retained","source_sha256":graph_sha,"edge_ids":["e17-18"],"reason":""}
+                {"path_id":"path-trigger-observe-01","status":"retained","source_sha256":source_artifact_sha,"edge_ids":["e17-18"],"reason":""}
             ],
             "path_coverage":{"status":"partial"},
             "claim_limits":{"claims_mechanism":false,"claims_causal_localization":false}
@@ -695,7 +695,7 @@ mod tests {
         let oracle = json!({
             "schema_version":"hardsec-localization-oracle-v1",
             "design_id":"design-alpha-01",
-            "source_sha256":graph_sha,
+            "source_sha256":source_artifact_sha,
             "label_semantics":"insertion_footprint",
             "reference_paths_complete":false,
             "positive_node_ids":["g17","g18","g20"],
