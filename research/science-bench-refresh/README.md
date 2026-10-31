@@ -35,6 +35,10 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - src/intervention_quality.rs: census-based candidate and blinded-panel receipt validator, semantic validity precision/recall, raw pairwise agreement, Fleiss' kappa, unique test yield and cost metrics.
 - schema/intervention-quality-plan.schema.json, schema/intervention-quality-receipt.schema.json and schema/intervention-quality-report.schema.json: strict plan, fixed-panel blinded adjudication and quality report contracts.
 - tools/intervention_quality_fixture.py: deterministic seven-candidate synthetic census with valid, invalid and ambiguous panel outcomes; not a human study.
+- docs/research/SCI-TARGET-DELTA-VERIFICATION-001.md: separately audits whether each intervention changed its declared target claim/scope in the intended direction without collateral material changes.
+- src/intervention_target_delta.rs: exact parent-plan binding, blinded target-transition consensus, changed-scope comparison, collateral-change detection and combined global/target validity.
+- schema/intervention-target-delta-plan.schema.json, schema/intervention-target-delta-receipt.schema.json and schema/intervention-target-delta-report.schema.json: strict target-delta plan, blinded adjudication receipt and claim-bounded report contracts.
+- tools/intervention_target_delta_fixture.py: deterministic seven-candidate composed synthetic fixture; not a human study or semantic-truth result.
 
 - `docs/research/SCI-BENCH-REFRESH-001.md`: benchmark-lifecycle protocol and competitive targets.
 - `schema/generation-manifest.schema.json`: versioned JSON Schema for the v1 generation manifest.
@@ -58,6 +62,22 @@ cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.
 ```
 
 The fixture is synthetic and non-scoring. Panel labels are supplied declarations; the analyzer does not prove reviewer independence, source custody, semantic truth or downstream judge fault detection. Ambiguous candidates are never treated as valid. Sampled/adaptive selection is intentionally excluded from v1 to avoid selective-adjudication bias. See [SCI-INTERVENTION-QUALITY-001](../../docs/research/SCI-INTERVENTION-QUALITY-001.md).
+
+## Verify intended target changes and collateral scope
+
+This second-stage audit composes with SCI-INTERVENTION-QUALITY-001. The parent panel judges global meaning-preserving / meaning-changing / ambiguous status. This layer separately checks whether the declared target claim/scope changed in the expected direction, whether the exact changed-claim set matches, and whether material collateral changes occurred. Every target-plan entry inherits the parent baseline/variant input digests, and each reviewer receipt must echo those digests and the target identity.
+
+```sh
+python3 research/science-bench-refresh/tools/intervention_target_delta_fixture.py /tmp/target-delta
+cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  analyze-intervention-target-delta \
+  /tmp/target-delta/intervention-quality-plan.example.json \
+  /tmp/target-delta/intervention-quality-receipt.example.json \
+  /tmp/target-delta/intervention-target-delta-plan.example.json \
+  /tmp/target-delta/intervention-target-delta-receipt.example.json
+```
+
+The target plan is bound to the exact parent quality-plan bytes, commitment, analyzer revision, purpose and study ID. Reviewers are blinded to expected direction, allowed changed IDs, generator identity, intended relation, pipeline disposition and downstream evaluator outcome. A final valid intervention requires both global relation validity and target-delta validity. Any known invalid axis produces invalid; ambiguity on either axis remains ambiguous. Reviewer independence, competence, semantic truth, raw artifact custody and execution authenticity are not proven. Scoring eligibility remains false. See [SCI-TARGET-DELTA-VERIFICATION-001](../../docs/research/SCI-TARGET-DELTA-VERIFICATION-001.md).
 
 ## Analyze interacting judge nuisance factors
 

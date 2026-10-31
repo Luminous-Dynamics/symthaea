@@ -484,6 +484,25 @@ fn verify_plan(plan_bytes: &[u8]) -> Result<(InterventionQualityPlanV1, String),
     Ok((plan, sha256_hex(plan_bytes)))
 }
 
+/// Verify and expose the immutable parent-plan binding needed by target-delta studies.
+pub fn intervention_quality_plan_binding(
+    plan_bytes: &[u8],
+) -> Result<(String, String, String, String, String), String> {
+    let (plan, plan_sha256) = verify_plan(plan_bytes)?;
+    let purpose = if plan.purpose.qualified() {
+        "qualified_run"
+    } else {
+        "example_only"
+    };
+    Ok((
+        plan_sha256,
+        plan.plan_commitment_sha256,
+        plan.analyzer_source_revision,
+        plan.study_id,
+        purpose.to_owned(),
+    ))
+}
+
 fn majority_relation(
     intended: IntendedSemanticRelationV1,
     reviewers: &[HumanAdjudicationV1],
