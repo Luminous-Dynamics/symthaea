@@ -865,3 +865,361 @@ pub fn analyze_mutation_validity(
     report.report_commitment_sha256 = commitment;
     Ok(report)
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn digest(label: &str) -> String {
+        sha256_hex(label.as_bytes())
+    }
+
+    fn artifact(label: &str, modality: MutationModalityV1) -> MutationArtifactCommitmentV1 {
+        MutationArtifactCommitmentV1 {
+            artifact_id: label.to_owned(),
+            modality,
+            content_sha256: digest(&format!("artifact:{label}")),
+            byte_length: 32,
+        }
+    }
+
+    fn variant(
+        id: &str,
+        relation: MutationSemanticRelationV1,
+    ) -> MutationVariantPlanV1 {
+        MutationVariantPlanV1 {
+            mutation_id: id.to_owned(),
+            metamorphic_pair_id: format!("pair-{id}"),
+            family: MutationFamilyV1::Paraphrase,
+            intended_relation: relation,
+            target_dimension: if relation == MutationSemanticRelationV1::Changing {
+                Some("measurement_unit".to_owned())
+            } else {
+                None
+            },
+            baseline_input_sha256: digest(&format!("{id}:baseline")),
+            variant_input_sha256: digest(&format!("{id}:variant")),
+            baseline_artifacts: vec![artifact(&format!("{id}-base"), MutationModalityV1::Text)],
+            variant_artifacts: vec![artifact(&format!("{id}-variant"), MutationModalityV1::Text)],
+        }
+    }
+
+    fn rating(id: &str, index: usize, decision: SemanticReviewDecisionV1) -> SemanticAdjudicationV1 {
+        SemanticAdjudicationV1 {
+            adjudicator_id_sha256: digest(&format!("{id}:reviewer:{index}")),
+            independence_group_sha256: digest(&format!("{id}:group:{index}")),
+            decision,
+            confidence_millionths: 900_000 - index as u32 * 50_000,
+            rationale_sha256: digest(&format!("{id}:rationale:{index}:{decision:?}")),
+        }
+    }
+
+    fn observation(
+        variant: &MutationVariantPlanV1,
+        decisions: &[SemanticReviewDecisionV1],
+        pass: Option<bool>,
+        failure: Option<&str>,
+        status: MutationEvaluationStatusV1,
+    ) -> MutationValidityObservationV1 {
+        let completed = status == MutationEvaluationStatusV1::Completed;
+        MutationValidityObservationV1 {
+            mutation_id: variant.mutation_id.clone(),
+            baseline_input_sha256: variant.baseline_input_sha256.clone(),
+            variant_input_sha256: variant.variant_input_sha256.clone(),
+            adjudications: decisions.iter().enumerate()
+                .map(|(index, decision)| rating(&variant.mutation_id, index, *decision))
+                .collect(),
+            evaluation_status: status,
+            evaluator_relation_pass: if completed { pass } else { None },
+            failure_fingerprint_sha256: if completed {
+                failure.map(|label| digest(&format!("failure:{label}")))
+            } else {
+                None
+            },
+            generator_call_count: 1,
+            generator_token_count: 1_000,
+            semantic_assistance_call_count: 1,
+            semantic_assistance_token_count: 200,
+            evaluator_call_count: if completed { 1 } else { 0 },
+            evaluator_token_count: if completed { 300 } else { 0 },
+            human_review_seconds: if decisions.is_empty() { 0 } else { 120 },
+            wall_time_milliseconds: 1_500,
+        }
+    }
+
+    fn make_plan_and_receipt() -> (Vec<u8>, Vec<u8>) {
+        let variants = vec![
+            variant("preserve-valid-1", MutationSemanticRelationV1::Preserving),
+            variant("change-valid", MutationSemanticRelationV1::Changing),
+            variant("preserve-invalid", MutationSemanticRelationV1::Preserving),
+            variant("preserve-disputed", MutationSemanticRelationV1::Preserving),
+            variant("change-unreviewed", MutationSemanticRelationV1::Changing),
+            variant("preserve-abstained", MutationSemanticRelationV1::Preserving),
+            variant("preserve-valid-duplicate", MutationSemanticRelationV1::Preserving),
+        ];
+        let fields = MutationValidityPlanFieldsV1 {
+            schema: MUTATION_PLAN_SCHEMA.to_owned(),
+            analyzer_source_revision: crate::BUILT_GENERATOR_SOURCE_REVISION.to_owned(),
+            purpose: MutationPurposeV1::ExampleOnly,
+            study_id: "mutation-validity-tests".to_owned(),
+            generator_source_revision: "b".repeat(40),
+            evaluator_source_revision: "c".repeat(40),
+            generator_policy_sha256: digest("generator-policy"),
+            semantic_task_set_sha256: digest("semantic-task-set"),
+            review_protocol_sha256: digest("review-protocol"),
+            metamorphic_plan_sha256: digest("metamorphic-plan"),
+            evaluator_prompt_sha256: digest("evaluator-prompt"),
+            rubric_sha256: digest("rubric"),
+            reviewers_per_mutation: 3,
+            variants: variants.clone(),
+        };
+        let commitment = plan_commitment(&fields).unwrap();
+        let plan = MutationValidityPlanV1 {
+            schema: fields.schema.clone(),
+            analyzer_source_revision: fields.analyzer_source_revision.clone(),
+            purpose: fields.purpose,
+            study_id: fields.study_id.clone(),
+            generator_source_revision: fields.generator_source_revision.clone(),
+            evaluator_source_revision: fields.evaluator_source_revision.clone(),
+            generator_policy_sha256: fields.generator_policy_sha256.clone(),
+            semantic_task_set_sha256: fields.semantic_task_set_sha256.clone(),
+            review_protocol_sha256: fields.review_protocol_sha256.clone(),
+            metamorphic_plan_sha256: fields.metamorphic_plan_sha256.clone(),
+            evaluator_prompt_sha256: fields.evaluator_prompt_sha256.clone(),
+            rubric_sha256: fields.rubric_sha256.clone(),
+            reviewers_per_mutation: fields.reviewers_per_mutation,
+            variants: variants.clone(),
+            plan_commitment_sha256: commitment,
+        };
+        let plan_bytes = serde_json::to_vec_pretty(&plan).unwrap();
+        let receipt = MutationValidityReceiptV1 {
+            schema: MUTATION_RECEIPT_SCHEMA.to_owned(),
+            analyzer_source_revision: plan.analyzer_source_revision.clone(),
+            purpose: MutationPurposeV1::ExampleOnly,
+            run_id: "synthetic-run-001".to_owned(),
+            plan_sha256: sha256_hex(&plan_bytes),
+            plan_commitment_sha256: plan.plan_commitment_sha256.clone(),
+            metamorphic_receipt_sha256: digest("metamorphic-receipt"),
+            generator_source_revision: plan.generator_source_revision.clone(),
+            evaluator_source_revision: plan.evaluator_source_revision.clone(),
+            evaluator_prompt_sha256: plan.evaluator_prompt_sha256.clone(),
+            rubric_sha256: plan.rubric_sha256.clone(),
+            observations: vec![
+                observation(
+                    &variants[0],
+                    &[SemanticReviewDecisionV1::PreservesSemantics; 3],
+                    Some(false),
+                    Some("fault-A"),
+                    MutationEvaluationStatusV1::Completed,
+                ),
+                observation(
+                    &variants[1],
+                    &[SemanticReviewDecisionV1::ChangesSemantics; 3],
+                    Some(true),
+                    None,
+                    MutationEvaluationStatusV1::Completed,
+                ),
+                observation(
+                    &variants[2],
+                    &[SemanticReviewDecisionV1::ChangesSemantics; 3],
+                    Some(false),
+                    Some("invalid-fault"),
+                    MutationEvaluationStatusV1::Completed,
+                ),
+                observation(
+                    &variants[3],
+                    &[
+                        SemanticReviewDecisionV1::PreservesSemantics,
+                        SemanticReviewDecisionV1::ChangesSemantics,
+                        SemanticReviewDecisionV1::Indeterminate,
+                    ],
+                    Some(false),
+                    Some("disputed-fault"),
+                    MutationEvaluationStatusV1::Completed,
+                ),
+                observation(
+                    &variants[4],
+                    &[],
+                    None,
+                    None,
+                    MutationEvaluationStatusV1::NotStarted,
+                ),
+                observation(
+                    &variants[5],
+                    &[SemanticReviewDecisionV1::Abstain; 3],
+                    Some(true),
+                    None,
+                    MutationEvaluationStatusV1::Completed,
+                ),
+                observation(
+                    &variants[6],
+                    &[SemanticReviewDecisionV1::PreservesSemantics; 3],
+                    Some(false),
+                    Some("fault-A"),
+                    MutationEvaluationStatusV1::Completed,
+                ),
+            ],
+        };
+        let receipt_bytes = serde_json::to_vec_pretty(&receipt).unwrap();
+        (plan_bytes, receipt_bytes)
+    }
+
+    #[test]
+    fn clean_fixture_counts_only_failures_on_confirmed_valid_mutations() {
+        let (plan, receipt) = make_plan_and_receipt();
+        let report = analyze_mutation_validity(&plan, &receipt).unwrap();
+        assert_eq!(report.planned_variant_count, 7);
+        assert_eq!(report.observed_variant_count, 7);
+        assert_eq!(report.completed_evaluation_count, 6);
+        assert_eq!(report.ineligible_evaluation_count, 1);
+        assert_eq!(report.planned_adjudication_slots, 21);
+        assert_eq!(report.observed_adjudication_count, 18);
+        assert_eq!(report.missing_adjudication_slots, 3);
+        assert_eq!(report.confirmed_valid_preserving_count, 2);
+        assert_eq!(report.confirmed_valid_changing_count, 1);
+        assert_eq!(report.confirmed_invalid_count, 1);
+        assert_eq!(report.disputed_count, 1);
+        assert_eq!(report.abstained_count, 1);
+        assert_eq!(report.unreviewed_count, 1);
+        assert_eq!(report.adjudicable_confirmed_count, 4);
+        assert_eq!(report.adjudicable_panel_concordance_millionths, Some(750_000.0));
+        assert_eq!(report.confirmed_valid_yield_over_planned_millionths, Some(3.0 / 7.0 * 1_000_000.0));
+        assert_eq!(report.pairwise_review_agreement_count, 15);
+        assert_eq!(report.pairwise_review_disagreement_count, 3);
+        assert_eq!(report.evaluator_failure_observation_count, 4);
+        assert_eq!(report.verified_failure_observation_count, 2);
+        assert_eq!(report.excluded_invalid_mutation_failure_count, 1);
+        assert_eq!(report.excluded_unconfirmed_mutation_failure_count, 1);
+        assert_eq!(report.unique_verified_failure_count, 1);
+        assert_eq!(report.duplicate_verified_failure_observation_count, 1);
+        assert_eq!(report.total_token_count, 10_200);
+        assert_eq!(report.total_human_review_seconds, 720);
+        assert_eq!(report.tokens_per_confirmed_valid_mutation, Some(3_400.0));
+        assert_eq!(report.tokens_per_unique_verified_failure, Some(10_200.0));
+        assert!(!report.raw_artifact_custody_proven);
+        assert!(!report.reviewer_identity_authenticated);
+        assert!(!report.reviewer_blinding_proven);
+        assert!(!report.panel_reference_validity_proven);
+        assert!(!report.evaluator_execution_proven);
+        assert!(!report.causal_effect_identified);
+        assert!(!report.generalized_validity_estimated);
+        assert!(report.external_anchor_required);
+        assert!(!report.scoring_eligible_declared);
+    }
+
+    #[test]
+    fn report_commitment_verifies_and_detects_tampering() {
+        let (plan, receipt) = make_plan_and_receipt();
+        let report = analyze_mutation_validity(&plan, &receipt).unwrap();
+        let bytes = serde_json::to_vec(&report).unwrap();
+        let verified = verify_mutation_validity_report(&bytes).unwrap();
+        assert_eq!(verified.report_commitment_sha256, report.report_commitment_sha256);
+        let mut tampered: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        tampered["confirmed_valid_preserving_count"] = serde_json::json!(99);
+        let tampered_bytes = serde_json::to_vec(&tampered).unwrap();
+        assert!(verify_mutation_validity_report(&tampered_bytes).unwrap_err()
+            .contains("commitment mismatch"));
+    }
+
+    #[test]
+    fn deterministic_for_exact_plan_and_receipt_bytes() {
+        let (plan, receipt) = make_plan_and_receipt();
+        let first = serde_json::to_vec(&analyze_mutation_validity(&plan, &receipt).unwrap()).unwrap();
+        let second = serde_json::to_vec(&analyze_mutation_validity(&plan, &receipt).unwrap()).unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn rejects_missing_or_duplicate_mutation_observations() {
+        let (plan, receipt) = make_plan_and_receipt();
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["observations"].as_array_mut().unwrap().pop();
+        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("missing"));
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        let first = value["observations"][0].clone();
+        value["observations"].as_array_mut().unwrap().push(first);
+        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("duplicate"));
+    }
+
+    #[test]
+    fn rejects_input_digest_drift_and_receipt_revision_drift() {
+        let (plan, receipt) = make_plan_and_receipt();
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["observations"][0]["variant_input_sha256"] = serde_json::json!(digest("wrong"));
+        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("input digest differs"));
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["evaluator_source_revision"] = serde_json::json!("d".repeat(40));
+        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("differs from frozen plan"));
+    }
+
+    #[test]
+    fn rejects_reused_reviewer_identity_or_independence_group_within_variant() {
+        let (plan, receipt) = make_plan_and_receipt();
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["observations"][0]["adjudications"][1]["adjudicator_id_sha256"] =
+            value["observations"][0]["adjudications"][0]["adjudicator_id_sha256"].clone();
+        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("reuses an adjudicator identity"));
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["observations"][0]["adjudications"][1]["independence_group_sha256"] =
+            value["observations"][0]["adjudications"][0]["independence_group_sha256"].clone();
+        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("reuses an adjudicator independence group"));
+    }
+
+    #[test]
+    fn rejects_semantics_changing_plan_without_target_dimension() {
+        let (plan, _) = make_plan_and_receipt();
+        let value: serde_json::Value = serde_json::from_slice(&plan).unwrap();
+        let mut fields: MutationValidityPlanFieldsV1 = serde_json::from_value(value).unwrap();
+        fields.variants[1].target_dimension = None;
+        let issues = validate_mutation_validity_plan_fields(&fields).unwrap_err();
+        assert!(issues.iter().any(|issue| issue.contains("requires a target_dimension")));
+    }
+
+    #[test]
+    fn rejects_failed_relation_without_fingerprint_and_passing_with_fingerprint() {
+        let (plan, receipt) = make_plan_and_receipt();
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["observations"][0]["failure_fingerprint_sha256"] = serde_json::Value::Null;
+        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("requires a valid failure fingerprint"));
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["observations"][1]["failure_fingerprint_sha256"] = serde_json::json!(digest("unexpected"));
+        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("must not carry a failure fingerprint"));
+    }
+
+    #[test]
+    fn rejects_partial_evaluator_outcome_on_ineligible_execution() {
+        let (plan, receipt) = make_plan_and_receipt();
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["observations"][4]["evaluator_relation_pass"] = serde_json::json!(false);
+        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("must not carry an evaluator outcome"));
+    }
+
+    #[test]
+    fn cost_overflow_is_rejected_not_wrapped() {
+        let (plan, receipt) = make_plan_and_receipt();
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["observations"][0]["generator_token_count"] = serde_json::json!(u64::MAX);
+        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("counter overflow"));
+    }
+
+    #[test]
+    fn rejects_more_reviewers_than_preregistered_slots() {
+        let (plan, receipt) = make_plan_and_receipt();
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["observations"][0]["adjudications"].as_array_mut().unwrap()
+            .push(value["observations"][0]["adjudications"][0].clone());
+        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("more adjudications than planned"));
+    }
+}
