@@ -185,15 +185,19 @@ impl SplitMix64 {
 }
 
 fn make_episode_case(seed: u64) -> EpisodeCase {
-    let mut rng = SplitMix64::new(seed ^ 0x018B_12A7);
+    // Domain-separated streams prevent the hidden regime from being the next
+    // predictable draw after the candidate-visible observation coordinates.
+    let mut observation_rng = SplitMix64::new(seed ^ 0x018B_12A7);
+    let mut regime_rng = SplitMix64::new(seed ^ 0xA11C_0180);
+    let mut disturbance_rng = SplitMix64::new(seed ^ 0xD157_0180);
     EpisodeCase {
         history_id: seed,
         history: ObservedHistory {
-            x: -0.35 + 0.70 * rng.unit(),
-            v: -0.25 + 0.50 * rng.unit(),
+            x: -0.35 + 0.70 * observation_rng.unit(),
+            v: -0.25 + 0.50 * observation_rng.unit(),
         },
-        hidden_regime_positive: rng.unit() >= 0.5,
-        common_disturbance: -0.01 + 0.02 * rng.unit(),
+        hidden_regime_positive: regime_rng.unit() >= 0.5,
+        common_disturbance: -0.01 + 0.02 * disturbance_rng.unit(),
     }
 }
 
