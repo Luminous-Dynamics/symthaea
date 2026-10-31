@@ -349,6 +349,81 @@ fn plan_checks(plan: Option<&GrammarPlanEvidence>) -> Vec<AnalystCheck> {
                 format!("{:?}", evidence.verification),
             ),
         ],
+        GrammarPlanEvidence::Opera(evidence) => {
+            let v = &evidence.verification;
+            vec![
+                observed_check(
+                    "opera-two-theme-statements",
+                    "Opera establishes two isolated melodic identities in their declared key regions",
+                    v.statement_a_isolated
+                        && v.statement_b_isolated
+                        && v.statement_b_uses_relative_key
+                        && v.theme_identities_are_distinct,
+                    "Theme A solo in home key; Theme B solo in relative key; distinct note identities",
+                    format!("{:?}", v),
+                ),
+                observed_check(
+                    "opera-alternating-dialogue",
+                    "Opera dialogue alternates one active character voice per bar",
+                    v.dialogue_alternates_one_bar_at_a_time,
+                    "Melody, CounterMelody, Melody, CounterMelody over four bars",
+                    format!("{:?}", v),
+                ),
+                observed_check(
+                    "opera-interruption-and-cadence",
+                    "Theme B is cut off exactly when Theme A's resolving tag enters",
+                    v.interruption_cuts_theme_b_at_exact_boundary
+                        && v.cadence_enters_at_cutoff,
+                    "Theme B ends at beat 2 of bar 9; Theme A tag enters at beat 2 and closes",
+                    format!("{:?}", v),
+                ),
+                observed_check(
+                    "opera-nine-bar-duration",
+                    "The dramatic form matches its declared nine-bar duration",
+                    v.nine_bar_timeline_matches,
+                    "9 bars at the declared meter",
+                    format!("{:?}", v),
+                ),
+            ]
+        }
+        GrammarPlanEvidence::Opera(evidence) => {
+            let v = &evidence.verification;
+            vec![
+                observed_check(
+                    "opera-two-theme-statements",
+                    "Opera establishes two distinct, isolated themes in their declared key contexts",
+                    v.statement_a_isolated
+                        && v.statement_b_isolated
+                        && v.statement_a_matches_home_key_theme
+                        && v.statement_b_uses_relative_key
+                        && v.theme_identities_are_distinct,
+                    "Theme A exact home-key theme; Theme B exact relative-key theme; each isolated",
+                    format!("{:?}", v),
+                ),
+                observed_check(
+                    "opera-alternating-dialogue",
+                    "Opera dialogue alternates one active character voice per bar",
+                    v.dialogue_alternates_one_bar_at_a_time,
+                    "Melody, CounterMelody, Melody, CounterMelody over four bars",
+                    format!("{:?}", v),
+                ),
+                observed_check(
+                    "opera-interruption-and-cadence",
+                    "Theme B is cut off exactly when Theme A's resolving tag enters",
+                    v.interruption_cuts_theme_b_at_exact_boundary
+                        && v.cadence_enters_at_cutoff,
+                    "Theme B ends at beat 2 of bar 9; Theme A tag enters at beat 2 and closes",
+                    format!("{:?}", v),
+                ),
+                observed_check(
+                    "opera-nine-bar-duration",
+                    "The dramatic form matches its declared nine-bar duration",
+                    v.nine_bar_timeline_matches,
+                    "9 bars at the declared meter",
+                    format!("{:?}", v),
+                ),
+            ]
+        }
         GrammarPlanEvidence::Compatibility {
             family,
             form_available,

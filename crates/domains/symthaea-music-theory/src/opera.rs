@@ -45,6 +45,7 @@ use crate::motif::Motif;
 use crate::phrase::Period;
 use crate::rhythm::Duration;
 use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
+use serde::{Deserialize, Serialize};
 
 /// Character one: confident, triadic, rising to the octave.
 pub(crate) fn theme_a() -> Motif {
@@ -175,6 +176,282 @@ fn push_theme(
     }
 }
 
+/// One region in the current Opera/Art Song conversational form.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OperaSectionPlan {
+    pub id: String,
+    /// Inclusive start bar, zero-based.
+    pub start_bar: u8,
+    /// Exclusive end bar, zero-based.
+    pub end_bar_exclusive: u8,
+    /// `home` or `relative`; the engine currently uses a relative-key
+    /// contrast for Statement B.
+    pub key_context: String,
+}
+
+/// The dramatic contract emitted beside an Opera score.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OperaPlan {
+    pub engine_version: String,
+    /// The seed selects the immutable Theme A and Theme B motif variants.
+    pub seed: u64,
+    pub meter: u8,
+    pub total_bars: u8,
+    pub sections: Vec<OperaSectionPlan>,
+    pub statement_a_role: VoiceRole,
+    pub statement_b_role: VoiceRole,
+    /// Four one-bar turns in the dialogue region.
+    pub dialogue_voice_order: Vec<VoiceRole>,
+    pub interruption_bar: u8,
+    /// Offset inside the interruption bar at which Theme B is cut off.
+    pub interruption_cutoff: Duration,
+    /// Theme A's resolving tag enters at exactly the cutoff.
+    pub cadence_entry: Duration,
+}
+
+/// Verifiable facts extracted from the emitted Opera score.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OperaVerification {
+    pub nine_bar_timeline_matches: bool,
+    pub statement_a_isolated: bool,
+    pub statement_b_isolated: bool,
+    pub statement_a_matches_home_key_theme: bool,
+    pub statement_b_uses_relative_key: bool,
+    pub dialogue_alternates_one_bar_at_a_time: bool,
+    pub interruption_cuts_theme_b_at_exact_boundary: bool,
+    pub cadence_enters_at_cutoff: bool,
+    pub theme_identities_are_distinct: bool,
+}
+
+impl OperaVerification {
+    pub fn all_verified(&self) -> bool {
+        self.nine_bar_timeline_matches
+            && self.statement_a_isolated
+            && self.statement_b_isolated
+            && self.statement_a_matches_home_key_theme
+            && self.statement_b_uses_relative_key
+            && self.dialogue_alternates_one_bar_at_a_time
+            && self.interruption_cuts_theme_b_at_exact_boundary
+            && self.cadence_enters_at_cutoff
+            && self.theme_identities_are_distinct
+    }
+}
+
+/// A score paired with the exact dramatic plan and score-side checks from the
+/// same generation pass.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OperaRealization {
+    pub score: Score,
+    pub plan: OperaPlan,
+    pub verification: OperaVerification,
+}
+
+fn opera_plan(meter: u8, seed: u64) -> OperaPlan {
+    OperaPlan {
+        engine_version: "two-theme-dialogue-v1".into(),
+        seed,
+        meter,
+        total_bars: 9,
+        sections: vec![
+            OperaSectionPlan {
+                id: "statement-a".into(),
+                start_bar: 0,
+                end_bar_exclusive: 2,
+                key_context: "home".into(),
+            },
+            OperaSectionPlan {
+                id: "statement-b".into(),
+                start_bar: 2,
+                end_bar_exclusive: 4,
+                key_context: "relative".into(),
+            },
+            OperaSectionPlan {
+                id: "dialogue".into(),
+                start_bar: 4,
+                end_bar_exclusive: 8,
+                key_context: "home".into(),
+            },
+            OperaSectionPlan {
+                id: "interruption-cadence".into(),
+                start_bar: 8,
+                end_bar_exclusive: 9,
+                key_context: "home".into(),
+            },
+        ],
+        statement_a_role: VoiceRole::Melody,
+        statement_b_role: VoiceRole::CounterMelody,
+        dialogue_voice_order: vec![
+            VoiceRole::Melody,
+            VoiceRole::CounterMelody,
+            VoiceRole::Melody,
+            VoiceRole::CounterMelody,
+        ],
+        interruption_bar: 8,
+        interruption_cutoff: Duration::new(2, 1),
+        cadence_entry: Duration::new(2, 1),
+    }
+}
+
+fn notes_in_bar(
+    score: &Score,
+    role: VoiceRole,
+    bar_index: u8,
+    meter: f64,
+) -> Vec<ScoreNote> {
+    let start = bar_index as f64 * meter;
+    let end = start + meter;
+    score
+        .notes
+        .iter()
+        .copied()
+        .filter(|note| {
+            note.role == role
+                && note.onset.beats() >= start - 1e-9
+                && note.onset.beats() < end - 1e-9
+        })
+        .collect()
+}
+
+pub(crate) fn verify_opera_plan(score: &Score, home_key: Key, plan: &OperaPlan) -> OperaVerification {
+    let meter = plan.meter as f64;
+    let expected_total = plan.total_bars as f64 * meter;
+    let expected_sections = [
+        ("statement-a", 0, 2, "home"),
+        ("statement-b", 2, 4, "relative"),
+        ("dialogue", 4, 8, "home"),
+        ("interruption-cadence", 8, 9, "home"),
+    ];
+    let section_layout_matches = plan.sections.len() == expected_sections.len()
+        && plan.sections.iter().zip(expected_sections).all(
+            |(section, (id, start, end, key_context))| {
+                section.id == id
+                    && section.start_bar == start
+                    && section.end_bar_exclusive == end
+                    && section.key_context == key_context
+            },
+        );
+    let timeline_matches = plan.engine_version == "two-theme-dialogue-v1"
+        && plan.statement_a_role == VoiceRole::Melody
+        && plan.statement_b_role == VoiceRole::CounterMelody
+        && score.meter == plan.meter
+        && (score.total_beats.beats() - expected_total).abs() <= 1e-7
+        && plan.total_bars == 9
+        && section_layout_matches;
+
+    let statement_a_melody: Vec<_> = (0..2)
+        .flat_map(|bar| notes_in_bar(score, VoiceRole::Melody, bar, meter))
+        .collect();
+    let statement_a_counter: Vec<_> = (0..2)
+        .flat_map(|bar| notes_in_bar(score, VoiceRole::CounterMelody, bar, meter))
+        .collect();
+    let statement_a_isolated = !statement_a_melody.is_empty()
+        && statement_a_counter.is_empty()
+        && (0..2).all(|bar| !notes_in_bar(score, VoiceRole::Melody, bar, meter).is_empty());
+
+    let statement_b_melody: Vec<_> = (2..4)
+        .flat_map(|bar| notes_in_bar(score, VoiceRole::Melody, bar, meter))
+        .collect();
+    let statement_b_counter: Vec<_> = (2..4)
+        .flat_map(|bar| notes_in_bar(score, VoiceRole::CounterMelody, bar, meter))
+        .collect();
+    let statement_b_isolated = !statement_b_counter.is_empty()
+        && statement_b_melody.is_empty()
+        && (2..4).all(|bar| !notes_in_bar(score, VoiceRole::CounterMelody, bar, meter).is_empty());
+    let relative_key = home_key.relative();
+    let expected_a_once = expected_theme_pitches(&theme_a_for_seed(plan.seed), home_key, 5);
+    let expected_b_once = expected_theme_pitches(&theme_b_for_seed(plan.seed), relative_key, 4);
+    let expected_a: Vec<_> = (0..2).flat_map(|_| expected_a_once.iter().copied()).collect();
+    let expected_b: Vec<_> = (0..2).flat_map(|_| expected_b_once.iter().copied()).collect();
+    let actual_a: Vec<_> = statement_a_melody.iter().map(|note| note.pitch.midi()).collect();
+    let actual_b: Vec<_> = statement_b_counter.iter().map(|note| note.pitch.midi()).collect();
+    let statement_a_matches_home_key_theme = actual_a == expected_a;
+    let statement_b_uses_relative_key = actual_b == expected_b;
+
+    let expected_dialogue = [
+        VoiceRole::Melody,
+        VoiceRole::CounterMelody,
+        VoiceRole::Melody,
+        VoiceRole::CounterMelody,
+    ];
+    let dialogue_alternates_one_bar_at_a_time =
+        plan.dialogue_voice_order.len() == expected_dialogue.len()
+        && plan
+            .dialogue_voice_order
+            .iter()
+            .zip(expected_dialogue)
+            .all(|(actual, expected)| *actual == expected)
+        && (0..4u8).all(|index| {
+            let bar = 4 + index;
+            let expected = plan.dialogue_voice_order[index as usize];
+            let other = if expected == VoiceRole::Melody {
+                VoiceRole::CounterMelody
+            } else {
+                VoiceRole::Melody
+            };
+            !notes_in_bar(score, expected, bar, meter).is_empty()
+                && notes_in_bar(score, other, bar, meter).is_empty()
+        });
+
+    let interruption_start = plan.interruption_bar as f64 * meter;
+    let cutoff = plan.interruption_cutoff.beats();
+    let interruption_plan_matches =
+        plan.interruption_bar == 8
+            && (cutoff - 2.0).abs() <= 1e-7
+            && (plan.cadence_entry.beats() - 2.0).abs() <= 1e-7;
+    let counter_interruption: Vec<_> = score
+        .notes
+        .iter()
+        .filter(|note| {
+            note.role == VoiceRole::CounterMelody
+                && note.onset.beats() >= interruption_start - 1e-9
+                && note.onset.beats() < interruption_start + meter - 1e-9
+        })
+        .collect();
+    let last_counter_end = counter_interruption
+        .iter()
+        .map(|note| (note.onset + note.duration).beats())
+        .max_by(f64::total_cmp);
+    let interruption_cuts_theme_b_at_exact_boundary = interruption_plan_matches
+        && last_counter_end
+            .is_some_and(|end| (end - (interruption_start + cutoff)).abs() <= 1e-7)
+        && counter_interruption.iter().all(|note| {
+            (note.onset + note.duration).beats() <= interruption_start + cutoff + 1e-7
+        });
+
+    let cadence_start = interruption_start + plan.cadence_entry.beats();
+    let cadence_notes: Vec<_> = score
+        .notes
+        .iter()
+        .filter(|note| {
+            note.role == VoiceRole::Melody
+                && note.onset.beats() >= interruption_start - 1e-9
+                && note.onset.beats() < interruption_start + meter - 1e-9
+        })
+        .collect();
+    let cadence_enters_at_cutoff = cadence_notes.len() == 2
+        && (cadence_notes[0].onset.beats() - cadence_start).abs() <= 1e-7
+        && cadence_notes[1].emphasis == Emphasis::Cadential;
+
+    let mut a_pitches: Vec<_> = statement_a_melody.iter().map(|note| note.pitch.midi()).collect();
+    let mut b_pitches: Vec<_> = statement_b_counter.iter().map(|note| note.pitch.midi()).collect();
+    a_pitches.sort_unstable();
+    b_pitches.sort_unstable();
+    let theme_identities_are_distinct = expected_a_once != expected_b_once
+        && a_pitches != b_pitches;
+
+    OperaVerification {
+        nine_bar_timeline_matches: timeline_matches,
+        statement_a_isolated,
+        statement_b_isolated,
+        statement_a_matches_home_key_theme,
+        statement_b_uses_relative_key,
+        dialogue_alternates_one_bar_at_a_time,
+        interruption_cuts_theme_b_at_exact_boundary,
+        cadence_enters_at_cutoff,
+        theme_identities_are_distinct,
+    }
+}
+
 pub(crate) fn realize_opera(
     home_key: Key,
     tempo: f32,
@@ -182,6 +459,20 @@ pub(crate) fn realize_opera(
     seed: u64,
     intent: &MusicalIntent,
 ) -> Score {
+    realize_opera_with_plan(home_key, tempo, meter, seed, intent).score
+}
+
+/// Plan-preserving realization for the common grammar evidence boundary.
+/// The canonical score-only entry point delegates here to avoid planner /
+/// composer drift.
+pub(crate) fn realize_opera_with_plan(
+    home_key: Key,
+    tempo: f32,
+    meter: f64,
+    seed: u64,
+    intent: &MusicalIntent,
+) -> OperaRealization {
+    let plan = opera_plan(meter as u8, seed);
     let bar = Duration::new(meter as i64, 1);
     let relative_key = home_key.relative();
     let melody_octave = 5;
@@ -349,7 +640,8 @@ pub(crate) fn realize_opera(
     score
         .notes
         .sort_by(|x, y| x.onset.beats().total_cmp(&y.onset.beats()));
-    score
+    let verification = verify_opera_plan(&score, home_key, &plan);
+    OperaRealization { score, plan, verification }
 }
 
 #[cfg(test)]
@@ -359,6 +651,83 @@ mod tests {
 
     fn intent() -> MusicalIntent {
         MusicalIntent::default()
+    }
+
+    #[test]
+    fn emitted_opera_plan_verifies_all_nine_bar_dialogue_obligations() {
+        let home = Key::major(PitchClass::C);
+        for seed in 0..64u64 {
+            let realized = realize_opera_with_plan(home, 100.0, 4.0, seed, &intent());
+            assert_eq!(realized.plan.engine_version, "two-theme-dialogue-v1");
+            assert_eq!(realized.plan.total_bars, 9);
+            assert_eq!(realized.plan.sections.len(), 4);
+            assert!(
+                realized.verification.all_verified(),
+                "seed {seed}: {:?}",
+                realized.verification
+            );
+            assert!((realized.score.total_beats.beats() - 36.0).abs() <= 1e-7);
+        }
+    }
+
+    #[test]
+    fn opera_plan_verifier_rejects_a_missing_dialogue_turn() {
+        let home = Key::major(PitchClass::C);
+        let realized = realize_opera_with_plan(home, 100.0, 4.0, 3, &intent());
+        let mut corrupted = realized.score.clone();
+        let dialogue_bar = 5.0 * 4.0;
+        corrupted.notes.retain(|note| {
+            !(note.role == VoiceRole::CounterMelody
+                && note.onset.beats() >= dialogue_bar
+                && note.onset.beats() < dialogue_bar + 4.0)
+        });
+        let verification = verify_opera_plan(&corrupted, home, &realized.plan);
+        assert!(!verification.dialogue_alternates_one_bar_at_a_time);
+        assert!(!verification.all_verified());
+    }
+
+    #[test]
+    fn opera_plan_verifier_rejects_statement_b_pitched_as_home_key_degrees() {
+        let home = Key::major(PitchClass::C);
+        let realized = realize_opera_with_plan(home, 100.0, 4.0, 3, &intent());
+        let mut corrupted = realized.score.clone();
+        let first_statement_b = corrupted
+            .notes
+            .iter_mut()
+            .find(|note| {
+                note.role == VoiceRole::CounterMelody
+                    && note.onset.beats() >= 8.0
+                    && note.onset.beats() < 16.0
+            })
+            .expect("Statement B must have a first theme event");
+        // B's first note is scale degree 7 of the relative minor. Replace it
+        // with scale degree 7 of the home major: still diatonic to the shared
+        // key signature, but not the declared relative-key realization.
+        first_statement_b.pitch = home.scale().degree_pitch(7, 4);
+        let verification = verify_opera_plan(&corrupted, home, &realized.plan);
+        assert!(!verification.statement_b_uses_relative_key);
+        assert!(!verification.all_verified());
+    }
+
+    #[test]
+    fn opera_plan_verifier_rejects_interruption_that_crosses_the_cutoff() {
+        let home = Key::major(PitchClass::C);
+        let realized = realize_opera_with_plan(home, 100.0, 4.0, 3, &intent());
+        let mut corrupted = realized.score.clone();
+        let last_counter = corrupted
+            .notes
+            .iter_mut()
+            .filter(|note| {
+                note.role == VoiceRole::CounterMelody
+                    && note.onset.beats() >= 32.0
+                    && note.onset.beats() < 36.0
+            })
+            .max_by(|left, right| left.onset.beats().total_cmp(&right.onset.beats()))
+            .expect("interruption must have a final Theme B note");
+        last_counter.duration = Duration::new(3, 2);
+        let verification = verify_opera_plan(&corrupted, home, &realized.plan);
+        assert!(!verification.interruption_cuts_theme_b_at_exact_boundary);
+        assert!(!verification.all_verified());
     }
 
     #[test]

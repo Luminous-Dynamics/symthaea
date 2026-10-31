@@ -538,6 +538,21 @@ pub fn build_grammar_trace(
                 }
             }
         }
+        GrammarPlanEvidence::Opera(evidence) => {
+            let bar = evidence.plan.meter as f64;
+            for section in &evidence.plan.sections {
+                if let Some(assertion) = structure_for_region(
+                    score,
+                    format!("opera-{}", section.id),
+                    format!("dramatic-{}", section.id),
+                    section.start_bar as f64 * bar,
+                    section.end_bar_exclusive as f64 * bar,
+                    "opera-two-theme-dialogue-plan",
+                ) {
+                    structures.push(assertion);
+                }
+            }
+        }
     }
 
     let mut obligations = Vec::new();
@@ -800,6 +815,44 @@ pub fn build_grammar_trace(
                         .flat_map(|region| [region.start, region.end])
                         .collect(),
                     responsible_pass: "renaissance-score-side-checker".into(),
+                    transformation: None,
+                });
+            }
+        }
+        GrammarPlanEvidence::Opera(evidence) => {
+            let checks = [
+                ("opera-nine-bar-duration", evidence.verification.nine_bar_timeline_matches),
+                ("opera-statement-a-isolation", evidence.verification.statement_a_isolated),
+                ("opera-statement-b-isolation", evidence.verification.statement_b_isolated),
+                ("opera-statement-a-home-key-theme", evidence.verification.statement_a_matches_home_key_theme),
+                ("opera-statement-b-relative-key", evidence.verification.statement_b_uses_relative_key),
+                ("opera-dialogue-turn-taking", evidence.verification.dialogue_alternates_one_bar_at_a_time),
+                ("opera-interruption-cutoff", evidence.verification.interruption_cuts_theme_b_at_exact_boundary),
+                ("opera-cadence-entry", evidence.verification.cadence_enters_at_cutoff),
+                ("opera-theme-identity", evidence.verification.theme_identities_are_distinct),
+            ];
+            for (id, verified) in checks {
+                obligations.push(ObligationAssertion {
+                    obligation_id: id.into(),
+                    from: None,
+                    to: AssertedObligationState::Created,
+                    evidence: Vec::new(),
+                    responsible_pass: "opera-dramatic-planner".into(),
+                    transformation: None,
+                });
+                obligations.push(ObligationAssertion {
+                    obligation_id: id.into(),
+                    from: Some(AssertedObligationState::Created),
+                    to: if verified {
+                        AssertedObligationState::Fulfilled
+                    } else {
+                        AssertedObligationState::Unresolved
+                    },
+                    evidence: structures
+                        .iter()
+                        .flat_map(|region| [region.start, region.end])
+                        .collect(),
+                    responsible_pass: "opera-score-side-verifier".into(),
                     transformation: None,
                 });
             }
