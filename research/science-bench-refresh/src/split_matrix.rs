@@ -52,6 +52,7 @@ pub struct SplitMatrixAuditReportV1 {
     pub observed_pair_count: u64,
     pub hard_blocking_pair_count: u64,
     pub manual_review_pair_count: u64,
+    pub shared_task_id_occurrences: u64,
     pub exact_policy_overlap_pair_count: u64,
     pub numeric_near_duplicate_candidate_pair_count: u64,
     pub shared_lineage_root_occurrences: u64,
@@ -130,6 +131,7 @@ pub fn audit_required_split_matrix(
     let mut pairs = Vec::with_capacity(EXPECTED_PAIR_COUNT as usize);
     let mut hard_blocking_pair_count = 0_u64;
     let mut manual_review_pair_count = 0_u64;
+    let mut shared_task_id_occurrences = 0_u64;
     let mut exact_policy_overlap_pair_count = 0_u64;
     let mut numeric_near_duplicate_candidate_pair_count = 0_u64;
     let mut shared_lineage_root_occurrences = 0_u64;
@@ -185,6 +187,11 @@ pub fn audit_required_split_matrix(
                 )?;
             }
 
+            add_checked(
+                &mut shared_task_id_occurrences,
+                policy_input.shared_task_id_count,
+                "shared task-ID occurrences",
+            )?;
             add_checked(
                 &mut exact_policy_overlap_pair_count,
                 policy_input.exact_overlap_pair_count,
@@ -255,6 +262,7 @@ pub fn audit_required_split_matrix(
         observed_pair_count,
         hard_blocking_pair_count,
         manual_review_pair_count,
+        shared_task_id_occurrences,
         exact_policy_overlap_pair_count,
         numeric_near_duplicate_candidate_pair_count,
         shared_lineage_root_occurrences,
@@ -412,7 +420,10 @@ mod tests {
         assert_eq!(first.expected_pair_count, 3);
         assert_eq!(first.observed_pair_count, 3);
         assert_eq!(first.pairs.len(), 3);
-        assert_eq!(first.admission, "no_detected_overlap_across_complete_declared_matrix_only");
+        assert_eq!(
+            first.admission,
+            "no_detected_overlap_across_complete_declared_matrix_only"
+        );
         assert_eq!(first.semantic_independence, "not_assessed");
         assert_eq!(first.model_training_contamination, "not_assessed");
         assert_eq!(
