@@ -446,19 +446,15 @@ pub fn verify_matched_offer_sets(
     let mut policy_ids = policy_ids;
     policy_ids.sort_unstable();
     let snapshots = first_snapshots.unwrap_or_default();
-    let mut digest_items: Vec<_> = snapshots.iter().collect();
-    digest_items.sort_by(|left, right| left.0.cmp(right.0));
-    let offer_set_manifest_sha256 = digest_serializable(
-        &digest_items
-            .iter()
-            .map(|(key, digest)| (key, digest))
-            .collect::<Vec<_>>(),
-    )?;
+    let shared_decision_boundaries = snapshots.len();
+    let mut digest_items: Vec<_> = snapshots.into_iter().collect();
+    digest_items.sort_by(|left, right| left.0.cmp(&right.0));
+    let offer_set_manifest_sha256 = digest_serializable(&digest_items)?;
 
     Ok(OfferSetMatchSummary {
         campaign_id: campaign_id.unwrap_or_default(),
         policy_ids,
-        shared_decision_boundaries: snapshots.len(),
+        shared_decision_boundaries,
         shared_batch_snapshots: shared_batch_snapshots / tapes.len(),
         shared_sequential_snapshots: shared_sequential_snapshots / tapes.len(),
         offer_set_manifest_sha256,
