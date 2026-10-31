@@ -20,7 +20,7 @@ A sensor should allocate a monotonic sequence **before** any operation that can 
 3. explicitly discarded because the event is required by the profile; or
 4. explicitly discarded because an independently reviewed policy excludes it.
 
-The ledger is scoped by `source_id`, `epoch_id` and `partition_id` (for example, a per-CPU producer). It records a terminal attempted-sequence high-water mark and a close fence after producers are quiesced and the userspace consumer has drained.
+The ledger is scoped by `source_id`, `epoch_id` and `partition_id` (for example, a per-CPU producer). It records a terminal attempted-sequence high-water mark and a close fence after producers are quiesced and the userspace consumer has drained. Policy-excluded discards remain explicit, but this auditor does not evaluate the exclusion policy; any such discard blocks loss-free promotion until a separate pinned policy evaluator approves it.
 
 The terminal high-water mark is critical. A dropped final event produces no later record, so an ordinary interior sequence-gap detector cannot see it. Only a final attempted-sequence fence can expose that tail loss.
 
@@ -48,7 +48,7 @@ This PR adds:
 - `basalt-event-delivery-audit --ledger PATH` CLI;
 - thirteen unit tests authored for clean closure, tail loss, interior gaps, overlap, counter mismatch, required/excluded discards, unclosed consumers, restart, unknown epochs and source duplication.
 
-The auditor compares each source epoch's attempted range against event singletons and classified loss/discard intervals. It checks that intervals are non-overlapping and cover the entire attempted range, including the tail. It recomputes published/lost/discarded counts and compares them against the supplied counters.
+The auditor compares each source epoch's attempted range against event singletons and classified loss/discard intervals. It checks that intervals are non-overlapping and cover the entire attempted range, including the tail. It recomputes published/lost/discarded counts and compares them against the supplied counters. It refuses loss-free status for any unreviewed policy exclusion, even when the sequence arithmetic is complete.
 
 ## Industry comparison
 
@@ -80,7 +80,7 @@ These are proposed research targets, not external standards or achieved measurem
 
 ## Trust boundary
 
-The auditor validates the supplied sequence ledger, event records, classified ranges, close-fence digest format and derived counter relationships. It does not attach a BPF program, observe kernel events, prove the counter was incremented by the kernel, authenticate the ledger producer, or qualify an observer profile.
+The auditor validates the supplied sequence ledger, event records, classified ranges, close-fence digest format and derived counter relationships. It does not evaluate the content of an exclusion policy, attach a BPF program, observe kernel events, prove the counter was incremented by the kernel, authenticate the ledger producer, or qualify an observer profile.
 
 The source supervisor must generate the terminal close only after producers stop and the consumer drain is acknowledged. The positive-control harness must prove each relevant drop path is detected before any loss-free claim is accepted.
 
