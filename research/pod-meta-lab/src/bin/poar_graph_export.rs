@@ -9,10 +9,6 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-fn fail(message: impl AsRef<str>) -> String {
-    message.as_ref().to_string()
-}
-
 fn split_from_str(value: &str) -> Result<DatasetSplit, String> {
     match value {
         "dev" | "development" => Ok(DatasetSplit::Development),
