@@ -1543,6 +1543,12 @@ mod tests {
     }
 
     #[test]
+    fn nonlinear_interaction_report_matches_pinned_golden_fixture_byte_for_byte() {
+        let expected = include_str!("../fixtures/interaction-suite.expected.json");
+        assert_eq!(interaction_suite_json().unwrap(), expected);
+    }
+
+    #[test]
     fn all_reference_cases_meet_their_declared_control() {
         let cases = reference_suite().expect("suite is valid");
         assert_eq!(cases.len(), 6);
