@@ -33,7 +33,9 @@ These are independent assurance claims. Passing one does not imply the others.
 
 A single best-scoring graph hides unresolved identity and synapse alternatives. Query results should be evaluated over a provenance-bound finite scenario set, set-valued envelope or empirically weighted ensemble. Probability language is allowed only when the ensemble construction, dependence assumptions and calibration justify it.
 
-This is tracked in [#9344](https://github.com/Luminous-Dynamics/symthaea/issues/9344). The certificate structure in #9255 must consume this result without claiming that a DAG digest proves biological truth.
+**V1 implementation added to PR #8883:** `connectome-query-ensemble-audit` evaluates the same frozen graph query over explicit finite scenarios, verifies canonical graph hashes, preserves shared evidence-lineage groups, sorts results deterministically, and reports the minimum/maximum value and decision stability. Its finite unweighted scenario semantics explicitly make no probability or posterior claim. The synthetic fixture includes a path query that changes across reconstructions and two stable controls. See `CONNECTOME_QUERY_ENSEMBLE_AUDIT.schema.json` and `CONNECTOME_QUERY_ENSEMBLE_AUDIT_PROTOCOL_V1.md`.
+
+The implementation is tracked in [#9344](https://github.com/Luminous-Dynamics/symthaea/issues/9344). The certificate structure in #9255 must consume this result without claiming that a DAG digest proves biological truth.
 
 ### 2.2 From graph nodes to continuous neurite evidence
 
@@ -263,7 +265,7 @@ A result is not promoted because it beats one baseline on one metric. Promotion 
 
 ## 10. Current evidence boundary
 
-PR #8883 includes source for the V2 intake/scorer, spatial frame/mask audit, candidate-generation coverage, co-linear synthetic baseline, exact small graph-edge portfolio evaluator and query dependency DAG checks. PR descriptions report authored tests and earlier historical CI runs. Authored counts are not passing counts, and historical runs do not validate a newer head.
+PR #8883 includes source for the V2 intake/scorer, spatial frame/mask audit, candidate-generation coverage, co-linear synthetic baseline, exact small graph-edge portfolio evaluator, query dependency DAG checks, and the new finite reconstruction query ensemble evaluator. The ensemble evaluator has a strict schema, synthetic fixture, protocol, README instructions, CI path triggers and nine authored unit tests. JSON Schema/fixture validation and all three graph digest recomputations were independently checked outside Rust. Authored counts are not passing counts, and the Rust compiler/test suite has not been run for this newest head.
 
 The live PR head and its CI status must be checked at each qualification attempt. A missing workflow run/status is **unconfirmed**, not pass. Synthetic fixture behavior is not biological validation. No SOTA superiority, biological recall gain, causal reviewer-time gain or production certification is claimed by this document.
 
