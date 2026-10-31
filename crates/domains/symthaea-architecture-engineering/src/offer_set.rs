@@ -463,3 +463,177 @@ fn digest_serializable<T: Serialize>(value: &T) -> Result<String, OfferSetError>
     let digest = Sha256::digest(&bytes);
     Ok(digest.iter().map(|byte| format!("{byte:02x}")).collect())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::event_tape::{
+        ActionEvent, ActionOutcome, CandidateDisposition, ComparisonMode, EventTapeHeader,
+        ExecutionContract, ExecutionMode, MeterValue, PolicySnapshot, ResourceReceipt,
+    };
+    use serde_json::json;
+
+    const H1: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const H2: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const H3: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    const H4: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+    const H5: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+
+    fn digest<T: Serialize>(value: &T) -> String {
+        let bytes = serde_json::to_vec(value).unwrap();
+        let hash = Sha256::digest(bytes);
+        hash.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+
+    fn tape(policy_id: &str, config: serde_json::Value) -> EventTape {
+        let measured = |value| MeterValue::Measured { value };
+        let header = EventTapeHeader {
+            schema: "symthaea.ar5b4.event-tape".to_owned(),
+            version: "0.1.0".to_owned(),
+            campaign_id: "offer-set-campaign".to_owned(),
+            source_commit: "0123456789abcdef0123456789abcdef01234567".to_owned(),
+            execution_environment_sha256: H1.to_owned(),
+            comparison_mode: ComparisonMode::MechanismMatched,
+            proposal_source_id: "shared-proposal-source-v1".to_owned(),
+            proposal_stream_sha256: Some(H2.to_owned()),
+            task_recipe_sha256: H3.to_owned(),
+            comparison_profile_sha256: H4.to_owned(),
+            evaluator_sha256: H5.to_owned(),
+            verifier_sha256: H1.to_owned(),
+            budget_model_id: "offer-set-budget-v1".to_owned(),
+            budget_model_sha256: H2.to_owned(),
+            budget_limit_microunits: 100,
+            initial_direction_ids: vec!["A".to_owned()],
+            execution: ExecutionContract {
+                mode: ExecutionMode::Sequential,
+                worker_count: 1,
+                seats_per_round: 1,
+                first_round_claim_cap: None,
+                steady_state_claim_cap: None,
+            },
+            policy: PolicySnapshot {
+                policy_id: policy_id.to_owned(),
+                algorithm_id: format!("algorithm-{policy_id}"),
+                config_sha256: digest(&config),
+                config,
+                has_hidden_oracle_access: false,
+            },
+        };
+        let mut tape = EventTape::new(header).unwrap();
+        tape.append(ActionEvent {
+            event_id: format!("event-{policy_id}"),
+            policy_id: policy_id.to_owned(),
+            worker_id: 0,
+            round_id: 1,
+            batch_id: None,
+            observed_through_sequence: 0,
+            visible_history_sha256: String::new(),
+            retry_of_event_id: None,
+            intent: ActionIntent::EvaluateCandidate {
+                candidate_sha256: H5.to_owned(),
+                parent_candidate_sha256: None,
+                semantic_delta_sha256: H3.to_owned(),
+                direction_id: "A".to_owned(),
+            },
+            outcome: ActionOutcome::CandidateEvaluation {
+                task_recipe_sha256: H3.to_owned(),
+                comparison_profile_sha256: H4.to_owned(),
+                evaluator_sha256: H5.to_owned(),
+                verifier_sha256: H1.to_owned(),
+                verifier_receipt_sha256: H2.to_owned(),
+                disposition: CandidateDisposition::Verified,
+                score: Some(0.9),
+                uncertainty: Some(0.0),
+                evidence_sha256: Some(H3.to_owned()),
+            },
+            resources: ResourceReceipt {
+                host_cpu_millis: measured(10),
+                wall_millis: measured(5),
+                accelerator_millis: measured(0),
+                peak_memory_bytes: measured(1024),
+                accelerator_peak_memory_bytes: measured(0),
+                energy_millijoules: measured(1),
+                input_tokens: measured(0),
+                output_tokens: measured(0),
+                tool_calls: measured(0),
+                evaluator_calls: measured(1),
+                verifier_calls: measured(1),
+                charged_budget_microunits: measured(10),
+            },
+        })
+        .unwrap();
+        tape
+    }
+
+    fn manifest(
+        tape: &EventTape,
+        offered: Vec<&str>,
+        state_sha256: &str,
+    ) -> OfferSetManifest {
+        let snapshot = OfferSetSnapshot::new(
+            1,
+            None,
+            0,
+            offered.into_iter().map(str::to_owned).collect(),
+            true,
+            state_sha256,
+        )
+        .unwrap();
+        OfferSetManifest::new(tape, vec![snapshot]).unwrap()
+    }
+
+    #[test]
+    fn identical_content_addressed_offer_sets_match_across_policies() {
+        let left = tape("board", json!({"alpha": 0.5}));
+        let right = tape("thompson", json!({"prior": 1.0}));
+        let left_manifest = manifest(&left, vec!["A", "B"], H3);
+        let right_manifest = manifest(&right, vec!["B", "A"], H3);
+        let summary = verify_matched_offer_sets(
+            &[left, right],
+            &[left_manifest, right_manifest],
+        )
+        .unwrap();
+        assert_eq!(summary.shared_decision_boundaries, 1);
+        assert_eq!(summary.shared_sequential_snapshots, 1);
+        assert_eq!(summary.shared_batch_snapshots, 0);
+    }
+
+    #[test]
+    fn cross_policy_offer_set_mismatch_is_rejected() {
+        let left = tape("board", json!({"alpha": 0.5}));
+        let right = tape("thompson", json!({"prior": 1.0}));
+        let left_manifest = manifest(&left, vec!["A", "B"], H3);
+        let right_manifest = manifest(&right, vec!["A", "C"], H4);
+        assert!(verify_matched_offer_sets(
+            &[left, right],
+            &[left_manifest, right_manifest],
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn unavailable_direction_cannot_be_evaluated() {
+        let tape = tape("board", json!({"alpha": 0.5}));
+        let snapshot = OfferSetSnapshot::new(1, None, 0, vec!["B".to_owned()], true, H3)
+            .unwrap();
+        assert!(OfferSetManifest::new(&tape, vec![snapshot]).is_err());
+    }
+
+    #[test]
+    fn snapshot_payload_tampering_invalidates_manifest() {
+        let tape = tape("board", json!({"alpha": 0.5}));
+        let mut manifest = manifest(&tape, vec!["A"], H3);
+        manifest.snapshots[0].new_proposal_allowed = false;
+        assert!(manifest.validate_for_tape(&tape).is_err());
+    }
+
+    #[test]
+    fn manifest_requires_every_decision_boundary_exactly_once() {
+        let tape = tape("board", json!({"alpha": 0.5}));
+        let snapshot = OfferSetSnapshot::new(1, None, 0, vec!["A".to_owned()], true, H3)
+            .unwrap();
+        let extra = OfferSetSnapshot::new(2, None, 1, vec!["A".to_owned()], true, H3)
+            .unwrap();
+        assert!(OfferSetManifest::new(&tape, vec![snapshot, extra]).is_err());
+    }
+}
