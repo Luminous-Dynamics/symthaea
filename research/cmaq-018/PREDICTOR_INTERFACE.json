@@ -23,7 +23,10 @@
           "predicted",
           "counterfactual"
         ],
-        "visibility": "candidate_request"
+        "semantics": {
+          "predicted": "forecast for a policy action under consideration/committed by the controller",
+          "counterfactual": "forecast for a hypothetical alternative action from the same observed history"
+        }
       }
     },
     "output": {
@@ -35,7 +38,8 @@
         "terminal"
       ],
       "provenance_field": "forecast_kind",
-      "abstention": "None"
+      "abstention": "None",
+      "requires_provenance_echo": true
     },
     "prohibited_inputs": [
       "evaluator_history_id",
@@ -45,15 +49,18 @@
       "common_disturbance",
       "realized_branch_outcomes",
       "future_counterfactuals"
-    ]
+    ],
+    "observation_memory_mutation_api": false
   },
   "candidate_effect_predictor": {
     "input": [
       "observed_history",
       "left_action",
-      "right_action"
+      "right_action",
+      "forecast_kind"
     ],
-    "output": "pairwise_utility_delta_or_abstention"
+    "output": "pairwise_utility_delta_or_abstention",
+    "output_provenance": "counterfactual"
   },
   "memory_boundary": {
     "forecast_is_observation": false,
