@@ -1620,6 +1620,126 @@ mod tests {
     }
 
     #[test]
+    fn paired_candidate_baseline_uses_identical_groups_and_reports_positive_deltas() {
+        let (candidate, manifest, truth, candidate_bytes, manifest_bytes, truth_bytes) = fixture_values();
+        let mut baseline = candidate.clone();
+        baseline["model_id"] = json!("fixture-improved-detector");
+        baseline["model_sha256"] = json!("c".repeat(64));
+        baseline["threshold_profile_sha256"] = json!("d".repeat(64));
+        baseline["cases"][1]["response"] = json!("alert");
+        baseline["cases"][2]["response"] = json!("alert");
+        baseline["cases"][6]["response"] = json!("clear");
+        baseline["cases"][7]["response"] = json!("sensor_invalid");
+        baseline["cases"][8]["response"] = json!("sensor_invalid");
+        let baseline_bytes = serde_json::to_vec(&baseline).unwrap();
+
+        let candidate_receipt = audit_values(
+            &candidate,
+            &manifest,
+            &truth,
+            &candidate_bytes,
+            &manifest_bytes,
+            &truth_bytes,
+        ).unwrap();
+        let baseline_receipt = audit_values(
+            &baseline,
+            &manifest,
+            &truth,
+            &baseline_bytes,
+            &manifest_bytes,
+            &truth_bytes,
+        ).unwrap();
+        let comparison = paired_model_comparison(
+            &candidate_receipt,
+            &baseline_receipt,
+            "hs012-synthetic-campaign-01",
+            &sha256(&baseline_bytes),
+        ).unwrap();
+
+        let groups = &comparison["group_metrics"];
+        let program = &groups["program_group_level"];
+        assert_eq!(program["independent_group_count"], 3);
+        assert!((program["candidate_macro_estimate"].as_f64().unwrap() - 1.0/3.0).abs() < 1e-12);
+        assert_eq!(program["baseline_macro_estimate"], 1.0);
+        assert!((program["improvement_point_estimate"].as_f64().unwrap() - 2.0/3.0).abs() < 1e-12);
+        assert_eq!(program["status"], "unavailable_insufficient_independent_groups");
+
+        let benign = &groups["benign_false_alert_by_program"];
+        assert_eq!(benign["independent_group_count"], 4);
+        assert!((benign["improvement_point_estimate"].as_f64().unwrap() - 0.25).abs() < 1e-12);
+        assert_eq!(benign["status"], "unavailable_insufficient_independent_groups");
+    }
+
+    #[test]
+    fn paired_comparison_rejects_different_group_sets() {
+        let (p,m,t,pb,mb,tb) = fixture_values();
+        let candidate = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
+        let mut baseline = candidate.clone();
+        baseline["generalization"]["program_group_level"].as_array_mut().unwrap().pop();
+        let error = paired_model_comparison(
+            &candidate,
+            &baseline,
+            "hs012-synthetic-campaign-01",
+            &"f".repeat(64),
+        ).unwrap_err();
+        assert!(error.contains("requires identical program_group_level group IDs"));
+    }
+
+    #[test]
+    fn paired_group_bootstrap_is_zero_for_identical_group_rates() {
+        let candidate: BTreeMap<String, f64> = (0..10)
+            .map(|index| (format!("g{index:02}"), 0.7))
+            .collect();
+        let baseline = candidate.clone();
+        let delta = paired_group_metric_delta(
+            &candidate,
+            &baseline,
+            "paired-campaign",
+            "program_group_level",
+            "attack_effect_recall",
+            true,
+        ).unwrap();
+        assert_eq!(delta["status"], "available_paired_group_bootstrap_interval");
+        assert_eq!(delta["candidate_macro_estimate"], 0.7);
+        assert_eq!(delta["baseline_macro_estimate"], 0.7);
+        assert_eq!(delta["improvement_point_estimate"], 0.0);
+        assert_eq!(delta["improvement_lower_95"], 0.0);
+        assert_eq!(delta["improvement_upper_95"], 0.0);
+        assert_eq!(delta["resampling_unit"], "paired_independent_group_delta");
+    }
+
+    #[test]
+    fn paired_group_bootstrap_known_answer_is_deterministic() {
+        let candidate: BTreeMap<String, f64> = (0..9)
+            .map(|index| (format!("g{index:02}"), 1.0))
+            .chain(std::iter::once(("g09".to_owned(), 0.0)))
+            .collect();
+        let baseline: BTreeMap<String, f64> = (0..10)
+            .map(|index| (format!("g{index:02}"), 0.0))
+            .collect();
+        let first = paired_group_metric_delta(
+            &candidate,
+            &baseline,
+            "paired-campaign",
+            "program_group_level",
+            "attack_effect_recall",
+            true,
+        ).unwrap();
+        let second = paired_group_metric_delta(
+            &candidate,
+            &baseline,
+            "paired-campaign",
+            "program_group_level",
+            "attack_effect_recall",
+            true,
+        ).unwrap();
+        assert_eq!(first, second);
+        assert!((first["improvement_point_estimate"].as_f64().unwrap() - 0.9).abs() < 1e-12);
+        assert_eq!(first["status"], "available_paired_group_bootstrap_interval");
+        assert_eq!(first["bootstrap_replicates"], GROUP_BOOTSTRAP_REPLICATES);
+    }
+
+    #[test]
     fn rejects_campaign_domain_pooling_at_case_level_by_contract() {
         let (p,mut m,t,pb,_,tb) = fixture_values();
         m["evidence_domain"] = json!("combined_physical_and_simulator");
