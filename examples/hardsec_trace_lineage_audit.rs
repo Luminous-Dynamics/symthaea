@@ -220,6 +220,9 @@ fn parse_traces(value: &Value) -> Result<Vec<Trace>, String> {
         let parent_trace_id = optional_string(item, "parent_trace_id", &ctx)?;
         let iteration_id = u64_field(item, "iteration_id", &ctx)?;
         let windows = parse_windows(item, &ctx)?;
+        if windows.windows(2).any(|pair| pair[1].sample_index <= pair[0].sample_index) {
+            return Err(format!("{ctx}. sample_index must strictly increase"));
+        }
         for window in &windows {
             if !window_ids.insert(window.window_id.clone()) {
                 return Err(format!("duplicate global window_id {}", window.window_id));
@@ -252,6 +255,9 @@ fn validate_offsets(traces: &[Trace], policy: &Policy) -> Result<Value, String> 
             continue;
         }
         if !any_offsets {
+            if policy.offset_unit != "unknown" {
+                return Err(format!("trace {} has no offsets but policy declares a known offset_unit; use unknown when offsets are unsupported", trace.trace_id));
+            }
             untimed_trace_count += 1;
             continue;
         }
@@ -474,8 +480,7 @@ fn audit_values(manifest: &Value, manifest_bytes: &[u8]) -> Result<Value, String
         if trace.adaptation_family_id != "none" {
             adaptation_families.insert(trace.adaptation_family_id.clone());
         }
-        trace_origin_counts.insert(trace.origin.as_str().to_owned(),
-            trace_origin_counts.get(trace.origin.as_str()).copied().unwrap_or(0) + 1);
+        *trace_origin_counts.entry(trace.origin.as_str().to_owned()).or_default() += 1;
         *split_window_counts.entry(trace.split.clone()).or_default() += trace.windows.len();
         trace_program_split.insert((trace.program_id.clone(), trace.split.clone()));
 
@@ -652,13 +657,37 @@ mod tests {
         assert_eq!(r["trace_lineage"]["trace_record_count"], 5);
         assert_eq!(r["trace_lineage"]["original_trace_count"], 4);
         assert_eq!(r["trace_lineage"]["repeated_iteration_trace_count"], 1);
-        assert_eq!(r["window_support"]["raw_window_count"], 6);
+        assert_eq!(r["window_support"]["raw_window_count"], 7);
         assert_eq!(r["window_support"]["repeated_iteration_window_count"], 2);
         assert_eq!(r["independent_group_support"]["unique_program_count"], 4);
         assert_eq!(r["independent_group_support"]["unique_execution_id_count"], 4);
         assert_eq!(r["window_support"]["duplicate_content_hash_group_count"], 2);
         assert_eq!(r["window_support"]["duplicate_content_extra_occurrences"], 2);
         assert_eq!(r["independent_group_support"]["effective_sample_size_estimate"], Value::Null);
+    }
+
+    #[test]
+    fn replay_requires_distinct_execution_id_from_parent() {
+        let (mut m,_) = fixture();
+        m["traces"].as_array_mut().unwrap().push(json!({
+            "trace_id":"trace-replay","source_trace_sha256":"6".repeat(64),
+            "program_id":"program-train","binary_sha256":"c".repeat(64),
+            "execution_id":"execution-train","device_config_id":"device-sim",
+            "attack_family_id":"family-train","adaptation_family_id":"none",
+            "split":"train","origin":"replayed","parent_trace_id":"trace-train-original","iteration_id":2,
+            "windows":[{"window_id":"w-replay","sample_index":0,"start_offset":0,"end_offset":10000,"window_sha256":"6".repeat(64)}]
+        }));
+        let b = serde_json::to_vec(&m).unwrap();
+        assert!(audit_values(&m,&b).unwrap_err().contains("distinct execution_id"));
+    }
+
+    #[test]
+    fn known_offset_policy_rejects_missing_offsets() {
+        let (mut m,_) = fixture();
+        m["traces"][2]["windows"][0]["start_offset"] = Value::Null;
+        m["traces"][2]["windows"][0]["end_offset"] = Value::Null;
+        let b = serde_json::to_vec(&m).unwrap();
+        assert!(audit_values(&m,&b).unwrap_err().contains("no offsets but policy declares a known offset_unit"));
     }
 
     #[test]
