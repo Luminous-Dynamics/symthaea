@@ -1,0 +1,11 @@
+[package]
+name = "connectome-iv-sensitivity"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+description = "Synthetic scalar-IV profiled Anderson-Rubin sensitivity reference"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
