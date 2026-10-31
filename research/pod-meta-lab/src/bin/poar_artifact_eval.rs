@@ -97,3 +97,24 @@ fn run() -> Result<(), String> {
 fn main() {
     if let Err(error)=run() { eprintln!("poar-artifact-eval: {error}"); std::process::exit(1); }
 }
+
+#[cfg(test)]
+mod sha256_tests {
+    use super::sha256;
+
+    #[test]
+    fn sha256_matches_empty_input_vector() {
+        assert_eq!(
+            sha256(b""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+    }
+
+    #[test]
+    fn sha256_matches_abc_vector() {
+        assert_eq!(
+            sha256(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+}
