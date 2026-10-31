@@ -972,6 +972,13 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn json_report_matches_the_pinned_golden_fixture_byte_for_byte() {
+        let expected = include_str!("../fixtures/reference-suite.expected.json");
+        assert_eq!(reference_suite_json().unwrap(), expected);
+    }
+
     #[test]
     fn all_reference_cases_meet_their_declared_control() {
         let cases = reference_suite().expect("suite is valid");
