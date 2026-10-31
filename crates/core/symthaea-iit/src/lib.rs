@@ -63,7 +63,7 @@ const ANALYSIS_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-ANALYSIS-REQUEST\0v0.1\0";
 /// Stable algorithm identity included in every IIT 4.0 (2023) system-search receipt.
 pub const IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID: &str =
     "symthaea-iit/iit4-2023-system-phi-eq4-minfill/0.2.0";
-const SYSTEM_PHI_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SYSTEM-PHI-RECEIPT\0v0.1\0";
+const SYSTEM_PHI_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SYSTEM-PHI-RECEIPT\0v0.2\0";
 
 /// Errors caused by invalid model inputs or invalid state requests.
 #[derive(Debug, Clone, PartialEq, Error)]
