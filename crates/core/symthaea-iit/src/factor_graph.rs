@@ -2270,7 +2270,7 @@ mod tests {
             vec![0, 1]
         );
         assert!(report.rejected_candidates.iter().all(|candidate| matches!(
-            candidate.error,
+            &candidate.error,
             FactorGraphError::IntermediateTooLarge { limit: 2, .. }
         )));
     }
