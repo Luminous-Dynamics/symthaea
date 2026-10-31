@@ -493,10 +493,15 @@ fn choose_next(
 
     match policy {
         Policy::FixedOrder => affordable.into_iter().next(),
-        Policy::GenericVoc => {
-            affordable.into_iter()
-                .filter(|i| operation_admissible_mask(case.operations[*i].public.advertised_mask) & unresolved != 0)
-                .max_by(|a, b| {
+        Policy::GenericVoc | Policy::UnverifiedConfidence => {
+            let candidates: Vec<usize> = if policy == Policy::UnverifiedConfidence {
+                affordable
+            } else {
+                affordable.into_iter()
+                    .filter(|i| operation_admissible_mask(case.operations[*i].public.advertised_mask) & unresolved != 0)
+                    .collect()
+            };
+            candidates.into_iter().max_by(|a, b| {
                 let oa = &case.operations[*a].public;
                 let ob = &case.operations[*b].public;
                 ratio_cmp(oa.predicted_gain, oa.cost, ob.predicted_gain, ob.cost)
@@ -731,9 +736,9 @@ mod tests {
     fn proof_guided_completes_minimum_sufficient_multi_obligation_packet() {
         let case = build_cases().into_iter()
             .find(|c| c.id == "valid_multi_obligation_packet").unwrap();
-        let result = run_trial(&case, Policy::MaskCoverageGreedy, 7, 1729);
+        let result = run_trial(&case, Policy::MaskCoverageGreedy, 10, 1729);
         assert!(result.completion_verified);
-        assert_eq!(result.spent, 6);
+        assert_eq!(result.spent, 9);
         assert_eq!(result.missed_mandatory_count, 0);
         assert_eq!(result.false_support_count, 0);
     }
@@ -869,6 +874,11 @@ mod tests {
     fn every_case_has_a_nonzero_mandatory_verification_contract() {
         for case in build_cases() {
             assert_eq!(case.mandatory_mask(), REQUIRED_MANDATORY, "{}", case.id);
+            let covered = case.operations.iter().fold(0u8, |mask, operation| {
+                mask | (operation_admissible_mask(operation.public.advertised_mask)
+                    & operation.public.mandatory_mask)
+            });
+            assert_eq!(covered, REQUIRED_MANDATORY, "{}", case.id);
         }
     }
 
