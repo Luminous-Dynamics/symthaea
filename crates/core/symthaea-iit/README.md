@@ -284,11 +284,29 @@ optimization.
 Required fail-closed behavior: invalid model, unsupported quantity/formalism pair,
 undefined cause-repertoire mass, timeout, incomplete exact search, missing reference
 output, or mismatched input digest must never produce a qualified scalar result.
-Current cause/effect routines are probability-repertoire primitives under explicit
-uniform-prior/background assumptions; the directed partition enumerator generates
-candidate severance matrices but does not evaluate their repertoire effects or select
-a minimum-information partition. These pieces are not by themselves proof of PyPhi
-conformance.
+The standalone cause/effect repertoire APIs and partition enumerator remain
+lower-level components; generating cuts alone does not select a minimum-information
+partition. The dense and sparse system-analysis APIs now compose these stages into
+bounded IIT 4.0 (2023) system search, including partition scoring and specified-state
+tie handling. They are not yet generally qualified against PyPhi beyond the pinned
+published anchors and explicitly named regression fixtures. This crate does not
+currently expose a complete IIT 4.0 (2026) system-phi analysis path.
+
+## Reproducible benchmark evidence
+
+The targeted GitHub Actions workflow writes a commit-bound evidence bundle for
+each run. It includes runner/toolchain identity, the locked Rust test log, Clippy
+output, and the CSV/log output of every partition, factor-elimination, cutset,
+Eq. 4, and full sparse system-search sweep. The artifact name includes the exact
+commit SHA and is retained for 30 days. Benchmark commands stream through
+`tee` under the runner's fail-fast shell, so capturing output does not turn a
+failed command into a successful step.
+
+The bundle is measurement provenance, not a scientific qualification certificate.
+A queued workflow has no measurements; a failed, cancelled, incomplete, or
+missing evidence artifact must not be turned into a successful benchmark record.
+Use the recorded commit, CPU, OS, Rust/Cargo versions, exact input digests,
+budgets, formalism, and cache mode when comparing artifacts across runs.
 
 ## Certified system-phi invariant
 
@@ -311,7 +329,7 @@ Reference: https://doi.org/10.1371/journal.pcbi.1012323
 Use two clearly separated upstream baselines:
 
 - **Reproducible release-candidate baseline:** `pyphi==2.0.0rc4`, pinned with
-  `IIT_4_0_2023` and `IIT_4_0_2026` tested separately. As of 2026-10-29,
+  `IIT_4_0_2023` and `IIT_4_0_2026` tested separately. As of 2026-10-31,
   PyPI lists 2.0.0rc4 (2026-10-13) as the newest 2.0 prerelease and 1.2.0 as
   the latest stable package. Do not silently treat GitHub `main` or rendered
   development docs as the same artifact:
