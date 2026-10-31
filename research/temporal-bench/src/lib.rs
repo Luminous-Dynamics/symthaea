@@ -8,6 +8,7 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
+pub mod digest;
 pub mod dms;
 pub mod evidence;
 pub mod temporal;
