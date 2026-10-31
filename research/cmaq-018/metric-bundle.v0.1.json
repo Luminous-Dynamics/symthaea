@@ -10,8 +10,8 @@
     "null_false_effect_rate": "fraction of covered pairs predicted nonzero when true scenario effect is identically zero"
   },
   "thresholds": {
-    "sign_tie_epsilon": 1e-9,
-    "null_nonzero_effect_epsilon": 1e-9
+    "sign_tie_epsilon_nano": 1,
+    "null_nonzero_effect_epsilon_nano": 1
   },
   "coverage_metrics": [
     "pair_coverage",
