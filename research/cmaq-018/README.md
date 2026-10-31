@@ -119,6 +119,13 @@ The focused GitHub Actions workflow runs formatting, tests, Clippy, JSON Schema 
 5. Build a pinned WorldOracle adapter only after public data, release policy, action interface and license are verified.
 6. Evaluate Rollback-style branch-and-compare policy improvement only after the evaluator and qualification split are frozen.
 
+
+## Selection-aware uncertainty extension
+
+The additive design and executable metric primitives in UNCERTAINTY_CALIBRATION.md and src/uncertainty.rs address a limitation of point forecasts plus abstention: marginal intervals need not remain calibrated after a planner selects the most attractive of many actions. The extension includes paired joint-draw effect intervals, whole-action-set coverage, interval scores and a conditional selected-action regret bound.
+
+**Status:** metric primitives and a future interface schema only. The v0.1 predictor API, candidate models and report remain point-prediction/abstention-only. No calibrated Symthaea predictor, uncertainty-qualified result or performance gain is claimed. The protocol also specifies repeated, held-out continuations to detect best-of-N selection optimism; this is a proposed CMAQ-017 integration, not a result from the current harness.
+
 ## Claim ceiling
 
 A synthetic pass demonstrates only the branch identity, known-answer intervention and metric contracts implemented by this generator. It does not establish real-world counterfactual correctness, physical safety, learned Symthaea world-model reliability, or SOTA. No physical robot intervention or actuator-control authority is enabled.
