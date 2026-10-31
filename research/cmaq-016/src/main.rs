@@ -455,6 +455,38 @@ mod tests {
     }
 
     #[test]
+    fn adaptive_search_exposes_the_narrow_optimism_pocket_as_budget_grows() {
+        let low = summarize(
+            Scenario::NarrowOptimismPocket,
+            8,
+            Policy::AdaptiveCem,
+        );
+        let high = summarize(
+            Scenario::NarrowOptimismPocket,
+            512,
+            Policy::AdaptiveCem,
+        );
+        assert!(high.selected_pocket_rate > low.selected_pocket_rate);
+        assert!(high.mean_true_return < low.mean_true_return);
+    }
+
+    #[test]
+    fn pessimistic_ensemble_reduces_the_synthetic_exploit_gap() {
+        let greedy = summarize(
+            Scenario::NarrowOptimismPocket,
+            512,
+            Policy::AdaptiveCem,
+        );
+        let robust = summarize(
+            Scenario::NarrowOptimismPocket,
+            512,
+            Policy::PessimisticEnsembleCem,
+        );
+        assert!(robust.selected_pocket_rate < 0.10);
+        assert!(robust.mean_true_return > greedy.mean_true_return + 0.10);
+    }
+
+    #[test]
     fn deterministic_report_replays_byte_for_byte() {
         assert_eq!(render_report(), render_report());
     }
