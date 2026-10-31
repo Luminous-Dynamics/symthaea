@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT candidate observer coverage profile v1",
+  "description": "A separately pinned candidate coverage contract. It is not a qualification statement.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format_version", "suite_id", "profile_id", "profile_status", "platform", "allowed_controls", "required_controls", "channels"],
+  "properties": {
+    "format_version": {"const": 1},
+    "suite_id": {"const": "basalt-observer-coverage-profile-v1"},
+    "profile_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
+    "profile_status": {"const": "candidate_not_qualified"},
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "architectures", "require_kernel_build_id", "require_kernel_btf_digest"],
+      "properties": {
+        "os": {"const": "linux"},
+        "architectures": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["x86_64", "aarch64"]}},
+        "require_kernel_build_id": {"type": "boolean"},
+        "require_kernel_btf_digest": {"type": "boolean"}
+      }
+    },
+    "allowed_controls": {"type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"}},
+    "required_controls": {"type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"}},
+    "channels": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["channel_id", "required_event_kinds"],
+        "properties": {
+          "channel_id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+          "required_event_kinds": {"type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"}}
+        }
+      }
+    }
+  }
+}
