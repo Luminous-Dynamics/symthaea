@@ -723,6 +723,12 @@ mod tests {
     }
 
     #[test]
+    fn kernel_machine_architecture_is_reported_separately_from_build_architecture() {
+        let machine = kernel_machine_architecture().expect("uname must report kernel machine architecture on Linux");
+        assert!(!machine.trim().is_empty());
+        assert!(!std::env::consts::ARCH.is_empty());
+    }
+    #[test]
     fn proc_status_security_fields_are_parsed_without_promoting_missing_values() {
         let status = "Name:\tbasalt\nCapEff:\t00000000000000a5\nCapBnd:\t00000000000000ff\nNoNewPrivs:\t1\nSeccomp:\t2\n";
         assert_eq!(proc_status_hex(status, "CapEff").as_deref(), Some("00000000000000a5"));
