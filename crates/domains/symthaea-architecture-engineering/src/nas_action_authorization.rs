@@ -83,6 +83,8 @@ pub struct NasMeasurementActionScope {
     pub measurement_protocol_sha256: String,
     pub instrument_identity_sha256: String,
     pub observation_likelihood_model_sha256: String,
+    /// Exact frozen family manifest; excluded only from derived stream ID to avoid a hash cycle.
+    pub confidence_family_manifest_sha256: String,
     pub resource_registry_sha256: String,
     pub resource_budget_sha256: String,
     pub resource_cost_sha256: String,
@@ -183,9 +185,14 @@ pub fn compute_measurement_scope_sha256(
 pub fn measurement_confidence_stream_id(
     scope: &NasMeasurementActionScope,
 ) -> Result<String, NasAuthorizationError> {
+    // Derive the stream identity from the full action context but not the manifest digest:
+    // the manifest contains this stream ID, so including the manifest digest would form a cycle.
+    // The final scope digest does include the manifest digest and is what the preflight receipt binds.
+    let mut stream_scope = scope.clone();
+    stream_scope.confidence_family_manifest_sha256 = "0".repeat(64);
     Ok(format!(
         "{MEASUREMENT_STREAM_PREFIX}{}",
-        compute_measurement_scope_sha256(scope)?
+        compute_measurement_scope_sha256(&stream_scope)?
     ))
 }
 
@@ -473,6 +480,14 @@ pub fn verify_measurement_preflight(
 
     verify_anytime_confidence_ledger(request.confidence_ledger)
         .map_err(|error| NasAuthorizationError::new("confidence_ledger", error.to_string()))?;
+    if request.confidence_ledger.manifest.manifest_sha256
+        != scope.confidence_family_manifest_sha256
+    {
+        return Err(NasAuthorizationError::new(
+            "confidence_family_manifest_sha256",
+            "confidence ledger family manifest differs from the exact manifest committed in the action scope",
+        ));
+    }
     if request.confidence_ledger.manifest.family_id != scope.run_id {
         return Err(NasAuthorizationError::new(
             "confidence_family",
@@ -692,6 +707,7 @@ fn validate_measurement_scope(scope: &NasMeasurementActionScope) -> Result<(), N
         ("measurement_protocol_sha256", &scope.measurement_protocol_sha256),
         ("instrument_identity_sha256", &scope.instrument_identity_sha256),
         ("observation_likelihood_model_sha256", &scope.observation_likelihood_model_sha256),
+        ("confidence_family_manifest_sha256", &scope.confidence_family_manifest_sha256),
         ("resource_registry_sha256", &scope.resource_registry_sha256),
         ("resource_budget_sha256", &scope.resource_budget_sha256),
         ("resource_cost_sha256", &scope.resource_cost_sha256),
@@ -1468,6 +1484,7 @@ mod tests {
             observation_likelihood_model_sha256: action
                 .observation_likelihood_model_sha256
                 .clone(),
+            confidence_family_manifest_sha256: String::new(),
             resource_registry_sha256: resource_registry.registry_sha256.clone(),
             resource_budget_sha256: digest_serde(
                 b"symthaea.nas.resource-budget.v0.1",
@@ -1493,6 +1510,7 @@ mod tests {
             }],
         )
         .unwrap();
+        scope.confidence_family_manifest_sha256 = manifest.manifest_sha256.clone();
         let mut confidence_ledger = create_anytime_confidence_ledger(manifest).unwrap();
         append_anytime_confidence_look(
             &mut confidence_ledger,
@@ -1521,6 +1539,23 @@ mod tests {
             "PREFLIGHT_ELIGIBLE_NO_RESERVATION_NO_EXECUTION"
         );
         verify_action_preflight_receipt_digest(&receipt).unwrap();
+
+        let mut changed_manifest_scope = scope.clone();
+        changed_manifest_scope.confidence_family_manifest_sha256 = sha('0');
+        assert!(verify_measurement_preflight(&MeasurementPreflightRequest {
+            scope: &changed_manifest_scope,
+            confidence_ledger: &confidence_ledger,
+            objective_registry: &objective_registry,
+            posterior: &posterior,
+            portfolios: &portfolios,
+            portfolio_config: &portfolio_config,
+            qmc_design: &qmc_design,
+            measurement_action: &action,
+            resource_registry: &resource_registry,
+            resource_budget: &resource_budget,
+            resource_actions: &resource_actions,
+        })
+        .is_err());
 
         scope.target_commit_id = "b".repeat(40);
         assert_ne!(
@@ -1554,6 +1589,7 @@ mod tests {
             measurement_protocol_sha256: sha('3'),
             instrument_identity_sha256: sha('4'),
             observation_likelihood_model_sha256: sha('5'),
+            confidence_family_manifest_sha256: sha('a'),
             resource_registry_sha256: sha('6'),
             resource_budget_sha256: sha('7'),
             resource_cost_sha256: sha('8'),
