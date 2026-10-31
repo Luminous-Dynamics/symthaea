@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/hardsec-episode-restarted-benchmark-v1.schema.json",
+  "title": "HARDSEC episode restarted benchmark plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "status",
+    "baselines",
+    "scenarios",
+    "holdout_axes",
+    "metrics",
+    "aspirational_targets",
+    "claim_rules"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-episode-restarted-benchmark-v1"
+    },
+    "benchmark_id": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "planned",
+        "active",
+        "complete",
+        "superseded"
+      ]
+    },
+    "baselines": {
+      "type": "array",
+      "minItems": 9,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "holdout_axes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "aspirational_targets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "iid_episode_null_pfa_max",
+        "p95_delay_episodes_at_small_effect_target",
+        "p95_delay_improvement_vs_fixed_start_min",
+        "invalid_or_unassigned_episode_silent_updates_max",
+        "cross_execution_window_reuse_max",
+        "variable_length_episode_acceptance_max",
+        "decision_layer_overhead_p95_ms"
+      ],
+      "properties": {
+        "iid_episode_null_pfa_max": {
+          "type": "number",
+          "minimum": 0
+        },
+        "p95_delay_episodes_at_small_effect_target": {
+          "type": "number",
+          "minimum": 0
+        },
+        "p95_delay_improvement_vs_fixed_start_min": {
+          "type": "number",
+          "minimum": 0
+        },
+        "invalid_or_unassigned_episode_silent_updates_max": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cross_execution_window_reuse_max": {
+          "type": "number",
+          "minimum": 0
+        },
+        "variable_length_episode_acceptance_max": {
+          "type": "number",
+          "minimum": 0
+        },
+        "decision_layer_overhead_p95_ms": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "claim_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_independence_is_assumption_not_proven",
+        "randomizer_independence_is_assumption_not_proven",
+        "correlated_windows_collapsed_before_testing",
+        "delay_units_are_episodes",
+        "synthetic_results_not_detector_performance"
+      ],
+      "properties": {
+        "episode_independence_is_assumption_not_proven": {
+          "const": true
+        },
+        "randomizer_independence_is_assumption_not_proven": {
+          "const": true
+        },
+        "correlated_windows_collapsed_before_testing": {
+          "const": true
+        },
+        "delay_units_are_episodes": {
+          "const": true
+        },
+        "synthetic_results_not_detector_performance": {
+          "const": true
+        }
+      }
+    }
+  }
+}
