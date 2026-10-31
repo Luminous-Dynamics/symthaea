@@ -365,7 +365,7 @@ fn choose_next(
                 .wrapping_add(u64::from(spent).wrapping_mul(6364136223846793005))
                 .wrapping_add(attempted.iter().filter(|x| **x).count() as u64);
             state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-            Some(affordable[(state as usize) % affordable.len()])
+            Some(affordable[((state >> 32) as usize) % affordable.len()])
         }
         Policy::ProofObligationGuided => {
             let mandatory_remaining: Vec<usize> = case.operations.iter().enumerate()
