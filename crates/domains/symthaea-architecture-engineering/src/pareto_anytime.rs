@@ -255,6 +255,16 @@ impl AnytimeTargetPlan {
         targets: Vec<AnytimeTarget>,
         reference_front_utility: Vec<Vec<f64>>,
     ) -> Result<Self, AnytimeError> {
+        let mut reference_front_utility = reference_front_utility;
+        reference_front_utility.sort_by(|left, right| {
+            for (a, b) in left.iter().zip(right) {
+                let ordering = a.total_cmp(b);
+                if ordering != std::cmp::Ordering::Equal {
+                    return ordering;
+                }
+            }
+            left.len().cmp(&right.len())
+        });
         let plan = Self {
             schema: TARGET_PLAN_SCHEMA.to_owned(),
             version: TARGET_PLAN_VERSION.to_owned(),
@@ -544,6 +554,7 @@ impl AnytimeHistory {
         let mut auxiliary_ids = BTreeSet::new();
         let mut attempts = BTreeMap::<String, u32>::new();
         let mut decisions = BTreeMap::<String, String>::new();
+        let mut decision_owners = BTreeMap::<String, String>::new();
         let mut successful = BTreeMap::<String, CandidateState>::new();
         let mut objective_attempts = 0u64;
 
@@ -600,6 +611,10 @@ impl AnytimeHistory {
                     if decisions.get(candidate_id).is_some_and(|previous| previous != decision_sha256) {
                         return Err(AnytimeError::new(format!("{path}.decision_sha256"), "decision digest changed across retries"));
                     }
+                    if decision_owners.get(decision_sha256).is_some_and(|owner| owner != candidate_id) {
+                        return Err(AnytimeError::new(format!("{path}.decision_sha256"), "identical decision bytes must share one canonical candidate ID"));
+                    }
+                    decision_owners.entry(decision_sha256.clone()).or_insert_with(|| candidate_id.clone());
                     decisions.entry(candidate_id.clone()).or_insert_with(|| decision_sha256.clone());
                     if successful.contains_key(candidate_id) {
                         return Err(AnytimeError::new(format!("{path}.candidate_id"), "candidate can be admitted successfully only once in v0.1"));
@@ -1131,6 +1146,12 @@ mod tests {
 
     fn append_candidate(history: &mut AnytimeHistory, ordinal: u64, candidate_id: &str, evaluation_id: &str, objectives: Vec<f64>) {
         let start = (ordinal - 1) * 10;
+        let decision_sha256 = match candidate_id {
+            "candidate-a" | "a" => H3,
+            "candidate-b" | "b" => H5,
+            "dominated" => H1,
+            _ => H2,
+        };
         history.append(AnytimeEventDraft {
             started_elapsed_millis: start,
             completed_elapsed_millis: start + 1,
@@ -1139,7 +1160,7 @@ mod tests {
                 evaluation_id: evaluation_id.to_owned(),
                 candidate_id: candidate_id.to_owned(),
                 attempt: 1,
-                decision_sha256: H3.to_owned(),
+                decision_sha256: decision_sha256.to_owned(),
                 outcome: EvaluationOutcome::Succeeded,
                 objective_values: Some(objectives),
                 feasible: Some(true),
@@ -1256,7 +1277,7 @@ mod tests {
         append_candidate(&mut history, 1, "a", "a1", vec![0.0, 1.0]);
         append_candidate(&mut history, 2, "b", "b1", vec![1.0, 0.0]);
         let before = analyze_anytime_history(&history).unwrap().target_results[0].final_metric_value.unwrap();
-        append_candidate(&mut history, 3, "dominated", "d1", vec![0.5, 0.5]);
+        append_candidate(&mut history, 3, "dominated", "d1", vec![0.25, 1.0]);
         let after = analyze_anytime_history(&history).unwrap().target_results[0].final_metric_value.unwrap();
         assert!((before - after).abs() < 1e-12);
     }
