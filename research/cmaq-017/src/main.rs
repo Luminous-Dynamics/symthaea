@@ -512,8 +512,16 @@ fn plan_actions(
         actions: selected.actions,
         predicted_prefix_return: selected.score.predicted_prefix_return,
         candidate_queries: candidate_budget,
-        model_head_evaluations: candidate_budget * policy.heads(),
-        model_transition_evaluations: candidate_budget * policy.heads() * horizon,
+        model_head_evaluations: if policy.uses_world_model() {
+            candidate_budget * policy.heads()
+        } else {
+            0
+        },
+        model_transition_evaluations: if policy.uses_world_model() {
+            candidate_budget * policy.heads() * horizon
+        } else {
+            0
+        },
         oracle_transition_evaluations: if policy.is_oracle() {
             candidate_budget * horizon
         } else {
@@ -525,6 +533,28 @@ fn plan_actions(
 fn in_training_support(state: State) -> bool {
     state.x.abs() <= TRAINING_X_SUPPORT && state.v.abs() <= TRAINING_V_SUPPORT
 }
+
+fn uniform_grid_one_step_state_rmse(scenario: Scenario) -> f64 {
+    const GRID_POINTS: usize = 201;
+    let mut squared_error = 0.0;
+    for index in 0..GRID_POINTS {
+        let x = -TRAINING_X_SUPPORT
+            + 2.0 * TRAINING_X_SUPPORT * index as f64 / (GRID_POINTS - 1) as f64;
+        let v_index = (index * 37) % GRID_POINTS;
+        let action_index = (index * 73) % GRID_POINTS;
+        let v = -TRAINING_V_SUPPORT
+            + 2.0 * TRAINING_V_SUPPORT * v_index as f64 / (GRID_POINTS - 1) as f64;
+        let action = -1.0 + 2.0 * action_index as f64 / (GRID_POINTS - 1) as f64;
+        let step = [0usize, 6, 8][index % 3];
+        let state = State { x, v };
+        let actual = true_step(state, action, step, scenario, BASE_SEED);
+        let predicted = model_step(state, action, step, scenario, 1, false);
+        squared_error += (actual.state.x - predicted.state.x).powi(2)
+            + (actual.state.v - predicted.state.v).powi(2);
+    }
+    (squared_error / GRID_POINTS as f64).sqrt()
+}
+
 
 fn run_episode(
     scenario: Scenario,
@@ -660,6 +690,7 @@ fn append_row(
     episode_results: &[EpisodeMetrics],
     direct_returns: &[f64],
     matched_returns: &[f64],
+    shuffled_returns: &[f64],
     oracle_returns: &[f64],
 ) {
     let returns: Vec<f64> = episode_results.iter().map(|row| row.total_return).collect();
@@ -672,6 +703,11 @@ fn append_row(
         .iter()
         .zip(matched_returns)
         .map(|(value, matched)| value - matched)
+        .collect();
+    let paired_shuffled: Vec<f64> = returns
+        .iter()
+        .zip(shuffled_returns)
+        .map(|(value, shuffled)| value - shuffled)
         .collect();
     let paired_oracle_gap: Vec<f64> = oracle_returns
         .iter()
@@ -688,8 +724,10 @@ fn append_row(
     let worst_episode_return = sorted_returns[0];
     let (direct_delta, direct_low, direct_high) = mean_and_ci(&paired_direct);
     let (matched_delta, matched_low, matched_high) = mean_and_ci(&paired_matched);
+    let (shuffled_delta, shuffled_low, shuffled_high) = mean_and_ci(&paired_shuffled);
     let (oracle_gap, oracle_low, oracle_high) = mean_and_ci(&paired_oracle_gap);
 
+    let uniform_grid_rmse = uniform_grid_one_step_state_rmse(scenario);
     let mean_gap = mean_optional(
         &episode_results
             .iter()
@@ -766,10 +804,19 @@ fn append_row(
     .expect("writing to String cannot fail");
     write!(
         output,
+        "\"paired_return_delta_vs_shuffled_future\":{shuffled_delta:.9},\"paired_delta_vs_shuffled_ci95_lower\":{shuffled_low:.9},\"paired_delta_vs_shuffled_ci95_upper\":{shuffled_high:.9},"
+    )
+    .expect("writing to String cannot fail");
+    write!(
+        output,
         "\"paired_return_gap_to_oracle\":{oracle_gap:.9},\"paired_gap_to_oracle_ci95_lower\":{oracle_low:.9},\"paired_gap_to_oracle_ci95_upper\":{oracle_high:.9},"
     )
     .expect("writing to String cannot fail");
-    output.push_str("\"mean_predicted_minus_realized_block_return\":");
+    write!(
+        output,
+        "\"uniform_grid_one_step_state_rmse\":{uniform_grid_rmse:.9},\"mean_predicted_minus_realized_block_return\":"
+    )
+    .expect("writing to String cannot fail");
     write_option(output, mean_gap);
     write!(
         output,
@@ -787,7 +834,7 @@ fn render_report() -> String {
     )
     .expect("writing to String cannot fail");
     output.push_str(
-        "\"scenarios\":[\"benign\",\"state_action_pocket\",\"compounding_drift\",\"termination_seam\",\"regime_migration\"],\"policies\":[\"direct_policy\",\"compute_matched_direct_search\",\"random_point_search\",\"adaptive_point_cem\",\"pessimistic_ensemble_cem\",\"uncertainty_lcb_cem\",\"shuffled_future_negative_control\",\"oracle_cem\"],\"horizons\":[1,4,8],\"candidate_budgets\":[8,32,64],\"execution_blocks\":[1,4],",
+        "\"evaluator_uniform_grid_probe_count\":201,\"scenarios\":[\"benign\",\"state_action_pocket\",\"compounding_drift\",\"termination_seam\",\"regime_migration\"],\"policies\":[\"direct_policy\",\"compute_matched_direct_search\",\"random_point_search\",\"adaptive_point_cem\",\"pessimistic_ensemble_cem\",\"uncertainty_lcb_cem\",\"shuffled_future_negative_control\",\"oracle_cem\"],\"horizons\":[1,4,8],\"candidate_budgets\":[8,32,64],\"execution_blocks\":[1,4],",
     );
     write!(
         &mut output,
@@ -830,6 +877,10 @@ fn render_report() -> String {
                         .iter()
                         .map(|row| row.total_return)
                         .collect();
+                    let shuffled_returns: Vec<f64> = all_results[6]
+                        .iter()
+                        .map(|row| row.total_return)
+                        .collect();
                     let oracle_returns: Vec<f64> = all_results[7]
                         .iter()
                         .map(|row| row.total_return)
@@ -850,6 +901,7 @@ fn render_report() -> String {
                             &all_results[index],
                             &direct_returns,
                             &matched_returns,
+                            &shuffled_returns,
                             &oracle_returns,
                         );
                     }
