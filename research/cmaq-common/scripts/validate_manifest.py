@@ -29,7 +29,10 @@ def semantic_errors(instance: dict) -> list[str]:
             errors.append("comparison control ID is not registered")
         if comparison["status"] == "qualified":
             required_match = {"episodes", "seeds", "observations", "actions", "horizon"}
-            for baseline_id in (comparison["treatment_id"], comparison["control_id"]):
+            comparison_baselines = (comparison["treatment_id"], comparison["control_id"])
+            if any(baseline_id not in baseline_set for baseline_id in comparison_baselines):
+                continue
+            for baseline_id in comparison_baselines:
                 baseline = baseline_by_id[baseline_id]
                 if baseline["eligibility"] != "eligible_for_primary_contrast":
                     errors.append("qualified contrast uses an ineligible baseline")
@@ -197,6 +200,11 @@ def main() -> None:
     mutated["data_sources"][0]["visibility"] = "evaluator_only"
     mutated["data_sources"][0]["candidate_access"] = ["hidden_truth"]
     hostile_cases.append(("evaluator-only dataset exposes fields to candidate", mutated))
+
+    mutated = copy.deepcopy(example)
+    mutated["comparisons"][0]["status"] = "qualified"
+    mutated["comparisons"][0]["treatment_id"] = "unregistered_model"
+    hostile_cases.append(("qualified comparison references unknown baseline", mutated))
 
     for label, hostile in hostile_cases:
         if fail_closed(validator, hostile):
