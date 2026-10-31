@@ -1,0 +1,308 @@
+{
+  "schema_version": "hardsec-context-assignment-truth-v1",
+  "evidence_domain": "synthetic_fixture",
+  "stream_id": "stream-prm-demo-01",
+  "evaluation_group_id": "heldout-prm-exec-01",
+  "records": [
+    {
+      "sequence_index": 1,
+      "window_id": "prm-window-001",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 2,
+      "window_id": "prm-window-002",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 3,
+      "window_id": "prm-window-003",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 4,
+      "window_id": "prm-window-004",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 5,
+      "window_id": "prm-window-005",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 6,
+      "window_id": "prm-window-006",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 7,
+      "window_id": "prm-window-007",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 8,
+      "window_id": "prm-window-008",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 9,
+      "window_id": "prm-window-009",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 10,
+      "window_id": "prm-window-010",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 11,
+      "window_id": "prm-window-011",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 12,
+      "window_id": "prm-window-012",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 13,
+      "window_id": "prm-window-013",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 14,
+      "window_id": "prm-window-014",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 15,
+      "window_id": "prm-window-015",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 16,
+      "window_id": "prm-window-016",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 17,
+      "window_id": "prm-window-017",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 18,
+      "window_id": "prm-window-018",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 19,
+      "window_id": "prm-window-019",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 20,
+      "window_id": "prm-window-020",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 21,
+      "window_id": "prm-window-021",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 22,
+      "window_id": "prm-window-022",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 23,
+      "window_id": "prm-window-023",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 24,
+      "window_id": "prm-window-024",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 25,
+      "window_id": "prm-window-025",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 26,
+      "window_id": "prm-window-026",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 27,
+      "window_id": "prm-window-027",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 28,
+      "window_id": "prm-window-028",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 29,
+      "window_id": "prm-window-029",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 30,
+      "window_id": "prm-window-030",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 31,
+      "window_id": "prm-window-031",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 32,
+      "window_id": "prm-window-032",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 33,
+      "window_id": "prm-window-033",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 34,
+      "window_id": "prm-window-034",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 35,
+      "window_id": "prm-window-035",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 36,
+      "window_id": "prm-window-036",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 37,
+      "window_id": "prm-window-037",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 38,
+      "window_id": "prm-window-038",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 39,
+      "window_id": "prm-window-039",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 40,
+      "window_id": "prm-window-040",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 41,
+      "window_id": "prm-window-041",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 42,
+      "window_id": "prm-window-042",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 43,
+      "window_id": "prm-window-043",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 44,
+      "window_id": "prm-window-044",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 45,
+      "window_id": "prm-window-045",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 46,
+      "window_id": "prm-window-046",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 47,
+      "window_id": "prm-window-047",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 48,
+      "window_id": "prm-window-048",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 49,
+      "window_id": "prm-window-049",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 50,
+      "window_id": "prm-window-050",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 51,
+      "window_id": "prm-window-051",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 52,
+      "window_id": "prm-window-052",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 53,
+      "window_id": "prm-window-053",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 54,
+      "window_id": "prm-window-054",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 55,
+      "window_id": "prm-window-055",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 56,
+      "window_id": "prm-window-056",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 57,
+      "window_id": "prm-window-057",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 58,
+      "window_id": "prm-window-058",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 59,
+      "window_id": "prm-window-059",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 60,
+      "window_id": "prm-window-060",
+      "true_context_id": "compute"
+    }
+  ]
+}
