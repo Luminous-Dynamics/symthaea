@@ -30,7 +30,7 @@
     "policies": {
       "const": [
         "direct_policy",
-        "compute_matched_direct_search",
+        "direct_search_control",
         "random_point_search",
         "adaptive_point_cem",
         "pessimistic_ensemble_cem",
@@ -77,9 +77,9 @@
           "paired_return_delta_vs_direct",
           "paired_delta_vs_direct_ci95_lower",
           "paired_delta_vs_direct_ci95_upper",
-          "paired_return_delta_vs_compute_matched_direct",
-          "paired_delta_vs_compute_matched_ci95_lower",
-          "paired_delta_vs_compute_matched_ci95_upper",
+          "paired_return_delta_vs_direct_search_control",
+          "paired_delta_vs_direct_search_control_ci95_lower",
+          "paired_delta_vs_direct_search_control_ci95_upper",
           "paired_return_gap_to_oracle",
           "paired_gap_to_oracle_ci95_lower",
           "paired_gap_to_oracle_ci95_upper",
@@ -104,7 +104,7 @@
           "policy": {
             "enum": [
               "direct_policy",
-              "compute_matched_direct_search",
+              "direct_search_control",
               "random_point_search",
               "adaptive_point_cem",
               "pessimistic_ensemble_cem",
@@ -126,9 +126,9 @@
           "paired_return_delta_vs_direct": { "type": "number" },
           "paired_delta_vs_direct_ci95_lower": { "type": "number" },
           "paired_delta_vs_direct_ci95_upper": { "type": "number" },
-          "paired_return_delta_vs_compute_matched_direct": { "type": "number" },
-          "paired_delta_vs_compute_matched_ci95_lower": { "type": "number" },
-          "paired_delta_vs_compute_matched_ci95_upper": { "type": "number" },
+          "paired_return_delta_vs_direct_search_control": { "type": "number" },
+          "paired_delta_vs_direct_search_control_ci95_lower": { "type": "number" },
+          "paired_delta_vs_direct_search_control_ci95_upper": { "type": "number" },
           "paired_return_gap_to_oracle": { "type": "number" },
           "paired_gap_to_oracle_ci95_lower": { "type": "number" },
           "paired_gap_to_oracle_ci95_upper": { "type": "number" },
