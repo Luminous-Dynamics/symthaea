@@ -365,6 +365,7 @@ pub enum TemporalGenerationError {
     TooFewStepsForRegimeShift { requested: usize, minimum: usize },
     ZeroForecastHorizon,
     ZeroFeedbackDelay,
+    FeedbackBeforeForecastHorizon { delay: u64, horizon: u64 },
     FeedbackDelayOutsideStream { delay: u64, steps: usize },
 }
 
@@ -385,6 +386,10 @@ impl fmt::Display for TemporalGenerationError {
             Self::ZeroFeedbackDelay => {
                 write!(f, "feedback_delay must be greater than zero")
             }
+            Self::FeedbackBeforeForecastHorizon { delay, horizon } => write!(
+                f,
+                "feedback_delay {delay} cannot reveal a forecast target before horizon {horizon}"
+            ),
             Self::FeedbackDelayOutsideStream { delay, steps } => {
                 write!(f, "feedback_delay {delay} must be less than stream steps {steps}")
             }
@@ -539,6 +544,12 @@ fn validate_config(config: MultiTimescaleConfig) -> Result<(), TemporalGeneratio
     if config.feedback_delay == 0 {
         return Err(TemporalGenerationError::ZeroFeedbackDelay);
     }
+    if config.feedback_delay < config.forecast_horizon {
+        return Err(TemporalGenerationError::FeedbackBeforeForecastHorizon {
+            delay: config.feedback_delay,
+            horizon: config.forecast_horizon,
+        });
+    }
     if config.feedback_delay >= u64::try_from(config.steps).unwrap_or(u64::MAX) {
         return Err(TemporalGenerationError::FeedbackDelayOutsideStream {
             delay: config.feedback_delay,
@@ -621,7 +632,7 @@ mod tests {
             seed: 0x5EED_2026_1031,
             steps: 512,
             forecast_horizon: 7,
-            feedback_delay: 3,
+            feedback_delay: 11,
             regime_shift,
         }
     }
@@ -838,6 +849,19 @@ mod tests {
         assert_eq!(
             verify_multiscale_trace(&task, &oracle),
             Err(TemporalVerificationError::StreamIdMismatch)
+        );
+    }
+
+    #[test]
+    fn feedback_cannot_precede_forecast_target_time() {
+        let mut cfg = config(false);
+        cfg.feedback_delay = cfg.forecast_horizon.saturating_sub(1);
+        assert_eq!(
+            generate_multiscale_task(cfg),
+            Err(TemporalGenerationError::FeedbackBeforeForecastHorizon {
+                delay: cfg.feedback_delay,
+                horizon: cfg.forecast_horizon,
+            })
         );
     }
 
