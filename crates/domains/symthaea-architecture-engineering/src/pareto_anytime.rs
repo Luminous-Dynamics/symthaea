@@ -291,10 +291,10 @@ impl AnytimeTargetPlan {
             if !target.threshold.is_finite() || !target.minimum_evidence_level.may_qualify_target() {
                 return Err(AnytimeError::new(format!("target_plan.targets[{index}]"), "threshold must be finite and Unverified is not an admissible target level"));
             }
-            if matches!(target.metric, AnytimeTargetMetric::Hypervolume | AnytimeTargetMetric::IgdPlus)
-                && target.threshold < 0.0
+            if (target.metric == AnytimeTargetMetric::Hypervolume && target.threshold <= 0.0)
+                || (target.metric == AnytimeTargetMetric::IgdPlus && target.threshold < 0.0)
             {
-                return Err(AnytimeError::new(format!("target_plan.targets[{index}].threshold"), "hypervolume and IGD+ thresholds must be non-negative"));
+                return Err(AnytimeError::new(format!("target_plan.targets[{index}].threshold"), "hypervolume targets must be positive and IGD+ targets non-negative"));
             }
         }
         if self.reference_front_utility.is_empty() {
@@ -1308,6 +1308,31 @@ mod tests {
         assert_eq!(receipt.total_resources.host_cpu_millis, Some(12));
         assert_eq!(receipt.total_resources.energy_millijoules, None);
         assert!(!receipt.required_resource_meters_satisfied);
+    }
+
+    #[test]
+    fn duplicate_decision_bytes_cannot_be_admitted_under_two_candidate_ids() {
+        let mut history = AnytimeHistory::new(header()).unwrap();
+        append_candidate(&mut history, 1, "candidate-a", "eval-a", vec![0.0, 1.0]);
+        let duplicate = history.append(AnytimeEventDraft {
+            started_elapsed_millis: 1,
+            completed_elapsed_millis: 2,
+            resources: known_cost(1, 1024),
+            action: AnytimeAction::CandidateEvaluation {
+                evaluation_id: "eval-b".to_owned(),
+                candidate_id: "candidate-b".to_owned(),
+                attempt: 1,
+                decision_sha256: H3.to_owned(),
+                outcome: EvaluationOutcome::Succeeded,
+                objective_values: Some(vec![1.0, 0.0]),
+                feasible: Some(true),
+                constraint_violations: Vec::new(),
+                evidence_sha256: Some(H5.to_owned()),
+                failure_reason: None,
+            },
+        });
+        assert!(duplicate.is_err());
+        assert_eq!(history.events.len(), 1);
     }
 
     #[test]
