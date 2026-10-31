@@ -194,6 +194,26 @@ pub fn compile_hybrid_style(
                 });
             }
         }
+        GrammarFamily::BluesCallResponse => {
+            if spec.meter != 4 {
+                issues.push(StyleMixIssue {
+                    code: "blues_call_response_meter_adapter_required".into(),
+                    layer: Some(StyleMixLayer::Structure),
+                    catalog_id: Some(structural_entry.id),
+                    message: "the current 12-bar BluesCallResponse realization is qualified only for 4/4; non-4/4 requires an explicit chorus/tala adapter".into(),
+                });
+            }
+        }
+        GrammarFamily::JazzChorus => {
+            if spec.meter != 4 {
+                issues.push(StyleMixIssue {
+                    code: "jazz_chorus_meter_adapter_required".into(),
+                    layer: Some(StyleMixLayer::Structure),
+                    catalog_id: Some(structural_entry.id),
+                    message: "the current 8-bar JazzChorus realization is qualified only for 4/4; non-4/4 requires an explicit chorus adapter".into(),
+                });
+            }
+        }
         family => {
             issues.push(StyleMixIssue {
                 code: "structural_engine_adapter_required".into(),
@@ -299,6 +319,20 @@ pub fn compile_hybrid_style(
                 catalog_id: Some(entry.id),
                 message: "ProcessAdditive preserves a static tonic/fifth field and does not consume progression or general harmonic-texture fields; an explicit modal/pitch-hierarchy adapter is required".into(),
             });
+        } else if matches!(
+            structural_family,
+            GrammarFamily::BluesCallResponse | GrammarFamily::JazzChorus
+        ) {
+            // These engines consume the key mode and progression directly.
+            // JazzChorus additionally passes seventh_chords into its
+            // harmony realizer; BluesCallResponse explicitly passes false.
+            // General drone/planing/stasis and mode-pool controls are not
+            // consumed by either dedicated engine and are not copied.
+            spec.progression = donor.progression;
+            spec.mode = donor.mode;
+            if structural_family == GrammarFamily::JazzChorus {
+                spec.texture.seventh_chords = donor.texture.seventh_chords;
+            }
         } else {
             spec.progression = donor.progression;
             spec.mode = donor.mode;
@@ -329,6 +363,14 @@ pub fn compile_hybrid_style(
                 catalog_id: Some(entry.id),
                 message: "ProcessAdditive currently consumes tempo_range and attitude only; the general rhetoric/texture bundle is not safe to claim until a process-specific performance contract is tested".into(),
             });
+        } else if matches!(
+            structural_family,
+            GrammarFamily::BluesCallResponse | GrammarFamily::JazzChorus
+        ) {
+            // Their dedicated engines read tempo_range but not the generic
+            // rhetoric/swing/entrance/damage bundle. Admit only the field
+            // that changes the actual score tempo.
+            spec.tempo_range = donor.tempo_range;
         } else {
             spec.tempo_range = donor.tempo_range;
             spec.rhetoric = donor.rhetoric;
@@ -810,6 +852,193 @@ mod tests {
         assert!(issues.iter().any(|issue| {
             issue.code == "process_melody_cell_shape_mismatch"
         }));
+    }
+
+    #[test]
+    fn blues_call_response_accepts_score_consumed_donors() {
+        let cases = [
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("Blues"),
+                    melodic_style_id: Some(id_for_composer_style("JazzBallad")),
+                    rhythmic_style_id: None,
+                    harmonic_style_id: None,
+                    ensemble_style_id: None,
+                    performance_style_id: None,
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "melodic",
+            ),
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("Blues"),
+                    melodic_style_id: None,
+                    rhythmic_style_id: Some(id_for_composer_style("Tango")),
+                    harmonic_style_id: None,
+                    ensemble_style_id: None,
+                    performance_style_id: None,
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "rhythmic",
+            ),
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("Blues"),
+                    melodic_style_id: None,
+                    rhythmic_style_id: None,
+                    harmonic_style_id: Some(id_for_composer_style("Classical")),
+                    ensemble_style_id: None,
+                    performance_style_id: None,
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "harmonic",
+            ),
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("Blues"),
+                    melodic_style_id: None,
+                    rhythmic_style_id: None,
+                    harmonic_style_id: None,
+                    ensemble_style_id: None,
+                    performance_style_id: Some(id_for_composer_style("JazzBallad")),
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "tempo",
+            ),
+        ];
+
+        for (hybrid, axis) in cases {
+            let intent = MusicalIntent {
+                bars: 24,
+                seed: 13,
+                ..MusicalIntent::default()
+            };
+            let baseline = symthaea_music_theory::compose_with_grammar_plan(
+                Style::Blues.grammar_profile(),
+                &intent,
+                &Style::Blues.spec(),
+            );
+            let candidate = compose_hybrid_style(&intent, &hybrid)
+                .unwrap_or_else(|issues| panic!("{axis} donor rejected: {issues:?}"));
+            assert_ne!(
+                baseline.score, candidate.score,
+                "{axis} donor did not change the Blues score"
+            );
+            match &candidate.grammar_plan {
+                GrammarPlanEvidence::CallResponse(plan) => {
+                    assert_eq!(plan.bars_per_chorus, 12);
+                    assert_eq!(plan.call_starts, vec![0, 4, 8]);
+                    assert_eq!(plan.response_starts, vec![2, 6, 10]);
+                }
+                other => panic!("wrong Blues grammar plan: {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn jazz_chorus_accepts_score_consumed_donors() {
+        let cases = [
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("JazzBallad"),
+                    melodic_style_id: Some(id_for_composer_style("Blues")),
+                    rhythmic_style_id: None,
+                    harmonic_style_id: None,
+                    ensemble_style_id: None,
+                    performance_style_id: None,
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "melodic",
+            ),
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("JazzBallad"),
+                    melodic_style_id: None,
+                    rhythmic_style_id: Some(id_for_composer_style("Tango")),
+                    harmonic_style_id: None,
+                    ensemble_style_id: None,
+                    performance_style_id: None,
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "rhythmic",
+            ),
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("JazzBallad"),
+                    melodic_style_id: None,
+                    rhythmic_style_id: None,
+                    harmonic_style_id: Some(id_for_composer_style("Classical")),
+                    ensemble_style_id: None,
+                    performance_style_id: None,
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "harmonic",
+            ),
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("JazzBallad"),
+                    melodic_style_id: None,
+                    rhythmic_style_id: None,
+                    harmonic_style_id: None,
+                    ensemble_style_id: None,
+                    performance_style_id: Some(id_for_composer_style("Blues")),
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "tempo",
+            ),
+        ];
+
+        for (hybrid, axis) in cases {
+            let intent = MusicalIntent {
+                bars: 24,
+                seed: 19,
+                ..MusicalIntent::default()
+            };
+            let baseline = symthaea_music_theory::compose_with_grammar_plan(
+                Style::JazzBallad.grammar_profile(),
+                &intent,
+                &Style::JazzBallad.spec(),
+            );
+            let candidate = compose_hybrid_style(&intent, &hybrid)
+                .unwrap_or_else(|issues| panic!("{axis} donor rejected: {issues:?}"));
+            assert_ne!(
+                baseline.score, candidate.score,
+                "{axis} donor did not change the JazzChorus score"
+            );
+            match &candidate.grammar_plan {
+                GrammarPlanEvidence::JazzChorus(plan) => {
+                    assert_eq!(plan.bars_per_chorus, 8);
+                    assert_eq!(plan.choruses, 3);
+                }
+                other => panic!("wrong JazzChorus grammar plan: {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn blues_and_jazz_chorus_reject_unqualified_meter_donors() {
+        for structural_style in ["Blues", "JazzBallad"] {
+            let hybrid = HybridStyleSpec {
+                structural_style_id: id_for_composer_style(structural_style),
+                melodic_style_id: None,
+                rhythmic_style_id: Some(id_for_composer_style("Flamenco")),
+                harmonic_style_id: None,
+                ensemble_style_id: None,
+                performance_style_id: None,
+                production_style_id: None,
+                culturally_qualified_sources_acknowledged: true,
+            };
+            let issues = compile_hybrid_style(&hybrid).unwrap_err();
+            assert!(issues.iter().any(|issue| issue.code == "rhythm_meter_mismatch"));
+        }
     }
 
     #[test]
