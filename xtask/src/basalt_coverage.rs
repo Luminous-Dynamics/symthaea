@@ -92,6 +92,9 @@ struct Receipt {
     profile_digest: String,
     observer_binary_digest: String,
     runner_binary_digest: String,
+    observer_configuration_digest: String,
+    hook_set_digest: String,
+    sandbox_policy_digest: String,
     platform: RuntimePlatform,
     controls_active: Vec<String>,
     capture: CaptureEnvelope,
@@ -118,6 +121,7 @@ struct CaptureEnvelope {
     root_pid: u32,
     process_tree_closed: bool,
     monitored_roots: Vec<String>,
+    snapshot_manifest_digest: String,
     snapshot_consistency: String,
 }
 
@@ -354,6 +358,9 @@ fn validate_receipt_shape(receipt: &Receipt, report: &mut CoverageAuditReport) {
     if !valid_digest(&receipt.profile_digest)
         || !valid_digest(&receipt.observer_binary_digest)
         || !valid_digest(&receipt.runner_binary_digest)
+        || !valid_digest(&receipt.observer_configuration_digest)
+        || !valid_digest(&receipt.hook_set_digest)
+        || !valid_digest(&receipt.sandbox_policy_digest)
     {
         push_error(report, "E_DIGEST", "receipt", "profile, observer and runner digests must be lowercase sha256 digests");
     }
@@ -405,6 +412,9 @@ fn validate_capture(receipt: &Receipt, report: &mut CoverageAuditReport) {
     }
     if capture.root_pid == 0 {
         push_error(report, "E_ROOT_PID", "receipt.capture.root_pid", "root_pid must be non-zero");
+    }
+    if !valid_digest(&capture.snapshot_manifest_digest) {
+        push_error(report, "E_SNAPSHOT_MANIFEST_DIGEST", "receipt.capture.snapshot_manifest_digest", "snapshot manifest digest must be a lowercase sha256 digest");
     }
     if capture.snapshot_consistency != "stable" && capture.snapshot_consistency != "raced" && capture.snapshot_consistency != "unknown" {
         push_error(report, "E_SNAPSHOT_STATE", "receipt.capture.snapshot_consistency", "snapshot_consistency must be stable, raced or unknown");
@@ -551,7 +561,10 @@ mod tests {
                 "environment_capture",
                 "network_policy_enforcement",
                 "kernel_event_loss_counters",
-                "snapshot_consistency_check"
+                "snapshot_consistency_check",
+                "hook_attachment_inventory",
+                "sandbox_policy_binding",
+                "snapshot_manifest_binding"
             ],
             "required_controls": [
                 "read_only_workspace_snapshot",
@@ -560,7 +573,10 @@ mod tests {
                 "environment_capture",
                 "network_policy_enforcement",
                 "kernel_event_loss_counters",
-                "snapshot_consistency_check"
+                "snapshot_consistency_check",
+                "hook_attachment_inventory",
+                "sandbox_policy_binding",
+                "snapshot_manifest_binding"
             ],
             "channels": [
                 {"channel_id":"filesystem","required_event_kinds":["content_read","metadata_read","directory_enumeration","symlink_target","mmap_access","namespace_mutation"]},
@@ -570,8 +586,8 @@ mod tests {
                 {"channel_id":"toolchain","required_event_kinds":["compiler_identity","linker_identity","sysroot_identity","target_configuration"]},
                 {"channel_id":"cache","required_event_kinds":["cache_lookup","cache_hit_provenance","cache_miss"]},
                 {"channel_id":"network","required_event_kinds":["network_attempt","endpoint_identity","response_artifact"]},
-                {"channel_id":"observer_integrity","required_event_kinds":["event_loss_counter","observer_lifecycle","root_boundary"]},
-                {"channel_id":"snapshot_consistency","required_event_kinds":["snapshot_start","snapshot_end","concurrent_mutation_check"]}
+                {"channel_id":"observer_integrity","required_event_kinds":["event_loss_counter","observer_lifecycle","root_boundary","hook_attach_set"]},
+                {"channel_id":"snapshot_consistency","required_event_kinds":["snapshot_start","snapshot_end","concurrent_mutation_check","snapshot_manifest_commitment"]}
             ]
         })
     }
@@ -598,6 +614,9 @@ mod tests {
             "profile_digest":digest,
             "observer_binary_digest":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "runner_binary_digest":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "observer_configuration_digest":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "hook_set_digest":"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "sandbox_policy_digest":"sha256:9999999999999999999999999999999999999999999999999999999999999999",
             "platform":{
                 "os":"linux",
                 "architecture":"x86_64",
@@ -612,6 +631,7 @@ mod tests {
                 "root_pid":123,
                 "process_tree_closed":true,
                 "monitored_roots":["/workspace","/nix/store"],
+                "snapshot_manifest_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 "snapshot_consistency":"stable"
             },
             "health":{
