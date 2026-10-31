@@ -63,6 +63,10 @@ pub struct EvidenceTask {
     pub observations: Vec<EvidenceObservation>,
     pub recall_start_step: u32,
     pub recall_end_step: u32,
+    pub interval_steps: u32,
+    pub cue_steps: u32,
+    pub delay_steps: u32,
+    pub cue_count: usize,
     pub input_channels: usize,
 }
 
@@ -222,6 +226,10 @@ pub fn generate_evidence_task(
             observations,
             recall_start_step: recall_start,
             recall_end_step: recall_end,
+            interval_steps,
+            cue_steps,
+            delay_steps,
+            cue_count: config.cue_count,
             input_channels: INPUT_CHANNELS,
         },
         EvidenceOracle {
@@ -232,6 +240,133 @@ pub fn generate_evidence_task(
             expected_label,
         },
     ))
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum EvidenceVerificationError {
+    StreamIdMismatch,
+    InvalidTaskWindow,
+    InvalidOracle,
+    InvalidObservation { expected_step: u32 },
+    ChannelOutOfRange { step: u32, channel: u16 },
+    ChannelsNotStrictlyOrdered { step: u32 },
+    CueChannelOutsideAssignedWindow { step: u32, channel: u16 },
+    RecallChannelOutsideRecallWindow { step: u32, channel: u16 },
+}
+
+impl fmt::Display for EvidenceVerificationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::StreamIdMismatch => write!(f, "evidence task and oracle stream IDs differ"),
+            Self::InvalidTaskWindow => write!(f, "evidence task timing or input dimensions are invalid"),
+            Self::InvalidOracle => write!(f, "evidence oracle assignments or majority label are invalid"),
+            Self::InvalidObservation { expected_step } => {
+                write!(f, "evidence observation is missing or reordered at step {expected_step}")
+            }
+            Self::ChannelOutOfRange { step, channel } => {
+                write!(f, "evidence event at step {step} contains out-of-range channel {channel}")
+            }
+            Self::ChannelsNotStrictlyOrdered { step } => {
+                write!(f, "evidence active channels are duplicated or unordered at step {step}")
+            }
+            Self::CueChannelOutsideAssignedWindow { step, channel } => {
+                write!(f, "cue channel {channel} is active outside its assigned cue window at step {step}")
+            }
+            Self::RecallChannelOutsideRecallWindow { step, channel } => {
+                write!(f, "recall channel {channel} is active outside the recall window at step {step}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for EvidenceVerificationError {}
+
+/// Evaluator-side oracle and event-structure validation for evidence trials.
+pub fn verify_evidence_trace(
+    task: &EvidenceTask,
+    oracle: &EvidenceOracle,
+) -> Result<(), EvidenceVerificationError> {
+    if task.stream_id != oracle.stream_id {
+        return Err(EvidenceVerificationError::StreamIdMismatch);
+    }
+    let expected_sequence_end = u64::try_from(task.cue_count)
+        .unwrap_or(u64::MAX)
+        .saturating_mul(u64::from(task.interval_steps.saturating_add(task.cue_steps)));
+    let expected_recall_start = expected_sequence_end.saturating_add(u64::from(task.delay_steps));
+    if task.input_channels != INPUT_CHANNELS
+        || task.cue_count == 0
+        || task.cue_count != oracle.cue_assignments.len()
+        || u64::from(task.recall_start_step) != expected_recall_start
+        || task.recall_start_step >= task.recall_end_step
+        || usize::try_from(task.recall_end_step).unwrap_or(usize::MAX)
+            != task.observations.len()
+    {
+        return Err(EvidenceVerificationError::InvalidTaskWindow);
+    }
+
+    let positive_count = oracle.cue_assignments.iter().filter(|value| **value).count();
+    if positive_count != oracle.positive_cue_count
+        || oracle.expected_label != u8::from(positive_count * 2 > task.cue_count)
+        || oracle.expected_label > 1
+    {
+        return Err(EvidenceVerificationError::InvalidOracle);
+    }
+
+    for (index, observation) in task.observations.iter().enumerate() {
+        let expected_step = u32::try_from(index).unwrap_or(u32::MAX);
+        if observation.step != expected_step {
+            return Err(EvidenceVerificationError::InvalidObservation { expected_step });
+        }
+        let mut previous = None;
+        for channel in &observation.active_channels {
+            let channel_index = usize::from(*channel);
+            if channel_index >= task.input_channels {
+                return Err(EvidenceVerificationError::ChannelOutOfRange {
+                    step: observation.step,
+                    channel: *channel,
+                });
+            }
+            if previous.is_some_and(|prior| prior >= *channel) {
+                return Err(EvidenceVerificationError::ChannelsNotStrictlyOrdered {
+                    step: observation.step,
+                });
+            }
+            previous = Some(*channel);
+
+            if channel_index < GROUP_SIZE * 2 {
+                let cue_index = (0..task.cue_count).find(|cue| {
+                    let start = u64::from(task.interval_steps)
+                        + u64::try_from(*cue).unwrap_or(u64::MAX)
+                            * u64::from(task.interval_steps.saturating_add(task.cue_steps));
+                    let end = start.saturating_add(u64::from(task.cue_steps));
+                    u64::from(observation.step) >= start
+                        && u64::from(observation.step) < end
+                });
+                let Some(cue_index) = cue_index else {
+                    return Err(EvidenceVerificationError::CueChannelOutsideAssignedWindow {
+                        step: observation.step,
+                        channel: *channel,
+                    });
+                };
+                let is_left_channel = channel_index < GROUP_SIZE;
+                if is_left_channel != oracle.cue_assignments[cue_index] {
+                    return Err(EvidenceVerificationError::CueChannelOutsideAssignedWindow {
+                        step: observation.step,
+                        channel: *channel,
+                    });
+                }
+            } else if channel_index < GROUP_SIZE * 3
+                && (observation.step < task.recall_start_step
+                    || observation.step >= task.recall_end_step)
+            {
+                return Err(EvidenceVerificationError::RecallChannelOutsideRecallWindow {
+                    step: observation.step,
+                    channel: *channel,
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 fn validate_config(config: EvidenceConfig) -> Result<(), EvidenceGenerationError> {
@@ -366,6 +501,59 @@ mod tests {
                 .iter()
                 .all(|channel| usize::from(*channel) < task.input_channels));
         }
+    }
+
+    #[test]
+    fn generated_evidence_trace_passes_oracle_verifier() {
+        let config = EvidenceConfig::braintrace_reference(321);
+        let (task, oracle) = generate_evidence_task(config).unwrap();
+        assert_eq!(verify_evidence_trace(&task, &oracle), Ok(()));
+    }
+
+    #[test]
+    fn verifier_rejects_mutated_majority_label() {
+        let config = EvidenceConfig::braintrace_reference(321);
+        let (task, mut oracle) = generate_evidence_task(config).unwrap();
+        oracle.expected_label ^= 1;
+        assert_eq!(
+            verify_evidence_trace(&task, &oracle),
+            Err(EvidenceVerificationError::InvalidOracle)
+        );
+    }
+
+    #[test]
+    fn verifier_rejects_recall_spikes_before_recall_window() {
+        let config = EvidenceConfig::braintrace_reference(321);
+        let (mut task, oracle) = generate_evidence_task(config).unwrap();
+        task.observations[0].active_channels.push(50);
+        task.observations[0].active_channels.sort_unstable();
+        assert!(matches!(
+            verify_evidence_trace(&task, &oracle),
+            Err(EvidenceVerificationError::RecallChannelOutsideRecallWindow { .. })
+        ));
+    }
+
+    #[test]
+    fn verifier_rejects_cue_spikes_outside_cue_windows() {
+        let config = EvidenceConfig::braintrace_reference(321);
+        let (mut task, oracle) = generate_evidence_task(config).unwrap();
+        task.observations[0].active_channels.push(0);
+        task.observations[0].active_channels.sort_unstable();
+        assert!(matches!(
+            verify_evidence_trace(&task, &oracle),
+            Err(EvidenceVerificationError::CueChannelOutsideAssignedWindow { .. })
+        ));
+    }
+
+    #[test]
+    fn verifier_rejects_stream_identity_mismatch() {
+        let config = EvidenceConfig::braintrace_reference(321);
+        let (task, mut oracle) = generate_evidence_task(config).unwrap();
+        oracle.stream_id ^= 1;
+        assert_eq!(
+            verify_evidence_trace(&task, &oracle),
+            Err(EvidenceVerificationError::StreamIdMismatch)
+        );
     }
 
     #[test]
