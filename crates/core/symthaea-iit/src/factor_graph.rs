@@ -42,6 +42,8 @@ pub enum FactorGraphError {
 
     #[error("cutset variable {variable} was requested more than once")]
     DuplicateCutsetVariable { variable: usize },
+    #[error("cutset frontier requires at least one candidate separator")]
+    EmptyCutsetCandidateSet,
 
     #[error("cutset variable {variable} is not in the elimination set")]
     CutsetVariableNotEliminated { variable: usize },
@@ -401,6 +403,37 @@ impl CutsetFactorEliminationPlan {
     pub fn remaining_elimination_plan(&self) -> &FactorEliminationPlan {
         &self.remaining_elimination_plan
     }
+}
+
+/// One feasible candidate separator and its exact structural preflight.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CutsetFrontierCandidate {
+    /// Position of this separator in the input candidate list.
+    pub candidate_index: usize,
+    pub plan: CutsetFactorEliminationPlan,
+}
+
+/// A candidate separator rejected during preflight.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CutsetFrontierRejection {
+    /// Position of the rejected separator in the input candidate list.
+    pub candidate_index: usize,
+    pub error: FactorGraphError,
+}
+
+/// Feasible candidate plans, their non-dominated subset, and rejected candidates.
+///
+/// frontier_candidate_indices refer to positions in the original input list,
+/// not positions in candidates. Exact metric ties retain the earliest input
+/// candidate as the deterministic representative.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CutsetPlanFrontierReport {
+    /// Successfully preflighted candidates, in original input order.
+    pub candidates: Vec<CutsetFrontierCandidate>,
+    /// Original input indices of Pareto-optimal candidates, in input order.
+    pub frontier_candidate_indices: Vec<usize>,
+    /// Candidates that failed a work or factor-entry budget or validation.
+    pub rejected_candidates: Vec<CutsetFrontierRejection>,
 }
 
 /// Plan exact binary-factor elimination without multiplying any factor tables.
