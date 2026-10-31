@@ -190,6 +190,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - name: Install pinned schema validator for smoke manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv "$RUNNER_TEMP/pitb-sorrydb-jsonschema"
+          "$RUNNER_TEMP/pitb-sorrydb-jsonschema/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
       - name: Stage PITB research crate as an isolated Cargo package
         shell: bash
         run: |
@@ -302,7 +308,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
+          "$RUNNER_TEMP/pitb-sorrydb-jsonschema/bin/python" - <<'PY'
           import json
           from pathlib import Path
 
