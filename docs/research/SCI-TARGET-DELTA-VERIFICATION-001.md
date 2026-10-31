@@ -49,7 +49,7 @@ Reviewers receive baseline and variant artifacts with the target identity, but d
 - expected target transition;
 - allowed changed-claim list.
 
-Each reviewer records:
+Each reviewer receipt echoes the target identity and both parent artifact digests, so it cannot be attached to a different planned candidate input without rejection. Each reviewer records:
 - observed target transition;
 - observed changed claim/scope identity digests;
 - whether a material collateral change outside the permitted scope occurred;
@@ -57,7 +57,7 @@ Each reviewer records:
 
 The reviewer panel uses a fixed preregistered 3–7 member size and consensus threshold. The receipt must contain every parent candidate exactly once and one unique, blinded reviewer record per panel member. Ambiguity is retained; it is never promoted to success.
 
-This is an audit of reviewer declarations, not proof that reviewers were independent, competent, or correct. Hashes bind declared artifacts; they do not prove raw artifact custody.
+This is an audit of reviewer declarations, not proof that reviewers were independent, competent, or correct. Hashes bind the declared target and parent artifacts; they do not prove that those bytes were actually presented to or reviewed by a person, nor do they prove raw artifact custody.
 
 ## 4. Final validity rule
 
