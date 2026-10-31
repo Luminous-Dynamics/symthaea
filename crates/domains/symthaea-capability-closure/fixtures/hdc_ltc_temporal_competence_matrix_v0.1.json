@@ -30,16 +30,21 @@
     "benchmark_executed": false,
     "hardware_energy_measured": false,
     "result_values_present": false,
-    "generator_scope": "Delayed-cue synthetic prototype only; the seven-family suite generator is not implemented.",
-    "rust_tests_authored": true
+    "generator_scope": "Delayed-cue and multi-timescale forecasting/change-point synthetic generators; the full seven-family generator suite is not implemented.",
+    "rust_tests_authored": true,
+    "oracle_trace_verifier_implemented": true,
+    "oracle_process_isolation_implemented": false,
+    "rust_tests_authored_count": 23
   },
   "workload_contract": {
     "sample_semantics": "Causal observations; no future samples; elapsed simulated time is explicit.",
     "source_split_unit": "source_family_for_synthetic; subject_session_or_source_recording_for_real",
     "pre_window_split_required": true,
-    "confirmatory_oracle_sealed": true,
+    "confirmatory_oracle_sealed": false,
     "failed_invalid_timed_out_runs_counted": true,
-    "repeated_timesteps_are_independent_samples": false
+    "repeated_timesteps_are_independent_samples": false,
+    "confirmatory_oracle_sealed_required": true,
+    "oracle_separation": "Generator currently returns public task and oracle in one process; the evaluator-side verifier is implemented, but qualification requires a separately permissioned oracle process."
   },
   "temporal_axes": {
     "delayed_cue_steps": [
@@ -271,7 +276,11 @@
     "gru_d_or_missingness_aware_recurrent",
     "ode_rnn_or_latent_ode",
     "adaptive_lif_or_alif_snn",
-    "temporal_convolution"
+    "temporal_convolution",
+    "braintrace_d_rtrl_online_snn",
+    "braintrace_pp_prop_online_snn",
+    "braintrace_eprop_online_snn",
+    "bptt_gradient_reference_small_scale"
   ],
   "fairness_controls": {
     "paired_instances": true,
@@ -339,5 +348,33 @@
     "null_controls_must_allow_simpler_baselines_to_win",
     "no_production_default_change_before_exact_head_validation"
   ],
-  "claim_ceiling": "Results apply only to declared workloads, splits, implementations, and hardware. They do not establish consciousness, general intelligence, universal superiority, or neuromorphic efficiency when measured only on conventional CPU/GPU."
+  "claim_ceiling": "Results apply only to declared workloads, splits, implementations, and hardware. They do not establish consciousness, general intelligence, universal superiority, or neuromorphic efficiency when measured only on conventional CPU/GPU.",
+  "baseline_registry": {
+    "BrainTrace": {
+      "publication": "Wang et al., Nature Communications 17, 1745 (2026-01-19)",
+      "doi": "10.1038/s41467-026-68453-w",
+      "package_repository": "https://github.com/chaobrain/braintrace",
+      "package_version": "0.2.8",
+      "package_commit": "4fd426e1ec58a61a11d47a8d95c32346778e8b11",
+      "experiments_repository": "https://github.com/chaobrain/braintrace-snn-experiments",
+      "experiments_commit": "81332436b3a0167bc83059878e43a0f0e2eb62c7",
+      "dms_script_path": "task-rsnn-long-term-dependency.py",
+      "dms_script_blob": "f219f53953cdca8465b00e962c7380ff025e0a0b",
+      "dms_task": "8-direction delayed match-to-sample with 1,000 ms delay and spiking population input.",
+      "methods": [
+        "D_RTRL",
+        "pp_prop_ES_D_RTRL",
+        "BPTT"
+      ],
+      "role": "Online-learning and long-horizon credit-assignment competitor; not a drop-in inference-only architecture.",
+      "code_audit_status": "Public DMS script inspected at pinned commit. Paper-to-script exact revision correspondence remains unverified.",
+      "known_replication_controls": [
+        "DMS script samples with NumPy global RNG and does not visibly reset a per-replicate seed in the inspected entry path.",
+        "The inspected training loop iterates generated batches until a training accuracy threshold and does not show a separate held-out confirmatory test split.",
+        "Reproduction must use independent seed resets, grouped/locked development and confirmatory trials, and one-shot confirmatory evaluation."
+      ],
+      "scores_imported": false,
+      "matched_reproduction_status": "not_executed"
+    }
+  }
 }
