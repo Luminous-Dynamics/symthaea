@@ -350,7 +350,7 @@ fn determinant(parameters: &LinearSystemParametersV1) -> i64 {
 /// Exact floor of the row-normalized determinant magnitude in permille.
 /// Computes the integer threshold with u128 arithmetic, avoiding floating
 /// point differences at generation cutoffs.
-fn normalized_determinant_margin_permille(
+pub(crate) fn normalized_determinant_margin_permille(
     parameters: &LinearSystemParametersV1,
 ) -> u16 {
     let row_one_sq = (i128::from(parameters.a11).pow(2)
