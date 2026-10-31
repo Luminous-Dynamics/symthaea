@@ -95,3 +95,55 @@ The key paradigm shift is not a larger prover. It is a proof-engineering control
 - LeanGraphSearch: https://pluslabnlp.github.io/LeanGraphSearch/
 - ProofBench v1.1: https://www.vals.ai/benchmarks/proof_bench
 - Lean 4 local instance synthesis: https://lean-lang.org/doc/reference/latest/Type-Classes/Instance-Synthesis/
+
+
+## Frontier update: EasyProver and Aegis (28 October 2026)
+
+A new preprint, *Scaling Lean Theorem Proving for Real-World Code Verification* (28 October 2026), adds an important architecture baseline. EasyProver reports an off-the-shelf frontier model, without additional training, proving 669/672 PutnamBench tasks, all six IMO 2026 formalizations, 597/600 NTP4VC verification conditions, and all 189 VERINA tasks by proof or refutation. These are different cohorts and acceptance endpoints, not scores that can be compared directly with SorryDB Pass@1 or PITB's family-transfer split.
+
+The system architecture is especially relevant:
+- Recursive model-directed delegation with child agents in fresh contexts and private project workspaces.
+- Asynchronous returns: completed children can redirect the parent before slower siblings finish.
+- Parallel tactic probing, with successful local continuations returned and failed probe diagnostics kept out of the parent context.
+- Explicit concurrency admission controls for agents and expensive Lean queries.
+- A stateless, elastic elaboration service with warm Mathlib workers, decoupled from proof-search agents.
+- Lock-protected candidate promotion followed by independent file checking and revert-on-failure.
+
+This motivates the next PITB paradigm: **bounded speculative proof engineering**. Each branch has a frozen task/environment/proof-state identity, a private workspace, a budget, and a typed result. Branches can explore aggressively, but only a single independent promotion gate may turn a candidate into a verified success.
+
+### PITB runtime ablation
+
+Register a distinct runtime ablation on SorryDB after the environment smoke is complete:
+
+| Arm | Runtime | Hypothesis |
+|---|---|---|
+| R0 | Serial agent with one shared context | Matched reference |
+| R1 | Independent restarts with isolated contexts | Value of context reset |
+| R2 | Recursive delegation with private workspaces and asynchronous returns | Value of adaptive branching |
+| R3 | R2 plus parallel tactic probes and separate agent/Lean admission caps | Value of local parallelism |
+| R4 | R3 plus PITB context evidence, typed insights, support selection and repair routing | Value of PITB's evidence layer |
+
+Match the same model, task set, toolchain, prompt family, checker, trust policy, and total resource envelope. Measure branch fan-out, useful-child-return rate, duplicate-work rate, branch survival, tactic-probe success rate, total Lean CPU time, elaborator queue time, warm-cache hit rate, p50/p95 time-to-first-verified-proof, model tokens, and cost per verified proof. Compare multiple budget caps. A larger search tree is not itself a result.
+
+Start with small worker tiers (1/2/4/8), separate the concurrency caps for agents and expensive Lean queries, and use backpressure when the elaborator or build service saturates. Share immutable build artifacts where safe; keep mutable proof workspaces isolated until promotion.
+
+### Aegis: a distinct future cohort
+
+The same preprint introduces Aegis, a generated implementation-level verification benchmark. It synthesizes safe Rust implementations, differentially checks behavior against Aeneas-translated Lean models, generates frozen specifications, and labels statements with kernel-checked proofs or refutations. The paper reports 2,045 validated Rust–Lean program pairs and 11,533 candidate specifications. On a stratified 2,000-statement sample, EasyProver proved 1,054 (52.7%) within a 30-minute per-statement budget; it left 943 unresolved and did not attempt three. Results vary by task difficulty and specification category.
+
+Aegis is not another SorryDB leaderboard row. It probes implementation semantics, fixed-width arithmetic, error behavior, loops, casts and mutation. PITB should add it only after pinning the exact code/data release, license, generated statement set, translation artifacts, differential-validation coverage and proof/refutation checker. Kernel-checked labels establish propositions about the translated Lean program; they do not automatically establish that a generated specification captures the intended user requirement.
+
+The best future Aegis report should separately measure proof, refutation, unresolved, invalid-specification and abstention rates; Rust/Lean differential mismatches; mutation-control performance; and resource cost. Keep it distinct from SorryDB and the research-math family split.
+
+### New PITB qualification hypotheses
+
+These are targets, not measured results:
+
+1. Zero cross-branch file contamination; every branch bound to source commit, task ID, Lean environment and proof-state digest.
+2. Lower p95 time-to-first-verified-proof at matched total budget, without reduced exact-task reliability.
+3. Measurable useful-child-return rate and more verified solves per 1,000 branch tokens.
+4. Measurable tactic-probe efficiency: success per probe and per Lean CPU-second.
+5. 100% independent replay of promoted candidates, with target/type identity, patch scope, and axiom policy preserved.
+6. Forward generalization on a later SorryDB cohort, with the Aegis set kept separately frozen.
+
+**Primary source:** Ganguly et al., *Scaling Lean Theorem Proving for Real-World Code Verification*, arXiv:2610.38174, 28 October 2026: https://arxiv.org/abs/2610.38174.
