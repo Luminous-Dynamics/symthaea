@@ -98,6 +98,9 @@ jobs:
       - name: Benchmark exact sparse system-search reuse
         run: cargo run --release --locked -p symthaea-iit --example sparse_system_search_reuse_sweep -- --repeats 2 --max-units 2048 2>&1 | tee target/iit-benchmark-evidence/sparse-full-system-search.csv
 
+      - name: Clippy the isolated crate
+        run: cargo clippy --locked -p symthaea-iit --all-targets -- -D warnings 2>&1 | tee target/iit-benchmark-evidence/clippy.log
+
       - name: Upload immutable IIT benchmark evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -107,5 +110,3 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Clippy the isolated crate
-        run: cargo clippy --locked -p symthaea-iit --all-targets -- -D warnings 2>&1 | tee target/iit-benchmark-evidence/clippy.log
