@@ -1046,6 +1046,9 @@ mod tests {
 
     fn target_reviewers(
         candidate_id: &str,
+        target_identity_sha256: &str,
+        baseline_artifact_sha256: &str,
+        variant_artifact_sha256: &str,
         change: &str,
         changed_claims: &[String],
         collateral: &str,
@@ -1054,6 +1057,9 @@ mod tests {
             .map(|index| {
                 json!({
                     "reviewer_id_sha256": digest(&format!("target-reviewer-{candidate_id}-{index}")),
+                    "reviewed_target_identity_sha256": target_identity_sha256,
+                    "baseline_artifact_sha256": baseline_artifact_sha256,
+                    "variant_artifact_sha256": variant_artifact_sha256,
                     "observed_target_change": change,
                     "observed_changed_claim_ids_sha256": changed_claims,
                     "collateral_change": collateral,
@@ -1078,6 +1084,10 @@ mod tests {
         let invariant_baseline = digest("state:invariant-target");
         let changed_baseline = digest("state:changed-target:baseline");
         let changed_variant = digest("state:changed-target:variant");
+        let invariant_baseline_artifact = digest("invariant baseline input");
+        let invariant_variant_artifact = digest("invariant variant input");
+        let changed_baseline_artifact = digest("change baseline input");
+        let changed_variant_artifact = digest("change variant input");
 
         let quality_fields = json!({
             "schema": crate::intervention_quality::QUALITY_PLAN_SCHEMA,
@@ -1105,8 +1115,8 @@ mod tests {
                     "semantic_cluster_sha256": digest("cluster invariant"),
                     "intended_relation": "semantic_invariant",
                     "pipeline_disposition": "accepted",
-                    "baseline_input_sha256": digest("invariant baseline input"),
-                    "variant_input_sha256": digest("invariant variant input"),
+                    "baseline_input_sha256": invariant_baseline_artifact,
+                    "variant_input_sha256": invariant_variant_artifact,
                     "generation_tokens": 100,
                     "generation_cost_micro_usd": 1000,
                     "generation_wall_clock_ms": 10
@@ -1118,8 +1128,8 @@ mod tests {
                     "semantic_cluster_sha256": digest("cluster changed"),
                     "intended_relation": "semantic_change",
                     "pipeline_disposition": "accepted",
-                    "baseline_input_sha256": digest("change baseline input"),
-                    "variant_input_sha256": digest("change variant input"),
+                    "baseline_input_sha256": changed_baseline_artifact,
+                    "variant_input_sha256": changed_variant_artifact,
                     "generation_tokens": 200,
                     "generation_cost_micro_usd": 2000,
                     "generation_wall_clock_ms": 20
@@ -1177,6 +1187,8 @@ mod tests {
                 {
                     "candidate_id": "candidate-invariant",
                     "target_identity_sha256": invariant_target_id,
+                    "baseline_artifact_sha256": invariant_baseline_artifact,
+                    "variant_artifact_sha256": invariant_variant_artifact,
                     "baseline_target_state_sha256": invariant_baseline,
                     "variant_target_state_sha256": invariant_baseline,
                     "expected_target_change": "unchanged",
@@ -1186,6 +1198,8 @@ mod tests {
                 {
                     "candidate_id": "candidate-change",
                     "target_identity_sha256": changed_target_id,
+                    "baseline_artifact_sha256": changed_baseline_artifact,
+                    "variant_artifact_sha256": changed_variant_artifact,
                     "baseline_target_state_sha256": changed_baseline,
                     "variant_target_state_sha256": changed_variant,
                     "expected_target_change": "support_decreased",
@@ -1213,11 +1227,11 @@ mod tests {
             "adjudications": [
                 {
                     "candidate_id": "candidate-invariant",
-                    "reviewers": target_reviewers("candidate-invariant", "unchanged", &[], "none_observed")
+                    "reviewers": target_reviewers("candidate-invariant", &invariant_target_id, &invariant_baseline_artifact, &invariant_variant_artifact, "unchanged", &[], "none_observed")
                 },
                 {
                     "candidate_id": "candidate-change",
-                    "reviewers": target_reviewers("candidate-change", "support_decreased", &[changed_target_id.clone()], "none_observed")
+                    "reviewers": target_reviewers("candidate-change", &changed_target_id, &changed_baseline_artifact, &changed_variant_artifact, "support_decreased", &[changed_target_id.clone()], "none_observed")
                 }
             ]
         });
