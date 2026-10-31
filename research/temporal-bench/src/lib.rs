@@ -19,6 +19,7 @@ pub mod knowledge_stream;
 pub mod phase;
 pub mod retention;
 pub mod temporal;
+pub mod temporal_error_debt;
 
 const MAX_DISTRACTORS: usize = 10_000;
 
