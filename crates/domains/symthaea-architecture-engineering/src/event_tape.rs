@@ -705,6 +705,12 @@ impl EventTape {
     /// be measured. Use validate_integrity for exploratory tapes that intentionally retain
     /// explicit unknowns; such tapes cannot be used in matched-budget claims.
     pub fn validate(&self) -> Result<EventTapeSummary, EventTapeError> {
+        if self.events.is_empty() {
+            return Err(EventTapeError::new(
+                "events",
+                "an empty tape cannot qualify as an executed campaign",
+            ));
+        }
         let summary = self.validate_integrity()?;
         if self.header.execution.mode == ExecutionMode::Batched {
             if let Some(last_event) = self.events.last() {
@@ -1597,6 +1603,13 @@ mod tests {
             .append(event("w0-round2", 0, 2, Some("batch-2"), 1, intent, outcome, 5))
             .is_err());
         assert_eq!(tape.events().len(), 1);
+    }
+
+    #[test]
+    fn empty_tape_cannot_qualify_as_an_experiment() {
+        let tape = EventTape::new(header(ExecutionMode::Sequential, 1, 20)).unwrap();
+        assert!(tape.validate_integrity().is_ok());
+        assert!(tape.validate().is_err());
     }
 
 }
