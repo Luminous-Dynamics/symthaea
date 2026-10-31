@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "dataset_id": "jeffbbrown2/ConnectomeBench2",
+  "dataset_revision": "v2",
+  "dataset_revision_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "pinned_upstream_commit": "5679b39aa2641d8d0afeed88b441e696f87a66df",
+  "source_sidecar_jsonl_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "eligibility_policy_version": "connectomebench2-v2-modality-cohorts-v1",
+  "cohort_set_sha256": "47faf2b7c82c01d8f4e67954046b2d5ed477485e22e0c45d8047a4f4f11ed56a",
+  "cohorts": {
+    "em_best_only_excluded": {
+      "membership_status": "ELIGIBLE",
+      "eligibility_rule": "em_best is present AND none of em_xy/em_xz/em_yz is present",
+      "sample_count": 1,
+      "sample_ids_sha256": "dd0726446b326da4e7b334f50ccd348f56a80a47a53343bc232bc698756afb67",
+      "sample_ids": ["de827f38b75edf34bf1809eb6f2c1792"]
+    },
+    "em_legal_any_view": {
+      "membership_status": "ELIGIBLE",
+      "eligibility_rule": "present_slots contains at least one of em_xy/em_xz/em_yz; excludes em_best",
+      "sample_count": 1,
+      "sample_ids_sha256": "6b04af2bc553e9d006853827c8f298f9ed9efb3405b61647d894d9f0c4995348",
+      "sample_ids": ["fb3d929f1c6abc735fb3e7972c1d45be"]
+    },
+    "em_legal_full_triplet": {
+      "membership_status": "NOT_ESTIMABLE",
+      "eligibility_rule": "present_slots contains em_xy AND em_xz AND em_yz; excludes em_best",
+      "sample_count": 0,
+      "sample_ids_sha256": "f734869e602e2e532cafd9d3b07af7f95264aab531aa57a3fc292f63d576d224",
+      "sample_ids": []
+    },
+    "fused_geometry_legal_em": {
+      "membership_status": "ELIGIBLE",
+      "eligibility_rule": "geometry is present AND at least one of em_xy/em_xz/em_yz is present",
+      "sample_count": 1,
+      "sample_ids_sha256": "34bfb388139d7fa1047da7af0051aabdfd72179f09c4682e6d7b9628082ae1aa",
+      "sample_ids": ["fb3d929f1c6abc735fb3e7972c1d45be"]
+    },
+    "geometry_all": {
+      "membership_status": "ELIGIBLE",
+      "eligibility_rule": "has_single_mask OR has_dual_mask",
+      "sample_count": 5,
+      "sample_ids_sha256": "8186a000e6349aa40162ef56697711eeb7978a4946eaed1704a361ca6bc7add7",
+      "sample_ids": [
+        "2a1cd98c4b6b4874b3745802d06d1631",
+        "6737480128e7adf0a97b182ec20d3503",
+        "ad17b6870e06cc32df6bf47ca39c3b7b",
+        "de827f38b75edf34bf1809eb6f2c1792",
+        "fb3d929f1c6abc735fb3e7972c1d45be"
+      ]
+    },
+    "geometry_without_legal_em": {
+      "membership_status": "ELIGIBLE",
+      "eligibility_rule": "geometry is present AND none of em_xy/em_xz/em_yz is present",
+      "sample_count": 4,
+      "sample_ids_sha256": "5c5f619809eae5bfe05a97439e122b026eeeaa73c69f5dcce0c72e5a5dd968f0",
+      "sample_ids": [
+        "2a1cd98c4b6b4874b3745802d06d1631",
+        "6737480128e7adf0a97b182ec20d3503",
+        "ad17b6870e06cc32df6bf47ca39c3b7b",
+        "de827f38b75edf34bf1809eb6f2c1792"
+      ]
+    },
+    "paired_em_legal_views": {
+      "membership_status": "ELIGIBLE",
+      "eligibility_rule": "exact same sample IDs as fused_geometry_legal_em; score legal EM views on this cohort",
+      "sample_count": 1,
+      "sample_ids_sha256": "48125c619883f082cb949ac95cfc10c108323329ca06440c86ecd2c5b99872d9",
+      "sample_ids": ["fb3d929f1c6abc735fb3e7972c1d45be"]
+    },
+    "paired_geometry_only": {
+      "membership_status": "ELIGIBLE",
+      "eligibility_rule": "exact same sample IDs as fused_geometry_legal_em; score geometry-only on this cohort",
+      "sample_count": 1,
+      "sample_ids_sha256": "2340c0e7af9ae1f38492bbe03381cf5baf5f30136b598b5eb79f829f3f6bcc88",
+      "sample_ids": ["fb3d929f1c6abc735fb3e7972c1d45be"]
+    }
+  },
+  "scope_note": "Synthetic illustrative manifest only. Membership is based on the five-row metadata-sidecar fixture and does not verify Parquet image payloads or biological correctness. paired_geometry_only and paired_em_legal_views contain exactly the same sample IDs. em_best-only records are diagnostic exclusions."
+}
