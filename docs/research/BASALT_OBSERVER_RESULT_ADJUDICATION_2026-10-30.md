@@ -219,6 +219,34 @@ The comparison is deliberately layered rather than a blanket claim that BASALT i
 
 SLSA provenance and in-toto supply-chain layouts provide valuable build and workflow provenance, authorized-step and integrity checks. BASALT should compose with these formats where useful, not reimplement their signature or supply-chain semantics. A provenance statement still depends on its builder/platform trust boundary; the SLSA specification explicitly distinguishes external inputs from parameters trusted because of the build platform. The BASALT oracle therefore needs its own independently reviewed trust root and replay semantics.
 
+## Current industry baseline and the actual gap
+
+BASALT should be designed as a composable proof layer, not as a replacement for build systems:
+
+| System | Strongest existing contribution | What BASALT should add alongside it |
+|---|---|---|
+| Cargo | Build-script execution and incremental invalidation from declared rerun paths | Challenge missing rerun declarations against actual build-script reads; detect stale warm-target output after hidden-input mutation |
+| Bazel | Declared action inputs, per-action execution roots and sandboxing | Independent evidence that the action's observed inputs fit its declared closure, and a fail-closed receipt for channels outside that boundary |
+| Nix | Store-based dependency closure and sandboxing with private namespaces | Runtime evidence for the precise execution, explicit unresolved channels, and receipt integrity/currentness |
+| SLSA / in-toto | Builder identity, provenance, workflow and artifact integrity | Independent challenge of dependency-coverage assertions rather than assuming an attested builder's input list is exhaustive |
+| Reproducible Builds | Bit-for-bit comparison of outputs across independent rebuilds | Detect hidden inputs before they cause stale reuse; define exactly which execution inputs and side effects were in the observation envelope |
+
+Bazel's own documentation identifies the precise failure class: without action sandboxing, undeclared input files can change while Bazel still considers the action up to date, producing incorrect incremental results; incorrect remote-cache entries can then affect many developers. Its action execroot contains known inputs, while sandbox behavior differs by platform and does not fully hide all host state. BASALT should measure both the sandbox-prevention arm and the observer/receipt arm, not claim that tracing alone beats a functioning sandbox.
+
+Nix sandboxing limits build visibility to declared store dependencies, the temporary build directory and selected special paths; on Linux it also uses private namespaces. Fixed-output derivations are an explicit network exception. This is a strong hermeticity boundary. BASALT should compare against it as a separate arm and treat any admitted external path or network exception as part of the declared profile.
+
+SLSA v1.2 is the approved specification. Its Build provenance describes the trusted builder/platform closure and resolved dependencies; the v1.2 provenance text describes dependency completeness as best-effort at Build L3. The SLSA future-directions page discusses complete input knowledge, hermetic builds and reproducible builds as possible Build L4 territory, not as a guarantee supplied by today's L3 provenance. This distinction is important: BASALT's proposed value is independently challenged runtime coverage, not another signature around an unverified dependency list.
+
+Reproducible Builds defines reproducibility as independent parties being able to recreate bit-identical artifacts from the same source, environment and instructions. That is an essential cross-check, but two identical outputs do not prove that every dependency was observed or that a prior incremental result was correctly invalidated after a hidden input changed.
+
+Primary references:
+- Cargo build-script change detection: https://doc.rust-lang.org/cargo/reference/build-scripts.html
+- Bazel sandboxing and undeclared inputs: https://bazel.build/versions/7.5.0/docs/sandboxing
+- Nix sandbox configuration: https://nix.dev/manual/nix/2.25/command-ref/conf-file
+- SLSA v1.2 Build provenance: https://slsa.dev/spec/v1.2/build-provenance
+- SLSA v1.2 future directions: https://slsa.dev/spec/v1.2/future-directions
+- Reproducible Builds definition: https://reproducible-builds.org/docs/definition/
+
 ### Proposed research gates (targets, not results)
 
 | Gate | Target |
@@ -254,4 +282,4 @@ The existing qualification note already identifies why fanotify alone cannot est
 
 ## Execution status and limitations
 
-This branch authors the scoped result adjudicator, separate worker executable, fixture runner, schemas, CLI integration, benchmark protocol, research documentation and corpus correction. Twenty-seven Rust unit tests are authored across the adjudicator, filesystem fixture, Cargo fixture and worker binary (19 adjudicator, 2 filesystem fixture, 3 Cargo fixture, 3 worker tests). The environment used for this work has no `cargo`, `rustc` or `rustfmt`; Rust compilation, formatting, unit-test execution, filesystem fixture execution, Cargo fixture execution and observer qualification have **not** been run here. The filesystem worker's byte-count field is still a worker claim. The Cargo fixture exercises a real offline Cargo build-script/cache path, but remains a source-controlled challenge without independent kernel observation. The next step is to build and execute these artifacts on an exact checkout, then add independent kernel/process observation of the worker and an adapter for real build/test tasks. Oracle signing, a separately trusted replay verifier and observer receipts remain future work. The report's strict-false policy remains in force even for a passing unit test or future green CI run.
+This branch authors the scoped result adjudicator, separate worker executable, fixture runner, schemas, CLI integration, benchmark protocol, research documentation and corpus correction. Twenty-seven Rust unit tests are authored across the adjudicator, filesystem fixture, Cargo fixture and worker binary (19 adjudicator, 2 filesystem fixture, 3 Cargo fixture, 3 worker tests). The environment used for this work has no `cargo`, `rustc` or `rustfmt`; Rust compilation, formatting, unit-test execution, filesystem fixture execution, Cargo fixture execution and observer qualification have **not** been run here. The filesystem worker's byte-count field is still a worker claim. The Cargo fixture exercises a real offline Cargo build-script/cache path, but remains a source-controlled challenge without independent kernel observation. The next step is to execute both fixture runners on an exact checkout, then attach an independent kernel/process observation lane to the real Cargo build-script child and compare its receipt against the fixture supervisor and fresh replay. Broader adapters should follow only after this first Linux path has pinned hook coverage, process lineage and event-loss accounting. Oracle signing, a separately trusted replay verifier and observer receipts remain future work. The report's strict-false policy remains in force even for a passing unit test or future green CI run.
