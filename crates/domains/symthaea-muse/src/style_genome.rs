@@ -382,6 +382,8 @@ pub struct GenomeArchive {
     pub reference_population_sha256: Option<String>,
     pub reference_population_bound: bool,
     pub entries: Vec<GenomeArchiveEntry>,
+    /// Domain-separated content digest with this field cleared during hashing.
+    pub archive_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -424,7 +426,60 @@ impl GenomeArchive {
             reference_population_sha256: None,
             reference_population_bound: false,
             entries: Vec::new(),
-        })
+            archive_sha256: String::new(),
+        })?;
+        archive.archive_sha256 = archive.compute_digest()?;
+        Ok(archive)
+    }
+
+    fn compute_digest(&self) -> Result<String, GenomeIssue> {
+        let mut copy = self.clone();
+        copy.archive_sha256.clear();
+        let bytes = serde_json::to_vec(&copy)
+            .map_err(|error| GenomeIssue::new("archive_serialization_failed", error.to_string()))?;
+        Ok(domain_sha256(b"symthaea:muse-style-genome-archive:v1\\n", &bytes))
+    }
+
+    /// Detect tampering, duplicate IDs, changed candidate receipts, mixed
+    /// novelty baselines, and a persisted set that is no longer Pareto-valid.
+    pub fn verify_digest(&self) -> bool {
+        if self.schema != STYLE_GENOME_ARCHIVE_SCHEMA
+            || self.config.max_entries == 0
+            || self.config.near_clone_threshold.is_some_and(|threshold| {
+                !threshold.is_finite() || !(0.0..=1.0).contains(&threshold)
+            })
+            || self.entries.len() > self.config.max_entries
+            || !self.reference_population_bound && !self.entries.is_empty()
+        {
+            return false;
+        }
+        let mut previous_id: Option<&str> = None;
+        let mut ids = BTreeSet::new();
+        for entry in &self.entries {
+            if !ids.insert(entry.genome_id.as_str())
+                || previous_id.is_some_and(|previous| previous >= entry.genome_id.as_str())
+                || !entry.evaluation.verify_digest()
+                || !entry.evaluation.eligible_for_archive
+                || entry.genome_id != entry.evaluation.genome.genome_id
+                || entry.evaluation_sha256 != entry.evaluation.evaluation_sha256
+                || entry.objectives != entry.evaluation.objectives
+                || entry.mean_structural_fingerprint != entry.evaluation.mean_structural_fingerprint
+                || entry.evaluation.reference_population_sha256 != self.reference_population_sha256
+            {
+                return false;
+            }
+            previous_id = Some(entry.genome_id.as_str());
+        }
+        for left in 0..self.entries.len() {
+            for right in (left + 1)..self.entries.len() {
+                if objective_dominates(&self.entries[left].objectives, &self.entries[right].objectives)
+                    || objective_dominates(&self.entries[right].objectives, &self.entries[left].objectives)
+                {
+                    return false;
+                }
+            }
+        }
+        self.compute_digest().is_ok_and(|expected| expected == self.archive_sha256)
     }
 
     pub fn insert(&mut self, evaluation: GenomeEvaluation) -> ArchiveInsertReceipt {
@@ -545,6 +600,18 @@ impl GenomeArchive {
         }
         self.entries.push(entry);
         self.entries.sort_by(|left, right| left.genome_id.cmp(&right.genome_id));
+        match self.compute_digest() {
+            Ok(digest) => self.archive_sha256 = digest,
+            Err(error) => {
+                self.entries.retain(|entry| entry.genome_id != genome_id);
+                return receipt(
+                    ArchiveInsertDisposition::RejectedIneligible,
+                    &genome_id,
+                    removed,
+                    format!("archive digest could not be recomputed: {}", error.message),
+                );
+            }
+        }
         receipt(
             if removed.is_empty() {
                 ArchiveInsertDisposition::Accepted
@@ -1336,6 +1403,24 @@ mod tests {
             archive.insert(with_reference).disposition,
             ArchiveInsertDisposition::RejectedReferencePopulationMismatch
         );
+    }
+
+    #[test]
+    fn archive_digest_verifies_and_detects_objective_tampering() {
+        let mut archive = GenomeArchive::new(GenomeArchiveConfig::default()).unwrap();
+        let genome = classical_genome();
+        let config = GenomeEvaluationConfig {
+            seeds: vec![1, 2, 3],
+            ..GenomeEvaluationConfig::default()
+        };
+        let evaluation = evaluate_genome(&genome, &MusicalIntent::default(), &config, &[]).unwrap();
+        let receipt = archive.insert(evaluation);
+        assert_eq!(receipt.disposition, ArchiveInsertDisposition::Accepted);
+        assert!(archive.verify_digest());
+
+        let mut tampered = archive.clone();
+        tampered.entries[0].objectives.within_genome_diversity += 0.1;
+        assert!(!tampered.verify_digest());
     }
 
     #[test]
