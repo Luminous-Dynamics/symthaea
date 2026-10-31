@@ -353,8 +353,10 @@ struct Report {
 
 fn relative_delta(left: f64, right: f64) -> Option<f64> {
     let denominator = left.abs().max(right.abs());
-    if !left.is_finite() || !right.is_finite() || denominator <= 0.0 {
+    if !left.is_finite() || !right.is_finite() {
         None
+    } else if denominator == 0.0 {
+        Some(0.0)
     } else {
         Some((left - right).abs() / denominator)
     }
@@ -1003,6 +1005,25 @@ mod tests {
         let input = synthetic_tsv(1,1.0,2.0,4.0,2.0,5.0);
         let modified = alter_row_field(&input,2,19,&test_digest(99999));
         assert!(parse_and_pair(&modified).unwrap_err().contains("paired contract mismatch"));
+    }
+
+
+    #[test]
+    fn profiling_receipt_digests_must_be_unique() {
+        let input = synthetic_tsv(1,1.0,2.0,4.0,2.0,5.0);
+        let modified = alter_row_field(&input,2,20,&test_digest(600));
+        assert!(parse_and_pair(&modified).unwrap_err().contains("profiling receipt digest is reused"));
+    }
+
+    #[test]
+    fn measured_energy_mismatch_is_not_hidden_by_compute_match() {
+        let input = synthetic_tsv(20,1.0,2.0,4.0,2.0,5.0);
+        let input = alter_arm_rows_field(&input,"D1",24,"10");
+        let input = alter_arm_rows_field(&input,"W1",24,"20");
+        let input = alter_arm_rows_field(&input,"W2",24,"20");
+        let report = build_report(&input,500,11).unwrap();
+        assert_eq!(report.groups[0].resource_match.energy_status, "measured_but_outside_10_percent");
+        assert_eq!(report.groups[0].resource_match.status, "budget_unmatched");
     }
 
     #[test]
