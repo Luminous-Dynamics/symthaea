@@ -20,8 +20,8 @@ The runner prints 280 data rows: 8 task profiles × 5 resource budgets × 7 poli
 ## Policy arms
 
 - fixed_order: executes operations in a fixed catalogue order under the budget (a fixed action sequence, not a recurrent-token-depth experiment).
-- generic_voc: ranks operations by generic predicted gain / abstract cost, without conditioning the ranking on the exact unresolved proof obligations.
-- budget_matched_random: seed-reproducible random selection from the same operation catalogue under the same total budget.
+- generic_voc: ranks operations by generic predicted gain / abstract cost, without conditioning its ranking on exact unresolved obligations, but after the shared typed operation-admissibility filter.
+- budget_matched_random: seed-reproducible random selection from the same typed-admissible candidates under the same total budget.
 - pod_meta_router: invokes the existing pod-meta-lab::choose_next implementation with typed obligations, operation kinds, scheduling classes, state identity, progress guards, and remaining/mandatory resource budgets. It credits only obligation IDs returned by that selector.
 - mask_coverage_greedy: a small benchmark-local obligation-mask heuristic retained as a diagnostic ablation, not the existing POD-Meta router.
 - unverified_confidence: diagnostic unsafe controller that trusts advertised claims without the independent verifier.
@@ -33,7 +33,7 @@ The oracle and unsafe confidence arms are diagnostics only. Do not include them 
 
 The planner-visible OperationSpec contains operation ID, advertised obligation/claim mask, generic predicted gain, abstract work-unit cost, and mandatory verification mask. The native-router arm maps this catalogue into the existing POD-Meta Obligation, CandidateOperation, OperationKind, SchedulingClass and SelectionContext contracts.
 
-The evaluator-only verified support mask is stored separately and is not read by the operation chooser. It becomes visible to the controller only after that operation is selected and the simulated independent verifier returns the result. For the native POD-Meta arm, the simulator credits only the obligation IDs returned by choose_next; an operation cannot receive benchmark credit for evidence outside its selected target set.
+Generic VOC and random controls share the same typed-admissibility filter as the native router, while fixed-order and unverified-confidence remain intentionally weaker diagnostic controls. The evaluator-only verified support mask is stored separately and is not read by the operation chooser. It becomes visible to the controller only after that operation is selected and the simulated independent verifier returns the result. For the native POD-Meta arm, the simulator credits only the obligation IDs returned by choose_next; an operation cannot receive benchmark credit for evidence outside its selected target set.
 
 This provides API-level separation inside one process, not a secure benchmark boundary. A confirmatory benchmark must move hidden labels, seeds and evaluator into a separately permissioned job/service.
 
