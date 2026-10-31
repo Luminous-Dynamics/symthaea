@@ -59,7 +59,14 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
             tick = tick.saturating_add(u64::from(event.delta.as_int()));
             match event.kind {
                 TrackEventKind::Meta(MetaMessage::Tempo(value)) => {
-                    tempo_bpm = 60_000_000.0 / value.as_int() as f32;
+                    let microseconds_per_beat = value.as_int();
+                    if microseconds_per_beat == 0 {
+                        return Err("MIDI tempo event encodes zero microseconds per beat".into());
+                    }
+                    tempo_bpm = 60_000_000.0 / microseconds_per_beat as f32;
+                    if !tempo_bpm.is_finite() || tempo_bpm <= 0.0 {
+                        return Err("MIDI tempo event does not encode a finite positive tempo".into());
+                    }
                 }
                 TrackEventKind::Meta(MetaMessage::TimeSignature(numerator, _, _, _)) => {
                     meter = numerator.max(1);
