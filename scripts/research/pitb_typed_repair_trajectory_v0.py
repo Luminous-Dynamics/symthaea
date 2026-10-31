@@ -194,7 +194,7 @@ def synthetic_episode():
         blueprint_sha256_before=h("graph-0"), blueprint_sha256_after=h("graph-0"),
         operation={"kind":"replace_dependency","node_id":"lemma-a"},
         affected_node_ids=[], decision="rejected", lean_check="failed",
-        rejection_code="wrong_direction", operation_receipt_sha256=h("op-0"))
+        rejection_code="precondition_failed", operation_receipt_sha256=h("op-0"))
     applied = dict(common, operation_id="apply-1", sequence_index=1,
         blueprint_sha256_before=h("graph-0"), blueprint_sha256_after=h("graph-1"),
         operation={"kind":"add_dependency","node_id":"lemma-a","source_node_id":"lemma-a","destination_node_id":"lemma-b"},
