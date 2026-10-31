@@ -159,5 +159,71 @@
     "expected-risk guarantee only, not a high-probability risk guarantee",
     "no distribution-shift guarantee",
     "local execution used an independent Python reference driver; exact committed module not executed from a clean checkout; no CI pass claimed"
-  ]
+  ],
+  "local_validation": {
+    "tests_authored": 11,
+    "tests_total": 11,
+    "execution": "independent local Python reference implementation of committed LP equations; exact branch blob not run from a clean checkout",
+    "all_alpha_augmented_constraints": true,
+    "piecewise_convexification_check": "eight interior action values; risk, specificity and node-size all match endpoint mixtures",
+    "primal_dual_receipts": {
+      "max_primal_inequality_violation": 3.3306690738754696e-14,
+      "max_primal_equality_residual": 2.930988785010413e-14,
+      "max_dual_sign_violation": 1.411197713268445e-15,
+      "max_stationarity_residual": 1.734723475976807e-18,
+      "max_complementarity_residual": 1.3133141493127644e-18,
+      "max_primal_dual_gap": 5.551115123125783e-16
+    },
+    "remote_ci": "not run; no pass claimed",
+    "committed_blobs": {
+      "source": "00d0632109c68f02d692a11b6cf5bcb97c5cf00d",
+      "tests": "53db4558b56170c938cb66fecb927b639c70cdc7"
+    }
+  },
+  "kkt_by_alpha": {
+    "0.02": {
+      "primal_ineq": 3.3306690738754696e-14,
+      "primal_eq": 8.770761894538737e-15,
+      "bound": 0,
+      "dual_ineq": 2.749007102732881e-16,
+      "dual_lower": 9.397661241101647e-16,
+      "dual_upper": 0,
+      "stationarity": 1.734723475976807e-18,
+      "complementarity": 7.291807771930162e-26,
+      "duality_gap": 1.3877787807814457e-17
+    },
+    "0.05": {
+      "primal_ineq": 8.881784197001252e-15,
+      "primal_eq": 2.930988785010413e-14,
+      "bound": 2.886579864025407e-15,
+      "dual_ineq": 1.8808705278832694e-16,
+      "dual_lower": 8.860178039988873e-16,
+      "dual_upper": 1.4111977136197945e-15,
+      "stationarity": 1.734723475976807e-18,
+      "complementarity": 1.3133141493127644e-18,
+      "duality_gap": 3.3306690738754696e-16
+    },
+    "0.1": {
+      "primal_ineq": 7.993605777301127e-15,
+      "primal_eq": 2.220446049250313e-16,
+      "bound": 0,
+      "dual_ineq": 8.664509291883991e-16,
+      "dual_lower": 9.397661241101647e-16,
+      "dual_upper": 0,
+      "stationarity": 1.734723475976807e-18,
+      "complementarity": 6.533794032495293e-19,
+      "duality_gap": 2.220446049250313e-16
+    },
+    "0.15": {
+      "primal_ineq": 4.440892098500626e-15,
+      "primal_eq": 6.661338147750939e-16,
+      "bound": 0,
+      "dual_ineq": 8.705845744639758e-16,
+      "dual_lower": 9.109567659443388e-16,
+      "dual_upper": 8.495045687455062e-16,
+      "stationarity": 1.734723475976807e-18,
+      "complementarity": 6.813356484056072e-19,
+      "duality_gap": 5.551115123125783e-16
+    }
+  }
 }
