@@ -656,15 +656,15 @@ fn aggregate_resource_usage(events: &[CampaignEvent]) -> Result<ResourceTotals, 
         let usage = &event.resource_usage;
         totals.action_units = totals.action_units.checked_add(usage.action_units)
             .ok_or_else(|| CampaignTapeError::new("totals.action_units", "overflow"))?;
-        add_optional(&mut totals.wall_millis, usage.wall_millis);
-        add_optional(&mut totals.cpu_millis, usage.cpu_millis);
-        add_optional(&mut totals.gpu_millis, usage.gpu_millis);
-        add_optional(&mut totals.energy_mwh, usage.energy_mwh);
-        add_optional(&mut totals.input_tokens, usage.input_tokens);
-        add_optional(&mut totals.output_tokens, usage.output_tokens);
-        add_optional(&mut totals.tool_calls, usage.tool_calls);
-        add_optional(&mut totals.evaluator_calls, usage.evaluator_calls);
-        add_optional(&mut totals.verifier_calls, usage.verifier_calls);
+        add_optional(&mut totals.wall_millis, usage.wall_millis, "wall_millis")?;
+        add_optional(&mut totals.cpu_millis, usage.cpu_millis, "cpu_millis")?;
+        add_optional(&mut totals.gpu_millis, usage.gpu_millis, "gpu_millis")?;
+        add_optional(&mut totals.energy_mwh, usage.energy_mwh, "energy_mwh")?;
+        add_optional(&mut totals.input_tokens, usage.input_tokens, "input_tokens")?;
+        add_optional(&mut totals.output_tokens, usage.output_tokens, "output_tokens")?;
+        add_optional(&mut totals.tool_calls, usage.tool_calls, "tool_calls")?;
+        add_optional(&mut totals.evaluator_calls, usage.evaluator_calls, "evaluator_calls")?;
+        add_optional(&mut totals.verifier_calls, usage.verifier_calls, "verifier_calls")?;
         rounds.entry(event.round_id).or_default().push(usage);
     }
     totals.host_memory_peak_mib = peak_round_memory(&rounds, |usage| usage.host_memory_peak_mib)?;
@@ -672,11 +672,18 @@ fn aggregate_resource_usage(events: &[CampaignEvent]) -> Result<ResourceTotals, 
     Ok(totals)
 }
 
-fn add_optional(total: &mut Option<u64>, value: Option<u64>) {
+fn add_optional(
+    total: &mut Option<u64>,
+    value: Option<u64>,
+    field: &str,
+) -> Result<(), CampaignTapeError> {
     *total = match (*total, value) {
-        (Some(left), Some(right)) => left.checked_add(right),
+        (Some(left), Some(right)) => Some(left.checked_add(right).ok_or_else(|| {
+            CampaignTapeError::new(format!("totals.{field}"), "resource sum overflow")
+        })?),
         _ => None,
     };
+    Ok(())
 }
 
 fn peak_round_memory(
@@ -932,8 +939,7 @@ mod tests {
     fn same_round_batch_cannot_see_other_batch_results() {
         let mut tape = tape("batch");
         tape.append(evaluation_event("e1", 1, "w1", 0, "A")).unwrap();
-        let mut second = evaluation_event("e2", 1, "w2", 1, "B");
-        second.policy_visible_through_sequence = 0;
+        let second = evaluation_event("e2", 1, "w2", 1, "B");
         tape.append(second).unwrap();
         assert!(tape.seal().is_err());
     }
@@ -986,7 +992,9 @@ mod tests {
 
     #[test]
     fn same_round_duplicate_can_map_to_a_direction_admitted_in_that_batch() {
-        let mut tape = tape("same-round-duplicate");
+        let mut batch_config = config();
+        batch_config.new_direction_claim_cap = 2;
+        let mut tape = CampaignTape::new("tape-same-round-duplicate", "same-round-duplicate", batch_config).unwrap();
         tape.append(proposal_event(
             "p1",
             1,
