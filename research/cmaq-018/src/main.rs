@@ -858,6 +858,23 @@ mod tests {
         assert!((first.1 - 0.25).abs() < 1e-12);
     }
 
+
+    #[test]
+    fn optional_metric_denominators_track_defined_episode_histories() {
+        let values = [Some(0.2), None, Some(0.8), None, Some(0.4)];
+        assert_eq!(optional_sample_count(&values), 3);
+        assert_eq!(optional_sample_count(&[None, None]), 0);
+    }
+
+    #[test]
+    fn bootstrap_requires_two_independent_episode_histories() {
+        assert!(bootstrap_mean_ci(&[Some(0.5)], BASE_SEED).is_none());
+        let values = [Some(0.5), None, Some(0.5)];
+        let interval = bootstrap_mean_ci(&values, BASE_SEED).unwrap();
+        assert!((interval.0 - 0.5).abs() < 1e-12);
+        assert!((interval.1 - 0.5).abs() < 1e-12);
+    }
+
     #[test]
     fn null_effect_branches_share_exactly_zero_causal_difference() {
         let case = make_episode_case(BASE_SEED);
