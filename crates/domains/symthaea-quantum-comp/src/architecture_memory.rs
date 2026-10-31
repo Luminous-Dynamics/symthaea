@@ -589,7 +589,7 @@ pub fn validate_memory_topology(
         {
             return Err(MemoryTopologyError::UnknownMemoryRegion);
         }
-        if !valid_metric(edge.conversion_latency_seconds, true)
+        if !valid_metric(edge.conversion_latency_seconds, false)
             || !valid_metric(edge.conversion_energy_joules_per_bit, true)
         {
             return Err(MemoryTopologyError::InvalidMetricInterval);
@@ -661,11 +661,13 @@ pub fn validate_memory_topology(
             placement.read_rate_per_second,
             placement.write_rate_per_second,
             placement.update_rate_hz,
-            placement.migration_latency_seconds,
         ] {
             if !valid_metric(metric, true) {
                 return Err(MemoryTopologyError::InvalidMetricInterval);
             }
+        }
+        if !valid_metric(placement.migration_latency_seconds, false) {
+            return Err(MemoryTopologyError::InvalidMetricInterval);
         }
         if placement.residency_mode == MemoryResidencyMode::Guaranteed {
             let region = region_by_id[placement.region_id.as_str()];
