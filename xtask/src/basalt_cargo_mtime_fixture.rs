@@ -130,6 +130,7 @@ pub fn run(catalog_path: &Path, out_dir: &Path) -> anyhow::Result<MtimeFixtureRu
         .context("system clock is before UNIX epoch")?.as_nanos();
     let run_id = format!("basalt-cargo-mtime-{}-{now}", std::process::id());
     fs::create_dir_all(out_dir)?;
+    let out_dir = out_dir.canonicalize().context("canonicalizing mtime fixture output directory")?;
     let run_dir = out_dir.join(&run_id);
     fs::create_dir(&run_dir).context("creating exclusive mtime fixture run directory")?;
     let workspace = run_dir.join("workspace");
@@ -153,7 +154,6 @@ pub fn run(catalog_path: &Path, out_dir: &Path) -> anyhow::Result<MtimeFixtureRu
     let cargo_home = run_dir.join("cargo-home");
     fs::create_dir(&cargo_home)?;
 
-    let declared_baseline_mtime = fs::metadata(&declared_input)?.modified()?;
     let mtime_baseline_mtime = fs::metadata(&mtime_input)?.modified()?;
     let declared_baseline = run_cargo(
         &cargo, &rustc_binary, &cargo_home, &run_dir, &declared_dir,
@@ -174,8 +174,8 @@ pub fn run(catalog_path: &Path, out_dir: &Path) -> anyhow::Result<MtimeFixtureRu
 
     // Force the ordinary declared control's mtime forward past any filesystem
     // timestamp granularity, so it tests the positive rerun-if-changed path.
-    let declared_new_mtime = declared_baseline_mtime
-        .checked_add(Duration::from_secs(3))
+    let declared_new_mtime = SystemTime::now()
+        .checked_add(Duration::from_secs(60))
         .context("declared control mtime overflow")?;
     set_modified_time(&declared_input, declared_new_mtime)?;
     if fs::metadata(&declared_input)?.modified()? <= declared_baseline_mtime {
@@ -200,8 +200,10 @@ pub fn run(catalog_path: &Path, out_dir: &Path) -> anyhow::Result<MtimeFixtureRu
         &cargo, &rustc_binary, &cargo_home, &run_dir, &mtime_dir,
         "mtime_control_after_preserving_mutation", "mtime",
     )?;
+    let mtime_fresh_root = run_dir.join("mtime-fresh-run");
+    fs::create_dir(&mtime_fresh_root)?;
     let mtime_fresh = run_cargo(
-        &cargo, &rustc_binary, &cargo_home, &run_dir.join("target-mtime-fresh-home"), &mtime_dir,
+        &cargo, &rustc_binary, &cargo_home, &mtime_fresh_root, &mtime_dir,
         "mtime_control_fresh_replay", "mtime",
     )?;
 

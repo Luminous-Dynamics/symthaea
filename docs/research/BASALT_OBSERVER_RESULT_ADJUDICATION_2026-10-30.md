@@ -192,7 +192,7 @@ Every preserve control must be paired with a capture control over the **same res
 
 ## Paradigm shift: benchmark the evidence-retention frontier
 
-The executable benchmark contract is `benchmarks/basalt/observer-evidence-retention-benchmark.v1.json`. It freezes seven matched comparison arms and ten metrics, including their numerators, denominators and targets. The protocol forbids compensating for a safety failure with a speed improvement; all six safety gates must pass before selectivity or cost can influence a promotion decision.
+The executable benchmark contract is `benchmarks/basalt/observer-evidence-retention-benchmark.v1.json`. It freezes seven matched comparison arms and eleven metrics, including their numerators, denominators and targets. The protocol forbids compensating for a safety failure with a speed improvement; all seven safety gates must pass before selectivity or cost can influence a promotion decision.
 
 A conventional cache benchmark tends to optimize cache hit rate and rebuild time. BASALT should instead optimize a constrained frontier:
 
@@ -264,13 +264,14 @@ Primary references:
 | Hidden dependency recall | 100% of seeded consumed inputs inside the declared profile, or explicit unresolved/invalidated |
 | Stale-evidence false acceptance | Zero in qualification and held-out challenge sets |
 | Integrity-loss response | 100% fail-closed or explicit unresolved for injected observer-loss cases |
+| Mtime-preserving input mutation detection | 100% of correctly declared same-mtime content mutations remain visible to the independent observer |
 | Semantic access retention | 100% of read-but-discard mutations retain the accessed resource and block reuse despite unchanged output |
 | Unrelated evidence retention | Preserve every independently proven unaffected case in the paired conformance set |
 | False invalidation | At most 5% on independently proven unrelated controls, with scenario-level intervals |
 | Re-verification cost | At least 30% less work than global rerun, only after all safety gates pass |
 | Shifted engineering outcomes | +3 percentage points paired success over a strong matched baseline, or non-inferior success at materially lower cost |
 
-A 36-case conformance set is not a statistical qualification sample. For a one-sided 95% upper bound near 0.1% after zero misses, the simple binomial rule-of-three requires about 2,995 independent scenario units. Cluster related mutations by task/repository lineage, report channel-stratified intervals, keep an untouched holdout, and do not count syscalls/events as independent trials.
+A 37-case conformance set is not a statistical qualification sample. For a one-sided 95% upper bound near 0.1% after zero misses, the simple binomial rule-of-three requires about 2,995 independent scenario units. Cluster related mutations by task/repository lineage, report channel-stratified intervals, keep an untouched holdout, and do not count syscalls/events as independent trials.
 
 ## Critical next work: make the oracle independently executable
 
