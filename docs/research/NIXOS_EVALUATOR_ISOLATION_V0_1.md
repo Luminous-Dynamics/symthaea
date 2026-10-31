@@ -24,12 +24,12 @@ taskgen -> candidate -> evaluator
 
 The CPU-only sandbox profile uses:
 - ProtectSystem=strict, ProtectHome=yes;
-- PrivateTmp=yes, PrivateDevices=yes, PrivateNetwork=yes;
+- PrivateTmp=yes, PrivateDevices=yes, PrivateNetwork=yes, PrivateIPC=yes, ProtectHostname=yes;
 - NoNewPrivileges=yes, empty capability bounding/ambient sets;
 - ProtectKernelTunables, ProtectKernelModules, ProtectControlGroups, ProtectClock;
 - ProtectProc=invisible, ProcSubset=pid;
 - RestrictNamespaces, RestrictSUIDSGID, LockPersonality, MemoryDenyWriteExecute;
-- native syscall architecture and @system-service filter;
+- AF_UNIX-only address-family allow-list, native syscall architecture and @system-service filter;
 - explicit per-service ReadOnlyPaths, ReadWritePaths and InaccessiblePaths.
 
 The candidate sees only public files, owns its work directory and writes to a narrow exchange path. The evaluator sees oracle files and can traverse/read a known prediction filename in the exchange directory, but cannot list that directory or access candidate work. Its signing credential is delivered with LoadCredentialEncrypted=; taskgen receives a different credential. Both are hidden from the candidate.
@@ -98,13 +98,13 @@ For each qualification attempt, capture:
 ## 6. Remaining work
 
 - Wire the taskgen/candidate/evaluator binaries to run-specific artifacts and enforce unique run IDs.
-- Add signed receipt production/verification using an audited signature library and evaluator-only key; no hand-rolled crypto.
-- Add persistent replay/nonce database and key rotation/revocation model.
+- Integrate the canonical Ed25519 receipt module and evaluator-only LoadCredentialEncrypted key into the actual evaluator executable.
+- Integrate the persistent create-only nonce/run/counter replay ledger into receipt finalization and add key rotation/revocation and ledger backup/recovery policy.
 - Add process/UID attack harness and test descriptor inheritance, /proc, AF_UNIX, symlink, hardlink, TOCTOU, oversized file, stale output and replay attacks.
 - Run Nix evaluation and systemd unit verification on actual target NixOS.
 - Run adversarial isolation tests before any confirmatory temporal benchmark.
 
 ## 7. Security claim ceiling
 
-The module and intake source are authored, not security-qualified. Even a future passing test only supports the declared NixOS/kernel/systemd/filesystem and threat model. It does not establish resistance to kernel compromise, root, privileged operator, hypervisor or hardware side-channel attacks.
+The module, openat2 intake, canonical Ed25519 receipt and replay-ledger sources are authored, not security-qualified. Their tests have not been executed. Even a future passing test only supports the declared NixOS/kernel/systemd/filesystem and threat model. It does not establish resistance to kernel compromise, root, privileged operator, hypervisor or hardware side-channel attacks.
 
