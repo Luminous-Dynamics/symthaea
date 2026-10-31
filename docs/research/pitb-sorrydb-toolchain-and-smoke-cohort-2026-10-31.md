@@ -120,3 +120,10 @@ I inspected the pinned Lean source tags directly for 4.24.0, 4.26.0, 4.26.0-rc2 
 A small standalone Lean calibration source now exercises the high-risk API path inside each selected project Lake environment. It obtains the current goal MetavarDecl, enumerates LocalInstances, resolves the registered FVarId back into the ordered LocalContext, checks that binder metadata is instImplicit, and verifies the class name is Decidable. It then runs inferInstance so Lean also typechecks a proof through the registered local instance. The workflow builds each untouched pinned project with leanprover/lean-action@v1 before running the calibration.
 
 The calibration emits a JSON line with a versioned schema marker and the local-instance rows. This establishes only API compatibility and registry capture for a controlled fixture. It does not yet prove that a real SorryDB target proof state was exported or that the complete v2 exporter compiles unchanged across all three versions.
+
+
+## Exact smoke-manifest identity is fail-closed
+
+The checkout verifier now binds each SorryDB task ID to its exact branch label, source path, source coordinates, source-file Git blob SHA-1, toolchain file, Lake config, Lake manifest, and Mathlib revision. This prevents a manifest edit from silently relabeling another convenient sorry in the same pinned repository as the selected benchmark task.
+
+The verifier rejects tracked modifications, untracked files, symlinked project pin files, and source paths escaping the canonical checkout. It also checks the actual sorry token using SorryDB's zero-based Unicode-codepoint column convention. This is source identity validation only. The three projects still have not been rebuilt or used in proof attempts; the exact-head GitHub workflow has not been observed.

@@ -494,7 +494,7 @@ jobs:
               receipts.append({"project": project, "lean_toolchain": actual_toolchain, **receipt})
           out = runner / "pitb-lean-local-instance-compatibility.receipts.json"
           out.write_text(json.dumps({"schema_version":"pitb.local-instance-api-compat-report.v0","receipts":receipts}, indent=2) + "\n")
-          print("PITB_LOCAL_INSTANCE_COMPAT_REPORT_PASS: 3 pinned toolchains, 3 exact Decidable local-instance receipts")
+          print("PITB_LOCAL_INSTANCE_COMPAT_REPORT_PASS: 3 pinned toolchains, 3 exact PITBLocalInstanceProbe local-instance receipts")
           PY
       - name: Retain Lean LocalInstances compatibility receipts
         if: always()

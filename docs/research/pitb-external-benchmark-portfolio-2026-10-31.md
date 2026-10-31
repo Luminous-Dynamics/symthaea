@@ -15,7 +15,10 @@ The current proof-engineering landscape measures several different capabilities.
 | Semantic theorem correctness | T² | Check generated theorem statements through dependent successor theorems | 2,206 problems across 5 repositories, ~41 successors per problem; best reported testing accuracy 38.9% despite stronger compilation performance |
 | Repair efficiency and trajectory quality | BlueprintTrace / BlueprintRepair | Typed local repair actions vs exact source patches vs whole-module rewrites | 142 controlled failure states; similar coverage, with typed repair cheapest per solved state in reported runs |
 | Premise retrieval | Legendre / MathlibQR and MathlibMPR | Relevant-declaration recall and complete multi-premise route coverage | Lean Finder v2: 97.3% Recall@100 on 894 resolved queries; LeanGraphSearch: 94.7% on a different 810-query subset and 42.8% Covered@20 on MathlibMPR |
-| Graduate-level formalization | ProofBench v1.1 | Natural-language problems paired with reviewed Lean statements | As of 2026-10-29, four systems tie at 100% on the reported leaderboard; the benchmark uses 100-problem public and private splits and a 40-turn tool budget |
+| Graduate-level theorem proving | ProofBench v1.1 | Natural-language problems paired with reviewed Lean statements | Private 100-problem split with an agentic 40-turn tool budget; current scores must be read with model/harness/cost settings |
+| Advanced mathematics formalization | AutoformBench | Formalize proof developments with missing definitions, intermediate lemmas and supporting infrastructure | 341 audited tasks from 24 sources; current source-present leaderboard shows GPT-6 Astra 281/341 (82.4%) and Opus 5 211/341 (61.9%); separate from fill-in-the-sorry |
+| Theory-scale autoformalization | LCS-Bench | Build coherent formal libraries across many interdependent textbook items | 327 items, 4,076+ declarations and 85K+ Lean LOC; reported best autoformalization result 20.1% |
+| Implementation-level software verification | Aegis | Prove or refute generated specifications for translated, real safe-Rust implementations | 2,045 Rust–Lean pairs and 11,533 candidate specifications; EasyProver solves 52.7% of a stratified 2,000-statement sample within 30 minutes per statement |
 | Cross-family strategy transfer | PITB frozen research-math split | Whether typed proof insights improve exact-target proofs on held-out mathematical families | PITB's unique research claim; no measured result yet |
 
 These rows are not head-to-head comparisons. Even the retrieval numbers differ in query denominator; the Legendre board explicitly resolves 894 of MathlibQR's 946 queries and warns that the original system papers used different corpora/metrics. The theorem and project benchmarks differ in task source, formal environment and acceptance criterion. Keep all of those facts visible.
@@ -94,6 +97,9 @@ The key paradigm shift is not a larger prover. It is a proof-engineering control
 - Legendre Mathlib retrieval board: https://www.legendre-leaderboard.com/
 - LeanGraphSearch: https://pluslabnlp.github.io/LeanGraphSearch/
 - ProofBench v1.1: https://www.vals.ai/benchmarks/proof_bench
+- AutoformBench: https://github.com/facebookresearch/autoformbench and https://ai.meta.com/research/publications/autoformbench-a-lean-formalization-benchmark-for-advanced-mathematics/
+- LCS-Bench: https://arxiv.org/abs/2606.26525
+- EasyProver / Aegis: https://arxiv.org/abs/2610.38174
 - Lean 4 local instance synthesis: https://lean-lang.org/doc/reference/latest/Type-Classes/Instance-Synthesis/
 
 
@@ -147,3 +153,12 @@ These are targets, not measured results:
 6. Forward generalization on a later SorryDB cohort, with the Aegis set kept separately frozen.
 
 **Primary source:** Ganguly et al., *Scaling Lean Theorem Proving for Real-World Code Verification*, arXiv:2610.38174, 28 October 2026: https://arxiv.org/abs/2610.38174.
+
+
+## Frontier update: AutoformBench and LCS-Bench
+
+AutoformBench (Meta AI, 13 October 2026) addresses advanced-mathematics formalization rather than filling an existing proof hole. It contains 341 audited Lean 4 tasks from 24 mathematical sources. The agent receives an informal proof but must build missing definitions, intermediate lemmas and infrastructure before proving the target. The current public source-present leaderboard lists GPT-6 Astra at 281/341 (82.4%), Opus 5 at 211/341 (61.9%), GPT-5.6 Sol at 201/341 (58.9%), and additional systems. The repository pins Lean v4.32.2 and a Mathlib commit. The release is source-free with respect to textbook excerpts and gold proofs and is licensed CC BY-NC 4.0; check licensing and obtain source texts independently before any reuse. Do not compare these percentages to SorryDB or PITB Pass@1.
+
+LCS-Bench tests theory-scale autoformalization of logics for computer science: 327 textbook items, more than 4,076 declarations and over 85K lines of Lean. Its reported state-of-the-art autoformalization score is 20.1% across its task setup. It is valuable for evaluating whether insights and typed dependencies scale from individual holes to whole formal libraries.
+
+**PITB implication:** add external replication targets by task type, not leaderboard score. SorryDB tests completion of project-local holes; AutoformBench tests filling in missing formal infrastructure around advanced mathematics; LCS-Bench tests coherent theory-scale construction; Aegis tests correctness obligations for real implementations. PITB's unifying contribution could be a typed evidence-and-search controller, but the success metric and denominators remain separate for each cohort.

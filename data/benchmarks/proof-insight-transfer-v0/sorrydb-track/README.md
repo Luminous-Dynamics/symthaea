@@ -25,7 +25,11 @@ The SorryDB leaderboard currently reports these rows for SorryDB_2601:
 | Claude Opus 4.5 | 7.8% Pass@1; 15.4% Pass@32 | General-purpose |
 | GPT-5.2 | 6.2% Pass@1; 13.2% Pass@32 | General-purpose |
 
-The leaderboard's **63.2% combined performance** is the fraction of tasks solved by at least one listed approach. It is an ensemble union, not an individual system's pass rate, not a Pass@k score, and not a PITB result. Do not claim a system beats 63.2% by comparing its own pass rate to that union.
+The live leaderboard's **63.2% combined performance** is the fraction of tasks solved by at least one approach currently listed on that board. It is an ensemble union, not an individual system's pass rate, not a Pass@k score, and not a PITB result. Do not claim a system beats 63.2% by comparing its own pass rate to that union.
+
+**Important version distinction:** the published ICML 2026 paper's Table 2 reports a **35.7% combined union** for the set of methods evaluated in that paper. The current hosted leaderboard reports 63.2% and includes additional/current entries such as Aleph Prover (57.2% Pass@1), which is not a row in the paper's Table 2. Both are unions on the 1,000-task SorryDB_2601 slice, but they refer to different sets of approaches and publication states. PITB records the live-board 63.2% as the current external reference and 35.7% as the paper's historical study-set union; neither is a single-system baseline.
+
+The paper describes iterative/self-correcting systems as running for up to 16 iterations, while general-purpose and specialized approaches may be evaluated by Pass@1 or Pass@32. In particular, the 30.3% Gemini Flash 3 agentic result is a single agent run per task with iterative tool/model feedback, not a single raw model completion. The fill-in-the-sorry unit can be a hole inside a larger theorem rather than a complete theorem from scratch. Comparisons must therefore publish iteration, feedback, context, and total resource limits—not only the Pass@k label.
 
 Pass@1 and Pass@32 are also not interchangeable. The agentic 30.3% row is Pass@1; the general-purpose 15.4% Claude row is Pass@32 (with 7.8% Pass@1). Compare like with like and publish the attempt policy and resource envelope. A 32-candidate ceiling is not a licence to spend 32 times the compute without reporting it.
 
@@ -120,10 +124,10 @@ The novel PITB claim should therefore be: **more verified real-project completio
 
 ## Current blockers and next executable milestones
 
-1. Fetch the exact upstream SorryDB_2601_1000_evaluation_split.json bytes; compute and commit its SHA-256, upstream Git blob SHA, and the exact SorryDB source commit. The data file is deliberately not copied into this repository.
-2. Implement a Rust importer/manifest auditor that rejects duplicate IDs, missing repository pins, malformed commit hashes, path traversal, changed task membership, and mismatch between declared and observed task/repository counts.
-3. Build a two-project Lean smoke cohort from the frozen split and verify reconstruction, target-type digest stability, sorry-span-only patching, independent clean build, and axiom receipts.
-4. Add a task × arm × replicate runner ledger and a Rust scorekeeper that derives Pass@k, repository-clustered intervals, cost curves, and complete denominator accounting from receipts.
+1. Pin the exact upstream SorryDB_2601_1000_evaluation_split.json bytes, SHA-256, Git blob SHA, and source commit. **Completed as source inspection and hash verification; the data file is not copied into this repository.**
+2. Implement a Rust importer that rejects changed bytes, duplicate IDs, malformed repository pins, path traversal, invalid source spans, and mismatched task/repository counts. **Implemented and wired into CI; not yet compiled or executed on the runner.**
+3. Establish a three-project, three-toolchain smoke cohort and source verifier, including exact source/manifest blob pins and a real LocalInstances API compatibility calibration. **Candidate and source verifier implemented; build and Lean capture not yet observed.**
+4. Implement a Rust task × arm × replicate scorekeeper deriving Pass@k, repository-clustered intervals, cost curves, and denominator accounting from receipts.
 5. Run matched S0–S4 pilot arms on a development-only subset. Freeze prompts/configs before opening any confirmatory rows.
 6. Run the full pinned cohort, then separately evaluate a temporally later SorryDB snapshot. Never use the January public test slice as evidence of contamination-free generalization.
 
@@ -168,3 +172,10 @@ The frozen 1,000-task cohort spans 14 Lean toolchain tags, ranging from v4.18.0-
 The first three source-inspected smoke candidates are recorded in smoke-cohort-candidates.v0.json: LeanCourse25/v4.24.0, PrimeNumberTheoremAnd/v4.26.0, and clap-lean/v4.26.0-rc2. The third task was selected because the SorryDB debug-context preview contains inst✝ : Fact (Nat.Prime p), providing a direct challenge for the new local-instance evidence path. This textual hint is only for selection. The actual LocalInstances registry must be read from the real Lean metavariable state.
 
 All three exact sorry source spans and project manifest blob pins have been inspected. None has been rebuilt, reconstructed as real Lean evidence, or solved. This is a small integration smoke cohort, not a statistical accuracy sample.
+
+
+## Snapshot status at 2026-10-31
+
+The raw source hash, source Git blob identity, 1,000-task count, 78-repository count, duplicate-ID check, and source-field audit have been independently inspected. The exact three smoke task coordinates and repository configuration blob identities are pinned in smoke-cohort-candidates.v0.json.
+
+The Rust importer and source verifier are committed. The focused workflow is designed to compile/test/lint the isolated PITB package, import the exact frozen snapshot twice and compare outputs, verify the three checkouts, build the original pinned projects, and compile the LocalInstances calibration. GitHub currently reports no workflow runs or commit status entries for the latest PR head. Therefore none of those compile/build/capture steps is claimed as passed. No real SorryDB proof has been attempted and no PITB success rate exists.

@@ -11,19 +11,11 @@ This changes the PITB comparison strategy. The frozen OpenAI-math family split m
 
 ## What the current external frontier says
 
-The hosted SorryDB leaderboard for SorryDB_2601 reports:
-- Aleph Prover: 57.2% Pass@1.
-- Gemini Flash 3 agentic: 30.3% Pass@1.
-- Gemini Flash 3 self-correcting: 27.9% Pass@1.
-- Claude Opus 4.5 self-correcting: 27.1% Pass@1.
-- General-purpose Gemini Pro 3: 11.0% Pass@1 / 20.5% Pass@32.
-- General-purpose Gemini Flash 3: 10.8% Pass@1 / 20.5% Pass@32.
-- General-purpose Claude Opus 4.5: 7.8% Pass@1 / 15.4% Pass@32.
-- General-purpose GPT-5.2: 6.2% Pass@1 / 13.2% Pass@32.
+The current hosted SorryDB leaderboard for SorryDB_2601 reports Aleph Prover at 57.2% Pass@1; Gemini Flash 3 Agentic at 30.3% Pass@1; Gemini Flash 3 Self-Correcting at 27.9%; Claude Opus 4.5 Self-Correcting at 27.1%; Gemini Pro 3 at 11.0% Pass@1 / 20.5% Pass@32; Gemini Flash 3 at 10.8% / 20.5%; Claude Opus 4.5 at 7.8% / 15.4%; and GPT-5.2 at 6.2% / 13.2%.
 
-The displayed 63.2% combined figure is an ensemble union (tasks solved by at least one listed approach), not a single prover result. The benchmark's live leaderboard and repository materials should be version-pinned when used: a union statistic is especially sensitive to which approaches and dataset snapshot are included. Never set 63.2% as a single-system baseline.
+The live leaderboard's 63.2% combined figure is the union of tasks solved by at least one approach currently listed there. It is not an individual system's score. The ICML 2026 paper's Table 2 reports a 35.7% combined union for its original, smaller method set. The current board includes additional/current entries, notably Aleph Prover at 57.2% Pass@1, which is not in the paper's Table 2. Both statistics concern the SorryDB_2601 1,000-task slice but different leaderboard method sets; PITB must label their source/version and never use either union as a single-system baseline.
 
-The current hosted table is a useful external reference, but the different attempt regimes matter. In particular, the 30.3% agentic row is Pass@1; the 15.4% Claude general-purpose result is Pass@32. A comparison that puts those numbers on one unqualified accuracy axis is invalid.
+The paper's iterative/self-correcting methods run for up to 16 iterations. The 30.3% Gemini Flash 3 Agentic result is one agent run per task with iterative feedback, not one raw model completion. The benchmark unit is an individual sorry hole, which can occur inside a larger theorem, not necessarily a theorem proved from scratch. Therefore comparisons must report context, feedback loop, iterations, candidate attempts, model calls, token/time/cost budgets and source environment—not just the Pass@k label.
 
 ## PITB's distinct value proposition
 
@@ -62,9 +54,9 @@ These are qualification targets, not results:
 
 ## Important gaps before a benchmark run
 
-- The source split bytes and exact upstream source commit have not yet been hashed into a PITB cohort manifest.
-- No importer has yet converted the SorryDB JSON records into a validated PITB task manifest.
-- No real task has passed a clean project rebuild, proof-hole-only patch audit, type-digest comparison and independent verification through PITB.
+- The source split is cryptographically pinned and structurally audited; the Rust importer is committed and wired into CI, but its compile/self-test/real import have not yet been observed.
+- A three-project, three-toolchain smoke candidate manifest and exact source verifier are committed; none of the projects has yet been rebuilt or captured by Lean.
+- No real task has passed the complete PITB pipeline of clean project build, proof-hole-only patch audit, target-type comparison, and independent verification.
 - No baseline or PITB model has been run on the fixed split.
 - The current Lean v2 evidence exporter and the broader PITB exact-head workflow are themselves still unverified.
 
@@ -95,3 +87,8 @@ A Rust importer has been added to the PITB crate. It verifies byte count and SHA
 SorryDB_2601 contains 14 Lean toolchain tags, not one homogeneous compiler environment. Separate source/toolchain/dependency/project reconstruction from proof completion. A task enters the model-evaluation denominator only after the original pinned project passes the preflight build. Also publish operational yield over the entire assigned cohort, retaining preflight failures as non-solves rather than silently dropping them. See pitb-sorrydb-toolchain-and-smoke-cohort-2026-10-31.md for the exact version distribution and the three pinned smoke-task candidates.
 
 A textual scan of the dataset's debugging goal previews finds 426 instance-like binder strings. This is only a selection heuristic. The first candidate exercising this path uses clap-lean, with a preview binder inst✝ : Fact (Nat.Prime p); actual local instance resources must be captured from Lean's metavariable declaration, not inferred from the rendered preview.
+
+
+## Leaderboard source/version note
+
+Current live-board figures were checked against https://sorrydb.org/ on 2026-10-31. The paper's Table 2 was checked against the ICML 2026 paper at https://openreview.net/pdf/04a9bc3eee4e412744350f23903a6e92d76f4b2a.pdf. The live board's 63.2% union and the paper's 35.7% union are not contradictory single-model scores: they summarize different sets of included systems. The paper's Table 2 also documents up-to-16-iteration self-correcting/agentic methods and clarifies that the unit is a sorry hole inside the project.
