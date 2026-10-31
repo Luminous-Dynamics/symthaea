@@ -260,18 +260,20 @@ pub fn generate_time_resolution_task(
 /// interval; it does not change observation count, physical duration, or
 /// public input bytes.
 pub fn internal_step_arms(
-    observation_interval_us: u64,
+    task: &TimeResolutionTask,
 ) -> Result<Vec<InternalStepArm>, TimeResolutionVerificationError> {
-    if observation_interval_us == 0 {
+    let observation_interval_us = task.observation_interval_us;
+    if observation_interval_us == 0 || task.observations.is_empty() {
         return Err(TimeResolutionVerificationError::InvalidProfile { substeps: 0 });
     }
+    let observation_count = u64::try_from(task.observations.len()).unwrap_or(u64::MAX);
     let mut arms = Vec::new();
     for substeps in INTERNAL_SUBSTEP_ARMS {
         if observation_interval_us % u64::from(substeps) == 0 {
             arms.push(InternalStepArm {
                 internal_substeps_per_observation: substeps,
                 internal_dt_us: observation_interval_us / u64::from(substeps),
-                total_internal_updates: 0,
+                total_internal_updates: observation_count.saturating_mul(u64::from(substeps)),
             });
         }
     }
@@ -286,7 +288,9 @@ pub fn bind_internal_step_arm(
     task: &TimeResolutionTask,
     substeps: u32,
 ) -> Result<InternalStepArm, TimeResolutionVerificationError> {
-    if substeps == 0 || task.observation_interval_us % u64::from(substeps) != 0 {
+    if !INTERNAL_SUBSTEP_ARMS.contains(&substeps)
+        || task.observation_interval_us % u64::from(substeps) != 0
+    {
         return Err(TimeResolutionVerificationError::InvalidProfile { substeps });
     }
     let observation_count = u64::try_from(task.observations.len()).unwrap_or(u64::MAX);
@@ -345,7 +349,9 @@ pub fn verify_time_resolution_trace(
         return Err(TimeResolutionVerificationError::OracleDigestMismatch);
     }
     if task.observations.len() != oracle.points.len()
+        || task.observations.len() > MAX_SLOTS
         || task.duration_us == 0
+        || task.duration_us > MAX_DURATION_US
         || task.observation_interval_us == 0
         || task.duration_us % task.observation_interval_us != 0
         || usize::try_from(task.duration_us / task.observation_interval_us)
@@ -404,7 +410,7 @@ pub fn verify_time_resolution_trace(
     Ok(())
 }
 
-const MAX_NOISE_AS_I32: i32 = i32::from(u16::MAX) / i32::from(u16::MAX) * 64;
+const MAX_NOISE_AS_I32: i32 = 64;
 
 pub fn verify_time_resolution_seeded(
     task: &TimeResolutionTask,
@@ -559,7 +565,7 @@ mod tests {
     fn internal_substep_arms_change_compute_not_public_input() {
         let config = TimeResolutionConfig::reference(91, 10_000);
         let (task, oracle) = generate_time_resolution_task(config).unwrap();
-        let arms = internal_step_arms(task.observation_interval_us).unwrap();
+        let arms = internal_step_arms(&task).unwrap();
         assert_eq!(
             arms.iter()
                 .map(|arm| arm.internal_substeps_per_observation)
@@ -583,13 +589,13 @@ mod tests {
     fn all_profiles_preserve_same_world_duration_and_observation_count() {
         let config = TimeResolutionConfig::reference(92, 10_000);
         let (task, _) = generate_time_resolution_task(config).unwrap();
-        let arms = internal_step_arms(task.observation_interval_us).unwrap();
+        let arms = internal_step_arms(&task).unwrap();
         for arm in arms {
             assert_eq!(task.duration_us, 4_000_000);
             assert_eq!(task.observations.len(), 400);
             assert_eq!(
                 arm.total_internal_updates,
-                0
+                400 * u64::from(arm.internal_substeps_per_observation)
             );
         }
     }
