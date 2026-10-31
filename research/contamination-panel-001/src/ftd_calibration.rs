@@ -54,6 +54,16 @@ pub struct BoundedEstimateV1 {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+pub struct PValueCalibrationDiagnosticV1 {
+    pub detector_feature_id: String,
+    pub repetitions_with_null_support: u64,
+    pub mean_null_count_per_supported_repetition: f64,
+    pub mean_maximum_ecdf_excess_on_10_point_grid: f64,
+    pub mean_absolute_ecdf_deviation_on_10_point_grid: f64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct FtdCalibrationReportV1 {
     pub schema: String,
     pub config_sha256: String,
@@ -69,6 +79,8 @@ pub struct FtdCalibrationReportV1 {
     pub mean_selected_clean_count: f64,
     pub mean_selected_contaminated_count: f64,
     pub mean_bh_retained_count: f64,
+    pub pvalue_calibration_by_feature: Vec<PValueCalibrationDiagnosticV1>,
+    pub combined_null_pvalue_calibration: Option<PValueCalibrationDiagnosticV1>,
     pub fdr_target: f64,
     pub run_fdr_exceedance_upper_95_hoeffding: f64,
     pub calibration_design: String,
@@ -305,6 +317,55 @@ fn make_feature_p_values(
     })
 }
 
+fn fixed_grid_calibration(values: &[f64]) -> Option<(u64, f64, f64)> {
+    if values.is_empty() {
+        return None;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let n = sorted.len() as f64;
+    let mut maximum_excess = 0.0_f64;
+    let mut absolute_deviation_sum = 0.0_f64;
+    for grid_index in 1..=10 {
+        let threshold = grid_index as f64 / 10.0;
+        let count = sorted.partition_point(|value| *value <= threshold) as f64;
+        let empirical = count / n;
+        maximum_excess = maximum_excess.max((empirical - threshold).max(0.0));
+        absolute_deviation_sum += (empirical - threshold).abs();
+    }
+    Some((
+        u64::try_from(sorted.len()).ok()?,
+        maximum_excess,
+        absolute_deviation_sum / 10.0,
+    ))
+}
+
+fn summarize_calibration_diagnostic(
+    feature_id: String,
+    observations: &[(u64, f64, f64)],
+) -> Option<PValueCalibrationDiagnosticV1> {
+    if observations.is_empty() {
+        return None;
+    }
+    let count = observations.len() as f64;
+    Some(PValueCalibrationDiagnosticV1 {
+        detector_feature_id: feature_id,
+        repetitions_with_null_support: u64::try_from(observations.len()).ok()?,
+        mean_null_count_per_supported_repetition: observations
+            .iter()
+            .map(|row| row.0 as f64)
+            .sum::<f64>() / count,
+        mean_maximum_ecdf_excess_on_10_point_grid: observations
+            .iter()
+            .map(|row| row.1)
+            .sum::<f64>() / count,
+        mean_absolute_ecdf_deviation_on_10_point_grid: observations
+            .iter()
+            .map(|row| row.2)
+            .sum::<f64>() / count,
+    })
+}
+
 fn bounded_estimate(values: &[f64]) -> Result<BoundedEstimateV1, String> {
     if values.is_empty() {
         return Err("cannot estimate an empty Monte Carlo outcome vector".to_owned());
@@ -339,6 +400,8 @@ pub fn run_ftd_calibration(
     let mut power_values = Vec::with_capacity(config.repetitions as usize);
     let mut selected_fraction_values = Vec::with_capacity(config.repetitions as usize);
     let mut run_exceedances = Vec::with_capacity(config.repetitions as usize);
+    let mut feature_calibration = vec![Vec::<(u64, f64, f64)>::new(); config.feature_count as usize];
+    let mut combined_calibration = Vec::<(u64, f64, f64)>::new();
     let mut selected_clean_total = 0_u64;
     let mut selected_contaminated_total = 0_u64;
     let mut total_nulls = 0_u64;
@@ -363,12 +426,36 @@ pub fn run_ftd_calibration(
         for (feature_index, feature_scores) in scores.iter().enumerate() {
             features.push(make_feature_p_values(config, &mut rng, feature_index, feature_scores)?);
         }
+        for (feature_index, feature) in features.iter().enumerate() {
+            let null_p_values: Vec<f64> = feature
+                .p_values
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| !is_clean[*index])
+                .map(|(_, row)| row.p_value)
+                .collect();
+            if let Some(stats) = fixed_grid_calibration(&null_p_values) {
+                feature_calibration[feature_index].push((stats.0, stats.1, stats.2));
+            }
+        }
         let fused = ftd_weighted_cauchy_bh(
             &features,
             alpha,
             config.weight_policy,
             config.softmax_temperature_milli,
         )?;
+
+        let null_combined_p_values: Vec<f64> = fused
+            .combined_p_values
+            .iter()
+            .filter_map(|row| {
+                let index = row.pair_id.strip_prefix("item-")?.parse::<usize>().ok()?;
+                (!is_clean.get(index).copied().unwrap_or(true)).then_some(row.p_value)
+            })
+            .collect();
+        if let Some(stats) = fixed_grid_calibration(&null_combined_p_values) {
+            combined_calibration.push((stats.0, stats.1, stats.2));
+        }
 
         let mut selected = 0_u64;
         let mut selected_clean = 0_u64;
@@ -418,6 +505,15 @@ pub fn run_ftd_calibration(
     } else {
         Some(bounded_estimate(&power_values)?)
     };
+    let pvalue_calibration_by_feature = feature_calibration
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, observations)| {
+            summarize_calibration_diagnostic(format!("feature-{index:02}"), &observations)
+        })
+        .collect();
+    let combined_null_pvalue_calibration =
+        summarize_calibration_diagnostic("combined".to_owned(), &combined_calibration);
     let repetitions = f64::from(config.repetitions);
     let fdr_target = alpha;
 
@@ -436,6 +532,8 @@ pub fn run_ftd_calibration(
         mean_selected_clean_count: selected_clean_total as f64 / repetitions,
         mean_selected_contaminated_count: selected_contaminated_total as f64 / repetitions,
         mean_bh_retained_count: selected_total as f64 / repetitions,
+        pvalue_calibration_by_feature,
+        combined_null_pvalue_calibration,
         fdr_target,
         run_fdr_exceedance_upper_95_hoeffding: exceedance_estimate.upper_95_hoeffding,
         calibration_design: match config.reference_design {
