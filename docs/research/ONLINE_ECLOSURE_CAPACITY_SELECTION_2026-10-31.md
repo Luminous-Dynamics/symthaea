@@ -71,7 +71,7 @@ This is **cumulative** capacity, not a per-period service-rate or queue-stabilit
 
 ## Independent validity and optimality verifier
 
-The module validation/crc_discrete_admissibility.py has no relation to the online track. The relevant module is validation/online_eclosure_capacity_oracle.py. It has two distinct checks:
+The independent verifier in validation/online_eclosure_capacity_oracle.py has two distinct checks:
 
 1. **Validity receipt:** recompute all \(2^t\) intersections for every selected \(R_t\), check closure slack, check \(R_{t-1}\subseteq R_t\), enforce cumulative capacity, and verify prefix digests and receipt fields.
 2. **Optimality receipt:** independently enumerate every nested and capacity-feasible candidate \(R\), check its e-closure membership, and confirm the selected set maximizes total predeclared value. Ties resolve by lower resource cost, then lexicographically smaller selected-index tuple.
