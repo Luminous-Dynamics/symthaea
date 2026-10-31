@@ -29,6 +29,10 @@ For an operational open-set claim, require distinct held-out strata for unseen m
 
 A clean reproduction must use an outer program-group holdout. Inside each outer-training partition only, perform feature selection (including mRMR/RFECV), normalization/transform fitting, model and hyperparameter selection, probability calibration, and threshold selection using group-aware inner validation. The outer held-out program must not influence any learned choice before final scoring. Report the paper-faithful setup and this fully nested setup separately if they differ; do not silently describe the former as leakage-free.
 
+**Temporal-support and preprocessing caveat for HARPY-V-GEM5:** the 27 October 2026 study samples every 10,000 committed instructions, truncates each program trace from the beginning to 12,890 windows, and extends GhostWrite from 2,340 naturally produced windows by repeated iterations. Thus 412,480 windows are not 412,480 independent attack trials. The importer must retain original trace, execution, instruction-range and replay/iteration identity, and statistical uncertainty must be grouped at the program/execution level. This does not invalidate the paper; it limits what the row count can support. The article also describes variance filtering, Min-Max normalization and SelectKBest as preprocessing for LOPO but does not make the fold-local fitting boundary for each learned transform sufficiently explicit in the text. This is not proof of leakage. A clean reproduction must fit every learned transform, feature selector, calibration and threshold inside the outer-training programs only. Track the dependence and effective-sample work in [HARDSEC-014 / issue #9413](https://github.com/Luminous-Dynamics/symthaea/issues/9413).
+
+**Instruction-only baseline clarification:** the GEM5 study reports known-workload detection above 99% for both HPC and instruction features, and reports instruction-only accuracy above 96% on its held-out attack-program cases, while instruction-based attack-family classification is substantially weaker (around 60%). That makes instruction-only DT/RF a mandatory binary-detection comparator in the *simulator evidence lane*, not an automatic physical-HARPY-V modality or proof of family attribution. Keep binary detection and attack classification as separate outcomes.
+
 These results make four failure modes first-class: source/program leakage, held-out-family failure, false alarms in benign but unusual workloads, and measurement-induced distribution shift.
 
 References:
@@ -141,6 +145,7 @@ The initial comparison should be deliberately modest and interpretable.
 | Simple threshold / non-ML rule | Establish a low-cost floor | Freeze the rule on validation data |
 | Decision Tree (DT) | Published lightweight baseline | Report tree depth/model size and threshold selection |
 | Random Forest (RF) | Strong tabular baseline | Measure actual end-to-end overhead |
+| Instruction-only DT/RF (HARPY-V-GEM5) | Published low-cost binary-detection comparator; reported >96% on held-out attack programs | Simulator evidence only; attack-family classification is weaker; do not assume this modality exists in physical HARPY-V V2 |
 | Instruction-only detector | Low-cost candidate where the modality exists | No use where aligned instruction telemetry is absent |
 | HPC-only detector | Microarchitectural signal baseline | Counter acquisition may perturb the workload |
 | Published workload-conditioned two-stage detector (T-SMADE) | Existing cascade comparator for evasive Spectre under varied workloads | Reproduce the workload classifier, selected HPC set, attack variants, platform and alert semantics; do not compare the abstract's rates across datasets |
@@ -173,8 +178,9 @@ Not every condition exists in each published corpus. Unsupported stress cases mu
 
 Before unlocking confirmatory test results, freeze:
 - exact source hashes and parser revision;
+- trace/window lineage, original-versus-replayed segment identity, window stride and independent group counts;
 - train/validation/test grouping and holdout rationale;
-- feature/preprocessing code and feature list;
+- feature/preprocessing code and feature list, with every learned transform/feature selector fit inside outer-training groups only;
 - model versions, seeds, search spaces, and attempt budgets;
 - threshold selection rule and alert deduplication policy;
 - primary endpoints, response deadlines, operating alert budget, equivalence/non-inferiority margin, and group-level statistical method;
