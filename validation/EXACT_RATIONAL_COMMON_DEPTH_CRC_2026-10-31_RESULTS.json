@@ -1,7 +1,16 @@
 {
   "schema": "symthaea-exact-rational-common-depth-crc-v1",
-  "status": "EXACT_RATIONAL_REFERENCE_ORACLE_RESULTS",
+  "status": "CORRECTED_EXACT_RATIONAL_COMMON_DEPTH_CRC_VERIFICATION",
   "reference": "Bai & Ramdas (2026), arXiv:2610.35821, Appendix B.7",
+  "correction": {
+    "prior_issue": "The earlier exact-rational baseline inversion omitted the factor 1/2 on the type-1 loss above depth one. It was conservative and its exact table feasibility checks were true, but it did not reproduce the paper's envelope-CRC baseline.",
+    "fix": "For a>=1, use h1*(a-1)/2 + (h2+1)*a/2 <= (n+1)*alpha for envelope CRC; standard CRC similarly uses h1*(a-1)/2 + h2*a/2 + 1.",
+    "new_regressions": [
+      "(h1,h2)=(4,3), B=51/10 -> envelope depth 71/40",
+      "(h1,h2)=(4,3), B=51/10 -> standard CRC depth 61/35"
+    ],
+    "consequence": "All reported exact baseline and recertification figures below supersede the earlier PR draft artifact."
+  },
   "protocol": {
     "n_calibration": 50,
     "calibration_count_vectors": 1326,
@@ -23,92 +32,79 @@
       200,
       500
     ],
-    "losses": {
-      "type0": "0",
-      "type1": "max(a-1,0)/2",
-      "type2": "a/2"
-    },
-    "action_domain": "[0,2]",
-    "arithmetic": "exact arbitrary-precision rational fractions",
-    "verifier": "for every augmented q, sum_c q[c] * loss(c, A(q-e_c)) <= (n+1)*alpha"
+    "arithmetic": "exact arbitrary-precision Fraction arithmetic",
+    "validity": "for every augmented q, sum_c q[c]*ell_c(A(q-e_c)) <= (n+1)*alpha"
   },
-  "local_validation": {
-    "unit_tests_passed": 7,
-    "unit_tests_total": 7,
-    "exact_reference_tests": "local module copy matching committed implementation logic",
-    "committed_source_blob": "4246b82635d20ff7b8aa4f83024d11b3671fc37b",
-    "committed_tests_blob": "61b7a92efe0cf1f514a1daab78d3620e3b4e5326",
-    "per_alpha_validation_passes": 1009,
-    "exact_checks_per_alpha": 1390402,
-    "exact_checks_total_four_alphas": 5561608,
-    "alpha_0_10_committed_equivalent_run_seconds": 43.4057,
-    "alpha_0_10_all_pass": true,
-    "alpha_0_10_max_final_denominator_digits": 865
+  "execution": {
+    "committed_source_blob_sha1": "c0c57ec2d78b8060dfd3e09bd61f3939f645bb87",
+    "committed_test_blob_sha1": "3a27bb8d1fd9f1790467896bffbaaef4548f0cb7",
+    "authored_tests": 9,
+    "exact_reference_run": "all four targets completed 500 rounds on a matching local rational reference implementation",
+    "remote_ci": "not relied on; no pass claimed",
+    "exact_full_table_validation_passes_per_alpha": 1009,
+    "exact_augmented_inequality_checks_per_alpha": 1390402,
+    "total_exact_checks_four_targets": 5561608
   },
-  "four_target_runs": {
+  "results": {
     "0.02": {
-      "seconds": 19.2328,
-      "all_500_rounds_valid": true,
-      "final_max_depth_denominator_digits": 858,
-      "exact_excess": "0",
+      "budget": "51/50",
       "worst_augmented_count": [
         0,
         0,
         51
       ],
       "worst_total": "51/50",
-      "budget": "51/50"
+      "max_excess": "0/1",
+      "max_denominator_digits": 857,
+      "all_snapshots_valid": true
     },
     "0.05": {
-      "seconds": 23.8331,
-      "all_500_rounds_valid": true,
-      "final_max_depth_denominator_digits": 863,
-      "exact_excess": "0",
+      "budget": "51/20",
       "worst_augmented_count": [
         0,
         0,
         51
       ],
       "worst_total": "51/20",
-      "budget": "51/20"
+      "max_excess": "0/1",
+      "max_denominator_digits": 857,
+      "all_snapshots_valid": true
     },
     "0.10": {
-      "seconds": 33.2354,
-      "all_500_rounds_valid": true,
-      "final_max_depth_denominator_digits": 865,
-      "exact_excess": "0",
+      "budget": "51/10",
       "worst_augmented_count": [
         0,
         0,
         51
       ],
       "worst_total": "51/10",
-      "budget": "51/10"
+      "max_excess": "0/1",
+      "max_denominator_digits": 857,
+      "all_snapshots_valid": true
     },
     "0.15": {
-      "seconds": 32.9933,
-      "all_500_rounds_valid": true,
-      "final_max_depth_denominator_digits": 870,
-      "exact_excess": "0",
+      "budget": "153/20",
       "worst_augmented_count": [
         0,
         0,
         51
       ],
       "worst_total": "153/20",
-      "budget": "153/20"
+      "max_excess": "0/1",
+      "max_denominator_digits": 857,
+      "all_snapshots_valid": true
     }
   },
   "interpretation": [
-    "Standard CRC and envelope CRC baselines were checked exactly for all four levels.",
-    "Envelope CRC remained exactly valid through 500 recertification rounds at all four levels.",
-    "Every saved snapshot had exact zero budget excess; no float tolerance was used.",
-    "The all-type-2 augmented state [0,0,51] was worst and exactly binding at every saved snapshot.",
-    "Final Fraction denominators reached 858-870 decimal digits; exact rational arithmetic is a trusted reference oracle, not the production performance target."
+    "The exact corrected standard CRC and envelope CRC baselines pass all 1,378 augmented states at every target.",
+    "The corrected envelope CRC remains exactly valid through all 500 equal-share updates at all four targets.",
+    "Every saved snapshot has exactly zero worst-case budget excess; no float tolerance is used.",
+    "The all-type-2 augmented state [0,0,51] is worst and exactly binding in the corrected common-depth run.",
+    "Python rational arithmetic is a reference oracle; its growing arbitrary-precision denominators are not a production-performance target."
   ],
   "limitations": [
-    "Common-depth family only, not confidence-adaptive per-image scores.",
+    "Common-depth family only; not confidence-adaptive per-image scores.",
     "Finite exchangeability only; no arbitrary distribution-shift guarantee.",
-    "No clean separate checkout or remote CI pass is claimed."
+    "Local reference run is not an independent clean checkout or remote CI pass."
   ]
 }
