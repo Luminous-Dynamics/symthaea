@@ -124,11 +124,15 @@ pub fn generate_multiscale_task(
         rng.next_u64() % periods[2],
     ];
     let weights_before = [random_weight(&mut rng), random_weight(&mut rng), random_weight(&mut rng)];
-    let weights_after = [
-        weights_before[2],
-        -weights_before[1],
-        weights_before[0],
-    ];
+    let weights_after = if config.regime_shift {
+        [
+            weights_before[2],
+            -weights_before[1],
+            weights_before[0],
+        ]
+    } else {
+        weights_before
+    };
     let hidden_change_step = if config.regime_shift {
         let low = u64::try_from(config.steps / 3).unwrap_or(u64::MAX);
         let high = u64::try_from((config.steps * 2) / 3).unwrap_or(u64::MAX);
@@ -320,7 +324,7 @@ mod tests {
     fn regime_change_is_hidden_and_bounded_to_middle_third_band() {
         let (task, oracle) = generate_multiscale_task(config(true)).unwrap();
         let change = oracle.hidden_change_step.unwrap();
-        assert!((task.events.first().unwrap().step..=512).contains(&change));
+        assert!(change < 512);
         assert!((512 / 3..=(512 * 2) / 3).contains(&(change as usize)));
         assert_ne!(oracle.weights_before, oracle.weights_after);
     }
@@ -336,11 +340,11 @@ mod tests {
     fn feedback_arrives_after_declared_delay_and_matches_oracle() {
         let (task, oracle) = generate_multiscale_task(config(true)).unwrap();
         for event in &task.events {
-            if let TemporalEventKind::Feedback { source_step, label } = event.kind {
-                assert_eq!(event.step - source_step, task.feedback_delay);
+            if let TemporalEventKind::Feedback { source_step, label } = &event.kind {
+                assert_eq!(event.step - *source_step, task.feedback_delay);
                 assert_eq!(
-                    oracle.targets[source_step as usize].label,
-                    label
+                    oracle.targets[*source_step as usize].label,
+                    *label
                 );
             }
         }
