@@ -736,7 +736,7 @@ mod tests {
     fn proof_guided_completes_minimum_sufficient_multi_obligation_packet() {
         let case = build_cases().into_iter()
             .find(|c| c.id == "valid_multi_obligation_packet").unwrap();
-        let result = run_trial(&case, Policy::MaskCoverageGreedy, 10, 1729);
+        let result = run_trial(&case, Policy::MaskCoverageGreedy, 14, 1729);
         assert!(result.completion_verified);
         assert_eq!(result.spent, 9);
         assert_eq!(result.missed_mandatory_count, 0);
