@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-016-report-v0.1.json",
+  "title": "CMAQ-016 Search Exploitability Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "episode_count",
+    "seed",
+    "candidate_budgets",
+    "scenarios",
+    "policies",
+    "summary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-016-search-exploitability-v0.1"
+    },
+    "episode_count": {
+      "const": 256
+    },
+    "seed": {
+      "type": "integer"
+    },
+    "candidate_budgets": {
+      "const": [
+        8,
+        32,
+        128,
+        512
+      ]
+    },
+    "scenarios": {
+      "const": [
+        "benign_iid_noise",
+        "narrow_optimism_pocket"
+      ]
+    },
+    "policies": {
+      "const": [
+        "direct_policy",
+        "random_search",
+        "adaptive_cem",
+        "pessimistic_ensemble_cem",
+        "oracle"
+      ]
+    },
+    "summary": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario",
+          "candidate_budget",
+          "policy",
+          "mean_true_return",
+          "mean_predicted_return",
+          "mean_optimizer_optimism_gap",
+          "mean_selected_action_regret",
+          "selected_pocket_rate",
+          "mean_selected_action_error",
+          "uniform_grid_prediction_mse"
+        ],
+        "properties": {
+          "scenario": {
+            "enum": [
+              "benign_iid_noise",
+              "narrow_optimism_pocket"
+            ]
+          },
+          "candidate_budget": {
+            "enum": [
+              8,
+              32,
+              128,
+              512
+            ]
+          },
+          "policy": {
+            "enum": [
+              "direct_policy",
+              "random_search",
+              "adaptive_cem",
+              "pessimistic_ensemble_cem",
+              "oracle"
+            ]
+          },
+          "mean_true_return": {
+            "type": "number"
+          },
+          "mean_predicted_return": {
+            "type": "number"
+          },
+          "mean_optimizer_optimism_gap": {
+            "type": "number"
+          },
+          "mean_selected_action_regret": {
+            "type": "number",
+            "minimum": 0
+          },
+          "selected_pocket_rate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "mean_selected_action_error": {
+            "type": "number"
+          },
+          "uniform_grid_prediction_mse": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}
