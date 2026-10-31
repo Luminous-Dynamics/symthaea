@@ -248,3 +248,76 @@ The reported p-value direction in the ACL paper's Eq. (4) appears to be a lower-
 
 This is not a full FTD reproduction: model scoring for PPL, Min-K and Min-K++ is not implemented here. Nor does running BH or a Cauchy combination alone establish an FDR guarantee. The null reference must be representative, p-values must be super-uniform under contamination, and the multiple-hypothesis dependence assumptions must be justified on the actual evaluation population.
 
+
+
+## DVD reproduction and two-state mixture diagnostics
+
+The module src/dvd.rs implements the EMNLP 2026 DVD statistic and an additional explicit state-separation analysis.
+
+Paper reference:
+- Liang et al., DVD: A Robust Method for Detecting Variant Contamination in Large Language Model Evaluation, EMNLP 2026, pp. 29366–29384.
+- https://aclanthology.org/2026.emnlp-main.1289/
+
+### Faithful DVD baseline
+
+For each of N sampled responses:
+1. Obtain the base model's conditional log-probability for every generated response token.
+2. Select the K least-probable tokens (smallest / most negative log-probability values).
+3. Average their log-probabilities to get that response's synthetic difficulty.
+4. Compute the population variance of the N synthetic difficulties, dividing by N.
+
+The paper's baseline configuration is N=50 and K=20. The implementation reports population variance separately from unbiased sample variance; only population variance is the paper DVD score.
+
+Important: the temperature parameter controls sampling, but the score requires base-model conditional token log-probabilities—not probabilities from the temperature-scaled sampling distribution. Providers that do not expose per-token output log-probabilities cannot run this faithful baseline. Do not substitute text similarity or token entropy and still label it DVD.
+
+### Added state-separation diagnostic
+
+The paper motivates DVD by a two-state mixture: memory adherence and perturbation drift. Its scalar variance score detects fluctuation but does not explicitly test whether the observations exhibit two separated modes.
+
+The extension fits:
+- a one-Gaussian model;
+- a two-Gaussian mixture using bounded deterministic EM and several quantile initializations;
+- BIC for each model and delta-BIC = BIC(one component) - BIC(two components);
+- mixture weights, means, variances, standardized mean separation and mean posterior entropy;
+- median absolute deviation and 10th/90th percentile winsorized variance.
+
+Positive delta-BIC favors the two-component model after its extra-parameter penalty. This is a model-comparison statistic, not a calibrated contamination probability. It can also respond to non-contamination causes of multimodality; threshold selection and calibration require clean and contaminated held-out controls. The report explicitly leaves calibration status unset.
+
+### Input and CLI
+
+The strict input JSON Schema is at schema/dvd-generation-input.schema.json. Example input using the paper's N=50/K=20 setting:
+
+~~~sh
+cargo run --locked -- score-dvd \
+  research/contamination-panel-001/fixtures/dvd-two-state-input.json \
+  /secure/evaluator/dvd-two-state-report.json
+~~~
+
+The fixture is synthetic and demonstrates the two-state numerical path. It is not model output and must not be used to claim detector accuracy.
+
+The input binds:
+- model/provider/version/access mode;
+- exact harness, prompt, decoding configuration and environment digests;
+- sampling temperature and K/N;
+- a generation seed-schedule commitment and a distinct seed commitment per response;
+- exact response token count and every response token's base-model log-probability.
+
+A report hash binds the entire input, including the token log-probability arrays. It reports sample count, total generated-token count and the digest fields needed to reconstruct the run's declared identity.
+
+### Required comparison and negative controls
+
+Reproduce DVD's N=50/K=20 baseline and compare it with the added mixture statistic under identical model outputs. Do not claim improvement until the paired comparison is complete.
+
+Negative controls must include:
+- clean tasks with naturally high response variability;
+- temperature and prompt sensitivity without contamination;
+- high-variance unimodal output distributions;
+- heavy-tailed but single-state output distributions;
+- long/short response and tokenizer effects;
+- reasoning tasks with multiple valid solutions;
+- model architecture/size and domain shifts.
+
+Positive controls must separately manipulate exact, syntactic, semantic-variant and answer-augmented exposure at pretraining-like, instruction-tuning and post-training stages. Keep source families and task recipes held out across train/development/qualification splits.
+
+Report AUROC and AUPRC, recall at fixed false-positive rates, per-family and worst-family results, calibration/PPV under prevalence grids, and generation/token/cost budgets. The current module produces per-item scores only; cohort-level calibration, ROC/PR evaluation and cluster-aware confidence intervals remain separate work.
+
