@@ -781,6 +781,12 @@ pub fn evaluate_genome(
                 format!("seed {seed} emitted no family-native grammar plan fingerprint"),
             ));
         }
+        if grammar_transformations.is_empty() {
+            issues.push(GenomeIssue::new(
+                "grammar_plan_operations_missing",
+                format!("seed {seed} emitted no named family-native grammar operations"),
+            ));
+        }
         let structural_fingerprint = fingerprint::structural_fingerprint(
             &realization.score,
             &realization.form,
@@ -1601,6 +1607,9 @@ impl GenomeEvaluation {
                 is_sha256_hex(&trial.score_sha256)
                     && (!self.eligible_for_archive
                         || trial.grammar_plan_signature.as_ref().is_some_and(|value| is_sha256_hex(value)))
+                    && (!self.eligible_for_archive
+                        || (trial.grammar_plan_well_formed && !trial.grammar_transformations.is_empty()))
+                    && !trial.grammar_plan_kind.trim().is_empty()
                     && trial.structural_fingerprint.len() == fingerprint::STRUCT_DIMS
                     && trial.structural_fingerprint.iter().all(|value| value.is_finite())
                     && trial.score_duration_beats.is_finite()
