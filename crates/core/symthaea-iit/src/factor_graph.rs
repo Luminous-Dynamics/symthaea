@@ -394,6 +394,8 @@ pub struct CutsetLogFactorEliminationReport {
     pub factor: BinaryLogFactor,
     pub cutset_variables: Vec<usize>,
     pub cutset_assignments_evaluated: usize,
+    pub max_cutset_assignments: usize,
+    pub max_factor_entries: usize,
     pub remaining_elimination_order: Vec<usize>,
     pub induced_width: usize,
     pub predicted_peak_factor_entries: usize,
@@ -743,8 +745,10 @@ pub fn min_fill_log_sum_product_with_cutset(
         for factor in factors {
             let mut conditioned = factor.clone();
             for (slot, variable) in canonical_cutset.iter().copied().enumerate() {
-                let value = ((branch >> slot) & 1) != 0;
-                conditioned = conditioned.condition(variable, value)?;
+                if conditioned.variables.binary_search(&variable).is_ok() {
+                    let value = ((branch >> slot) & 1) != 0;
+                    conditioned = conditioned.condition(variable, value)?;
+                }
             }
             conditioned_factors.push(conditioned);
         }
@@ -783,6 +787,8 @@ pub fn min_fill_log_sum_product_with_cutset(
         factor,
         cutset_variables: canonical_cutset,
         cutset_assignments_evaluated: branch_count,
+        max_cutset_assignments,
+        max_factor_entries,
         remaining_elimination_order: plan.elimination_order,
         induced_width: plan.induced_width,
         predicted_peak_factor_entries,
