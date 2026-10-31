@@ -380,3 +380,17 @@ The report therefore always sets independently_verified=false and labels externa
 
 A structurally valid paired receipt is evidence that the supplied claims are consistent with the preregistered design—not proof that the claims are true.
 
+
+
+## Paired training execution receipt hardening
+
+The paired receipt validator also checks calendar-valid UTC timestamps, not only timestamp string shape. For example, an impossible date such as February 30 or an hour value of 24 is rejected.
+
+Runner-attestation and checkpoint-custody receipt digests are explicitly nullable. This is deliberate: missing external attestation evidence must remain a visible negative condition, not make the entire structurally valid run record disappear. The validator can therefore return:
+- execution consistent;
+- external runner/custody attestation missing;
+- not ready for independent verification;
+- independently verified = false.
+
+When those external digests are present, this still proves only their format and binding—not their signature validity or issuer identity. Missing evidence blocks readiness; present-but-unverified evidence does not become trusted automatically.
+
