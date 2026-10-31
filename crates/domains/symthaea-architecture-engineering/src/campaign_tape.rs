@@ -1057,6 +1057,7 @@ mod tests {
 
         right.config.candidate_stream_sha256 = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_owned();
         right.tape_sha256.clear();
+        right.seal().unwrap();
         assert!(validate_matched_tape_headers(&[left, right]).is_err());
     }
 
