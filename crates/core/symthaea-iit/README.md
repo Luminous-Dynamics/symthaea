@@ -486,6 +486,37 @@ not measured runtime or total-RSS values. Changing the min-fill heuristic or
 separator changes requires updating the complete-output parity and budget tests
 together, not weakening either check.
 
+### Candidate separator Pareto frontier
+
+The `cutset_frontier_sweep` example preflights a wider, explicit family of
+separator candidates on the same grid fixtures: every single row and column,
+every two-row and two-column band, and every row/column cross. Each candidate
+is checked with the exact planner before any numeric branch is run. The sweep
+then reports the non-dominated frontier across three separate resource axes:
+
+- exact number of conditioned branches (`2^|cutset|`);
+- residual induced width after conditioning;
+- predicted peak factor-table entries, including input and retained output
+  tables.
+
+A candidate is removed only when another candidate is no worse on all three
+axes and strictly better on at least one. Exact metric ties keep one stable
+lexical representative. The executable verifies that every feasible candidate
+is either on the frontier or dominated by a frontier member, and that no
+reported frontier member is dominated.
+
+This is a **bounded candidate-family Pareto planner**, not a globally optimal
+cutset solver. It makes branch-count versus table-width tradeoffs explicit
+before spending inference time. It does not run the numeric factor graph, prove
+a global optimum, or guarantee lower total RSS. The existing cutset sweep
+remains the exact numeric oracle for complete retained-factor parity on its
+pinned separator fixtures.
+
+Run:
+
+    cargo run --release --locked -p symthaea-iit --example cutset_frontier_sweep
+
+
 Run:
 
     cargo run --release --locked -p symthaea-iit --example cutset_conditioning_sweep
