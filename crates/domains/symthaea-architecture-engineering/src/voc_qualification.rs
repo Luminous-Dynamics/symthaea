@@ -449,6 +449,12 @@ pub fn qualify_voc_model(
             thresholds.interval_coverage_tolerance,
             &mut failure_reasons,
         );
+        check_at_most(
+            &format!("{}.mean_interval_width", stratum.stratum_id),
+            stratum.mean_interval_width,
+            thresholds.max_mean_interval_width,
+            &mut failure_reasons,
+        );
     }
 
     failure_reasons.sort();
@@ -685,23 +691,33 @@ fn validate_thresholds(
             ));
         }
     }
+    for (field, value) in [
+        ("max_top1_log_loss", thresholds.max_top1_log_loss),
+        ("max_top1_brier", thresholds.max_top1_brier),
+        ("max_mean_credible_set_size_fraction", thresholds.max_mean_credible_set_size_fraction),
+        ("max_mean_interval_width", thresholds.max_mean_interval_width),
+        ("max_action_outcome_log_loss", thresholds.max_action_outcome_log_loss),
+        ("max_action_outcome_brier", thresholds.max_action_outcome_brier),
+        ("max_voi_mean_absolute_error", thresholds.max_voi_mean_absolute_error),
+        ("max_cost_relative_error", thresholds.max_cost_relative_error),
+    ] {
+        if !value.is_finite() || value < 0.0 {
+            return Err(QualificationError::new(
+                field,
+                "must be finite and non-negative",
+            ));
+        }
+    }
     if thresholds.min_effective_sample_size_fraction == 0.0
         || thresholds.nominal_interval_mass == 0.0
         || thresholds.topk_inclusion_probability_floor == 0.0
-        || thresholds.max_mean_credible_set_size_fraction <= 0.0
+        || thresholds.max_mean_credible_set_size_fraction == 0.0
         || thresholds.max_mean_credible_set_size_fraction > 1.0
-        || thresholds.max_mean_interval_width < 0.0
         || thresholds.max_mean_interval_width > 1.0
-        || thresholds.max_top1_log_loss < 0.0
-        || thresholds.max_top1_brier < 0.0
-        || thresholds.max_action_outcome_log_loss < 0.0
-        || thresholds.max_action_outcome_brier < 0.0
-        || thresholds.max_voi_mean_absolute_error < 0.0
-        || thresholds.max_cost_relative_error < 0.0
     {
         return Err(QualificationError::new(
             "thresholds",
-            "loss, width, and error ceilings must be non-negative; positive floors are required",
+            "probability and normalized-width limits must be positive and no greater than one",
         ));
     }
     if thresholds.nominal_interval_mass >= 1.0 {
