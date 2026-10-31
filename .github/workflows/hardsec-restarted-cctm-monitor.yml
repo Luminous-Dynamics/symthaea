@@ -1,0 +1,160 @@
+name: HARDSEC-021 restarted fixed-reference DKW-CCTM
+
+on:
+  pull_request:
+    paths:
+      - "examples/hardsec_context_restarted_cctm_monitor.rs"
+      - "examples/hardsec_context_assignment_audit.rs"
+      - "docs/research/HARDSEC_021_RESTARTED_CCTM.md"
+      - "schemas/hardsec-context-restarted-cctm-*.schema.json"
+      - "schemas/hardsec-context-assignment-*.schema.json"
+      - "schemas/hardsec-context-sequential-benchmark-v1.schema.json"
+      - "tests/fixtures/hardsec/context-restarted-v1/**"
+      - "tools/hardsec-adaptive-evasion-audit-harness/**"
+      - ".github/workflows/hardsec-restarted-cctm-monitor.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-restarted-cctm-monitor-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  restarted-cctm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact pull request revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_context_assignment_audit.rs examples/hardsec_context_restarted_cctm_monitor.rs
+      - name: Run focused context assignment auditor tests
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-assignment-audit --example hardsec_context_assignment_audit
+      - name: Run restarted CCTM tests
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-restarted-cctm-monitor --example hardsec_context_restarted_cctm_monitor
+      - name: Generate truth-free context assignment receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          out_dir="$(mktemp -d)"
+          echo "$out_dir" > "$RUNNER_TEMP/restarted-cctm-output-dir"
+          cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-assignment-audit --example hardsec_context_assignment_audit -- \
+            --policy tests/fixtures/hardsec/context-restarted-v1/context-policy.json \
+            --assignments tests/fixtures/hardsec/context-restarted-v1/context-assignments.json \
+            --truth tests/fixtures/hardsec/context-restarted-v1/context-truth-oracle.json \
+            --receipt "$out_dir/context-assignment-receipt.json"
+          python3 - "$out_dir/context-assignment-receipt.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          metrics = receipt["assignment_integrity"]
+          assert receipt["result"] == "audited"
+          assert metrics["assignment_record_count"] == 26
+          assert metrics["accepted_count"] == 23
+          assert metrics["abstained_count"] == 3
+          assert metrics["accepted_accuracy_denominator"] == 23
+          assert abs(metrics["accepted_accuracy"] - 1.0) < 1e-12
+          assert abs(metrics["accepted_coverage"] - 23/26) < 1e-12
+          assert receipt["runtime_mapping"]["contains_truth_labels"] is False
+          assert len(receipt["runtime_mapping"]["assignments"]) == 26
+          assert receipt["anomaly_score_artifact_sha256"] == "c" * 64
+          PY
+      - name: Run restarted DKW-CCTM against audited context receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          out_dir="$(cat "$RUNNER_TEMP/restarted-cctm-output-dir")"
+          cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-restarted-cctm-monitor --example hardsec_context_restarted_cctm_monitor -- \
+            --plan tests/fixtures/hardsec/context-restarted-v1/plan.json \
+            --stream tests/fixtures/hardsec/context-restarted-v1/stream.json \
+            --context-receipt "$out_dir/context-assignment-receipt.json" \
+            --receipt "$out_dir/restarted-cctm-receipt.json"
+          python3 - "$out_dir/restarted-cctm-receipt.json" <<'PY'
+          import json, sys, math
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          assert receipt["result"] == "restarted_alarm_threshold_crossed", receipt
+          monitor = receipt["sequential_monitor"]
+          assert monitor["overall_first_alarm_sequence_index"] == 22
+          assert monitor["overall_first_alarm_context_id"] == "compute"
+          assert monitor["single_start_reference"]["first_alarm_sequence_index"] == 16
+          assert monitor["valid_observation_count"] == 23
+          assert monitor["abstention_count"] == 3
+          assert monitor["alarm_is_latched"] is True
+          assert monitor["post_alarm_reset_count"] == 0
+          restart = monitor["restart_guarantee_contract"]
+          assert restart["weight_sum_at_most_one"] is True
+          assert restart["infinite_weight_sum_upper_bound"] < 0.744
+          assert restart["maximum_restart_age"] == 256
+          assert abs(receipt["statistical_guarantees"]["unconditional_type_i_upper_bound_if_all_paper_assumptions_hold"] - 0.05) < 1e-12
+          guarantee = receipt["statistical_guarantees"]
+          assert guarantee["null_stream_iid_assumption_status"] == "assumption_not_verified"
+          assert guarantee["reference_sample_iid_assumption_status"] == "assumption_not_verified"
+          assert guarantee["context_assignment_exogeneity_status"] == "assumption_not_verified"
+          assert guarantee["accepted_observation_selection_status"] == "assumption_not_verified"
+          assert guarantee["theorem_guarantee_status"] == "not_established_from_input_receipts"
+          assert guarantee["effective_sample_size_estimate"] is None
+          assert receipt["context_assignment"]["truth_labels_in_runtime_mapping"] is False
+          assert len(receipt["context_assignment"]["receipt_sha256"]) == 64
+          rows = monitor["window_decisions"]
+          assert rows[16]["abstention_reason"] == "invalid_sensor_state"
+          assert rows[17]["abstention_reason"] == "context_assignment_not_accepted"
+          assert rows[18]["abstention_reason"] == "invalid_sensor_state"
+          for row in rows:
+              restarted = row.get("restarted")
+              if restarted is not None:
+                  assert restarted["live_state_count_after_expiry"] <= 256
+                  for candidate in restarted["candidate_starts"]:
+                      assert candidate["status"] in {"active", "zero_wealth_killed", "expires_after_current_update"}
+                      assert candidate["weight"] > 0
+                      assert candidate["age"] >= 1
+                      assert candidate["local_log_wealth"] is None or isinstance(candidate["local_log_wealth"], (int, float))
+          starts = rows[0]["restarted"]["candidate_starts"]
+          assert len(starts) == 1
+          assert starts[0]["start_index"] == 1
+          assert starts[0]["age"] == 1
+          assert starts[0]["status"] == "active"
+          assert starts[0]["local_log_wealth"] is not None
+          assert starts[0]["weight"] > 0
+          assert rows[2]["restarted"]["candidate_starts"][0]["age"] == 2
+          PY
+      - name: Enforce restart benchmark contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          path = "tests/fixtures/hardsec/context-restarted-v1/benchmark-plan.json"
+          with open(path, "r", encoding="utf-8") as handle:
+              plan = json.load(handle)
+          assert plan["status"] == "planned"
+          assert len(plan["baselines"]) == 13
+          assert len(plan["candidates"]) == 6
+          assert "dkw_fixed_reference_cctm_restarted_near_harmonic" in plan["candidates"]
+          assert "published_bhattacharyya_ramdas_restarted_cmm" in plan["baselines"]
+          assert "late_change_point_t_1000000" in plan["scenarios"]
+          assert "overlapping_window_dependency" in plan["scenarios"]
+          assert "pfa_probability_over_infinite_stream" in plan["metrics"]
+          assert "arl_mean_time_to_false_alarm" in plan["metrics"]
+          assert plan["claim_rules"]["pfa_and_arl_not_conflated"] is True
+          assert plan["claim_rules"]["finite_restart_lifetime_requires_predictable_kill"] is True
+          assert plan["claim_rules"]["iid_or_conditional_superuniformity_required_for_sequential_guarantees"] is True
+          assert any(item["id"] == "bhattacharyya_ramdas_restarted_conformal_martingales_paper" for item in plan["reference_implementations"])
+          industry = {item["id"]: item for item in plan["industry_comparators"]}
+          riscv = industry["pou_etal_2026_riscv_hpc_c910"]
+          assert abs(riscv["reported_perf_collection_overhead"] - 0.02) < 1e-12
+          assert riscv["observed_counter_interference_over_3x"] is True
+          assert riscv["reproduction_status"] == "published_result_not_independently_reproduced"
+          assert industry["kosasih_etal_2024_sok_hpc_cache_detection"]["reproduction_status"] == "qualitative_field_critique_not_a_numeric_baseline"
+          reference = plan["reference_calibration_design"]
+          assert abs(reference["total_alpha_budget"] + reference["total_dkw_delta_budget"] - 0.05) < 1e-12
+          assert reference["windows_do_not_establish_reference_independence"] is True
+          PY

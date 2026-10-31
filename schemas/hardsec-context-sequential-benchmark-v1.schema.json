@@ -16,7 +16,8 @@
     "aspirational_targets",
     "claim_rules",
     "reference_implementations",
-    "reference_calibration_design"
+    "reference_calibration_design",
+    "industry_comparators"
   ],
   "properties": {
     "schema_version": {
@@ -44,7 +45,7 @@
     },
     "candidates": {
       "type": "array",
-      "minItems": 4,
+      "minItems": 6,
       "uniqueItems": true,
       "items": {
         "type": "string"
@@ -123,7 +124,10 @@
         "alpha_budget_allocated_across_streams",
         "domain_pooling_forbidden",
         "random_window_confirmatory_claim_forbidden",
-        "targets_not_achievements"
+        "targets_not_achievements",
+        "pfa_and_arl_not_conflated",
+        "finite_restart_lifetime_requires_predictable_kill",
+        "iid_or_conditional_superuniformity_required_for_sequential_guarantees"
       ],
       "properties": {
         "conditional_superuniformity_must_be_justified": {
@@ -139,6 +143,15 @@
           "const": true
         },
         "targets_not_achievements": {
+          "const": true
+        },
+        "pfa_and_arl_not_conflated": {
+          "const": true
+        },
+        "finite_restart_lifetime_requires_predictable_kill": {
+          "const": true
+        },
+        "iid_or_conditional_superuniformity_required_for_sequential_guarantees": {
           "const": true
         }
       }
@@ -179,7 +192,8 @@
           "implementation_status": {
             "enum": [
               "rust_equations_implemented_parity_not_yet_independently_reproduced",
-              "source_pinned_metrics_and_execution_not_reproduced"
+              "source_pinned_metrics_and_execution_not_reproduced",
+              "paper_protocol_not_yet_reproduced"
             ]
           }
         }
@@ -270,6 +284,110 @@
         },
         "windows_do_not_establish_reference_independence": {
           "const": true
+        }
+      }
+    },
+    "industry_comparators": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "source_url",
+          "platform",
+          "reproduction_status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "platform": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reported_precision_benign": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "reported_precision_malicious": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "reported_malicious_classification_performance": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "reported_perf_collection_overhead": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "sampling_interval_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "observed_counter_interference_over_3x": {
+            "type": "boolean"
+          },
+          "simultaneous_counter_collection": {
+            "type": "string"
+          },
+          "transfer_limitations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "threat_model_warning": {
+            "type": "string"
+          },
+          "reproducibility_warning": {
+            "type": "string"
+          },
+          "reproduction_status": {
+            "enum": [
+              "published_result_not_independently_reproduced",
+              "qualitative_field_critique_not_a_numeric_baseline"
+            ]
+          },
+          "reported_accuracy": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "reported_overhead": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          }
         }
       }
     }
