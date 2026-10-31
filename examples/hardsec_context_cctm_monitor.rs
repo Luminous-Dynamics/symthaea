@@ -403,10 +403,36 @@ fn parse_context_assignment_receipt(
     let integrity = value.get("assignment_integrity").ok_or("context assignment receipt assignment_integrity missing")?;
     let accepted_count = assignments.iter().filter(|a| a.get("decision_status").and_then(Value::as_str) == Some("accepted")).count();
     let abstained_count = assignments.iter().filter(|a| a.get("decision_status").and_then(Value::as_str) == Some("abstained")).count();
-    if count_field(integrity, "assignment_record_count", "context_receipt.assignment_integrity")? != assignments.len()
-        || count_field(integrity, "accepted_count", "context_receipt.assignment_integrity")? != accepted_count
-        || count_field(integrity, "abstained_count", "context_receipt.assignment_integrity")? != abstained_count {
-        return Err("context assignment receipt aggregate counts do not match its runtime mapping".to_owned());
+    let reported_total = count_field(integrity, "assignment_record_count", "context_receipt.assignment_integrity")?;
+    let reported_accepted = count_field(integrity, "accepted_count", "context_receipt.assignment_integrity")?;
+    let reported_abstained = count_field(integrity, "abstained_count", "context_receipt.assignment_integrity")?;
+    let reported_accuracy_denominator = count_field(integrity, "accepted_accuracy_denominator", "context_receipt.assignment_integrity")
+        .or_else(|error| {
+            if accepted_count == 0
+                && integrity.get("accepted_accuracy_denominator").and_then(Value::as_u64) == Some(0) {
+                Ok(0)
+            } else { Err(error) }
+        })?;
+    let reported_coverage = f64_field(integrity, "accepted_coverage", "context_receipt.assignment_integrity")?;
+    let reported_end_to_end = f64_field(integrity, "end_to_end_correct_context_coverage", "context_receipt.assignment_integrity")?;
+    if reported_total != assignments.len()
+        || reported_accepted != accepted_count
+        || reported_abstained != abstained_count
+        || reported_accepted + reported_abstained != reported_total
+        || reported_accuracy_denominator != accepted_count
+        || (reported_coverage - accepted_count as f64 / assignments.len() as f64).abs() > 1e-9
+        || !(0.0..=1.0).contains(&reported_end_to_end) {
+        return Err("context assignment receipt aggregate counts/coverage do not match its runtime mapping".to_owned());
+    }
+    match (integrity.get("accepted_accuracy"), accepted_count) {
+        (Some(Value::Null), 0) => {}
+        (Some(value), count) if count > 0 => {
+            let accuracy = value.as_f64().ok_or("accepted_accuracy must be numeric when accepted_count > 0")?;
+            if !(0.0..=1.0).contains(&accuracy) {
+                return Err("accepted_accuracy must be in [0,1]".to_owned());
+            }
+        }
+        _ => return Err("accepted_accuracy nullability does not match accepted_count".to_owned()),
     }
 
     let mut output = Vec::with_capacity(assignments.len());
@@ -920,9 +946,14 @@ mod tests {
         let r = audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
         assert_eq!(r["sequential_monitor"]["valid_observation_count"], 14);
         assert_eq!(r["sequential_monitor"]["abstention_count"], 5);
-        assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["invalid_sensor_state"], 2);
+        assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["invalid_sensor_state"], 3);
         assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["context_assignment_not_accepted"], 2);
-        assert_eq!(r["reference_policy"]["contexts"][0]["final_log_wealth"], 0.0);
+        let decisions = r["sequential_monitor"]["window_decisions"].as_array().unwrap();
+        assert_eq!(decisions[0]["abstention_reason"], "invalid_sensor_state");
+        assert_eq!(decisions[0]["log_wealth_context"], 0.0);
+        assert_eq!(decisions[1]["abstention_reason"], "context_assignment_not_accepted");
+        assert_eq!(decisions[1]["log_wealth_context"], 0.0);
+        assert_eq!(decisions[2]["abstention_reason"], Value::Null);
     }
 
     #[test]
@@ -1088,6 +1119,8 @@ mod tests {
         assignment_receipt["assignment_integrity"]["abstained_count"] = json!(19);
         assignment_receipt["assignment_integrity"]["accepted_accuracy"] = Value::Null;
         assignment_receipt["assignment_integrity"]["accepted_accuracy_denominator"] = json!(0);
+        assignment_receipt["assignment_integrity"]["accepted_coverage"] = json!(0.0);
+        assignment_receipt["assignment_integrity"]["end_to_end_correct_context_coverage"] = json!(0.0);
         let rb = encode(&assignment_receipt);
         let r = audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
         assert_eq!(r["sequential_monitor"]["valid_observation_count"], 0);
