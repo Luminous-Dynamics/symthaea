@@ -585,7 +585,7 @@ pub fn score_fast_event_predictions(
         .iter()
         .map(|event| {
             u64::from(event.end_step.saturating_sub(event.start_step))
-                .saturating_add(u64::from(event.is_target))
+                .saturating_add(if event.is_target { 1 } else { 0 })
         })
         .sum();
     let total_slots = u64::try_from(task.slots).unwrap_or(u64::MAX);
