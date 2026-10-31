@@ -327,7 +327,7 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin conne
   --tolerance-nm 500 --output colinear-merge-report.json
 ```
 
-The input contains no labels; the evaluator truth is parsed only after proposal generation. This is a 1D feature-profile baseline, not a detector trained on or operating directly on EM imagery. See `docs/neuroscience/CONNECTOME_COLINEAR_MERGE_AUDIT_PROTOCOL_V1.md`.
+The input contains no labels; the evaluator truth is parsed only after proposal generation. This is a 1D feature-profile baseline, not a detector trained on or operating directly on EM imagery. The default is the V1 sample-index baseline. To enable the optional physical-arclength mode, add both `resample_interval_nm` and `half_window_nm` to the input's `detector` object. For example, a 25 nm grid with a 400 nm half-window uses 16 grid samples per half-window. The report retains V1 outputs and adds physical-mode radius-only and multifeature outputs plus per-track resampling counts. Both settings must be held constant across source sampling-density comparisons; the score threshold is still heuristic and not calibrated. See `docs/neuroscience/CONNECTOME_COLINEAR_MERGE_AUDIT_PROTOCOL_V1.md` and schema `docs/neuroscience/CONNECTOME_COLINEAR_PROFILE_INPUT.schema.json`.
 
 
 ## Query-scoped certificate dependency DAG
