@@ -1,0 +1,356 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb.support-landscape-trial.v2.schema.json",
+  "title": "PITB repeated-seed dependency-aware support-landscape trial",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "study_id",
+    "component_id",
+    "target_id",
+    "model_id",
+    "model_version",
+    "checker_version",
+    "solver_policy_sha256",
+    "budget_sha256",
+    "target_statement_sha256",
+    "environment_sha256",
+    "toolchain_sha256",
+    "fixed_context_sha256",
+    "replicate_count",
+    "budget",
+    "mutable_declarations",
+    "fixed_declarations",
+    "declaration_order",
+    "declaration_dependencies",
+    "requested_declarations",
+    "context_well_formed",
+    "local_context_sha256",
+    "context_receipt_sha256",
+    "replicate_index",
+    "seed_sha256",
+    "run_receipt_sha256",
+    "checker_receipt_sha256",
+    "semantic_gate_receipt_sha256",
+    "outcome",
+    "solver_started",
+    "kernel_passed",
+    "semantic_gate_passed",
+    "model_calls",
+    "tokens",
+    "wall_ms",
+    "checker_ms",
+    "cost_microusd"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.support-landscape-trial.v2"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "component_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "checker_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "solver_policy_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "budget_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "target_statement_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "environment_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "toolchain_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "fixed_context_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "replicate_count": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "replicate_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_model_calls",
+        "max_tokens",
+        "max_wall_ms",
+        "max_checker_ms",
+        "max_cost_microusd"
+      ],
+      "properties": {
+        "max_model_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_wall_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_checker_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_cost_microusd": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "mutable_declarations": {
+      "$ref": "#/$defs/ids"
+    },
+    "fixed_declarations": {
+      "$ref": "#/$defs/ids"
+    },
+    "declaration_order": {
+      "$ref": "#/$defs/ids"
+    },
+    "declaration_dependencies": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/ids"
+      }
+    },
+    "requested_declarations": {
+      "$ref": "#/$defs/ids"
+    },
+    "context_well_formed": {
+      "type": "boolean"
+    },
+    "local_context_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "context_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "seed_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "run_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "checker_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "semantic_gate_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "outcome": {
+      "enum": [
+        "verified_success",
+        "non_solve",
+        "timeout",
+        "invalid_context"
+      ]
+    },
+    "solver_started": {
+      "type": "boolean"
+    },
+    "kernel_passed": {
+      "type": "boolean"
+    },
+    "semantic_gate_passed": {
+      "type": "boolean"
+    },
+    "model_calls": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "wall_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "checker_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cost_microusd": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "verified_success"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "context_well_formed": {
+            "const": true
+          },
+          "solver_started": {
+            "const": true
+          },
+          "kernel_passed": {
+            "const": true
+          },
+          "semantic_gate_passed": {
+            "const": true
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "enum": [
+              "non_solve",
+              "timeout"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "context_well_formed": {
+            "const": true
+          },
+          "solver_started": {
+            "const": true
+          }
+        },
+        "not": {
+          "properties": {
+            "kernel_passed": {
+              "const": true
+            },
+            "semantic_gate_passed": {
+              "const": true
+            }
+          },
+          "required": [
+            "kernel_passed",
+            "semantic_gate_passed"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "invalid_context"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "context_well_formed": {
+            "const": false
+          },
+          "solver_started": {
+            "const": false
+          },
+          "kernel_passed": {
+            "const": false
+          },
+          "semantic_gate_passed": {
+            "const": false
+          },
+          "model_calls": {
+            "const": 0
+          },
+          "tokens": {
+            "const": 0
+          },
+          "wall_ms": {
+            "const": 0
+          },
+          "checker_ms": {
+            "const": 0
+          },
+          "cost_microusd": {
+            "const": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "semantic_gate_passed": {
+            "const": true
+          }
+        },
+        "required": [
+          "semantic_gate_passed"
+        ]
+      },
+      "then": {
+        "properties": {
+          "kernel_passed": {
+            "const": true
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    }
+  },
+  "description": "Structural schema only. The v2 analyzer additionally verifies the exact Clopper-Pearson lower bound, budget digest, exact telescope order and prerequisite closure for every retained declaration (mutable and fixed), paired-seed completeness, context/receipt identity, repeated-trial reliability, and group consistency."
+}
