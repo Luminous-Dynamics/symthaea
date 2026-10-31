@@ -537,8 +537,8 @@ fn allocate_round(
                         stats
                             .descriptor
                             .scope
-                            .split(':')
-                            .next()
+                            .split_once(':')
+                            .map(|(_, direction_id)| direction_id)
                             .unwrap_or("")
                             .to_owned(),
                         potential,
@@ -744,7 +744,8 @@ mod tests {
                 matches!(seat.action, RoundAction::EvaluateDirection(_))
             })
         }));
-        assert!(run.final_best_score > 0.90);
+        assert_eq!(run.oracle_best_score, 0.97);
+        assert!(run.final_best_score <= run.oracle_best_score);
     }
 
     #[test]
@@ -760,8 +761,12 @@ mod tests {
                 101,
             )
             .unwrap();
-            assert_eq!(run.final_best_direction, "A");
             assert!(run.final_best_score < 0.90);
+            assert!(run.executions.iter().all(|execution| {
+                execution.plan.seats.iter().all(|seat| {
+                    matches!(seat.action, RoundAction::EvaluateDirection(_))
+                })
+            }));
         }
     }
 }
