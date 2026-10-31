@@ -1,0 +1,187 @@
+{
+  "schema_version": "hardsec-hardware-benchmark-plan-v1",
+  "benchmark_id": "hardsec-017-matched-multiplatform-runtime-detector",
+  "status": "planned",
+  "evidence_domains": [
+    "synthetic_fixture",
+    "simulator",
+    "physical_hardware"
+  ],
+  "evidence_separation": {
+    "no_domain_pooling": true,
+    "source_lineage_required": true,
+    "exact_input_digests_required": true,
+    "truth_oracle_independent": true,
+    "threshold_frozen_on_validation": true,
+    "energy_requires_measurement": true
+  },
+  "minimum_platform_scope": {
+    "physical_microarchitectures": 3,
+    "isa_families": 2
+  },
+  "split_ladder": [
+    "random_window_diagnostic",
+    "contiguous_temporal_block",
+    "execution_holdout",
+    "program_binary_holdout",
+    "attack_family_holdout",
+    "adaptation_family_holdout",
+    "device_configuration_holdout",
+    "cross_platform_holdout"
+  ],
+  "baseline_arms": [
+    {
+      "id": "dt_hpc",
+      "method": "decision_tree",
+      "modality": "hpc",
+      "role": "mandatory_conventional_baseline"
+    },
+    {
+      "id": "rf_hpc",
+      "method": "random_forest",
+      "modality": "hpc",
+      "role": "mandatory_conventional_baseline"
+    },
+    {
+      "id": "svm_hpc",
+      "method": "support_vector_machine",
+      "modality": "hpc",
+      "role": "mandatory_conventional_baseline"
+    },
+    {
+      "id": "nb_hpc",
+      "method": "naive_bayes",
+      "modality": "hpc",
+      "role": "mandatory_conventional_baseline"
+    },
+    {
+      "id": "dt_instruction",
+      "method": "decision_tree",
+      "modality": "instruction",
+      "role": "low_cost_baseline"
+    },
+    {
+      "id": "hpc_instruction_normalized",
+      "method": "random_forest",
+      "modality": "hpc_retired_instruction_normalized",
+      "role": "physical_contention_reproduction"
+    },
+    {
+      "id": "t-smade",
+      "method": "workload_aware_two_stage_mlp",
+      "modality": "four_hpc_events_plus_workload_class",
+      "role": "evasive_spectre_comparator"
+    },
+    {
+      "id": "tong-2026-augmentation",
+      "method": "adversarial_sample_augmentation",
+      "modality": "hpc",
+      "role": "adversarial_training_comparator"
+    },
+    {
+      "id": "mandal-2024-interleaving",
+      "method": "statistical_interleaving_detector",
+      "modality": "hpc_distribution",
+      "role": "interleaving_comparator"
+    },
+    {
+      "id": "robust-statistics",
+      "method": "robust_threshold_and_change_detection",
+      "modality": "hpc_and_instruction",
+      "role": "non_ml_control"
+    }
+  ],
+  "candidate_arms": [
+    {
+      "id": "symthaea-hdc",
+      "method": "hyperdimensional_temporal_detector",
+      "modality": "multimodal"
+    },
+    {
+      "id": "symthaea-liquid",
+      "method": "liquid_temporal_detector",
+      "modality": "multimodal"
+    },
+    {
+      "id": "symthaea-selective-cascade",
+      "method": "selective_two_stage_cascade",
+      "modality": "instruction_hpc_temporal"
+    }
+  ],
+  "attack_families": [
+    "spectre_evasive_nop",
+    "spectre_evasive_memory",
+    "spectre_v1_v2_rsb",
+    "flush_reload_flush_flush",
+    "tlb_eviction_page_walk",
+    "interrupt_timing_timer_drift",
+    "probabilistic_interleaving",
+    "counter_aware_adaptation",
+    "workload_mimicry"
+  ],
+  "nuisance_factors": [
+    "cpu_contention",
+    "memory_contention",
+    "cache_contention",
+    "branch_contention",
+    "io_contention",
+    "phase_shift",
+    "multiprocess_interference",
+    "counter_multiplexing",
+    "sampling_jitter",
+    "counter_reset_overflow"
+  ],
+  "primary_metrics": [
+    "attack_effect_conditioned_recall",
+    "false_alerts_per_device_hour",
+    "worst_attack_family_recall",
+    "worst_adaptation_group_recall",
+    "p95_time_to_detection",
+    "end_to_end_overhead",
+    "sensor_invalid_silent_clear_count"
+  ],
+  "aspirational_targets": {
+    "pooled_attack_effect_recall_min": 0.95,
+    "worst_family_recall_min": 0.9,
+    "benign_false_alerts_per_device_hour_max": 0.1,
+    "p95_detection_delay_sampling_windows_max": 2,
+    "median_end_to_end_overhead_fraction_max": 0.01,
+    "p95_end_to_end_overhead_fraction_max": 0.02,
+    "invalid_sensor_silent_clears_max": 0,
+    "scope_note": "Research targets only; not standards, achieved results or release criteria until preregistered per campaign."
+  },
+  "statistical_support": {
+    "endpoint_alpha": 0.05,
+    "family_wise_alpha": 0.05,
+    "bonferroni_group_risk_endpoint_count": 6,
+    "zero_failure_independent_groups_for_upper_risk_le_0_05_single_endpoint": 59,
+    "zero_failure_independent_groups_for_upper_risk_le_0_01_single_endpoint": 299,
+    "zero_failure_independent_groups_for_upper_risk_le_0_05_six_endpoints": 94,
+    "zero_failure_independent_groups_for_upper_risk_le_0_01_six_endpoints": 477,
+    "iid_group_assumption_must_be_justified": true,
+    "windows_do_not_increase_independent_group_support": true
+  },
+  "negative_controls": [
+    "duplicate_trace",
+    "repeat_iteration",
+    "replay_trace",
+    "overlapping_windows",
+    "cross_split_parentage",
+    "within_group_label_permutation",
+    "full_dataset_preprocessing_leak",
+    "simultaneous_counter_interference",
+    "counter_event_aliasing",
+    "counter_scaling_mismatch",
+    "sensor_missing_stale_misaligned",
+    "invalid_sensor_clear",
+    "attacker_threshold_adaptation"
+  ],
+  "report_rules": {
+    "paper_faithful_and_nested_reproduction_separate": true,
+    "no_random_window_confirmatory_claim": true,
+    "one_class_fold_mixed_precision_f1_mcc_na": true,
+    "failed_runs_preserved": true,
+    "na_reason_required": true,
+    "simulator_physical_synthetic_separate": true
+  }
+}
