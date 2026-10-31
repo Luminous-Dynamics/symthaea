@@ -231,7 +231,12 @@ pub fn generate_phase_task(
     let changes_frequency = matches!(config.mode, PhaseMode::FrequencyShift | PhaseMode::Mixed);
     let changes_phase = matches!(config.mode, PhaseMode::PhaseShift | PhaseMode::Mixed);
     let period_after_us = if changes_frequency {
-        let scale_percent = 75 + (rng.next_u64() % 51);
+        let raw_scale_percent = 75 + (rng.next_u64() % 50);
+        let scale_percent = if raw_scale_percent >= 100 {
+            raw_scale_percent + 1
+        } else {
+            raw_scale_percent
+        };
         u64::try_from(
             (u128::from(config.base_period_us) * u128::from(scale_percent)) / 100,
         )
@@ -377,8 +382,10 @@ pub fn verify_phase_trace(
 
     if oracle.period_before_us < MIN_PERIOD_US
         || oracle.period_before_us % MIN_PERIOD_US != 0
-        || oracle.period_after_us < MIN_PERIOD_US
-        || oracle.period_after_us % (MIN_PERIOD_US / 4) != 0
+        || oracle.period_after_us < (MIN_PERIOD_US * 3 / 4)
+        || oracle.period_after_us % 4 != 0
+        || oracle.period_before_us > (MAX_PHASE_DURATION_US * 4 / 5)
+        || oracle.period_after_us > MAX_PHASE_DURATION_US
         || oracle.initial_phase_us >= oracle.period_before_us
     {
         return Err(PhaseVerificationError::InvalidOracleMode);
@@ -523,6 +530,7 @@ fn validate_config(config: PhaseConfig) -> Result<(), PhaseGenerationError> {
     }
     if config.base_period_us < MIN_PERIOD_US
         || config.base_period_us % MIN_PERIOD_US != 0
+        || config.base_period_us > (MAX_PHASE_DURATION_US * 4 / 5)
     {
         return Err(PhaseGenerationError::InvalidPeriod {
             period_us: config.base_period_us,
@@ -688,7 +696,8 @@ mod tests {
             phase_state_at(shift_time, &oracle, config.sample_interval_us);
         let fractional_after = (u128::from(phase_after) * 1_000_000)
             / u128::from(period_after);
-        assert!(fractional_before.abs_diff(fractional_after) <= 1);
+        let rounding_tolerance = 1_000_000_u128 / u128::from(period_after) + 1;
+        assert!(fractional_before.abs_diff(fractional_after) <= rounding_tolerance);
     }
 
     #[test]
