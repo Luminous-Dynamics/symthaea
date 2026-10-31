@@ -63,7 +63,7 @@ Four dimensions are reported independently:
 3. action-decision agreement;
 4. completion-state agreement.
 
-A case is an exact match only when all four match. There is deliberately no weighted aggregate in which action utility can compensate for epistemic violations.
+A case is an exact match only when all four match. `hard_gate_pass` reports only whether the non-compensatory epistemic safety gates are clear; `full_conformance_pass` additionally requires every case to match all four expected decisions. A safe but incorrect candidate can therefore have `hard_gate_pass: true` and `full_conformance_pass: false`. There is deliberately no weighted aggregate in which action utility can compensate for epistemic violations.
 
 Non-compensatory gates currently include:
 - false causal assertion where the oracle says not identified / shifted / outcome-unverified;
@@ -78,7 +78,7 @@ The cost columns are carried into the receipt for future matched runs. In the bu
 
 ## Rust tests authored
 
-The Rust unit suite contains 17 main-evaluator tests and 5 SCM tests. It covers:
+The Rust unit suite contains 20 main-evaluator tests and 5 SCM tests. It covers:
 - bundled input/oracle audit and synthetic perfect-control scoring;
 - false causal claim, unsafe transfer reuse and unsupported completion mutations;
 - anchor/control policy inconsistency and mutation of a relevant current-state field;
