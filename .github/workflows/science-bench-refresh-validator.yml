@@ -42,6 +42,7 @@ jobs:
           research/science-bench-refresh/src/lib.rs
           research/science-bench-refresh/src/judge_factorial.rs
           research/science-bench-refresh/src/intervention_quality.rs
+          research/science-bench-refresh/src/intervention_target_delta.rs
           research/science-bench-refresh/src/evidence_behavior_contracts.rs
           research/science-bench-refresh/src/reference_assurance.rs
 
@@ -1144,6 +1145,20 @@ jobs:
           done
           jq -e '[.issues[] | select(test("at least three distinct"))] | length > 0' \
             /tmp/sbr-ref-missing-panel-report.json >/dev/null
+
+      - name: Intervention target-delta and collateral-scope controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq empty research/science-bench-refresh/schema/intervention-target-delta-plan.schema.json
+          jq empty research/science-bench-refresh/schema/intervention-target-delta-receipt.schema.json
+          jq empty research/science-bench-refresh/schema/intervention-target-delta-report.schema.json
+          python3 research/science-bench-refresh/tools/intervention_target_delta_fixture.py /tmp/sbr-target-delta
+          python3 research/science-bench-refresh/tools/intervention_target_delta_fixture.py /tmp/sbr-target-delta-repeat
+          for artifact in intervention-quality-plan.example.json intervention-quality-receipt.example.json intervention-target-delta-plan.example.json intervention-target-delta-receipt.example.json intervention-target-delta-report.example.json; do
+            cmp "/tmp/sbr-target-delta/$artifact" "/tmp/sbr-target-delta-repeat/$artifact"
+          done
+          jq -e '.candidate_count == 7 and .adjudicated_candidate_count == 7 and .global_relation_valid_count == 3 and .global_relation_invalid_count == 1 and .global_relation_ambiguous_count == 3 and .target_delta_valid_count == 6 and .target_delta_invalid_count == 0 and .target_delta_ambiguous_count == 1 and .final_valid_count == 3 and .final_invalid_count == 1 and .final_ambiguous_count == 3 and .accepted_valid_count == 2 and .accepted_invalid_count == 1 and .accepted_ambiguous_count == 1 and .rejected_valid_count == 1 and .rejected_invalid_count == 0 and .rejected_ambiguous_count == 1 and .abstained_valid_count == 0 and .abstained_invalid_count == 0 and .abstained_ambiguous_count == 1 and .exact_changed_scope_match_count == 6 and .collateral_material_change_count == 0 and .reviewer_pairwise_comparison_count == 21 and .reviewer_pairwise_agreement_ppm == 857142 and .reviewer_target_transition_comparison_count == 21 and .reviewer_target_transition_agreement_ppm == 857142 and .generation_tokens == 700 and .generation_cost_micro_usd == 7000 and .reviewer_independence_proven == false and .reviewer_competence_proven == false and .semantic_truth_proven == false and .raw_artifact_custody_proven == false and .execution_authenticity_proven == false and .external_anchor_required == true and .scoring_eligible_declared == false and (.report_commitment_sha256 | test("^[0-9a-f]{64}$"))' /tmp/sbr-target-delta/intervention-target-delta-report.example.json >/dev/null
 
       - name: Python benchmark tooling unit tests
         shell: bash
