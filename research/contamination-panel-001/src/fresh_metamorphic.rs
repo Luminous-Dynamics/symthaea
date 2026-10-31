@@ -128,6 +128,7 @@ pub struct FreshMetamorphicManifestV1 {
     pub public_packet_sha256: String,
     pub sealed_oracle_sha256: String,
     pub transformation_rules_sha256: String,
+    pub transformation_source_sha256: String,
     pub item_set_sha256: String,
     pub group_count: u64,
     pub item_count: u64,
@@ -459,6 +460,13 @@ fn task_text_digest(text: &str) -> String {
     hash_domain(b"fresh-task-text.v1", text.as_bytes())
 }
 
+fn transformation_source_digest() -> String {
+    hash_domain(
+        b"fresh-metamorphic-source.v1",
+        include_bytes!("fresh_metamorphic.rs"),
+    )
+}
+
 fn transformation_rules_digest() -> Result<String, String> {
     let rules = [
         FreshMetamorphicFormV1::Base,
@@ -596,6 +604,7 @@ pub fn generate_fresh_metamorphic_bundle(
         public_packet_sha256: public_packet.public_packet_sha256.clone(),
         sealed_oracle_sha256: sealed_oracle.sealed_oracle_sha256.clone(),
         transformation_rules_sha256: transformation_rules_digest()?,
+        transformation_source_sha256: transformation_source_digest(),
         item_set_sha256,
         group_count,
         item_count,
@@ -1145,14 +1154,14 @@ pub fn verify_fresh_metamorphic_score_report_integrity(
             || group.correct_count > group.valid_response_count
             || group.complete_valid_group != (group.valid_response_count == group.item_count)
             || group.outputs_agree.is_some() != group.complete_valid_group
-            || (group.fully_correct_and_consistent
-                && !(group.complete_valid_group
+            || group.fully_correct_and_consistent
+                != (group.complete_valid_group
                     && group.outputs_agree == Some(true)
-                    && group.correct_count == group.item_count))
-            || (group.consistent_but_wrong
-                && !(group.complete_valid_group
+                    && group.correct_count == group.item_count)
+            || group.consistent_but_wrong
+                != (group.complete_valid_group
                     && group.outputs_agree == Some(true)
-                    && group.correct_count == 0))
+                    && group.correct_count == 0)
             || (group.outputs_agree == Some(true)
                 && group.correct_count != 0
                 && group.correct_count != group.item_count)
@@ -1163,6 +1172,15 @@ pub fn verify_fresh_metamorphic_score_report_integrity(
         }
         let group_items = items_by_group.get(group.group_id.as_str())
             .ok_or_else(|| format!("metamorphic group {} has no item records", group.group_id))?;
+        let observed_forms: BTreeSet<FreshMetamorphicFormV1> =
+            group_items.iter().map(|item| item.form).collect();
+        let expected_forms: BTreeSet<FreshMetamorphicFormV1> =
+            FRESH_METAMORPHIC_FORMS.into_iter().collect();
+        if observed_forms != expected_forms
+            || group_items.iter().any(|item| item.group_id != item.parent_item_id)
+        {
+            return Err(format!("metamorphic group {} does not contain the exact form universe or parent binding", group.group_id));
+        }
         if group_items.len() as u64 != group.item_count {
             return Err(format!("metamorphic group {} item membership count mismatch", group.group_id));
         }
@@ -1205,6 +1223,7 @@ pub fn verify_fresh_metamorphic_score_report_integrity(
     }
     if group_item_total != report.item_count
         || group_ids.len() as u64 != report.group_count
+        || group_ids != items_by_group.keys().copied().collect()
         || complete != report.complete_valid_group_count
         || incomplete != report.incomplete_group_count
         || consistent != report.consistent_group_count
@@ -1339,6 +1358,26 @@ mod tests {
     ) -> FreshMetamorphicScoreReportV1 {
         let submission = make_submission(bundle, responses);
         score_fresh_metamorphic_submission(base, bundle, &serde_json::to_vec(&submission).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn metamorphic_report_verifier_rejects_missing_form_and_flag_inconsistency() {
+        let base = base_bundle();
+        let bundle = generate_fresh_metamorphic_bundle(&base).unwrap();
+        let report = score_all(&base, &bundle, exact_responses(&bundle));
+
+        let mut bad_group = report.clone();
+        bad_group.groups[0].item_count -= 1;
+        bad_group.report_sha256.clear();
+        bad_group.report_sha256 = report_digest(&bad_group).unwrap();
+        assert!(verify_fresh_metamorphic_score_report_integrity(&bad_group).is_err());
+
+        let mut bad_group = report;
+        bad_group.groups[0].fully_correct_and_consistent = false;
+        bad_group.report_sha256.clear();
+        bad_group.report_sha256 = report_digest(&bad_group).unwrap();
+        assert!(verify_fresh_metamorphic_score_report_integrity(&bad_group)
+            .unwrap_err().contains("summary fields"));
     }
 
     #[test]
