@@ -91,6 +91,7 @@ pub struct FtdCalibrationReportV1 {
     pub mean_final_selected_count: f64,
     pub pvalue_calibration_by_feature: Vec<PValueCalibrationDiagnosticV1>,
     pub combined_null_pvalue_calibration: Option<PValueCalibrationDiagnosticV1>,
+    pub final_multiple_testing: MultipleTestingProcedureV1,
     pub fdr_target: f64,
     pub run_fdr_exceedance_upper_95_hoeffding: f64,
     pub calibration_design: String,
