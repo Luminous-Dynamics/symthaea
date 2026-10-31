@@ -746,6 +746,19 @@ mod tests {
         assert_eq!(public_task_properties, actual_public_task);
         assert!(!public_task_properties.contains("solution"));
         assert!(!public_task_properties.contains("generation_seed_hex"));
+
+        let first_oracle = &bundle.sealed_oracle_packet.entries[0];
+        let oracle_entry_schema = &oracle_schema["properties"]["entries"]["items"]["properties"];
+        let actual_parameters: BTreeSet<String> = serde_json::to_value(&first_oracle.parameters)
+            .unwrap().as_object().unwrap().keys().cloned().collect();
+        let expected_parameters: BTreeSet<String> = oracle_entry_schema["parameters"]["properties"]
+            .as_object().unwrap().keys().cloned().collect();
+        assert_eq!(actual_parameters, expected_parameters);
+        let actual_solution: BTreeSet<String> = serde_json::to_value(&first_oracle.solution)
+            .unwrap().as_object().unwrap().keys().cloned().collect();
+        let expected_solution: BTreeSet<String> = oracle_entry_schema["solution"]["properties"]
+            .as_object().unwrap().keys().cloned().collect();
+        assert_eq!(actual_solution, expected_solution);
     }
 
     #[test]
