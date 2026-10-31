@@ -160,7 +160,7 @@ fn parse_predictions(value: &Value) -> Result<(String, String, String, Vec<Predi
     Ok((campaign_id, model_id, model_sha, output))
 }
 
-fn axis_value(case: &CaseMeta, axis: &str) -> &str {
+fn axis_value<'a>(case: &'a CaseMeta, axis: &str) -> &'a str {
     match axis {
         "program" => &case.program_group_id,
         "execution" => &case.execution_group_id,
