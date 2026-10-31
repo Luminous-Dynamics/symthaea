@@ -128,7 +128,7 @@ The calibration cutoff is 0.9; calibration coverage at that cutoff is 0.9005 and
 
 The iid reference standard error is approximately 0.00949. This deterministic fixture makes the block-vs-iid accounting visible; it is not an empirical confidence interval study or a physical PMU result.
 
-Twenty-two authored Rust tests cover the known answer, FDM tail arithmetic, block sensitivity, assumption/identity gates, not-bounded mode, invalid envelopes, group overlap, insufficient blocks and explicit non-anytime-valid claim limits.
+Twenty-five authored Rust tests cover the known answer, FDM tail arithmetic, block sensitivity, assumption/identity gates, not-bounded mode, invalid envelopes, group overlap, insufficient blocks and explicit non-anytime-valid claim limits.
 
 ## 6. Run
 
