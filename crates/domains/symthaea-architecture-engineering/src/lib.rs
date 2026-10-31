@@ -23,6 +23,7 @@ pub mod pareto_regret_voc;
 pub mod hardware_objectives;
 pub mod pareto_hypervolume_qmc;
 pub mod pareto_portfolio_voc;
+pub mod multi_resource_budget;
 
 const MATRIX_SCHEMA: &str = "symthaea.architecture-engineering.candidate-matrix";
 const MATRIX_VERSION: &str = "0.1.0";
