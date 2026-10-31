@@ -78,6 +78,8 @@ pub struct EventTapeHeader {
     pub verifier_sha256: String,
     /// Human-readable normalized-cost model identity.
     pub budget_model_id: String,
+    /// Complete executable cost formula; its digest is checked against budget_model_sha256.
+    pub budget_model: BudgetModel,
     /// Digest of the exact conversion weights and accounting rules.
     pub budget_model_sha256: String,
     pub budget_limit_microunits: u64,
@@ -174,6 +176,211 @@ impl ResourceReceipt {
             }
         }
         Ok(())
+    }
+}
+
+
+/// Immutable normalized-cost model bound into every experiment header.
+///
+/// All coefficients are integer micro-cost units per measured unit. Weighted models use
+/// host/accelerator peak-memory byte-milliseconds (peak bytes multiplied by action wall ms)
+/// rather than summing instantaneous peaks across actions.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum BudgetModel {
+    /// Explicit synthetic cost model. Useful for algorithmic controls only; it does not
+    /// represent real compute, latency, memory, energy or token expenditure.
+    ActionUnit {
+        charge_per_action_microunits: u64,
+    },
+    /// Fixed-point weighted resource model for matched-resource experiments.
+    WeightedResources {
+        weights: ResourceCostWeights,
+    },
+}
+
+/// Fixed-point resource price vector. A zero coefficient makes that dimension non-billable
+/// under this model, but strict qualification still requires every receipt meter to be known.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceCostWeights {
+    pub host_cpu_millis: u64,
+    pub wall_millis: u64,
+    pub accelerator_millis: u64,
+    pub host_memory_byte_millis: u64,
+    pub accelerator_memory_byte_millis: u64,
+    pub energy_millijoules: u64,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub tool_calls: u64,
+    pub evaluator_calls: u64,
+    pub verifier_calls: u64,
+}
+
+impl BudgetModel {
+    fn validate(&self) -> Result<(), EventTapeError> {
+        match self {
+            Self::ActionUnit {
+                charge_per_action_microunits,
+            } if *charge_per_action_microunits == 0 => Err(EventTapeError::new(
+                "header.budget_model.charge_per_action_microunits",
+                "synthetic action-unit charge must be positive",
+            )),
+            Self::WeightedResources { weights } => {
+                let sum = [
+                    weights.host_cpu_millis,
+                    weights.wall_millis,
+                    weights.accelerator_millis,
+                    weights.host_memory_byte_millis,
+                    weights.accelerator_memory_byte_millis,
+                    weights.energy_millijoules,
+                    weights.input_tokens,
+                    weights.output_tokens,
+                    weights.tool_calls,
+                    weights.evaluator_calls,
+                    weights.verifier_calls,
+                ]
+                .into_iter()
+                .fold(0u128, |total, value| total + u128::from(value));
+                if sum == 0 {
+                    return Err(EventTapeError::new(
+                        "header.budget_model.weights",
+                        "at least one resource cost coefficient must be positive",
+                    ));
+                }
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// Recompute an event's normalized charge from the declared model and its raw receipt.
+    ///
+    /// None means a weighted model needs a meter that is explicitly Unknown. It does not
+    /// mean zero. ActionUnit models are always independently computable from the action count.
+    fn expected_charge(
+        &self,
+        receipt: &ResourceReceipt,
+        path: &str,
+    ) -> Result<Option<u64>, EventTapeError> {
+        match self {
+            Self::ActionUnit {
+                charge_per_action_microunits,
+            } => Ok(Some(*charge_per_action_microunits)),
+            Self::WeightedResources { weights } => {
+                let mut total = 0u128;
+                let mut computable = true;
+                let mut add_linear = |meter: &MeterValue, weight: u64, field: &str| {
+                    if weight == 0 {
+                        return Ok(());
+                    }
+                    match meter {
+                        MeterValue::Measured { value } => {
+                            total = total
+                                .checked_add(u128::from(*value) * u128::from(weight))
+                                .ok_or_else(|| {
+                                    EventTapeError::new(
+                                        format!("{path}.{field}"),
+                                        "normalized cost calculation overflow",
+                                    )
+                                })?;
+                        }
+                        MeterValue::Unknown { .. } => computable = false,
+                    }
+                    Ok::<(), EventTapeError>(())
+                };
+
+                add_linear(
+                    &receipt.host_cpu_millis,
+                    weights.host_cpu_millis,
+                    "host_cpu_millis",
+                )?;
+                add_linear(&receipt.wall_millis, weights.wall_millis, "wall_millis")?;
+                add_linear(
+                    &receipt.accelerator_millis,
+                    weights.accelerator_millis,
+                    "accelerator_millis",
+                )?;
+                add_linear(
+                    &receipt.energy_millijoules,
+                    weights.energy_millijoules,
+                    "energy_millijoules",
+                )?;
+                add_linear(&receipt.input_tokens, weights.input_tokens, "input_tokens")?;
+                add_linear(&receipt.output_tokens, weights.output_tokens, "output_tokens")?;
+                add_linear(&receipt.tool_calls, weights.tool_calls, "tool_calls")?;
+                add_linear(
+                    &receipt.evaluator_calls,
+                    weights.evaluator_calls,
+                    "evaluator_calls",
+                )?;
+                add_linear(
+                    &receipt.verifier_calls,
+                    weights.verifier_calls,
+                    "verifier_calls",
+                )?;
+
+                if weights.host_memory_byte_millis > 0 {
+                    match (&receipt.peak_memory_bytes, &receipt.wall_millis) {
+                        (MeterValue::Measured { value: bytes }, MeterValue::Measured { value: ms }) => {
+                            let memory_time = u128::from(*bytes)
+                                .checked_mul(u128::from(*ms))
+                                .and_then(|value| {
+                                    value.checked_mul(u128::from(weights.host_memory_byte_millis))
+                                })
+                                .ok_or_else(|| EventTapeError::new(
+                                    format!("{path}.peak_memory_bytes"),
+                                    "host memory-time cost calculation overflow",
+                                ))?;
+                            total = total.checked_add(memory_time).ok_or_else(|| {
+                                EventTapeError::new(
+                                    format!("{path}.peak_memory_bytes"),
+                                    "normalized cost calculation overflow",
+                                )
+                            })?;
+                        }
+                        _ => computable = false,
+                    }
+                }
+                if weights.accelerator_memory_byte_millis > 0 {
+                    match (
+                        &receipt.accelerator_peak_memory_bytes,
+                        &receipt.wall_millis,
+                    ) {
+                        (MeterValue::Measured { value: bytes }, MeterValue::Measured { value: ms }) => {
+                            let memory_time = u128::from(*bytes)
+                                .checked_mul(u128::from(*ms))
+                                .and_then(|value| {
+                                    value.checked_mul(u128::from(
+                                        weights.accelerator_memory_byte_millis,
+                                    ))
+                                })
+                                .ok_or_else(|| EventTapeError::new(
+                                    format!("{path}.accelerator_peak_memory_bytes"),
+                                    "accelerator memory-time cost calculation overflow",
+                                ))?;
+                            total = total.checked_add(memory_time).ok_or_else(|| {
+                                EventTapeError::new(
+                                    format!("{path}.accelerator_peak_memory_bytes"),
+                                    "normalized cost calculation overflow",
+                                )
+                            })?;
+                        }
+                        _ => computable = false,
+                    }
+                }
+
+                if !computable {
+                    return Ok(None);
+                }
+                let total = u64::try_from(total).map_err(|_| {
+                    EventTapeError::new(
+                        format!("{path}.charged_budget_microunits"),
+                        "normalized cost exceeds the supported u64 range",
+                    )
+                })?;
+                Ok(Some(total))
+            }
+        }
     }
 }
 
@@ -513,6 +720,35 @@ impl EventTape {
                 .validate_unknown_reasons(&format!("{path}.resources"))?;
             if payload.resources.has_unknown_measurement() {
                 fully_metered = false;
+            }
+            let expected_charge = self.header.budget_model.expected_charge(
+                &payload.resources,
+                &format!("{path}.resources"),
+            )?;
+            match (
+                expected_charge,
+                payload.resources.charged_budget_microunits.measured_value(),
+            ) {
+                (Some(expected), Some(actual)) if expected == actual => {}
+                (Some(expected), Some(actual)) => {
+                    return Err(EventTapeError::new(
+                        format!("{path}.resources.charged_budget_microunits"),
+                        format!("reported charge {actual} does not match recomputed charge {expected}"),
+                    ));
+                }
+                (Some(_), None) => {
+                    return Err(EventTapeError::new(
+                        format!("{path}.resources.charged_budget_microunits"),
+                        "cost model can recompute this action, but its normalized charge is Unknown",
+                    ));
+                }
+                (None, Some(_)) => {
+                    return Err(EventTapeError::new(
+                        format!("{path}.resources.charged_budget_microunits"),
+                        "normalized charge is reported even though required raw meters are Unknown",
+                    ));
+                }
+                (None, None) => {}
             }
             match payload.resources.charged_budget_microunits.measured_value() {
                 Some(charge) => {
@@ -1105,7 +1341,14 @@ fn validate_header(header: &EventTapeHeader) -> Result<(), EventTapeError> {
         "header.execution_environment_sha256",
     )?;
     validate_non_empty(&header.budget_model_id, "header.budget_model_id")?;
+    header.budget_model.validate()?;
     validate_sha256(&header.budget_model_sha256, "header.budget_model_sha256")?;
+    if digest_serializable(&header.budget_model)? != header.budget_model_sha256 {
+        return Err(EventTapeError::new(
+            "header.budget_model_sha256",
+            "budget-model digest does not match the embedded executable cost formula",
+        ));
+    }
     validate_non_empty(&header.proposal_source_id, "header.proposal_source_id")?;
     validate_sha256(&header.task_recipe_sha256, "header.task_recipe_sha256")?;
     validate_sha256(
