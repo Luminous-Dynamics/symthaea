@@ -330,8 +330,9 @@ pub fn run_coral_batch_campaign(
                     let (disposition, score, canonical) = if landscape == DirectionLandscapeFamily::NewOperatorBreakthrough {
                         if known_new_direction {
                             let direction_id = "D";
-                            let state = board.directions.get(direction_id)
-                                .ok_or_else(|| "D direction disappeared after verifier admission".to_owned())?;
+                            if !board.directions.contains_key(direction_id) {
+                                return Err("D direction disappeared after verifier admission".to_owned());
+                            }
                             let parent_score = round_parent_scores.get(direction_id)
                                 .copied()
                                 .flatten()
@@ -349,9 +350,7 @@ pub fn run_coral_batch_campaign(
                             let direction_id = "D";
                             let global_best_before = global_best_at_batch_start;
                             board.register_direction(direction_id).map_err(|error| error.to_string())?;
-                            let eval_index = direction_eval_counts.get(direction_id).copied().unwrap_or(0)
-                                + round_new_eval_offsets;
-                            round_new_eval_offsets += 1;
+                            let eval_index = direction_eval_counts.get(direction_id).copied().unwrap_or(0);
                             let score = payoff(landscape, direction_id, eval_index);
                             let attempt_id = format!("{action_id}-evaluation");
                             board.record_evaluation(
@@ -451,7 +450,7 @@ pub fn run_coral_batch_campaign(
                             landscape,
                             seed,
                             &attempt_id,
-                            proposal_index(new_attempt_index),
+                            new_attempt_index,
                             disposition.clone(),
                             None,
                         ));
@@ -634,10 +633,6 @@ fn unknown_usage() -> ResourceUsage {
         evaluator_calls: None,
         verifier_calls: None,
     }
-}
-
-fn proposal_index(value: usize) -> usize {
-    value
 }
 
 fn config_digest(config: &CoralBaselineConfig) -> Result<String, String> {
