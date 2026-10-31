@@ -1106,7 +1106,6 @@ mod tests {
         let report_schema: serde_json::Value = serde_json::from_str(include_str!(
             "../schema/search-time-access-trial-report.schema.json"
         )).unwrap();
-        let study = fixture_study();
         let study = two_block_fixture_study();
         let report = analyze_search_time_access_trial(&study).unwrap();
         for (schema, value, version) in [
