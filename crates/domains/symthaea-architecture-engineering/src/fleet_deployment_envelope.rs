@@ -21,7 +21,7 @@ use sha2::{Digest, Sha256};
 
 use crate::hardware_objectives::{
     compute_hardware_profile_sha256, score_objective_observation,
-    validate_hardware_profile, validate_objective_registry, HardwareProfileManifest,
+    validate_hardware_profile, validate_objective_registry,
     ObjectiveDirection, ObjectiveNormalization, ObjectiveObservation, ObjectiveRegistry,
     ScoredMeasurement,
 };
