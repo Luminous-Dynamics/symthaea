@@ -1,6 +1,6 @@
 # QARCH-022: Memory topology and state-placement contract
 
-**Status:** research contract / schema proposal  
+**Status:** typed Rust validator + schema proposal  
 **Version:** `symthaea.quantum_comp.architecture_memory_topology.v1`  
 **Parent evidence model:** QARCH-020 receipts (#9305)  
 **Workload-side descriptor:** QARCH-021 regimes (#9317)  
@@ -130,10 +130,11 @@ For HDC retrieval, reuse the existing proposed target from #7864 as a preregiste
 - Semantic validation tests for duplicate IDs, missing endpoints, disconnected routes, prohibited route cycles, double counting, capacity overflow, absent/unknown metrics, invalid units, placement mismatch and source provenance.
 - Synthetic values are explicitly labelled and never enter measured architecture rankings.
 
-**Stage 1 — typed Rust model**
-- Typed memory region, transfer edge, route and state placement structs.
-- Cross-record validation against architecture evidence, workload-regime profile and exact comparison contract.
-- Unknowns remain absent; invalid or incomplete evidence fails closed.
+**Stage 1 — typed Rust model (initial implementation in `architecture_memory.rs`)**
+- Typed memory region, transfer edge, explicit route and state placement structs.
+- Structural checks for unique IDs, valid endpoints, route connectivity, optional acyclicity, boundary uniqueness, interval domains and capacity feasibility.
+- Cross-record validation against the QARCH-020 evidence record and QARCH-021 workload-regime profile, including exact observation/architecture/workload/contract/precision identity.
+- Synthetic fixtures are rejected by the comparison validator. Unknowns remain absent; invalid or incomplete evidence fails closed.
 
 **Stage 2 — one canonical consumer**
 - Integrate with an existing #7864 or #7749 run without creating a new runner.
@@ -142,6 +143,10 @@ For HDC retrieval, reuse the existing proposed target from #7864 as a preregiste
 **Stage 3 — measured comparison**
 - Report per-regime Pareto frontiers and confidence/coverage; do not collapse to a universal “best architecture.”
 - Promote only when correctness/quality and hard constraints pass, with a measured gain on identical full-path boundaries.
+
+## Current implementation boundary
+
+The typed API is an initial contract validator, not a hardware collector or benchmark runner. It validates declared topology records and joins their identities to existing QARCH records. The schema and fixture values remain synthetic; no physical memory bandwidth, occupancy, cache hit rate, latency, or energy is asserted. Integration with the existing HDC retrieval or HDC-LTC run owners is still required before any comparison result can be produced.
 
 ## References
 
