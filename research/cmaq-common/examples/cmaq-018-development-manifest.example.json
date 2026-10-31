@@ -11,14 +11,14 @@
   },
   "repository": {
     "url": "https://github.com/Luminous-Dynamics/symthaea",
-    "commit": "043883b36e383a3e27cb19e7e15eabb121f6c5d6",
+    "commit": "836a418b8ca2f9c0c61f5b7ef212ff09817ccbc0",
     "dirty_tree": false,
     "source_tree_sha256": null
   },
   "candidate": {
     "name": "CMAQ-018 synthetic predictor-arm suite",
     "kind": "synthetic_reference_arms",
-    "source_commit": "043883b36e383a3e27cb19e7e15eabb121f6c5d6",
+    "source_commit": "836a418b8ca2f9c0c61f5b7ef212ff09817ccbc0",
     "artifact_sha256": null,
     "config_sha256": "49fe170c255c14b93808ad8de22f1300cdc2e342374295e0ed0990be5f0f7b11",
     "weights_sha256": null,
@@ -27,13 +27,13 @@
   },
   "generator": {
     "name": "CMAQ-018 deterministic same-history branch generator",
-    "source_commit": "043883b36e383a3e27cb19e7e15eabb121f6c5d6",
+    "source_commit": "836a418b8ca2f9c0c61f5b7ef212ff09817ccbc0",
     "config_sha256": "cdc87841a4a5de86ebfe96e67de32695e685aec87b6fc9dde56d5162af9151e6"
   },
   "evaluator": {
     "name": "CMAQ-018 branch-fidelity evaluator",
-    "source_commit": "043883b36e383a3e27cb19e7e15eabb121f6c5d6",
-    "metric_bundle_sha256": "8dc2463d1b812cb540573e54e2d2b72270732e503f9cd39ef119117d1fee2871",
+    "source_commit": "836a418b8ca2f9c0c61f5b7ef212ff09817ccbc0",
+    "metric_bundle_sha256": "e031f529ddbb7e489c1875e98973d6d2f451d9fd06cee501701a45f167775f9a",
     "version": "0.1.0",
     "external_judge": null
   },
@@ -116,7 +116,7 @@
       "id": "point_outcome",
       "role": "primary",
       "kind": "world_model",
-      "source_commit": "043883b36e383a3e27cb19e7e15eabb121f6c5d6",
+      "source_commit": "836a418b8ca2f9c0c61f5b7ef212ff09817ccbc0",
       "config_sha256": "49fe170c255c14b93808ad8de22f1300cdc2e342374295e0ed0990be5f0f7b11",
       "eligibility": "diagnostic_only",
       "ineligibility_reason": "Synthetic fixed predictor; no trained model or compute-matched deployment claim.",
@@ -126,7 +126,7 @@
       "id": "explicit_effect_head",
       "role": "world_model_control",
       "kind": "world_model",
-      "source_commit": "043883b36e383a3e27cb19e7e15eabb121f6c5d6",
+      "source_commit": "836a418b8ca2f9c0c61f5b7ef212ff09817ccbc0",
       "config_sha256": "49fe170c255c14b93808ad8de22f1300cdc2e342374295e0ed0990be5f0f7b11",
       "eligibility": "diagnostic_only",
       "ineligibility_reason": "Pair-effect head has different query granularity from absolute branch prediction.",
@@ -136,7 +136,7 @@
       "id": "shuffled_action_labels",
       "role": "negative_control",
       "kind": "negative_control",
-      "source_commit": "043883b36e383a3e27cb19e7e15eabb121f6c5d6",
+      "source_commit": "836a418b8ca2f9c0c61f5b7ef212ff09817ccbc0",
       "config_sha256": "49fe170c255c14b93808ad8de22f1300cdc2e342374295e0ed0990be5f0f7b11",
       "eligibility": "diagnostic_only",
       "ineligibility_reason": "Intentional action-identity corruption; negative control only.",
@@ -146,7 +146,7 @@
       "id": "support_aware_point",
       "role": "world_model_control",
       "kind": "world_model",
-      "source_commit": "043883b36e383a3e27cb19e7e15eabb121f6c5d6",
+      "source_commit": "836a418b8ca2f9c0c61f5b7ef212ff09817ccbc0",
       "config_sha256": "49fe170c255c14b93808ad8de22f1300cdc2e342374295e0ed0990be5f0f7b11",
       "eligibility": "diagnostic_only",
       "ineligibility_reason": "Deterministic support rule is not a calibrated learned uncertainty model.",
@@ -156,7 +156,7 @@
       "id": "oracle",
       "role": "oracle_ceiling",
       "kind": "oracle",
-      "source_commit": "043883b36e383a3e27cb19e7e15eabb121f6c5d6",
+      "source_commit": "836a418b8ca2f9c0c61f5b7ef212ff09817ccbc0",
       "config_sha256": "49fe170c255c14b93808ad8de22f1300cdc2e342374295e0ed0990be5f0f7b11",
       "eligibility": "oracle_only",
       "ineligibility_reason": "Evaluator-owned truth; not candidate deployable.",
@@ -195,7 +195,7 @@
   ],
   "metrics": {
     "bundle_id": "cmaq018-v0.1-metrics",
-    "bundle_sha256": "8dc2463d1b812cb540573e54e2d2b72270732e503f9cd39ef119117d1fee2871",
+    "bundle_sha256": "e031f529ddbb7e489c1875e98973d6d2f451d9fd06cee501701a45f167775f9a",
     "required_metrics": [
       "pair_coverage",
       "effect_sign_accuracy",
