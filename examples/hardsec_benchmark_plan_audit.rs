@@ -170,8 +170,8 @@ fn required_dataset_sources(plan: &Value) -> Result<usize, String> {
         if !seen_ids.insert(id.to_owned()) || !seen_dois.insert(doi.to_owned()) {
             return Err(fail(&context, "dataset IDs and DOIs must be unique"));
         }
-        if !matches!(status, "metadata_discovered_archive_unverified" | "archive_bytes_verified" | "provenance_verified") {
-            return Err(fail(&context, "unsupported dataset availability_status"));
+        if status != "metadata_discovered_archive_unverified" {
+            return Err(fail(&context, "v1 only permits metadata_discovered_archive_unverified until archive and provenance digest fields are implemented"));
         }
     }
     for (id, doi, domain) in expected {
@@ -440,6 +440,15 @@ mod tests {
         plan["dataset_sources"].as_array_mut().unwrap().retain(|v| v["id"] != "harpy-v-gem5-100c");
         let bytes = encoded(&plan);
         assert!(audit_plan(&plan, &bytes).unwrap_err().contains("missing or mismatched dataset harpy-v-gem5-100c"));
+    }
+
+
+    #[test]
+    fn rejects_unsubstantiated_dataset_verification_status() {
+        let (mut plan, _) = fixture();
+        plan["dataset_sources"][0]["availability_status"] = json!("provenance_verified");
+        let bytes = encoded(&plan);
+        assert!(audit_plan(&plan, &bytes).unwrap_err().contains("until archive and provenance digest fields"));
     }
 
     #[test]
