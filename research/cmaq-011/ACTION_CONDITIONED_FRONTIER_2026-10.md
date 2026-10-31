@@ -14,10 +14,43 @@ No one benchmark below covers all four.
 | Work | What it measures / contributes | How CMAQ should use it | Important boundary |
 | --- | --- | --- | --- |
 | **WorldSimProbe** | Five released action-conditioned video diagnostics: local action calibration; global trajectory coverage; behaviour-source preservation; interaction grounding; interaction dynamics. Tests whether the causal chain from supplied action to robot motion/object response is preserved. | First external visual manipulation adapter candidate. Keep all five task scores separate. Report Task 1 response-ratio calibration; Tasks 2–3 flow/action-source fidelity; Task 4 hallucinated interaction; Task 5 primitive accuracy. | Public test inputs and a separate local validation set are released; hidden official scoring references remain evaluator-side. It is a video/action-following suite, not a full same-history set of alternative physical interventions. |
-| **WorldOracle** | Action-conditioned generated rollouts are evaluated against paired real executions using the same initial observation and action sequence; measures physical-state correctness, interaction alignment and multi-view coherence over longer episodes. | Candidate fixed-action real-execution fidelity track, once a public and licensed evaluation split is actually available. | Current validation/test ground-truth datasets are labelled private/pending release. Do not access, mirror, or infer their hidden labels. No adapter until official public release/access policy and data license are verified. |
+| **WorldOracle** | Action-conditioned generated rollouts are evaluated against paired real executions using the same initial observation and low-level action sequence; measures physical-state correctness, interaction alignment and multi-view coherence over long, successful and failed episodes. | **Highest-priority external real-execution track:** reproduce on its disclosed validation set, then submit to the official withheld leaderboard test through the portal. | The official repository announces the validation release (Oct 15, 2026), but the Hugging Face dataset card still contains stale/private wording. The disclosed validation GT is described as 32 AgiBot G2 episodes (20 human-operated + 12 policy-rollout; ~18.6 GiB). Confirm data access and CC BY-NC-SA 4.0 terms before use. Test inputs may be released, but test GT remains withheld and evaluated by the official service. |
 | **MiraBench** | Human-judgement-oriented evaluation of action-following fidelity and optimism bias across multiple world-model configurations. It probes whether the model obeys the requested action and overstates plausible outcomes. | Use as an external action-following/optimism diagnostic reference; compare definitions and failure taxonomy, not raw scores across incompatible datasets. | Human annotation protocol and model/task interface differ from CMAQ's deterministic paired causal branches. |
 | **Rollback** | A policy-improvement method using rewind/branch/counterfactual comparisons to obtain action-level supervision and improve robot policies. | Later downstream algorithmic comparator for a *frozen* counterfactual evaluator; report policy lift over its strongest eligible direct baseline. | It is an algorithm/method paper, not a benchmark metric or substitute for verifying branch truth. Its reported task gains must not be treated as a portable baseline score without reproducing its task/protocol. |
 | **RoboWM-Bench** | Video-to-executable-action evaluation: generated motion must be grounded in a physically executable action sequence in the simulator/robot task. | Add as a separate manipulation/action-execution lane after the task interface, license and evaluator are pinned. | It tests executable action translation, not the same estimand as model-based action-effect ranking. |
+
+### Pin: WorldOracle public validation release
+
+- Official repository: https://github.com/WorldOracle-benchmark/WorldOracle
+- Exact source commit: `8636e00ba221ed031a8fba5f7384116a8b10b5fa`.
+- Code license: Apache-2.0.
+- Official release announcement: Oct 15, 2026; online submission portal opened Oct 16.
+- Validation dataset: https://huggingface.co/datasets/WorldOracle/worldoracle-validation
+- Exact observed validation dataset revision: `0ada1ba08b905de0801b7ffd6bdfb4dc4da761ef` (2026-10-29; pin current files and SHA-256 manifest before any local evaluation).
+- Data license on the Hugging Face dataset card: CC BY-NC-SA 4.0. This is non-commercial/share-alike data licensing; it is not the same license as the Apache-2.0 evaluation code. Do not assume that code-license permissions apply to the videos/annotations or to commercial model training.
+- Officially documented current AgiBot G2 validation split: 20 human-operated episodes (five each across `hangtowel`, `pickfruit`, `pourwater`, `pulldrawer`) and 12 policy-rollout episodes (four each across `hangtowel`, `pickfruit`, `pourwater`). Disclosed ground truth totals approximately 18.6 GiB. Other platform entries may be present in the dataset manifest; do not infer their task counts from the AgiBot-only README table.
+- Test-set inputs: https://huggingface.co/datasets/WorldOracle/worldoracle-testset. The 268 test inputs are for inference only; test GT remains private and leaderboard-evaluated.
+- Official submission portal: https://worldoracle-benchmark.github.io/submission/
+- Pinned source README blob: `c7d3c7e814ce99e86a304a8da5ae7d7027bf4717`.
+- Pinned validation results blob: `db184e72e4eb7aa43c1272f5ba7048adb1c5e698`.
+
+**Published public-validation baselines (WorldOracle validation results file):**
+
+| Track / embodiment | GE-Sim 2.0 SV | GE-Sim 2.0 MV | Next reported SV baseline |
+| --- | ---: | ---: | --- |
+| WorldOracle-Core / AgiBot G2 | 72.25 | 78.50 | Cosmos 3: 54.83 |
+| WorldOracle-Core / YAM | 69.05 | 68.50 | Cosmos 3: 56.64 |
+| WorldOracle-Policy / AgiBot G2 | 65.99 | 73.59 | IRASim: 42.10 |
+| WorldOracle-Long / AgiBot G2 | 61.04 | 69.98 | IRASim: 37.83 |
+| WorldOracle-Long / YAM | 52.87 | 51.97 | IRASim: 35.65 |
+
+These are reported public validation results, not hidden test-set or live-leaderboard results. The official repository warns that the validation set is substantially smaller and less diverse than the test set and that its results can have considerable variance. The paper used GPT-5.5 for physical-state judging; the live leaderboard re-evaluated baselines and uses GPT-5.6 Luna. **Do not compare a local run across evaluator versions as though the score were identical.** Freeze the exact code/dataset revision, physical-judge endpoint/model, and all metric settings.
+
+Before adapter execution:
+1. Verify the HF dataset's currently downloadable files and SHA-256 manifest against the recorded revision.
+2. Review and accept the data terms for this project/use. CC BY-NC-SA 4.0 is not a permissive commercial-training license.
+3. Pin the benchmark code, V-JEPA2/DINOv3 checkpoints and source commits, VLM evaluator, Python/CUDA dependencies, and task/distribution manifests.
+4. Start with a one-episode smoke test and local validation scoring, then reproduce published baselines on the exact split before any model comparison.
 
 ### Pin: WorldSimProbe public code release
 
@@ -73,7 +106,7 @@ For any adapter:
 
 WorldSimProbe is the first practical external video/action-conditioning adapter candidate because its code, MIT license, public submission format, task definitions and a local validation set are available at a pinned revision. It should be integrated as a **separate visual track**, not silently merged with MRS.Q/WIMLE DMC scores or the synthetic CMAQ-018 branch results.
 
-WorldOracle is a high-value follow-on, but its private validation/test ground truth makes an immediate public adapter inappropriate. Keep its release/access status as a hard stop.
+WorldOracle is now the highest-value external real-execution adapter because the official code and a disclosed validation split are released. The contradictory Hugging Face card wording makes access/license verification the first gate, not a reason to misclassify the entire validation release as private. Test GT remains withheld.
 
 ## Claim ceiling
 
