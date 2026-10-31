@@ -35,7 +35,7 @@ pub enum Policy {
 }
 
 impl Policy {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::FixedOrder,
         Self::GenericVoc,
         Self::BudgetMatchedRandom,
@@ -351,7 +351,15 @@ fn choose_with_pod_meta_router(
     progress_key: &str,
     spent: u32,
     budget: u32,
-) -> (Option<usize>, u32) {
+) -> (Option<usize>, u8, u32) {
+    let remaining = budget.saturating_sub(spent);
+    let mandatory_remaining_cost = case.mandatory_cost(attempted);
+    if mandatory_remaining_cost > remaining {
+        // Fail closed before invoking the generic selector: do not spend
+        // partial mandatory capacity if the complete mandatory set cannot fit.
+        return (None, 0, 0);
+    }
+
     let obligation_rows = [
         (TEMPORAL, "temporal", ObligationState::StaleOrRetracted, 6),
         (INDEPENDENCE, "independence", ObligationState::Contested, 6),
@@ -390,6 +398,9 @@ fn choose_with_pod_meta_router(
                 .collect();
             let targets = if targets.is_empty() { all_ids.clone() } else { targets };
 
+            // One typed operation family is used per candidate. For mixed
+            // profiles the real POD-Meta scheduler chooses only compatible
+            // obligations; the evaluator below credits only those selected.
             let kind = if mask == 0 {
                 OperationKind::RepairDerivation
             } else if mask & TEMPORAL != 0 && mask & INDEPENDENCE != 0 {
@@ -422,18 +433,28 @@ fn choose_with_pod_meta_router(
         obligations: &obligations,
         operations: &operations,
         attempted_without_progress,
-        remaining_work_units: u64::from(budget.saturating_sub(spent)),
-        mandatory_reserve_units: u64::from(case.mandatory_cost(attempted)),
+        remaining_work_units: u64::from(remaining),
+        mandatory_reserve_units: u64::from(mandatory_remaining_cost),
     });
     let rejection_count = decision.rejected.len() as u32;
-    let selected_id = match decision.selection {
-        PodSelection::Run { operation_id, .. } => Some(operation_id),
-        PodSelection::Stop(_) => None,
-    };
-    let selected_index = selected_id.and_then(|id| {
-        case.operations.iter().position(|operation| operation.public.id == id)
-    });
-    (selected_index, rejection_count)
+
+    match decision.selection {
+        PodSelection::Run { operation_id, obligation_ids, .. } => {
+            let selected_mask = obligation_ids.iter().fold(0u8, |mask, id| {
+                mask | match id.as_str() {
+                    "temporal" => TEMPORAL,
+                    "independence" => INDEPENDENCE,
+                    "authority" => AUTHORITY,
+                    "proof_path" => PROOF_PATH,
+                    _ => 0,
+                }
+            });
+            let selected_index = case.operations.iter()
+                .position(|operation| operation.public.id == operation_id);
+            (selected_index, selected_mask, rejection_count)
+        }
+        PodSelection::Stop(_) => (None, 0, rejection_count),
+    }
 }
 
 fn choose_next(
@@ -471,6 +492,7 @@ fn choose_next(
             state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
             Some(affordable[((state >> 32) as usize) % affordable.len()])
         }
+        Policy::PodMetaRouter => None,
         Policy::MaskCoverageGreedy => {
             let mandatory_remaining: Vec<usize> = case.operations.iter().enumerate()
                 .filter_map(|(i, operation)| {
@@ -522,6 +544,9 @@ pub fn run_trial(case: &TaskCase, policy: Policy, budget: u32, seed: u64) -> Tri
     let mut claimed_mask = 0u8;
     let mut mandatory_verified_mask = 0u8;
     let mut operations = 0usize;
+    let mut scheduler_candidate_rejections = 0u32;
+    let mut attempted_without_progress = BTreeSet::<(String, String)>::new();
+    let mut progress_version = 0u32;
     let mut rejected_candidate_count = 0u32;
     let mut rejected_candidate_cost = 0u32;
     let mut redundant_operation_count = 0u32;
@@ -538,15 +563,18 @@ pub fn run_trial(case: &TaskCase, policy: Policy, budget: u32, seed: u64) -> Tri
         }
 
         let progress_key = format!("proof-state-{progress_version}");
-        let next = if policy == Policy::PodMetaRouter {
-            let (selected, rejected) = choose_with_pod_meta_router(
+        let (next, selected_obligation_mask) = if policy == Policy::PodMetaRouter {
+            let (selected, selected_mask, rejected) = choose_with_pod_meta_router(
                 case, &attempted, &attempted_without_progress, verified_mask,
                 &progress_key, spent, budget,
             );
             scheduler_candidate_rejections = scheduler_candidate_rejections.saturating_add(rejected);
-            selected
+            (selected, selected_mask)
         } else {
-            choose_next(case, policy, &attempted, unresolved, spent, budget, seed)
+            (
+                choose_next(case, policy, &attempted, unresolved, spent, budget, seed),
+                case.required_mask,
+            )
         };
         let Some(index) = next else {
             break;
@@ -557,7 +585,7 @@ pub fn run_trial(case: &TaskCase, policy: Policy, budget: u32, seed: u64) -> Tri
         operations += 1;
         spent = spent.saturating_add(operation.public.cost);
 
-        let actual = operation.verified_mask & case.required_mask;
+        let actual = operation.verified_mask & case.required_mask & selected_obligation_mask;
         let newly_verified = actual & !verified_mask;
         verified_mask |= actual;
         if operation.public.mandatory_mask != 0 {
@@ -730,6 +758,27 @@ mod tests {
         assert_eq!(result.spent, 0);
         assert!(!result.completion_verified);
         assert_eq!(result.missed_mandatory_count, 2);
+    }
+
+    #[test]
+    fn actual_pod_meta_router_never_credits_unselected_obligations() {
+        let case = build_cases().into_iter()
+            .find(|c| c.id == "valid_multi_obligation_packet").unwrap();
+        let result = run_trial(&case, Policy::PodMetaRouter, 14, 1729);
+        assert!(result.completion_verified);
+        assert_eq!(result.verified_obligations, result.required_obligations);
+        assert_eq!(result.false_support_count, 0);
+    }
+
+    #[test]
+    fn actual_pod_meta_router_never_false_completes_across_budget_curve() {
+        for case in build_cases() {
+            for budget in [3, 5, 7, 10, 14, 20] {
+                let result = run_trial(&case, Policy::PodMetaRouter, budget, 1729);
+                assert!(!result.false_completion, "{}:{}", case.id, budget);
+                assert_eq!(result.false_support_count, 0, "{}:{}", case.id, budget);
+            }
+        }
     }
 
     #[test]
