@@ -1799,8 +1799,8 @@ mod tests {
             Style::Opera,
         ];
         let intent = MusicalIntent {
-            bars: 12,
-            seed: 7,
+            bars: 16,
+            seed: 17,
             ..Default::default()
         };
 
