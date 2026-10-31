@@ -189,6 +189,7 @@ impl DirectionCampaignRun {
             // Three logical bootstrap slots are committed as one batch. Policy-selected
             // actions then use one slot per sequential round; this is not a throughput claim.
             worker_count: 3,
+            first_allocation_round: 1,
             first_round_direction_claim_cap: 1,
             steady_state_direction_claim_cap: 2,
             new_direction_claim_cap: 1,
