@@ -420,14 +420,14 @@ impl GenomeArchive {
                 "near_clone_threshold must be None or finite and in [0,1]",
             ));
         }
-        Ok(Self {
+        let mut archive = Self {
             schema: STYLE_GENOME_ARCHIVE_SCHEMA.into(),
             config,
             reference_population_sha256: None,
             reference_population_bound: false,
             entries: Vec::new(),
             archive_sha256: String::new(),
-        })?;
+        };
         archive.archive_sha256 = archive.compute_digest()?;
         Ok(archive)
     }
@@ -565,7 +565,7 @@ impl GenomeArchive {
         }
         self.entries.retain(|entry| !removed.contains(&entry.genome_id));
 
-        if self.config.near_clone_threshold.is_some_and(|threshold| {
+        if removed.is_empty() && self.config.near_clone_threshold.is_some_and(|threshold| {
             self.entries.iter().any(|entry| {
                 mean_fingerprint_array(&entry.mean_structural_fingerprint)
                     .is_some_and(|existing| normalized_distance(&candidate, &existing) <= threshold)
