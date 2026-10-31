@@ -83,9 +83,7 @@ impl Table {
 
 #[derive(Clone, Debug)]
 struct AgentCase {
-    id: String,
     task: String,
-    payload: String,
 }
 
 #[derive(Clone, Debug)]
@@ -102,7 +100,6 @@ struct OracleCase {
 
 #[derive(Clone, Debug)]
 struct CandidateCase {
-    id: String,
     causal_status: String,
     transfer: String,
     action: String,
@@ -227,7 +224,7 @@ fn load_agent(input: &str) -> Result<HashMap<String, AgentCase>, String> {
             return Err(format!("agent input: case {id} task column does not match payload_json"));
         }
 
-        if cases.insert(id.clone(), AgentCase { id: id.clone(), task, payload }).is_some() {
+        if cases.insert(id.clone(), AgentCase { task }).is_some() {
             return Err(format!("agent input: duplicate case_id {id:?}"));
         }
     }
@@ -412,7 +409,6 @@ fn load_candidate(input: &str) -> Result<HashMap<String, CandidateCase>, String>
         }
 
         let item = CandidateCase {
-            id: id.clone(),
             causal_status,
             transfer,
             action,
@@ -579,13 +575,13 @@ fn score_cases(
         let action_match = actual.action == expected.expected_action;
         let completion_match = actual.completion == expected.expected_completion;
 
-        report.causal_status_matches += usize::from(causal_match);
-        report.transfer_matches += usize::from(transfer_match);
-        report.action_matches += usize::from(action_match);
-        report.completion_matches += usize::from(completion_match);
-        report.exact_case_matches += usize::from(
-            causal_match && transfer_match && action_match && completion_match
-        );
+        if causal_match { report.causal_status_matches += 1; }
+        if transfer_match { report.transfer_matches += 1; }
+        if action_match { report.action_matches += 1; }
+        if completion_match { report.completion_matches += 1; }
+        if causal_match && transfer_match && action_match && completion_match {
+            report.exact_case_matches += 1;
+        }
 
         if expected.causal_status != "identified" && actual.causal_status == "identified" {
             report.false_causal_claims += 1;
