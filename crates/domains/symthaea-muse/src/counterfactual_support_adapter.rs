@@ -610,6 +610,13 @@ mod tests {
             altered.evidence_sha256,
             event_evidence_sha256(&altered).unwrap()
         );
+
+        let mut raw_altered = verified.evidence.clone();
+        raw_altered.raw_measured_support[0].end_frame = 66;
+        assert_ne!(
+            raw_altered.evidence_sha256,
+            event_evidence_sha256(&raw_altered).unwrap()
+        );
     }
 
     fn lineage(source_index: usize, channel: u8, midi_note: u8) -> crate::performed_event_map::PerformedEventLineage {
