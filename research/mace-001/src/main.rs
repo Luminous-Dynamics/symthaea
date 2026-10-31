@@ -926,11 +926,31 @@ mod tests {
 
     #[test]
     fn task_prompt_pair_mismatch_is_rejected() {
-        let changed = AGENT_INPUT.replace(
-            "MACE-287\tCan the system safely store",
-            "MACE-287\tShould the system safely store",
-        );
+        let changed = AGENT_INPUT
+            .replace(
+                "MACE-287\tCan the system safely store",
+                "MACE-287\tShould the system safely store",
+            )
+            .replace(
+                "\"current_task\":\"Can the system safely store",
+                "\"current_task\":\"Should the system safely store",
+            );
         assert!(audit_texts(&changed, ORACLE_INPUT, ("a", "o")).is_err());
+    }
+
+    #[test]
+    fn pair_must_have_one_anchor_and_one_irrelevant_control() {
+        let broken = ORACLE_INPUT.replace(
+            "MACE-287\tobservational_confounding\tPAIR-OBS-01\tirrelevant_control",
+            "MACE-287\tobservational_confounding\tPAIR-OBS-01\tanchor",
+        );
+        assert!(audit_texts(AGENT_INPUT, &broken, ("a", "o")).is_err());
+    }
+
+    #[test]
+    fn missing_oracle_case_fails_closed() {
+        let truncated = ORACLE_INPUT.lines().take(8).collect::<Vec<_>>().join("\n") + "\n";
+        assert!(audit_texts(AGENT_INPUT, &truncated, ("a", "o")).is_err());
     }
 
     #[test]
