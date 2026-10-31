@@ -45,7 +45,7 @@ Run one audit per axis. A domain ID must map to one axis and one held-out status
 
 ### Probability calibration
 
-The scorer reports a ten-bin fixed-width probability-calibration table (last bin includes p_error = 1.0), including counts, mean predicted error probability, observed adjudicated error frequency and absolute gap. Separately, to align with ConnectomeBench2's confidence-calibration view, it reports a 15-bin adaptive confidence-versus-correctness ECE/MCE and a 12-bin equal-mass confidence reliability curve. Equal-confidence ties are never split across quantile bins. It also reports:
+The scorer reports a ten-bin fixed-width probability-calibration table (last bin includes p_error = 1.0), including counts, mean predicted error probability, observed adjudicated error frequency and absolute gap. Separately, to align with ConnectomeBench2's confidence-calibration view, it reports a 15-bin adaptive confidence-versus-correctness ECE/MCE and a 12-bin equal-mass confidence reliability curve. Equal-confidence ties are never split across quantile bins. Each equal-mass reliability bin also carries cluster-bootstrap 95% intervals for observed accuracy and mean confidence, using fixed full-sample bin boundaries for the resampled curve; bins with inadequate valid replicate support have no interval. It also reports:
 - Brier score and log loss;
 - expected calibration error (ECE) and maximum calibration error (MCE);
 - false-accept fraction among predictions at `p_error >= 0.90` and `>= 0.95`;
