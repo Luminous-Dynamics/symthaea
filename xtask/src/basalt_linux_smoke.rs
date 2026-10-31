@@ -664,7 +664,17 @@ mod tests {
                 release: None,
                 architecture: "x86_64",
                 boot_id_digest: None,
+            },
+            process_context: ProcessSecurityContext {
+                effective_uid: None,
+                effective_gid: None,
+                cap_eff_hex: None,
+                cap_bnd_hex: None,
+                no_new_privs: None,
+                seccomp_mode: None,
                 mount_namespace_inode: None,
+                user_namespace_inode: None,
+                pid_namespace_inode: None,
             },
             permission_class_probe_requested: false,
             probes: vec![not_attempted("bpf_lsm_load_attach", "not run")],
@@ -690,6 +700,72 @@ mod tests {
         assert!(!report.side_effects.landlock_rulesets_created_or_enforced);
     }
 
+    #[test]
+    fn proc_status_security_fields_are_parsed_without_promoting_missing_values() {
+        let status = "Name:\tbasalt\nCapEff:\t00000000000000a5\nCapBnd:\t00000000000000ff\nNoNewPrivs:\t1\nSeccomp:\t2\n";
+        assert_eq!(proc_status_hex(status, "CapEff").as_deref(), Some("00000000000000a5"));
+        assert_eq!(proc_status_hex(status, "CapBnd").as_deref(), Some("00000000000000ff"));
+        assert_eq!(proc_status_u8(status, "NoNewPrivs"), Some(1));
+        assert_eq!(proc_status_u8(status, "Seccomp"), Some(2));
+        assert_eq!(proc_status_u8(status, "NoSuchField"), None);
+    }
+
+    #[test]
+    fn malformed_proc_status_capability_values_remain_unknown() {
+        let status = "CapEff:\t0xnot-hex\nNoNewPrivs:\tunknown\nSeccomp:\t3\n";
+        assert_eq!(proc_status_hex(status, "CapEff"), None);
+        assert_eq!(proc_status_u8(status, "NoNewPrivs"), None);
+        assert_eq!(proc_status_u8(status, "Seccomp"), Some(3));
+    }
+
+    #[test]
+    fn benchmark_gate_ids_must_resolve_to_declared_metrics() {
+        let benchmark: serde_json::Value = serde_json::from_str(include_str!(
+            "../../benchmarks/basalt/linux-runtime-smoke-benchmark.v1.json"
+        )).unwrap();
+        let ids: std::collections::BTreeSet<&str> = benchmark["metrics"].as_array().unwrap()
+            .iter().map(|metric| metric["metric_id"].as_str().unwrap()).collect();
+        for gate_group in ["safety", "efficiency"] {
+            for gate in benchmark["gates"][gate_group].as_array().unwrap() {
+                assert!(ids.contains(gate.as_str().unwrap()), "unresolved benchmark gate: {gate}");
+            }
+        }
+    }
+
+    #[test]
+    fn report_schema_required_fields_match_serialized_report_fixture() {
+        let report: RuntimeSmokeReport = RuntimeSmokeReport {
+            report_version: 1,
+            suite_id: "basalt-linux-runtime-smoke-v1",
+            probe_id: "schema-test".to_string(),
+            observed_at_unix_ns: 1,
+            kernel: KernelIdentity { release: None, architecture: "x86_64", boot_id_digest: None },
+            process_context: ProcessSecurityContext {
+                effective_uid: None, effective_gid: None, cap_eff_hex: None, cap_bnd_hex: None,
+                no_new_privs: None, seccomp_mode: None, mount_namespace_inode: None,
+                user_namespace_inode: None, pid_namespace_inode: None,
+            },
+            permission_class_probe_requested: false,
+            probes: Vec::new(),
+            side_effects: SideEffectClaims {
+                bpf_programs_loaded_or_attached: false, tracepoints_enabled_or_attached: false,
+                fanotify_marks_added: false, landlock_rulesets_created_or_enforced: false,
+                cgroups_or_namespaces_created: false, host_policy_or_sysctls_changed: false,
+                workload_processes_spawned: false,
+            },
+            observer_attached: false, workload_executed: false,
+            event_capture_established: false, qualification_eligible: false,
+        };
+        let value = serde_json::to_value(report).unwrap();
+        let mut actual: Vec<String> = value.as_object().unwrap().keys().cloned().collect();
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../benchmarks/basalt/schema/linux-runtime-smoke.v1.schema.json"
+        )).unwrap();
+        let mut required: Vec<String> = schema["required"].as_array().unwrap().iter()
+            .map(|field| field.as_str().unwrap().to_string()).collect();
+        actual.sort(); required.sort();
+        assert_eq!(actual, required);
+    }
     #[test]
     fn digest_is_domain_tagged_and_fixed_width() {
         let digest = sha256_tagged(b"basalt-linux-smoke");
