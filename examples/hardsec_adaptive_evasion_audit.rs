@@ -401,8 +401,8 @@ fn group_bootstrap_interval(
             "minimum_independent_groups": MIN_GROUPS_FOR_BOOTSTRAP_INTERVAL,
             "bootstrap_replicates": GROUP_BOOTSTRAP_REPLICATES,
             "nominal_percentile_level": 0.95,
-            "lower_95": null,
-            "upper_95": null,
+            "lower_percentile_95": null,
+            "upper_percentile_95": null,
             "seed_sha256": seed_sha256,
             "seed_scope": "campaign_id + grouping_axis + algorithm_version",
             "resampling_unit": "caller_declared_independent_group",
@@ -443,8 +443,8 @@ fn group_bootstrap_interval(
         "minimum_independent_groups": MIN_GROUPS_FOR_BOOTSTRAP_INTERVAL,
         "bootstrap_replicates": GROUP_BOOTSTRAP_REPLICATES,
         "nominal_percentile_level": 0.95,
-        "lower_95": bootstrap_means[lower_index],
-        "upper_95": bootstrap_means[upper_index],
+        "lower_percentile_95": bootstrap_means[lower_index],
+        "upper_percentile_95": bootstrap_means[upper_index],
         "quantile_rule": "lower_floor_upper_ceil_order_statistic",
         "coverage_guarantee": false,
         "seed_sha256": seed_sha256,
@@ -662,9 +662,10 @@ fn paired_group_metric_delta(
         "candidate_macro_estimate": candidate_macro,
         "baseline_macro_estimate": baseline_macro,
         "improvement_point_estimate": point,
-        "improvement_lower_95": lower,
-        "improvement_upper_95": upper,
+        "improvement_lower_percentile_95": lower,
+        "improvement_upper_percentile_95": upper,
         "bootstrap_coverage_guarantee": false,
+        "bootstrap_interval_type": "descriptive_percentile_range_no_coverage_guarantee",
         "distribution_free_hoeffding_95": hoeffding,
         "bootstrap_replicates": GROUP_BOOTSTRAP_REPLICATES,
         "minimum_independent_groups": MIN_GROUPS_FOR_BOOTSTRAP_INTERVAL,
@@ -1667,8 +1668,8 @@ mod tests {
         let interval = group_bootstrap_interval(&groups, "campaign-a", "program");
         assert_eq!(interval["status"], "unavailable_insufficient_independent_groups");
         assert_eq!(interval["independent_group_count"], 9);
-        assert_eq!(interval["lower_95"], Value::Null);
-        assert_eq!(interval["upper_95"], Value::Null);
+        assert_eq!(interval["lower_percentile_95"], Value::Null);
+        assert_eq!(interval["upper_percentile_95"], Value::Null);
         assert_eq!(interval["distribution_free_hoeffding_95"]["status"], "available_finite_sample_bound");
         assert_eq!(interval["distribution_free_hoeffding_95"]["group_count"], 9);
         assert_eq!(interval["coverage_guarantee"], false);
@@ -1721,8 +1722,8 @@ mod tests {
         assert_eq!(first["status"], "available_descriptive_interval");
         let point = first["point_estimate"].as_f64().unwrap();
         assert!((point - 0.9).abs() < 1e-12);
-        let lower = first["lower_95"].as_f64().unwrap();
-        let upper = first["upper_95"].as_f64().unwrap();
+        let lower = first["lower_percentile_95"].as_f64().unwrap();
+        let upper = first["upper_percentile_95"].as_f64().unwrap();
         assert!((lower - 0.7).abs() < 1e-12);
         assert!((upper - 1.0).abs() < 1e-12);
         assert!(lower <= point && point <= upper);
@@ -1868,8 +1869,8 @@ mod tests {
         assert_eq!(delta["candidate_macro_estimate"], 0.7);
         assert_eq!(delta["baseline_macro_estimate"], 0.7);
         assert_eq!(delta["improvement_point_estimate"], 0.0);
-        assert_eq!(delta["improvement_lower_95"], 0.0);
-        assert_eq!(delta["improvement_upper_95"], 0.0);
+        assert_eq!(delta["improvement_lower_percentile_95"], 0.0);
+        assert_eq!(delta["improvement_upper_percentile_95"], 0.0);
         assert_eq!(delta["resampling_unit"], "paired_independent_group_delta");
         assert_eq!(delta["distribution_free_hoeffding_95"]["status"], "available_finite_sample_bound");
         assert!((delta["distribution_free_hoeffding_95"]["lower"].as_f64().unwrap() + 0.8589388166934752).abs() < 1e-12);
