@@ -107,7 +107,7 @@ A local process that reaches exactly zero betting wealth is also removed; its as
 
 ### 2.4 Mandatory independent workload context
 
-The restarted monitor requires the HARDSEC-020 truth-free runtime context receipt. It verifies the exact stream-window identity, context assignment policy and artifact hashes before updating any local process. Invalid PMU input or an abstained context assignment does not create a local process and does not advance that context's restart clock.
+The restarted monitor requires the HARDSEC-020 truth-free runtime context receipt. It verifies the exact stream-window identity, context assignment policy and artifact hashes before updating any local process. Invalid PMU input or an abstained context assignment does not create a local process and does not advance that context's restart clock. However, dropping rows creates a selected-observation subsequence: the guarantee additionally requires the admission/abstention mechanism to be predictable and appropriately exogenous to the current null score, or to have a separately proved conditional validity result. This admission-selection assumption is marked unverified.
 
 The context assignment process remains unsigned and caller-declared; this integration does not authenticate its model or prove exogeneity.
 
@@ -120,8 +120,8 @@ The context assignment process remains unsigned and caller-declared; this integr
   - `schemas/hardsec-context-restarted-cctm-stream-v1.schema.json`
 - Fixtures: `tests/fixtures/hardsec/context-restarted-v1/`
 - The source retains the single-start DKW-CCTM as a diagnostic comparator; only the restarted aggregate is used for the primary alarm result.
-- The receipt records, per accepted observation, every candidate start's index, weight, age, local log wealth and status; it also emits live-state counts before/after expiry, expired counts, the reserve and aggregate log e-value.
-- 26 authored Rust tests cover the DKW and alpha/delta contract, exact stream/context receipts, fail-closed abstention, unit capital bound, deterministic lifetime expiry, per-start receipt fields, and a deterministic late-change stress fixture.
+- The receipt records, per accepted observation, every candidate start's index, weight, age, local log wealth and status (active, zero-wealth-killed, or expiring after the current update); it also emits live-state counts before/after expiry, expired counts, the reserve and aggregate log e-value.
+- 27 authored Rust tests cover the DKW and alpha/delta contract, exact stream/context receipts, fail-closed abstention, unit capital bound, deterministic lifetime expiry, per-start receipt fields, and a deterministic late-change stress fixture.
 
 ### Fixture known answers
 
@@ -194,12 +194,13 @@ The restarted sum inherits a PFA-style supermartingale argument only if every lo
 - exogenous context assignment and an appropriate accepted-observation filtration;
 - correct reference/evaluation separation.
 
-These assumptions are **not established** by the JSON receipt, caller-declared group IDs, or a digest. The paper's independent-observation restart result does not imply validity for serially dependent or adversarial PMU telemetry. The dependent-null stress test exists precisely because iid claims cannot be inferred from marginal distributions.
+These assumptions are **not established** by the JSON receipt, caller-declared group IDs, or a digest. In particular, the receipt also requires `accepted_observation_selection_assumption_status=assumption_not_verified`; a sensor-validity or context-confidence gate can itself select a non-iid subset if correlated with the score or attack state. The paper's independent-observation restart result does not imply validity for serially dependent or adversarial PMU telemetry. The dependent-null stress test exists precisely because iid claims cannot be inferred from marginal distributions.
 
 The receipt therefore reports:
 - null i.i.d. status: `assumption_not_verified`;
 - reference i.i.d. status: `assumption_not_verified`;
 - context exogeneity: `not_established_from_input_receipts`;
+- accepted-observation/admission exogeneity: `assumption_not_verified`;
 - theorem guarantee: `not_established_from_input_receipts`;
 - effective sample size: `null`.
 
