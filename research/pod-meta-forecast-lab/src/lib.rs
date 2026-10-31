@@ -266,7 +266,7 @@ pub enum SelectionPolicy {
     GlobalBayes,
     FamilyBayes,
     ContextFamilyShrinkage,
-    OracleUpperBound,
+    OracleTrueProbabilityPerCost,
 }
 
 impl SelectionPolicy {
@@ -277,7 +277,7 @@ impl SelectionPolicy {
         Self::GlobalBayes,
         Self::FamilyBayes,
         Self::ContextFamilyShrinkage,
-        Self::OracleUpperBound,
+        Self::OracleTrueProbabilityPerCost,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -288,12 +288,12 @@ impl SelectionPolicy {
             Self::GlobalBayes => "global_bayes",
             Self::FamilyBayes => "family_bayes",
             Self::ContextFamilyShrinkage => "context_family_shrinkage",
-            Self::OracleUpperBound => "oracle_upper_bound",
+            Self::OracleTrueProbabilityPerCost => "oracle_true_probability_per_cost",
         }
     }
 
     pub const fn promotion_candidate(self) -> bool {
-        !matches!(self, Self::OracleUpperBound)
+        !matches!(self, Self::OracleTrueProbabilityPerCost)
     }
 
     fn forecast_method(self) -> Option<ForecastMethod> {
@@ -302,7 +302,7 @@ impl SelectionPolicy {
             Self::GlobalBayes => Some(ForecastMethod::GlobalBayes),
             Self::FamilyBayes => Some(ForecastMethod::FamilyBayes),
             Self::ContextFamilyShrinkage => Some(ForecastMethod::ContextFamilyShrinkage),
-            Self::FixedOrder | Self::BudgetMatchedRandom | Self::OracleUpperBound => None,
+            Self::FixedOrder | Self::BudgetMatchedRandom | Self::OracleTrueProbabilityPerCost => None,
         }
     }
 }
@@ -481,8 +481,7 @@ fn evaluate_forecasts(
     let count = selected.len();
     let mut ece = 0.0;
     let mut bins = Vec::with_capacity(RELIABILITY_BIN_COUNT);
-    for bin in 0..RELIABILITY_BIN_COUNT {
-        let bin_n = bin_count[bin];
+    for (bin, &bin_n) in bin_count.iter().enumerate() {
         if bin_n > 0 {
             let mean_probability = bin_probability_sum[bin] / bin_n as f64;
             let observed_rate = bin_success_sum[bin] as f64 / bin_n as f64;
@@ -561,10 +560,14 @@ fn policy_order(
                 order.swap(i, j);
             }
         }
-        SelectionPolicy::OracleUpperBound => {
+        SelectionPolicy::OracleTrueProbabilityPerCost => {
             order.sort_by(|a, b| {
-                true_success_probability(episode.regime, *b)
-                    .partial_cmp(&true_success_probability(episode.regime, *a))
+                let score_a = true_success_probability(episode.regime, *a)
+                    / f64::from(a.cost());
+                let score_b = true_success_probability(episode.regime, *b)
+                    / f64::from(b.cost());
+                score_b
+                    .partial_cmp(&score_a)
                     .unwrap_or(Ordering::Equal)
                     .then_with(|| (*a as usize).cmp(&(*b as usize)))
             });
@@ -797,7 +800,7 @@ mod tests {
 
     #[test]
     fn oracle_is_marked_diagnostic_only() {
-        assert!(!SelectionPolicy::OracleUpperBound.promotion_candidate());
+        assert!(!SelectionPolicy::OracleTrueProbabilityPerCost.promotion_candidate());
         assert!(SelectionPolicy::ContextFamilyShrinkage.promotion_candidate());
     }
 
