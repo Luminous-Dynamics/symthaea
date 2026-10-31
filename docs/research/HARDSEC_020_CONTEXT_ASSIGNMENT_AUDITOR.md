@@ -52,7 +52,7 @@ The auditor emits `hardsec-context-assignment-receipt-v1`. Its `runtime_mapping.
 
 HARDSEC-019 now requires this receipt as `--context-receipt`. Before CCTM accumulates any score evidence it verifies exact policy ID, assignment artifact, stream/evaluation identity and exact sequence/window mapping. Accepted assignments must match the context in the CCTM score stream. Abstained assignments cannot update CCTM wealth, even if a caller supplies a known context string.
 
-The runtime mapping is unsigned and caller-declared. It is not hardware attestation or proof that the actual classifier produced the probabilities.
+The runtime mapping is unsigned and caller-declared. It is not hardware attestation or proof that the actual classifier produced the probabilities. HARDSEC-019 now checks the mapping's exact policy/artifact/stream identities, each sequence/window pair, accepted selected context, truth-free status and aggregate counts before updating CCTM wealth.
 
 ## 6. Run the auditor
 
