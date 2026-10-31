@@ -71,6 +71,8 @@ pub struct FastEventTask {
     pub sample_interval_us: u64,
     pub slots: usize,
     pub similarity: EventDistractorSimilarity,
+    /// Maximum permitted decision lag after the final event sample.
+    pub response_deadline_steps: u32,
     pub observations: Vec<FastEventObservation>,
     pub content_sha256: [u8; 32],
 }
@@ -252,6 +254,7 @@ pub fn generate_fast_event_task(
         sample_interval_us: config.sample_interval_us,
         slots: config.slots,
         similarity: config.similarity,
+        response_deadline_steps: u32::try_from(EVENT_WIDTH).unwrap_or(u32::MAX),
         observations,
         content_sha256: [0; 32],
     };
@@ -278,6 +281,7 @@ pub fn fast_event_content_digest(task: &FastEventTask) -> [u8; 32] {
         EventDistractorSimilarity::High => 0,
         EventDistractorSimilarity::Low => 1,
     });
+    hash.u32(task.response_deadline_steps);
     hash.usize(task.observations.len());
     for observation in &task.observations {
         hash.u32(observation.step);
@@ -321,6 +325,7 @@ pub fn verify_fast_event_trace(
         || task.slots < BLOCK_SIZE
         || task.slots > MAX_EVENT_SLOTS
         || task.observations.len() != task.slots
+        || task.response_deadline_steps != u32::try_from(EVENT_WIDTH).unwrap_or(u32::MAX)
         || task.sample_interval_us.saturating_mul(task.slots as u64) > 86_400_000_000
     {
         return Err(FastEventVerificationError::InvalidTaskContract);
@@ -337,6 +342,7 @@ pub fn verify_fast_event_trace(
 
     let mut previous_end = 0_u32;
     let mut used_blocks = BTreeSet::new();
+    let mut used_distractor_codes = BTreeSet::new();
     for (index, event) in oracle.events.iter().enumerate() {
         let start = usize::try_from(event.start_step).unwrap_or(usize::MAX);
         let end = usize::try_from(event.end_step).unwrap_or(usize::MAX);
@@ -359,7 +365,9 @@ pub fn verify_fast_event_trace(
                 EventDistractorSimilarity::Low => (4..=7).contains(&distance),
             }
         };
-        if !code_valid {
+        if !code_valid
+            || (!event.is_target && !used_distractor_codes.insert(event.code))
+        {
             return Err(FastEventVerificationError::InvalidEventCode { index });
         }
         previous_end = event.end_step;
@@ -393,6 +401,190 @@ pub fn verify_fast_event_trace(
         }
     }
     Ok(())
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FastEventPrediction {
+    /// Candidate decision time in sample steps. One target activation is one prediction.
+    pub step: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FastEventScore {
+    pub true_positives: usize,
+    pub false_negatives: usize,
+    pub false_positive_idle: usize,
+    pub false_positive_distractor: usize,
+    pub duplicate_target_activations: usize,
+    pub quiet_exposure_us: u64,
+    /// One latency for each matched target event, in microseconds.
+    pub detection_latency_us: Vec<u64>,
+}
+
+impl FastEventScore {
+    pub fn false_positives(&self) -> usize {
+        self.false_positive_idle
+            .saturating_add(self.false_positive_distractor)
+            .saturating_add(self.duplicate_target_activations)
+    }
+
+    pub fn precision(&self) -> Option<f64> {
+        let predicted = self.true_positives.saturating_add(self.false_positives());
+        (predicted > 0).then_some(self.true_positives as f64 / predicted as f64)
+    }
+
+    pub fn recall(&self) -> Option<f64> {
+        let actual = self.true_positives.saturating_add(self.false_negatives);
+        (actual > 0).then_some(self.true_positives as f64 / actual as f64)
+    }
+
+    /// Quiet-period false activations normalized to one monitored hour.
+    pub fn idle_false_triggers_per_hour(&self) -> Option<f64> {
+        (self.quiet_exposure_us > 0).then_some(
+            self.false_positive_idle as f64 * 3_600_000_000.0
+                / self.quiet_exposure_us as f64,
+        )
+    }
+
+    /// Nearest-rank latency percentile, with numerator/denominator in [0, 1].
+    pub fn latency_percentile_us(
+        &self,
+        numerator: usize,
+        denominator: usize,
+    ) -> Option<u64> {
+        if self.detection_latency_us.is_empty()
+            || denominator == 0
+            || numerator == 0
+            || numerator > denominator
+        {
+            return None;
+        }
+        let mut sorted = self.detection_latency_us.clone();
+        sorted.sort_unstable();
+        let rank = sorted
+            .len()
+            .saturating_mul(numerator)
+            .saturating_add(denominator - 1)
+            / denominator;
+        sorted.get(rank.saturating_sub(1)).copied()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum FastEventScoringError {
+    InvalidTrace(FastEventVerificationError),
+    PredictionOutOfRange { step: u32 },
+    PredictionsNotStrictlyIncreasing { index: usize },
+}
+
+impl fmt::Display for FastEventScoringError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidTrace(error) => write!(f, "cannot score invalid task: {error}"),
+            Self::PredictionOutOfRange { step } => {
+                write!(f, "candidate prediction at step {step} is outside the stream")
+            }
+            Self::PredictionsNotStrictlyIncreasing { index } => {
+                write!(f, "candidate predictions are duplicated or reordered at index {index}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for FastEventScoringError {}
+
+/// Score event decisions with one-to-one target matching and explicit idle/distractor false alarms.
+///
+/// A target can be detected from its first sample through its exclusive end
+/// boundary (the decision may occur immediately after consuming the final
+/// motif sample). Extra activations for that same event are duplicates, not
+/// additional true positives. Detections during distractors and quiet periods
+/// are reported separately. Quiet exposure excludes every target and
+/// distractor motif interval; no rate extrapolation is presented without its
+/// exact monitored exposure.
+pub fn score_fast_event_predictions(
+    task: &FastEventTask,
+    oracle: &FastEventOracle,
+    predictions: &[FastEventPrediction],
+) -> Result<FastEventScore, FastEventScoringError> {
+    verify_fast_event_trace(task, oracle)
+        .map_err(FastEventScoringError::InvalidTrace)?;
+
+    let mut matched_targets = vec![false; oracle.events.len()];
+    let mut score = FastEventScore {
+        true_positives: 0,
+        false_negatives: oracle.target_event_count,
+        false_positive_idle: 0,
+        false_positive_distractor: 0,
+        duplicate_target_activations: 0,
+        quiet_exposure_us: u64::try_from(task.slots)
+            .unwrap_or(u64::MAX)
+            .saturating_mul(task.sample_interval_us),
+        detection_latency_us: Vec::new(),
+    };
+
+    for (index, prediction) in predictions.iter().enumerate() {
+        if u64::from(prediction.step) > u64::try_from(task.slots).unwrap_or(u64::MAX) {
+            return Err(FastEventScoringError::PredictionOutOfRange {
+                step: prediction.step,
+            });
+        }
+        if index > 0 && predictions[index - 1].step >= prediction.step {
+            return Err(FastEventScoringError::PredictionsNotStrictlyIncreasing {
+                index,
+            });
+        }
+
+        let mut matched_target = false;
+        let mut in_distractor = false;
+        for (event_index, event) in oracle.events.iter().enumerate() {
+            let within_target_window = event.is_target
+                && prediction.step >= event.start_step
+                && prediction.step <= event.end_step;
+            if within_target_window {
+                if matched_targets[event_index] {
+                    score.duplicate_target_activations =
+                        score.duplicate_target_activations.saturating_add(1);
+                } else {
+                    matched_targets[event_index] = true;
+                    score.true_positives = score.true_positives.saturating_add(1);
+                    score.false_negatives = score.false_negatives.saturating_sub(1);
+                    let latency_steps = prediction.step.saturating_sub(event.start_step);
+                    score.detection_latency_us.push(
+                        u64::from(latency_steps).saturating_mul(task.sample_interval_us),
+                    );
+                }
+                matched_target = true;
+                break;
+            }
+            if !event.is_target
+                && prediction.step >= event.start_step
+                && prediction.step < event.end_step
+            {
+                in_distractor = true;
+            }
+        }
+
+        if !matched_target {
+            if in_distractor {
+                score.false_positive_distractor =
+                    score.false_positive_distractor.saturating_add(1);
+            } else {
+                score.false_positive_idle = score.false_positive_idle.saturating_add(1);
+            }
+        }
+    }
+
+    let event_slots: u64 = oracle.events
+        .iter()
+        .map(|event| u64::from(event.end_step.saturating_sub(event.start_step)))
+        .sum();
+    let total_slots = u64::try_from(task.slots).unwrap_or(u64::MAX);
+    score.quiet_exposure_us = total_slots
+        .saturating_sub(event_slots)
+        .saturating_mul(task.sample_interval_us);
+
+    Ok(score)
 }
 
 fn validate_config(config: FastEventConfig) -> Result<(), FastEventGenerationError> {
@@ -553,6 +745,79 @@ mod tests {
             verify_fast_event_trace(&task, &oracle),
             Err(FastEventVerificationError::OracleDigestMismatch)
         );
+    }
+
+    #[test]
+    fn perfect_detector_scores_all_targets_with_latency() {
+        let config = FastEventConfig::reference(31);
+        let (task, oracle) = generate_fast_event_task(config).unwrap();
+        let predictions: Vec<_> = oracle
+            .events
+            .iter()
+            .filter(|event| event.is_target)
+            .map(|event| FastEventPrediction { step: event.end_step })
+            .collect();
+        let score = score_fast_event_predictions(&task, &oracle, &predictions).unwrap();
+        assert_eq!(score.true_positives, config.target_event_count);
+        assert_eq!(score.false_negatives, 0);
+        assert_eq!(score.false_positives(), 0);
+        assert_eq!(
+            score.latency_percentile_us(99, 100),
+            Some(u64::from(EVENT_WIDTH as u32) * config.sample_interval_us)
+        );
+    }
+
+    #[test]
+    fn quiet_idle_predictions_are_counted_as_false_triggers() {
+        let config = FastEventConfig::quiet_idle(32);
+        let (task, oracle) = generate_fast_event_task(config).unwrap();
+        let predictions = [FastEventPrediction { step: 12 }];
+        let score = score_fast_event_predictions(&task, &oracle, &predictions).unwrap();
+        assert_eq!(score.false_positive_idle, 1);
+        assert_eq!(score.true_positives, 0);
+        assert_eq!(score.idle_false_triggers_per_hour(), Some(1.0 * 3_600_000_000.0 / score.quiet_exposure_us as f64));
+    }
+
+    #[test]
+    fn distractor_detections_are_not_counted_as_idle_false_triggers() {
+        let config = FastEventConfig::reference(33);
+        let (task, oracle) = generate_fast_event_task(config).unwrap();
+        let event = oracle.events.iter().find(|event| !event.is_target).unwrap();
+        let score = score_fast_event_predictions(
+            &task,
+            &oracle,
+            &[FastEventPrediction { step: event.start_step }],
+        ).unwrap();
+        assert_eq!(score.false_positive_distractor, 1);
+        assert_eq!(score.false_positive_idle, 0);
+    }
+
+    #[test]
+    fn second_activation_for_a_target_is_a_duplicate_not_an_extra_hit() {
+        let config = FastEventConfig::reference(34);
+        let (task, oracle) = generate_fast_event_task(config).unwrap();
+        let event = oracle.events.iter().find(|event| event.is_target).unwrap();
+        let predictions = [
+            FastEventPrediction { step: event.start_step },
+            FastEventPrediction { step: event.end_step },
+        ];
+        let score = score_fast_event_predictions(&task, &oracle, &predictions).unwrap();
+        assert_eq!(score.true_positives, 1);
+        assert_eq!(score.duplicate_target_activations, 1);
+    }
+
+    #[test]
+    fn non_monotonic_candidate_predictions_are_rejected() {
+        let config = FastEventConfig.reference(35);
+        let (task, oracle) = generate_fast_event_task(config).unwrap();
+        let predictions = [
+            FastEventPrediction { step: 10 },
+            FastEventPrediction { step: 9 },
+        ];
+        assert!(matches!(
+            score_fast_event_predictions(&task, &oracle, &predictions),
+            Err(FastEventScoringError::PredictionsNotStrictlyIncreasing { .. })
+        ));
     }
 
     #[test]
