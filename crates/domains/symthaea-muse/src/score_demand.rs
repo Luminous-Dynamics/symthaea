@@ -60,6 +60,10 @@ pub struct ScoreDemandProfile {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ScoreDemandError {
     EmptyScore,
+    NonFiniteTempo,
+    NonPositiveTempo,
+    NonFiniteDeclaredSpan,
+    NegativeDeclaredSpan,
     NonFiniteOnset { note_index: usize },
     NegativeOnset { note_index: usize },
     NonFiniteDuration { note_index: usize },
@@ -93,9 +97,18 @@ pub fn analyze_score_demand(
     // from register, temporal overlap or VoiceRole. Aggregate the whole score
     // by role and label that loss of identity explicitly.
     let mut groups = BTreeMap::<(u16, u8), Vec<&ScoreNote>>::new();
-    let mut declared_span = score.total_beats.beats();
-    if !declared_span.is_finite() || declared_span < 0.0 {
-        declared_span = 0.0;
+    if !score.tempo_bpm.is_finite() {
+        return Err(ScoreDemandError::NonFiniteTempo);
+    }
+    if score.tempo_bpm <= 0.0 {
+        return Err(ScoreDemandError::NonPositiveTempo);
+    }
+    let declared_span = score.total_beats.beats();
+    if !declared_span.is_finite() {
+        return Err(ScoreDemandError::NonFiniteDeclaredSpan);
+    }
+    if declared_span < 0.0 {
+        return Err(ScoreDemandError::NegativeDeclaredSpan);
     }
     let mut analyzed_span = declared_span;
 
@@ -211,13 +224,14 @@ fn build_voice_demand(
     }
 
     onsets.sort_by(f64::total_cmp);
-    let distinct_onset_count = onsets
-        .iter()
-        .enumerate()
-        .filter(|(index, onset)| {
-            *index == 0 || (**onset - onsets[*index - 1]).abs() > 1.0e-9
-        })
-        .count();
+    let mut distinct_onset_count = 0usize;
+    let mut previous_onset = None::<f64>;
+    for onset in &onsets {
+        if previous_onset.is_none_or(|previous| (*onset - previous).abs() > 1.0e-9) {
+            distinct_onset_count += 1;
+            previous_onset = Some(*onset);
+        }
+    }
 
     // At a shared boundary, note-off must be processed before note-on:
     // adjacent notes in one monophonic part do not count as overlapping.
