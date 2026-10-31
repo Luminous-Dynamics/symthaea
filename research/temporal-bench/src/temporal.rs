@@ -299,15 +299,19 @@ pub fn verify_multiscale_trace(
             let expected_label = oracle.targets[
                 usize::try_from(source_step).unwrap_or(usize::MAX)
             ].label;
-            match &feedback.kind {
-                TemporalEventKind::Feedback { source_step: actual_source, label }
-                    if feedback.step == step
-                        && feedback.ordinal == 1
-                        && *actual_source == source_step
-                        && *label == expected_label => {}
-                _ => {
-                    return Err(TemporalVerificationError::InvalidFeedback { source_step });
-                }
+            let TemporalEventKind::Feedback {
+                source_step: actual_source,
+                label,
+            } = &feedback.kind
+            else {
+                return Err(TemporalVerificationError::MissingFeedback { source_step });
+            };
+            if feedback.step != step
+                || feedback.ordinal != 1
+                || *actual_source != source_step
+                || *label != expected_label
+            {
+                return Err(TemporalVerificationError::InvalidFeedback { source_step });
             }
             cursor = cursor.saturating_add(1);
         }
