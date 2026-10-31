@@ -149,12 +149,6 @@ jobs:
           PY
 
 
-  sorrydb-snapshot-import:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Validate speculative branch ledger contract
         shell: bash
         run: |
@@ -222,6 +216,13 @@ jobs:
           if not errors(bad): raise SystemExit("active-branch cap negative control did not fail")
           print("PITB_SPECULATIVE_BRANCH_NEGATIVE_CONTROLS_PASS: workspace, DAG, state, and concurrency")
           PY
+
+  sorrydb-snapshot-import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Checkout exact SorryDB source snapshot
         uses: actions/checkout@v4
         with:
