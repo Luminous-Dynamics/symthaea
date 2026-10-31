@@ -4,10 +4,6 @@
     {
       "case_id": "MACE-A01",
       "family": "observational_confounding",
-      "pair": {
-        "pair_id": "PAIR-OBS-01",
-        "role": "anchor"
-      },
       "agent_view": {
         "scenario_context": {
           "environment": "microgrid-lab",
@@ -59,10 +55,6 @@
     {
       "case_id": "MACE-A02",
       "family": "observational_confounding",
-      "pair": {
-        "pair_id": "PAIR-OBS-01",
-        "role": "irrelevant_control"
-      },
       "agent_view": {
         "scenario_context": {
           "environment": "microgrid-lab",
@@ -123,10 +115,6 @@
     {
       "case_id": "MACE-B01",
       "family": "controlled_intervention",
-      "pair": {
-        "pair_id": "PAIR-INT-01",
-        "role": "anchor"
-      },
       "agent_view": {
         "scenario_context": {
           "environment": "microgrid-lab",
@@ -180,10 +168,6 @@
     {
       "case_id": "MACE-B02",
       "family": "controlled_intervention",
-      "pair": {
-        "pair_id": "PAIR-INT-01",
-        "role": "irrelevant_control"
-      },
       "agent_view": {
         "scenario_context": {
           "environment": "microgrid-lab",
@@ -246,10 +230,6 @@
     {
       "case_id": "MACE-C01",
       "family": "regime_shift",
-      "pair": {
-        "pair_id": "PAIR-REGIME-01",
-        "role": "anchor"
-      },
       "agent_view": {
         "scenario_context": {
           "environment": "thermal-lab",
@@ -306,10 +286,6 @@
     {
       "case_id": "MACE-C02",
       "family": "regime_shift",
-      "pair": {
-        "pair_id": "PAIR-REGIME-01",
-        "role": "irrelevant_control"
-      },
       "agent_view": {
         "scenario_context": {
           "environment": "thermal-lab",
@@ -375,10 +351,6 @@
     {
       "case_id": "MACE-D01",
       "family": "outcome_misattribution",
-      "pair": {
-        "pair_id": "PAIR-OUTCOME-01",
-        "role": "anchor"
-      },
       "agent_view": {
         "scenario_context": {
           "environment": "device-lab",
@@ -434,10 +406,6 @@
     {
       "case_id": "MACE-D02",
       "family": "outcome_misattribution",
-      "pair": {
-        "pair_id": "PAIR-OUTCOME-01",
-        "role": "irrelevant_control"
-      },
       "agent_view": {
         "scenario_context": {
           "environment": "device-lab",
