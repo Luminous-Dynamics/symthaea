@@ -83,7 +83,7 @@ The evaluator-only receipt module is `src/receipt.rs`. It encodes a versioned ca
 
 The local `ReplayLedger` consumes nonce, run-ID and per-key monotonic-counter markers after signature verification. The private evaluator ledger directory is enforced as evaluator-owned, directory-only and inaccessible to group/other users. Marker and counter writes are synced. A crash can consume an identifier without recording a successful result, but cannot permit replay of that identifier. Restoring an old ledger backup can roll back replay state; this prototype is not a distributed monotonic database. Do not accept receipts after unverified ledger restore.
 
-The receipt and replay code are source-authored; their Rust tests have not been executed and the code is not wired into a working evaluator binary yet.
+The receipt and replay code are source-authored (14 test functions total across receipt/replay and 5 artifact-intake tests); their Rust tests have not been executed and the code is not wired into a working evaluator binary yet. Receipts with resource use over a declared budget must carry `OutOfBudget`, and failed runs retain a nonzero failure code. Completed runs with a declared energy budget require an actual measured-energy value.
 
 ## Mandatory host attacks
 
