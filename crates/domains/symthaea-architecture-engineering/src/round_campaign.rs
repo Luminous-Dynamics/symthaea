@@ -732,7 +732,6 @@ impl RoundLedger {
         close: &RoundCloseReceipt,
     ) -> Result<ValidatedRoundSummary, RoundContractError> {
         self.validate_integrity()?;
-        self.validate_integrity()?;
         plan.validate_integrity()?;
         if plan.campaign_id != self.campaign_id {
             return Err(RoundContractError::new("campaign_id", "round belongs to a different campaign"));
@@ -767,19 +766,23 @@ impl RoundLedger {
             action_count: summary.action_count as u64,
             charged_budget_units: summary.charged_budget_units,
         };
-        self.total_action_count = self
+        // Apply the append to a clone so an overflow or invariant failure cannot leave
+        // the live ledger partially mutated.
+        let mut updated = self.clone();
+        updated.total_action_count = updated
             .total_action_count
             .checked_add(entry.action_count)
             .ok_or_else(|| RoundContractError::new("total_action_count", "overflow"))?;
-        self.total_charged_budget_units = self
+        updated.total_charged_budget_units = updated
             .total_charged_budget_units
             .checked_add(entry.charged_budget_units)
             .ok_or_else(|| RoundContractError::new("total_charged_budget_units", "overflow"))?;
-        self.closed_round_ids.insert(plan.round_id.clone());
-        self.entries.push(entry);
-        self.last_close_sha256 = Some(close_digest);
-        self.next_round_index += 1;
-        self.validate_integrity()?;
+        updated.closed_round_ids.insert(plan.round_id.clone());
+        updated.entries.push(entry);
+        updated.last_close_sha256 = Some(close_digest);
+        updated.next_round_index += 1;
+        updated.validate_integrity()?;
+        *self = updated;
         Ok(summary)
     }
 }
@@ -836,6 +839,7 @@ mod tests {
             .into_iter()
             .collect();
         RoundPlan::new(
+            "campaign-1",
             "round-0",
             0,
             "coral-faithful",
@@ -1022,6 +1026,7 @@ mod tests {
 
         let parent = ledger.last_close_sha256.clone().unwrap();
         let next = RoundPlan::new(
+            "campaign-1",
             "round-1",
             1,
             "coral-faithful",
