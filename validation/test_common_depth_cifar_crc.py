@@ -51,6 +51,35 @@ class CommonDepthCRCTests(unittest.TestCase):
         self.assertAlmostEqual(superclass["correct_specificity"],__import__("math").log(20)/__import__("math").log(100))
         self.assertEqual(leaf_correct["correct_specificity"],1.)
 
+
+    def test_pool_sampler_uses_published_finite_population_counts(self):
+        from common_depth_cifar_crc import _sample_finite_population_splits
+        splits=_sample_finite_population_splits((7300,969,1731),50,16,300,20261031)
+        self.assertEqual(len(splits),300)
+        for calibration,test in splits:
+            self.assertEqual(sum(calibration),50)
+            self.assertEqual(sum(test),16)
+            self.assertTrue(all(0<=x<=50 for x in calibration))
+            self.assertTrue(all(0<=x<=16 for x in test))
+
+    def test_common_depth_split_metric_aggregation(self):
+        engine=CommonDepthCIFARCRC(50,.1)
+        controller=engine.baseline("envelope")
+        h=(48,1,1)
+        test=(8,4,4)
+        got=engine.aggregate_test_metrics(controller,h,test)
+        depth=controller[h]
+        manual={key:sum(test[z]*engine.expected_metrics(depth,z)[key] for z in range(3))/16
+                for key in ("risk","expected_node_size","correct_specificity")}
+        for key in manual:
+            self.assertAlmostEqual(got[key],manual[key],places=12)
+
+    def test_standard_and_envelope_baselines_are_valid_at_all_paper_levels(self):
+        for alpha in (.02,.05,.10,.15):
+            engine=CommonDepthCIFARCRC(50,alpha)
+            self.assertTrue(engine.validity_report(engine.baseline("crc"))["valid"])
+            self.assertTrue(engine.validity_report(engine.baseline("envelope"))["valid"])
+
     def test_invalid_alpha_and_n_rejected(self):
         with self.assertRaises(ValueError):CommonDepthCIFARCRC(0,.1)
         with self.assertRaises(ValueError):CommonDepthCIFARCRC(50,1.0)
