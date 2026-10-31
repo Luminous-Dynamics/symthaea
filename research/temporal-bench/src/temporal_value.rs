@@ -9,7 +9,6 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 const PPM: u128 = 1_000_000;
-const SCORE_SCALE: u128 = 1_000_000_000_000_000_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RetentionPolicy {
@@ -243,24 +242,20 @@ fn score_candidate(
 
     let (rank_score, eligible) = match policy {
         RetentionPolicy::TemporalValuePerByteSecond => {
-            // Multiply before dividing so fixed-point truncation happens
-            // once rather than discarding fractional value at every factor.
-            // u64 * 1e18 remains within u128.
+            // The three PPM factors contribute their own 1e18 fixed-point
+            // scale. Divide directly by byte-time so sub-microsecond weighted
+            // values are not truncated to zero before ranking.
             let weighted_product = u128::from(candidate.predicted_ted_reduction_us)
                 .checked_mul(u128::from(candidate.confidence_ppm))
                 .and_then(|value| value.checked_mul(u128::from(candidate.relevance_ppm)))
                 .and_then(|value| value.checked_mul(u128::from(candidate.freshness_ppm)))
                 .ok_or(RetentionError::ArithmeticOverflow)?;
-            let weighted_value = weighted_product / (PPM * PPM * PPM);
 
             let denominator = u128::from(candidate.bytes)
                 .checked_mul(u128::from(effective_horizon))
                 .ok_or(RetentionError::ArithmeticOverflow)?;
-            let scaled = weighted_value
-                .checked_mul(SCORE_SCALE)
-                .ok_or(RetentionError::ArithmeticOverflow)?
-                / denominator;
-            (scaled, hard_valid && weighted_value > 0)
+            let score = weighted_product / denominator;
+            (score, hard_valid && weighted_product > 0)
         }
         RetentionPolicy::Lru => (u128::from(candidate.last_access_us), hard_valid),
         RetentionPolicy::Lfu => (u128::from(candidate.access_count), hard_valid),
@@ -512,6 +507,22 @@ mod tests {
         .unwrap();
         // 15 * 0.9^3 = 10.935, which exceeds candidate B's value of 9.
         assert_eq!(plan.selected_ids, vec![1]);
+    }
+
+    #[test]
+    fn fractional_confidence_does_not_round_small_positive_value_to_zero() {
+        let mut item = candidate(1, 1, 1);
+        item.confidence_ppm = 500_000;
+        let plan = select_retained_items(
+            &[item],
+            1,
+            1_000_000,
+            RetentionPolicy::TemporalValuePerByteSecond,
+            [0; 32],
+        )
+        .unwrap();
+        assert_eq!(plan.selected_ids, vec![1]);
+        assert!(plan.ranked[0].rank_score > 0);
     }
 
     #[test]
