@@ -595,6 +595,7 @@ fn evaluate_strategy(
         };
         let initial_posterior = posterior.clone();
         let mut used = BTreeSet::new();
+        let mut episode_allocator_cost = 0.0_f64;
         let mut rng = SplitMix64::new(seed ^ ((true_index as u64 + 1) * 0x9E37_79B9));
 
         if !matches!(strategy, Strategy::Oracle | Strategy::NoProbe) {
@@ -609,6 +610,7 @@ fn evaluate_strategy(
                 let score_evaluations = allocator_work_units(strategy, safe_candidates.len());
                 allocator_work_unit_total += score_evaluations;
                 let selection_cost = score_evaluations as f64 * allocator_cost_per_evaluation;
+                episode_allocator_cost += selection_cost;
                 allocator_cost_total += selection_cost;
 
                 let Some(query) = select_probe(
@@ -665,7 +667,7 @@ fn evaluate_strategy(
 
         let oracle_utility = oracle_decision_value(true_world);
         let total_declared_cost =
-            used.len() as f64 * probe_cost + allocator_cost_total;
+            used.len() as f64 * probe_cost + episode_allocator_cost;
         let net_utility = utility - total_declared_cost / decision_horizon as f64;
         utility_total += utility;
         net_utility_total += net_utility;
