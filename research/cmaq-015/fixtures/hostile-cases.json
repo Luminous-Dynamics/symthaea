@@ -3,11 +3,19 @@
   "status": "specification_only_not_executed",
   "cases": [
     {
-      "id": "tamper-subject-bytes",
-      "mutation": "Change the content addressed by evidence.subject_sha256 without changing the signed payload.",
+      "id": "raw-evidence-bytes-changed",
+      "mutation": "Change the raw evidence bytes while retaining the signed subject_sha256 in the unchanged payload.",
       "expected": {
         "byte_integrity": "fail",
-        "cryptographic_authenticity": "fail_or_unverifiable"
+        "cryptographic_authenticity": "pass",
+        "decision_qualification": "not_qualified"
+      }
+    },
+    {
+      "id": "payload-subject-digest-tamper",
+      "mutation": "Change evidence.subject_sha256 in the signed payload without generating a new signature.",
+      "expected": {
+        "cryptographic_authenticity": "fail"
       }
     },
     {
