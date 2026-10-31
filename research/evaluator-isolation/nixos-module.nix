@@ -42,32 +42,33 @@ let
     ProcSubset = "pid";
 
     SystemCallArchitectures = "native";
-    SystemCallFilter = [ "@system-service" ];
+    # Prevent a service from undoing the mount namespace protections.
+    SystemCallFilter = [ "@system-service" "~@mount" ];
     SystemCallErrorNumber = "EPERM";
   };
 
   commonInvisiblePaths = [
     # PrivateNetwork does not by itself hide host AF_UNIX sockets.
-    "/run/dbus/system_bus_socket"
-    "/run/systemd/private"
-    "/run/systemd/journal/socket"
-    "/run/systemd/journal/stdout"
-    "/run/user"
+    "-/run/dbus/system_bus_socket"
+    "-/run/systemd/private"
+    "-/run/systemd/journal/socket"
+    "-/run/systemd/journal/stdout"
+    "-/run/user"
     # Particularly important on NixOS: do not let an untrusted candidate
     # contact the privileged Nix daemon or common container/host daemons.
-    "/nix/var/nix/daemon-socket/socket"
-    "/run/nix/daemon-socket/socket"
-    "/run/docker.sock"
-    "/var/run/docker.sock"
-    "/run/containerd/containerd.sock"
-    "/run/udev/control"
-    "/run/NetworkManager/private"
-    "/run/avahi-daemon/socket"
-    "/run/podman/podman.sock"
-    "/etc/credstore"
-    "/etc/credstore.encrypted"
-    "/run/credstore"
-    "/run/credstore.encrypted"
+    "-/nix/var/nix/daemon-socket/socket"
+    "-/run/nix/daemon-socket/socket"
+    "-/run/docker.sock"
+    "-/var/run/docker.sock"
+    "-/run/containerd/containerd.sock"
+    "-/run/udev/control"
+    "-/run/NetworkManager/private"
+    "-/run/avahi-daemon/socket"
+    "-/run/podman/podman.sock"
+    "-/etc/credstore"
+    "-/etc/credstore.encrypted"
+    "-/run/credstore"
+    "-/run/credstore.encrypted"
   ];
 in
 {
