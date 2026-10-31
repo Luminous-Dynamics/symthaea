@@ -28,6 +28,8 @@ pub const REQUIRED_REVIEWERS_PER_PAIR: usize = 3;
 const HASH_DOMAIN: &[u8] = b"symthaea.contamination_panel.hash.v1\0";
 const HMAC_DOMAIN: &[u8] = b"symthaea.contamination_panel.prf.v1\0";
 
+pub mod detectors;
+
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum TierV1 {
