@@ -1036,6 +1036,202 @@ pub fn score_fresh_metamorphic_submission(
     Ok(report)
 }
 
+pub fn verify_fresh_metamorphic_score_report_integrity(
+    report: &FreshMetamorphicScoreReportV1,
+) -> Result<(), String> {
+    if report.schema != FRESH_METAMORPHIC_SCORE_SCHEMA
+        || report.metric_id != FRESH_METAMORPHIC_METRIC_ID
+        || report.independently_verified
+    {
+        return Err("metamorphic score report schema, metric or trust boundary is invalid".to_owned());
+    }
+    for (digest, label) in [
+        (&report.model_checkpoint_sha256, "model_checkpoint_sha256"),
+        (&report.base_public_packet_sha256, "base_public_packet_sha256"),
+        (&report.base_manifest_sha256, "base_manifest_sha256"),
+        (&report.base_sealed_oracle_sha256, "base_sealed_oracle_sha256"),
+        (&report.metamorphic_public_packet_sha256, "metamorphic_public_packet_sha256"),
+        (&report.metamorphic_manifest_sha256, "metamorphic_manifest_sha256"),
+        (&report.metamorphic_sealed_oracle_sha256, "metamorphic_sealed_oracle_sha256"),
+        (&report.submission_sha256, "submission_sha256"),
+        (&report.inference_harness_sha256, "inference_harness_sha256"),
+        (&report.prompt_and_decoding_sha256, "prompt_and_decoding_sha256"),
+        (&report.metric_definition_sha256, "metric_definition_sha256"),
+        (&report.run_execution_receipt_sha256, "run_execution_receipt_sha256"),
+        (&report.report_sha256, "report_sha256"),
+    ] {
+        validate_digest(digest, label)?;
+    }
+    if report_digest(report)? != report.report_sha256 {
+        return Err("metamorphic score report digest mismatch".to_owned());
+    }
+    let mut ids = BTreeSet::new();
+    let mut correct = 0_u64;
+    let mut incorrect = 0_u64;
+    let mut invalid = 0_u64;
+    let mut abstained = 0_u64;
+    let mut base_count = 0_u64;
+    let mut transformed_count = 0_u64;
+    let mut base_correct = 0_u64;
+    let mut transformed_correct = 0_u64;
+    for item in &report.items {
+        if item.item_id.trim().is_empty() || !ids.insert(item.item_id.as_str()) {
+            return Err("metamorphic score report item IDs must be unique and nonempty".to_owned());
+        }
+        validate_digest(&item.response_sha256, "item.response_sha256")?;
+        match item.form {
+            FreshMetamorphicFormV1::Base => {
+                base_count += 1;
+                if item.status == FreshItemScoreStatusV1::Correct {
+                    base_correct += 1;
+                }
+            }
+            _ => {
+                transformed_count += 1;
+                if item.status == FreshItemScoreStatusV1::Correct {
+                    transformed_correct += 1;
+                }
+            }
+        }
+        match item.status {
+            FreshItemScoreStatusV1::Correct => correct += 1,
+            FreshItemScoreStatusV1::Incorrect => incorrect += 1,
+            FreshItemScoreStatusV1::InvalidFormat => invalid += 1,
+            FreshItemScoreStatusV1::Abstained => abstained += 1,
+        }
+    }
+    let partitioned = correct.checked_add(incorrect)
+        .and_then(|value| value.checked_add(invalid))
+        .and_then(|value| value.checked_add(abstained))
+        .ok_or_else(|| "metamorphic score item count overflowed".to_owned())?;
+    let valid_responses = correct.checked_add(incorrect)
+        .ok_or_else(|| "metamorphic valid response count overflowed".to_owned())?;
+    if partitioned != report.item_count
+        || report.items.len() as u64 != report.item_count
+        || base_count != report.base_item_count
+        || transformed_count != report.transformed_item_count
+        || correct != report.correct_count
+        || incorrect != report.incorrect_count
+        || invalid != report.invalid_format_count
+        || abstained != report.abstained_count
+        || valid_responses != report.valid_response_count
+        || base_correct != report.base_correct_count
+        || transformed_correct != report.transformed_correct_count
+        || base_count == 0
+        || transformed_count == 0
+    {
+        return Err("metamorphic score item statuses and summary counts disagree".to_owned());
+    }
+
+    let mut group_ids = BTreeSet::new();
+    let mut group_item_total = 0_u64;
+    let mut complete = 0_u64;
+    let mut incomplete = 0_u64;
+    let mut consistent = 0_u64;
+    let mut disagreement = 0_u64;
+    let mut consistent_wrong = 0_u64;
+    let mut fully_correct_consistent = 0_u64;
+    let mut base_correct_variant_inconsistent = 0_u64;
+    for group in &report.groups {
+        if group.group_id.trim().is_empty() || !group_ids.insert(group.group_id.as_str()) {
+            return Err("metamorphic score group IDs must be unique and nonempty".to_owned());
+        }
+        if group.item_count != FRESH_METAMORPHIC_FORMS_PER_GROUP as u64
+            || group.valid_response_count > group.item_count
+            || group.correct_count > group.valid_response_count
+            || group.complete_valid_group != (group.valid_response_count == group.item_count)
+            || group.outputs_agree.is_some() != group.complete_valid_group
+            || (group.fully_correct_and_consistent
+                && !(group.complete_valid_group
+                    && group.outputs_agree == Some(true)
+                    && group.correct_count == group.item_count))
+            || (group.consistent_but_wrong
+                && !(group.complete_valid_group
+                    && group.outputs_agree == Some(true)
+                    && group.correct_count == 0))
+            || (group.base_correct_variant_inconsistent
+                && !(group.complete_valid_group && group.outputs_agree == Some(false)))
+        {
+            return Err(format!("metamorphic group {} has inconsistent summary fields", group.group_id));
+        }
+        let group_items: Vec<&FreshMetamorphicItemScoreV1> =
+            report.items.iter().filter(|item| item.group_id == group.group_id).collect();
+        if group_items.len() as u64 != group.item_count {
+            return Err(format!("metamorphic group {} item membership count mismatch", group.group_id));
+        }
+        let group_correct = group_items.iter()
+            .filter(|item| item.status == FreshItemScoreStatusV1::Correct).count() as u64;
+        let group_valid = group_items.iter()
+            .filter(|item| matches!(
+                item.status,
+                FreshItemScoreStatusV1::Correct | FreshItemScoreStatusV1::Incorrect
+            )).count() as u64;
+        let base_items: Vec<_> = group_items.iter()
+            .filter(|item| item.form == FreshMetamorphicFormV1::Base).collect();
+        if group_correct != group.correct_count
+            || group_valid != group.valid_response_count
+            || base_items.len() != 1
+        {
+            return Err(format!("metamorphic group {} summaries do not match item records", group.group_id));
+        }
+        if group.base_correct_variant_inconsistent
+            && base_items[0].status != FreshItemScoreStatusV1::Correct
+        {
+            return Err(format!("metamorphic group {} claims base-correct inconsistency without a correct base form", group.group_id));
+        }
+        group_item_total = group_item_total.checked_add(group.item_count)
+            .ok_or_else(|| "metamorphic group item total overflowed".to_owned())?;
+        if group.complete_valid_group {
+            complete += 1;
+            if group.outputs_agree == Some(true) {
+                consistent += 1;
+            } else {
+                disagreement += 1;
+            }
+        } else {
+            incomplete += 1;
+        }
+        consistent_wrong += u64::from(group.consistent_but_wrong);
+        fully_correct_consistent += u64::from(group.fully_correct_and_consistent);
+        base_correct_variant_inconsistent += u64::from(group.base_correct_variant_inconsistent);
+    }
+    if group_item_total != report.item_count
+        || group_ids.len() as u64 != report.group_count
+        || complete != report.complete_valid_group_count
+        || incomplete != report.incomplete_group_count
+        || consistent != report.consistent_group_count
+        || disagreement != report.disagreement_group_count
+        || consistent_wrong != report.consistent_but_wrong_group_count
+        || fully_correct_consistent != report.fully_correct_and_consistent_group_count
+        || base_correct_variant_inconsistent != report.base_correct_variant_inconsistent_group_count
+    {
+        return Err("metamorphic score group totals disagree with report summaries".to_owned());
+    }
+    let rate_matches = |actual: f64, expected: f64| {
+        actual.is_finite() && (actual - expected).abs() < 1.0e-9
+    };
+    let expected_all = correct as f64 * 1_000.0 / report.item_count as f64;
+    let expected_base = base_correct as f64 * 1_000.0 / base_count as f64;
+    let expected_transformed = transformed_correct as f64 * 1_000.0 / transformed_count as f64;
+    let answered = report.item_count.checked_sub(abstained)
+        .ok_or_else(|| "metamorphic abstention count underflowed".to_owned())?;
+    let expected_coverage = answered as f64 * 1_000.0 / report.item_count as f64;
+    if !rate_matches(report.accuracy_all_forms_permille, expected_all)
+        || !rate_matches(report.accuracy_base_form_permille, expected_base)
+        || !rate_matches(report.accuracy_transformed_forms_permille, expected_transformed)
+        || !rate_matches(report.coverage_permille, expected_coverage)
+    {
+        return Err("metamorphic score accuracy/coverage rates disagree with item counts".to_owned());
+    }
+    match (report.metamorphic_consistency_permille, complete) {
+        (None, 0) => {}
+        (Some(value), denominator) if denominator > 0
+            && rate_matches(value, consistent as f64 * 1_000.0 / denominator as f64) => {}
+        _ => return Err("metamorphic consistency rate does not match complete-group denominator".to_owned()),
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
