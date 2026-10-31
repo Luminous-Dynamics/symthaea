@@ -12,6 +12,10 @@ use contamination_panel_bench::{
         SEARCH_MAX_FINDINGS_BYTES, SEARCH_MAX_TRACE_BYTES,
         audit_search_time_trace, audit_search_time_findings,
     },
+    search_time_composition::{
+        CompositionalExposureFindingsV1, audit_compositional_exposure,
+        COMPOSITION_FINDINGS_SCHEMA,
+    },
     DetectorSpecV1, PublicChallengePacketV1, SealedChallengeKeyV1,
     audit_blinded_adjudications, detectors::{evaluate_detector_run, score_public_packet},
     ftd::{
@@ -283,6 +287,47 @@ fn verify_fresh_score_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn audit_search_time_compositions_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 4 {
+        return Err(
+            "usage: contamination-panel-bench audit-search-time-compositions <trace.json> <compositional-findings.json> <audit-report.json>"
+                .into(),
+        );
+    }
+    let trace_bytes = fs::read(&args[1])?;
+    if trace_bytes.len() > SEARCH_MAX_TRACE_BYTES {
+        return Err("search-time trace exceeds 256 MiB safety bound".into());
+    }
+    let trace: SearchTimeExposureTraceV1 = serde_json::from_slice(&trace_bytes)?;
+    let findings_bytes = fs::read(&args[2])?;
+    if findings_bytes.len() > SEARCH_MAX_FINDINGS_BYTES {
+        return Err("compositional findings exceed 64 MiB safety bound".into());
+    }
+    let findings: CompositionalExposureFindingsV1 =
+        serde_json::from_slice(&findings_bytes)?;
+    if findings.schema != COMPOSITION_FINDINGS_SCHEMA {
+        return Err("unknown compositional findings schema".into());
+    }
+    let report = audit_compositional_exposure(&trace, &findings)
+        .map_err(io::Error::other)?;
+    write_bytes(&args[3], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "valid={} compositions={} context={} answer={} unknown={} minimality_certified={}",
+        report.valid,
+        report.finding_count,
+        report.context_bearing_count,
+        report.answer_bearing_count,
+        report.unknown_count,
+        report.minimality_certified_count
+    );
+    println!(
+        "independently_verified={} semantic_evidence_independently_verified={}",
+        report.independently_verified,
+        report.semantic_evidence_independently_verified
+    );
+    Ok(())
+}
+
 fn audit_search_time_trace_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 3 {
         return Err(
@@ -540,9 +585,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("verify-fresh-score") => verify_fresh_score_cli(&args),
         Some("audit-search-time-trace") => audit_search_time_trace_cli(&args),
         Some("audit-search-time-findings") => audit_search_time_findings_cli(&args),
+        Some("audit-search-time-compositions") => audit_search_time_compositions_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | verify-fresh-score | audit-search-time-trace | audit-search-time-findings | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | verify-fresh-score | audit-search-time-trace | audit-search-time-findings | audit-search-time-compositions | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
