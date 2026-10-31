@@ -26,8 +26,10 @@ cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-v1
 - Anti-replay behavior: a later revocation/correction advances the state identity, so an earlier valid receipt cannot resurrect a superseded conclusion.
 - A declared producer/verifier identity distinction (not cryptographic proof of independence).
 - Receipt validation is transactional: duplicate state IDs, missing/mismatched current-state identities, or stale receipt bindings leave the obligation state unchanged.
-- A public deterministic POAR-v1 runner with 16 scheduler/receipt conformance fixtures. Fifteen fixtures assert routing/stopping choices; one exercises the valid-promotion → revocation → stale-replay receipt lifecycle. These are structural smoke fixtures, not simulations of the complete named domain phenomena, a model leaderboard, or a hidden-test evaluation.
-- 25 authored unit tests covering routing, budget boundaries, no-progress stopping, current-state binding, stale-receipt replay, transactional multi-obligation freshness, exact receipt binding, source revocation, invalid proof, deterministic selection, and non-promotion on failed/unverified work.
+- A public deterministic POAR-v1 runner with 16 scheduler/receipt conformance fixtures. Fifteen fixtures assert routing/stopping choices; one exercises the valid-promotion → revocation → stale-replay receipt lifecycle. These are structural smoke fixtures, not full domain simulations.
+- An AND/OR graph generator with private source-truth labels, a separate recursive oracle, disjoint source-family splits, valid-time / known-time evidence revisions, source-independence groups, scope/authority constraints, cycle rejection, and a retraction mutation control.
+- 35 authored unit tests: 24 scheduler/receipt tests, one POAR routing-suite test, and ten graph/oracle tests.
+- Graph benchmarks report disposition correctness, false support/refutation, unsupported proof paths, citation completeness, temporal/scope/authority/integrity violations, retracted citations, and correlated-source violations as separate metrics; there is no composite score.
 
 ## Deliberate limits
 
