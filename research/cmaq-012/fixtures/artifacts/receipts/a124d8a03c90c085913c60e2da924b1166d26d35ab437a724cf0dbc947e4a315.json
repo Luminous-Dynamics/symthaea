@@ -1,0 +1,23 @@
+{
+  "schema_version": "cmaq-012-profiling-receipt-v0.1",
+  "resource_profile_sha256": "7fface57b733540bbe96458325b739a529d2669cbb31209c93690abba1b45f9d",
+  "task": "halfcheetah",
+  "capability": "control",
+  "split": "qualification",
+  "seed": 1,
+  "arm": "W3",
+  "measurement_method": "operator_trace",
+  "latency_ms": 12.5,
+  "compute_work_units": 100000,
+  "peak_memory_bytes": 1048576,
+  "energy_millijoules": null,
+  "direct_value_calls": 0,
+  "world_model_forward_calls": 0,
+  "world_model_transition_calls": 0,
+  "oracle_transition_calls": 300,
+  "environment_transition_calls": 3,
+  "optimizer_iterations": 3,
+  "recorder_id": "synthetic-fixture-no-independent-recorder",
+  "claim_ceiling": "artifact_content_integrity_verified_profiler_and_hardware_origin_unattested",
+  "fixture_only": true
+}
