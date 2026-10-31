@@ -201,7 +201,6 @@ pub fn audit_bytes(profile_bytes: &[u8], receipt_bytes: &[u8]) -> CoverageAuditR
 
     let before_receipt_errors = report.errors.len();
     validate_receipt_shape(&receipt, &mut report);
-    report.receipt_well_formed = report.errors.len() == before_receipt_errors;
 
     let profile_digest_matches = receipt.profile_digest == report.profile_digest;
     let profile_id_matches = receipt.profile_id == profile.profile_id;
@@ -217,6 +216,9 @@ pub fn audit_bytes(profile_bytes: &[u8], receipt_bytes: &[u8]) -> CoverageAuditR
     validate_controls(&profile, &receipt, &mut report);
     validate_capture(&receipt, &mut report);
     validate_channels(&profile, &receipt, &mut report);
+    // Channel classification, capture identity and profile binding are part of
+    // receipt well-formedness, not merely advisory diagnostics.
+    report.receipt_well_formed = report.errors.len() == before_receipt_errors;
 
     let all_events_observed = report.counts.required_event_kinds > 0
         && report.counts.observed_event_kinds == report.counts.required_event_kinds
@@ -248,9 +250,16 @@ pub fn audit_bytes(profile_bytes: &[u8], receipt_bytes: &[u8]) -> CoverageAuditR
         && health_clean
         && all_events_observed;
 
-    report.coverage_claim_consistent = match receipt.claim.as_str() {
+    let platform_supported = receipt.platform.os == profile.platform.os
+        && profile.platform.architectures.contains(&receipt.platform.architecture);
+    let has_unresolved_scope = report.counts.unresolved_event_kinds > 0
+        || report.counts.excluded_event_kinds > 0
+        || !controls_complete
+        || !platform_complete;
+    report.coverage_claim_consistent = report.receipt_well_formed && report.profile_match && match receipt.claim.as_str() {
         "complete_within_profile" => complete_conditions,
-        "incomplete" | "unsupported" => true,
+        "incomplete" => true,
+        "unsupported" => !platform_supported || has_unresolved_scope,
         _ => false,
     };
     report.coverage_complete_within_profile =
