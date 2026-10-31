@@ -705,3 +705,101 @@ The normalized threshold is computed with exact integer comparisons; it is not a
 
 This helps prevent near-singular systems from being accidentally mixed into the same task difficulty band. It does not yet make the problem generator psychometrically calibrated: difficulty also depends on coefficient/solution magnitudes, cancellation, representation, and model-specific skill. These factors need separate calibration experiments.
 
+
+
+## Metamorphic robustness for fresh linear-system tasks
+
+The module src/fresh_metamorphic.rs extends every base 2x2 integer linear-system challenge into a five-form equivalence group:
+
+1. Base representation.
+2. Swap equation order.
+3. Multiply equation 1 by +2.
+4. Multiply equation 2 by -2.
+5. Swap rows and independently scale the new first/second rows by +3/-2.
+
+All transformations preserve the exact integer solution. Coefficients and right-hand sides are transformed with checked arithmetic. The generator also requires the exact row-normalized determinant margin to remain unchanged. The transformation rule set and exact source file are bound into the metamorphic manifest.
+
+### Generate equivalent forms
+
+The metamorphic public packet, evaluator-only sealed oracle and manifest are derived from a validated base fresh bundle:
+
+~~~sh
+cargo run --locked -- generate-fresh-metamorphic \
+  /secure/evaluator/base-public-packet.json \
+  /secure/evaluator/base-sealed-oracle.json \
+  /secure/evaluator/base-manifest.json \
+  /secure/evaluator/metamorphic-public-packet.json \
+  /secure/evaluator/metamorphic-sealed-oracle.json \
+  /secure/evaluator/metamorphic-manifest.json
+~~~
+
+Audit deterministic regeneration and exact solution/stability preservation:
+
+~~~sh
+cargo run --locked -- audit-fresh-metamorphic \
+  /secure/evaluator/base-public-packet.json \
+  /secure/evaluator/base-sealed-oracle.json \
+  /secure/evaluator/base-manifest.json \
+  /secure/evaluator/metamorphic-public-packet.json \
+  /secure/evaluator/metamorphic-sealed-oracle.json \
+  /secure/evaluator/metamorphic-manifest.json \
+  /secure/evaluator/metamorphic-audit.json
+~~~
+
+The model-facing packet contains base and transformed equations, item IDs, parent/group IDs and form names only. It does not contain the seed, hidden parameters, exact answers or normalized determinant margin. The evaluator-only oracle binds each transformed parameter set to the base answer and exact answer digest.
+
+### Score and verify
+
+Submit exactly one raw response per base/variant task:
+
+~~~sh
+cargo run --locked -- score-fresh-metamorphic \
+  /secure/evaluator/base-public-packet.json \
+  /secure/evaluator/base-sealed-oracle.json \
+  /secure/evaluator/base-manifest.json \
+  /secure/evaluator/metamorphic-public-packet.json \
+  /secure/evaluator/metamorphic-sealed-oracle.json \
+  /secure/evaluator/metamorphic-manifest.json \
+  /secure/evaluator/metamorphic-submission.json \
+  /secure/evaluator/metamorphic-score-report.json
+~~~
+
+Then verify report integrity and aggregate counts/rates:
+
+~~~sh
+cargo run --locked -- verify-fresh-metamorphic-score \
+  /secure/evaluator/metamorphic-score-report.json
+~~~
+
+### Metrics are deliberately separated
+
+- **Exact accuracy:** correct answers over all forms.
+- **Base accuracy:** exact correctness on the original representation.
+- **Transformed accuracy:** exact correctness on the equivalent presentations.
+- **Coverage:** non-abstained responses; malformed nonempty responses remain answered but invalid-format.
+- **Metamorphic consistency:** fraction of complete, valid five-form groups whose parsed answers all agree.
+- **Consistent but wrong:** all five outputs agree with each other but none matches the oracle.
+- **Fully correct and consistent:** all five forms are exact and agree.
+- **Base-correct/variant-inconsistent:** the base form is correct but at least one equivalent form disagrees.
+- **Incomplete group:** at least one response is invalid or abstained; it is excluded from the consistency denominator and explicitly counted.
+
+This prevents a model that repeats the same wrong answer across every form from looking successful. It also prevents invalid/abstained responses from being treated as consistency passes.
+
+Variants are repeated measurements within a base item group, not independent benchmark samples. Any future model comparison must cluster by base task and independently replicate model runs.
+
+### Psychometric calibration is not yet claimed
+
+The first strata are algebraically structural controls. Determinant margin, coefficient/solution magnitude and representation type are candidate difficulty covariates, not calibrated item parameters. A later psychometric stage should fit IRT or hierarchical item models on a calibration split, freeze item parameters, and evaluate any adaptive selector on an untouched holdout. The proposed goal of at least 50% fewer variants at a preregistered measurement-error tolerance is a research target, not a result.
+
+Schemas:
+- schema/fresh-metamorphic-public-packet.schema.json
+- schema/fresh-metamorphic-sealed-oracle.schema.json
+- schema/fresh-metamorphic-manifest.schema.json
+- schema/fresh-metamorphic-audit.schema.json
+- schema/fresh-metamorphic-submission.schema.json
+- schema/fresh-metamorphic-score-report.schema.json
+
+### Claim boundary
+
+This lane measures correctness and answer agreement under the registered row permutation/scaling transformations only. It does not prove broad mathematical reasoning, robustness to arbitrary paraphrases, psychometric calibration, task-recipe novelty, or absence from training data. The execution receipt and checkpoint identity remain self-reported until independent attestation verification exists.
+
