@@ -61,9 +61,9 @@
       "unit": "proportion"
     },
     {
-      "metric_id": "unsupported_disabled_denied_classification_accuracy",
+      "metric_id": "errno_classification_accuracy",
       "phase": "safety",
-      "definition": "Fraction of controlled ENOSYS/EINVAL, EOPNOTSUPP, EPERM/EACCES cases assigned the correct status class; permission denial must not be called unsupported.",
+      "definition": "Fraction of controlled ENOSYS, EOPNOTSUPP, EPERM/EACCES and EINVAL outcomes assigned to distinct not-supported, disabled, permission-denied and invalid-request classes.",
       "target": {
         "operator": "=",
         "value": 1
