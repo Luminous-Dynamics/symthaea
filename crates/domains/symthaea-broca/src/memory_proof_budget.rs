@@ -1724,8 +1724,10 @@ mod tests {
     fn legacy_single_session_serialization_omits_new_zero_and_absent_fields() {
         let mut legacy_candidate = candidate("A", "family-A", 2);
         legacy_candidate.source_session_id = None;
+        legacy_candidate.source_speaker = None;
         let candidate_json = serde_json::to_value(&legacy_candidate).unwrap();
         assert!(candidate_json.get("source_session_id").is_none());
+        assert!(candidate_json.get("source_speaker").is_none());
 
         let req = request(
             vec![legacy_candidate],
@@ -1739,6 +1741,21 @@ mod tests {
         assert!(
             request_json["obligations"][0]
                 .get("minimum_distinct_sessions")
+                .is_none()
+        );
+        assert!(
+            request_json["obligations"][0]
+                .get("minimum_user_authored_evidence")
+                .is_none()
+        );
+        assert!(
+            request_json["obligations"][0]
+                .get("required_complete_evidence_ids")
+                .is_none()
+        );
+        assert!(
+            request_json["obligations"][0]
+                .get("enumeration_receipt_sha256")
                 .is_none()
         );
         assert_eq!(
