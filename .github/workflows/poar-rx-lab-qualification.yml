@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: poar-rx-lab-\${{ github.ref }}
+  group: poar-rx-lab-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: \${{ github.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@1.96.0
         with:
@@ -40,9 +40,21 @@ jobs:
       - name: Run deterministic matrix
         run: |
           set -euo pipefail
-          cargo run --manifest-path research/poar-rx-lab/Cargo.toml > poar-rx-matrix.tsv
+          cargo run --manifest-path research/poar-rx-lab/Cargo.toml --bin poar-rx-lab > poar-rx-matrix.tsv
           test "$(wc -l < poar-rx-matrix.tsv)" -eq 25
           grep -q 'reconcile_first.*commit_then_lose_ack.*non_idempotent.*completed_verified' poar-rx-matrix.tsv
           grep -q 'blind_retry_once.*commit_then_lose_ack.*non_idempotent.*reported_complete_unverified' poar-rx-matrix.tsv
           grep -q 'reconcile_first.*commit_then_readback_unavailable.*non_idempotent.*unknown_outcome' poar-rx-matrix.tsv
           sha256sum poar-rx-matrix.tsv
+
+      - name: Run two-target workflow matrix
+        run: |
+          set -euo pipefail
+          cargo run --manifest-path research/poar-rx-lab/Cargo.toml --bin poar-rx-workflow-matrix > poar-rx-workflow-matrix.tsv
+          test "$(wc -l < poar-rx-workflow-matrix.tsv)" -eq 49
+          grep -Fq $'proof_gated_reconcile\tsecond_commit_ack_lost\tfalse\tcompleted_verified' poar-rx-workflow-matrix.tsv
+          grep -Fq $'blind_workflow_replay\tpermission_revoked_before_second\tfalse\tpartial_state' poar-rx-workflow-matrix.tsv
+          grep -Fq $'proof_gated_reconcile\tconcurrent_update_first_target\tfalse\tpartial_state' poar-rx-workflow-matrix.tsv
+          grep -Fq $'proof_gated_reconcile\tcompensation_failure\ttrue\tpartial_state' poar-rx-workflow-matrix.tsv
+          grep -Fq $'proof_gated_reconcile\tsecond_commit_ack_lost_readback_unavailable\ttrue\tunknown_outcome' poar-rx-workflow-matrix.tsv
+          sha256sum poar-rx-workflow-matrix.tsv
