@@ -46,6 +46,8 @@ pub struct DvdGenerationInputV1 {
     pub model_name: String,
     pub model_version: String,
     pub model_access_mode: String,
+    /// Must be base_model_conditional_log_probability, not the tempered sampling distribution.
+    pub log_probability_semantics: String,
     pub harness_revision_sha256: String,
     pub prompt_sha256: String,
     pub decoding_config_sha256: String,
@@ -89,6 +91,7 @@ pub struct DvdItemReportV1 {
     pub model_name: String,
     pub model_version: String,
     pub model_access_mode: String,
+    pub log_probability_semantics: String,
     pub harness_revision_sha256: String,
     pub prompt_sha256: String,
     pub decoding_config_sha256: String,
@@ -476,8 +479,9 @@ pub fn score_dvd_item(input: &DvdGenerationInputV1) -> Result<DvdItemReportV1, S
         || input.model_name.trim().is_empty()
         || input.model_version.trim().is_empty()
         || input.model_access_mode.trim().is_empty()
+        || input.log_probability_semantics != "base_model_conditional_log_probability"
     {
-        return Err("item, benchmark and model identity fields must be nonempty".to_owned());
+        return Err("item, benchmark and model identity fields must be nonempty, and log_probability_semantics must be base_model_conditional_log_probability".to_owned());
     }
     if !(10..=1_000).contains(&input.requested_generation_count) {
         return Err("requested_generation_count must be in [10, 1000]".to_owned());
@@ -569,6 +573,7 @@ pub fn score_dvd_item(input: &DvdGenerationInputV1) -> Result<DvdItemReportV1, S
         model_name: input.model_name.clone(),
         model_version: input.model_version.clone(),
         model_access_mode: input.model_access_mode.clone(),
+        log_probability_semantics: input.log_probability_semantics.clone(),
         harness_revision_sha256: input.harness_revision_sha256.clone(),
         prompt_sha256: input.prompt_sha256.clone(),
         decoding_config_sha256: input.decoding_config_sha256.clone(),
@@ -643,6 +648,7 @@ mod tests {
             model_name: "fixture-model".to_owned(),
             model_version: "1".to_owned(),
             model_access_mode: "logprob".to_owned(),
+            log_probability_semantics: "base_model_conditional_log_probability".to_owned(),
             harness_revision_sha256: digest("harness"),
             prompt_sha256: digest("prompt"),
             decoding_config_sha256: digest("decode"),
@@ -728,6 +734,13 @@ mod tests {
         let mut input = input_from_difficulties(&[-2.0; 10]);
         input.generations[0].response_token_log_probabilities = vec![-0.1, -0.2];
         assert!(score_dvd_item(&input).unwrap_err().contains("at least 4 required"));
+    }
+
+    #[test]
+    fn tempered_sampling_logprobs_cannot_be_mislabeled_as_base_model_probabilities() {
+        let mut input = input_from_difficulties(&[-2.0; 10]);
+        input.log_probability_semantics = "temperature_scaled_sampling_log_probability".to_owned();
+        assert!(score_dvd_item(&input).unwrap_err().contains("base_model_conditional_log_probability"));
     }
 
     #[test]
