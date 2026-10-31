@@ -17,6 +17,7 @@ pub const SCORE_DEMAND_PROFILE_SCHEMA: &str = "muse-score-demand-profile-v1";
 #[serde(rename_all = "snake_case")]
 pub enum DemandIdentityBasis {
     StablePartId,
+    RoleAggregateSummary,
     RoleAggregateBecausePartIdentityIsIncomplete,
 }
 
@@ -96,7 +97,8 @@ pub fn analyze_score_demand(
     // If any note lacks an assigned PartId, do not infer missing identities
     // from register, temporal overlap or VoiceRole. Aggregate the whole score
     // by role and label that loss of identity explicitly.
-    let mut groups = BTreeMap::<(u16, u8), Vec<&ScoreNote>>::new();
+    let mut part_groups = BTreeMap::<u16, Vec<&ScoreNote>>::new();
+    let mut role_groups = BTreeMap::<u8, Vec<&ScoreNote>>::new();
     if !score.tempo_bpm.is_finite() {
         return Err(ScoreDemandError::NonFiniteTempo);
     }
@@ -133,36 +135,56 @@ pub fn analyze_score_demand(
         }
         analyzed_span = analyzed_span.max(end);
 
-        let group_id = if has_complete_part_identity {
-            note.part.0
-        } else {
-            u16::MAX
-        };
-        // Stable parts are grouped once even if their functional role changes.
-        // Without complete part identity, use one aggregate per role.
-        let group_role_key = if has_complete_part_identity {
-            0
-        } else {
-            role_rank(note.role)
-        };
-        groups
-            .entry((group_id, group_role_key))
+        role_groups
+            .entry(role_rank(note.role))
             .or_default()
             .push(note);
+        if has_complete_part_identity {
+            // Group by stable PartId only. One continuing line remains one
+            // instrument demand even if its functional role changes.
+            part_groups.entry(note.part.0).or_default().push(note);
+        }
     }
 
-    let voice_demands = groups
-        .into_iter()
-        .map(|((group_id, _), notes)| {
+    let score_span = analyzed_span.max(f64::EPSILON);
+    let mut voice_demands = Vec::with_capacity(
+        part_groups.len() + role_groups.len(),
+    );
+    if has_complete_part_identity {
+        // Part-level demands preserve identity across role changes.
+        voice_demands.extend(part_groups.into_iter().map(|(part_id, notes)| {
             build_voice_demand(
-                group_id,
+                Some(part_id),
                 notes,
-                has_complete_part_identity,
-                analyzed_span.max(f64::EPSILON),
+                DemandIdentityBasis::StablePartId,
+                score_span,
                 score.meter,
             )
-        })
-        .collect();
+        }));
+        // Role summaries retain workload information useful to lead/bass/
+        // harmony balancing, but are not additional independent parts.
+        voice_demands.extend(role_groups.into_iter().map(|(_, notes)| {
+            build_voice_demand(
+                None,
+                notes,
+                DemandIdentityBasis::RoleAggregateSummary,
+                score_span,
+                score.meter,
+            )
+        }));
+    } else {
+        // No complete part identity: role aggregates are the strongest
+        // claim supported by the source score. Do not reconstruct parts.
+        voice_demands.extend(role_groups.into_iter().map(|(_, notes)| {
+            build_voice_demand(
+                None,
+                notes,
+                DemandIdentityBasis::RoleAggregateBecausePartIdentityIsIncomplete,
+                score_span,
+                score.meter,
+            )
+        }));
+    }
 
     Ok(ScoreDemandProfile {
         schema: SCORE_DEMAND_PROFILE_SCHEMA.into(),
@@ -186,9 +208,9 @@ fn role_rank(role: VoiceRole) -> u8 {
 }
 
 fn build_voice_demand(
-    group_id: u16,
+    part_id: Option<u16>,
     notes: Vec<&ScoreNote>,
-    has_complete_part_identity: bool,
+    identity_basis: DemandIdentityBasis,
     score_span: f64,
     meter: u8,
 ) -> VoiceDemand {
@@ -264,13 +286,9 @@ fn build_voice_demand(
     });
 
     VoiceDemand {
-        part_id: has_complete_part_identity.then_some(group_id),
+        part_id,
         roles,
-        identity_basis: if has_complete_part_identity {
-            DemandIdentityBasis::StablePartId
-        } else {
-            DemandIdentityBasis::RoleAggregateBecausePartIdentityIsIncomplete
-        },
+        identity_basis,
         note_count,
         min_midi,
         max_midi,
@@ -324,12 +342,16 @@ mod tests {
         let profile = analyze_score_demand(&score()).unwrap();
         assert!(profile.has_complete_part_identity);
         assert_eq!(profile.assigned_part_note_fraction, 1.0);
-        assert_eq!(profile.voice_demands.len(), 2);
+        // Two part demands plus two role summaries.
+        assert_eq!(profile.voice_demands.len(), 4);
 
         let melody = profile
             .voice_demands
             .iter()
-            .find(|voice| voice.roles.contains(&VoiceRole::Melody))
+            .find(|voice| {
+                voice.part_id == Some(1)
+                    && voice.identity_basis == DemandIdentityBasis::StablePartId
+            })
             .unwrap();
         assert_eq!(melody.part_id, Some(1));
         assert_eq!(melody.note_count, 3);
@@ -343,7 +365,10 @@ mod tests {
         let bass = profile
             .voice_demands
             .iter()
-            .find(|voice| voice.roles.contains(&VoiceRole::Bass))
+            .find(|voice| {
+                voice.part_id == Some(2)
+                    && voice.identity_basis == DemandIdentityBasis::StablePartId
+            })
             .unwrap();
         assert_eq!(bass.part_id, Some(2));
         assert_eq!(bass.peak_simultaneous_notes, 1);
@@ -368,11 +393,19 @@ mod tests {
             });
         }
         let profile = analyze_score_demand(&score).unwrap();
-        assert_eq!(profile.voice_demands.len(), 1);
-        assert_eq!(profile.voice_demands[0].part_id, Some(9));
+        assert_eq!(profile.voice_demands.len(), 3);
+        let part = profile.voice_demands.iter()
+            .find(|demand| demand.part_id == Some(9))
+            .unwrap();
         assert_eq!(
-            profile.voice_demands[0].roles,
+            part.roles,
             vec![VoiceRole::Melody, VoiceRole::Harmony]
+        );
+        assert_eq!(
+            profile.voice_demands.iter()
+                .filter(|demand| demand.identity_basis == DemandIdentityBasis::RoleAggregateSummary)
+                .count(),
+            2
         );
     }
 
