@@ -221,11 +221,12 @@ pub fn probe_linux() -> anyhow::Result<LinuxProbeReport> {
     };
 
     let landlock_config = config.flags.get("CONFIG_SECURITY_LANDLOCK").copied();
-    let landlock_status = match landlock_config {
-        Some(true) => CapabilityStatus::CandidateAvailable,
-        Some(false) => CapabilityStatus::NotAvailable,
-        None => CapabilityStatus::Unknown,
-    };
+    let landlock_active = has_active_lsm(active_lsm.value.as_deref(), "landlock");
+    let landlock_status = assess_landlock(
+        landlock_active,
+        active_lsm.status,
+        landlock_config,
+    );
 
     let cgroup_v2_mount = mounts.iter().any(|mount| mount.filesystem == "cgroup2");
     let cgroup_membership = read_text_evidence("cgroup_membership", Path::new("/proc/self/cgroup"));
@@ -290,6 +291,7 @@ pub fn probe_linux() -> anyhow::Result<LinuxProbeReport> {
             capability_id: CAPABILITY_IDS[4],
             status: landlock_status,
             evidence: vec![
+                active_lsm.clone(),
                 config.evidence.clone(),
                 not_probed_evidence("landlock_abi", "no landlock_create_ruleset syscall was executed"),
             ],
@@ -358,6 +360,26 @@ fn assess_bpf_lsm(
         Some(false) => CapabilityStatus::NotAvailable,
         Some(true) if btf_available => CapabilityStatus::CandidateAvailable,
         Some(true) => CapabilityStatus::Unknown,
+        None if active_lsm_status == EvidenceStatus::Inaccessible => CapabilityStatus::Inaccessible,
+        None => CapabilityStatus::Unknown,
+    }
+}
+
+fn assess_landlock(
+    active: Option<bool>,
+    active_lsm_status: EvidenceStatus,
+    kernel_config: Option<bool>,
+) -> CapabilityStatus {
+    if kernel_config == Some(false) {
+        return if active == Some(true) {
+            CapabilityStatus::Unknown
+        } else {
+            CapabilityStatus::NotAvailable
+        };
+    }
+    match active {
+        Some(true) => CapabilityStatus::CandidateAvailable,
+        Some(false) => CapabilityStatus::NotAvailable,
         None if active_lsm_status == EvidenceStatus::Inaccessible => CapabilityStatus::Inaccessible,
         None => CapabilityStatus::Unknown,
     }
@@ -774,6 +796,26 @@ mod tests {
     fn contradictory_bpf_configuration_does_not_promote_a_candidate() {
         assert_eq!(
             assess_bpf_lsm(Some(true), EvidenceStatus::Collected, true, Some(false), Some(true)),
+            CapabilityStatus::Unknown
+        );
+    }
+
+    #[test]
+    fn landlock_candidate_requires_active_lsm_not_config_presence_alone() {
+        assert_eq!(
+            assess_landlock(Some(true), EvidenceStatus::Collected, Some(true)),
+            CapabilityStatus::CandidateAvailable
+        );
+        assert_eq!(
+            assess_landlock(Some(false), EvidenceStatus::Collected, Some(true)),
+            CapabilityStatus::NotAvailable
+        );
+        assert_eq!(
+            assess_landlock(None, EvidenceStatus::Inaccessible, Some(true)),
+            CapabilityStatus::Inaccessible
+        );
+        assert_eq!(
+            assess_landlock(Some(true), EvidenceStatus::Collected, Some(false)),
             CapabilityStatus::Unknown
         );
     }
