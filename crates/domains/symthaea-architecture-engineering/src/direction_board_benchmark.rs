@@ -1253,8 +1253,8 @@ impl DirectionCampaignRun {
                 input_tokens: unknown("synthetic campaign does not meter model tokens"),
                 output_tokens: unknown("synthetic campaign does not meter model tokens"),
                 tool_calls: unknown("synthetic campaign does not meter external tool calls"),
-                evaluator_calls: meter_value(1),
-                verifier_calls: meter_value(if action.is_new_proposal { 1 } else { 0 }),
+                evaluator_calls: meter_value(if action.is_new_proposal { 0 } else { 1 }),
+                verifier_calls: meter_value(1),
                 charged_budget_microunits: meter_value(charge),
             };
             tape.append(ActionEvent {
