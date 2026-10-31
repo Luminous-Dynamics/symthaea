@@ -707,6 +707,16 @@ mod tests {
             audit_schema["properties"]["schema"]["const"].as_str(),
             Some(TRAINING_RECEIPT_REPORT_SCHEMA)
         );
+        let arm_properties: BTreeSet<String> = receipt_schema["$defs"]["arm"]["properties"]
+            .as_object().unwrap().keys().cloned().collect();
+        let arm_required: BTreeSet<String> = receipt_schema["$defs"]["arm"]["required"]
+            .as_array().unwrap().iter()
+            .map(|value| value.as_str().unwrap().to_owned()).collect();
+        let treatment_keys: BTreeSet<String> = receipt_value["treatment"].as_object().unwrap()
+            .keys().cloned().collect();
+        assert_eq!(arm_properties, arm_required);
+        assert_eq!(arm_properties, treatment_keys);
+
         let receipt_required: BTreeSet<String> = receipt_schema["required"].as_array().unwrap()
             .iter().map(|value| value.as_str().unwrap().to_owned()).collect();
         let receipt_properties: BTreeSet<String> = receipt_schema["properties"].as_object().unwrap()
