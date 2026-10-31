@@ -336,6 +336,8 @@ fn audit_values(
     let graph_sha = sha256(graph_bytes);
     let explanation_sha = sha256(explanation_bytes);
     let oracle_sha = sha256(oracle_bytes);
+    let source_artifact_sha = string(graph, "source_artifact_sha256", "graph")?;
+    valid_sha(source_artifact_sha, "graph.source_artifact_sha256")?;
     let (nodes, edges, node_edge_sha) = load_graph(graph)?;
 
     let design_id = string(explanation.get("grouping").ok_or("explanation.grouping is required")?, "design_id", "explanation.grouping")?;
@@ -349,9 +351,9 @@ fn audit_values(
     let source = explanation.get("source").ok_or("explanation.source is required")?;
     let _ = string(source, "artifact_id", "explanation.source")?;
     let _ = string(source, "source_path", "explanation.source")?;
-    require_digest(source, "source_sha256", &graph_sha, "explanation.source")?;
+    require_digest(source, "source_sha256", source_artifact_sha, "explanation.source")?;
     require_digest(source, "node_edge_map_sha256", &node_edge_sha, "explanation.source")?;
-    require_digest(oracle, "source_sha256", &graph_sha, "oracle")?;
+    require_digest(oracle, "source_sha256", source_artifact_sha, "oracle")?;
     let model = explanation.get("model").ok_or("explanation.model is required")?;
     for key in ["model_sha256", "config_sha256", "training_lineage_sha256"] {
         let value = string(model, key, "explanation.model")?;
@@ -435,7 +437,7 @@ fn audit_values(
         if !seen_path_ids.insert(path_id.clone()) {
             return Err(format!("duplicate explanation path_id {path_id}"));
         }
-        require_digest(path, "source_sha256", &graph_sha, &ctx)?;
+        require_digest(path, "source_sha256", source_artifact_sha, &ctx)?;
         let status = string(path, "status", &ctx)?;
         let edge_ids = string_array(path, "edge_ids", &ctx)?;
         let reason = string(path, "reason", &ctx)?;
@@ -522,7 +524,8 @@ fn audit_values(
         "claim_scope": CLAIM_SCOPE,
         "inputs": {
             "explanation_sha256": explanation_sha,
-            "source_graph_sha256": graph_sha,
+            "source_graph_document_sha256": graph_sha,
+            "source_artifact_sha256": source_artifact_sha,
             "oracle_sha256": oracle_sha,
             "node_edge_map_sha256": node_edge_sha,
             "model_sha256": explanation.get("model").and_then(|v| v.get("model_sha256")),
