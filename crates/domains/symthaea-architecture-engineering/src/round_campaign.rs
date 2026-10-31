@@ -65,12 +65,10 @@ pub struct ClaimCapProfile {
 
 impl ClaimCapProfile {
     pub fn validate(&self, seat_count: usize) -> Result<(), RoundContractError> {
-        if self.max_evaluations_per_direction_per_round == 0
-            || self.max_new_proposals_per_round == 0
-        {
+        if self.max_evaluations_per_direction_per_round == 0 {
             return Err(RoundContractError::new(
-                "claim_caps",
-                "both claim limits must be positive",
+                "claim_caps.max_evaluations_per_direction_per_round",
+                "evaluation claim limit must be positive",
             ));
         }
         if self.max_evaluations_per_direction_per_round > seat_count
@@ -109,6 +107,7 @@ pub struct RoundSeat {
 pub struct RoundPlan {
     pub schema: String,
     pub version: String,
+    pub campaign_id: String,
     pub round_id: String,
     pub round_index: u64,
     pub policy_id: String,
@@ -129,6 +128,7 @@ pub struct RoundPlan {
 impl RoundPlan {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        campaign_id: impl Into<String>,
         round_id: impl Into<String>,
         round_index: u64,
         policy_id: impl Into<String>,
@@ -143,6 +143,7 @@ impl RoundPlan {
         let mut plan = Self {
             schema: ROUND_SCHEMA.to_owned(),
             version: ROUND_VERSION.to_owned(),
+            campaign_id: campaign_id.into(),
             round_id: round_id.into(),
             round_index,
             policy_id: policy_id.into(),
@@ -175,6 +176,7 @@ impl RoundPlan {
                 "unsupported scheduler round schema/version",
             ));
         }
+        validate_identifier("campaign_id", &self.campaign_id)?;
         validate_identifier("round_id", &self.round_id)?;
         validate_identifier("policy_id", &self.policy_id)?;
         match (self.round_index, self.parent_close_sha256.as_deref()) {
@@ -730,7 +732,11 @@ impl RoundLedger {
         close: &RoundCloseReceipt,
     ) -> Result<ValidatedRoundSummary, RoundContractError> {
         self.validate_integrity()?;
+        self.validate_integrity()?;
         plan.validate_integrity()?;
+        if plan.campaign_id != self.campaign_id {
+            return Err(RoundContractError::new("campaign_id", "round belongs to a different campaign"));
+        }
         if plan.round_index != self.next_round_index {
             return Err(RoundContractError::new(
                 "round_index",
@@ -810,7 +816,7 @@ fn domain_digest(domain: &[u8], bytes: &[u8]) -> String {
     hasher.update(domain);
     hasher.update(bytes);
     let digest = hasher.finalize();
-    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+    digest.iter().map(|byte| format!("{byte:02x}")).collect::<Vec<_>>().join("")
 }
 
 #[cfg(test)]
