@@ -1,68 +1,75 @@
-# Exact-rational verifier for common-depth CRC
+# Corrected exact-rational verifier for common-depth CRC
 
 **Date:** 2026-10-31  
-**Status:** 7/7 local tests passed; all four alpha targets were checked for 500 recertification rounds with exact rational arithmetic. No remote CI pass is claimed.
+**Status:** Corrected baseline inversion; all four targets checked through 500 rounds with exact rational arithmetic. The earlier draft's exact feasibility checks were valid, but its starting envelope baseline was too conservative because it omitted a factor of one-half on type-1 loss.
 
-## Motivation
+## Correction
 
-The floating-point common-depth recursion already checked all 1,378 augmented count vectors. The next assurance step is to remove tolerances from the verifier: for decimal risk targets such as .02, .05, .10 and .15, use the exact rational levels 1/50, 1/20, 1/10 and 3/20. Every loss and budget operation is then performed using arbitrary-precision fractions.
+The hierarchical loss for a type-1 error is
+[
+\ell_1(a)=\frac12(a-1)_+,
+]
+not ((a-1)_+). Above depth one, the envelope CRC inequality is therefore
 
-For calibration count vector h=(h0,h1,h2) and augmented vector q of size n+1, the exact validity inequality is:
+[
+\frac{h_1}{2}(a-1)+\frac{h_2+1}{2}a\le(n+1)\alpha.
+]
 
-    sum_{c=0}^2 q[c] * ell_c(A(q-e_c)) <= (n+1)*alpha
+For standard CRC, replace the envelope term (a/2) with 1:
 
-where ell0(a)=0, ell1(a)=max(a-1,0)/2, and ell2(a)=a/2.
+[
+1+\frac{h_1}{2}(a-1)+\frac{h_2}{2}a\le(n+1)\alpha.
+]
 
-The code independently solves the piecewise-linear CRC and envelope-CRC baseline on [0,1] and [1,2], and computes every equal-share recertification update using exact slacks. Negative slack is a hard error; no clipping, epsilon or Monte Carlo result can convert a failing table into a pass.
+The earlier rational implementation had the correct loss function and correct augmented-state verifier, so all of its returned tables still satisfied the exact risk inequalities. However, its closed-form baseline inversion used (h_1(a-1)) above depth one, making the starting controller unnecessarily conservative. Its baseline/recertification results are superseded by this corrected version.
+
+A new exact regression uses (h_1=4,h_2=3,B=51/10):
+- envelope depth: (71/40);
+- standard CRC depth: (61/35).
+
+These values satisfy their respective piecewise inequalities with equality.
 
 ## Exact state universe
 
-At n=50:
+For n=50:
 - 1,326 calibration count vectors;
 - 1,378 augmented count vectors.
 
-Every recertification round checks the input table and updated table against all 1,378 augmented constraints. The report's check count accounts for each table validation, including snapshot validations.
+Every equal-share round checks its input and output table against every augmented count vector using Fraction arithmetic. The full 500-round protocol records 1,009 complete table validations per alpha (baseline, pre/post-update checks and saved snapshots), or 1,390,402 exact inequalities per alpha.
 
-## Executed results
+## Corrected results
 
-All four risk targets were run through 500 rounds.
-
-| alpha | exact budget | worst augmented vector | worst total | exact excess | final denominator digits |
+| alpha | Exact budget | Worst augmented state | Worst total | Excess | Max denominator digits |
 |---:|---:|---|---:|---:|---:|
-| .02 | 51/50 | (0,0,51) | 51/50 | 0 | 858 |
-| .05 | 51/20 | (0,0,51) | 51/20 | 0 | 863 |
-| .10 | 51/10 | (0,0,51) | 51/10 | 0 | 865 |
-| .15 | 153/20 | (0,0,51) | 153/20 | 0 | 870 |
+| .02 | 51/50 | (0,0,51) | 51/50 | 0/1 | 857 |
+| .05 | 51/20 | (0,0,51) | 51/20 | 0/1 | 857 |
+| .10 | 51/10 | (0,0,51) | 51/10 | 0/1 | 857 |
+| .15 | 153/20 | (0,0,51) | 153/20 | 0/1 | 857 |
 
-Every saved snapshot at rounds 0, 1, 10, 20, 50, 100, 200 and 500 had exact maximum budget excess 0. The same all-type-2 augmented vector was worst and exactly binding at every saved round. Both standard CRC and envelope CRC baselines also passed exact checks at all four levels.
+At rounds 0, 1, 10, 20, 50, 100, 200 and 500, the maximum exact excess is zero for each target. The same all-type-2 augmented state is the worst and exactly binding. Both corrected standard CRC and envelope CRC baselines passed exact checks at every target.
 
-Across 500 rounds, 1,009 full-table verification passes are recorded per target, or 1,390,402 exact augmented inequalities per alpha and 5,561,608 across four targets. A full 500-round alpha=.10 run using the committed-code-equivalent reference completed in 43.41 seconds. The independent four-target prototype runs took 19.23, 23.83, 33.24 and 32.99 seconds respectively.
+Across four risk levels: 5,561,608 exact augmented-state inequalities were evaluated. Final controller depths use rational denominators of at most 857 decimal digits.
 
-The largest final rational denominators range from 858 to 870 decimal digits. This shows both the strength and the cost of arbitrary-precision rational checking.
+## Local validation and provenance
 
-## Negative controls and tests
-
-7/7 tests passed on a local executable copy matching the committed logic:
+Nine tests are now authored, including the two new factor-of-one-half regressions:
 - count-vector cardinalities;
 - exact piecewise loss values;
-- exact inversions on both action intervals;
-- standard and envelope CRC exact validity at all four paper alpha levels;
-- 50 rounds with every table validation exact;
-- an over-lossy depth table fails closed and returns the exact witness (0,0,3);
-- decimal alpha parsing maps .10 exactly to 1/10.
+- both sides of the depth-one kink;
+- exact type-1 slope and direct budget equality;
+- standard and envelope baseline validity at all paper targets;
+- 50-round exact validity;
+- invalid controller with a concrete witness;
+- exact decimal alpha parsing.
 
-The local test run did not use a clean independent checkout, and remote CI was not run. Committed source/test blobs:
-- source: `4246b82635d20ff7b8aa4f83024d11b3671fc37b`
-- tests: `61b7a92efe0cf1f514a1daab78d3620e3b4e5326`
+Committed blobs:
+- source: `c0c57ec2d78b8060dfd3e09bd61f3939f645bb87`;
+- test: `3a27bb8d1fd9f1790467896bffbaaef4548f0cb7`.
+
+The numerical run used a local exact-rational reference matching the corrected formulas. It was not a clean detached checkout and no remote CI pass is claimed.
 
 ## Engineering implication
 
-The exact rational implementation should remain a *reference oracle*, not the production engine. A production Rust verifier should target certified interval arithmetic or a proven error-bound scheme, and should be differentially tested against this exact oracle on all finite fixtures. The certificate should preserve the exact rational target, controller digest, loss definition, augmented-state universe, worst-state witness and verifier identity.
-
-This closes a meaningful gap between “the float calculation stayed within tolerance” and “the finite exchangeability constraints were exactly satisfied” for the common-depth family.
-
-## Scope
-
-This verifies the common-depth finite-exchangeability family only. It does not reproduce the confidence-adaptive per-image controller, prove robustness under distribution shift, or prove a new theorem.
+Keep arbitrary-precision rational arithmetic as a trusted reference oracle. A production verifier should use directed interval arithmetic or a separately proved fixed-point error budget, with differential vectors against this oracle. This work validates finite exchangeability only and does not imply robustness under arbitrary distribution shift.
 
 Reference: Bai & Ramdas (2026), Appendix B.7, https://arxiv.org/abs/2610.35821
