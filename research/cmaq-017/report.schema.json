@@ -131,7 +131,7 @@
           "mean_model_transition_evaluations": { "type": "number", "minimum": 0 },
           "mean_oracle_transition_evaluations": { "type": "number", "minimum": 0 },
           "mean_evaluator_diagnostic_transition_evaluations": { "type": "number", "minimum": 1, "maximum": 12 },
-          "mean_executed_steps: { "type": "number", "minimum": 1, "maximum": 12 }
+          "mean_executed_steps": { "type": "number", "minimum": 1, "maximum": 12 }
         }
       }
     }
