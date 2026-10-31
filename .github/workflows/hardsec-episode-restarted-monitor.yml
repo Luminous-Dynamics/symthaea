@@ -85,7 +85,10 @@ jobs:
           with open("tests/fixtures/hardsec/episode-restarted-v1/benchmark-plan.json", "r", encoding="utf-8") as handle:
               plan = json.load(handle)
           assert plan["status"] == "planned"
+          assert len(plan["baselines"]) == 13
           assert "fixed_start_power_mixture_cmm" in plan["baselines"]
+          assert "t-smade-2024-two-stage-hpc-detector" in plan["baselines"]
+          assert "intel-vtune-topdown-pmu-profile" in plan["baselines"]
           assert "weighted_restarted_sum_near_harmonic" in plan["baselines"]
           assert "dependent_ar1_episode_null" in plan["scenarios"]
           assert "shared_latent_episode_null" in plan["scenarios"]
