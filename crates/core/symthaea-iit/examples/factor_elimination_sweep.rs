@@ -10,7 +10,9 @@
 
 use std::time::{Duration, Instant};
 
-use symthaea_iit::{min_fill_log_sum_product, BinaryLogFactor};
+use symthaea_iit::{
+    min_fill_log_sum_product, plan_min_fill_elimination, BinaryLogFactor,
+};
 
 #[derive(Clone, Copy)]
 struct Fixture {
@@ -109,22 +111,51 @@ fn median_duration(samples: &mut [Duration]) -> Duration {
 
 fn run() -> Result<(), String> {
     println!(
-        "topology,variables,factors,eliminated_variables,induced_width,peak_factor_entries,multiplications,median_ns,min_ns,validated"
+        "topology,variables,factors,eliminated_variables,plan_median_ns,plan_min_ns,induced_width,predicted_output_entries,predicted_peak_factor_entries,observed_peak_factor_entries,multiplications,end_to_end_median_ns,end_to_end_min_ns,validated"
     );
     for fixture in FIXTURES {
         let factors = build_factors(fixture)?;
         let eliminate = (0..fixture.variables - 1).collect::<Vec<_>>();
+        let factor_scopes = factors
+            .iter()
+            .map(|factor| factor.variables().to_vec())
+            .collect::<Vec<_>>();
+        let plan_warmup = plan_min_fill_elimination(
+            &factor_scopes,
+            &eliminate,
+            MAX_FACTOR_ENTRIES,
+        ).map_err(|error| format!("planning failed for {}-{}: {error}", fixture.topology, fixture.variables))?;
         let warmup = min_fill_log_sum_product(&factors, &eliminate, MAX_FACTOR_ENTRIES)
             .map_err(|error| format!("warm-up failed for {}-{}: {error}", fixture.topology, fixture.variables))?;
         if warmup.factor.variables() != [fixture.variables - 1]
             || warmup.factor.log_values().len() != 2
             || warmup.factor.log_values().iter().any(|value| !value.is_finite())
             || warmup.variables_summed_out != fixture.variables - 1
+            || plan_warmup.induced_width != warmup.induced_width
+            || plan_warmup.predicted_output_entries != warmup.predicted_output_entries
+            || plan_warmup.predicted_peak_factor_entries != warmup.peak_factor_entries
         {
             return Err(format!(
                 "result-shape or finiteness invariant failed for {}-{}",
                 fixture.topology, fixture.variables
             ));
+        }
+
+        let mut plan_samples = Vec::with_capacity(REPEATS);
+        for _ in 0..REPEATS {
+            let start = Instant::now();
+            let plan = plan_min_fill_elimination(
+                &factor_scopes,
+                &eliminate,
+                MAX_FACTOR_ENTRIES,
+            ).map_err(|error| format!("planning failed: {error}"))?;
+            plan_samples.push(start.elapsed());
+            if plan != plan_warmup {
+                return Err(format!(
+                    "deterministic-plan invariant failed for {}-{}",
+                    fixture.topology, fixture.variables
+                ));
+            }
         }
 
         let mut samples = Vec::with_capacity(REPEATS);
@@ -136,6 +167,8 @@ fn run() -> Result<(), String> {
             if report.factor.variables() != [fixture.variables - 1]
                 || report.factor.log_values().len() != 2
                 || report.induced_width != warmup.induced_width
+                || report.predicted_output_entries != warmup.predicted_output_entries
+                || report.predicted_peak_factor_entries != warmup.predicted_peak_factor_entries
                 || report.peak_factor_entries != warmup.peak_factor_entries
             {
                 return Err(format!(
@@ -144,16 +177,24 @@ fn run() -> Result<(), String> {
                 ));
             }
         }
+        let plan_median_ns = median_duration(&mut plan_samples).as_nanos();
+        let plan_min_ns = plan_samples.iter().copied().min().unwrap_or_default().as_nanos();
         let median_ns = median_duration(&mut samples).as_nanos();
         let min_ns = samples.iter().copied().min().unwrap_or_default().as_nanos();
-        let validated = warmup.factor.log_values().iter().all(|value| value.is_finite());
+        let validated = warmup.factor.log_values().iter().all(|value| value.is_finite())
+            && warmup.predicted_output_entries == warmup.factor.log_values().len()
+            && warmup.predicted_peak_factor_entries == warmup.peak_factor_entries;
         println!(
-            "{},{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
             fixture.topology,
             fixture.variables,
             factors.len(),
             eliminate.len(),
+            plan_median_ns,
+            plan_min_ns,
             warmup.induced_width,
+            warmup.predicted_output_entries,
+            warmup.predicted_peak_factor_entries,
             warmup.peak_factor_entries,
             warmup.factor_multiplications,
             median_ns,
