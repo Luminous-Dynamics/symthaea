@@ -128,7 +128,9 @@
           "terminal_false_safe_rate_episode_count",
           "null_false_effect_episode_count",
           "null_false_effect_rate_ci95_lower",
-          "null_false_effect_rate_ci95_upper"
+          "null_false_effect_rate_ci95_upper",
+          "branch_outcome_mae_episode_count",
+          "branch_state_mae_episode_count"
         ],
         "properties": {
           "scenario": {
@@ -360,6 +362,16 @@
             ],
             "minimum": 0,
             "maximum": 1
+          },
+          "branch_outcome_mae_episode_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
+          },
+          "branch_state_mae_episode_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
           }
         }
       }
