@@ -155,6 +155,7 @@ pub fn run(out_path: &Path, probe_permission_class: bool) -> anyhow::Result<Runt
         probe_id,
         observed_at_unix_ns,
         kernel: kernel_identity(),
+        process_context: process_security_context(),
         permission_class_probe_requested: probe_permission_class,
         probes,
         side_effects: SideEffectClaims {
@@ -188,19 +189,73 @@ fn kernel_identity() -> KernelIdentity {
         .filter(|bytes| !bytes.is_empty() && bytes.len() <= MAX_BOOT_ID_BYTES)
         .map(|bytes| sha256_tagged(&bytes));
 
-    #[cfg(target_os = "linux")]
-    let mount_namespace_inode = std::fs::metadata("/proc/self/ns/mnt")
-        .ok()
-        .map(|metadata| metadata.ino());
-    #[cfg(not(target_os = "linux"))]
-    let mount_namespace_inode = None;
-
     KernelIdentity {
         release,
         architecture: std::env::consts::ARCH,
         boot_id_digest,
-        mount_namespace_inode,
     }
+}
+
+fn proc_status_value<'a>(status: &'a str, key: &str) -> Option<&'a str> {
+    status.lines().find_map(|line| {
+        let (name, value) = line.split_once(':')?;
+        (name == key).then_some(value.trim())
+    })
+}
+
+fn proc_status_hex(status: &str, key: &str) -> Option<String> {
+    let value = proc_status_value(status, key)?;
+    (!value.is_empty() && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        .then(|| value.to_ascii_lowercase())
+}
+
+fn proc_status_u8(status: &str, key: &str) -> Option<u8> {
+    proc_status_value(status, key)?.parse().ok()
+}
+
+#[cfg(target_os = "linux")]
+fn namespace_inode(path: &str) -> Option<u64> {
+    std::fs::metadata(path).ok().map(|metadata| metadata.ino())
+}
+
+fn process_security_context() -> ProcessSecurityContext {
+    let status = read_process_status();
+    #[cfg(target_os = "linux")]
+    let (effective_uid, effective_gid) = (Some(unsafe { libc::geteuid() }), Some(unsafe { libc::getegid() }));
+    #[cfg(not(target_os = "linux"))]
+    let (effective_uid, effective_gid) = (None, None);
+
+    #[cfg(target_os = "linux")]
+    let (mount_namespace_inode, user_namespace_inode, pid_namespace_inode) = (
+        namespace_inode("/proc/self/ns/mnt"),
+        namespace_inode("/proc/self/ns/user"),
+        namespace_inode("/proc/self/ns/pid"),
+    );
+    #[cfg(not(target_os = "linux"))]
+    let (mount_namespace_inode, user_namespace_inode, pid_namespace_inode) = (None, None, None);
+
+    ProcessSecurityContext {
+        effective_uid,
+        effective_gid,
+        cap_eff_hex: status.as_deref().and_then(|text| proc_status_hex(text, "CapEff")),
+        cap_bnd_hex: status.as_deref().and_then(|text| proc_status_hex(text, "CapBnd")),
+        no_new_privs: status.as_deref().and_then(|text| proc_status_u8(text, "NoNewPrivs")),
+        seccomp_mode: status.as_deref().and_then(|text| proc_status_u8(text, "Seccomp")),
+        mount_namespace_inode,
+        user_namespace_inode,
+        pid_namespace_inode,
+    }
+}
+
+fn read_process_status() -> Option<String> {
+    const MAX_STATUS_BYTES: u64 = 256 * 1024;
+    let file = File::open("/proc/self/status").ok()?;
+    let mut bytes = Vec::new();
+    file.take(MAX_STATUS_BYTES + 1).read_to_end(&mut bytes).ok()?;
+    if bytes.len() as u64 > MAX_STATUS_BYTES {
+        return None;
+    }
+    String::from_utf8(bytes).ok()
 }
 
 trait LinuxSmokeSyscalls {
