@@ -27,9 +27,10 @@ cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-v1
 - A declared producer/verifier identity distinction (not cryptographic proof of independence).
 - Receipt validation is transactional: duplicate state IDs, missing/mismatched current-state identities, or stale receipt bindings leave the obligation state unchanged.
 - A public deterministic POAR-v1 runner with 16 scheduler/receipt conformance fixtures. Fifteen fixtures assert routing/stopping choices; one exercises the valid-promotion → revocation → stale-replay receipt lifecycle. These are structural smoke fixtures, not full domain simulations.
-- An AND/OR graph generator with private source-truth labels, a separate recursive oracle, disjoint source-family and source-ID splits, valid-time / known-time evidence revisions, source-independence groups, scope/authority constraints, cycle rejection, a 64-claim dependency chain, false asserted content, and an unverified-source case.
-- Controlled mutations for retraction, asserted-polarity flip, known/valid-time shifts, scope/authority changes, integrity downgrade, and independence-group merging; hidden source-truth labels remain unchanged.
-- 41 authored unit tests: 24 scheduler/receipt tests, one POAR routing-suite test, and 16 graph/oracle tests.
+- An AND/OR graph generator with private source-truth labels, a separate recursive oracle, disjoint source-family and source-ID splits, valid-time / known-time evidence revisions, source-independence groups, scope/authority constraints, cycle rejection, split-stratified dependency chains (8 development / 32 calibration / 64 test), false asserted content, and an unverified-source case.
+- Controlled mutations for retraction, asserted-polarity flip, known/valid-time shifts, scope/authority changes, integrity downgrade, and independence-group merging; hidden source-truth labels remain unchanged. Retraction controls assert that dependent claims invalidate while unrelated independently supported claims remain stable.
+- A POAR Contamination Transparency Card discloses public-template exposure, unknown third-party model training provenance, T1-T4 audit gaps, and release restrictions.
+- 43 authored unit tests: 24 scheduler/receipt tests, one POAR routing-suite test, and 18 graph/oracle tests.
 - Graph benchmarks report disposition correctness, false support/refutation, unsupported proof paths, citation completeness, temporal/scope/authority/integrity violations, retracted citations, correlated-source violations, plus ranked temporal evidence coverage@3 and precision@3; retrieval ranking is separate from final proof citations, and there is no composite score.
 
 ## Deliberate limits
