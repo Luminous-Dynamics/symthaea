@@ -26,6 +26,8 @@ const TARGET_SCORE: f64 = 0.90;
 const BOARD_EXPLORATION_COEFFICIENT: f64 = 0.55;
 const NEW_DIRECTION_CREDIT: f64 = 0.20;
 const GLOBAL_UCB_EXPLORATION: f64 = 0.55;
+// Frozen recency parameter for the nonstationary discounted-UCB control.
+const DISCOUNT_FACTOR: f64 = 0.85;
 
 /// Independent payoff families. The no-new-direction family is a null control.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -55,6 +57,10 @@ pub enum DirectionCampaignPolicy {
     GlobalUcb,
     /// The implementation under test: verifier-grounded, local-record UCB board.
     VerifierGroundedDirectionBoard,
+    /// Discounted-UCB control for deliberately nonstationary payoff landscapes.
+    DiscountedUcb,
+    /// Beta-Bernoulli Thompson sampling for target-hit probability.
+    ThompsonSampling,
     /// Sees the complete payoff schedule. This is an upper bound, never deployable.
     OracleUpperBound,
 }
@@ -70,6 +76,22 @@ pub struct DirectionCampaignAction {
     pub cost_units: u64,
 }
 
+/// Frozen parameter snapshot for policy interpretation and replay.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DirectionCampaignPolicyConfig {
+    pub target_score: f64,
+    pub board_exploration_coefficient: f64,
+    pub global_ucb_exploration_coefficient: f64,
+    pub new_direction_prior_credit: f64,
+    pub common_bootstrap_evaluations: u64,
+    pub board_minimum_initial_evaluations: u64,
+    pub discounted_ucb_factor: f64,
+    pub thompson_prior_alpha: f64,
+    pub thompson_prior_beta: f64,
+    pub action_cost_units: u64,
+    pub oracle_uses_hidden_payoff_schedule: bool,
+}
+
 /// Full audit summary for one policy, landscape and seed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DirectionCampaignRun {
@@ -77,6 +99,8 @@ pub struct DirectionCampaignRun {
     pub version: String,
     pub landscape: DirectionLandscapeFamily,
     pub policy: DirectionCampaignPolicy,
+    pub policy_config: DirectionCampaignPolicyConfig,
+    pub policy_config_sha256: String,
     pub seed: u64,
     pub action_budget: usize,
     pub action_count: usize,
@@ -157,6 +181,7 @@ pub fn run_direction_campaign(
     let mut observations: BTreeMap<String, Vec<f64>> = BTreeMap::new();
     let mut actions = Vec::with_capacity(action_budget);
     let mut proposal_count = 0usize;
+    let mut new_proposal_successes: Vec<bool> = Vec::new();
     let mut admitted_new_directions = 0usize;
     let mut duplicate_new_proposals = 0usize;
     let mut rejected_new_proposals = 0usize;
@@ -204,6 +229,16 @@ pub fn run_direction_campaign(
                 admitted_new_directions,
                 actions.len(),
             ),
+            DirectionCampaignPolicy::DiscountedUcb => select_discounted_ucb(
+                &observations,
+                &new_proposal_successes,
+                actions.len(),
+            ),
+            DirectionCampaignPolicy::ThompsonSampling => select_thompson_sampling(
+                &observations,
+                &new_proposal_successes,
+                &mut random_state,
+            ),
             DirectionCampaignPolicy::VerifierGroundedDirectionBoard => {
                 select_direction_board(&board, &direction_digests)?
             }
@@ -239,6 +274,7 @@ pub fn run_direction_campaign(
             let admitted_id = board
                 .record_new_direction_proposal(proposal)
                 .map_err(|error| error.to_string())?;
+            new_proposal_successes.push(disposition == NewDirectionDisposition::Admitted);
             match disposition {
                 NewDirectionDisposition::Admitted => {
                     let direction_sha = admitted_id.ok_or_else(|| {
@@ -281,11 +317,29 @@ pub fn run_direction_campaign(
     let (final_best_direction, final_best_score) =
         best_observed_direction(&observations)?;
     let oracle_best_score = oracle_best_score(landscape);
+    let policy_config = DirectionCampaignPolicyConfig {
+        target_score: TARGET_SCORE,
+        board_exploration_coefficient: BOARD_EXPLORATION_COEFFICIENT,
+        global_ucb_exploration_coefficient: GLOBAL_UCB_EXPLORATION,
+        new_direction_prior_credit: NEW_DIRECTION_CREDIT,
+        common_bootstrap_evaluations: 3,
+        board_minimum_initial_evaluations: 1,
+        discounted_ucb_factor: DISCOUNT_FACTOR,
+        thompson_prior_alpha: 1.0,
+        thompson_prior_beta: 1.0,
+        action_cost_units: 1,
+        oracle_uses_hidden_payoff_schedule: policy == DirectionCampaignPolicy::OracleUpperBound,
+    };
+    let policy_config_bytes = serde_json::to_vec(&policy_config)
+        .map_err(|error| format!("policy config serialization failed: {error}"))?;
+    let policy_config_sha256 = digest_bytes(&policy_config_bytes);
     Ok(DirectionCampaignRun {
         schema: "symthaea.direction-campaign.run".to_owned(),
         version: "0.1.0".to_owned(),
         landscape,
         policy,
+        policy_config,
+        policy_config_sha256,
         seed,
         action_budget,
         action_count: actions.len(),
@@ -663,6 +717,154 @@ fn select_global_ucb(
     best_arm
 }
 
+/// Select by recency-weighted reward and effective-sample UCB bonus.
+///
+/// This is a discounted-UCB control, not a claim to reproduce one unique literature
+/// configuration. The discount factor is frozen in the benchmark source and recorded
+/// by the campaign version. NEW receives one fixed pseudo-observation at the declared
+/// discovery prior; every proposal disposition is retained as a Bernoulli reward.
+fn select_discounted_ucb(
+    observations: &BTreeMap<String, Vec<f64>>,
+    new_proposal_successes: &[bool],
+    total_actions: usize,
+) -> String {
+    let log_total = ((total_actions as f64) + 2.0).ln();
+    let (new_sum, new_weight) = discounted_binary_history(new_proposal_successes);
+    let new_mean = (new_sum + NEW_DIRECTION_CREDIT) / (new_weight + 1.0);
+    let new_bonus = (2.0 * log_total / (new_weight + 2.0)).sqrt();
+    let mut best_arm = "NEW".to_owned();
+    let mut best_potential = new_mean + new_bonus;
+
+    for (direction_id, values) in observations {
+        let mut weight = 1.0;
+        let mut weighted_sum = 0.0;
+        let mut effective_count = 0.0;
+        for value in values.iter().rev() {
+            weighted_sum += weight * value;
+            effective_count += weight;
+            weight *= DISCOUNT_FACTOR;
+        }
+        let mean = if effective_count > 0.0 {
+            weighted_sum / effective_count
+        } else {
+            0.0
+        };
+        let bonus = (2.0 * log_total / (effective_count + 1.0)).sqrt();
+        let potential = mean + bonus;
+        if potential > best_potential
+            || ((potential - best_potential).abs() <= f64::EPSILON
+                && direction_id.as_str() < best_arm.as_str())
+        {
+            best_arm.clone_from(direction_id);
+            best_potential = potential;
+        }
+    }
+    best_arm
+}
+
+fn discounted_binary_history(outcomes: &[bool]) -> (f64, f64) {
+    let mut weight = 1.0;
+    let mut weighted_successes = 0.0;
+    let mut effective_count = 0.0;
+    for success in outcomes.iter().rev() {
+        if *success {
+            weighted_successes += weight;
+        }
+        effective_count += weight;
+        weight *= DISCOUNT_FACTOR;
+    }
+    (weighted_successes, effective_count)
+}
+
+/// Beta-Bernoulli Thompson sampling over target-hit probability.
+///
+/// Each verified score is converted to a Bernoulli outcome using the frozen campaign
+/// target. NEW proposals are successful only when the independent synthetic verifier
+/// admits a genuinely novel direction; duplicates/rejections are failures. Gamma
+/// variates use the Marsaglia-Tsang sampler and a seeded SplitMix stream.
+fn select_thompson_sampling(
+    observations: &BTreeMap<String, Vec<f64>>,
+    new_proposal_successes: &[bool],
+    random_state: &mut u64,
+) -> String {
+    let mut best_arm = "NEW".to_owned();
+    let new_successes = new_proposal_successes.iter().filter(|success| **success).count();
+    let new_failures = new_proposal_successes.len() - new_successes;
+    let mut best_sample = sample_beta(
+        1.0 + new_successes as f64,
+        1.0 + new_failures as f64,
+        random_state,
+    );
+
+    for (direction_id, values) in observations {
+        let successes = values.iter().filter(|score| **score >= TARGET_SCORE).count();
+        let failures = values.len() - successes;
+        let sample = sample_beta(
+            1.0 + successes as f64,
+            1.0 + failures as f64,
+            random_state,
+        );
+        if sample > best_sample
+            || ((sample - best_sample).abs() <= f64::EPSILON
+                && direction_id.as_str() < best_arm.as_str())
+        {
+            best_arm.clone_from(direction_id);
+            best_sample = sample;
+        }
+    }
+    best_arm
+}
+
+fn sample_beta(alpha: f64, beta: f64, state: &mut u64) -> f64 {
+    let left = sample_gamma(alpha, state);
+    let right = sample_gamma(beta, state);
+    let total = left + right;
+    if total.is_finite() && total > 0.0 {
+        (left / total).clamp(0.0, 1.0)
+    } else {
+        alpha / (alpha + beta)
+    }
+}
+
+fn sample_gamma(shape: f64, state: &mut u64) -> f64 {
+    if !shape.is_finite() || shape <= 0.0 {
+        return 0.0;
+    }
+    if shape < 1.0 {
+        let uniform = unit_random(state).max(1e-12);
+        return sample_gamma(shape + 1.0, state) * uniform.powf(1.0 / shape);
+    }
+
+    let d = shape - (1.0 / 3.0);
+    let c = (9.0 * d).sqrt().recip();
+    for _ in 0..1024 {
+        let normal = standard_normal(state);
+        let base = 1.0 + c * normal;
+        if base <= 0.0 {
+            continue;
+        }
+        let v = base * base * base;
+        let uniform = unit_random(state).max(1e-12);
+        if uniform < 1.0 - 0.0331 * normal.powi(4)
+            || uniform.ln() < 0.5 * normal * normal + d * (1.0 - v + v.ln())
+        {
+            return d * v;
+        }
+    }
+    // Deterministic finite fallback for an extraordinarily unlikely rejection tail.
+    shape
+}
+
+fn standard_normal(state: &mut u64) -> f64 {
+    let u1 = unit_random(state).max(1e-12);
+    let u2 = unit_random(state);
+    (-2.0 * u1.ln()).sqrt() * (std::f64::consts::TAU * u2).cos()
+}
+
+fn unit_random(state: &mut u64) -> f64 {
+    ((next_random(state) >> 11) as f64) * (1.0 / ((1u64 << 53) as f64))
+}
+
 fn select_oracle(
     landscape: DirectionLandscapeFamily,
     observations: &BTreeMap<String, Vec<f64>>,
@@ -809,7 +1011,11 @@ fn schedule(
 }
 
 fn digest(value: &str) -> String {
-    let bytes = Sha256::digest(value.as_bytes());
+    digest_bytes(value.as_bytes())
+}
+
+fn digest_bytes(value: &[u8]) -> String {
+    let bytes = Sha256::digest(value);
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
@@ -835,6 +1041,8 @@ mod tests {
         DirectionCampaignPolicy::FixedRoundRobin,
         DirectionCampaignPolicy::Random,
         DirectionCampaignPolicy::GlobalUcb,
+        DirectionCampaignPolicy::DiscountedUcb,
+        DirectionCampaignPolicy::ThompsonSampling,
         DirectionCampaignPolicy::VerifierGroundedDirectionBoard,
         DirectionCampaignPolicy::OracleUpperBound,
     ];
@@ -865,6 +1073,8 @@ mod tests {
     fn random_and_board_policies_are_reproducible_for_the_same_seed() {
         for policy in [
             DirectionCampaignPolicy::Random,
+            DirectionCampaignPolicy::DiscountedUcb,
+            DirectionCampaignPolicy::ThompsonSampling,
             DirectionCampaignPolicy::VerifierGroundedDirectionBoard,
         ] {
             let first = run_direction_campaign(
@@ -883,6 +1093,69 @@ mod tests {
             .unwrap();
             assert_eq!(first, second);
         }
+    }
+
+    #[test]
+    fn policy_configuration_snapshot_is_complete_and_digest_bound() {
+        let run = run_direction_campaign(
+            DirectionLandscapeFamily::DelayedBreakthrough,
+            DirectionCampaignPolicy::ThompsonSampling,
+            32,
+            0xabc,
+        )
+        .expect("campaign should run");
+        let bytes = serde_json::to_vec(&run.policy_config).expect("config serializes");
+        assert_eq!(run.policy_config_sha256, digest_bytes(&bytes));
+        assert_eq!(run.policy_config.target_score, TARGET_SCORE);
+        assert_eq!(run.policy_config.common_bootstrap_evaluations, 3);
+        assert_eq!(run.policy_config.thompson_prior_alpha, 1.0);
+        assert_eq!(run.policy_config.thompson_prior_beta, 1.0);
+        assert!(!run.policy_config.oracle_uses_hidden_payoff_schedule);
+    }
+
+    #[test]
+    fn discounted_ucb_prefers_recent_payoff_after_rank_reversal() {
+        let mut observations = BTreeMap::new();
+        observations.insert("A".to_owned(), vec![0.95, 0.20, 0.10]);
+        observations.insert("B".to_owned(), vec![0.20, 0.30, 0.95]);
+        let stale_failed_proposals = vec![false; 100];
+        let selected = select_discounted_ucb(&observations, &stale_failed_proposals, 106);
+        assert_eq!(selected, "B");
+    }
+
+    #[test]
+    fn thompson_sampling_obeys_budget_and_is_seed_reproducible() {
+        let first = run_direction_campaign(
+            DirectionLandscapeFamily::NewOperatorBreakthrough,
+            DirectionCampaignPolicy::ThompsonSampling,
+            64,
+            0x5eed,
+        )
+        .expect("Thompson campaign should run");
+        let second = run_direction_campaign(
+            DirectionLandscapeFamily::NewOperatorBreakthrough,
+            DirectionCampaignPolicy::ThompsonSampling,
+            64,
+            0x5eed,
+        )
+        .expect("Thompson replay should run");
+        assert_eq!(first, second);
+        assert_eq!(first.action_count, 64);
+        assert_eq!(first.total_cost_units, 64);
+    }
+
+    #[test]
+    fn discounted_ucb_campaign_obeys_budget_and_preserves_nonstationary_policy_id() {
+        let run = run_direction_campaign(
+            DirectionLandscapeFamily::RankReversal,
+            DirectionCampaignPolicy::DiscountedUcb,
+            64,
+            0xdecaf,
+        )
+        .expect("discounted-UCB campaign should run");
+        assert_eq!(run.action_count, 64);
+        assert_eq!(run.total_cost_units, 64);
+        assert_eq!(run.policy, DirectionCampaignPolicy::DiscountedUcb);
     }
 
     #[test]
