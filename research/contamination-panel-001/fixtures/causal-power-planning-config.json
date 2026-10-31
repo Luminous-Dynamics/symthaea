@@ -1,0 +1,25 @@
+{
+  "schema": "symthaea.contamination_causal_power_config.v1",
+  "study_id": "causal-power-fixture",
+  "primary_metric_id": "exact-correctness",
+  "candidate_model_pair_counts": [
+    6,
+    12,
+    20
+  ],
+  "clusters_per_model_pair": 32,
+  "task_family_count": 4,
+  "exposure_fraction_permille": 500,
+  "direct_exposure_effect_permille": 250,
+  "spillover_effect_permille": 100,
+  "between_model_pair_sd_permille": 25,
+  "within_cluster_sd_permille": 100,
+  "within_family_icc_permille": 200,
+  "pair_failure_probability_permille": 50,
+  "simulation_replicates": 2000,
+  "alpha_permille": 50,
+  "target_power_permille": 800,
+  "calibration_tolerance_permille": 30,
+  "maximum_inconclusive_fraction_permille": 50,
+  "simulation_seed_hex": "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5"
+}
