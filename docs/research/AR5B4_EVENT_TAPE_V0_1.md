@@ -175,3 +175,19 @@ The direction campaign now includes a seeded stochastic heteroscedastic family. 
 The campaign artifact keeps two distinct values for every candidate evaluation: `observed_score` is the noisy value revealed to the policy; `expected_score` is evaluator-side truth and is not copied into the policy-visible event outcome. The run reports the maximum observed score and the maximum expected score among tested candidates separately. Simple regret uses the latter against the oracle's expected optimum, avoiding a lucky high-variance observation being mistaken for a better mechanism. Paired comparisons now report both observed-score deltas and expected-score deltas.
 
 This remains a synthetic noise model with seeded pseudo-random draws; it is not a calibrated model of any real scientific instrument. Stochastic landscape seeds must still be paired across policies, and uncertainty must be clustered at independent landscape/template level.
+
+## Retained offer-set source-state evidence
+
+The original OfferSetManifest stores a source-state SHA-256 commitment, but the manifest alone does not retain the state bytes needed to recompute that digest. The new `offer_set_evidence` module adds an evidence-bundle path:
+
+1. `OfferSetSourceState` retains the evaluator-owned JSON object and the extracted decision-boundary fields.
+2. `OfferSetStateArtifact` hashes the complete serialized state and reconstructs an OfferSetSnapshot from those same bytes.
+3. `OfferSetEvidenceBundle` binds one retained artifact to every manifest snapshot and to the policy's EventTape.
+4. `verify_matched_offer_set_evidence` validates the state artifacts before comparing offer sets across policies.
+5. `analyze_qualified_paired_metric_with_state_evidence` requires this evidence check before the matched-execution and preregistered paired-inference path.
+
+The retained payload must contain enough evaluator-owned state for an independent verifier to reconstruct why each direction was eligible and whether NEW was allowed. A detached list of direction IDs is not sufficient. The current module hashes the JSON serialization produced by the pinned serde_json dependency; schema/version changes must be explicit.
+
+This closes the prior gap between a source-state commitment and a retained, independently rehashable artifact. It still does not prove that the evaluator process was independent, honest, or scientifically correct, nor does a hash authenticate the artifact's origin. Those require separate evaluator control, signed provenance or trusted append-only storage, verifier independence, and sealed negative controls.
+
+Exact-head unit tests are authored for canonical offer ordering, payload tampering, snapshot reconstruction, and malformed source states. They have not been compiled or executed in this environment.
