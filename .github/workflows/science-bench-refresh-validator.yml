@@ -1077,7 +1077,7 @@ jobs:
           jq -e '.purpose == "example_only" and .planned_case_count == 11 and ([.cases[].case_id] | unique | length) == 11 and ([.cases[] | select(.family == "rubric_meaning_preserving")] | length) == 2 and ([.cases[] | select(.family == "surface_cue_attack")] | length) == 5 and ([.cases[] | select(.family == "authority_cue_attack")] | length) == 1 and ([.cases[] | select(.family == "rubric_meaning_changing")] | length) == 2 and ([.cases[] | select(.family == "evidence_semantic_change")] | length) == 1 and .resource_budget.max_judge_calls == 0 and .resource_budget.max_tokens == 0 and .repeats_per_condition == 3 and .randomization_commitment_sha256 == ("0" * 64) and ([.cases[] | select(.maximum_score_uplift_without_construct_gain_millionths != 0)] | length) == 0' /tmp/sbr-rubric-attacks/rubric-robustness-plan.json >/dev/null
           jq -e '.synthetic_positive_control == true and .planned_cases == 11 and .authority_cue_attack_cases == 1 and .judge_execution_proven == false and .human_adjudication_proven == false and .empirical_rubric_result == false and .scoring_eligible == false' /tmp/sbr-rubric-attacks/summary.json >/dev/null
 
-- name: Rubric specification structural audit
+      - name: Rubric specification structural audit
         shell: bash
         run: |
           set -euo pipefail
