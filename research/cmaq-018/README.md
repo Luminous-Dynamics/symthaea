@@ -52,6 +52,21 @@ It does not receive the hidden regime bit, evaluator disturbance, scenario label
 
 The common disturbance is shared across alternatives. This common-random-number design isolates action effects by cancelling episode-level noise. It does not model all forms of branch-dependent stochasticity; those belong in a later randomized paired-repeat track.
 
+## Content-addressed configuration
+
+The fixed candidate, generator, metric, observation, action, reward, wrapper and dataset contracts are now stored as separate JSON artifacts beside this README:
+
+- `candidate-config.v0.1.json`
+- `generator-config.v0.1.json`
+- `metric-bundle.v0.1.json`
+- `observation-schema.v0.1.json`
+- `action-schema.v0.1.json`
+- `reward-definition.v0.1.json`
+- `wrapper-stack.v0.1.json`
+- `data-manifest.v0.1.json`
+
+The frozen-manifest example in `research/cmaq-common` binds the SHA-256 digest of each artifact, the exact benchmark source commit and the 64-episode seed schedule. There are 64 episode histories **per scenario/model condition** (448 scenario-history cases across seven scenarios, with the same seed panel paired across the five predictor arms); pairs within one history remain clustered.
+
 ## Model arms
 
 - `point_outcome`: approximate absolute branch outcome predictor with a shared history-dependent bias and a misspecified linear action response.
