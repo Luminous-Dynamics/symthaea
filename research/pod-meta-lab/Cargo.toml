@@ -19,3 +19,7 @@ path = "src/main.rs"
 [[bin]]
 name = "poar-v1"
 path = "src/bin/poar_v1.rs"
+
+[[bin]]
+name = "poar-graph-export"
+path = "src/bin/poar_graph_export.rs"
