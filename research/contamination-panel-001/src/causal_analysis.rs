@@ -381,7 +381,9 @@ fn validate_replicate(
     {
         return Err("training execution audit is missing a required consistency or external-attestation receipt".to_owned());
     }
-    if replicate.training_receipt_audit.design_sha256 != replicate.manifest.design_sha256
+    if replicate.training_receipt_audit.training_rng_seed_commitment_sha256
+            != replicate.design.training_rng_seed_commitment_sha256
+        || replicate.training_receipt_audit.design_sha256 != replicate.manifest.design_sha256
         || replicate.training_receipt_audit.manifest_sha256 != replicate.manifest.manifest_sha256
         || replicate.training_receipt_audit.intervention_manifest_sha256 != replicate.manifest.manifest_sha256
         || replicate.training_receipt_audit.treatment_checkpoint_sha256
@@ -690,6 +692,7 @@ pub fn analyze_replicated_causal_study(
     let first_evaluation = &study.replicates[0].evaluation_evidence;
     let mut replicate_ids = BTreeSet::new();
     let mut seed_commitments = BTreeSet::new();
+    let mut training_seed_commitments = BTreeSet::new();
     let mut all_checkpoint_digests = BTreeSet::new();
     let mut all_training_audit_digests = BTreeSet::new();
     let mut all_evaluation_receipt_digests = BTreeSet::new();
@@ -721,6 +724,11 @@ pub fn analyze_replicated_causal_study(
         }
         if !seed_commitments.insert(replicate.manifest.randomization_seed_commitment_sha256.as_str()) {
             return Err("each model-pair replicate must use a unique randomization seed commitment".to_owned());
+        }
+        if !training_seed_commitments.insert(
+            replicate.design.training_rng_seed_commitment_sha256.as_str()
+        ) {
+            return Err("each independent model-pair replicate must use a unique training RNG seed commitment".to_owned());
         }
         for checkpoint in [
             replicate.evaluation_evidence.treatment_checkpoint_sha256.as_str(),
@@ -914,6 +922,7 @@ mod tests {
             shared_training_token_count: 96_000,
             total_training_token_budget: 100_000,
             training_steps: 1_000,
+            training_rng_seed_commitment_sha256: digest(&format!("training-rng-{index}")),
             training_code_sha256: digest("training-code"),
             runtime_image_sha256: digest("runtime"),
             tokenization_pipeline_sha256: digest("tokenizer"),
@@ -953,6 +962,7 @@ mod tests {
             design_sha256: manifest.design_sha256.clone(),
             manifest_sha256: manifest.manifest_sha256.clone(),
             seed_commitment_sha256: manifest.randomization_seed_commitment_sha256.clone(),
+            training_rng_seed_commitment_sha256: design.training_rng_seed_commitment_sha256.clone(),
             treatment_run_id: format!("treatment-run-{index}"),
             placebo_run_id: format!("placebo-run-{index}"),
             treatment_checkpoint_sha256: treatment_checkpoint.clone(),
