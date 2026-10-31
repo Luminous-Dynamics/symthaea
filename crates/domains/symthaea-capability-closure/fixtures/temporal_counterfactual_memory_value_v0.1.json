@@ -1,0 +1,101 @@
+{
+  "schema": "symthaea.temporal_counterfactual_memory_value",
+  "version": "0.1.0",
+  "tracking_issue": 9561,
+  "status": "evaluator_prototype_authored_not_executed",
+  "candidate_allocator_pr": 9559,
+  "evaluator_package": "research/temporal-evaluator",
+  "security_dependency_issue": 9437,
+  "counterfactual_definition": "TED(evict intervention) - TED(retain intervention)",
+  "outcome_dimensions": [
+    "wrong_belief_us",
+    "abstention_us",
+    "missing_output_us"
+  ],
+  "no_weighted_aggregate": true,
+  "paired_run_context": [
+    "episode_id",
+    "task_sha256",
+    "future_stream_sha256",
+    "model_sha256",
+    "initial_state_sha256",
+    "candidate_feature_sha256",
+    "total_exposure_us",
+    "byte_budget",
+    "compute_budget",
+    "refresh_budget",
+    "observation_budget",
+    "optional_energy_budget_nj"
+  ],
+  "paired_run_checks": [
+    "same_task_and_future_stream",
+    "same_model_and_initial_state",
+    "same_candidate_feature_snapshot",
+    "same_resource_budgets",
+    "retain_arm_contains_intervention_set",
+    "evict_arm_excludes_intervention_set",
+    "all_other_selected_items_identical",
+    "unique_run_ids",
+    "actual_resource_use_within_each_budget",
+    "exposure_components_do_not_exceed_episode_duration"
+  ],
+  "randomization": {
+    "method": "seeded_splitmix64",
+    "purpose": "reproducible retain_first_or_evict_first order",
+    "seed_owner": "evaluator_only",
+    "cryptographic": false
+  },
+  "measured_costs": [
+    "bytes_used",
+    "compute_used",
+    "refreshes_used",
+    "observations_used",
+    "read_bytes",
+    "write_bytes",
+    "measured_energy_nj"
+  ],
+  "exact_subset_oracle": {
+    "maximum_items": 16,
+    "requires_all_subsets": true,
+    "outputs": [
+      "best_wrong_belief_subset",
+      "best_abstention_subset",
+      "best_missing_output_subset",
+      "three_component_pareto_frontier",
+      "candidate_componentwise_regret"
+    ],
+    "claim_ceiling": "evaluator_only_clairvoyant_upper_bound_not_a_candidate_policy",
+    "exponential": true
+  },
+  "implementation": {
+    "source": "research/temporal-evaluator/src/main.rs",
+    "test_functions_authored": 11,
+    "tests_executed": false,
+    "randomized_intervention_harness": false,
+    "os_level_isolation": false,
+    "signed_receipts": false
+  },
+  "confirmatory_prerequisites": [
+    "separate_generator_candidate_evaluator_os_identities",
+    "protected_oracle_storage",
+    "candidate_sandbox_without_oracle_descriptors",
+    "evaluator_owned_signing_key",
+    "signed_run_receipts",
+    "replay_and_toctou_controls"
+  ],
+  "qualification_targets_not_results": {
+    "calibration_slope": [0.9, 1.1],
+    "realized_ted_relative_reduction_target": 0.2,
+    "alternative_byte_seconds_reduction_at_equal_ted_target": 0.3,
+    "stale_memory_false_recall_increase_allowed": 0,
+    "future_information_leakage_allowed": 0
+  },
+  "validation": {
+    "cargo_build": false,
+    "rustfmt": false,
+    "clippy": false,
+    "tests": false,
+    "benchmark_runs": false,
+    "energy_measurements": false
+  }
+}
