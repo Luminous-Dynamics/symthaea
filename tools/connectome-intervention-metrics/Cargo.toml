@@ -1,0 +1,11 @@
+[package]
+name = "connectome-intervention-metrics"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+description = "Independent paired intervention trajectory metrics and cluster bootstrap"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
