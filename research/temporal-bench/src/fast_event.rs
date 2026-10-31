@@ -118,11 +118,11 @@ impl fmt::Display for FastEventGenerationError {
             Self::DurationExceedsLimit => write!(f, "fast-event stream duration exceeds one day"),
             Self::TooManyEvents { requested, available_blocks } => write!(
                 f,
-                "requested {requested} events but only {available_blocks} non-overlapping event blocks exist"
+                "requested {requested} events; only {available_blocks} non-overlapping blocks exist"
             ),
             Self::TooManyDistinctDistractorCodes { requested, maximum } => write!(
                 f,
-                "requested {requested} distinct distractor codes but only {maximum} exist in the selected similarity band"
+                "requested {requested} distractor codes; max {maximum} in this similarity band"
             ),
         }
     }
