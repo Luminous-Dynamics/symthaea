@@ -913,6 +913,13 @@ pub fn analyze_anytime_history(history: &AnytimeHistory) -> Result<AnytimeRunRec
                 ))?;
                 state.evidence_level = *level;
             }
+            AnytimeAction::CandidateVerificationRejected { candidate_id, .. } => {
+                let state = candidates.get_mut(candidate_id).ok_or_else(|| AnytimeError::new(
+                    "history.candidate_verification_rejected",
+                    "validated history lost a rejected candidate",
+                ))?;
+                state.verification_rejected = true;
+            }
             _ => {}
         }
 
@@ -1395,6 +1402,36 @@ mod tests {
         assert_eq!(receipt.total_resources.verifier_calls, Some(1));
         assert_eq!(receipt.event_count, 2);
         verify_anytime_run_receipt(&history, &receipt).unwrap();
+    }
+
+    #[test]
+    fn verifier_rejection_is_terminal_for_candidate_promotion_in_a_run() {
+        let mut history = AnytimeHistory::new(header()).unwrap();
+        append_candidate(&mut history, 1, "candidate-a", "eval-a", vec![0.0, 1.0]);
+        history.append(AnytimeEventDraft {
+            started_elapsed_millis: 1,
+            completed_elapsed_millis: 2,
+            resources: known_cost(1, 1024),
+            action: AnytimeAction::CandidateVerificationRejected {
+                candidate_id: "candidate-a".to_owned(),
+                evidence_sha256: H4.to_owned(),
+                verifier_receipt_sha256: H5.to_owned(),
+                rejection_reason: "hidden test regression".to_owned(),
+            },
+        }).unwrap();
+        let promotion = history.append(AnytimeEventDraft {
+            started_elapsed_millis: 2,
+            completed_elapsed_millis: 3,
+            resources: known_cost(1, 1024),
+            action: AnytimeAction::CandidateVerification {
+                candidate_id: "candidate-a".to_owned(),
+                evidence_sha256: H4.to_owned(),
+                level: EvidenceLevel::HeldOutVerified,
+                verifier_receipt_sha256: H1.to_owned(),
+            },
+        });
+        assert!(promotion.is_err());
+        assert_eq!(history.events.len(), 2);
     }
 
     #[test]
