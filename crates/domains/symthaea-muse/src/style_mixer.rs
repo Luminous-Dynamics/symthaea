@@ -15,7 +15,7 @@ use symthaea_muse_protocol::catalog::{
 };
 use symthaea_music_theory::{
     Accompaniment, CompositionSpec, FormKind, GrammarFamily, GrammarPlanEvidence,
-    GrammarStructuralTrace, MusicalIntent, Score, Style,
+    GrammarStructuralTrace, HookCell, MusicalIntent, Score, Style,
     MUSIC_THEORY_ENGINE_VERSION, compose_with_grammar_plan,
 };
 
@@ -99,10 +99,12 @@ pub struct HybridComposition {
 /// Ternary/Rondo/Variations, GrooveCycle owners with cycle-safe
 /// accompaniment pools, ProcessAdditive owners with shape-preserving
 /// motif-cell donors, and the dedicated BluesCallResponse/JazzChorus engines
-/// with family-specific melody, rhythm, harmony and tempo transfer contracts.
-/// Other dedicated engines remain fail-closed until their own donor-consumption
-/// contracts exist. Unsupported meter transfers, cycle incompatibilities,
-/// process-cell mismatches and unknown/unimplemented routes fail closed.
+/// with family-specific melody, rhythm, harmony and tempo transfer contracts,
+/// plus the dedicated Contrapuntal/Fugue engine with hook-subject, modal-pitch
+/// and tempo contracts. Other dedicated engines remain fail-closed until
+/// their own donor-consumption contracts exist. Unsupported meter transfers,
+/// cycle incompatibilities, process-cell mismatches and unknown routes fail
+/// closed.
 pub fn compile_hybrid_style(
     hybrid: &HybridStyleSpec,
 ) -> Result<CompiledHybridStyle, Vec<StyleMixIssue>> {
@@ -215,13 +217,23 @@ pub fn compile_hybrid_style(
                 });
             }
         }
+        GrammarFamily::Contrapuntal => {
+            if !matches!(spec.form_pool.as_slice(), [FormKind::Fugue]) {
+                issues.push(StyleMixIssue {
+                    code: "contrapuntal_form_contract_mismatch".into(),
+                    layer: Some(StyleMixLayer::Structure),
+                    catalog_id: Some(structural_entry.id),
+                    message: "the current Contrapuntal adapter requires the dedicated Fugue form; mixed form pools need a separately qualified dispatch contract".into(),
+                });
+            }
+        }
         family => {
             issues.push(StyleMixIssue {
                 code: "structural_engine_adapter_required".into(),
                 layer: Some(StyleMixLayer::Structure),
                 catalog_id: Some(structural_entry.id),
                 message: format!(
-                    "the {} structural grammar ({family:?}) requires its own hybrid donor adapter; compiler v1 supports PeriodSentence, GrooveCycle, ProcessAdditive, BluesCallResponse and JazzChorus",
+                    "the {} structural grammar ({family:?}) requires its own hybrid donor adapter; compiler v1 supports PeriodSentence, GrooveCycle, ProcessAdditive, Contrapuntal/Fugue, BluesCallResponse and JazzChorus",
                     structural_entry.display_name
                 ),
             });
@@ -231,7 +243,10 @@ pub fn compile_hybrid_style(
     // The melodic donor is realized through HookCell. Do not silently copy
     // DNA into a structural preset whose own recipe disables that mechanism.
     if melody.is_some()
-        && structural_family != GrammarFamily::ProcessAdditive
+        && !matches!(
+            structural_family,
+            GrammarFamily::ProcessAdditive | GrammarFamily::Contrapuntal
+        )
         && !spec.texture.hook_cell
     {
         issues.push(StyleMixIssue {
@@ -256,6 +271,32 @@ pub fn compile_hybrid_style(
                 catalog_id: Some(entry.id),
                 message: "the ProcessAdditive engine consumes its motif cell, not accompaniment_pool/drum fields; rhythmic transfer requires an explicit event-alignment adapter".into(),
             });
+        } else if structural_family == GrammarFamily::Contrapuntal {
+            if donor.meter != spec.meter {
+                issues.push(StyleMixIssue {
+                    code: "fugue_rhythm_meter_mismatch".into(),
+                    layer: Some(StyleMixLayer::Rhythm),
+                    catalog_id: Some(entry.id),
+                    message: format!(
+                        "Fugue subject hook rhythms must fit the structural owner's meter {}; donor {} declares meter {}",
+                        spec.meter, entry.display_name, donor.meter
+                    ),
+                });
+            } else {
+                let mut candidate = spec.melody.clone();
+                candidate.hook_rhythms = donor.melody.hook_rhythms;
+                if !hook_dna_changes_realization(&spec.melody, &candidate, spec.meter) {
+                    issues.push(StyleMixIssue {
+                        code: "fugue_rhythm_dna_has_no_effect".into(),
+                        layer: Some(StyleMixLayer::Rhythm),
+                        catalog_id: Some(entry.id),
+                        message: "the rhythm donor does not produce a distinct valid HookCell under the Fugue meter; no silent generic rhythm fallback is admitted".into(),
+                    });
+                } else {
+                    spec.melody = candidate;
+                    spec.texture.hook_cell = true;
+                }
+            }
         } else if donor.meter != spec.meter {
             issues.push(StyleMixIssue {
                 code: "rhythm_meter_mismatch".into(),
@@ -303,6 +344,25 @@ pub fn compile_hybrid_style(
                 spec.motifs_medium = donor.motifs_medium;
                 spec.motifs_busy = donor.motifs_busy;
             }
+        } else if structural_family == GrammarFamily::Contrapuntal {
+            // The Fugue engine's only melodic-spec input is its generated
+            // HookCell subject. It does not consume the general spec motif
+            // bank as an independent layer after subject construction. Give
+            // the melody donor contour ownership only; rhythm is a separate
+            // axis, and no ornament/rhetoric claim is transferred.
+            let mut candidate = spec.melody.clone();
+            candidate.hook_contours = donor.melody.hook_contours;
+            if !hook_dna_changes_realization(&spec.melody, &candidate, spec.meter) {
+                issues.push(StyleMixIssue {
+                    code: "fugue_melody_dna_has_no_effect".into(),
+                    layer: Some(StyleMixLayer::Melody),
+                    catalog_id: Some(entry.id),
+                    message: "the melodic donor contours do not produce a distinct valid HookCell under the Fugue meter; generic fallback is not admitted".into(),
+                });
+            } else {
+                spec.melody = candidate;
+                spec.texture.hook_cell = true;
+            }
         } else {
             // Melodic DNA is independent from the structural owner's form and
             // section plan. Keep the owner's motif banks and meter obligations;
@@ -320,6 +380,20 @@ pub fn compile_hybrid_style(
                 catalog_id: Some(entry.id),
                 message: "ProcessAdditive preserves a static tonic/fifth field and does not consume progression or general harmonic-texture fields; an explicit modal/pitch-hierarchy adapter is required".into(),
             });
+        } else if structural_family == GrammarFamily::Contrapuntal {
+            if let Some(mode) = donor.mode {
+                // The Fugue engine reads only the pitch collection for its
+                // harmonic identity; progression and chord-texture flags are
+                // not consumed by its subject/answer/counterpoint engine.
+                spec.mode = Some(mode);
+            } else {
+                issues.push(StyleMixIssue {
+                    code: "fugue_harmony_requires_explicit_mode".into(),
+                    layer: Some(StyleMixLayer::Harmony),
+                    catalog_id: Some(entry.id),
+                    message: "a Fugue harmonic donor must declare an explicit diatonic mode; an absent mode would silently preserve the owner's valence-derived key".into(),
+                });
+            }
         } else if matches!(
             structural_family,
             GrammarFamily::BluesCallResponse | GrammarFamily::JazzChorus
@@ -364,6 +438,12 @@ pub fn compile_hybrid_style(
                 catalog_id: Some(entry.id),
                 message: "ProcessAdditive currently consumes tempo_range and attitude only; the general rhetoric/texture bundle is not safe to claim until a process-specific performance contract is tested".into(),
             });
+        } else if structural_family == GrammarFamily::Contrapuntal {
+            // compose_with_grammar_plan reads tempo_range and attitude when
+            // realizing the Fugue. Its generic rhetoric/swing/damage fields
+            // are not consumed by that engine.
+            spec.tempo_range = donor.tempo_range;
+            spec.attitude = donor.attitude;
         } else if matches!(
             structural_family,
             GrammarFamily::BluesCallResponse | GrammarFamily::JazzChorus
@@ -504,6 +584,22 @@ pub fn compose_hybrid_style(
         grammar_plan: realization.plan,
         grammar_trace: realization.trace,
         compiled,
+    })
+}
+
+/// Check that a donor DNA changes the actual HookCell generator output
+/// under the owner's meter rather than merely changing unconsumed metadata.
+/// The representative seed panel is deterministic and includes enough
+/// domain-separated variants to reject DNA that always falls back to the
+/// generic shared pools.
+fn hook_dna_changes_realization(
+    owner: &symthaea_music_theory::spec::MelodicDna,
+    candidate: &symthaea_music_theory::spec::MelodicDna,
+    meter: u8,
+) -> bool {
+    (0..64).any(|seed| {
+        HookCell::generate_with(owner, seed, meter as f64)
+            != HookCell::generate_with(candidate, seed, meter as f64)
     })
 }
 
