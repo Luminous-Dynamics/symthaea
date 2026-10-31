@@ -303,34 +303,30 @@ fn validate_common_design(
     {
         return Err("replicate designs differ on preregistered common benchmark/training conditions".to_owned());
     }
-    let first_clusters: BTreeMap<&str, (&str, &str, usize, u64, &str, &str)> = first.clusters
-        .iter()
-        .map(|cluster| (
-            cluster.cluster_id.as_str(),
+    let first_clusters: BTreeMap<String, (String, String, usize, u64, String, String)> =
+        first.clusters.iter().map(|cluster| (
+            cluster.cluster_id.clone(),
             (
-                cluster.task_family.as_str(),
-                cluster.source_family_sha256.as_str(),
+                cluster.task_family.clone(),
+                cluster.source_family_sha256.clone(),
                 cluster.item_ids.len(),
                 cluster.exposure_token_count,
-                cluster.exposure_variant_sha256.as_str(),
-                cluster.matched_placebo_record_sha256.as_str(),
+                cluster.exposure_variant_sha256.clone(),
+                cluster.matched_placebo_record_sha256.clone(),
             )
-        ))
-        .collect();
-    let next_clusters: BTreeMap<&str, (&str, &str, usize, u64, &str, &str)> = next.clusters
-        .iter()
-        .map(|cluster| (
-            cluster.cluster_id.as_str(),
+        )).collect();
+    let next_clusters: BTreeMap<String, (String, String, usize, u64, String, String)> =
+        next.clusters.iter().map(|cluster| (
+            cluster.cluster_id.clone(),
             (
-                cluster.task_family.as_str(),
-                cluster.source_family_sha256.as_str(),
+                cluster.task_family.clone(),
+                cluster.source_family_sha256.clone(),
                 cluster.item_ids.len(),
                 cluster.exposure_token_count,
-                cluster.exposure_variant_sha256.as_str(),
-                cluster.matched_placebo_record_sha256.as_str(),
+                cluster.exposure_variant_sha256.clone(),
+                cluster.matched_placebo_record_sha256.clone(),
             )
-        ))
-        .collect();
+        )).collect();
     if first_clusters != next_clusters {
         return Err("replicate source-cluster universe or cluster records differ".to_owned());
     }
@@ -443,7 +439,7 @@ fn validate_replicate(
         let (task_family, assigned, item_count) = assignment_map
             .get(outcome.cluster_id.as_str())
             .ok_or_else(|| format!("unknown cluster outcome {}", outcome.cluster_id))?;
-        if *task_family != outcome.task_family
+        if *task_family != outcome.task_family.as_str()
             || *assigned != outcome.assigned_to_exposure
             || u64::try_from(*item_count).ok() != Some(outcome.item_count)
         {
@@ -451,7 +447,7 @@ fn validate_replicate(
         }
         validate_digest(&outcome.evaluation_item_set_sha256, "evaluation_item_set_sha256")?;
         let expected_item_ids = replicate.design.clusters.iter()
-            .find(|cluster| cluster.cluster_id == outcome.cluster_id)
+            .find(|cluster| cluster.cluster_id.as_str() == outcome.cluster_id.as_str())
             .map(|cluster| {
                 let mut ids = cluster.item_ids.clone();
                 ids.sort();
@@ -801,23 +797,29 @@ pub fn analyze_replicated_causal_study(
         .map(|family| family.task_family.clone()).collect();
     let mut family_reports = Vec::new();
     for family in &family_keys {
-        let mut estimates = Vec::new();
+        let mut base_values = Vec::new();
+        let mut treatment_values = Vec::new();
+        let mut placebo_values = Vec::new();
+        let mut advantage_values = Vec::new();
         for effect in &replicate_effects {
             let found = effect.families.iter()
                 .find(|entry| &entry.task_family == family)
                 .ok_or_else(|| format!("family {family} missing from replicate"))?;
-            estimates.push(found.treatment_minus_placebo_permille);
+            base_values.push(found.base_score_permille);
+            treatment_values.push(found.treatment_score_permille);
+            placebo_values.push(found.placebo_score_permille);
+            advantage_values.push(found.treatment_minus_placebo_permille);
         }
+        let first_family = replicate_effects[0].families.iter()
+            .find(|entry| &entry.task_family == family)
+            .ok_or_else(|| format!("family {family} missing from first replicate"))?;
         family_reports.push(FamilyEffectV1 {
             task_family: family.clone(),
-            cluster_count: replicate_effects[0].families.iter()
-                .find(|entry| &entry.task_family == family)
-                .map(|entry| entry.cluster_count)
-                .unwrap_or(0),
-            base_score_permille: sample_mean(&replicate_effects.iter().map(|e| e.families.iter().find(|f| &f.task_family == family).unwrap().base_score_permille).collect::<Vec<_>>())?,
-            treatment_score_permille: sample_mean(&replicate_effects.iter().map(|e| e.families.iter().find(|f| &f.task_family == family).unwrap().treatment_score_permille).collect::<Vec<_>>())?,
-            placebo_score_permille: sample_mean(&replicate_effects.iter().map(|e| e.families.iter().find(|f| &f.task_family == family).unwrap().placebo_score_permille).collect::<Vec<_>>())?,
-            treatment_minus_placebo_permille: sample_mean(&estimates)?,
+            cluster_count: first_family.cluster_count,
+            base_score_permille: sample_mean(&base_values)?,
+            treatment_score_permille: sample_mean(&treatment_values)?,
+            placebo_score_permille: sample_mean(&placebo_values)?,
+            treatment_minus_placebo_permille: sample_mean(&advantage_values)?,
         });
     }
 
@@ -908,7 +910,7 @@ mod tests {
             }
         }
         let suffix = format!("replicate-{index:03}");
-        let mut design = RandomizedInterventionDesignV1 {
+        let design = RandomizedInterventionDesignV1 {
             schema: crate::intervention::INTERVENTION_DESIGN_SCHEMA.to_owned(),
             experiment_id: "causal-study-test".to_owned(),
             replicate_id: suffix.clone(),
@@ -933,7 +935,6 @@ mod tests {
             placebo_training_corpus_sha256: digest(&format!("placebo-corpus-{index}")),
             clusters,
         };
-        design.replicate_id = suffix.clone();
         let seed = vec![index; 32];
         let manifest = randomize_intervention(&design, &seed).unwrap();
         let treatment_checkpoint = digest(&format!("treatment-checkpoint-{index}"));
