@@ -34,7 +34,7 @@ pub const INFLUENCE_SUPPORT_POLICY_VERSION: &str =
 pub const REPEATABILITY_CALIBRATION_VERSION: &str =
     "mel-mr-eval-017-repeatability-calibration-v0.1";
 const CALIBRATION_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-repeatability-v1\0";
-const INFLUENCE_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-influence-v1\0";
+const INFLUENCE_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-influence-v2\0";
 const MINIMUM_NOOP_RENDERS: usize = 3;
 const MAX_EVENT_ID_BYTES: usize = 256;
 const MAX_ARTIFACT_BYTES: usize = 64 * 1024 * 1024;
@@ -2318,7 +2318,27 @@ mod tests {
             counterfactual_evidence.receipt_sha256()
         );
         assert_eq!(report.counterfactual_event_map_receipt_sha256, counterfactual.map.receipt_sha256);
+        assert!(!report.measured_influence_intervals.is_empty());
+        assert!(!report.qualified_support_intervals.is_empty());
+        assert_eq!(report.window_measurements.len(), report.total_channel_windows);
+        assert_eq!(report.disposition, InfluenceDisposition::EffectDetected);
         assert!(verify_counterfactual_influence(&report, &experiment, &calibration).unwrap());
+
+        let mut policy_tampered = report.clone();
+        policy_tampered.support_policy.tail_extension_frames = 1;
+        assert_eq!(
+            verify_counterfactual_influence(&policy_tampered, &experiment, &calibration)
+                .unwrap_err(),
+            CounterfactualInfluenceError::InvalidInfluenceReceipt,
+        );
+        let mut trace_tampered = report.clone();
+        trace_tampered.window_measurements[0].effect_detected =
+            !trace_tampered.window_measurements[0].effect_detected;
+        assert_eq!(
+            verify_counterfactual_influence(&trace_tampered, &experiment, &calibration)
+                .unwrap_err(),
+            CounterfactualInfluenceError::InvalidInfluenceReceipt,
+        );
     }
 
     #[test]
@@ -2558,11 +2578,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             intervals,
-            vec![
-                FrameInterval { start_frame: 0, end_frame: 10 },
-                FrameInterval { start_frame: 10, end_frame: 20 },
-                FrameInterval { start_frame: 20, end_frame: 30 },
-            ],
+            vec![FrameInterval { start_frame: 0, end_frame: 30 }],
         );
         assert_eq!(counts.qualified_channel_windows, 3);
     }
