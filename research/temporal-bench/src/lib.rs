@@ -175,7 +175,10 @@ fn unique_similar_key(
 ) -> u64 {
     loop {
         let candidate = match similarity {
-            DistractorSimilarity::High => target ^ random_mask(rng, 1 + (rng.next_u64() % 4)),
+            DistractorSimilarity::High => {
+                let bit_count = 1 + (rng.next_u64() % 4);
+                target ^ random_mask(rng, bit_count)
+            }
             DistractorSimilarity::Low => target ^ low_similarity_mask(rng),
         };
         if used.insert(candidate) {
@@ -258,8 +261,8 @@ mod tests {
     fn associations(task: &PublicTask) -> Vec<(u64, u64, u64)> {
         task.events
             .iter()
-            .filter_map(|event| match event.kind {
-                EventKind::Associate { key, value } => Some((event.step, key, value)),
+            .filter_map(|event| match &event.kind {
+                EventKind::Associate { key, value } => Some((event.step, *key, *value)),
                 EventKind::Probe { .. } => None,
             })
             .collect()
@@ -281,16 +284,16 @@ mod tests {
             .iter()
             .find(|event| {
                 matches!(
-                    event.kind,
+                    &event.kind,
                     EventKind::Associate { key, value }
-                        if key == oracle.target_key && value == oracle.expected_value
+                        if *key == oracle.target_key && *value == oracle.expected_value
                 )
             })
             .unwrap();
         let probe = task
             .events
             .iter()
-            .find(|event| matches!(event.kind, EventKind::Probe { .. }))
+            .find(|event| matches!(&event.kind, EventKind::Probe { .. }))
             .unwrap();
         assert_eq!(target.step, 0);
         assert_eq!(probe.step, task.delay_steps);
