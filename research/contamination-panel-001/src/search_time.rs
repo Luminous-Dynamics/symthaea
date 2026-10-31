@@ -91,6 +91,8 @@ pub struct SearchTimeExposureTraceV1 {
     pub enforcement_build_sha256: String,
     pub policy_id: String,
     pub access_mode: SearchAccessModeV1,
+    /// SHA-256 digests of normalized destinations permitted by allowlisted mode.
+    pub allowlisted_destination_sha256s: Vec<String>,
     /// Channels that the instrumentation claims to observe.
     pub instrumented_channels: Vec<SearchInformationChannelV1>,
     /// Known channels outside this trace perimeter. Must be disclosed.
@@ -115,6 +117,7 @@ pub struct SearchTimeExposureAuditV1 {
     pub blocked_events_have_no_response_bytes: bool,
     pub network_disabled_policy_respected: bool,
     pub all_event_channels_declared_instrumented: bool,
+    pub all_known_channel_types_accounted_for: bool,
     pub no_unobserved_channels_declared: bool,
     /// Always false: this module cannot authenticate the enforcement perimeter.
     pub complete_mediation_verified: bool,
@@ -201,6 +204,20 @@ fn validate_digest(value: &str, label: &str) -> Result<(), String> {
     } else {
         Err(format!("{label} must be a lowercase SHA-256 digest"))
     }
+}
+
+fn all_known_channels() -> BTreeSet<SearchInformationChannelV1> {
+    [
+        SearchInformationChannelV1::WebSearch,
+        SearchInformationChannelV1::BrowserNavigation,
+        SearchInformationChannelV1::HttpApi,
+        SearchInformationChannelV1::RemoteMcp,
+        SearchInformationChannelV1::VectorStore,
+        SearchInformationChannelV1::LocalCache,
+        SearchInformationChannelV1::MountedFile,
+        SearchInformationChannelV1::AgentMemory,
+        SearchInformationChannelV1::Other,
+    ].into_iter().collect()
 }
 
 fn event_digest(event: &SearchTimeEventV1) -> Result<String, String> {
@@ -319,12 +336,32 @@ pub fn audit_search_time_trace(
         trace.instrumented_channels.iter().copied().collect();
     let unobserved: BTreeSet<SearchInformationChannelV1> =
         trace.unobserved_channels.iter().copied().collect();
+    let allowlisted_destinations: BTreeSet<&str> =
+        trace.allowlisted_destination_sha256s.iter().map(String::as_str).collect();
+    for digest in &trace.allowlisted_destination_sha256s {
+        validate_digest(digest, "allowlisted_destination_sha256s[]")?;
+    }
     if instrumented.len() != trace.instrumented_channels.len()
         || unobserved.len() != trace.unobserved_channels.len()
+        || allowlisted_destinations.len() != trace.allowlisted_destination_sha256s.len()
         || !instrumented.is_disjoint(&unobserved)
     {
-        return Err("instrumented and unobserved channel declarations must be unique and disjoint".to_owned());
+        return Err("instrumented/unobserved channels and allowlist destinations must be unique and disjoint".to_owned());
     }
+    match trace.access_mode {
+        SearchAccessModeV1::Allowlisted if allowlisted_destinations.is_empty() => {
+            return Err("allowlisted access mode requires at least one destination digest".to_owned());
+        }
+        SearchAccessModeV1::NetworkDisabled | SearchAccessModeV1::Unrestricted
+            if !allowlisted_destinations.is_empty() =>
+        {
+            return Err("network-disabled and unrestricted modes must not carry an allowlist".to_owned());
+        }
+        _ => {}
+    }
+    let declared_channels: BTreeSet<SearchInformationChannelV1> =
+        instrumented.union(&unobserved).copied().collect();
+    let all_channel_types_accounted_for = declared_channels == all_known_channels();
 
     let mut previous = SEARCH_TRACE_GENESIS.to_owned();
     let mut last_timestamp: Option<String> = None;
@@ -335,7 +372,9 @@ pub fn audit_search_time_trace(
     let mut response_receipts_complete = true;
     let mut blocked_events_clean = true;
     let mut network_disabled_respected = true;
+    let mut allowlist_respected = true;
     let mut channels_instrumented = true;
+    let mut invocation_ids = BTreeSet::new();
     let mut sequence_complete = true;
     let mut issues = Vec::new();
 
@@ -345,6 +384,13 @@ pub fn audit_search_time_trace(
         sequence_complete &= event.sequence == expected_sequence;
         if event.sequence != expected_sequence {
             issues.push(format!("event at index {index} has non-contiguous sequence"));
+        }
+        if event.invocation_id.trim().is_empty()
+            || event.provider_or_tool.trim().is_empty()
+            || !invocation_ids.insert(event.invocation_id.as_str())
+        {
+            request_receipts_complete = false;
+            issues.push(format!("event {} has missing or duplicate invocation/provider identity", event.sequence));
         }
         request_receipts_complete &= valid_digest(&event.request_sha256);
         if !valid_digest(&event.request_sha256) {
@@ -370,11 +416,20 @@ pub fn audit_search_time_trace(
                 if event.response_bytes == 0 && event.response_sha256.is_some() {
                     response_receipts_complete = false;
                 }
-                if trace.access_mode == SearchAccessModeV1::NetworkDisabled
-                    && event.channel.requires_network()
-                {
-                    network_disabled_respected = false;
-                    issues.push(format!("network-disabled trace contains allowed network event {}", event.sequence));
+                if event.channel.requires_network() {
+                    match trace.access_mode {
+                        SearchAccessModeV1::NetworkDisabled => {
+                            network_disabled_respected = false;
+                            issues.push(format!("network-disabled trace contains allowed network event {}", event.sequence));
+                        }
+                        SearchAccessModeV1::Allowlisted
+                            if !allowlisted_destinations.contains(event.destination_sha256.as_str()) =>
+                        {
+                            allowlist_respected = false;
+                            issues.push(format!("allowed network event {} targets a destination outside the declared allowlist", event.sequence));
+                        }
+                        SearchAccessModeV1::Allowlisted | SearchAccessModeV1::Unrestricted => {}
+                    }
                 }
             }
             SearchEventDispositionV1::Blocked => {
@@ -432,8 +487,12 @@ pub fn audit_search_time_trace(
         sequence_complete = false;
         issues.push("declared event_count does not match trace events".to_owned());
     }
-    let no_unobserved_channels = trace.unobserved_channels.is_empty();
-    if !no_unobserved_channels {
+    let no_unobserved_channels =
+        trace.unobserved_channels.is_empty() && all_channel_types_accounted_for;
+    if !all_channel_types_accounted_for {
+        issues.push("instrumented plus unobserved declarations do not cover every known information channel".to_owned());
+    }
+    if !trace.unobserved_channels.is_empty() {
         issues.push("trace declares information channels outside the instrumentation perimeter".to_owned());
     }
     let valid = trace_root_matches
@@ -444,10 +503,12 @@ pub fn audit_search_time_trace(
         && response_receipts_complete
         && blocked_events_clean
         && network_disabled_respected
+        && allowlist_respected
         && channels_instrumented
+        && all_channel_types_accounted_for
         && no_unobserved_channels;
     let coverage_status = if no_unobserved_channels && channels_instrumented {
-        "declared_all_known_channels_but_not_independently_qualified"
+        "all_known_channel_types_declared_instrumented_not_independently_qualified"
     } else {
         "partial_or_unobserved_information_channels"
     }.to_owned();
@@ -463,6 +524,7 @@ pub fn audit_search_time_trace(
         blocked_events_have_no_response_bytes: blocked_events_clean,
         network_disabled_policy_respected: network_disabled_respected,
         all_event_channels_declared_instrumented: channels_instrumented,
+        all_known_channel_types_accounted_for,
         no_unobserved_channels_declared: no_unobserved_channels,
         complete_mediation_verified: false,
         independently_verified: false,
@@ -493,6 +555,10 @@ pub fn audit_search_time_findings(
     if !digest_matches {
         return Err("search exposure findings digest does not match contents".to_owned());
     }
+    let trace_audit = audit_search_time_trace(trace)?;
+    if !trace_audit.valid {
+        return Err("search-time trace failed integrity audit".to_owned());
+    }
     let event_by_sequence: BTreeMap<u64, &SearchTimeEventV1> =
         trace.events.iter().map(|event| (event.sequence, event)).collect();
     let mut seen = BTreeSet::new();
@@ -513,6 +579,15 @@ pub fn audit_search_time_findings(
             return Err(format!("finding references blocked event {}", finding.event_sequence));
         }
         validate_digest(&finding.evidence_sha256, "finding.evidence_sha256")?;
+        if matches!(
+            finding.exposure_class,
+            SearchExposureClassV1::ContextBearing | SearchExposureClassV1::AnswerBearing
+        ) && finding.matched_item_ids.is_empty() {
+            return Err("context/answer-bearing findings must reference at least one benchmark item".to_owned());
+        }
+        if event.response_bytes == 0 || event.response_sha256.is_none() {
+            return Err("exposure finding requires a received response body".to_owned());
+        }
         if finding.confidence_permille > 1_000 {
             return Err("finding confidence must be in [0, 1000] permille".to_owned());
         }
@@ -594,6 +669,7 @@ mod tests {
             enforcement_build_sha256: digest("enforcer"),
             policy_id: "network-isolated-v1".to_owned(),
             access_mode: SearchAccessModeV1::NetworkDisabled,
+            allowlisted_destination_sha256s: Vec::new(),
             instrumented_channels: vec![
                 SearchInformationChannelV1::WebSearch,
                 SearchInformationChannelV1::BrowserNavigation,
@@ -698,6 +774,7 @@ mod tests {
         let audit = audit_search_time_trace(&trace).unwrap();
         assert!(!audit.valid);
         assert!(!audit.no_unobserved_channels_declared);
+        assert!(audit.all_known_channel_types_accounted_for);
 
         let mut trace = trace();
         trace.instrumented_channels.retain(|channel| *channel != SearchInformationChannelV1::LocalCache);
