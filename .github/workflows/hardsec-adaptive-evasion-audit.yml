@@ -88,6 +88,9 @@ jobs:
           paired = receipt["paired_baseline_comparison"]
           assert paired["result"] == "paired"
           assert paired["baseline_model_id"] == "fixture-baseline-detector"
+          assert paired["decision"] == "descriptive_paired_comparison_no_superiority_claim"
+          assert paired["operating_point_comparability"]["status"] == "not_verified_by_paired_ledger"
+          assert paired["operating_point_comparability"]["matched_false_alert_budget_verified"] is False
           paired_groups = paired["group_metrics"]
           program = paired_groups["program_group_level"]
           assert program["independent_group_count"] == 3
