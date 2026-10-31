@@ -40,6 +40,18 @@ pub enum FactorGraphError {
     #[error("elimination variable {variable} was requested more than once")]
     DuplicateEliminationVariable { variable: usize },
 
+    #[error("cutset variable {variable} was requested more than once")]
+    DuplicateCutsetVariable { variable: usize },
+
+    #[error("cutset variable {variable} is not in the elimination set")]
+    CutsetVariableNotEliminated { variable: usize },
+
+    #[error("cutset requires {assignments} branches, exceeding the configured limit {maximum}")]
+    CutsetAssignmentBudgetExceeded { assignments: usize, maximum: usize },
+
+    #[error("conditioned cutset branches returned different output scopes")]
+    CutsetBranchScopeMismatch,
+
     #[error("variable {variable} is not present in the factor scope")]
     VariableNotInFactor { variable: usize },
 
@@ -226,6 +238,26 @@ impl BinaryLogFactor {
         Self::new(variables, log_values)
     }
 
+    /// Condition one variable to a binary value and remove it from this factor's scope.
+    ///
+    /// The remaining table preserves the original sorted variable order and local
+    /// least-significant-bit convention. Conditioning an absent variable is an
+    /// identity operation, which is useful when a cutset variable is disconnected.
+    pub fn condition(&self, variable: usize, value: bool) -> Result<Self, FactorGraphError> {
+        let Ok(variable_slot) = self.variables.binary_search(&variable) else {
+            return Ok(self.clone());
+        };
+        let mut variables = self.variables.clone();
+        variables.remove(variable_slot);
+        let entries = assignment_count(variables.len())?;
+        let mut log_values = Vec::with_capacity(entries);
+        for assignment in 0..entries {
+            let conditioned_index = insert_assignment_bit(assignment, variable_slot, value)?;
+            log_values.push(self.log_values[conditioned_index]);
+        }
+        Self::new(variables, log_values)
+    }
+
     /// Sum out one variable with numerically stable log-sum-exp.
     pub fn sum_out(
         &self,
@@ -350,6 +382,23 @@ pub struct LogFactorEliminationReport {
     pub peak_factor_entries: usize,
     pub factor_multiplications: usize,
     pub variables_summed_out: usize,
+}
+
+/// Telemetry for exact log-domain cutset conditioning followed by min-fill.
+///
+/// The induced width describes the residual graph after conditioning the cutset.
+/// Peak factor-entry counters include original input tables and residual
+/// min-fill contractions. The result is the exact sum over all cutset assignments.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CutsetLogFactorEliminationReport {
+    pub factor: BinaryLogFactor,
+    pub cutset_variables: Vec<usize>,
+    pub cutset_assignments_evaluated: usize,
+    pub remaining_elimination_order: Vec<usize>,
+    pub induced_width: usize,
+    pub predicted_peak_factor_entries: usize,
+    pub peak_factor_entries: usize,
+    pub factor_multiplications: usize,
 }
 
 fn log_add_exp(left: f64, right: f64) -> f64 {
@@ -506,14 +555,21 @@ pub fn min_fill_log_sum_product(
         .map(|factor| factor.variables.clone())
         .collect::<Vec<_>>();
     let plan = plan_min_fill_elimination(&scopes, eliminate, max_factor_entries)?;
+    min_fill_log_sum_product_with_plan(factors, &plan)
+}
 
+/// Reuse a checked plan when factor scopes are invariant across numeric queries.
+fn min_fill_log_sum_product_with_plan(
+    factors: &[BinaryLogFactor],
+    plan: &FactorEliminationPlan,
+) -> Result<LogFactorEliminationReport, FactorGraphError> {
     let mut work = Vec::<Option<BinaryLogFactor>>::with_capacity(
-        factors.len().saturating_add(eliminate.len()),
+        factors.len().saturating_add(plan.elimination_order.len()),
     );
     let mut buckets = BTreeMap::<usize, BTreeSet<usize>>::new();
     let mut peak_factor_entries = 1usize;
     for factor in factors {
-        check_budget(factor.log_values.len(), max_factor_entries)?;
+        check_budget(factor.log_values.len(), plan.max_factor_entries)?;
         peak_factor_entries = peak_factor_entries.max(factor.log_values.len());
         let factor_id = work.len();
         for variable in factor.variables.iter().copied() {
@@ -552,7 +608,7 @@ pub fn min_fill_log_sum_product(
                 None => factor,
                 Some(previous) => {
                     factor_multiplications += 1;
-                    previous.multiply(&factor, max_factor_entries)?
+                    previous.multiply(&factor, plan.max_factor_entries)?
                 }
             });
             if let Some(current) = &product {
@@ -561,7 +617,7 @@ pub fn min_fill_log_sum_product(
         }
 
         let product = product.ok_or(FactorGraphError::VariableNotInFactor { variable })?;
-        let reduced = product.sum_out(variable, max_factor_entries)?;
+        let reduced = product.sum_out(variable, plan.max_factor_entries)?;
         peak_factor_entries = peak_factor_entries.max(reduced.log_values.len());
         let factor_id = work.len();
         for remaining_variable in reduced.variables.iter().copied() {
@@ -574,7 +630,7 @@ pub fn min_fill_log_sum_product(
     let mut remaining = work.into_iter().flatten();
     let mut result = remaining.next().ok_or(FactorGraphError::EmptyFactorGraph)?;
     for factor in remaining {
-        result = result.multiply(&factor, max_factor_entries)?;
+        result = result.multiply(&factor, plan.max_factor_entries)?;
         factor_multiplications += 1;
         peak_factor_entries = peak_factor_entries.max(result.log_values.len());
     }
@@ -583,6 +639,7 @@ pub fn min_fill_log_sum_product(
         factor: result,
         elimination_order,
         induced_width,
+        predicted_output_entries: plan.predicted_output_entries,
         predicted_peak_factor_entries: plan.predicted_peak_factor_entries,
         peak_factor_entries,
         factor_multiplications,
@@ -590,6 +647,149 @@ pub fn min_fill_log_sum_product(
     })
 }
 
+/// Exact bounded-memory sum-product by cutset conditioning followed by min-fill.
+///
+/// Every variable in the cutset must also appear in the elimination set. The
+/// function enumerates all 2^k assignments, conditions each input factor,
+/// eliminates the remaining variables with one preflighted min-fill plan, and
+/// log-adds the branch outputs. This is exact, not approximate: it trades
+/// 2^k branches for a potentially much smaller residual induced width.
+///
+/// The cutset can include variables absent from all factors; summing over their
+/// two conditioned branches correctly contributes a factor of two. If the
+/// residual plan or any input factor exceeds max_factor_entries, it fails
+/// before evaluating a branch. max_cutset_assignments independently bounds
+/// the number of branches.
+pub fn min_fill_log_sum_product_with_cutset(
+    factors: &[BinaryLogFactor],
+    eliminate: &[usize],
+    cutset: &[usize],
+    max_factor_entries: usize,
+    max_cutset_assignments: usize,
+) -> Result<CutsetLogFactorEliminationReport, FactorGraphError> {
+    if factors.is_empty() {
+        return Err(FactorGraphError::EmptyFactorGraph);
+    }
+
+    let elimination_set = eliminate.iter().copied().collect::<BTreeSet<_>>();
+    if elimination_set.len() != eliminate.len() {
+        let mut seen = BTreeSet::new();
+        let duplicate = eliminate
+            .iter()
+            .copied()
+            .find(|variable| !seen.insert(*variable))
+            .ok_or(FactorGraphError::IndexOverflow)?;
+        return Err(FactorGraphError::DuplicateEliminationVariable { variable: duplicate });
+    }
+
+    let mut canonical_cutset = cutset.to_vec();
+    canonical_cutset.sort_unstable();
+    for pair in canonical_cutset.windows(2) {
+        if pair[0] == pair[1] {
+            return Err(FactorGraphError::DuplicateCutsetVariable { variable: pair[0] });
+        }
+    }
+    for variable in canonical_cutset.iter().copied() {
+        if !elimination_set.contains(&variable) {
+            return Err(FactorGraphError::CutsetVariableNotEliminated { variable });
+        }
+    }
+
+    let branch_count = assignment_count(canonical_cutset.len())?;
+    if branch_count > max_cutset_assignments {
+        return Err(FactorGraphError::CutsetAssignmentBudgetExceeded {
+            assignments: branch_count,
+            maximum: max_cutset_assignments,
+        });
+    }
+
+    let cutset_set = canonical_cutset.iter().copied().collect::<BTreeSet<_>>();
+    let remaining_eliminate = eliminate
+        .iter()
+        .copied()
+        .filter(|variable| !cutset_set.contains(variable))
+        .collect::<Vec<_>>();
+    let reduced_scopes = factors
+        .iter()
+        .map(|factor| {
+            factor
+                .variables
+                .iter()
+                .copied()
+                .filter(|variable| !cutset_set.contains(variable))
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+
+    let plan = plan_min_fill_elimination(
+        &reduced_scopes,
+        &remaining_eliminate,
+        max_factor_entries,
+    )?;
+    let original_peak = factors
+        .iter()
+        .map(|factor| factor.log_values.len())
+        .max()
+        .unwrap_or(1);
+    check_budget(original_peak, max_factor_entries)?;
+    let predicted_peak_factor_entries = original_peak.max(plan.predicted_peak_factor_entries);
+
+    let mut accumulated: Option<BinaryLogFactor> = None;
+    let mut peak_factor_entries = original_peak;
+    let mut factor_multiplications = 0usize;
+
+    for branch in 0..branch_count {
+        let mut conditioned_factors = Vec::with_capacity(factors.len());
+        for factor in factors {
+            let mut conditioned = factor.clone();
+            for (slot, variable) in canonical_cutset.iter().copied().enumerate() {
+                let value = ((branch >> slot) & 1) != 0;
+                conditioned = conditioned.condition(variable, value)?;
+            }
+            conditioned_factors.push(conditioned);
+        }
+
+        let report = min_fill_log_sum_product_with_plan(&conditioned_factors, &plan)?;
+        if let Some(previous) = &accumulated {
+            if previous.variables != report.factor.variables {
+                return Err(FactorGraphError::CutsetBranchScopeMismatch);
+            }
+        }
+        peak_factor_entries = peak_factor_entries.max(report.peak_factor_entries);
+        factor_multiplications = factor_multiplications
+            .checked_add(report.factor_multiplications)
+            .ok_or(FactorGraphError::IndexOverflow)?;
+
+        match &mut accumulated {
+            None => accumulated = Some(report.factor),
+            Some(previous) => {
+                for (left, right) in previous
+                    .log_values
+                    .iter_mut()
+                    .zip(report.factor.log_values.iter().copied())
+                {
+                    *left = log_add_exp(*left, right);
+                }
+            }
+        }
+    }
+
+    let factor = accumulated.ok_or(FactorGraphError::CutsetAssignmentBudgetExceeded {
+        assignments: branch_count,
+        maximum: max_cutset_assignments,
+    })?;
+
+    Ok(CutsetLogFactorEliminationReport {
+        factor,
+        cutset_variables: canonical_cutset,
+        cutset_assignments_evaluated: branch_count,
+        remaining_elimination_order: plan.elimination_order,
+        induced_width: plan.induced_width,
+        predicted_peak_factor_entries,
+        peak_factor_entries,
+        factor_multiplications,
+    })
+}
 /// Compute the deterministic min-fill order and its induced width.
 ///
 /// A lazy min-priority queue keeps the planner from rescanning every active
