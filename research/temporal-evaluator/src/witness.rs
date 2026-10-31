@@ -548,6 +548,8 @@ mod tests {
         let attestations = vec![
             attest(&local, &witness_keys[0], 40, challenge),
             attest(&conflicting, &witness_keys[1], 41, challenge),
+            attest(&conflicting, &witness_keys[2], 42, challenge),
+            attest(&conflicting, &witness_keys[3], 43, challenge),
         ];
         assert_eq!(
             verify_checkpoint_quorum(
@@ -560,6 +562,54 @@ mod tests {
             ),
             Err(CheckpointError::WitnessCheckpointConflict { epoch: 4 })
         );
+    }
+
+    #[test]
+    fn one_byzantine_higher_epoch_attestation_cannot_override_current_quorum() {
+        let evaluator_key = SigningKey::from_bytes(&[37; 32]);
+        let witness_keys = witness_keys(38);
+        let current = checkpoint(&evaluator_key, 5, [8; 32]);
+        let higher = checkpoint(&evaluator_key, 6, [9; 32]);
+        let challenge = [101; 32];
+        let attestations = vec![
+            attest(&current, &witness_keys[0], 80, challenge),
+            attest(&current, &witness_keys[1], 81, challenge),
+            attest(&current, &witness_keys[2], 82, challenge),
+            attest(&higher, &witness_keys[3], 83, challenge),
+        ];
+        let result = verify_checkpoint_quorum(
+            &current,
+            &evaluator_key.verifying_key(),
+            challenge,
+            &attestations,
+            &witnesses(&witness_keys),
+            bft_policy(),
+        ).unwrap();
+        assert_eq!(result.confirming_witnesses, 3);
+    }
+
+    #[test]
+    fn one_byzantine_conflicting_head_cannot_deny_current_quorum() {
+        let evaluator_key = SigningKey::from_bytes(&[42; 32]);
+        let witness_keys = witness_keys(43);
+        let current = checkpoint(&evaluator_key, 5, [8; 32]);
+        let conflicting = checkpoint(&evaluator_key, 5, [9; 32]);
+        let challenge = [102; 32];
+        let attestations = vec![
+            attest(&current, &witness_keys[0], 90, challenge),
+            attest(&current, &witness_keys[1], 91, challenge),
+            attest(&current, &witness_keys[2], 92, challenge),
+            attest(&conflicting, &witness_keys[3], 93, challenge),
+        ];
+        let result = verify_checkpoint_quorum(
+            &current,
+            &evaluator_key.verifying_key(),
+            challenge,
+            &attestations,
+            &witnesses(&witness_keys),
+            bft_policy(),
+        ).unwrap();
+        assert_eq!(result.confirming_witnesses, 3);
     }
 
     #[test]
