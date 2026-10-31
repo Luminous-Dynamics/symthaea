@@ -12,7 +12,7 @@
 use crate::{
     hash_domain,
     fresh_instance::{
-        normalized_determinant_margin_permille, task_text, ExactLinearSolutionV1, FreshChallengeBundleV1,
+        normalized_determinant_margin_permille, parse_timestamp, task_text, ExactLinearSolutionV1, FreshChallengeBundleV1,
         FreshChallengeManifestV1, FreshPublicChallengePacketV1,
         LinearSystemParametersV1, SealedFreshOraclePacketV1,
     },
@@ -241,6 +241,24 @@ fn validate_bundle(
     ] {
         validate_digest(digest, label)?;
     }
+    for (digest, label) in [
+        (&public.model_checkpoint_sha256, "model_checkpoint_sha256"),
+        (&public.generator_source_sha256, "generator_source_sha256"),
+        (&public.generator_binary_sha256, "generator_binary_sha256"),
+        (&public.runtime_image_sha256, "runtime_image_sha256"),
+        (&public.generator_config_sha256, "generator_config_sha256"),
+        (&manifest.checkpoint_freeze_receipt_sha256, "checkpoint_freeze_receipt_sha256"),
+        (&manifest.model_checkpoint_sha256, "manifest.model_checkpoint_sha256"),
+        (&manifest.generator_source_sha256, "manifest.generator_source_sha256"),
+        (&manifest.generator_binary_sha256, "manifest.generator_binary_sha256"),
+        (&manifest.runtime_image_sha256, "manifest.runtime_image_sha256"),
+        (&manifest.generator_config_sha256, "manifest.generator_config_sha256"),
+        (&manifest.generation_seed_commitment_sha256, "generation_seed_commitment_sha256"),
+    ] {
+        validate_digest(digest, label)?;
+    }
+    parse_timestamp(&manifest.checkpoint_frozen_at_utc, "checkpoint_frozen_at_utc")?;
+    parse_timestamp(&manifest.challenge_generated_at_utc, "challenge_generated_at_utc")?;
     crate::fresh_instance::parse_timestamp(
         &manifest.checkpoint_frozen_at_utc,
         "checkpoint_frozen_at_utc",
@@ -932,6 +950,28 @@ mod tests {
             &bundle,
             &serde_json::to_vec(&build_submission(&bundle, exact_responses(&bundle))).unwrap()
         ).unwrap_err().contains("stability margin does not match matrix parameters"));
+    }
+
+    #[test]
+    fn scorer_rejects_malformed_freeze_timestamps_and_metadata_digests() {
+        let mut bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
+        bundle.manifest.checkpoint_frozen_at_utc = "2026-02-30T18:00:00Z".to_owned();
+        bundle.manifest.manifest_sha256 = manifest_digest(&bundle.manifest).unwrap();
+        assert!(score_fresh_submission(
+            &bundle,
+            &serde_json::to_vec(&build_submission(&bundle, exact_responses(&bundle))).unwrap()
+        ).unwrap_err().contains("impossible date or clock"));
+
+        let mut bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
+        bundle.public_packet.generator_binary_sha256 = "not-a-digest".to_owned();
+        bundle.public_packet.public_packet_sha256 = public_packet_digest(&bundle.public_packet).unwrap();
+        bundle.manifest.generator_binary_sha256 = "not-a-digest".to_owned();
+        bundle.manifest.public_packet_sha256 = bundle.public_packet.public_packet_sha256.clone();
+        bundle.manifest.manifest_sha256 = manifest_digest(&bundle.manifest).unwrap();
+        assert!(score_fresh_submission(
+            &bundle,
+            &serde_json::to_vec(&build_submission(&bundle, exact_responses(&bundle))).unwrap()
+        ).unwrap_err().contains("generator_binary_sha256"));
     }
 
     #[test]
