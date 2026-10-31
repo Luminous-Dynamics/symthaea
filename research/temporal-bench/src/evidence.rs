@@ -616,6 +616,7 @@ mod tests {
         let config = EvidenceConfig::braintrace_reference(321);
         let (mut task, oracle) = generate_evidence_task(config).unwrap();
         task.recall_steps = task.recall_steps.saturating_add(1);
+        task.content_sha256 = evidence_content_digest(&task);
         assert_eq!(
             verify_evidence_trace(&task, &oracle),
             Err(EvidenceVerificationError::InvalidTaskWindow)
@@ -639,6 +640,7 @@ mod tests {
         let (mut task, oracle) = generate_evidence_task(config).unwrap();
         task.observations[0].active_channels.push(50);
         task.observations[0].active_channels.sort_unstable();
+        task.content_sha256 = evidence_content_digest(&task);
         assert!(matches!(
             verify_evidence_trace(&task, &oracle),
             Err(EvidenceVerificationError::RecallChannelOutsideRecallWindow { .. })
@@ -651,6 +653,7 @@ mod tests {
         let (mut task, oracle) = generate_evidence_task(config).unwrap();
         task.observations[0].active_channels.push(0);
         task.observations[0].active_channels.sort_unstable();
+        task.content_sha256 = evidence_content_digest(&task);
         assert!(matches!(
             verify_evidence_trace(&task, &oracle),
             Err(EvidenceVerificationError::CueChannelOutsideAssignedWindow { .. })
