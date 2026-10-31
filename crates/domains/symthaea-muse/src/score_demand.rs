@@ -8,10 +8,12 @@
 //! instrument/asset evidence.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use symthaea_music_theory::score::{Score, ScoreNote, VoiceRole};
 
 pub const SCORE_DEMAND_PROFILE_SCHEMA: &str = "muse-score-demand-profile-v1";
+pub const SCORE_DEMAND_INPUT_DIGEST_SCHEMA: &str = "muse-score-serde-json-sha256-v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -48,6 +50,10 @@ pub struct VoiceDemand {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScoreDemandProfile {
     pub schema: String,
+    pub input_digest_schema: String,
+    /// SHA-256 over a domain separator and the complete serialized symbolic
+    /// Score (including notes, key, tempo, meter and declared total span).
+    pub score_sha256: String,
     pub meter_beats: u8,
     pub tempo_bpm: f32,
     pub declared_score_span_beats: f64,
@@ -74,6 +80,11 @@ pub enum ScoreDemandError {
     NonFiniteDuration { note_index: usize },
     NonPositiveDuration { note_index: usize },
     NonFiniteNoteEnd { note_index: usize },
+    NonFiniteVelocity { note_index: usize },
+    VelocityOutOfRange { note_index: usize },
+    NonFiniteSectionIntensity { note_index: usize },
+    NegativeSectionIntensity { note_index: usize },
+    ScoreSerialization(String),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -137,6 +148,18 @@ pub fn analyze_score_demand(
         if !end.is_finite() {
             return Err(ScoreDemandError::NonFiniteNoteEnd { note_index: index });
         }
+        if !note.velocity.is_finite() {
+            return Err(ScoreDemandError::NonFiniteVelocity { note_index: index });
+        }
+        if !(0.0..=1.0).contains(&note.velocity) {
+            return Err(ScoreDemandError::VelocityOutOfRange { note_index: index });
+        }
+        if !note.section_intensity.is_finite() {
+            return Err(ScoreDemandError::NonFiniteSectionIntensity { note_index: index });
+        }
+        if note.section_intensity < 0.0 {
+            return Err(ScoreDemandError::NegativeSectionIntensity { note_index: index });
+        }
         analyzed_span = analyzed_span.max(end);
 
         role_groups
@@ -150,6 +173,7 @@ pub fn analyze_score_demand(
         }
     }
 
+    let score_sha256 = score_input_sha256(score)?;
     let score_span = analyzed_span.max(f64::EPSILON);
     let mut voice_demands = Vec::with_capacity(
         part_groups.len() + role_groups.len(),
@@ -192,6 +216,8 @@ pub fn analyze_score_demand(
 
     Ok(ScoreDemandProfile {
         schema: SCORE_DEMAND_PROFILE_SCHEMA.into(),
+        input_digest_schema: SCORE_DEMAND_INPUT_DIGEST_SCHEMA.into(),
+        score_sha256,
         meter_beats: score.meter,
         tempo_bpm: score.tempo_bpm,
         declared_score_span_beats: declared_span,
@@ -200,6 +226,17 @@ pub fn analyze_score_demand(
         assigned_part_note_fraction,
         voice_demands,
     })
+}
+
+fn score_input_sha256(score: &Score) -> Result<String, ScoreDemandError> {
+    // serde_json serializes this struct in declaration order; the domain tag
+    // prevents the same bytes from being confused with another artifact type.
+    let bytes = serde_json::to_vec(score)
+        .map_err(|error| ScoreDemandError::ScoreSerialization(error.to_string()))?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea:muse-score-demand-input:v1\n");
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
 }
 
 fn role_rank(role: VoiceRole) -> u8 {
@@ -461,6 +498,44 @@ mod tests {
         );
         assert_eq!(profile.voice_demands[0].note_count, 2);
         assert_eq!(profile.voice_demands[0].roles, vec![VoiceRole::Melody]);
+    }
+
+    #[test]
+    fn input_digest_is_deterministic_and_changes_with_score_content() {
+        let original = score();
+        let first = analyze_score_demand(&original).unwrap();
+        let second = analyze_score_demand(&score()).unwrap();
+        assert_eq!(first.score_sha256, second.score_sha256);
+        assert_eq!(first.input_digest_schema, SCORE_DEMAND_INPUT_DIGEST_SCHEMA);
+
+        let mut changed = original;
+        changed.notes[0].velocity = 0.8;
+        let changed_profile = analyze_score_demand(&changed).unwrap();
+        assert_ne!(first.score_sha256, changed_profile.score_sha256);
+    }
+
+    #[test]
+    fn rejects_nonfinite_and_out_of_range_dynamics_before_digesting() {
+        let mut invalid = score();
+        invalid.notes[0].velocity = f32::NAN;
+        assert_eq!(
+            analyze_score_demand(&invalid),
+            Err(ScoreDemandError::NonFiniteVelocity { note_index: 0 })
+        );
+
+        let mut invalid = score();
+        invalid.notes[0].velocity = 1.1;
+        assert_eq!(
+            analyze_score_demand(&invalid),
+            Err(ScoreDemandError::VelocityOutOfRange { note_index: 0 })
+        );
+
+        let mut invalid = score();
+        invalid.notes[0].section_intensity = f32::INFINITY;
+        assert_eq!(
+            analyze_score_demand(&invalid),
+            Err(ScoreDemandError::NonFiniteSectionIntensity { note_index: 0 })
+        );
     }
 
     #[test]
