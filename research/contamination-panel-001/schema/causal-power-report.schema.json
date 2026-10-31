@@ -1,0 +1,314 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/causal-power-report-v1.json",
+  "title": "Replicated causal power planning report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "study_id",
+    "primary_metric_id",
+    "config_sha256",
+    "simulation_seed_commitment_sha256",
+    "simulation_replicates",
+    "nominal_alpha_permille",
+    "target_power_permille",
+    "target_interval_coverage_permille",
+    "calibration_tolerance_permille",
+    "requested_exposure_fraction_permille",
+    "actual_balanced_exposure_fraction_permille",
+    "expected_direct_exposure_effect_permille",
+    "expected_global_spillover_effect_permille",
+    "expected_primary_global_effect_permille",
+    "between_model_pair_sd_permille",
+    "within_cluster_sd_permille",
+    "within_family_icc_permille",
+    "pair_failure_probability_permille",
+    "candidate_estimates",
+    "smallest_qualifying_model_pair_count",
+    "assumption_summary",
+    "design_interpretation",
+    "claim_boundary",
+    "report_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.contamination_causal_power_report.v1"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "primary_metric_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "config_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "simulation_seed_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "simulation_replicates": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 100000
+    },
+    "nominal_alpha_permille": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 200
+    },
+    "target_power_permille": {
+      "type": "integer",
+      "minimum": 500,
+      "maximum": 990
+    },
+    "target_interval_coverage_permille": {
+      "const": 950
+    },
+    "calibration_tolerance_permille": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 100
+    },
+    "requested_exposure_fraction_permille": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 999
+    },
+    "actual_balanced_exposure_fraction_permille": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "expected_direct_exposure_effect_permille": {
+      "type": "number",
+      "minimum": -1000,
+      "maximum": 1000
+    },
+    "expected_global_spillover_effect_permille": {
+      "type": "number",
+      "minimum": -1000,
+      "maximum": 1000
+    },
+    "expected_primary_global_effect_permille": {
+      "type": "number",
+      "minimum": -2000,
+      "maximum": 2000
+    },
+    "between_model_pair_sd_permille": {
+      "type": "number",
+      "minimum": 0
+    },
+    "within_cluster_sd_permille": {
+      "type": "number",
+      "minimum": 0
+    },
+    "within_family_icc_permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 900
+    },
+    "pair_failure_probability_permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 900
+    },
+    "candidate_estimates": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    },
+    "smallest_qualifying_model_pair_count": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 2,
+      "maximum": 1000
+    },
+    "assumption_summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "design_interpretation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "report_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_pair_count",
+        "null_evaluable_simulations",
+        "null_inconclusive_simulations",
+        "null_inconclusive_fraction_permille",
+        "type_i_error_permille",
+        "type_i_error_monte_carlo_se_permille",
+        "alternative_evaluable_simulations",
+        "alternative_inconclusive_simulations",
+        "alternative_inconclusive_fraction_permille",
+        "estimated_power_permille",
+        "power_monte_carlo_se_permille",
+        "interval_coverage_permille",
+        "interval_coverage_monte_carlo_se_permille",
+        "mean_surviving_model_pairs",
+        "estimated_primary_effect_sd_permille",
+        "estimated_primary_effect_se_permille",
+        "meets_preregistered_targets"
+      ],
+      "properties": {
+        "model_pair_count": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 1000
+        },
+        "null_evaluable_simulations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "null_inconclusive_simulations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "null_inconclusive_fraction_permille": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "type_i_error_permille": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type_i_error_monte_carlo_se_permille": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "alternative_evaluable_simulations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "alternative_inconclusive_simulations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "alternative_inconclusive_fraction_permille": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "estimated_power_permille": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "power_monte_carlo_se_permille": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "interval_coverage_permille": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "interval_coverage_monte_carlo_se_permille": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mean_surviving_model_pairs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "estimated_primary_effect_sd_permille": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "estimated_primary_effect_se_permille": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "meets_preregistered_targets": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
