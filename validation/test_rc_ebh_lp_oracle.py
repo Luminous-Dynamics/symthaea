@@ -21,6 +21,21 @@ class RCEBHFullLPOracleTests(unittest.TestCase):
                 tested+=1
         self.assertEqual(tested,200)
 
+
+    def test_random_families_k6_to_k8_match_full_subset_lp(self):
+        rng=np.random.default_rng(20261101)
+        tested=0
+        for k in (6,7,8):
+            for _ in range(10):
+                e=np.exp(rng.normal(0,2.0,k))
+                alpha=float(rng.choice([.01,.025,.05,.1,.2,.5]))
+                result=compare_rc_to_full_lp(e,alpha)
+                self.assertTrue(result["rc_feasible"],result)
+                self.assertTrue(result["objective_match"],result)
+                self.assertLessEqual(result["objective_gap"],1e-8)
+                tested+=1
+        self.assertEqual(tested,30)
+
     def test_boundary_and_tied_vectors_match(self):
         vectors=[
             [0.0],[1.0],[0.0,0.0],[1.0,1.0],[100.0,1.0],
