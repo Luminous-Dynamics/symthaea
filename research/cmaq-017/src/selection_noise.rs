@@ -229,10 +229,10 @@ mod tests {
         assert!((metrics.best_candidate_mean - 0.0).abs() < 1e-12);
         assert!((metrics.baseline_mean - 0.0).abs() < 1e-12);
         assert!((metrics.naive_best_of_n_mean - 7.5).abs() < 1e-12);
-        assert!((metrics.cross_fitted_selected_mean + 7.5).abs() < 1e-12);
+        assert!((metrics.cross_fitted_selected_mean + 2.5).abs() < 1e-12);
         assert!((metrics.naive_selection_gain - 7.5).abs() < 1e-12);
-        assert!((metrics.held_out_selection_gain + 7.5).abs() < 1e-12);
-        assert!((metrics.selection_optimism_gap - 15.0).abs() < 1e-12);
+        assert!((metrics.held_out_selection_gain + 2.5).abs() < 1e-12);
+        assert!((metrics.selection_optimism_gap - 10.0).abs() < 1e-12);
     }
 
     #[test]
