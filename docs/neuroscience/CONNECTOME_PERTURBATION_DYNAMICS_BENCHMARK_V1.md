@@ -139,6 +139,18 @@ If the source data, code, checkpoint or split cannot be obtained, report NOT_REP
 
 These studies imply that model comparisons must factor anatomy, effective physiological coupling, cell-intrinsic dynamics, proprioceptive/body feedback, network state and task. They also require task/condition holdouts that were not used to fit parameters.
 
+### External LDS reproduction hazard — configuration is not the paper by default
+
+A source audit of Nondairy-Creamer/Creamer_LDS_2026 (latest located commit bba43302d50a4947804d98b01779856e648237cc) found a critical configuration distinction:
+- main.py with no command-line arguments selects submission_params/exp_test.yml;
+- exp_test.yml uses the not_synaptic mask, only 10 datasets and 10 EM steps;
+- ssm_classes.py defines not_synaptic as the complement of anatomical chemical/electrical connections (plus self terms), while inference_utilities.solve_masked fits coefficients where mask == 1;
+- the separate submission_params/slurm_example.yml uses the synaptic mask, 80 datasets, 200 EM steps, 45 input lags and start_index 120.
+
+Thus, the default no-argument code path is a reduced test configuration and does not reproduce the stated connectome-constrained model. The Slurm example is a candidate full configuration, but it is not yet proven to be the exact configuration used for the published figures. The loader also performs lexical path discovery, named holdout removal, a deterministic worm split, train-only neuron-presence filtering and a default AWCL/AWCR blacklist. All of these must be captured in the reproduction manifest.
+
+Tracking: [SCI-CONNECTOMICS-032 / #9578](https://github.com/Luminous-Dynamics/symthaea/issues/9578). Do not report a reproduced 82% or 92% until the exact config, split, paper version, data files, connectome CSVs and score script are pinned and executed.
+
 ### Tier B — Fish1.5 same-specimen structure/function
 
 Official release: https://jboulanger91.github.io/fish1.5-release/
