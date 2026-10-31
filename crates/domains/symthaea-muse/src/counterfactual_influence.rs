@@ -36,6 +36,10 @@ const INFLUENCE_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-influence-v1
 const MINIMUM_NOOP_RENDERS: usize = 3;
 const MAX_EVENT_ID_BYTES: usize = 256;
 const MAX_ARTIFACT_BYTES: usize = 64 * 1024 * 1024;
+const MAX_RECORDED_EFFECTS_GROUPS: u8 = 128;
+const MAX_SEGMENTATION_WINDOWS: usize = 2_000_000;
+const MAX_RELEASE_PERSISTENCE_WINDOWS: usize = 1024;
+const MAX_TAIL_GUARD_FRAMES: usize = 10_000_000;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InfluenceAnalysisConfig {
@@ -154,6 +158,48 @@ pub struct VerifiedRendererAudioBinding {
     performed_event_map_artifact_sha256: String,
     expected_primary_pitches_sha256: String,
     performed_event_lineage: Vec<PerformedEventLineage>,
+    renderer_executable_sha256: String,
+    soundfont_sha256: String,
+    render_config_sha256: String,
+    output_bits_per_sample: u16,
+    output_sample_format: crate::renderer_execution_receipt::DecodedSampleFormat,
+    /// Explicit FluidSynth effects-group count parsed from the exact, receipt-
+    /// bound child argv. None means the historical/unknown topology did not
+    /// explicitly record the setting; downstream routing adapters must abstain.
+    fluid_synth_effects_groups: Option<u8>,
+}
+
+/// Test-only constructor for a verified FluidSynth token carrying an
+/// explicitly recorded effects-group count. Production must obtain this value
+/// only through the receipt-replaying verifier above.
+#[cfg(test)]
+pub(crate) fn test_verified_renderer_audio_binding_with_effects_groups(
+    audio: &AudioView<'_>,
+    receipt_sha256: String,
+    renderer_identity_sha256: String,
+    renderer_config_sha256: String,
+    source_score_sha256: String,
+    input_artifact_sha256: String,
+    performed_event_map_sha256: String,
+    performed_event_map_artifact_sha256: String,
+    expected_primary_pitches_sha256: String,
+    performed_event_lineage: Vec<PerformedEventLineage>,
+    effects_groups: u8,
+) -> VerifiedRendererAudioBinding {
+    let mut binding = test_verified_renderer_audio_binding(
+        audio,
+        receipt_sha256,
+        renderer_identity_sha256,
+        renderer_config_sha256,
+        source_score_sha256,
+        input_artifact_sha256,
+        performed_event_map_sha256,
+        performed_event_map_artifact_sha256,
+        expected_primary_pitches_sha256,
+        performed_event_lineage,
+    );
+    binding.fluid_synth_effects_groups = Some(effects_groups);
+    binding
 }
 
 /// Test-only constructor for exercising downstream coalition validators.
@@ -183,6 +229,12 @@ pub(crate) fn test_verified_renderer_audio_binding(
         performed_event_map_artifact_sha256,
         expected_primary_pitches_sha256,
         performed_event_lineage,
+        renderer_executable_sha256: sha256_hex(b"test-fluid-synth-executable"),
+        soundfont_sha256: sha256_hex(b"test-soundfont"),
+        render_config_sha256: sha256_hex(b"test-render-config"),
+        output_bits_per_sample: 32,
+        output_sample_format: crate::renderer_execution_receipt::DecodedSampleFormat::PcmFloat,
+        fluid_synth_effects_groups: None,
     }
 }
 
@@ -226,6 +278,18 @@ impl VerifiedRendererAudioBinding {
     pub fn performed_event_lineage(&self) -> &[PerformedEventLineage] {
         &self.performed_event_lineage
     }
+
+    /// Explicit FluidSynth FX group count from the verified receipt argv.
+    /// None must be treated as incomplete routing, not as the default group.
+    pub fn fluid_synth_effects_groups(&self) -> Option<u8> {
+        self.fluid_synth_effects_groups
+    }
+
+    pub fn renderer_executable_sha256(&self) -> &str { &self.renderer_executable_sha256 }
+    pub fn soundfont_sha256(&self) -> &str { &self.soundfont_sha256 }
+    pub fn render_config_sha256(&self) -> &str { &self.render_config_sha256 }
+    pub fn output_bits_per_sample(&self) -> u16 { self.output_bits_per_sample }
+    pub fn output_sample_format(&self) -> crate::renderer_execution_receipt::DecodedSampleFormat { self.output_sample_format }
 }
 
 /// Hash the interleaved decoded f32 samples exactly as the renderer receipt
@@ -288,6 +352,30 @@ fn renderer_execution_profile_sha256(
     .map_err(|_| CounterfactualInfluenceError::SerializationFailure)?;
 
     Ok((sha256_hex(&identity_bytes), sha256_hex(&config_bytes)))
+}
+
+
+fn receipt_fluidsynth_effects_groups(
+    receipt: &RendererExecutionReceipt,
+) -> Option<u8> {
+    let process = receipt.process_observation.as_ref()?;
+    let mut matches = Vec::new();
+    for pair in process.arguments.windows(2) {
+        if pair[0] == "-o" {
+            if let Some(value) = pair[1].strip_prefix("synth.effects-groups=") {
+                let groups = value.parse::<u8>().ok()?;
+                if !(1..=MAX_RECORDED_EFFECTS_GROUPS).contains(&groups) {
+                    return None;
+                }
+                matches.push(groups);
+            }
+        }
+    }
+    if matches.len() == 1 {
+        matches.first().copied()
+    } else {
+        None
+    }
 }
 
 /// Verify the receipt against its exact serialized Score/config/MIDI-or-schedule,
@@ -417,6 +505,12 @@ pub(crate) fn verify_renderer_audio_binding_excluding_set(
         performed_event_map_artifact_sha256: sha256_hex(performed_event_map_bytes),
         expected_primary_pitches_sha256: sha256_hex(expected_primary_midi_by_score_index),
         performed_event_lineage: parsed_map.events,
+        renderer_executable_sha256: receipt.renderer_executable_sha256.clone().ok_or(CounterfactualInfluenceError::RendererReceiptInvalid)?,
+        soundfont_sha256: receipt.soundfont_sha256.clone().ok_or(CounterfactualInfluenceError::RendererReceiptInvalid)?,
+        render_config_sha256: receipt.render_config_sha256.clone(),
+        output_bits_per_sample: receipt.output.bits_per_sample,
+        output_sample_format: receipt.output.sample_format,
+        fluid_synth_effects_groups: receipt_fluidsynth_effects_groups(receipt),
     })
 }
 
@@ -538,6 +632,100 @@ pub struct CounterfactualInfluenceReport {
     pub receipt_sha256: String,
 }
 
+/// Explicit rule for combining independent RMS and spectral evidence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InfluenceThresholdCombination {
+    /// Preserve the legacy conservative-any-signal detection semantics.
+    AnyMetricExceeds,
+    /// Require both RMS and spectral evidence to exceed their own thresholds.
+    BothMetricsExceed,
+}
+
+impl InfluenceThresholdCombination {
+    fn combines(self, rms_exceeded: bool, spectral_exceeded: bool) -> bool {
+        match self {
+            Self::AnyMetricExceeds => rms_exceeded || spectral_exceeded,
+            Self::BothMetricsExceed => rms_exceeded && spectral_exceeded,
+        }
+    }
+}
+
+/// Versioned temporal segmentation policy. This is separate from v0.1's raw
+/// influence-analysis configuration so existing reports remain byte-compatible.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InfluenceSegmentationConfig {
+    /// Explicit combination rule for separate RMS and spectral channels.
+    pub threshold_combination: InfluenceThresholdCombination,
+    /// Offset threshold as a strict fraction of each window's calibrated
+    /// onset threshold. Must be finite and strictly between 0 and 1.
+    pub release_threshold_ratio: f32,
+    /// Number of consecutive below-release windows retained before closing
+    /// the event. These windows remain marked as hysteresis-qualified.
+    pub release_persistence_windows: usize,
+    /// Additional conservative frames appended after the hysteresis end.
+    /// This is a guard, not measured influence, and is reported separately.
+    pub tail_guard_frames: usize,
+    /// Frozen renderer/effect-topology calibration profile for non-zero tail
+    /// guards. The referenced profile is externally resolved; the digest
+    /// alone does not authenticate its publisher or prove its calibration.
+    pub tail_guard_profile_sha256: Option<String>,
+}
+
+impl Default for InfluenceSegmentationConfig {
+    fn default() -> Self {
+        Self {
+            threshold_combination: InfluenceThresholdCombination::AnyMetricExceeds,
+            release_threshold_ratio: 0.5,
+            release_persistence_windows: 2,
+            tail_guard_frames: 0,
+            tail_guard_profile_sha256: None,
+        }
+    }
+}
+
+/// Per-window hysteresis decision. Independent RMS/spectral booleans, raw
+/// onset decision and release decision remain visible for audit.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InfluenceWindowSegmentation {
+    pub window_index: usize,
+    pub start_frame: usize,
+    pub end_frame: usize,
+    pub channel: usize,
+    pub onset_rms_exceeded: bool,
+    pub onset_spectral_exceeded: bool,
+    pub onset_triggered: bool,
+    pub release_rms_threshold: f32,
+    pub release_spectral_threshold: f32,
+    pub release_rms_exceeded: bool,
+    pub release_spectral_exceeded: bool,
+    pub release_triggered: bool,
+    pub hysteresis_active: bool,
+}
+
+/// Versioned successor to EVAL-017 v0.1. It retains the exact raw report and
+/// raw per-window measurements, then separately commits hysteresis and any
+/// conservative tail padding.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CounterfactualInfluenceSegmentedReport {
+    pub version: String,
+    pub base_report: CounterfactualInfluenceReport,
+    pub segmentation: InfluenceSegmentationConfig,
+    pub window_measurements: Vec<InfluenceWindowMeasurement>,
+    pub window_segmentation: Vec<InfluenceWindowSegmentation>,
+    /// Raw per-channel threshold-exceedance union, before hysteresis.
+    pub raw_measured_intervals: Vec<FrameInterval>,
+    /// Per-channel hysteresis output, unioned only after temporal segmentation.
+    pub hysteresis_support_intervals: Vec<FrameInterval>,
+    /// Explicit post-hysteresis conservative padding; never described as measured.
+    pub tail_guard_intervals: Vec<FrameInterval>,
+    /// Union of hysteresis support and explicit tail guard.
+    pub conservative_support_intervals: Vec<FrameInterval>,
+    /// True when requested tail padding would extend beyond the output horizon.
+    pub tail_guard_was_clipped: bool,
+    pub receipt_sha256: String,
+}
+
 /// Exact artifacts and audio supplied to the paired measurement. The caller
 /// must create the counterfactual schedule by changing only the declared event;
 /// this module binds the bytes but does not independently parse the schedule.
@@ -650,6 +838,13 @@ impl std::error::Error for CounterfactualInfluenceError {}
 
 fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
+}
+
+fn is_lower_hex_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn parse_score_event_index(value: &str) -> Option<usize> {
@@ -1282,14 +1477,12 @@ fn seal_report(
     Ok(report)
 }
 
-/// Measure the paired output difference using an already replay-verified
-/// no-op calibration. The result is an empirical influence estimate for the
-/// declared intervention and renderer configuration, not exclusive ownership
-/// of affected audio samples.
-pub fn measure_counterfactual_influence(
+/// Shared v0.1 measurement core. Returns the canonical v0.1 report and the
+/// complete per-window trace so the segmented v0.2 path can preserve raw facts.
+fn measure_counterfactual_influence_with_trace(
     input: &CounterfactualInfluenceInput<'_, '_>,
     verified_calibration: &VerifiedRepeatabilityCalibration,
-) -> Result<CounterfactualInfluenceReport, CounterfactualInfluenceError> {
+) -> Result<(CounterfactualInfluenceReport, Vec<InfluenceWindowMeasurement>), CounterfactualInfluenceError> {
     let calibration = &verified_calibration.calibration;
     validate_config(&calibration.analysis)?;
     validate_input(input, calibration)?;
@@ -1353,7 +1546,7 @@ pub fn measure_counterfactual_influence(
     } else {
         InfluenceDisposition::NoEffectAboveNoiseFloor
     };
-    seal_report(CounterfactualInfluenceReport {
+    let report = seal_report(CounterfactualInfluenceReport {
         version: COUNTERFACTUAL_INFLUENCE_VERSION.to_owned(),
         source_event_id: input.source_event_id.to_owned(),
         intervention: input.intervention.clone(),
@@ -1390,7 +1583,307 @@ pub fn measure_counterfactual_influence(
         measured_influence_intervals: merge_intervals(affected),
         disposition,
         receipt_sha256: String::new(),
-    })
+    })?;
+    Ok((report, measurements))
+}
+
+/// Backwards-compatible EVAL-017 v0.1 raw-threshold measurement. Existing
+/// report bytes and threshold semantics remain unchanged.
+pub fn measure_counterfactual_influence(
+    input: &CounterfactualInfluenceInput<'_, '_>,
+    verified_calibration: &VerifiedRepeatabilityCalibration,
+) -> Result<CounterfactualInfluenceReport, CounterfactualInfluenceError> {
+    measure_counterfactual_influence_with_trace(input, verified_calibration)
+        .map(|(report, _)| report)
+}
+
+const SEGMENTED_INFLUENCE_DOMAIN: &[u8] =
+    b"luminous-dynamics-mel-mr-eval-017-segmented-influence-v0.2\0";
+
+fn validate_segmentation_config(
+    config: &InfluenceSegmentationConfig,
+) -> Result<(), CounterfactualInfluenceError> {
+    if !config.release_threshold_ratio.is_finite()
+        || config.release_threshold_ratio <= 0.0
+        || config.release_threshold_ratio >= 1.0
+    {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "release_threshold_ratio must be finite and strictly between 0 and 1",
+        ));
+    }
+    if config.release_persistence_windows == 0
+        || config.release_persistence_windows > MAX_RELEASE_PERSISTENCE_WINDOWS
+    {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "release_persistence_windows is outside the bounded range",
+        ));
+    }
+    if config.tail_guard_frames > MAX_TAIL_GUARD_FRAMES {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "tail_guard_frames exceeds the bounded maximum",
+        ));
+    }
+    if config.tail_guard_frames > 0
+        && !config.tail_guard_profile_sha256.as_deref()
+            .is_some_and(is_lower_hex_sha256)
+    {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "non-zero tail guard requires a frozen profile SHA-256",
+        ));
+    }
+    if config.tail_guard_profile_sha256.as_deref()
+        .is_some_and(|digest| !is_lower_hex_sha256(digest))
+    {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "tail guard profile digest must be lowercase SHA-256",
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn segmented_report_digest_for_test(
+    report: &CounterfactualInfluenceSegmentedReport,
+) -> String {
+    segmented_report_digest(report).expect("test fixture report serializes")
+}
+
+fn segmented_report_digest(
+    report: &CounterfactualInfluenceSegmentedReport,
+) -> Result<String, CounterfactualInfluenceError> {
+    let mut unsigned = report.clone();
+    unsigned.receipt_sha256.clear();
+    let bytes = serde_json::to_vec(&unsigned)
+        .map_err(|_| CounterfactualInfluenceError::SerializationFailure)?;
+    let mut hasher = Sha256::new();
+    hasher.update(SEGMENTED_INFLUENCE_DOMAIN);
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn hysteresis_segment(
+    measurements: &[InfluenceWindowMeasurement],
+    channels: usize,
+    config: &InfluenceAnalysisConfig,
+    segmentation: &InfluenceSegmentationConfig,
+    total_frames: usize,
+) -> Result<(Vec<InfluenceWindowSegmentation>, Vec<FrameInterval>, Vec<FrameInterval>, Vec<FrameInterval>, bool), CounterfactualInfluenceError> {
+    if channels == 0 || measurements.is_empty() || measurements.len() % channels != 0 {
+        return Err(CounterfactualInfluenceError::WindowIndexMismatch);
+    }
+    let window_count = measurements.len() / channels;
+    if window_count > MAX_SEGMENTATION_WINDOWS {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "segmentation window count exceeds the bounded maximum",
+        ));
+    }
+
+    let mut decisions: Vec<Option<InfluenceWindowSegmentation>> =
+        vec![None; measurements.len()];
+    let mut channel_intervals = Vec::new();
+
+    for channel in 0..channels {
+        let mut active = false;
+        let mut below_release_count = 0usize;
+        let mut segment_start = 0usize;
+        let mut segment_end = 0usize;
+
+        for window_index in 0..window_count {
+            let measurement_index = window_index * channels + channel;
+            let measurement = &measurements[measurement_index];
+            if measurement.channel != channel
+                || measurement.start_frame >= measurement.end_frame
+                || measurement.end_frame > total_frames
+            {
+                return Err(CounterfactualInfluenceError::WindowIndexMismatch);
+            }
+            if channel > 0 {
+                let first = &measurements[window_index * channels];
+                if measurement.start_frame != first.start_frame
+                    || measurement.end_frame != first.end_frame
+                {
+                    return Err(CounterfactualInfluenceError::WindowIndexMismatch);
+                }
+            }
+            let onset_rms_exceeded =
+                measurement.rms_delta > measurement.calibrated_rms_threshold;
+            let onset_spectral_exceeded =
+                measurement.spectral_magnitude_distance > measurement.calibrated_spectral_threshold;
+            let onset_triggered = segmentation.threshold_combination
+                .combines(onset_rms_exceeded, onset_spectral_exceeded);
+            let release_rms_threshold = config.minimum_rms_delta.max(
+                measurement.calibrated_rms_threshold * segmentation.release_threshold_ratio,
+            );
+            let release_spectral_threshold = config.minimum_spectral_distance.max(
+                measurement.calibrated_spectral_threshold
+                    * segmentation.release_threshold_ratio,
+            );
+            let release_rms_exceeded = measurement.rms_delta > release_rms_threshold;
+            let release_spectral_exceeded =
+                measurement.spectral_magnitude_distance > release_spectral_threshold;
+            let release_triggered = segmentation.threshold_combination
+                .combines(release_rms_exceeded, release_spectral_exceeded);
+            let mut hysteresis_active = false;
+
+            if !active {
+                if onset_triggered {
+                    active = true;
+                    below_release_count = 0;
+                    segment_start = measurement.start_frame;
+                    segment_end = measurement.end_frame;
+                    hysteresis_active = true;
+                }
+            } else if release_triggered {
+                below_release_count = 0;
+                segment_end = measurement.end_frame;
+                hysteresis_active = true;
+            } else {
+                below_release_count = below_release_count.saturating_add(1);
+                if below_release_count <= segmentation.release_persistence_windows {
+                    segment_end = measurement.end_frame;
+                    hysteresis_active = true;
+                } else {
+                    if segment_start < segment_end {
+                        channel_intervals.push(FrameInterval {
+                            start_frame: segment_start,
+                            end_frame: segment_end,
+                        });
+                    }
+                    active = false;
+                    below_release_count = 0;
+                }
+            }
+
+            decisions[measurement_index] = Some(InfluenceWindowSegmentation {
+                window_index,
+                start_frame: measurement.start_frame,
+                end_frame: measurement.end_frame,
+                channel,
+                onset_rms_exceeded,
+                onset_spectral_exceeded,
+                onset_triggered,
+                release_rms_threshold,
+                release_spectral_threshold,
+                release_rms_exceeded,
+                release_spectral_exceeded,
+                release_triggered,
+                hysteresis_active,
+            });
+        }
+
+        if active && segment_start < segment_end {
+            channel_intervals.push(FrameInterval {
+                start_frame: segment_start,
+                end_frame: segment_end,
+            });
+        }
+    }
+
+    let decisions = decisions
+        .into_iter()
+        .collect::<Option<Vec<_>>>()
+        .ok_or(CounterfactualInfluenceError::WindowIndexMismatch)?;
+    let hysteresis_support = merge_intervals(channel_intervals);
+
+    let mut tail_guard = Vec::new();
+    let mut tail_guard_was_clipped = false;
+    if segmentation.tail_guard_frames > 0 {
+        for interval in &hysteresis_support {
+            let requested_end = interval
+                .end_frame
+                .checked_add(segmentation.tail_guard_frames)
+                .ok_or(CounterfactualInfluenceError::InvalidConfig(
+                    "tail guard frame addition overflow",
+                ))?;
+            if requested_end > total_frames {
+                tail_guard_was_clipped = true;
+            }
+            let guarded_end = requested_end.min(total_frames);
+            if interval.end_frame < guarded_end {
+                tail_guard.push(FrameInterval {
+                    start_frame: interval.end_frame,
+                    end_frame: guarded_end,
+                });
+            }
+        }
+    }
+    let tail_guard = merge_intervals(tail_guard);
+    let conservative_support = merge_intervals(
+        hysteresis_support
+            .iter()
+            .copied()
+            .chain(tail_guard.iter().copied())
+            .collect(),
+    );
+    Ok((
+        decisions,
+        hysteresis_support,
+        tail_guard,
+        conservative_support,
+        tail_guard_was_clipped,
+    ))
+}
+
+/// Measure a v0.2 segmented influence report while preserving the original
+/// v0.1 raw report and every raw window metric. This adds hysteresis and a
+/// separate conservative tail guard; it does not rewrite v0.1 semantics.
+pub fn measure_counterfactual_influence_segmented(
+    input: &CounterfactualInfluenceInput<'_, '_>,
+    verified_calibration: &VerifiedRepeatabilityCalibration,
+    segmentation: &InfluenceSegmentationConfig,
+) -> Result<CounterfactualInfluenceSegmentedReport, CounterfactualInfluenceError> {
+    validate_segmentation_config(segmentation)?;
+    let (base_report, window_measurements) =
+        measure_counterfactual_influence_with_trace(input, verified_calibration)?;
+    let (window_segmentation, hysteresis_support_intervals, tail_guard_intervals,
+        conservative_support_intervals, tail_guard_was_clipped) =
+        hysteresis_segment(
+            &window_measurements,
+            base_report.channels,
+            &base_report.analysis,
+            segmentation,
+            base_report.total_frames,
+        )?;
+
+    let mut report = CounterfactualInfluenceSegmentedReport {
+        version: "mel-mr-eval-017-segmented-influence-v0.2".to_owned(),
+        raw_measured_intervals: base_report.measured_influence_intervals.clone(),
+        base_report,
+        segmentation: segmentation.clone(),
+        window_measurements,
+        window_segmentation,
+        hysteresis_support_intervals,
+        tail_guard_intervals,
+        conservative_support_intervals,
+        tail_guard_was_clipped,
+        receipt_sha256: String::new(),
+    };
+    report.receipt_sha256 = segmented_report_digest(&report)?;
+    Ok(report)
+}
+
+/// Replay the entire v0.2 raw measurement, hysteresis state machine, tail guard
+/// and receipt from the original renderer-bound inputs and calibration.
+pub fn verify_counterfactual_influence_segmented(
+    report: &CounterfactualInfluenceSegmentedReport,
+    input: &CounterfactualInfluenceInput<'_, '_>,
+    verified_calibration: &VerifiedRepeatabilityCalibration,
+) -> Result<bool, CounterfactualInfluenceError> {
+    if report.version != "mel-mr-eval-017-segmented-influence-v0.2"
+        || report.receipt_sha256.len() != 64
+        || report.receipt_sha256 != segmented_report_digest(report)?
+    {
+        return Err(CounterfactualInfluenceError::InvalidInfluenceReceipt);
+    }
+    let expected = measure_counterfactual_influence_segmented(
+        input,
+        verified_calibration,
+        &report.segmentation,
+    )?;
+    if expected != *report {
+        return Err(CounterfactualInfluenceError::InfluenceReplayMismatch);
+    }
+    Ok(true)
 }
 
 /// Replay the influence measurements and receipt from the exact score,
@@ -1554,6 +2047,8 @@ mod tests {
                 format!("/tmp/{render_id}.wav"),
                 "-r".into(),
                 "48000".into(),
+                "-o".into(),
+                "synth.effects-groups=1".into(),
                 "-ni".into(),
                 "/fixture/soundfont.sf2".into(),
                 format!("/tmp/{render_id}.mid"),
@@ -1684,6 +2179,7 @@ mod tests {
         assert_eq!(verified.audio_sha256(), audio_sha256(&audio(&samples)));
         assert_eq!(verified.receipt_sha256(), render.receipt.receipt_sha256);
         assert_eq!(verified.performed_event_lineage().len(), 2);
+        assert_eq!(verified.fluid_synth_effects_groups(), Some(1));
 
         let mut altered = samples.clone();
         altered[10] = 0.25;
@@ -1940,6 +2436,34 @@ mod tests {
         );
         assert_eq!(report.counterfactual_event_map_receipt_sha256, counterfactual.map.receipt_sha256);
         assert!(verify_counterfactual_influence(&report, &experiment, &calibration).unwrap());
+
+        let segmentation = InfluenceSegmentationConfig::default();
+        let segmented =
+            measure_counterfactual_influence_segmented(&experiment, &calibration, &segmentation)
+                .unwrap();
+        assert_eq!(segmented.base_report, report);
+        assert_eq!(
+            segmented.raw_measured_intervals,
+            report.measured_influence_intervals
+        );
+        assert!(verify_counterfactual_influence_segmented(
+            &segmented,
+            &experiment,
+            &calibration,
+        )
+        .unwrap());
+
+        let mut tampered_segmented = segmented.clone();
+        tampered_segmented.window_measurements[0].rms_delta += 0.01;
+        assert_eq!(
+            verify_counterfactual_influence_segmented(
+                &tampered_segmented,
+                &experiment,
+                &calibration,
+            )
+            .unwrap_err(),
+            CounterfactualInfluenceError::InvalidInfluenceReceipt
+        );
     }
 
     #[test]
@@ -2047,6 +2571,308 @@ mod tests {
             measure_counterfactual_influence(&experiment, &calibration).unwrap_err(),
             CounterfactualInfluenceError::RendererIdentityMismatch
         );
+    }
+
+    fn influence_measurement(
+        start_frame: usize,
+        end_frame: usize,
+        rms_delta: f32,
+        spectral_distance: f32,
+        onset_threshold: f32,
+        effect_detected: bool,
+    ) -> InfluenceWindowMeasurement {
+        InfluenceWindowMeasurement {
+            start_frame,
+            end_frame,
+            channel: 0,
+            rms_delta,
+            peak_sample_delta: rms_delta,
+            spectral_magnitude_distance: spectral_distance,
+            calibrated_rms_threshold: onset_threshold,
+            calibrated_spectral_threshold: onset_threshold,
+            effect_detected,
+        }
+    }
+
+    #[test]
+    fn hysteresis_retains_short_release_excursions_then_closes_segment() {
+        let measurements = vec![
+            influence_measurement(0, 10, 2.0, 0.0, 1.0, true),
+            influence_measurement(10, 20, 0.3, 0.3, 1.0, false),
+            influence_measurement(20, 30, 0.2, 0.2, 1.0, false),
+            influence_measurement(30, 40, 0.1, 0.1, 1.0, false),
+            influence_measurement(40, 50, 2.0, 0.0, 1.0, true),
+        ];
+        let config = InfluenceSegmentationConfig {
+            threshold_combination: InfluenceThresholdCombination::AnyMetricExceeds,
+            release_threshold_ratio: 0.5,
+            release_persistence_windows: 2,
+            tail_guard_frames: 0,
+            tail_guard_profile_sha256: None,
+        };
+        let (decisions, hysteresis, guard, conservative, clipped) =
+            hysteresis_segment(
+                &measurements,
+                1,
+                &InfluenceAnalysisConfig {
+                    minimum_rms_delta: 0.0,
+                    minimum_spectral_distance: 0.0,
+                    ..Default::default()
+                },
+                &config,
+                50,
+            )
+            .unwrap();
+
+        assert_eq!(
+            hysteresis,
+            vec![
+                FrameInterval {
+                    start_frame: 0,
+                    end_frame: 30,
+                },
+                FrameInterval {
+                    start_frame: 40,
+                    end_frame: 50,
+                },
+            ]
+        );
+        assert!(decisions[1].hysteresis_active);
+        assert!(decisions[2].hysteresis_active);
+        assert!(!decisions[3].hysteresis_active);
+        assert!(guard.is_empty());
+        assert_eq!(conservative, hysteresis);
+        assert!(!clipped);
+    }
+
+    #[test]
+    fn release_threshold_retains_between_onset_and_offset_levels() {
+        let measurements = vec![
+            influence_measurement(0, 10, 2.0, 0.0, 1.0, true),
+            // Below the onset threshold (1.0), but above release threshold (0.5).
+            influence_measurement(10, 20, 0.7, 0.0, 1.0, false),
+            influence_measurement(20, 30, 0.7, 0.0, 1.0, false),
+        ];
+        let config = InfluenceSegmentationConfig {
+            threshold_combination: InfluenceThresholdCombination::AnyMetricExceeds,
+            release_threshold_ratio: 0.5,
+            release_persistence_windows: 1,
+            tail_guard_frames: 0,
+            tail_guard_profile_sha256: None,
+        };
+        let (_, intervals, _, _, _) = hysteresis_segment(
+            &measurements,
+            1,
+            &InfluenceAnalysisConfig::default(),
+            &config,
+            30,
+        )
+        .unwrap();
+        assert_eq!(
+            intervals,
+            vec![FrameInterval {
+                start_frame: 0,
+                end_frame: 30,
+            }]
+        );
+    }
+
+    #[test]
+    fn rms_and_spectral_combination_mode_is_explicit_and_replayable() {
+        let measurements = vec![
+            influence_measurement(0, 10, 2.0, 0.0, 1.0, true),
+        ];
+        let any_config = InfluenceSegmentationConfig {
+            threshold_combination: InfluenceThresholdCombination::AnyMetricExceeds,
+            release_threshold_ratio: 0.5,
+            release_persistence_windows: 1,
+            tail_guard_frames: 0,
+            tail_guard_profile_sha256: None,
+        };
+        let both_config = InfluenceSegmentationConfig {
+            threshold_combination: InfluenceThresholdCombination::BothMetricsExceed,
+            ..any_config.clone()
+        };
+        let (_, any_support, _, _, _) = hysteresis_segment(
+            &measurements,
+            1,
+            &InfluenceAnalysisConfig::default(),
+            &any_config,
+            10,
+        )
+        .unwrap();
+        let (_, both_support, _, _, _) = hysteresis_segment(
+            &measurements,
+            1,
+            &InfluenceAnalysisConfig::default(),
+            &both_config,
+            10,
+        )
+        .unwrap();
+        assert_eq!(any_support, vec![FrameInterval { start_frame: 0, end_frame: 10 }]);
+        assert!(both_support.is_empty());
+    }
+
+    #[test]
+    fn tail_guard_is_separate_from_measured_and_hysteresis_support() {
+        let measurements = vec![
+            influence_measurement(0, 10, 2.0, 0.0, 1.0, true),
+        ];
+        let config = InfluenceSegmentationConfig {
+            threshold_combination: InfluenceThresholdCombination::AnyMetricExceeds,
+            release_threshold_ratio: 0.5,
+            release_persistence_windows: 1,
+            tail_guard_frames: 15,
+            tail_guard_profile_sha256: Some(sha256_hex(b"held-out-fluidsynth-tail-profile")),
+        };
+        let (_, hysteresis, guard, conservative, clipped) = hysteresis_segment(
+            &measurements,
+            1,
+            &InfluenceAnalysisConfig::default(),
+            &config,
+            40,
+        )
+        .unwrap();
+        assert_eq!(hysteresis, vec![FrameInterval { start_frame: 0, end_frame: 10 }]);
+        assert_eq!(guard, vec![FrameInterval { start_frame: 10, end_frame: 25 }]);
+        assert_eq!(conservative, vec![FrameInterval { start_frame: 0, end_frame: 25 }]);
+        assert!(!clipped);
+    }
+
+    #[test]
+    fn clipped_tail_guard_is_flagged_at_rendered_pcm_horizon() {
+        let measurements = vec![
+            influence_measurement(30, 40, 2.0, 0.0, 1.0, true),
+        ];
+        let config = InfluenceSegmentationConfig {
+            threshold_combination: InfluenceThresholdCombination::AnyMetricExceeds,
+            release_threshold_ratio: 0.5,
+            release_persistence_windows: 1,
+            tail_guard_frames: 20,
+            tail_guard_profile_sha256: Some(sha256_hex(b"held-out-fluidsynth-tail-profile")),
+        };
+        let (_, hysteresis, guard, conservative, clipped) = hysteresis_segment(
+            &measurements,
+            1,
+            &InfluenceAnalysisConfig::default(),
+            &config,
+            50,
+        )
+        .unwrap();
+        assert_eq!(hysteresis, vec![FrameInterval { start_frame: 30, end_frame: 40 }]);
+        assert_eq!(guard, vec![FrameInterval { start_frame: 40, end_frame: 50 }]);
+        assert_eq!(conservative, vec![FrameInterval { start_frame: 30, end_frame: 50 }]);
+        assert!(clipped);
+    }
+
+    #[test]
+    fn segmented_config_rejects_invalid_hysteresis_and_unbounded_tail() {
+        let mut config = InfluenceSegmentationConfig::default();
+        config.release_threshold_ratio = 1.0;
+        assert!(validate_segmentation_config(&config).is_err());
+
+        config.release_threshold_ratio = 0.5;
+        config.tail_guard_frames = 1;
+        config.tail_guard_profile_sha256 = None;
+        assert!(validate_segmentation_config(&config).is_err());
+
+        config.tail_guard_frames = 0;
+        config.release_persistence_windows = 0;
+        assert!(validate_segmentation_config(&config).is_err());
+
+        config.release_persistence_windows = 1;
+        config.tail_guard_frames = MAX_TAIL_GUARD_FRAMES + 1;
+        assert!(validate_segmentation_config(&config).is_err());
+    }
+
+    #[test]
+    fn segmented_report_digest_commits_raw_hysteresis_and_tail_outputs() {
+        let base = CounterfactualInfluenceReport {
+            version: COUNTERFACTUAL_INFLUENCE_VERSION.to_owned(),
+            source_event_id: "score_event_index:0".to_owned(),
+            intervention: EventIntervention::Remove,
+            source_score_sha256: sha256_hex(b"score"),
+            performed_event_map_sha256: sha256_hex(b"map"),
+            performed_event_map_receipt_sha256: sha256_hex(b"map-receipt"),
+            counterfactual_event_map_sha256: sha256_hex(b"cf-map"),
+            counterfactual_event_map_receipt_sha256: sha256_hex(b"cf-map-receipt"),
+            expected_primary_pitches_sha256: sha256_hex(&[60_u8]),
+            baseline_schedule_sha256: sha256_hex(b"baseline"),
+            counterfactual_schedule_sha256: sha256_hex(b"counterfactual"),
+            renderer_identity_sha256: sha256_hex(b"renderer"),
+            renderer_config_sha256: sha256_hex(b"config"),
+            baseline_audio_sha256: sha256_hex(b"audio-a"),
+            counterfactual_audio_sha256: sha256_hex(b"audio-b"),
+            baseline_renderer_receipt_sha256: sha256_hex(b"receipt-a"),
+            counterfactual_renderer_receipt_sha256: sha256_hex(b"receipt-b"),
+            repeatability_calibration_sha256: sha256_hex(b"calibration"),
+            sample_rate_hz: 48_000,
+            channels: 1,
+            total_frames: 40,
+            analysis: InfluenceAnalysisConfig {
+                window_size_frames: 16,
+                hop_size_frames: 8,
+                minimum_rms_delta: 0.0,
+                minimum_spectral_distance: 0.0,
+                noise_floor_multiplier: 3.0,
+            },
+            total_channel_windows: 1,
+            affected_channel_windows: 1,
+            measured_influence_intervals: vec![FrameInterval { start_frame: 0, end_frame: 10 }],
+            disposition: InfluenceDisposition::EffectDetected,
+            receipt_sha256: sha256_hex(b"base-receipt"),
+        };
+        let measurement = influence_measurement(0, 10, 2.0, 0.0, 1.0, true);
+        let segmentation = InfluenceSegmentationConfig {
+            threshold_combination: InfluenceThresholdCombination::AnyMetricExceeds,
+            release_threshold_ratio: 0.5,
+            release_persistence_windows: 1,
+            tail_guard_frames: 15,
+            tail_guard_profile_sha256: Some(sha256_hex(b"fixture-tail-profile")),
+        };
+        let (decisions, hysteresis, guard, conservative, clipped) = hysteresis_segment(
+            std::slice::from_ref(&measurement),
+            1,
+            &base.analysis,
+            &segmentation,
+            40,
+        )
+        .unwrap();
+        let mut report = CounterfactualInfluenceSegmentedReport {
+            version: "mel-mr-eval-017-segmented-influence-v0.2".to_owned(),
+            raw_measured_intervals: base.measured_influence_intervals.clone(),
+            base_report: base,
+            segmentation,
+            window_measurements: vec![measurement],
+            window_segmentation: decisions,
+            hysteresis_support_intervals: hysteresis,
+            tail_guard_intervals: guard,
+            conservative_support_intervals: conservative,
+            tail_guard_was_clipped: clipped,
+            receipt_sha256: String::new(),
+        };
+        report.receipt_sha256 = segmented_report_digest(&report).unwrap();
+        assert_eq!(
+            report.raw_measured_intervals,
+            vec![FrameInterval { start_frame: 0, end_frame: 10 }]
+        );
+        assert_eq!(
+            report.hysteresis_support_intervals,
+            vec![FrameInterval { start_frame: 0, end_frame: 10 }]
+        );
+        assert_eq!(
+            report.tail_guard_intervals,
+            vec![FrameInterval { start_frame: 10, end_frame: 25 }]
+        );
+        assert_eq!(
+            report.conservative_support_intervals,
+            vec![FrameInterval { start_frame: 0, end_frame: 25 }]
+        );
+        let receipt = report.receipt_sha256.clone();
+        report.tail_guard_intervals[0].end_frame = 26;
+        assert_ne!(report.receipt_sha256, segmented_report_digest(&report).unwrap());
+        report.tail_guard_intervals[0].end_frame = 25;
+        assert_eq!(receipt, segmented_report_digest(&report).unwrap());
     }
 
     #[test]
