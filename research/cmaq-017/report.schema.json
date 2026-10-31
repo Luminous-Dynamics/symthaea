@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-017-report-v0.1.json",
+  "title": "CMAQ-017 Multi-Step Exploitability Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "episode_count",
+    "environment_steps",
+    "seed",
+    "scenarios",
+    "policies",
+    "horizons",
+    "candidate_budgets",
+    "execution_blocks",
+    "training_support",
+    "summary"
+  ],
+  "properties": {
+    "schema_version": { "const": "cmaq-017-multistep-exploitability-v0.1" },
+    "episode_count": { "const": 16 },
+    "environment_steps": { "const": 12 },
+    "seed": { "type": "integer" },
+    "scenarios": {
+      "const": ["benign", "state_action_pocket", "compounding_drift", "termination_seam", "regime_migration"]
+    },
+    "policies": {
+      "const": [
+        "direct_policy",
+        "compute_matched_direct_search",
+        "random_point_search",
+        "adaptive_point_cem",
+        "pessimistic_ensemble_cem",
+        "uncertainty_lcb_cem",
+        "shuffled_future_negative_control",
+        "oracle_cem"
+      ]
+    },
+    "horizons": { "const": [1, 4, 8] },
+    "candidate_budgets": { "const": [8, 32, 64] },
+    "execution_blocks": { "const": [1, 4] },
+    "training_support": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["abs_x_max", "abs_v_max"],
+      "properties": {
+        "abs_x_max": { "const": 0.35 },
+        "abs_v_max": { "const": 0.45 }
+      }
+    },
+    "summary": {
+      "type": "array",
+      "minItems": 600,
+      "maxItems": 600,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario",
+          "horizon",
+          "execution_block",
+          "candidate_budget",
+          "policy",
+          "episode_count",
+          "mean_return",
+          "return_ci95_lower",
+          "return_ci95_upper",
+          "paired_return_delta_vs_direct",
+          "paired_delta_vs_direct_ci95_lower",
+          "paired_delta_vs_direct_ci95_upper",
+          "paired_return_delta_vs_compute_matched_direct",
+          "paired_delta_vs_compute_matched_ci95_lower",
+          "paired_delta_vs_compute_matched_ci95_upper",
+          "paired_return_gap_to_oracle",
+          "paired_gap_to_oracle_ci95_lower",
+          "paired_gap_to_oracle_ci95_upper",
+          "mean_predicted_minus_realized_block_return",
+          "mean_ood_visit_fraction",
+          "mean_selected_one_step_state_rmse",
+          "reference_model_false_safe_rate",
+          "mean_candidate_sequence_queries",
+          "mean_model_head_evaluations",
+          "mean_oracle_transition_evaluations",
+          "mean_executed_steps"
+        ],
+        "properties": {
+          "scenario": {
+            "enum": ["benign", "state_action_pocket", "compounding_drift", "termination_seam", "regime_migration"]
+          },
+          "horizon": { "enum": [1, 4, 8] },
+          "execution_block": { "enum": [1, 4] },
+          "candidate_budget": { "enum": [8, 32, 64] },
+          "policy": {
+            "enum": [
+              "direct_policy",
+              "compute_matched_direct_search",
+              "random_point_search",
+              "adaptive_point_cem",
+              "pessimistic_ensemble_cem",
+              "uncertainty_lcb_cem",
+              "shuffled_future_negative_control",
+              "oracle_cem"
+            ]
+          },
+          "episode_count": { "const": 16 },
+          "mean_return": { "type": "number" },
+          "return_ci95_lower": { "type": "number" },
+          "return_ci95_upper": { "type": "number" },
+          "paired_return_delta_vs_direct": { "type": "number" },
+          "paired_delta_vs_direct_ci95_lower": { "type": "number" },
+          "paired_delta_vs_direct_ci95_upper": { "type": "number" },
+          "paired_return_delta_vs_compute_matched_direct": { "type": "number" },
+          "paired_delta_vs_compute_matched_ci95_lower": { "type": "number" },
+          "paired_delta_vs_compute_matched_ci95_upper": { "type": "number" },
+          "paired_return_gap_to_oracle": { "type": "number" },
+          "paired_gap_to_oracle_ci95_lower": { "type": "number" },
+          "paired_gap_to_oracle_ci95_upper": { "type": "number" },
+          "mean_predicted_minus_realized_block_return": { "type": ["number", "null"] },
+          "mean_ood_visit_fraction": { "type": "number", "minimum": 0, "maximum": 1 },
+          "mean_selected_one_step_state_rmse": { "type": "number", "minimum": 0 },
+          "reference_model_false_safe_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+          "mean_candidate_sequence_queries": { "type": "number", "minimum": 0 },
+          "mean_model_head_evaluations": { "type": "number", "minimum": 0 },
+          "mean_oracle_transition_evaluations": { "type": "number", "minimum": 0 },
+          "mean_executed_steps": { "type": "number", "minimum": 1, "maximum": 12 }
+        }
+      }
+    }
+  }
+}
