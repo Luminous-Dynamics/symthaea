@@ -206,7 +206,19 @@ struct CalibrationClusterBootstrap {
     maximum_calibration_error_95: Option<Interval>,
     adaptive_confidence_ece_15_95: Option<Interval>,
     reliability_curve_ece_12_95: Option<Interval>,
+    reliability_curve_observed_accuracy_95: Vec<ConfidenceBinClusterBootstrap>,
     brier_score_95: Option<Interval>,
+}
+
+#[derive(Debug, Serialize)]
+struct ConfidenceBinClusterBootstrap {
+    index: usize,
+    full_sample_count: usize,
+    requested_replicates: usize,
+    valid_replicates: usize,
+    minimum_valid_replicates_for_interval: usize,
+    observed_accuracy_95: Option<Interval>,
+    mean_confidence_95: Option<Interval>,
 }
 
 #[derive(Debug, Serialize)]
@@ -757,6 +769,7 @@ fn calibration_cluster_bootstrap(
             maximum_calibration_error_95: None,
             adaptive_confidence_ece_15_95: None,
             reliability_curve_ece_12_95: None,
+            reliability_curve_observed_accuracy_95: Vec::new(),
             brier_score_95: None,
         };
     }
@@ -768,6 +781,9 @@ fn calibration_cluster_bootstrap(
     let mut mce = Vec::with_capacity(replicates);
     let mut adaptive_ece = Vec::with_capacity(replicates);
     let mut reliability_ece = Vec::with_capacity(replicates);
+    let reliability_reference = adaptive_confidence_bins(rows, 12);
+    let mut reliability_accuracy_by_bin = vec![Vec::with_capacity(replicates); reliability_reference.len()];
+    let mut reliability_confidence_by_bin = vec![Vec::with_capacity(replicates); reliability_reference.len()];
     let mut brier = Vec::with_capacity(replicates);
     for _ in 0..replicates {
         let mut sample = Vec::with_capacity(rows.len());
@@ -776,6 +792,32 @@ fn calibration_cluster_bootstrap(
             sample.extend(cluster_rows[index].iter().copied());
         }
         let metrics = calibration_diagnostics(&sample);
+        if !reliability_reference.is_empty() {
+            let mut bin_counts = vec![0_usize; reliability_reference.len()];
+            let mut bin_correct = vec![0_usize; reliability_reference.len()];
+            let mut bin_confidence_sums = vec![0.0_f64; reliability_reference.len()];
+            for row in &sample {
+                let confidence = predicted_confidence(row);
+                let bin_index = reliability_reference.iter()
+                    .position(|bin| confidence <= bin.maximum_confidence)
+                    .unwrap_or(reliability_reference.len() - 1);
+                bin_counts[bin_index] += 1;
+                bin_confidence_sums[bin_index] += confidence;
+                if (row.p_error >= 0.5) == row.label_is_error {
+                    bin_correct[bin_index] += 1;
+                }
+            }
+            for bin_index in 0..reliability_reference.len() {
+                if bin_counts[bin_index] > 0 {
+                    reliability_accuracy_by_bin[bin_index].push(
+                        bin_correct[bin_index] as f64 / bin_counts[bin_index] as f64
+                    );
+                    reliability_confidence_by_bin[bin_index].push(
+                        bin_confidence_sums[bin_index] / bin_counts[bin_index] as f64
+                    );
+                }
+            }
+        }
         if let (Some(e), Some(m), Some(a), Some(r), Some(b)) = (
             metrics.expected_calibration_error,
             metrics.maximum_calibration_error,
@@ -792,6 +834,19 @@ fn calibration_cluster_bootstrap(
             }
         }
     }
+    let per_bin_intervals = reliability_reference.iter().enumerate().map(|(index, bin)| {
+        let accuracy_values = std::mem::take(&mut reliability_accuracy_by_bin[index]);
+        let confidence_values = std::mem::take(&mut reliability_confidence_by_bin[index]);
+        ConfidenceBinClusterBootstrap {
+            index: bin.index,
+            full_sample_count: bin.count,
+            requested_replicates: replicates,
+            valid_replicates: accuracy_values.len(),
+            minimum_valid_replicates_for_interval: minimum_valid,
+            observed_accuracy_95: scalar_percentile_interval(accuracy_values, replicates),
+            mean_confidence_95: scalar_percentile_interval(confidence_values, replicates),
+        }
+    }).collect();
     CalibrationClusterBootstrap {
         requested_replicates: replicates,
         valid_replicates: ece.len(),
@@ -800,6 +855,7 @@ fn calibration_cluster_bootstrap(
         maximum_calibration_error_95: scalar_percentile_interval(mce, replicates),
         adaptive_confidence_ece_15_95: scalar_percentile_interval(adaptive_ece, replicates),
         reliability_curve_ece_12_95: scalar_percentile_interval(reliability_ece, replicates),
+        reliability_curve_observed_accuracy_95: per_bin_intervals,
         brier_score_95: scalar_percentile_interval(brier, replicates),
     }
 }
@@ -1823,6 +1879,34 @@ mod tests {
         assert_eq!(first.brier_score_95, Some(Interval { lower: 0.04, upper: 0.04 }));
         assert_eq!(first.adaptive_confidence_ece_15_95, Some(Interval { lower: 0.2, upper: 0.2 }));
         assert_eq!(first.reliability_curve_ece_12_95, Some(Interval { lower: 0.2, upper: 0.2 }));
+    }
+
+    #[test]
+    fn calibration_bootstrap_reports_cluster_intervals_for_each_reliability_bin() {
+        let mut rows = Vec::new();
+        for cluster in 0..6 {
+            for within in 0..2 {
+                let label = within == 0;
+                let mut item = row(
+                    &format!("rel-{cluster}-{within}"),
+                    label,
+                    if label { 0.8 } else { 0.2 },
+                    0.5,
+                    1.0,
+                    1.0,
+                    "merge",
+                );
+                item.cluster_id = format!("reliability-psu-{cluster}");
+                rows.push(item);
+            }
+        }
+        let refs = rows.iter().collect::<Vec<_>>();
+        let result = calibration_cluster_bootstrap(&refs, 200, "reliability-per-bin");
+        assert_eq!(result.reliability_curve_observed_accuracy_95.len(), 1);
+        let bin = &result.reliability_curve_observed_accuracy_95[0];
+        assert_eq!(bin.full_sample_count, 12);
+        assert_eq!(bin.valid_replicates, 200);
+        assert_eq!(bin.observed_accuracy_95, Some(Interval { lower: 1.0, upper: 1.0 }));
     }
 
     #[test]
