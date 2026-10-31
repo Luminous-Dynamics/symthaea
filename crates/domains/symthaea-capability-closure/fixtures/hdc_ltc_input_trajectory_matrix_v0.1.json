@@ -122,7 +122,7 @@
       "candidates": "evaluate the same gate/equilibrium rule at each input-path substep; do not alter sigma_base law",
       "statistics": "separate internal substeps from external observation intervals; update running statistics according to an explicit fixed policy"
     },
-    "fourier_gate": "No RK4 reference claim for Fourier-enabled configurations until compute_derivative uses the same configured Fourier basis as compute_equilibrium or Fourier is disabled in the oracle contract."
+    "fourier_gate": "compute_equilibrium includes optional Fourier basis computed from self.total_time; compute_derivative does not. Since update_stats(dt) advances total_time after the RK4 call, true time-varying Fourier forcing requires basis evaluation at each RK stage time t0, t0+dt/2, t0+dt/2, t0+dt. Otherwise label it interval-held Fourier snapshot. See issue #9373."
   },
   "time_and_event_contract": {
     "dt_source": "monotonic input timestamps",
