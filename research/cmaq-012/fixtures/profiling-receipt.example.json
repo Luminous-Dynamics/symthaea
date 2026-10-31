@@ -3,7 +3,7 @@
   "resource_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "task": "halfcheetah",
   "capability": "control",
-  "split": "smoke",
+  "split": "qualification",
   "seed": 0,
   "arm": "D1",
   "measurement_method": "operator_trace",
