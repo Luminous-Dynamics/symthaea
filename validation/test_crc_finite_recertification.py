@@ -12,12 +12,18 @@ from crc_finite_recertification import (
 
 
 class FiniteExchangeabilityCrcTests(unittest.TestCase):
-    def test_two_type_one_step_exact_rational(self):
+    def test_paper_two_type_example_exact_rational(self):
+        # Bai & Ramdas (2026), Section 3.4, Table 1:
+        # ell(H, lambda)=1-lambda; ell(L, lambda)=(1-lambda)/2.
         n = 2
         alpha = Fraction(1, 2)
-        base = [Fraction(1, 2), Fraction(1, 4)]
-        slope = [Fraction(3, 10), Fraction(3, 10)]
-        baseline = {state: Fraction(1) for state in compositions(n, 2)}
+        base = [Fraction(0), Fraction(0)]
+        slope = [Fraction(1), Fraction(1, 2)]
+        baseline = {
+            (2, 0): Fraction(1, 2),   # HH
+            (1, 1): Fraction(2, 5),   # HL
+            (0, 2): Fraction(1, 4),   # LL
+        }
 
         before = verify_controller(baseline, n, alpha, base, slope)
         self.assertTrue(before["valid"], before)
@@ -25,9 +31,9 @@ class FiniteExchangeabilityCrcTests(unittest.TestCase):
         self.assertEqual(before["augmented_states_checked"], 4)
 
         recertified = recertify_once(baseline, n, alpha, base, slope)
-        self.assertEqual(recertified[(0, 2)], Fraction(4, 9))
-        self.assertEqual(recertified[(1, 1)], Fraction(13, 18))
-        self.assertEqual(recertified[(2, 0)], Fraction(1))
+        self.assertEqual(recertified[(2, 0)], Fraction(1, 2))
+        self.assertEqual(recertified[(1, 1)], Fraction(23, 60))
+        self.assertEqual(recertified[(0, 2)], Fraction(1, 5))
 
         check = verify_recertification_step(
             baseline, recertified, n, alpha, base, slope
@@ -36,21 +42,58 @@ class FiniteExchangeabilityCrcTests(unittest.TestCase):
         self.assertTrue(check["pointwise_no_more_conservative"])
         self.assertEqual(check["risk"]["minimum_slack"], Fraction(0))
 
-    def test_iterates_remain_valid_and_actions_decrease(self):
+    def test_repeated_recursions_match_paper_geometric_limit(self):
         n = 2
         alpha = Fraction(1, 2)
-        base = [Fraction(1, 2), Fraction(1, 4)]
-        slope = [Fraction(3, 10), Fraction(3, 10)]
-        baseline = {state: Fraction(1) for state in compositions(n, 2)}
+        base = [Fraction(0), Fraction(0)]
+        slope = [Fraction(1), Fraction(1, 2)]
+        baseline = {
+            (2, 0): Fraction(1, 2),
+            (1, 1): Fraction(2, 5),
+            (0, 2): Fraction(1, 4),
+        }
+        limit = {
+            (2, 0): Fraction(1, 2),
+            (1, 1): Fraction(3, 8),
+            (0, 2): Fraction(1, 8),
+        }
 
         result = iterate_recertification(
             baseline, n, alpha, base, slope, max_iterations=8
         )
         self.assertEqual(len(result["history"]), 8)
         self.assertTrue(result["validity"]["valid"])
-        changes = [row["sup_action_change"] for row in result["history"]]
-        for previous, current in zip(changes, changes[1:]):
-            self.assertLessEqual(current, previous * Fraction(2, 3))
+        initial_error = max(abs(baseline[state] - limit[state]) for state in baseline)
+        final_error = max(abs(result["controller"][state] - limit[state]) for state in baseline)
+        rho = Fraction(n, n + 1)
+        self.assertLessEqual(final_error, rho**8 * initial_error)
+
+    def test_loss_proportional_allocation_is_valid_and_more_aggressive(self):
+        n = 2
+        alpha = Fraction(1, 2)
+        base = [Fraction(0), Fraction(0)]
+        slope = [Fraction(1), Fraction(1, 2)]
+        baseline = {
+            (2, 0): Fraction(1, 2),
+            (1, 1): Fraction(2, 5),
+            (0, 2): Fraction(1, 4),
+        }
+
+        equal = recertify_once(baseline, n, alpha, base, slope)
+        weighted = recertify_once(
+            baseline, n, alpha, base, slope, allocation="loss_proportional"
+        )
+        self.assertEqual(weighted[(2, 0)], Fraction(1, 2))
+        self.assertEqual(weighted[(1, 1)], Fraction(11, 29))
+        self.assertEqual(weighted[(0, 2)], Fraction(1, 6))
+        self.assertTrue(all(weighted[state] <= equal[state] for state in baseline))
+
+        check = verify_recertification_step(
+            baseline, weighted, n, alpha, base, slope,
+            allocation="loss_proportional",
+        )
+        self.assertTrue(check["valid"], check)
+        self.assertEqual(check["risk"]["minimum_slack"], Fraction(0))
 
     def test_three_type_n50_full_state_enumeration(self):
         n = 50
