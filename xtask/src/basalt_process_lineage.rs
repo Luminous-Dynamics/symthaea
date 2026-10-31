@@ -565,6 +565,21 @@ fn validate_observed_events(
         source_events.entry(event.source_id.as_str()).or_default().push((event.sequence,event.observed_at_monotonic_ns));
     }
 
+    if receipt.health.event_count != receipt.events.len() as u64 {
+        error(report, "E_EVENT_COUNT_COUNTER", "receipt.health.event_count", "reported event_count must equal the number of serialized observer events");
+    }
+    if receipt.health.dropped_event_count > 0 {
+        error(report, "E_EVENT_LOSS", "receipt.health.dropped_event_count", "nonzero dropped-event count prevents lineage completeness");
+    }
+    if receipt.health.ring_buffer_overflow_count > 0 {
+        error(report, "E_RING_BUFFER_OVERFLOW", "receipt.health.ring_buffer_overflow_count", "nonzero ring-buffer overflow count prevents lineage completeness");
+    }
+    if receipt.health.observer_restart_count > 0 {
+        error(report, "E_OBSERVER_RESTART", "receipt.health.observer_restart_count", "observer restart prevents lineage completeness for this capture interval");
+    }
+    if receipt.health.unmonitored_process_count > 0 {
+        error(report, "E_UNMONITORED_PROCESS", "receipt.health.unmonitored_process_count", "unmonitored processes prevent process-tree closure");
+    }
     let mut gaps = 0usize;
     let mut integral = true;
     for (source, events) in &mut source_events {
