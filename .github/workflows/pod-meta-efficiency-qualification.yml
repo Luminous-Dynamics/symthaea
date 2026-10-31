@@ -1,0 +1,48 @@
+name: POD-Meta Efficiency Lab Qualification
+
+on:
+  push:
+    branches:
+      - research/pod-meta-efficiency-2026-10-31
+    paths:
+      - "research/pod-meta-efficiency-lab/**"
+      - ".github/workflows/pod-meta-efficiency-qualification.yml"
+  pull_request:
+    paths:
+      - "research/pod-meta-efficiency-lab/**"
+      - ".github/workflows/pod-meta-efficiency-qualification.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pod-meta-efficiency-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format
+        run: cargo fmt --manifest-path research/pod-meta-efficiency-lab/Cargo.toml -- --check
+      - name: Tests
+        run: cargo test --manifest-path research/pod-meta-efficiency-lab/Cargo.toml
+      - name: Clippy
+        run: cargo clippy --manifest-path research/pod-meta-efficiency-lab/Cargo.toml --all-targets -- -D warnings
+      - name: Run frozen policy-budget matrix
+        run: |
+          set -euo pipefail
+          cargo run --quiet --manifest-path research/pod-meta-efficiency-lab/Cargo.toml --bin pod-meta-efficiency > pod-meta-efficiency.tsv
+          test "$(wc -l < pod-meta-efficiency.tsv)" -eq 241
+          grep -Fq 'proof_obligation_guided' pod-meta-efficiency.tsv
+          grep -Fq 'oracle_minimum_cost' pod-meta-efficiency.tsv
+          grep -Fq 'unverified_confidence' pod-meta-efficiency.tsv
+          sha256sum pod-meta-efficiency.tsv
