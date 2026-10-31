@@ -186,7 +186,7 @@ fn validate_digest(value: &str, label: &str) -> Result<(), String> {
     }
 }
 
-fn parse_timestamp(value: &str, label: &str) -> Result<(), String> {
+pub(crate) fn parse_timestamp(value: &str, label: &str) -> Result<(), String> {
     let bytes = value.as_bytes();
     if bytes.len() != 20
         || bytes[4] != b'-'
