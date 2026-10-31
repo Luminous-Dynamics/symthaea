@@ -322,7 +322,7 @@ where
         }
     }
 
-    let mut front_population = population.clone();
+    let front_population = population.clone();
     let fronts = fast_non_dominated_sort(&front_population)?;
     let first_front = fronts.first().cloned().unwrap_or_default();
     let mut final_population = population.iter()
