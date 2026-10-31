@@ -60,6 +60,8 @@ pub struct VoCQualificationManifest {
     pub benchmark_id: String,
     pub metric_id: String,
     pub metric_direction: MetricDirection,
+    /// Unit used by every planned/measured action cost in this receipt.
+    pub resource_unit: String,
     pub source_artifact_sha256: String,
     pub posterior_model_sha256: String,
     pub action_likelihood_model_sha256: String,
@@ -291,6 +293,9 @@ pub fn compute_split_manifest_sha256(
     canonical.fit_architecture_families.sort();
     canonical.calibration_architecture_families.sort();
     canonical.evaluation_architecture_families.sort();
+    canonical.evaluation_rank_regimes.sort();
+    canonical.evaluation_curve_shapes.sort();
+    canonical.evaluation_noise_regimes.sort();
     canonical.fit_seed_ids.sort();
     canonical.calibration_seed_ids.sort();
     canonical.evaluation_seed_ids.sort();
@@ -521,6 +526,7 @@ fn validate_manifest(
     for (field, value) in [
         ("benchmark_id", manifest.benchmark_id.as_str()),
         ("metric_id", manifest.metric_id.as_str()),
+        ("resource_unit", manifest.resource_unit.as_str()),
     ] {
         if value.trim().is_empty() {
             return Err(QualificationError::new(field, "must be non-empty"));
@@ -1466,6 +1472,7 @@ mod tests {
             benchmark_id: "nb201-cifar10".into(),
             metric_id: "validation_accuracy".into(),
             metric_direction: MetricDirection::Maximize,
+            resource_unit: "gpu-seconds".into(),
             source_artifact_sha256: sha('a'),
             posterior_model_sha256: sha('b'),
             action_likelihood_model_sha256: sha('c'),
@@ -1682,6 +1689,28 @@ mod tests {
         second.action_forecasts[0].predicted_outcome_probabilities.reverse();
         let receipt = qualify_voc_model(&manifest, &[first, second], &thresholds()).unwrap();
         assert_eq!(receipt.decision, QualificationDecision::Qualified);
+    }
+
+    #[test]
+    fn resource_unit_is_bound_to_the_split_manifest_digest() {
+        let first = manifest();
+        let mut second = first.clone();
+        second.resource_unit = "joules".into();
+        second.split_manifest_sha256 = compute_split_manifest_sha256(&second).unwrap();
+        assert_ne!(first.split_manifest_sha256, second.split_manifest_sha256);
+    }
+
+    #[test]
+    fn evaluation_stratum_taxonomy_order_is_canonicalized() {
+        let first = manifest();
+        let mut second = first.clone();
+        second.evaluation_rank_regimes.reverse();
+        second.evaluation_curve_shapes.reverse();
+        second.evaluation_noise_regimes.reverse();
+        assert_eq!(
+            first.split_manifest_sha256,
+            compute_split_manifest_sha256(&second).unwrap()
+        );
     }
 
     #[test]
