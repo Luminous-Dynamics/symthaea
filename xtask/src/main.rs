@@ -11,6 +11,7 @@ mod basalt_coverage;
 mod basalt_linux_probe;
 mod basalt_linux_smoke;
 mod basalt_process_lineage;
+mod basalt_event_delivery;
 mod basalt_validate;
 mod crate_status;
 mod duplicate_scan;
@@ -123,6 +124,12 @@ enum Commands {
         /// Path to the raw observer process/event receipt JSON.
         #[arg(long)]
         receipt: PathBuf,
+    },
+    /// Audit source-epoch delivery, loss ranges and final sequence fences for an observer event stream.
+    BasaltEventDeliveryAudit {
+        /// Path to the bounded event-delivery ledger JSON.
+        #[arg(long)]
+        ledger: PathBuf,
     },
     /// Validate a BASALT versioned run record and its cross-record evidence invariants.
     BasaltValidate {
@@ -262,6 +269,13 @@ fn main() -> anyhow::Result<()> {
             println!("{}", serde_json::to_string_pretty(&report)?);
             if !report.lineage_audit_passed {
                 anyhow::bail!("BASALT process-lineage reconciliation failed");
+            }
+        }
+        Commands::BasaltEventDeliveryAudit { ledger } => {
+            let report = basalt_event_delivery::audit_file(&ledger)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if !report.audit_passed {
+                anyhow::bail!("BASALT event-delivery accounting failed");
             }
         }
         Commands::BasaltValidate { input, manifest, spec_root } => {

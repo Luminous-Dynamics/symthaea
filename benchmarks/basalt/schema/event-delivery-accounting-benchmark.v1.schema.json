@@ -1,0 +1,446 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/basalt/event-delivery-accounting.v1.schema.json",
+  "title": "BASALT event-delivery accounting benchmark protocol v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "suite_id",
+    "version",
+    "status",
+    "purpose",
+    "unit_of_analysis",
+    "scoring_policy",
+    "comparison_arms",
+    "metrics",
+    "gates",
+    "statistical_protocol",
+    "required_disclosures",
+    "forbidden_claims",
+    "targets_are_proposed_not_measured"
+  ],
+  "properties": {
+    "suite_id": {
+      "const": "basalt-event-delivery-accounting-v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "status": {
+      "const": "protocol"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "unit_of_analysis": {
+      "const": "independent_host_boot_source_configuration_task_lineage"
+    },
+    "scoring_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "composite_score",
+        "safety_before_efficiency",
+        "promote_only_when_all_safety_gates_pass",
+        "events_within_one_run_are_independent_samples",
+        "paired_comparison_required",
+        "held_out_configuration_split_required"
+      ],
+      "properties": {
+        "composite_score": {
+          "const": "prohibited"
+        },
+        "safety_before_efficiency": {
+          "const": true
+        },
+        "promote_only_when_all_safety_gates_pass": {
+          "const": true
+        },
+        "events_within_one_run_are_independent_samples": {
+          "const": false
+        },
+        "paired_comparison_required": {
+          "const": true
+        },
+        "held_out_configuration_split_required": {
+          "const": true
+        }
+      }
+    },
+    "comparison_arms": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "arm_id",
+          "role",
+          "description",
+          "promotable"
+        ],
+        "properties": {
+          "arm_id": {
+            "enum": [
+              "ringbuf_counter_only",
+              "ringbuf_sequence_fence",
+              "perf_buffer_native_loss",
+              "falco_modern_ebpf_metrics",
+              "tetragon_event_export",
+              "ptrace_wait_events",
+              "intentionally_lossy_transport"
+            ]
+          },
+          "role": {
+            "enum": [
+              "baseline",
+              "candidate",
+              "industry_baseline",
+              "comparison_reference",
+              "negative_control"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "promotable": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "phase",
+          "definition",
+          "target",
+          "unit"
+        ],
+        "properties": {
+          "metric_id": {
+            "enum": [
+              "sequence_accounting_completeness",
+              "seeded_loss_detection_recall",
+              "false_loss_free_acceptances",
+              "counter_consistency",
+              "tail_loss_detection",
+              "required_discard_disclosure",
+              "source_epoch_close_integrity",
+              "p95_event_delivery_latency_ms",
+              "p95_workload_slowdown_pct"
+            ]
+          },
+          "phase": {
+            "enum": [
+              "safety",
+              "efficiency"
+            ]
+          },
+          "definition": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operator",
+              "value"
+            ],
+            "properties": {
+              "operator": {
+                "enum": [
+                  "=",
+                  "<=",
+                  ">="
+                ]
+              },
+              "value": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          },
+          "unit": {
+            "enum": [
+              "proportion",
+              "scenario_count",
+              "milliseconds",
+              "percent"
+            ]
+          }
+        }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "safety",
+        "efficiency",
+        "promotion_rule"
+      ],
+      "properties": {
+        "safety": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "sequence_accounting_completeness",
+              "seeded_loss_detection_recall",
+              "false_loss_free_acceptances",
+              "counter_consistency",
+              "tail_loss_detection",
+              "required_discard_disclosure",
+              "source_epoch_close_integrity"
+            ]
+          }
+        },
+        "efficiency": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "p95_event_delivery_latency_ms",
+              "p95_workload_slowdown_pct"
+            ]
+          }
+        },
+        "promotion_rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "statistical_protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "confidence_level",
+        "independence_unit",
+        "clustering",
+        "stratification",
+        "controls",
+        "splits",
+        "stopping"
+      ],
+      "properties": {
+        "confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "independence_unit": {
+          "const": "independent_host_boot_source_configuration_task_lineage"
+        },
+        "clustering": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stratification": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "controls": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "splits": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stopping": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "required_disclosures": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "forbidden_claims": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "targets_are_proposed_not_measured": {
+      "const": true
+    }
+  },
+  "allOf": [
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "sequence_accounting_completeness"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "seeded_loss_detection_recall"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "false_loss_free_acceptances"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "counter_consistency"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "tail_loss_detection"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "required_discard_disclosure"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "source_epoch_close_integrity"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "p95_event_delivery_latency_ms"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "p95_workload_slowdown_pct"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
