@@ -759,6 +759,45 @@ mod tests {
     }
 
     #[test]
+    fn nonlinear_all_temporal_modules_attached_matches_full_bptt() {
+        let mut config = ScalarChainConfig::four_module_reference();
+        config.activations = vec![ScalarActivation::Tanh; 4];
+        let exact = full_bptt_gradient(&config).unwrap().flatten_main();
+        let attached =
+            gradient_with_temporal_detachment(&config, &[false, false, false, false])
+                .unwrap()
+                .flatten_main();
+        for (actual, expected) in attached.into_iter().zip(exact) {
+            close(actual, expected, 1.0e-12);
+        }
+    }
+
+    #[test]
+    fn nonlinear_temporal_detachment_changes_gradient_coverage() {
+        let mut config = ScalarChainConfig::four_module_reference();
+        config.activations = vec![ScalarActivation::Tanh; 4];
+        let exact = full_bptt_gradient(&config).unwrap().flatten_main();
+        let detached =
+            gradient_with_temporal_detachment(&config, &[true, true, true, true])
+                .unwrap()
+                .flatten_main();
+        assert!(exact
+            .iter()
+            .zip(detached)
+            .any(|(full, cut)| (full - cut).abs() > 1.0e-8));
+    }
+
+    #[test]
+    fn activation_vector_length_must_match_module_count() {
+        let mut config = ScalarChainConfig::four_module_reference();
+        config.activations.pop();
+        assert!(matches!(
+            forward(&config),
+            Err(ChainOracleError::ParameterLengthMismatch)
+        ));
+    }
+
+    #[test]
     fn invalid_spatial_boundary_is_rejected() {
         let config = ScalarChainConfig::four_module_reference();
         assert!(matches!(
