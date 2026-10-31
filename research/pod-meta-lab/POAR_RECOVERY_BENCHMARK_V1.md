@@ -1,6 +1,6 @@
 # POAR-RX v1: Recovery Under Fault Injection
 
-**Date:** 2026-10-31. **Status:** research proposal; no Symthaea recovery score is claimed.
+**Date:** 2026-10-31. **Status:** benchmark specification plus a first in-memory Rust lifecycle model; no Symthaea recovery score is claimed.
 
 ## Thesis
 
@@ -51,6 +51,6 @@ Use official evaluators independently: [Open Agent Leaderboard / Exgentic](https
 
 Symthaea proposes transitions; the obligation graph defines pre/postconditions; the journal binds actions to state, authority and idempotency; the recovery controller chooses reconcile, retry, compensate, seek approval or stop; a separate verifier checks observed outcomes. Mycelix provenance can later attest authority, but an identifier or hash alone does not prove real-world identity.
 
-Implement a Rust fault-state runner, inject the single-fault families first, add journal/replay/postcondition tests, conduct no-journal/no-reconcile/no-proof-gate ablations, then adapt a reversible sandbox with live writes disabled by default.
+The lab now contains a first single-action lifecycle model in research/pod-meta-lab/src/recovery.rs. It exercises ambiguous acknowledgement, non-idempotent retry blocking, retry after observed non-commit, declared idempotency-key replay, unknown read-back, safe-abort versus unknown-stop, compensation authorization, and event append behavior. This model is in-memory and does not execute external tools. Next implement a multi-action append-only run journal and deterministic fault-state runner, add the remaining fault families, conduct no-journal/no-reconcile/no-proof-gate ablations, then adapt a reversible sandbox with live writes disabled by default.
 
 **Claim ceiling:** any result is limited to named tool contracts, state observers, fault distributions and policies. It does not prove universal reliability or exactly-once execution.
