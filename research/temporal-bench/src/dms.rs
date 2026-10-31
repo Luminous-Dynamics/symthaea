@@ -101,6 +101,19 @@ pub struct DmsOracle {
     pub sample_direction: u8,
     pub test_direction: u8,
     pub expected_label: u8,
+    /// SHA-256 over the versioned canonical oracle record.
+    pub content_sha256: [u8; 32],
+}
+
+/// Domain-separated canonical SHA-256 of the DMS evaluator oracle.
+pub fn dms_oracle_digest(oracle: &DmsOracle) -> [u8; 32] {
+    let mut hash = CanonicalHasher::new(b"symthaea.temporal.dms.oracle.v1");
+    hash.u64(oracle.stream_id);
+    hash.u8(u8::from(oracle.is_match));
+    hash.u8(oracle.sample_direction);
+    hash.u8(oracle.test_direction);
+    hash.u8(oracle.expected_label);
+    hash.finish()
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -259,12 +272,17 @@ pub fn generate_dms_task(
 
     Ok((
         public_task,
-        DmsOracle {
-            stream_id,
-            is_match,
-            sample_direction,
-            test_direction,
-            expected_label: u8::from(is_match),
+        {
+            let mut oracle = DmsOracle {
+                stream_id,
+                is_match,
+                sample_direction,
+                test_direction,
+                expected_label: u8::from(is_match),
+                content_sha256: [0; 32],
+            };
+            oracle.content_sha256 = dms_oracle_digest(&oracle);
+            oracle
         },
     ))
 }
@@ -273,6 +291,7 @@ pub fn generate_dms_task(
 pub enum DmsVerificationError {
     StreamIdMismatch,
     ContentDigestMismatch,
+    OracleDigestMismatch,
     InvalidDecisionWindow,
     InvalidOracle,
     InvalidObservation { expected_step: u32 },
@@ -285,6 +304,7 @@ impl fmt::Display for DmsVerificationError {
         match self {
             Self::StreamIdMismatch => write!(f, "DMS public task and oracle stream IDs differ"),
             Self::ContentDigestMismatch => write!(f, "DMS public task SHA-256 digest does not match its contents"),
+            Self::OracleDigestMismatch => write!(f, "DMS oracle SHA-256 digest does not match its contents"),
             Self::InvalidDecisionWindow => write!(f, "DMS decision window or observation length is invalid"),
             Self::InvalidOracle => write!(f, "DMS oracle direction or match relation is invalid"),
             Self::InvalidObservation { expected_step } => {
@@ -312,6 +332,9 @@ pub fn verify_dms_trace(
     }
     if task.content_sha256 != dms_content_digest(task) {
         return Err(DmsVerificationError::ContentDigestMismatch);
+    }
+    if oracle.content_sha256 != dms_oracle_digest(oracle) {
+        return Err(DmsVerificationError::OracleDigestMismatch);
     }
     if task.sample_start_step >= task.sample_end_step
         || task.sample_end_step.saturating_add(task.delay_steps) != task.test_start_step
@@ -513,6 +536,24 @@ mod tests {
         let config = DmsConfig::braintrace_reference(93);
         let (task, oracle) = generate_dms_task(config).unwrap();
         assert_eq!(verify_dms_trace(&task, &oracle), Ok(()));
+    }
+
+    #[test]
+    fn generated_oracle_has_valid_sha256() {
+        let config = DmsConfig::braintrace_reference(93);
+        let (_, oracle) = generate_dms_task(config).unwrap();
+        assert_eq!(oracle.content_sha256, dms_oracle_digest(&oracle));
+    }
+
+    #[test]
+    fn verifier_rejects_oracle_mutation_after_generation() {
+        let config = DmsConfig::braintrace_reference(93);
+        let (task, mut oracle) = generate_dms_task(config).unwrap();
+        oracle.expected_label ^= 1;
+        assert_eq!(
+            verify_dms_trace(&task, &oracle),
+            Err(DmsVerificationError::OracleDigestMismatch)
+        );
     }
 
     #[test]
