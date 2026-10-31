@@ -12,7 +12,7 @@
 //! Style-specific musical judgments remain reported separately; this module
 //! does not force every tradition through common-practice tonal rules.
 //!
-//! This v2 uses the existing hybrid compiler, typed family-native grammar
+//! This v3 uses the existing hybrid compiler, typed family-native grammar
 //! plans, native trace, score validator and structural fingerprint. It does
 //! not duplicate those mechanisms; it fingerprints their emitted evidence.
 
@@ -34,8 +34,9 @@ use crate::analyst::{composer_trace_from_theory, verify_composer_trace};
 use crate::style_mixer::compile_hybrid_style;
 
 pub const STYLE_GENOME_SCHEMA: &str = "muse-style-genome-v1";
-pub const STYLE_GENOME_EVALUATION_SCHEMA: &str = "muse-style-genome-evaluation-v2";
-pub const STYLE_GENOME_ARCHIVE_SCHEMA: &str = "muse-style-genome-pareto-archive-v2";
+pub const STYLE_GENOME_EVALUATION_SCHEMA: &str = "muse-style-genome-evaluation-v3";
+pub const STYLE_GENOME_ARCHIVE_SCHEMA: &str = "muse-style-genome-pareto-archive-v3";
+pub const STYLE_GENOME_CAUSAL_GENE_AUDIT_VERSION: &str = "muse-style-genome-causal-gene-audit-v1";
 pub const STYLE_GENOME_TRACE_REFERENCE_AUDIT_VERSION: &str = "muse-style-genome-trace-reference-audit-v1";
 pub const STYLE_GENOME_FINGERPRINT_VERSION: &str = "symthaea-music-theory-structural-fingerprint-v1";
 pub const STYLE_GENOME_GRAMMAR_PLAN_FINGERPRINT_VERSION: &str = "muse-grammar-plan-fingerprint-v1";
@@ -391,6 +392,7 @@ pub struct GenomeEvaluation {
     pub trace_reference_audit_version: String,
     pub fingerprint_version: String,
     pub grammar_plan_fingerprint_version: String,
+    pub gene_effect_audit_version: String,
     pub compiled_spec_sha256: String,
     pub evaluation_config: GenomeEvaluationConfig,
     pub evaluation_config_sha256: String,
@@ -507,7 +509,7 @@ impl GenomeArchive {
         copy.archive_sha256.clear();
         let bytes = serde_json::to_vec(&copy)
             .map_err(|error| GenomeIssue::new("archive_serialization_failed", error.to_string()))?;
-        Ok(domain_sha256(b"symthaea:muse-style-genome-archive:v2\n", &bytes))
+        Ok(domain_sha256(b"symthaea:muse-style-genome-archive:v3\n", &bytes))
     }
 
     /// Detect tampering, duplicate IDs, changed candidate receipts, mixed
@@ -992,6 +994,7 @@ pub fn evaluate_genome(
         trace_reference_audit_version: STYLE_GENOME_TRACE_REFERENCE_AUDIT_VERSION.into(),
         fingerprint_version: STYLE_GENOME_FINGERPRINT_VERSION.into(),
         grammar_plan_fingerprint_version: STYLE_GENOME_GRAMMAR_PLAN_FINGERPRINT_VERSION.into(),
+        gene_effect_audit_version: STYLE_GENOME_CAUSAL_GENE_AUDIT_VERSION.into(),
         compiled_spec_sha256: compiled.provenance.compiled_spec_sha256.clone(),
         evaluation_config: config.clone(),
         evaluation_config_sha256,
@@ -1840,7 +1843,7 @@ fn evaluation_digest(evaluation: &GenomeEvaluation) -> Result<String, Vec<Genome
     copy.evaluation_sha256.clear();
     let bytes = serde_json::to_vec(&copy)
         .map_err(|error| vec![GenomeIssue::new("evaluation_serialization_failed", error.to_string())])?;
-    Ok(domain_sha256(b"symthaea:muse-style-genome-evaluation:v2\n", &bytes))
+    Ok(domain_sha256(b"symthaea:muse-style-genome-evaluation:v3\n", &bytes))
 }
 
 pub fn reference_population_digest(
@@ -2023,6 +2026,7 @@ impl GenomeEvaluation {
             && self.trace_reference_audit_version == STYLE_GENOME_TRACE_REFERENCE_AUDIT_VERSION
             && self.fingerprint_version == STYLE_GENOME_FINGERPRINT_VERSION
             && self.grammar_plan_fingerprint_version == STYLE_GENOME_GRAMMAR_PLAN_FINGERPRINT_VERSION
+            && self.gene_effect_audit_version == STYLE_GENOME_CAUSAL_GENE_AUDIT_VERSION
             && self.genome.verify_id()
             && is_sha256_hex(&self.evaluation_config_sha256)
             && config_digest(&self.evaluation_config).is_ok_and(|expected| {
