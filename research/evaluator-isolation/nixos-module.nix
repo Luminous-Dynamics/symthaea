@@ -38,12 +38,13 @@ let
     ProtectKernelModules = true;
     ProtectControlGroups = true;
     ProtectClock = true;
+    ProtectKernelLogs = true;
     ProtectProc = "invisible";
     ProcSubset = "pid";
 
     SystemCallArchitectures = "native";
     # The systemd @system-service group already excludes @mount syscalls.
-    SystemCallFilter = [ "@system-service" ];
+    SystemCallFilter = [ "@system-service" "openat2" "flock" "fsync" "fdatasync" ];
     SystemCallErrorNumber = "EPERM";
   };
 
@@ -192,8 +193,10 @@ in
         ] ++ commonInvisiblePaths;
         LoadCredentialEncrypted = "taskgen-seed:${cfg.generatorSeedCredential}";
         StandardInput = "null";
-        StandardOutput = "journal";
-        StandardError = "journal";
+        # Do not send taskgen stdout/stderr to a host-readable logging socket;
+        # taskgen may handle protected oracle material.
+        StandardOutput = "null";
+        StandardError = "null";
         TimeoutStartSec = "10min";
         KillMode = "control-group";
       };
@@ -217,8 +220,8 @@ in
         # No evaluator credential, task seed, inherited socket activation or
         # network socket is configured for this service.
         StandardInput = "null";
-        StandardOutput = "journal";
-        StandardError = "journal";
+        StandardOutput = "null";
+        StandardError = "null";
         TimeoutStartSec = "30min";
         KillMode = "control-group";
       };
