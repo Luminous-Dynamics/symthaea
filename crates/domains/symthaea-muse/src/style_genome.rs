@@ -1929,6 +1929,8 @@ fn gene_effect_audits_well_formed(
         if audit.layer == GeneEffectLayer::Renderer {
             if audit.status != GeneEffectStatus::RendererPending
                 || audit.reason.as_ref().is_none_or(|reason| reason.trim().is_empty())
+                || audit.counterfactual_genome_id.is_some()
+                || audit.counterfactual_compiled_spec_sha256.is_some()
                 || !audit.paired_trials.is_empty()
                 || audit.changed_seed_count != 0
             {
@@ -1936,6 +1938,16 @@ fn gene_effect_audits_well_formed(
             }
             continue;
         }
+
+        let counterfactual_genome_valid = audit
+            .counterfactual_genome_id
+            .as_deref()
+            .and_then(|id| id.strip_prefix("sha256:"))
+            .is_some_and(is_sha256_hex);
+        let counterfactual_spec_valid = audit
+            .counterfactual_compiled_spec_sha256
+            .as_deref()
+            .is_some_and(is_sha256_hex);
 
         let mut invalid_pairs = 0usize;
         let mut changed_pairs = 0usize;
@@ -1999,6 +2011,8 @@ fn gene_effect_audits_well_formed(
                     || invalid_pairs != 0
                     || changed_pairs == 0
                     || audit.reason.is_some()
+                    || !counterfactual_genome_valid
+                    || !counterfactual_spec_valid
                 {
                     return false;
                 }
@@ -2008,13 +2022,25 @@ fn gene_effect_audits_well_formed(
                     || invalid_pairs != 0
                     || changed_pairs != 0
                     || audit.reason.as_ref().is_none_or(|reason| reason.trim().is_empty())
+                    || !counterfactual_genome_valid
+                    || !counterfactual_spec_valid
                 {
                     return false;
                 }
             }
             GeneEffectStatus::CounterfactualUnavailable => {
+                let no_recipe = audit.counterfactual_genome_id.is_none()
+                    && audit.counterfactual_compiled_spec_sha256.is_none()
+                    && audit.paired_trials.is_empty();
+                let compile_failed = counterfactual_genome_valid
+                    && audit.counterfactual_compiled_spec_sha256.is_none()
+                    && audit.paired_trials.is_empty();
+                let paired_trials_failed = counterfactual_genome_valid
+                    && counterfactual_spec_valid
+                    && audit.paired_trials.len() == trials.len()
+                    && invalid_pairs > 0;
                 if audit.reason.as_ref().is_none_or(|reason| reason.trim().is_empty())
-                    || !(audit.paired_trials.is_empty() || invalid_pairs > 0)
+                    || !(no_recipe || compile_failed || paired_trials_failed)
                 {
                     return false;
                 }
