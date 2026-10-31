@@ -263,6 +263,7 @@ impl BinaryLogFactor {
 pub struct FactorEliminationPlan {
     pub elimination_order: Vec<usize>,
     pub induced_width: usize,
+    pub predicted_output_entries: usize,
     pub predicted_peak_factor_entries: usize,
     pub max_factor_entries: usize,
 }
@@ -270,10 +271,12 @@ pub struct FactorEliminationPlan {
 /// Plan exact binary-factor elimination without multiplying any factor tables.
 ///
 /// The planner validates scopes and the elimination set, computes a deterministic
-/// min-fill order, and calculates the maximum input/bucket table size. Because
-/// an eliminated variable's incident-factor union contains exactly its active
-/// primal-graph neighbours plus itself, the largest bucket has `2^(width + 1)`
-/// entries. The plan is rejected before contraction if that table exceeds budget.
+/// min-fill order, and calculates the largest input, bucket, or final output
+/// table. Because an eliminated variable's incident-factor union contains exactly
+/// its active primal-graph neighbours plus itself, the largest bucket has
+/// `2^(width + 1)` entries. The final output factor spans every retained variable,
+/// including disconnected retained components that the current API multiplies
+/// into one factor. The plan is rejected before contraction if any table exceeds budget.
 pub fn plan_min_fill_elimination(
     factor_scopes: &[Vec<usize>],
     eliminate: &[usize],
@@ -315,12 +318,22 @@ pub fn plan_min_fill_elimination(
             .ok_or(FactorGraphError::IndexOverflow)?;
         assignment_count(bucket_scope)?
     };
-    let predicted_peak_factor_entries = largest_input_factor.max(largest_bucket);
+    let retained_variables = factor_scopes
+        .iter()
+        .flatten()
+        .copied()
+        .filter(|variable| !seen.contains(variable))
+        .collect::<BTreeSet<_>>();
+    let predicted_output_entries = assignment_count(retained_variables.len())?;
+    let predicted_peak_factor_entries = largest_input_factor
+        .max(largest_bucket)
+        .max(predicted_output_entries);
     check_budget(predicted_peak_factor_entries, max_factor_entries)?;
 
     Ok(FactorEliminationPlan {
         elimination_order,
         induced_width,
+        predicted_output_entries,
         predicted_peak_factor_entries,
         max_factor_entries,
     })
@@ -332,6 +345,7 @@ pub struct LogFactorEliminationReport {
     pub factor: BinaryLogFactor,
     pub elimination_order: Vec<usize>,
     pub induced_width: usize,
+    pub predicted_output_entries: usize,
     pub predicted_peak_factor_entries: usize,
     pub peak_factor_entries: usize,
     pub factor_multiplications: usize,
@@ -359,6 +373,8 @@ pub struct FactorEliminationReport {
     pub elimination_order: Vec<usize>,
     /// Maximum number of active neighbours at the point of elimination.
     pub induced_width: usize,
+    /// Final output table size predicted by the preflight elimination plan.
+    pub predicted_output_entries: usize,
     /// Peak table size predicted by the preflight elimination plan.
     pub predicted_peak_factor_entries: usize,
     /// Largest input or intermediate factor table observed.
@@ -466,6 +482,7 @@ pub fn min_fill_sum_product(
         factor: result,
         elimination_order,
         induced_width,
+        predicted_output_entries: plan.predicted_output_entries,
         predicted_peak_factor_entries: plan.predicted_peak_factor_entries,
         peak_factor_entries,
         factor_multiplications,
@@ -864,6 +881,18 @@ mod tests {
         assert_eq!(report.peak_factor_entries, 4);
     }
 
+    #[test]
+    fn preflight_plan_accounts_for_the_final_retained_scope_product() {
+        let disconnected_retained = vec![vec![0], vec![1]];
+        let plan = plan_min_fill_elimination(&disconnected_retained, &[9], 4).unwrap();
+        assert_eq!(plan.induced_width, 0);
+        assert_eq!(plan.predicted_output_entries, 4);
+        assert_eq!(plan.predicted_peak_factor_entries, 4);
+        assert!(matches!(
+            plan_min_fill_elimination(&disconnected_retained, &[9], 3),
+            Err(FactorGraphError::IntermediateTooLarge { entries: 4, limit: 3 })
+        ));
+    }
     #[test]
     fn preflight_plan_rejects_invalid_scopes_and_duplicate_elimination() {
         assert!(matches!(
