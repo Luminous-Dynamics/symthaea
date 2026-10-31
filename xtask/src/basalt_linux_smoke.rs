@@ -418,19 +418,64 @@ fn write_new(path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::RefCell;
+
+    struct FakeSyscalls {
+        landlock: Result<i32, i32>,
+        fanotify: Result<libc::c_int, i32>,
+        close: Result<(), i32>,
+        closed_fds: RefCell<Vec<libc::c_int>>,
+        fanotify_flags: RefCell<Vec<libc::c_uint>>,
+    }
+
+    impl FakeSyscalls {
+        fn new(
+            landlock: Result<i32, i32>,
+            fanotify: Result<libc::c_int, i32>,
+            close: Result<(), i32>,
+        ) -> Self {
+            Self {
+                landlock,
+                fanotify,
+                close,
+                closed_fds: RefCell::new(Vec::new()),
+                fanotify_flags: RefCell::new(Vec::new()),
+            }
+        }
+    }
+
+    impl LinuxSmokeSyscalls for FakeSyscalls {
+        fn landlock_abi_version(&self) -> Result<i32, i32> {
+            self.landlock
+        }
+
+        fn fanotify_init(
+            &self,
+            flags: libc::c_uint,
+            _event_file_flags: libc::c_int,
+        ) -> Result<libc::c_int, i32> {
+            self.fanotify_flags.borrow_mut().push(flags);
+            self.fanotify
+        }
+
+        fn close_fd(&self, fd: libc::c_int) -> Result<(), i32> {
+            self.closed_fds.borrow_mut().push(fd);
+            self.close
+        }
+    }
 
     #[test]
-    fn errno_mapping_distinguishes_unsupported_disabled_and_denied() {
+    fn errno_mapping_distinguishes_unsupported_disabled_denied_and_invalid_request() {
         assert_eq!(classify_errno(libc::ENOSYS), ProbeStatus::NotSupported);
-        assert_eq!(classify_errno(libc::EINVAL), ProbeStatus::InvalidRequest);
         assert_eq!(classify_errno(libc::EOPNOTSUPP), ProbeStatus::Disabled);
         assert_eq!(classify_errno(libc::EPERM), ProbeStatus::PermissionDenied);
         assert_eq!(classify_errno(libc::EACCES), ProbeStatus::PermissionDenied);
+        assert_eq!(classify_errno(libc::EINVAL), ProbeStatus::InvalidRequest);
         assert_eq!(classify_errno(libc::EIO), ProbeStatus::Failed);
     }
 
     #[test]
-    fn fanotify_flags_are_bounded_notification_or_permission_class_only() {
+    fn notification_and_permission_class_flags_do_not_use_an_invalid_combination() {
         let notification = fanotify_init_flags(0);
         let permission = fanotify_init_flags(FAN_CLASS_CONTENT);
         assert_eq!(notification & FAN_CLASS_CONTENT, 0);
@@ -442,8 +487,97 @@ mod tests {
     }
 
     #[test]
-    fn landlock_query_flag_is_version_query_not_ruleset_creation() {
-        assert_eq!(LANDLOCK_CREATE_RULESET_VERSION, 1);
+    fn landlock_version_query_pass_records_version_without_resource_creation() {
+        let fake = FakeSyscalls::new(Ok(7), Ok(31), Ok(()));
+        let item = probe_landlock_abi_with(&fake);
+        assert_eq!(item.status, ProbeStatus::Passed);
+        assert_eq!(item.abi_version, Some(7));
+        assert!(!item.resource_created);
+        assert_eq!(item.cleanup_status, CleanupStatus::NotRequired);
+    }
+
+    #[test]
+    fn zero_landlock_version_is_not_promoted_to_a_pass() {
+        let fake = FakeSyscalls::new(Ok(0), Ok(31), Ok(()));
+        let item = probe_landlock_abi_with(&fake);
+        assert_eq!(item.status, ProbeStatus::Failed);
+        assert_eq!(item.abi_version, Some(0));
+    }
+
+    #[test]
+    fn landlock_errno_is_preserved_and_classified() {
+        let fake = FakeSyscalls::new(Err(libc::EOPNOTSUPP), Ok(31), Ok(()));
+        let item = probe_landlock_abi_with(&fake);
+        assert_eq!(item.status, ProbeStatus::Disabled);
+        assert_eq!(item.errno, Some(libc::EOPNOTSUPP));
+        assert!(!item.resource_created);
+    }
+
+    #[test]
+    fn fanotify_success_requires_a_confirmed_close() {
+        let fake = FakeSyscalls::new(Ok(1), Ok(31), Ok(()));
+        let item = probe_fanotify_group_with(&fake, "fanotify_notification_group_init", 0);
+        assert_eq!(item.status, ProbeStatus::Passed);
+        assert_eq!(item.cleanup_status, CleanupStatus::Closed);
+        assert!(item.resource_created);
+        assert_eq!(*fake.closed_fds.borrow(), vec![31]);
+        assert!(!item.event_capture_attempted);
+    }
+
+    #[test]
+    fn fanotify_initialization_error_never_attempts_close() {
+        let fake = FakeSyscalls::new(Ok(1), Err(libc::EPERM), Ok(()));
+        let item = probe_fanotify_group_with(&fake, "fanotify_notification_group_init", 0);
+        assert_eq!(item.status, ProbeStatus::PermissionDenied);
+        assert_eq!(item.errno, Some(libc::EPERM));
+        assert_eq!(item.cleanup_status, CleanupStatus::NotRequired);
+        assert!(!item.resource_created);
+        assert!(fake.closed_fds.borrow().is_empty());
+    }
+
+    #[test]
+    fn fanotify_close_failure_downgrades_the_probe_to_failed() {
+        let fake = FakeSyscalls::new(Ok(1), Ok(31), Err(libc::EIO));
+        let item = probe_fanotify_group_with(&fake, "fanotify_notification_group_init", 0);
+        assert_eq!(item.status, ProbeStatus::Failed);
+        assert_eq!(item.cleanup_status, CleanupStatus::Failed);
+        assert!(item.resource_created);
+        assert_eq!(item.errno, Some(libc::EIO));
+        assert_eq!(*fake.closed_fds.borrow(), vec![31]);
+    }
+
+    #[test]
+    fn permission_class_path_omits_report_fid_and_records_exact_flags() {
+        let fake = FakeSyscalls::new(Ok(1), Ok(44), Ok(()));
+        let item = probe_fanotify_group_with(
+            &fake,
+            "fanotify_permission_class_group_init",
+            FAN_CLASS_CONTENT,
+        );
+        assert_eq!(item.status, ProbeStatus::Passed);
+        assert_eq!(fake.fanotify_flags.borrow()[0] & FAN_REPORT_FID, 0);
+        assert_ne!(fake.fanotify_flags.borrow()[0] & FAN_CLASS_CONTENT, 0);
+        assert_eq!(*fake.closed_fds.borrow(), vec![44]);
+    }
+
+    #[test]
+    fn not_attempted_observations_have_no_resource_or_cleanup_claim() {
+        let item = not_attempted("tracepoint", "deliberately omitted");
+        assert_eq!(item.status, ProbeStatus::NotAttempted);
+        assert_eq!(item.cleanup_status, CleanupStatus::NotRequired);
+        assert!(!item.resource_created);
+        assert!(!item.event_capture_attempted);
+        assert_eq!(item.errno, None);
+    }
+
+    #[test]
+    fn not_requested_permission_class_probe_stays_not_attempted() {
+        let item = not_attempted(
+            "fanotify_permission_class_group_init",
+            "not requested",
+        );
+        assert_eq!(item.status, ProbeStatus::NotAttempted);
+        assert!(!item.resource_created);
     }
 
     #[test]
@@ -484,27 +618,6 @@ mod tests {
     }
 
     #[test]
-    fn not_attempted_observations_have_no_resource_or_cleanup_claim() {
-        let item = not_attempted("tracepoint", "deliberately omitted");
-        assert_eq!(item.status, ProbeStatus::NotAttempted);
-        assert_eq!(item.cleanup_status, CleanupStatus::NotRequired);
-        assert!(!item.resource_created);
-        assert!(!item.event_capture_attempted);
-        assert_eq!(item.errno, None);
-    }
-
-    #[test]
-    fn permission_class_probe_is_separate_from_default_notification_probe() {
-        let requested = false;
-        let skipped = if requested {
-            probe_fanotify_group("permission", FAN_CLASS_CONTENT)
-        } else {
-            not_attempted("permission", "not requested")
-        };
-        assert_eq!(skipped.status, ProbeStatus::NotAttempted);
-    }
-
-    #[test]
     fn digest_is_domain_tagged_and_fixed_width() {
         let digest = sha256_tagged(b"basalt-linux-smoke");
         assert!(digest.starts_with("sha256:"));
@@ -512,83 +625,16 @@ mod tests {
         assert!(digest[7..].bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()));
     }
 
-    #[test]
-    fn kernel_identity_does_not_require_optional_host_metadata() {
-        let identity = KernelIdentity {
-            release: None,
-            architecture: "x86_64",
-            boot_id_digest: None,
-            mount_namespace_inode: None,
-        };
-        assert_eq!(identity.release, None);
-        assert_eq!(identity.boot_id_digest, None);
-    }
-
-    #[test]
-    fn successful_fanotify_probe_must_record_descriptor_cleanup() {
-        let item = ProbeObservation {
-            probe_id: "fanotify_notification_group_init",
-            status: ProbeStatus::Passed,
-            detail: "closed".to_string(),
-            abi_version: None,
-            errno: None,
-            cleanup_status: CleanupStatus::Closed,
-            resource_created: true,
-            event_capture_attempted: false,
-        };
-        assert_eq!(item.cleanup_status, CleanupStatus::Closed);
-        assert!(!item.event_capture_attempted);
-    }
-
     #[cfg(target_os = "linux")]
     #[test]
-    fn landlock_version_query_is_nonfatal_and_never_creates_a_ruleset() {
-        let item = probe_landlock_abi();
-        assert!(matches!(
-            item.status,
-            ProbeStatus::Passed
-                | ProbeStatus::NotSupported
-                | ProbeStatus::InvalidRequest
-                | ProbeStatus::Disabled
-                | ProbeStatus::PermissionDenied
-                | ProbeStatus::Failed
-        ));
-        assert!(!item.resource_created);
-        assert_eq!(item.cleanup_status, CleanupStatus::NotRequired);
-        assert!(!item.event_capture_attempted);
-    }
-
-    #[cfg(target_os = "linux")]
-    #[test]
-    fn fanotify_group_smoke_never_marks_or_reads_events_and_closes_successes() {
-        let item = probe_fanotify_group("fanotify_notification_group_init", 0);
-        assert!(matches!(
-            item.status,
-            ProbeStatus::Passed
-                | ProbeStatus::NotSupported
-                | ProbeStatus::Disabled
-                | ProbeStatus::PermissionDenied
-                | ProbeStatus::Failed
-        ));
-        assert!(!item.event_capture_attempted);
-        if item.status == ProbeStatus::Passed {
-            assert!(item.resource_created);
-            assert_eq!(item.cleanup_status, CleanupStatus::Closed);
-        } else {
-            assert!(!item.resource_created);
-            assert_eq!(item.cleanup_status, CleanupStatus::NotRequired);
+    fn live_safe_probes_never_claim_capture() {
+        let landlock = probe_landlock_abi();
+        let fanotify = probe_fanotify_group("fanotify_notification_group_init", 0);
+        assert!(!landlock.resource_created);
+        assert_eq!(landlock.cleanup_status, CleanupStatus::NotRequired);
+        assert!(!fanotify.event_capture_attempted);
+        if fanotify.status == ProbeStatus::Passed {
+            assert_eq!(fanotify.cleanup_status, CleanupStatus::Closed);
         }
-    }
-
-    #[test]
-    fn report_version_and_suite_identifier_are_pinned() {
-        assert_eq!(1u32, 1);
-        assert_eq!("basalt-linux-runtime-smoke-v1", "basalt-linux-runtime-smoke-v1");
-    }
-
-    #[test]
-    fn permission_class_opt_in_has_explicit_fanotify_content_flag() {
-        assert_ne!(FAN_CLASS_CONTENT, 0);
-        assert_eq!(FAN_CLASS_CONTENT & !0x7, 0);
     }
 }
