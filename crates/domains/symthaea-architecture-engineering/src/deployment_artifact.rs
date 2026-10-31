@@ -907,7 +907,10 @@ mod tests {
         let observation = measured_observation(&manifest, &registry, &profile);
         let receipt = create_deployment_measurement_receipt(&artifact, &registry, observation).unwrap();
         let scored = verify_deployment_measurement_receipt(&artifact, &registry, &receipt).unwrap();
-        assert!(matches!(scored, ScoredMeasurement::Measured { raw_value: 42.0, .. }));
+        match scored {
+            ScoredMeasurement::Measured { raw_value, .. } => assert_eq!(raw_value, 42.0),
+            other => panic!("expected a measured objective, got {other:?}"),
+        }
     }
 
     #[test]
