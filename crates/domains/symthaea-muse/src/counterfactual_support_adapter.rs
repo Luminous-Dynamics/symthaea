@@ -637,7 +637,7 @@ mod tests {
     }
 
     #[test]
-    fn single_event_binding_maps_channels_and_preserves_measured_empty_support() {
+    fn raw_isolated_measurement_is_retained_but_not_sent_to_the_planner() {
         let baseline_samples = vec![0.0_f32; 67 * 2];
         let counterfactual_samples = baseline_samples.clone();
         let baseline_audio = crate::audio_preservation::AudioView {
@@ -736,7 +736,7 @@ mod tests {
             affected_channel_windows: 0,
             support_policy: crate::counterfactual_influence::InfluenceSupportPolicy::default(),
             window_measurements: Vec::new(),
-            measured_influence_intervals: Vec::new(),
+            measured_influence_intervals: vec![crate::audio_preservation::FrameInterval { start_frame: 20, end_frame: 30 }],
             qualified_support_intervals: Vec::new(),
             qualified_channel_windows: 0,
             bridged_channel_windows: 0,
@@ -749,6 +749,10 @@ mod tests {
         let evidence = verified.evidence();
         assert_eq!(evidence.source_event_index, 1);
         assert_eq!(evidence.output_frame_count, 67);
+        assert_eq!(
+            evidence.raw_measured_support,
+            vec![AcousticSupportInterval { start_frame: 20, end_frame: 30 }]
+        );
         assert!(evidence.support.acoustic_support.is_empty());
         assert_eq!(
             evidence.support.routing_domains,
