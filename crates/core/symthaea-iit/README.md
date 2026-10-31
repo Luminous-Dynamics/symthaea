@@ -167,7 +167,14 @@ cross-implementation claim.
 
 Dense-vs-sparse parity covers local transitions, Eq. 3 repertoires, uncut Eq. 4,
 maximum-entropy-cut TPM cells, partitioned Eq. 4 and complete per-partition
-cause/effect scores for an embedded five-unit substrate.
+cause/effect scores for an embedded five-unit substrate. Full system-search
+differential coverage now adds 18 deterministic cases across three- and
+four-unit strongly connected cycles, three CPT parameterizations per size,
+and three observed states per parameterization. Each case compares all
+specified-state pairs, MIP cut matrices, cause/effect GID terms, combined scores,
+tie status, theorem-bound metadata, and result completion against the dense
+oracle. The common theorem-bound guard is tested for valid-within-tolerance,
+over-bound negative control, non-finite scalar, and theorem-out-of-domain cases.
 
 The sparse backend now also exposes a bounded exhaustive
 `analyze_iit4_2023_system_phi_s` path for the declared binary local-CPT profile.
@@ -180,8 +187,9 @@ and mandatory one-unit TotalCut remain outside that bound domain.
 
 The sparse system search is exact for the declared computation when it returns
 `complete = true`, but it is **not yet generally qualified against PyPhi**.
-Dense-vs-sparse tests cover selected small systems and score families; they do
-not replace an independently pinned PyPhi fixture corpus. Nonzero
+Dense-vs-sparse tests now cover 18 end-to-end small-system fixtures in addition
+to the repertoire and cut-transform oracle suite; they do not replace an
+independently pinned PyPhi fixture corpus. Nonzero
 Composition-level specified-state ties still return an explicit unresolved
 status because this crate does not yet construct distinctions, relations, or
 big Phi. The IIT 4.0 (2026) intrinsic-information requirement remains a
