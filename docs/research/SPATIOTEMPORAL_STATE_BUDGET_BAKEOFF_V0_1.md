@@ -33,9 +33,11 @@ These are experiment strata, not promised operating points. If a method cannot f
 
 ## 3. Stage 0 — exact small-model dependency and gradient oracle
 
-A first scalar two-module control is now implemented in `research/temporal-bench/src/gradient_oracle.rs`. It computes the exact reverse-mode BPTT gradient, checks it against centered finite differences and a pinned known-answer vector, and measures the effect of hidden/downstream temporal detachment and a local auxiliary-head objective. Nine Rust tests are authored but unrun.
+The first scalar two-module control is implemented in `research/temporal-bench/src/gradient_oracle.rs`. It computes exact reverse-mode BPTT gradients, checks centered finite differences and a pinned known-answer vector, and isolates hidden/downstream temporal detachment from a separate local auxiliary-head objective.
 
-Before using large vision models, extend this into a deterministic two- and four-module recurrent model with:
+A second chain oracle is now implemented in `research/temporal-bench/src/chain_oracle.rs` for 2- and 4-module scalar recurrent chains. It computes full BPTT gradients, per-module temporal stop-gradient masks, and an STDL-style spatial cut plus a separate local auxiliary loss. Its negative controls verify that downstream global credit stops at the declared boundary and that the local loss restores an upstream training signal. Nine tests are authored for each oracle (18 total); none have been compiled or run.
+
+The next extension is nonlinear module dynamics and multi-scale delayed dependencies before using large vision models.
 - controllable cross-module dependencies;
 - 2–3 temporal scales;
 - known delayed targets;
@@ -51,11 +53,11 @@ Compare:
 6. BrainTrace pp-prop / ES-D-RTRL with available trace/filter/decay configuration explicit.
 13. BrainTrace pp-prop sensitivity sweep across controlled firing-statistics strata and network depths [2, 4, 8].
 7. HDC fast-only cross-boundary summary.
-8. HDC slow-only summary.
-9. HDC fast+slow summary with fixed cadence.
-10. HDC fast+slow summary with novelty/event-triggered refresh.
-11. HDC summary + STDL-style local auxiliary training.
-12. HDC summary + BrainTrace eligibility method, only after component arms are understood.
+9. HDC slow-only summary.
+10. HDC fast+slow summary with fixed cadence.
+11. HDC fast+slow summary with novelty/event-triggered refresh.
+12. HDC summary + STDL-style local auxiliary training.
+13. HDC summary + BrainTrace eligibility method, only after component arms are understood.
 
 Do not label local STDL losses as exact global gradients. For each method, report:
 - update-direction cosine similarity against full BPTT on the small oracle;
