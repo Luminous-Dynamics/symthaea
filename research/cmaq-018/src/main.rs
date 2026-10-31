@@ -395,10 +395,13 @@ fn branch_predictions(
     history: ObservedHistory,
     actions: &[Intervention],
 ) -> Vec<Option<BranchPrediction>> {
+    let point_predictor = PointOutcomePredictor;
+    let shuffled_predictor = ShuffledActionLabelsPredictor;
+    let support_predictor = SupportAwarePointPredictor;
     let predictor: Option<&dyn CandidateBranchPredictor> = match model {
-        Model::PointOutcome => Some(&PointOutcomePredictor),
-        Model::ShuffledActionLabels => Some(&ShuffledActionLabelsPredictor),
-        Model::SupportAwarePoint => Some(&SupportAwarePointPredictor),
+        Model::PointOutcome => Some(&point_predictor),
+        Model::ShuffledActionLabels => Some(&shuffled_predictor),
+        Model::SupportAwarePoint => Some(&support_predictor),
         Model::ExplicitEffectHead | Model::Oracle => None,
     };
 
