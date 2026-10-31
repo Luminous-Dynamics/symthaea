@@ -29,6 +29,7 @@ pub mod paired_outcome_analysis;
 pub mod reference_assurance;
 pub mod search_exposure;
 pub mod search_exposure_match;
+pub mod split_matrix;
 pub use generator::{RegenerationReportV1, generate_task_set_bytes, verify_regeneration};
 const WEIGHT_TOLERANCE: f64 = 1.0e-9;
 
