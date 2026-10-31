@@ -621,6 +621,23 @@
       "paired_case_ids": [],
       "description": "A Rust build script reads and correctly declares a file with rerun-if-changed, but the file bytes mutate while its modification timestamp is restored exactly.",
       "safety_property": "Dependency observation must detect content mutation even when Cargo's mtime-based rerun detector does not invalidate the build script."
+    },
+    {
+      "case_id": "cargo-build-script-env-input",
+      "family": "environment",
+      "channel": "environment",
+      "mutation_kind": "env_value",
+      "ground_truth_resource_id": "env:BASALT_BUILD_INPUT",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "environment_binding",
+        "value_commitment",
+        "process_lineage",
+        "toolchain_digest"
+      ],
+      "paired_case_ids": [],
+      "description": "A Rust build script reads a custom variable from the Cargo invocation environment; a control declares rerun-if-env-changed and a hidden case omits it.",
+      "safety_property": "Changes to invocation environment values consumed by build scripts must be observed even when the build system does not rerun the script."
     }
   ]
 }

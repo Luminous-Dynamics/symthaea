@@ -22,6 +22,9 @@ const CASE_ID: &str = "cargo-mtime-preserving-input";
 const RESOURCE_ID: &str = "fixture:build.rs-input-mtime-preserved.txt";
 const BEFORE: &[u8] = b"baseline-state\n";
 const AFTER: &[u8] = b"mutated-state\n";
+const ENV_BEFORE: &str = "baseline-environment";
+const ENV_AFTER: &str = "mutated-environment";
+const ENV_VARIABLE: &str = "BASALT_BUILD_INPUT";
 const FIXTURE: &[(&str, &str)] = &[
     ("declared/Cargo.toml", include_str!("../../benchmarks/basalt/fixtures/cargo-mtime-declared-control/Cargo.toml")),
     ("declared/Cargo.lock", include_str!("../../benchmarks/basalt/fixtures/cargo-mtime-declared-control/Cargo.lock")),
@@ -31,6 +34,14 @@ const FIXTURE: &[(&str, &str)] = &[
     ("mtime/Cargo.lock", include_str!("../../benchmarks/basalt/fixtures/cargo-mtime-adversary/Cargo.lock")),
     ("mtime/build.rs", include_str!("../../benchmarks/basalt/fixtures/cargo-mtime-adversary/build.rs")),
     ("mtime/src/main.rs", include_str!("../../benchmarks/basalt/fixtures/cargo-mtime-adversary/src/main.rs")),
+    ("env-hidden/Cargo.toml", include_str!("../../benchmarks/basalt/fixtures/cargo-env-hidden/Cargo.toml")),
+    ("env-hidden/Cargo.lock", include_str!("../../benchmarks/basalt/fixtures/cargo-env-hidden/Cargo.lock")),
+    ("env-hidden/build.rs", include_str!("../../benchmarks/basalt/fixtures/cargo-env-hidden/build.rs")),
+    ("env-hidden/src/main.rs", include_str!("../../benchmarks/basalt/fixtures/cargo-env-hidden/src/main.rs")),
+    ("env-declared/Cargo.toml", include_str!("../../benchmarks/basalt/fixtures/cargo-env-declared/Cargo.toml")),
+    ("env-declared/Cargo.lock", include_str!("../../benchmarks/basalt/fixtures/cargo-env-declared/Cargo.lock")),
+    ("env-declared/build.rs", include_str!("../../benchmarks/basalt/fixtures/cargo-env-declared/build.rs")),
+    ("env-declared/src/main.rs", include_str!("../../benchmarks/basalt/fixtures/cargo-env-declared/src/main.rs")),
     (".gitignore", include_str!("../../benchmarks/basalt/fixtures/cargo-mtime-declared-control/.gitignore")),
 ];
 
@@ -377,6 +388,19 @@ fn run_cargo(
     stage: &'static str,
     package: &'static str,
 ) -> anyhow::Result<Execution> {
+    run_cargo_with_env(cargo, rustc, cargo_home, run_root, package_dir, stage, package, &[])
+}
+
+fn run_cargo_with_env(
+    cargo: &Path,
+    rustc: &Path,
+    cargo_home: &Path,
+    run_root: &Path,
+    package_dir: &Path,
+    stage: &'static str,
+    package: &'static str,
+    env_overrides: &[(&str, &str)],
+) -> anyhow::Result<Execution> {
     let target = run_root.join(format!("target-{package}"));
     let mut command = Command::new(cargo);
     command.args(["run", "--quiet", "--offline", "--locked", "--manifest-path"])
@@ -403,6 +427,9 @@ fn run_cargo(
             command.env_remove(key);
         }
     }
+    for (key, value) in env_overrides {
+        command.env(key, value);
+    }
     let mut child = command.spawn().context("starting isolated offline Cargo run")?;
     let pid = child.id();
     let output = child.wait_with_output()?;
@@ -425,14 +452,16 @@ fn run_cargo(
 
 fn initialize_git(workspace: &Path) -> anyhow::Result<String> {
     git(workspace, &["init", "--quiet"])?;
-    git(workspace, &["config", "user.name", "BASALT Cargo mtime Fixture"])?;
-    git(workspace, &["config", "user.email", "basalt-mtime-fixture@example.invalid"])?;
+    git(workspace, &["config", "user.name", "BASALT Cargo fixture"])?;
+    git(workspace, &["config", "user.email", "basalt-cargo-fixture@example.invalid"])?;
     git(workspace, &[
         "add", "--force", "--", ".gitignore",
         "declared/Cargo.toml", "declared/Cargo.lock", "declared/build.rs", "declared/src/main.rs",
         "mtime/Cargo.toml", "mtime/Cargo.lock", "mtime/build.rs", "mtime/src/main.rs",
+        "env-hidden/Cargo.toml", "env-hidden/Cargo.lock", "env-hidden/build.rs", "env-hidden/src/main.rs",
+        "env-declared/Cargo.toml", "env-declared/Cargo.lock", "env-declared/build.rs", "env-declared/src/main.rs",
     ])?;
-    git(workspace, &["commit", "--quiet", "-m", "BASALT Cargo mtime fixture baseline"])?;
+    git(workspace, &["commit", "--quiet", "-m", "BASALT Cargo fixture baseline"])?;
     let output = Command::new("git").args(["rev-parse", "HEAD"]).current_dir(workspace).output()?;
     if !output.status.success() { bail!("git rev-parse HEAD failed"); }
     Ok(String::from_utf8(output.stdout)?.trim().to_string())
@@ -515,6 +544,32 @@ mod tests {
     use super::*;
 
     #[test]
+    fn hidden_environment_build_script_omits_rerun_env_declaration() {
+        let source = FIXTURE.iter().find(|(p, _)| *p == "env-hidden/build.rs").unwrap().1;
+        assert!(source.contains("env::var(\"BASALT_BUILD_INPUT\")"));
+        assert!(!source.contains("rerun-if-env-changed=BASALT_BUILD_INPUT"));
+    }
+
+    #[test]
+    fn declared_environment_build_script_declares_the_invocation_variable() {
+        let source = FIXTURE.iter().find(|(p, _)| *p == "env-declared/build.rs").unwrap().1;
+        assert!(source.contains("env::var(\"BASALT_BUILD_INPUT\")"));
+        assert!(source.contains("rerun-if-env-changed=BASALT_BUILD_INPUT"));
+    }
+
+    #[test]
+    fn environment_value_commitments_are_distinct_and_raw_values_are_not_in_the_evidence_shape() {
+        assert_ne!(sha256(ENV_BEFORE.as_bytes()), sha256(ENV_AFTER.as_bytes()));
+        let shape = serde_json::json!({
+            "before_value_commitment": sha256(ENV_BEFORE.as_bytes()),
+            "after_value_commitment": sha256(ENV_AFTER.as_bytes()),
+            "raw_environment_values_stored": false
+        });
+        assert!(shape.get("before_value").is_none());
+        assert_eq!(shape["raw_environment_values_stored"], false);
+    }
+
+    #[test]
     fn both_fixture_build_scripts_declare_the_input() {
         for path in ["declared/build.rs","mtime/build.rs"] {
             let source=FIXTURE.iter().find(|(p,_)| *p==path).unwrap().1;
@@ -562,6 +617,225 @@ mod tests {
     }
 }
 
+
+
+#[derive(Debug, Serialize)]
+pub struct EnvironmentFixtureRunReport {
+    pub report_version: u32,
+    pub run_id: String,
+    pub case_id: &'static str,
+    pub evidence_path: String,
+    pub hidden_cached_stale_output: bool,
+    pub declared_control_detected_change: bool,
+    pub fresh_replay_detected_change: bool,
+    pub qualification_eligible: bool,
+}
+#[derive(Debug, Serialize)]
+struct EnvironmentEvidence {
+    format_version: u32,
+    suite_id: &'static str,
+    run_id: String,
+    case_id: &'static str,
+    resource_id: &'static str,
+    environment_variable_name: &'static str,
+    before_value_commitment: String,
+    after_value_commitment: String,
+    catalog_digest: String,
+    fixture_digest: String,
+    cargo_binary_digest: String,
+    cargo_version: String,
+    rustc_launcher_digest: String,
+    rustc_sysroot_binary_digest: String,
+    rustc_version: String,
+    rustc_sysroot: String,
+    path_environment_digest: String,
+    cargo_home_relative_path: &'static str,
+    cargo_configuration_policy: &'static str,
+    ancestor_cargo_config_absent: bool,
+    workspace_relative_path: &'static str,
+    git_baseline_commit: String,
+    hidden_build_script_digest: String,
+    hidden_rerun_env_variables: Vec<&'static str>,
+    declared_build_script_digest: String,
+    declared_rerun_env_variables: Vec<&'static str>,
+    hidden_baseline: RedactedExecution,
+    hidden_warm_after_environment_change: RedactedExecution,
+    hidden_fresh_after_environment_change: RedactedExecution,
+    declared_baseline: RedactedExecution,
+    declared_warm_after_environment_change: RedactedExecution,
+    hidden_cached_stale_output: bool,
+    declared_control_detected_change: bool,
+    fresh_replay_detected_change: bool,
+    ground_truth_basis: &'static str,
+    raw_environment_values_stored: bool,
+    independent_kernel_observation: bool,
+    qualification_eligible: bool,
+}
+#[derive(Debug, Serialize)]
+struct RedactedExecution {
+    stage: &'static str,
+    package: &'static str,
+    target_directory: String,
+    cargo_process_id: u32,
+    exit_code: i32,
+    stdout_digest: String,
+    stderr_digest: String,
+}
+fn redact_execution(execution: Execution) -> RedactedExecution {
+    RedactedExecution {
+        stage: execution.stage,
+        package: execution.package,
+        target_directory: execution.target_directory,
+        cargo_process_id: execution.cargo_process_id,
+        exit_code: execution.exit_code,
+        stdout_digest: execution.stdout_digest,
+        stderr_digest: execution.stderr_digest,
+    }
+}
+
+pub fn run_environment(catalog_path: &Path, out_dir: &Path) -> anyhow::Result<EnvironmentFixtureRunReport> {
+    let catalog_bytes = read_bounded(catalog_path, 16 * 1024 * 1024)?;
+    let audit = crate::basalt_observer::audit_bytes(&catalog_bytes);
+    if !audit.structurally_valid { bail!("challenge catalog failed structural validation"); }
+    let catalog: Value = serde_json::from_slice(&catalog_bytes)?;
+    validate_environment_catalog_case(&catalog)?;
+
+    let cargo_name = env::var_os("CARGO").unwrap_or_else(|| OsStr::new("cargo").to_os_string());
+    let cargo = resolve_executable(&cargo_name)?;
+    let cargo_binary_digest = sha256_file(&cargo)?;
+    let cargo_version = cargo_version(&cargo)?;
+    let (rustc_launcher, rustc_version, rustc_sysroot, rustc_binary) = rustc_identity()?;
+    let rustc_launcher_digest = sha256_file(&rustc_launcher)?;
+    let rustc_binary_digest = sha256_file(&rustc_binary)?;
+    let path_environment_digest = env::var_os("PATH")
+        .map(|value| sha256(value.to_string_lossy().as_bytes()))
+        .unwrap_or_else(|| sha256(b"<PATH-unset>"));
+
+    let nanos = SystemTime::now().duration_since(UNIX_EPOCH)
+        .context("system clock is before UNIX epoch")?.as_nanos();
+    let run_id = format!("basalt-cargo-env-{}-{nanos}", std::process::id());
+    fs::create_dir_all(out_dir)?;
+    let out_dir = out_dir.canonicalize().context("canonicalizing environment fixture output directory")?;
+    let run_root = out_dir.join(&run_id);
+    fs::create_dir(&run_root).context("creating exclusive environment fixture run directory")?;
+    let workspace = run_root.join("workspace");
+    fs::create_dir(&workspace)?;
+    materialize(&workspace)?;
+    let hidden_dir = workspace.join("env-hidden");
+    let declared_dir = workspace.join("env-declared");
+    ensure_no_ancestor_cargo_config(&hidden_dir)?;
+    ensure_no_ancestor_cargo_config(&declared_dir)?;
+    let git_baseline_commit = initialize_git(&workspace)?;
+    let git_status = Command::new("git").args(["status", "--porcelain", "--untracked-files=all"])
+        .current_dir(&workspace).output().context("checking clean environment fixture baseline")?;
+    if !git_status.status.success() || !git_status.stdout.is_empty() {
+        bail!("environment fixture Git baseline is not clean");
+    }
+    let cargo_home = run_root.join("cargo-home");
+    fs::create_dir(&cargo_home)?;
+
+    let baseline_override = [(ENV_VARIABLE, ENV_BEFORE)];
+    let mutated_override = [(ENV_VARIABLE, ENV_AFTER)];
+    let hidden_baseline = run_cargo_with_env(
+        &cargo, &rustc_binary, &cargo_home, &run_root, &hidden_dir,
+        "hidden_baseline", "env-hidden", &baseline_override,
+    )?;
+    let declared_baseline = run_cargo_with_env(
+        &cargo, &rustc_binary, &cargo_home, &run_root, &declared_dir,
+        "declared_baseline", "env-declared", &baseline_override,
+    )?;
+    if hidden_baseline.stdout_value != ENV_BEFORE || declared_baseline.stdout_value != ENV_BEFORE {
+        bail!("environment fixture baseline output did not match initial invocation value");
+    }
+    let hidden_warm = run_cargo_with_env(
+        &cargo, &rustc_binary, &cargo_home, &run_root, &hidden_dir,
+        "hidden_warm_after_environment_change", "env-hidden", &mutated_override,
+    )?;
+    let declared_warm = run_cargo_with_env(
+        &cargo, &rustc_binary, &cargo_home, &run_root, &declared_dir,
+        "declared_warm_after_environment_change", "env-declared", &mutated_override,
+    )?;
+    let fresh_root = run_root.join("hidden-fresh-run");
+    fs::create_dir(&fresh_root)?;
+    let hidden_fresh = run_cargo_with_env(
+        &cargo, &rustc_binary, &cargo_home, &fresh_root, &hidden_dir,
+        "hidden_fresh_after_environment_change", "env-hidden", &mutated_override,
+    )?;
+
+    let hidden_cached_stale_output = hidden_warm.stdout_value == ENV_BEFORE;
+    let declared_control_detected_change = declared_warm.stdout_value == ENV_AFTER;
+    let fresh_replay_detected_change = hidden_fresh.stdout_value == ENV_AFTER;
+    if !hidden_cached_stale_output { bail!("hidden environment input did not reproduce stale warm Cargo output"); }
+    if !declared_control_detected_change { bail!("declared rerun-if-env-changed positive control did not detect the new invocation value"); }
+    if !fresh_replay_detected_change { bail!("fresh Cargo replay did not expose mutated environment value"); }
+
+    let evidence = EnvironmentEvidence {
+        format_version: 1,
+        suite_id: "basalt-cargo-environment-fixture-evidence-v1",
+        run_id: run_id.clone(),
+        case_id: "cargo-build-script-env-input",
+        resource_id: "env:BASALT_BUILD_INPUT",
+        environment_variable_name: ENV_VARIABLE,
+        before_value_commitment: sha256(ENV_BEFORE.as_bytes()),
+        after_value_commitment: sha256(ENV_AFTER.as_bytes()),
+        catalog_digest: sha256(&catalog_bytes),
+        fixture_digest: fixture_digest()?,
+        cargo_binary_digest,
+        cargo_version,
+        rustc_launcher_digest,
+        rustc_sysroot_binary_digest: rustc_binary_digest,
+        rustc_version,
+        rustc_sysroot,
+        path_environment_digest,
+        cargo_home_relative_path: "cargo-home",
+        cargo_configuration_policy: "isolated_empty_cargo_home_no_ancestor_dot_cargo_config",
+        ancestor_cargo_config_absent: true,
+        workspace_relative_path: "workspace",
+        git_baseline_commit,
+        hidden_build_script_digest: fixture_file_digest("env-hidden/build.rs")?,
+        hidden_rerun_env_variables: vec![],
+        declared_build_script_digest: fixture_file_digest("env-declared/build.rs")?,
+        declared_rerun_env_variables: vec![ENV_VARIABLE],
+        hidden_baseline: redact_execution(hidden_baseline),
+        hidden_warm_after_environment_change: redact_execution(hidden_warm),
+        hidden_fresh_after_environment_change: redact_execution(hidden_fresh),
+        declared_baseline: redact_execution(declared_baseline),
+        declared_warm_after_environment_change: redact_execution(declared_warm),
+        hidden_cached_stale_output,
+        declared_control_detected_change,
+        fresh_replay_detected_change,
+        ground_truth_basis: "checked-in build-script source plus controlled Cargo invocation environment mutation and declared rerun-if-env-changed positive control",
+        raw_environment_values_stored: false,
+        independent_kernel_observation: false,
+        qualification_eligible: false,
+    };
+    let evidence_path = run_root.join("cargo-environment-fixture-evidence.v1.json");
+    write_new(&evidence_path, &serde_json::to_vec_pretty(&evidence)?)?;
+
+    Ok(EnvironmentFixtureRunReport {
+        report_version: 1,
+        run_id,
+        case_id: "cargo-build-script-env-input",
+        evidence_path: evidence_path.display().to_string(),
+        hidden_cached_stale_output,
+        declared_control_detected_change,
+        fresh_replay_detected_change,
+        qualification_eligible: false,
+    })
+}
+
+fn validate_environment_catalog_case(catalog: &Value) -> anyhow::Result<()> {
+    let cases = catalog.get("cases").and_then(Value::as_array).context("catalog.cases must be an array")?;
+    let case = cases.iter().find(|case| case.get("case_id").and_then(Value::as_str)==Some("cargo-build-script-env-input"))
+        .context("catalog does not contain cargo-build-script-env-input")?;
+    if case.get("expected_disposition").and_then(Value::as_str)!=Some("capture_dependency")
+        || case.get("ground_truth_resource_id").and_then(Value::as_str)!=Some("env:BASALT_BUILD_INPUT")
+        || case.get("channel").and_then(Value::as_str)!=Some("environment")
+        || case.get("mutation_kind").and_then(Value::as_str)!=Some("env_value") {
+        bail!("Cargo environment challenge differs from runner fixture contract");
+    }
+    Ok(())
+}
 
 #[derive(Debug, Serialize)]
 pub struct MtimeEvidenceVerifyReport {

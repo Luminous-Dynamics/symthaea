@@ -80,6 +80,13 @@ enum Commands {
         #[arg(long)]
         catalog: PathBuf,
     },
+    /// Run a Cargo build-script environment-variable invalidation challenge.
+    BasaltCargoEnvironmentFixtureRun {
+        #[arg(long)]
+        catalog: PathBuf,
+        #[arg(long)]
+        out_dir: PathBuf,
+    },
     /// Validate a BASALT versioned run record and its cross-record evidence invariants.
     BasaltValidate {
         /// Path to the run-record JSON file.
@@ -192,6 +199,10 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::BasaltCargoMtimeEvidenceVerify { evidence, catalog } => {
             let report = basalt_cargo_mtime_fixture::verify(&evidence, &catalog)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Commands::BasaltCargoEnvironmentFixtureRun { catalog, out_dir } => {
+            let report = basalt_cargo_mtime_fixture::run_environment(&catalog, &out_dir)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
         Commands::BasaltValidate { input, manifest, spec_root } => {

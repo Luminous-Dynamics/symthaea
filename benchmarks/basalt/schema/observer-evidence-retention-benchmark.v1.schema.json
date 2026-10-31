@@ -111,8 +111,8 @@
     },
     "metrics": {
       "type": "array",
-      "minItems": 11,
-      "maxItems": 11,
+      "minItems": 12,
+      "maxItems": 12,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -138,7 +138,8 @@
               "paired_shifted_task_success_delta",
               "semantic_access_retention",
               "undeclared_build_script_stale_replay_detection",
-              "mtime_preserving_build_script_mutation_detection"
+              "mtime_preserving_build_script_mutation_detection",
+              "build_script_environment_mutation_detection"
             ]
           },
           "phase": {
@@ -210,7 +211,7 @@
       "properties": {
         "safety": {
           "type": "array",
-          "minItems": 7,
+          "minItems": 8,
           "uniqueItems": true,
           "items": {
             "enum": [
@@ -220,7 +221,8 @@
               "integrity_loss_fail_closed",
               "semantic_access_retention",
               "undeclared_build_script_stale_replay_detection",
-              "mtime_preserving_build_script_mutation_detection"
+              "mtime_preserving_build_script_mutation_detection",
+              "build_script_environment_mutation_detection"
             ]
           }
         },
@@ -318,7 +320,7 @@
       "properties": {
         "required_strata": {
           "type": "array",
-          "minItems": 8,
+          "minItems": 9,
           "uniqueItems": true,
           "items": {
             "type": "string"
@@ -683,6 +685,25 @@
             "properties": {
               "metric_id": {
                 "const": "mtime_preserving_build_script_mutation_detection"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "build_script_environment_mutation_detection"
               }
             },
             "required": [
