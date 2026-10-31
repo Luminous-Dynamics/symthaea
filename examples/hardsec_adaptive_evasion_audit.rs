@@ -118,7 +118,6 @@ fn parse_predictions(value: &Value) -> Result<(String, String, String, Vec<Predi
     let model_id = str_field(value, "model_id", "predictions")?.to_owned();
     digest_field(value, "model_sha256", "predictions")?;
     digest_field(value, "threshold_profile_sha256", "predictions")?;
-    let threshold_sha = str_field(value, "threshold_profile_sha256", "predictions")?.to_owned();
     let values = value.get("cases").and_then(Value::as_array)
         .ok_or_else(|| "predictions.cases must be an array".to_owned())?;
     if values.is_empty() {
@@ -381,6 +380,9 @@ fn audit_values(
     let mut benign_alerts = 0usize;
     let mut benign_clears = 0usize;
     let mut benign_abstentions = 0usize;
+    let mut valid_benign_cases = 0usize;
+    let mut valid_benign_clears = 0usize;
+    let mut invalid_benign_cases = 0usize;
     let mut all_alerts = 0usize;
     let mut all_abstentions = 0usize;
     let mut invalid_sensor_cases = 0usize;
@@ -453,6 +455,11 @@ fn audit_values(
             },
             "benign" => {
                 benign_cases += 1;
+                if invalid_sensor {
+                    invalid_benign_cases += 1;
+                } else {
+                    valid_benign_cases += 1;
+                }
                 let counts = benign_by_program.entry(meta.program_group_id.clone()).or_insert((0,0,0));
                 counts.0 += 1;
                 match prediction.response.as_str() {
@@ -463,6 +470,9 @@ fn audit_values(
                     "clear" => {
                         benign_clears += 1;
                         counts.2 += 1;
+                        if !invalid_sensor {
+                            valid_benign_clears += 1;
+                        }
                     }
                     "abstain" | "sensor_invalid" => benign_abstentions += 1,
                     _ => unreachable!(),
@@ -545,8 +555,8 @@ fn audit_values(
     let benign_false_alert_rate = if benign_cases == 0 { None } else {
         Some(benign_alerts as f64 / benign_cases as f64)
     };
-    let benign_true_negative_rate = if benign_cases == 0 { None } else {
-        Some(benign_clears as f64 / benign_cases as f64)
+    let benign_true_negative_rate = if valid_benign_cases == 0 { None } else {
+        Some(valid_benign_clears as f64 / valid_benign_cases as f64)
     };
     let conservative_alert_precision = if all_alerts == 0 { None } else {
         Some(successful_attack_alerts as f64 / all_alerts as f64)
@@ -638,7 +648,9 @@ fn audit_values(
             "benign_clear_verdicts": benign_clears,
             "benign_abstentions": benign_abstentions,
             "benign_false_alert_rate": benign_false_alert_rate,
-            "benign_true_negative_rate": benign_true_negative_rate,
+            "benign_true_negative_rate_on_valid_sensor_cases": benign_true_negative_rate,
+            "benign_valid_sensor_cases": valid_benign_cases,
+            "benign_invalid_sensor_cases": invalid_benign_cases,
             "conservative_effect_confirmed_alert_precision": conservative_alert_precision,
             "all_alerts": all_alerts,
             "abstention_rate": abstention_rate
