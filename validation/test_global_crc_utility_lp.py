@@ -35,7 +35,7 @@ class GlobalCRCUtilityLPTests(unittest.TestCase):
         _,w50=multinomial_state_weights(2,[.5,.5])
         result=self.engine.solve_reference_weighted(w50)
         self.assertAlmostEqual(result["expected_utility"],.65625,places=9)
-        self.assertEqual(result["actions"],self.equal_actions.tolist())
+        self.assertTrue(np.allclose(result["actions"],self.equal_actions,atol=1e-9,rtol=0.0))
         _,w90=multinomial_state_weights(2,[.9,.1])
         result90=self.engine.solve_reference_weighted(w90)
         equal90=float(np.dot(w90,1-self.equal_actions))
