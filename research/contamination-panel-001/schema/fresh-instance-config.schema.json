@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/fresh-instance-config-v1.json",
+  "title": "Fresh inference-time challenge generator config v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "batch_id",
+    "benchmark_id",
+    "benchmark_version",
+    "task_family",
+    "requested_item_count",
+    "matrix_coefficient_min",
+    "matrix_coefficient_max",
+    "solution_component_min",
+    "solution_component_max",
+    "minimum_absolute_determinant",
+    "model_checkpoint_sha256",
+    "checkpoint_freeze_receipt_sha256",
+    "checkpoint_frozen_at_utc",
+    "challenge_generated_at_utc",
+    "generator_source_sha256",
+    "generator_binary_sha256",
+    "runtime_image_sha256",
+    "generator_config_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.fresh_instance_config.v1"
+    },
+    "batch_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_family": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requested_item_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000
+    },
+    "matrix_coefficient_min": {
+      "type": "integer"
+    },
+    "matrix_coefficient_max": {
+      "type": "integer"
+    },
+    "solution_component_min": {
+      "type": "integer"
+    },
+    "solution_component_max": {
+      "type": "integer"
+    },
+    "minimum_absolute_determinant": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "model_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "checkpoint_freeze_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "checkpoint_frozen_at_utc": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "challenge_generated_at_utc": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "generator_source_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "generator_binary_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "runtime_image_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "generator_config_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
