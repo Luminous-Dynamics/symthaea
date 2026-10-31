@@ -48,6 +48,7 @@ The competitive comparison is now not simply textual CoT versus recurrent HDC.
 - **LOTUS (June 2026):** trains looped latent blocks with parallel gold CoT-step-token supervision. The authors report reaching explicit-CoT performance at 3B in tested settings and 2.5–6.9× lower thought-phase latency. The important lesson is that latent recurrence needs a task-relevant learning signal.
 - **Google's Latent Reasoning with Supervised Thinking States (2026):** adds a recurrent pathway trained through teacher-forced supervised thinking states, avoiding a BPTT requirement in the described method. This is especially relevant to a Broca training path whose current CPU/GPU update rules do not provide temporal BPTT; it is a candidate comparator, not a ready-made drop-in for HDC/CfC.
 - **Think-at-Hard (ICML 2026):** identifies overthinking in looped transformers and learns to selectively allocate latent iterations. The paper reports 3.8–4.4 percentage-point gains over always-iterate baselines while skipping iterations for 93% of tokens in its evaluated settings. This argues for measuring the value of a particular reasoning operation, not assuming that deeper recurrence is always beneficial.
+- **TEMPO (EMNLP 2026):** measures temporal completeness as well as multi-hop retrieval. It contains 1,730 complex queries across 13 domains and 3,976 decomposed steps, with Temporal Coverage@k / Temporal Precision@k; the reported best system reaches 32.0 NDCG@10 and 71.4% Temporal Coverage@10. POAR should complement this suite rather than replace it: https://aclanthology.org/2026.emnlp-main.291/
 - **LongCoT (ICML 2026):** uses 2,500 expert-designed problems with dependency graphs spanning tens to hundreds of thousands of reasoning tokens. It directly stresses dependency preservation and recovery.
 - **GRACE (EMNLP 2026):** provides step-level faithfulness labels separating inference mistakes from grounding mistakes.
 
@@ -179,7 +180,7 @@ Never promote an answer just because the budget expired.
 
 POAR measures whether proof-aware scheduling achieves better correctness/resource trade-offs than generic adaptive reasoning. It is a custom benchmark, not a substitute for LongCoT, GRACE, or official memory benchmarks.
 
-The research crate now includes a public deterministic POAR-v1 conformance runner with 16 fixtures. Fifteen fixtures assert routing/stopping choices for synthetic obligation states; one exercises a receipt lifecycle (valid promotion, later revocation, stale replay rejection). Fixture names describe the decision pattern, not a full simulation of bitemporal storage, proof-graph cascade, source-independence analysis, or long-dependency reasoning. This is a contract smoke suite, not an evaluation of a learned model, not a hidden-label benchmark, and not an independent proof verifier. The confirmatory benchmark still requires separate hidden source-truth labels, held-out source/rule families, independently implemented evaluators, and matched baselines.
+The research crate now includes a public deterministic POAR-v1 conformance runner with 16 scheduler/receipt fixtures. In addition, research/pod-meta-lab/src/graph.rs adds an AND/OR proof-and-evidence graph suite and a separate recursive oracle. The planner-facing records expose evidence assertions, source families, independence groups, valid-time / known-time intervals, scope, authority, integrity, and lifecycle; the evaluator's source-truth labels remain private to GraphSuite. The initial generator has fixed templates (not stochastic natural-language generation), split-scoped source families, a late-correction pair, correlated-source echo, transitive retraction mutation, scope/authority mismatches, contested evidence, cycles, and future-known leakage. The oracle returns per-case metrics rather than a composite score. These are synthetic conformance fixtures, not a trained-model benchmark; a confirmatory evaluation still needs an independently deployed evaluator, access-controlled oracle labels, held-out source/rule families, mutation tests, and matched model baselines.
 
 ### Deterministic task families
 
@@ -233,6 +234,10 @@ Report independently:
 - independent derivation acceptance;
 - evidence support precision and provenance/authorization correctness;
 - dependency retraction recall and unaffected-claim stability;
+- source-family generalization and split leakage checks;
+- AND/OR proof-path correctness, cycle rejection, and witness independence-group count;
+- temporal coverage/precision across valid-time and known-time windows, including future-known leakage;
+- scope, authority, source-integrity, revocation, and citation-completeness violations;
 - stale-receipt replay rejection and transactional all-or-nothing behavior for mixed-currentness multi-obligation receipts;
 - contradiction detection and resolution/abstention quality;
 - semantic-progress efficiency (verified obligations discharged per resource unit);
@@ -323,7 +328,7 @@ The distinctive hypothesis is **proof-carrying adaptive computation**: latent dy
 
 1. Preserve the existing COG-META prerequisites: finish/qualify #5469 inventory before #5470 chooses type ownership; do not bypass the dependency chain with speculative public types.
 2. Implement a **research-only obligation adapter** from existing proof/query outputs to the existing shadow-scheduler input. Keep it behind a feature/test boundary; it cannot change production routing.
-3. Keep the public POAR-v1 runner as a deterministic contract smoke suite; separately build the synthetic data generator and independent oracle with mutation controls and hidden-label isolation before model comparisons.
+3. Keep the public POAR-v1 runner as a deterministic contract smoke suite; use the new AND/OR graph generator and private oracle as a first synthetic baseline, then harden it with graph-template mutation tests, source-family holdouts, and an evaluator process boundary before any confirmatory model comparison.
 4. Add proof-directed operation routing in a standalone evaluation harness: obligation -> eligible operation set -> receipt -> proof delta.
 5. Compare P3 generic COG-META against P4 fixed proof routing before fitting any value predictor.
 6. Only then add P5 prospective VOC calibration using #5476, with prediction-before-outcome binding and explicit missing-counterfactual states.
