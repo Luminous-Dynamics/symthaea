@@ -261,3 +261,24 @@ This specification is not evidence that any optimizer has improved or that the i
 - PlatEMO v4.16 release notes: https://github.com/BIMK/PlatEMO/releases/tag/v4.16
 - CodeEvolve, Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.1345/
 - Empirical attainment functions: https://eden.dei.uc.pt/~cmfonsec/fonseca-emo2011-reprint.pdf
+
+
+## 13. Implementation status — first shared Rust tranche
+
+The optimizer-agnostic sequential history/receipt foundation has now been committed:
+
+- \`crates/domains/symthaea-architecture-engineering/src/pareto_anytime.rs\`
+- exported from the architecture-engineering crate;
+- hash-chained header and action events;
+- candidate evaluation, failed attempt, verifier promotion/rejection, and auxiliary actions;
+- candidate identity binds decision digests and prevents alias IDs for identical decision bytes;
+- frozen algorithm/evaluator/verifier builds, execution environment, target plan, cost model, and required meters;
+- archive-prefix HV/IGD+/epsilon analysis with evidence-level filters;
+- explicit first-crossing and not-reached-by-budget outcomes;
+- replay-reconstructed, digest-bound run receipts.
+
+Implementation notes and claim limits: \`AR5B5_ANYTIME_IMPLEMENTATION_V0_1.md\`.
+
+Optimizer instrumentation is deliberately not implied by this module: NSGA-II, MOEA/D-DE, and SMS-EMOA still need to emit the shared trace. That work is tracked in [Issue #9606](https://github.com/Luminous-Dynamics/symthaea/issues/9606).
+
+**Validation boundary:** the code and tests are committed but have not been compiled, formatted, linted, or executed in this environment. The module records verifier-level assertions and receipt digests; it does not yet retrieve/verify candidate artifact bytes or authenticate verifier signatures. Therefore, no independently verified held-out discovery claim is yet supported.
