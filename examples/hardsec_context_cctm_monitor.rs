@@ -55,10 +55,21 @@ struct Plan {
     stream_id: String,
     evaluation_group_id: String,
     scoring_artifact_sha256: String,
+    context_assignment_policy_id: String,
+    context_assignment_artifact_sha256: String,
     alpha_budget: f64,
     delta_budget: f64,
     smoothing_k: f64,
     contexts: BTreeMap<String, ContextState>,
+}
+
+#[derive(Debug, Clone)]
+struct AssignmentDecision {
+    sequence_index: usize,
+    window_id: String,
+    decision_status: String,
+    decision_reason: String,
+    selected_context_id: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -75,6 +86,7 @@ struct StreamRecord {
 struct Args {
     plan: PathBuf,
     stream: PathBuf,
+    context_receipt: PathBuf,
     receipt: PathBuf,
 }
 
@@ -149,6 +161,12 @@ fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> 
     }
     let scoring_artifact_sha256 = string_field(value, "scoring_artifact_sha256", "plan")?.to_owned();
     valid_sha(&scoring_artifact_sha256, "plan.scoring_artifact_sha256")?;
+    let context_assignment_policy_id = string_field(value, "context_assignment_policy_id", "plan")?.to_owned();
+    let context_assignment_artifact_sha256 = string_field(value, "context_assignment_artifact_sha256", "plan")?.to_owned();
+    valid_sha(&context_assignment_artifact_sha256, "plan.context_assignment_artifact_sha256")?;
+    if scoring_artifact_sha256 == context_assignment_artifact_sha256 {
+        return Err("anomaly scoring and context assignment artifacts must be separately pinned".to_owned());
+    }
     if string_field(value, "anomaly_score_direction", "plan")? != "higher_is_more_anomalous" {
         return Err("anomaly_score_direction must be higher_is_more_anomalous".to_owned());
     }
@@ -260,6 +278,8 @@ fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> 
         stream_id,
         evaluation_group_id: evaluation_group_id.to_owned(),
         scoring_artifact_sha256,
+        context_assignment_policy_id,
+        context_assignment_artifact_sha256,
         alpha_budget,
         delta_budget,
         smoothing_k,
@@ -282,6 +302,12 @@ fn parse_stream(value: &Value, plan: &Plan) -> Result<Vec<StreamRecord>, String>
     }
     if string_field(value, "scoring_artifact_sha256", "stream")? != plan.scoring_artifact_sha256 {
         return Err("stream scoring_artifact_sha256 does not match the plan".to_owned());
+    }
+    if string_field(value, "context_assignment_policy_id", "stream")? != plan.context_assignment_policy_id {
+        return Err("stream context_assignment_policy_id does not match the plan".to_owned());
+    }
+    if string_field(value, "context_assignment_artifact_sha256", "stream")? != plan.context_assignment_artifact_sha256 {
+        return Err("stream context_assignment_artifact_sha256 does not match the plan".to_owned());
     }
 
     let records = value.get("records").and_then(Value::as_array)
@@ -315,6 +341,100 @@ fn parse_stream(value: &Value, plan: &Plan) -> Result<Vec<StreamRecord>, String>
             anomaly_score,
             sensor_state,
             pmu_qualification_result,
+        });
+    }
+    Ok(output)
+}
+
+fn parse_context_assignment_receipt(
+    value: &Value,
+    plan: &Plan,
+    records: &[StreamRecord],
+) -> Result<Vec<AssignmentDecision>, String> {
+    if string_field(value, "schema_version", "context_receipt")? != "hardsec-context-assignment-receipt-v1" {
+        return Err("unsupported context assignment receipt schema_version".to_owned());
+    }
+    if string_field(value, "result", "context_receipt")? != "audited" {
+        return Err("context assignment receipt result must be audited".to_owned());
+    }
+    if string_field(value, "claim_scope", "context_receipt")?
+        != "declared_context_assignment_gate_and_heldout_label_evaluation_only" {
+        return Err("unexpected context assignment receipt claim_scope".to_owned());
+    }
+    for (field, expected) in [
+        ("policy_id", plan.context_assignment_policy_id.as_str()),
+        ("stream_id", plan.stream_id.as_str()),
+        ("evaluation_group_id", plan.evaluation_group_id.as_str()),
+        ("evidence_domain", plan.evidence_domain.as_str()),
+        ("assignment_artifact_sha256", plan.context_assignment_artifact_sha256.as_str()),
+        ("anomaly_score_artifact_sha256", plan.scoring_artifact_sha256.as_str()),
+    ] {
+        if field == "anomaly_score_artifact_sha256" {
+            // Older/compatible receipts may omit this optional cross-link;
+            // if present it must match the anomaly scorer pinned in the plan.
+            if value.get(field).and_then(Value::as_str).is_some_and(|actual| actual != expected) {
+                return Err("context assignment receipt anomaly_score_artifact_sha256 mismatch".to_owned());
+            }
+        } else if string_field(value, field, "context_receipt")? != expected {
+            return Err(format!("context assignment receipt {field} does not match CCTM plan/stream"));
+        }
+    }
+    let inputs = value.get("inputs").ok_or("context assignment receipt inputs missing")?;
+    for field in ["policy_sha256", "assignments_sha256", "truth_oracle_sha256"] {
+        let digest = string_field(inputs, field, "context_receipt.inputs")?;
+        valid_sha(digest, &format!("context_receipt.inputs.{field}"))?;
+    }
+    let mapping = value.get("runtime_mapping").ok_or("context assignment receipt runtime_mapping missing")?;
+    if string_field(mapping, "mapping_schema_version", "context_receipt.runtime_mapping")?
+        != "hardsec-context-assignment-runtime-map-v1" {
+        return Err("unsupported context assignment runtime map schema".to_owned());
+    }
+    if mapping.get("contains_truth_labels").and_then(Value::as_bool) != Some(false) {
+        return Err("runtime context assignment mapping must not contain truth labels".to_owned());
+    }
+    let assignments = mapping.get("assignments").and_then(Value::as_array)
+        .ok_or("context assignment receipt runtime_mapping.assignments must be an array")?;
+    if assignments.len() != records.len() {
+        return Err("context assignment receipt must map every CCTM stream record exactly once".to_owned());
+    }
+
+    let mut output = Vec::with_capacity(assignments.len());
+    for (index, (assignment, stream_record)) in assignments.iter().zip(records.iter()).enumerate() {
+        let context = format!("context_receipt.runtime_mapping.assignments[{index}]");
+        let sequence_index = usize_field(assignment, "sequence_index", &context)?;
+        let window_id = string_field(assignment, "window_id", &context)?.to_owned();
+        if sequence_index != stream_record.sequence_index || window_id != stream_record.window_id {
+            return Err(format!("{context} sequence/window identity does not match the CCTM stream"));
+        }
+        let decision_status = string_field(assignment, "decision_status", &context)?.to_owned();
+        if !matches!(decision_status.as_str(), "accepted" | "abstained") {
+            return Err(format!("{context}.decision_status must be accepted or abstained"));
+        }
+        let decision_reason = string_field(assignment, "decision_reason", &context)?.to_owned();
+        if !matches!(decision_reason.as_str(), "accepted" | "invalid_sensor" | "unknown_context" | "ambiguous_assignment") {
+            return Err(format!("{context}.decision_reason is unsupported"));
+        }
+        let selected_context_id = match assignment.get("selected_context_id") {
+            Some(Value::String(value)) => Some(value.clone()),
+            Some(Value::Null) => None,
+            _ => return Err(format!("{context}.selected_context_id must be a string or null")),
+        };
+        if decision_status == "accepted" {
+            if decision_reason != "accepted" || selected_context_id.as_deref() != Some(stream_record.context_id.as_str()) {
+                return Err(format!("{context} accepted context does not match the CCTM stream's context"));
+            }
+            if !plan.contexts.contains_key(stream_record.context_id.as_str()) {
+                return Err(format!("{context} accepted an undeclared CCTM context"));
+            }
+        } else if selected_context_id.is_some() {
+            return Err(format!("{context} abstained assignment must not select a context"));
+        }
+        output.push(AssignmentDecision {
+            sequence_index,
+            window_id,
+            decision_status,
+            decision_reason,
+            selected_context_id,
         });
     }
     Ok(output)
@@ -369,12 +489,19 @@ fn ons_next_eta(eta: f64, accumulator: f64, g_prime: f64, beta: f64) -> Result<(
     Ok((next_eta, next_accumulator))
 }
 
-fn abstention_reason(record: &StreamRecord, plan: &Plan) -> Option<&'static str> {
+fn abstention_reason(
+    record: &StreamRecord,
+    assignment: &AssignmentDecision,
+    plan: &Plan,
+) -> Option<&'static str> {
     if record.sensor_state != "valid" {
         return Some("invalid_sensor_state");
     }
     if record.pmu_qualification_result != QUALIFIED_PMU {
         return Some("pmu_acquisition_not_qualified");
+    }
+    if assignment.decision_status != "accepted" {
+        return Some("context_assignment_not_accepted");
     }
     if !plan.contexts.contains_key(&record.context_id) {
         return Some("unseen_workload_context");
@@ -382,23 +509,33 @@ fn abstention_reason(record: &StreamRecord, plan: &Plan) -> Option<&'static str>
     None
 }
 
-fn audit_values(plan_value: &Value, stream_value: &Value, plan_bytes: &[u8], stream_bytes: &[u8]) -> Result<Value, String> {
+fn audit_values_with_context_receipt(
+    plan_value: &Value,
+    stream_value: &Value,
+    context_receipt_value: &Value,
+    plan_bytes: &[u8],
+    stream_bytes: &[u8],
+    context_receipt_bytes: &[u8],
+) -> Result<Value, String> {
     let evaluation_group_id = string_field(stream_value, "evaluation_group_id", "stream")?;
     let mut plan = parse_plan(plan_value, evaluation_group_id)?;
     let records = parse_stream(stream_value, &plan)?;
+    let assignment_decisions = parse_context_assignment_receipt(context_receipt_value, &plan, &records)?;
     let mut first_alarm_sequence_index: Option<usize> = None;
     let mut first_alarm_context_id: Option<String> = None;
     let mut output_records = Vec::with_capacity(records.len());
     let mut abstention_counts: BTreeMap<String, usize> = BTreeMap::new();
 
-    for record in &records {
-        if let Some(reason) = abstention_reason(record, &plan) {
+    for (record, assignment) in records.iter().zip(assignment_decisions.iter()) {
+        if let Some(reason) = abstention_reason(record, assignment, &plan) {
             *abstention_counts.entry(reason.to_owned()).or_default() += 1;
             let context_log_wealth = plan.contexts.get(&record.context_id).map(|state| state.log_wealth);
             output_records.push(json!({
                 "sequence_index":record.sequence_index,
                 "window_id":record.window_id,
                 "context_id":record.context_id,
+                "context_assignment_status":assignment.decision_status,
+                "context_assignment_reason":assignment.decision_reason,
                 "action":if first_alarm_sequence_index.is_some() {"alert_latched_observation_abstained"} else {"abstain"},
                 "abstention_reason":reason,
                 "ecdf_value":null,
@@ -443,6 +580,8 @@ fn audit_values(plan_value: &Value, stream_value: &Value, plan_bytes: &[u8], str
             "sequence_index":record.sequence_index,
             "window_id":record.window_id,
             "context_id":record.context_id,
+            "context_assignment_status":assignment.decision_status,
+            "context_assignment_reason":assignment.decision_reason,
             "reference_id":state.reference_id,
             "ecdf_value":p_value,
             "epsilon_dkw":state.epsilon,
@@ -492,7 +631,20 @@ fn audit_values(plan_value: &Value, stream_value: &Value, plan_bytes: &[u8], str
         "evidence_domain":plan.evidence_domain,
         "evaluation_group_id":plan.evaluation_group_id,
         "scoring_artifact_sha256":plan.scoring_artifact_sha256,
-        "inputs":{"plan_sha256":sha256(plan_bytes),"stream_sha256":sha256(stream_bytes)},
+        "context_assignment_policy_id":plan.context_assignment_policy_id,
+        "context_assignment_artifact_sha256":plan.context_assignment_artifact_sha256,
+        "context_assignment":{
+            "receipt_sha256":sha256(context_receipt_bytes),
+            "accepted_count":assignment_decisions.iter().filter(|a| a.decision_status=="accepted").count(),
+            "abstained_count":assignment_decisions.iter().filter(|a| a.decision_status=="abstained").count(),
+            "truth_labels_in_runtime_mapping":false,
+            "exogeneity_status":"not_established_from_input_receipts"
+        },
+        "inputs":{
+            "plan_sha256":sha256(plan_bytes),
+            "stream_sha256":sha256(stream_bytes),
+            "context_assignment_receipt_sha256":sha256(context_receipt_bytes)
+        },
         "reference_policy":{
             "update_policy":"immutable_no_test_time_updates",
             "test_time_reference_updates":0,
@@ -543,6 +695,18 @@ fn audit_values(plan_value: &Value, stream_value: &Value, plan_bytes: &[u8], str
     }))
 }
 
+fn audit_values(
+    plan_value: &Value,
+    stream_value: &Value,
+    plan_bytes: &[u8],
+    stream_bytes: &[u8],
+) -> Result<Value, String> {
+    let bytes = include_bytes!("../tests/fixtures/hardsec/context-assignment-v1/runtime-receipt.json");
+    let receipt: Value = serde_json::from_slice(bytes)
+        .map_err(|e| format!("invalid bundled context receipt fixture: {e}"))?;
+    audit_values_with_context_receipt(plan_value, stream_value, &receipt, plan_bytes, stream_bytes, bytes)
+}
+
 fn read_input(path: &Path, label: &str) -> Result<(Vec<u8>, Value), String> {
     let metadata = fs::symlink_metadata(path)
         .map_err(|e| format!("cannot stat {label} {}: {e}", path.display()))?;
@@ -557,12 +721,14 @@ fn read_input(path: &Path, label: &str) -> Result<(Vec<u8>, Value), String> {
 fn parse_args() -> Result<Args, String> {
     let mut plan = None;
     let mut stream = None;
+    let mut context_receipt = None;
     let mut receipt = None;
     let mut args = env::args().skip(1);
     while let Some(flag) = args.next() {
         let target = match flag.as_str() {
             "--plan" => &mut plan,
             "--stream" => &mut stream,
+            "--context-receipt" => &mut context_receipt,
             "--receipt" => &mut receipt,
             _ => return Err(format!("unknown argument {flag}")),
         };
@@ -574,6 +740,7 @@ fn parse_args() -> Result<Args, String> {
     Ok(Args {
         plan:plan.ok_or("missing required argument --plan")?,
         stream:stream.ok_or("missing required argument --stream")?,
+        context_receipt:context_receipt.ok_or("missing required argument --context-receipt")?,
         receipt:receipt.ok_or("missing required argument --receipt")?,
     })
 }
@@ -599,8 +766,14 @@ fn run() -> Result<(), String> {
     let args = parse_args()?;
     let (plan_bytes, plan) = read_input(&args.plan, "plan")?;
     let (stream_bytes, stream) = read_input(&args.stream, "stream")?;
-    validate_receipt_location(&args.receipt, &[args.plan.as_path(), args.stream.as_path()])?;
-    let receipt = audit_values(&plan, &stream, &plan_bytes, &stream_bytes)?;
+    let (context_receipt_bytes, context_receipt) = read_input(&args.context_receipt, "context assignment receipt")?;
+    validate_receipt_location(&args.receipt, &[
+        args.plan.as_path(), args.stream.as_path(), args.context_receipt.as_path()
+    ])?;
+    let receipt = audit_values_with_context_receipt(
+        &plan, &stream, &context_receipt,
+        &plan_bytes, &stream_bytes, &context_receipt_bytes
+    )?;
     let encoded = serde_json::to_vec_pretty(&receipt).map_err(|e| format!("cannot encode receipt: {e}"))?;
     let mut file = OpenOptions::new().write(true).create_new(true).open(&args.receipt)
         .map_err(|e| format!("cannot create receipt without overwrite: {e}"))?;
@@ -826,6 +999,41 @@ mod tests {
 
         let fraction = alarm_paths as f64 / 10_000.0;
         assert!(fraction > 0.75 && fraction < 0.85, "dependent-null grid alarm fraction {fraction}");
+    }
+
+
+    #[test]
+    fn rejects_context_assignment_receipt_with_mismatched_context_mapping() {
+        let (p, mut s, _, _) = fixture();
+        s["records"][0]["context_id"] = json!("memory");
+        let error = audit(&p, &s).unwrap_err();
+        assert!(error.contains("accepted context does not match"));
+    }
+
+    #[test]
+    fn rejects_context_assignment_receipt_with_wrong_policy_artifact() {
+        let (p, s, _, _) = fixture();
+        let bytes = include_bytes!("../tests/fixtures/hardsec/context-assignment-v1/runtime-receipt.json");
+        let mut assignment_receipt: Value = serde_json::from_slice(bytes).unwrap();
+        assignment_receipt["assignment_artifact_sha256"] = json!("e".repeat(64));
+        let pb = encode(&p);
+        let sb = encode(&s);
+        let rb = encode(&assignment_receipt);
+        assert!(audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb)
+            .unwrap_err().contains("assignment_artifact_sha256 does not match"));
+    }
+
+    #[test]
+    fn abstained_context_assignment_never_updates_wealth() {
+        let (p, s, pb, sb) = fixture();
+        let bytes = include_bytes!("../tests/fixtures/hardsec/context-assignment-v1/runtime-receipt.json");
+        let assignment_receipt: Value = serde_json::from_slice(bytes).unwrap();
+        let rb = bytes.to_vec();
+        let r = audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
+        let rows = r["sequential_monitor"]["window_decisions"].as_array().unwrap();
+        assert_eq!(rows[16]["abstention_reason"], "invalid_sensor_state");
+        assert_eq!(rows[17]["abstention_reason"], "context_assignment_not_accepted");
+        assert_eq!(rows[18]["abstention_reason"], "invalid_sensor_state");
     }
 
     #[test]
