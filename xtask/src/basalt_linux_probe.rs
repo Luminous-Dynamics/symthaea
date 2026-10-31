@@ -445,20 +445,52 @@ fn trace_event_evidence() -> Vec<ProbeEvidence> {
         ("sched_process_exit", "process_exit_tracepoint"),
     ];
     events.iter().map(|(event, key)| {
+        let mut inaccessible = false;
+        let mut unclassified_failure = false;
         for base in bases {
             let path = base.join(event).join("id");
-            if let Ok(text) = read_bounded_text(&path) {
-                return ProbeEvidence {
-                    key: (*key).to_string(),
-                    status: EvidenceStatus::Collected,
-                    value: Some(text.trim().to_string()),
-                    content_digest: Some(sha256_tagged(text.as_bytes())),
-                    path: Some(path.display().to_string()),
-                };
+            match read_bounded_text(&path) {
+                Ok(text) => {
+                    return ProbeEvidence {
+                        key: (*key).to_string(),
+                        status: EvidenceStatus::Collected,
+                        value: Some(text.trim().to_string()),
+                        content_digest: Some(sha256_tagged(text.as_bytes())),
+                        path: Some(path.display().to_string()),
+                    };
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+                    inaccessible = true;
+                }
+                Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+                    unclassified_failure = true;
+                }
+                Err(_) => {}
             }
         }
-        missing_evidence(key, event)
+        let status = if inaccessible {
+            EvidenceStatus::Inaccessible
+        } else if unclassified_failure {
+            EvidenceStatus::NotProbed
+        } else {
+            EvidenceStatus::Absent
+        };
+        ProbeEvidence {
+            key: (*key).to_string(),
+            status,
+            value: None,
+            content_digest: None,
+            path: Some(format!("tracefs/{event}/id")),
+        }
     }).collect()
+}
+
+fn read_failure_status(kind: std::io::ErrorKind) -> EvidenceStatus {
+    match kind {
+        std::io::ErrorKind::NotFound => EvidenceStatus::Absent,
+        std::io::ErrorKind::PermissionDenied => EvidenceStatus::Inaccessible,
+        _ => EvidenceStatus::NotProbed,
+    }
 }
 
 fn read_text_evidence(key: &str, path: &Path) -> ProbeEvidence {
@@ -471,11 +503,7 @@ fn read_text_evidence(key: &str, path: &Path) -> ProbeEvidence {
             path: Some(path.display().to_string()),
         },
         Err(error) => {
-            let status = match error.kind() {
-                std::io::ErrorKind::NotFound => EvidenceStatus::Absent,
-                std::io::ErrorKind::PermissionDenied => EvidenceStatus::Inaccessible,
-                _ => EvidenceStatus::NotProbed,
-            };
+            let status = read_failure_status(error.kind());
             ProbeEvidence {
                 key: key.to_string(),
                 status,
@@ -777,6 +805,16 @@ mod tests {
         schema_ids.sort();
         source_ids.sort();
         assert_eq!(schema_ids, source_ids);
+    }
+
+    #[test]
+    fn tracepoint_read_failures_preserve_inaccessible_unknown_and_absent_states() {
+        let permission = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied");
+        let missing = std::io::Error::new(std::io::ErrorKind::NotFound, "missing");
+        let invalid = std::io::Error::new(std::io::ErrorKind::InvalidData, "invalid");
+        assert_eq!(read_failure_status(permission.kind()), EvidenceStatus::Inaccessible);
+        assert_eq!(read_failure_status(missing.kind()), EvidenceStatus::Absent);
+        assert_eq!(read_failure_status(invalid.kind()), EvidenceStatus::NotProbed);
     }
 
     #[test]
