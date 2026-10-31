@@ -12,7 +12,7 @@
 use crate::{
     hash_domain,
     fresh_instance::{
-        ExactLinearSolutionV1, FreshChallengeBundleV1,
+        task_text, ExactLinearSolutionV1, FreshChallengeBundleV1,
         FreshChallengeManifestV1, FreshPublicChallengePacketV1,
         LinearSystemParametersV1, SealedFreshOraclePacketV1,
     },
@@ -304,6 +304,9 @@ fn validate_bundle(
         return Err("public task and sealed oracle item IDs must be unique and identical".to_owned());
     }
     let mut answers = BTreeMap::new();
+    let public_task_by_id: BTreeMap<&str, &str> = public.tasks.iter()
+        .map(|task| (task.item_id.as_str(), task.task_text.as_str()))
+        .collect();
     let mut task_text_digests = BTreeSet::new();
     for task in &public.tasks {
         validate_digest(&task.task_text_sha256, "task_text_sha256")?;
@@ -337,6 +340,15 @@ fn validate_bundle(
         let (b1, b2) = compute_rhs(&entry.parameters, &entry.solution)?;
         if b1 != entry.parameters.b1 || b2 != entry.parameters.b2 {
             return Err(format!("oracle answer does not satisfy item {}", entry.item_id));
+        }
+        let expected_public_task = task_text(&entry.parameters);
+        if public_task_by_id.get(entry.item_id.as_str()).copied()
+            != Some(expected_public_task.as_str())
+        {
+            return Err(format!(
+                "public task text does not correspond to sealed oracle parameters for {}",
+                entry.item_id
+            ));
         }
         answers.insert(entry.item_id.clone(), entry.solution.clone());
     }
@@ -880,6 +892,22 @@ mod tests {
         submission.model_checkpoint_sha256 = digest("another-checkpoint");
         assert!(score_fresh_submission(&bundle, &serde_json::to_vec(&submission).unwrap())
             .unwrap_err().contains("checkpoint/public packet"));
+    }
+
+    #[test]
+    fn scorer_rejects_rehashed_public_task_that_no_longer_matches_oracle_parameters() {
+        let mut bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
+        bundle.public_packet.tasks[0].task_text.push_str(" + 0");
+        bundle.public_packet.tasks[0].task_text_sha256 =
+            hash_domain(b"fresh-task-text.v1", bundle.public_packet.tasks[0].task_text.as_bytes());
+        bundle.public_packet.public_packet_sha256 =
+            public_packet_digest(&bundle.public_packet).unwrap();
+        bundle.manifest.public_packet_sha256 = bundle.public_packet.public_packet_sha256.clone();
+        bundle.manifest.manifest_sha256 = manifest_digest(&bundle.manifest).unwrap();
+        assert!(score_fresh_submission(
+            &bundle,
+            &serde_json::to_vec(&build_submission(&bundle, exact_responses(&bundle))).unwrap()
+        ).unwrap_err().contains("does not correspond to sealed oracle parameters"));
     }
 
     #[test]
