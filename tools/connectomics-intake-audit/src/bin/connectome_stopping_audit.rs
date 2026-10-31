@@ -53,6 +53,9 @@ struct Snapshot {
     graph: GraphSummary,
     query_evidence: QueryEvidence,
     provenance: Provenance,
+    /// Explicit numerator/denominator evidence; never inferred from graph invariants.
+    #[serde(default)]
+    synaptic_completeness: Option<SynapticCompletenessEvidence>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -110,6 +113,32 @@ struct QueryMetric {
     upper: Option<f64>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct SynapticCompletenessEvidence {
+    /// Stable ID for the declared synapse population being measured.
+    population_id: String,
+    /// Digest of the population definition, including spatial and inclusion scope.
+    population_definition_sha256: String,
+    /// Digest of the exact synapse IDs included in the denominator at this snapshot.
+    synapse_population_sha256: String,
+    /// Digest of the exact cells considered fully proofread at this snapshot.
+    fully_proofread_cell_set_sha256: String,
+    /// Denominator: all synapses in the declared synapse population.
+    total_synapse_count: u64,
+    /// Numerator: synapses whose pre- and postsynaptic locations both belong to fully proofread cells.
+    synapses_with_both_partners_in_fully_proofread_cells: u64,
+}
+
+impl SynapticCompletenessEvidence {
+    fn fraction(&self) -> Option<f64> {
+        (self.total_synapse_count > 0).then_some(
+            self.synapses_with_both_partners_in_fully_proofread_cells as f64
+                / self.total_synapse_count as f64
+        )
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 struct Provenance {
@@ -133,6 +162,8 @@ struct AuditReport {
     query_id: Option<String>,
     invariant_tail: BTreeMap<String, MetricStability>,
     query_metric_tail: BTreeMap<String, MetricStability>,
+    /// Separate biological completeness observation; never inferred from graph invariants.
+    synaptic_completeness: SynapticCompletenessTail,
     graph_invariants_stable_in_tail: Option<bool>,
     query_metrics_stable_in_tail: Option<bool>,
     forecast_min_training_snapshots: usize,
@@ -142,6 +173,20 @@ struct AuditReport {
     recommendation: &'static str,
     status: &'static str,
     errors: Vec<String>,
+    scope_note: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+struct SynapticCompletenessTail {
+    status: &'static str,
+    population_id: Option<String>,
+    population_definition_sha256: Option<String>,
+    observed_snapshot_count: usize,
+    tail_window_snapshot_count: usize,
+    latest_total_synapse_count: Option<u64>,
+    latest_fully_proofread_partner_synapse_count: Option<u64>,
+    latest_fraction: Option<f64>,
+    stability: MetricStability,
     scope_note: &'static str,
 }
 
@@ -327,6 +372,25 @@ fn validate_snapshot(snapshot: &Snapshot, position: usize) -> Vec<String> {
             errors.push(format!("{prefix}: query metric {name:?} has invalid name, unit, bounds, or value"));
         }
     }
+    if let Some(completeness) = &snapshot.synaptic_completeness {
+        if completeness.population_id.trim().is_empty() {
+            errors.push(format!("{prefix}: synaptic completeness population_id must be non-empty"));
+        }
+        for (field, digest) in [
+            ("population_definition_sha256", completeness.population_definition_sha256.as_str()),
+            ("synapse_population_sha256", completeness.synapse_population_sha256.as_str()),
+            ("fully_proofread_cell_set_sha256", completeness.fully_proofread_cell_set_sha256.as_str()),
+        ] {
+            if !is_lower_hex(digest, 64) {
+                errors.push(format!("{prefix}: synaptic completeness {field} must be 64 lowercase hexadecimal characters"));
+            }
+        }
+        if completeness.synapses_with_both_partners_in_fully_proofread_cells
+            > completeness.total_synapse_count
+        {
+            errors.push(format!("{prefix}: fully-proofread-partner synapse count exceeds the declared synapse population"));
+        }
+    }
     if let Some(previous_digest) = snapshot.snapshot.previous_graph_sha256.as_deref() {
         if !is_lower_hex(previous_digest, 64) {
             errors.push(format!("{prefix}: previous_graph_sha256 must be 64 lowercase hexadecimal characters"));
@@ -415,6 +479,20 @@ fn validate_series(snapshots: &[Snapshot]) -> Vec<String> {
             || current.provenance.query_evaluation_profile_sha256 != previous.provenance.query_evaluation_profile_sha256
         {
             errors.push(format!("snapshot {:?}: graph/query computation profile changed inside a series", current.snapshot.snapshot_id));
+        }
+        if let (Some(current_completeness), Some(previous_completeness)) = (
+            current.synaptic_completeness.as_ref(),
+            previous.synaptic_completeness.as_ref(),
+        ) {
+            if current_completeness.population_id != previous_completeness.population_id
+                || current_completeness.population_definition_sha256
+                    != previous_completeness.population_definition_sha256
+            {
+                errors.push(format!(
+                    "snapshot {:?}: synaptic completeness population identity/definition changed inside a series",
+                    current.snapshot.snapshot_id
+                ));
+            }
         }
         if current.graph.directed != previous.graph.directed
             || current.graph.invariants.keys().ne(previous.graph.invariants.keys())
@@ -644,6 +722,60 @@ fn walk_forward_forecasts(
     (forecasts, summaries)
 }
 
+fn synaptic_completeness_tail(
+    snapshots: &[Snapshot],
+    tail_window: usize,
+    relative_tolerance: f64,
+    absolute_tolerance: f64,
+) -> SynapticCompletenessTail {
+    let observed = snapshots.iter()
+        .filter_map(|snapshot| snapshot.synaptic_completeness.as_ref())
+        .collect::<Vec<_>>();
+    let latest = snapshots.last().and_then(|snapshot| snapshot.synaptic_completeness.as_ref());
+    let tail_count = snapshots.len().min(tail_window);
+    let tail_records = if tail_count == 0 {
+        &[][..]
+    } else {
+        &snapshots[snapshots.len() - tail_count..]
+    };
+    let tail_values = tail_records.iter()
+        .map(|snapshot| snapshot.synaptic_completeness.as_ref().and_then(SynapticCompletenessEvidence::fraction))
+        .collect::<Vec<_>>();
+    let tail_complete = snapshots.len() >= tail_window
+        && tail_values.len() == tail_window
+        && tail_values.iter().all(Option::is_some);
+    let stability_report = if tail_complete {
+        let values = tail_values.into_iter().flatten().collect::<Vec<_>>();
+        stability(&values, tail_window, relative_tolerance, absolute_tolerance)
+    } else {
+        stability(&[], tail_window, relative_tolerance, absolute_tolerance)
+    };
+    let status = if observed.is_empty() {
+        "NOT_PROVIDED"
+    } else if snapshots.len() < tail_window {
+        "INSUFFICIENT_TAIL_HISTORY"
+    } else if !tail_complete {
+        "INCOMPLETE_TAIL"
+    } else {
+        "AVAILABLE"
+    };
+    SynapticCompletenessTail {
+        status,
+        population_id: latest.map(|value| value.population_id.clone())
+            .or_else(|| observed.first().map(|value| value.population_id.clone())),
+        population_definition_sha256: latest.map(|value| value.population_definition_sha256.clone())
+            .or_else(|| observed.first().map(|value| value.population_definition_sha256.clone())),
+        observed_snapshot_count: observed.len(),
+        tail_window_snapshot_count: tail_count,
+        latest_total_synapse_count: latest.map(|value| value.total_synapse_count),
+        latest_fully_proofread_partner_synapse_count: latest
+            .map(|value| value.synapses_with_both_partners_in_fully_proofread_cells),
+        latest_fraction: latest.and_then(SynapticCompletenessEvidence::fraction),
+        stability: stability_report,
+        scope_note: "Fraction is the declared numerator of synapses whose pre- and postsynaptic locations both belong to fully proofread cells divided by the declared total synapse population. Counts are accepted as independently supplied observations; this tool does not inspect synapse endpoints, validate fully-proofread cell membership, or infer completeness from graph invariants. Missing snapshots or zero denominators make tail stability not estimable.",
+    }
+}
+
 fn build_report(bytes: &[u8], snapshots: &[Snapshot], args: &Args) -> AuditReport {
     let errors = validate_series(snapshots);
     let (walk_forward_forecasts, forecast_summaries) = if errors.is_empty() {
@@ -696,6 +828,12 @@ fn build_report(bytes: &[u8], snapshots: &[Snapshot], args: &Args) -> AuditRepor
         query_metrics_stable_in_tail: aggregate_stability(&query_metric_tail),
         invariant_tail,
         query_metric_tail,
+        synaptic_completeness: synaptic_completeness_tail(
+            snapshots,
+            args.tail_window,
+            args.relative_tolerance,
+            args.absolute_tolerance,
+        ),
         forecast_min_training_snapshots: args.forecast_min_training_snapshots,
         walk_forward_forecast_status: forecast_status,
         walk_forward_forecasts,
