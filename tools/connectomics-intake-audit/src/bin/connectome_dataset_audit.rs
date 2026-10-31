@@ -1095,6 +1095,35 @@ mod tests {
     }
 
     #[test]
+    fn task_specific_paired_cohorts_use_task_appropriate_geometry_and_exact_ids() {
+        let mut rows = valid_dataset();
+        rows[0].row.present_slots.push("em_xy".to_string());
+        rows[0].row.has_em = true;
+        rows[1].row.present_slots.push("em_xz".to_string());
+        rows[1].row.has_em = true;
+
+        let manifest = build_cohort_manifest(&rows, &"a".repeat(40), &"b".repeat(64));
+        let cohorts = &manifest.cohorts;
+        let false_split_geometry = &cohorts["paired_false_split_correction_geometry_only"];
+        let false_split_em = &cohorts["paired_false_split_correction_em_legal_views"];
+        assert_eq!(false_split_geometry.sample_ids, vec![rows[0].row.combined_sample_hash.clone()]);
+        assert_eq!(false_split_geometry.sample_ids, false_split_em.sample_ids);
+
+        let false_merge_geometry = &cohorts["paired_false_merge_identification_geometry_only"];
+        let false_merge_em = &cohorts["paired_false_merge_identification_em_legal_views"];
+        assert_eq!(false_merge_geometry.sample_ids, vec![rows[1].row.combined_sample_hash.clone()]);
+        assert_eq!(false_merge_geometry.sample_ids, false_merge_em.sample_ids);
+
+        let split_mask_geometry = &cohorts["paired_split_mask_generation_geometry_only"];
+        let split_mask_em = &cohorts["paired_split_mask_generation_em_legal_views"];
+        assert_eq!(split_mask_geometry.sample_ids, vec![rows[1].row.combined_sample_hash.clone()]);
+        assert_eq!(split_mask_geometry.sample_ids, split_mask_em.sample_ids);
+
+        assert!(!false_split_geometry.sample_ids.contains(&rows[1].row.combined_sample_hash));
+        assert!(!false_merge_geometry.sample_ids.contains(&rows[0].row.combined_sample_hash));
+    }
+
+    #[test]
     fn cohort_membership_and_set_digests_are_order_stable_but_source_bound() {
         let mut rows = valid_dataset();
         rows[0].row.present_slots.push("em_xy".to_string());
