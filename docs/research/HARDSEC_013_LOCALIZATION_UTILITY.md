@@ -202,8 +202,9 @@ The detector-facing explanation never includes ground-truth labels or oracle ans
 ### 11.1 Rust receipt auditor
 
 The first semantic auditor is implemented at `examples/hardsec_localization_audit.rs` and compiled through an isolated nested workspace at `tools/hardsec-localization-audit-harness`. It:
-- hashes exact explanation, graph and oracle bytes;
-- computes a canonical node/edge-map digest;
+- hashes exact explanation, graph-document and oracle bytes;
+- carries three distinct source identities: the original design/netlist digest (`source_artifact_sha256` declared in the graph manifest), the exact graph-document digest, and a canonical node/edge-map digest;
+- requires explanation and evaluator oracle source digests to match the graph manifest's original design/netlist digest;
 - verifies design and source identity bindings;
 - rejects unknown candidate nodes/edges, candidate edges whose endpoints fall outside their declared region, duplicate region IDs/ranks, duplicate graph IDs and discontinuous retained paths;
 - validates model, explainer and threshold digests, decision score bounds and supported path-coverage states;
@@ -234,7 +235,7 @@ The known-answer fixture labels nodes `g17` and `g18` as insertion-footprint pos
 
 Eighteen focused unit tests are authored for known-answer scoring, source digest mutation, unknown node mutation, candidate-region endpoint mismatch, malformed model digest, out-of-range decision score, unsupported path-coverage state, discontinuous paths, incomplete-oracle completeness claims, causal-claim rejection, duplicate ranks, unknown oracle labels, retained-path mismatch, edge review budgets, unknown path handling, exact complete-path matching, empty path sets and review-curve emission. The dedicated workflow runs rustfmt, the locked Cargo suite and the known-answer CLI receipt assertion.
 
-The JSON schemas describe record shape; the semantic auditor is responsible for cross-record ID/path checks. Neither alone proves the truth or authority of source lineage, labels, equivalence certificates or completeness statements.
+The JSON schemas describe record shape; the semantic auditor is responsible for cross-record ID/path checks. The graph manifest's `source_artifact_sha256` is a caller-declared commitment to the original design/netlist: this auditor does not receive or hash the original netlist bytes, so it checks that explanation/oracle agree with the graph manifest but cannot authenticate that source commitment. The graph-document digest and canonical node/edge-map digest are separate, independently recorded identities. Neither schemas nor receipt prove the authority of labels, equivalence certificates or completeness statements.
 
 ## 12. Implementation sequence
 
