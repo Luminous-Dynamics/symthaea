@@ -1,6 +1,6 @@
 # HDC-LTC Multi-timescale Temporal Competence Benchmark (v0.1)
 
-**Status:** preregistered protocol; not implemented or executed  
+**Status:** preregistered protocol with nine prototype Rust task generators; benchmark not built or executed  
 **Tracking:** NEURO-SILICON-007 / issue #9394  
 **Parent research:** #9369 / #9370 (fast/slow memory), #9371 / #9372 (input trajectories), #9373 (Fourier/RK4 semantics), #7749 (HDC-LTC architecture)  
 **Version:** 0.1.0
@@ -129,7 +129,7 @@ Required baseline families, where semantics are appropriate:
 - a small temporal convolution network;
 - matched parameter/state-budget and compute-budget controls.
 
-**BrainTrace is a required named competitor, not a generic SNN checkbox.** The paper *Model-agnostic linear-memory online learning in spiking neural networks* (Nature Communications, 19 January 2026; DOI 10.1038/s41467-026-68453-w) introduces model-agnostic online learning/eligibility-trace compilation. Its published abstract and full text report D-RTRL and pp-prop/ES-D-RTRL methods, and online training across several SNN dynamics. The current public package inspected for this protocol is BrainTrace v0.2.8 at commit `4fd426e1ec58a61a11d47a8d95c32346778e8b11`; the public DMS experiment repository is pinned at `81332436b3a0167bc83059878e43a0f0e2eb62c7`. See `BRAINTRACE_REFERENCE_AUDIT_V0_1.md` for the code-level task and split audit.
+**BrainTrace is a required named competitor, not a generic SNN checkbox.** The paper *Model-agnostic linear-memory online learning in spiking neural networks* (Nature Communications, 19 January 2026; DOI 10.1038/s41467-026-68453-w) introduces model-agnostic online learning/eligibility-trace compilation. Its published abstract reports D-RTRL and pp-prop/ES-D-RTRL methods, and online training across several SNN dynamics. The current public package inspected for this protocol is BrainTrace v0.2.8 at commit `4fd426e1ec58a61a11d47a8d95c32346778e8b11`; the public DMS experiment repository is pinned at `81332436b3a0167bc83059878e43a0f0e2eb62c7`. See `BRAINTRACE_REFERENCE_AUDIT_V0_1.md` for the code-level task and split audit.
 
 BrainTrace's algorithms are online **learning** baselines, not drop-in inference-only architectures. Compare them on online adaptation and long-horizon credit assignment, count trace memory and compute, and include BPTT as a small-scale gradient reference. Do not interpret pp-prop's factorized trace as an exact full-parameter gradient; keep its approximation/rank/decay explicit. Paper-reported metrics remain literature results, not Symthaea reproductions.
 
@@ -224,7 +224,7 @@ These commands are a runbook, not evidence that checks have passed.
 
 ## 11. Evidence and claim boundary
 
-The repository contains an isolated Rust research crate under research/temporal-bench (using the standard sha2 crate, not a dependency-free implementation). It now has prototype generators for all nine task families:
+The repository contains a standalone Rust research crate under research/temporal-bench (using the standard sha2 crate, not a dependency-free implementation). Prototype generators and task/oracle verifiers are authored for all nine task families:
 - a delayed-cue generator with controlled key similarity and distractor interference;
 - a multi-timescale forecasting/change-point generator with hidden periods/phases, a hidden middle-third regime boundary, delayed online feedback, and labels recomputed by the verifier from the hidden process;
 - a DMS generator/verifier matching the pinned eight-direction task timing and population-tuned spike input;
@@ -233,6 +233,11 @@ The repository contains an isolated Rust research crate under research/temporal-
 - a selective-retention/invalidation generator with before/after query semantics and stale-memory abstention;
 - an always-on sparse-event generator with rare target motifs, controlled distractor similarity, a quiet-idle control, event-level scoring, and false-trigger exposure accounting;
 - a phase-sensitive prediction generator with fixed-point oscillator phase, hidden phase/frequency shifts, exact next-crossing targets, and circular phase/timing scoring;
+- seed-bound deterministic stream regeneration for multiscale forecasting/change-point, DMS and evidence accumulation;
 - canonical SHA-256 digests for public streams and oracle records, with mutation negative controls.
 
-The generated public event stream and oracle remain returned in one process. The verifier has been implemented, but the confirmatory oracle is **not yet sealed by process or permission isolation**. 101 Rust unit tests are authored but unrun in this environment; the environment used for this work has no cargo, rustc, or rustfmt. The full nine-family generator (including the DMS and evidence-accumulation adapters), streaming runner, real-dataset adapters, separate evaluator service, benchmark execution, model comparison, hardware measurement, and energy result are not yet included. A passing benchmark would establish a result only for the declared tasks, splits, model versions, and hardware. It would not establish consciousness, general intelligence, universal superiority, or neuromorphic hardware efficiency if measured only on conventional CPU/GPU execution.
+The three seed-bound checks regenerate the expected task and oracle from evaluator-held seed/config metadata and reject recommitted but inconsistent event streams. The other generator verifiers enforce their current task semantics and digest integrity but do not all yet perform a full seed replay. These checks improve reproducibility; they are not a cryptographic security boundary.
+
+The public task and oracle are still returned together in one process. The confirmatory oracle is **not yet sealed by process or permission isolation**; there is no candidate sandbox, evaluator-owned signature, replay-resistant receipt, or secure taskgen/evaluator runner. **144 Rust unit tests are authored but unrun** in this environment; cargo, rustc, and rustfmt are unavailable here.
+
+No dataset adapter, baseline training run, model comparison, hardware measurement, or energy result has been executed. The nine synthetic/reference-task generators are authored, but burst-cluster T1 and sinusoidal/frequency-sweep T7 extensions remain open. The evaluator runner, real-dataset adapters, independent process isolation, signed receipts, benchmark execution, system measurements, and energy result are not yet included. A passing benchmark would establish a result only for the declared tasks, splits, model versions, and hardware. It would not establish consciousness, general intelligence, universal superiority, or neuromorphic hardware efficiency if measured only on conventional CPU/GPU execution.
