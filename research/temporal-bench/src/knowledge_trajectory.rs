@@ -34,6 +34,10 @@ pub struct KnowledgeTrajectoryTask {
     pub stream: KnowledgeStreamTask,
     /// Maps candidate-visible query events to stable current/historical lanes.
     pub checkpoints: Vec<KnowledgeCheckpointBinding>,
+    /// Subdivision of the source update interval. Chosen to create about four
+    /// observation opportunities between knowledge updates while exactly
+    /// dividing the update interval.
+    pub checkpoint_interval_steps: u64,
     /// SHA-256 over the public stream digest and the checkpoint bindings.
     pub content_sha256: [u8; 32],
 }
@@ -71,6 +75,23 @@ impl fmt::Display for KnowledgeTrajectoryError {
 
 impl std::error::Error for KnowledgeTrajectoryError {}
 
+fn checkpoint_interval(interval_steps: u64) -> u64 {
+    if interval_steps <= 1 {
+        return 1;
+    }
+    let desired = (interval_steps / 4).max(1);
+    greatest_common_divisor(interval_steps, desired)
+}
+
+fn greatest_common_divisor(mut left: u64, mut right: u64) -> u64 {
+    while right != 0 {
+        let remainder = left % right;
+        left = right;
+        right = remainder;
+    }
+    left.max(1)
+}
+
 /// Generate repeated current and historical queries over the same append-only history.
 ///
 /// There are two stable scorer lanes:
@@ -89,9 +110,10 @@ pub fn generate_knowledge_trajectory(
         .map_err(|error| KnowledgeTrajectoryError::Generation(error.to_string()))?;
 
     let interval = config.interval_steps;
+    let checkpoint_interval_steps = checkpoint_interval(interval);
     let query_issued_at = base_task.query_issued_at;
     let checkpoint_count_u64 = query_issued_at
-        .checked_div(interval)
+        .checked_div(checkpoint_interval_steps)
         .and_then(|last| last.checked_add(1))
         .ok_or(KnowledgeTrajectoryError::InvalidCheckpointSchedule)?;
     let checkpoint_count = usize::try_from(checkpoint_count_u64)
@@ -112,7 +134,7 @@ pub fn generate_knowledge_trajectory(
             .map_err(|_| KnowledgeTrajectoryError::InvalidCheckpointSchedule)?;
         let known_at = u64::try_from(index)
             .ok()
-            .and_then(|step| step.checked_mul(interval))
+            .and_then(|step| step.checked_mul(checkpoint_interval_steps))
             .ok_or(KnowledgeTrajectoryError::InvalidCheckpointSchedule)?;
         let current_query_event_id = u64::try_from(index)
             .ok()
@@ -162,6 +184,7 @@ pub fn generate_knowledge_trajectory(
     let mut task = KnowledgeTrajectoryTask {
         stream,
         checkpoints,
+        checkpoint_interval_steps,
         content_sha256: [0; 32],
     };
     task.content_sha256 = knowledge_trajectory_digest(&task);
@@ -175,6 +198,7 @@ pub fn knowledge_trajectory_digest(task: &KnowledgeTrajectoryTask) -> [u8; 32] {
     hash.bytes(&task.stream.content_sha256);
     hash.u64(task.stream.query_issued_at);
     hash.u64(task.stream.interval_steps);
+    hash.u64(task.checkpoint_interval_steps);
     hash.usize(task.checkpoints.len());
     for checkpoint in &task.checkpoints {
         hash.u32(checkpoint.checkpoint_index);
@@ -192,7 +216,7 @@ pub fn knowledge_trajectory_digest(task: &KnowledgeTrajectoryTask) -> [u8; 32] {
 pub fn knowledge_trajectory_windows(
     task: &KnowledgeTrajectoryTask,
 ) -> Vec<KnowledgeExposureWindow> {
-    let duration = task.stream.interval_steps;
+    let duration = task.checkpoint_interval_steps;
     let mut windows = Vec::with_capacity(task.checkpoints.len().saturating_mul(2));
     for checkpoint in &task.checkpoints {
         windows.push(KnowledgeExposureWindow {
@@ -276,7 +300,11 @@ pub fn verify_knowledge_trajectory(
         return Err(KnowledgeTrajectoryError::InvalidTaskDigest);
     }
     let interval = task.stream.interval_steps;
-    if interval == 0 || task.checkpoints.is_empty() {
+    let expected_checkpoint_interval = checkpoint_interval(interval);
+    if interval == 0
+        || task.checkpoint_interval_steps != expected_checkpoint_interval
+        || task.checkpoints.is_empty()
+    {
         return Err(KnowledgeTrajectoryError::InvalidCheckpointSchedule);
     }
     let expected_last = oracle.retraction_observed_at
@@ -288,7 +316,7 @@ pub fn verify_knowledge_trajectory(
 
     let expected_checkpoint_count = usize::try_from(
         expected_last
-            .checked_div(interval)
+            .checked_div(task.checkpoint_interval_steps)
             .and_then(|value| value.checked_add(1))
             .ok_or(KnowledgeTrajectoryError::InvalidCheckpointSchedule)?,
     )
@@ -308,7 +336,7 @@ pub fn verify_knowledge_trajectory(
             .map_err(|_| KnowledgeTrajectoryError::InvalidCheckpointSchedule)?;
         let known_at = u64::try_from(index)
             .ok()
-            .and_then(|step| step.checked_mul(interval))
+            .and_then(|step| step.checked_mul(task.checkpoint_interval_steps))
             .ok_or(KnowledgeTrajectoryError::InvalidCheckpointSchedule)?;
         let current_query_event_id = u64::try_from(index)
             .ok()
@@ -460,7 +488,8 @@ mod tests {
     fn generated_trajectory_has_repeated_current_and_historical_query_checkpoints() {
         let (task, oracle) = generate_knowledge_trajectory(config()).unwrap();
         assert_eq!(verify_knowledge_trajectory(&task, &oracle), Ok(()));
-        assert_eq!(task.checkpoints.len(), 8);
+        assert_eq!(task.checkpoints.len(), 29);
+        assert_eq!(task.checkpoint_interval_steps, 4);
         assert_eq!(task.checkpoints.first().unwrap().known_at, 0);
         assert_eq!(task.checkpoints.last().unwrap().known_at, task.stream.query_issued_at);
         let windows = knowledge_trajectory_windows(&task);
@@ -495,9 +524,9 @@ mod tests {
         }).unwrap();
         delayed.answer = KnowledgeCandidateAnswer::Value(oracle.initial_value);
         let score = score_temporal_error_debt(&oracle, &windows, &predictions).unwrap();
-        assert_eq!(score.wrong_belief_exposure, u128::from(task.stream.interval_steps));
-        assert_eq!(score.missed_correction_exposure, u128::from(task.stream.interval_steps));
-        assert_eq!(score.correction_latency, Some(task.stream.interval_steps));
+        assert_eq!(score.wrong_belief_exposure, u128::from(task.checkpoint_interval_steps));
+        assert_eq!(score.missed_correction_exposure, u128::from(task.checkpoint_interval_steps));
+        assert_eq!(score.correction_latency, Some(task.checkpoint_interval_steps));
         assert_eq!(score.retraction_latency, Some(0));
     }
 
@@ -514,9 +543,9 @@ mod tests {
         }).unwrap();
         delayed.answer = KnowledgeCandidateAnswer::Value(oracle.corrected_value);
         let score = score_temporal_error_debt(&oracle, &windows, &predictions).unwrap();
-        assert_eq!(score.wrong_belief_exposure, u128::from(task.stream.interval_steps));
-        assert_eq!(score.stale_after_retraction_exposure, u128::from(task.stream.interval_steps));
-        assert_eq!(score.retraction_latency, Some(task.stream.interval_steps));
+        assert_eq!(score.wrong_belief_exposure, u128::from(task.checkpoint_interval_steps));
+        assert_eq!(score.stale_after_retraction_exposure, u128::from(task.checkpoint_interval_steps));
+        assert_eq!(score.retraction_latency, Some(task.checkpoint_interval_steps));
     }
 
     #[test]
@@ -543,8 +572,8 @@ mod tests {
                 && prediction.checkpoint_index == interval_index
         ));
         let score = score_temporal_error_debt(&oracle, &windows, &predictions).unwrap();
-        assert_eq!(score.abstention_exposure, u128::from(task.stream.interval_steps));
-        assert_eq!(score.missing_exposure, u128::from(task.stream.interval_steps));
+        assert_eq!(score.abstention_exposure, u128::from(task.checkpoint_interval_steps));
+        assert_eq!(score.missing_exposure, u128::from(task.checkpoint_interval_steps));
         assert_eq!(score.wrong_belief_exposure, 0);
     }
 
