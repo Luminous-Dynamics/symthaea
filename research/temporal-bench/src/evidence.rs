@@ -104,6 +104,22 @@ pub struct EvidenceOracle {
     pub cue_assignments: Vec<bool>,
     pub positive_cue_count: usize,
     pub expected_label: u8,
+    /// SHA-256 over the versioned canonical oracle record.
+    pub content_sha256: [u8; 32],
+}
+
+/// Domain-separated canonical SHA-256 of the evidence evaluator oracle.
+pub fn evidence_oracle_digest(oracle: &EvidenceOracle) -> [u8; 32] {
+    let mut hash = CanonicalHasher::new(b"symthaea.temporal.evidence-accumulation.oracle.v1");
+    hash.u64(oracle.stream_id);
+    hash.u8(u8::from(oracle.hidden_ground_truth));
+    hash.usize(oracle.cue_assignments.len());
+    for selected_left in &oracle.cue_assignments {
+        hash.u8(u8::from(*selected_left));
+    }
+    hash.usize(oracle.positive_cue_count);
+    hash.u8(oracle.expected_label);
+    hash.finish()
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -264,12 +280,17 @@ pub fn generate_evidence_task(
 
     Ok((
         public_task,
-        EvidenceOracle {
-            stream_id,
-            hidden_ground_truth,
-            cue_assignments,
-            positive_cue_count,
-            expected_label,
+        {
+            let mut oracle = EvidenceOracle {
+                stream_id,
+                hidden_ground_truth,
+                cue_assignments,
+                positive_cue_count,
+                expected_label,
+                content_sha256: [0; 32],
+            };
+            oracle.content_sha256 = evidence_oracle_digest(&oracle);
+            oracle
         },
     ))
 }
@@ -278,6 +299,7 @@ pub fn generate_evidence_task(
 pub enum EvidenceVerificationError {
     StreamIdMismatch,
     ContentDigestMismatch,
+    OracleDigestMismatch,
     InvalidTaskWindow,
     InvalidOracle,
     InvalidObservation { expected_step: u32 },
@@ -292,6 +314,7 @@ impl fmt::Display for EvidenceVerificationError {
         match self {
             Self::StreamIdMismatch => write!(f, "evidence task and oracle stream IDs differ"),
             Self::ContentDigestMismatch => write!(f, "evidence public task SHA-256 digest does not match its contents"),
+            Self::OracleDigestMismatch => write!(f, "evidence oracle SHA-256 digest does not match its contents"),
             Self::InvalidTaskWindow => write!(f, "evidence task timing or input dimensions are invalid"),
             Self::InvalidOracle => write!(f, "evidence oracle assignments or majority label are invalid"),
             Self::InvalidObservation { expected_step } => {
@@ -325,6 +348,9 @@ pub fn verify_evidence_trace(
     }
     if task.content_sha256 != evidence_content_digest(task) {
         return Err(EvidenceVerificationError::ContentDigestMismatch);
+    }
+    if oracle.content_sha256 != evidence_oracle_digest(oracle) {
+        return Err(EvidenceVerificationError::OracleDigestMismatch);
     }
     let expected_sequence_end = u64::try_from(task.cue_count)
         .unwrap_or(u64::MAX)
@@ -547,6 +573,24 @@ mod tests {
         let config = EvidenceConfig::braintrace_reference(321);
         let (task, oracle) = generate_evidence_task(config).unwrap();
         assert_eq!(verify_evidence_trace(&task, &oracle), Ok(()));
+    }
+
+    #[test]
+    fn generated_oracle_has_valid_sha256() {
+        let config = EvidenceConfig::braintrace_reference(321);
+        let (_, oracle) = generate_evidence_task(config).unwrap();
+        assert_eq!(oracle.content_sha256, evidence_oracle_digest(&oracle));
+    }
+
+    #[test]
+    fn verifier_rejects_oracle_mutation_after_generation() {
+        let config = EvidenceConfig::braintrace_reference(321);
+        let (task, mut oracle) = generate_evidence_task(config).unwrap();
+        oracle.cue_assignments[0] = !oracle.cue_assignments[0];
+        assert_eq!(
+            verify_evidence_trace(&task, &oracle),
+            Err(EvidenceVerificationError::OracleDigestMismatch)
+        );
     }
 
     #[test]
