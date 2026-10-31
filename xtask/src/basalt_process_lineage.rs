@@ -245,15 +245,60 @@ pub fn audit_bytes(oracle_bytes: &[u8], receipt_bytes: &[u8]) -> ProcessLineageA
     report.counts.reported_restarts = receipt.health.observer_restart_count;
     report.counts.reported_unmonitored_processes = receipt.health.unmonitored_process_count;
 
+    let oracle_checks_before = report.errors.len();
     if oracle.format_version != 1 || oracle.suite_id != "basalt-process-lineage-oracle-v1" {
         error(&mut report, "E_ORACLE_VERSION", "oracle", "unsupported oracle format_version or suite_id");
-    }
-    if receipt.format_version != 1 || receipt.suite_id != "basalt-process-lineage-receipt-v1" {
-        error(&mut report, "E_RECEIPT_VERSION", "receipt", "unsupported receipt format_version or suite_id");
     }
     if oracle.run_id.is_empty() || oracle.run_id.len() > 128 || oracle.task_id.is_empty() || oracle.task_id.len() > 128 || oracle.attempt_id.is_empty() || oracle.attempt_id.len() > 128 {
         error(&mut report, "E_ORACLE_SCOPE", "oracle", "run_id, task_id and attempt_id must be non-empty and at most 128 bytes");
     }
+    if !valid_digest(&oracle.host_boot_id_digest)
+        || !valid_digest(&oracle.harness_binary_digest)
+        || !valid_digest(&oracle.supervisor_binary_digest)
+    {
+        error(&mut report, "E_ORACLE_DIGEST_FORMAT", "oracle", "boot and executable commitments must be lowercase sha256 digests");
+    }
+    if oracle.pid_namespace_inode == 0 {
+        error(&mut report, "E_ORACLE_PID_NAMESPACE", "oracle.pid_namespace_inode", "PID namespace inode must be non-zero");
+    }
+    if oracle.capture_start_monotonic_ns >= oracle.capture_end_monotonic_ns {
+        error(&mut report, "E_ORACLE_CAPTURE_INTERVAL", "oracle.capture", "oracle capture interval must be strictly increasing");
+    }
+    if oracle.processes.is_empty() || oracle.processes.len() > MAX_PROCESSES {
+        error(&mut report, "E_ORACLE_PROCESS_COUNT", "oracle.processes", "oracle process list is empty or exceeds the 10,000-process limit");
+    }
+    if oracle.events.is_empty() || oracle.events.len() > MAX_EVENTS {
+        error(&mut report, "E_ORACLE_EVENT_COUNT", "oracle.events", "oracle event list is empty or exceeds the 100,000-event limit");
+    }
+    report.oracle_well_formed = report.errors.len() == oracle_checks_before;
+
+    let receipt_checks_before = report.errors.len();
+    if receipt.format_version != 1 || receipt.suite_id != "basalt-process-lineage-receipt-v1" {
+        error(&mut report, "E_RECEIPT_VERSION", "receipt", "unsupported receipt format_version or suite_id");
+    }
+    if receipt.run_id.is_empty() || receipt.run_id.len() > 128 || receipt.task_id.is_empty() || receipt.task_id.len() > 128 || receipt.attempt_id.is_empty() || receipt.attempt_id.len() > 128 {
+        error(&mut report, "E_RECEIPT_SCOPE", "receipt", "run_id, task_id and attempt_id must be non-empty and at most 128 bytes");
+    }
+    if !valid_digest(&receipt.host_boot_id_digest)
+        || !valid_digest(&receipt.observer_binary_digest)
+        || !valid_digest(&receipt.observer_configuration_digest)
+    {
+        error(&mut report, "E_RECEIPT_DIGEST_FORMAT", "receipt", "boot and observer commitments must be lowercase sha256 digests");
+    }
+    if receipt.pid_namespace_inode == 0 {
+        error(&mut report, "E_RECEIPT_PID_NAMESPACE", "receipt.pid_namespace_inode", "PID namespace inode must be non-zero");
+    }
+    if receipt.capture_start_monotonic_ns >= receipt.capture_end_monotonic_ns {
+        error(&mut report, "E_RECEIPT_CAPTURE_INTERVAL", "receipt.capture", "receipt capture interval must be strictly increasing");
+    }
+    if receipt.processes.is_empty() || receipt.processes.len() > MAX_PROCESSES {
+        error(&mut report, "E_RECEIPT_PROCESS_COUNT", "receipt.processes", "observer process list is empty or exceeds the 10,000-process limit");
+    }
+    if receipt.events.is_empty() || receipt.events.len() > MAX_EVENTS {
+        error(&mut report, "E_RECEIPT_EVENT_COUNT", "receipt.events", "observer event list is empty or exceeds the 100,000-event limit");
+    }
+    report.receipt_well_formed = report.errors.len() == receipt_checks_before;
+
     if oracle.host_boot_id_digest != receipt.host_boot_id_digest
         || oracle.pid_namespace_inode != receipt.pid_namespace_inode
         || oracle.run_id != receipt.run_id
@@ -265,43 +310,19 @@ pub fn audit_bytes(oracle_bytes: &[u8], receipt_bytes: &[u8]) -> ProcessLineageA
     } else {
         report.identity_context_match = true;
     }
-    if !valid_digest(&oracle.host_boot_id_digest)
-        || !valid_digest(&oracle.harness_binary_digest)
-        || !valid_digest(&oracle.supervisor_binary_digest)
-        || !valid_digest(&receipt.host_boot_id_digest)
-        || !valid_digest(&receipt.observer_binary_digest)
-        || !valid_digest(&receipt.observer_configuration_digest)
-    {
-        error(&mut report, "E_DIGEST_FORMAT", "$", "identity and executable commitments must be lowercase sha256 digests");
-    }
-    if oracle.pid_namespace_inode == 0 || receipt.pid_namespace_inode == 0 {
-        error(&mut report, "E_PID_NAMESPACE", "pid_namespace_inode", "PID namespace inode must be non-zero");
-    }
-    if oracle.capture_start_monotonic_ns >= oracle.capture_end_monotonic_ns
-        || receipt.capture_start_monotonic_ns >= receipt.capture_end_monotonic_ns
-    {
-        error(&mut report, "E_CAPTURE_INTERVAL", "capture", "capture interval must be strictly increasing");
-    }
     if receipt.capture_start_monotonic_ns > oracle.capture_start_monotonic_ns
         || receipt.capture_end_monotonic_ns < oracle.capture_end_monotonic_ns
     {
         error(&mut report, "E_CAPTURE_WINDOW_NOT_COVERED", "receipt.capture", "observer interval must cover the independent oracle interval");
     }
-    if oracle.processes.is_empty() || oracle.processes.len() > MAX_PROCESSES
-        || receipt.processes.len() > MAX_PROCESSES
-    {
-        error(&mut report, "E_PROCESS_COUNT", "processes", "process list is empty or exceeds the 10,000-process limit");
-        return report;
-    }
-    if oracle.events.is_empty() || oracle.events.len() > MAX_EVENTS || receipt.events.len() > MAX_EVENTS {
-        error(&mut report, "E_EVENT_COUNT", "events", "event list is empty or exceeds the 100,000-event limit");
+    if !report.oracle_well_formed || !report.receipt_well_formed {
         return report;
     }
 
     let before_oracle_validation = report.errors.len();
     let oracle_processes = validate_oracle_processes(&oracle, &mut report);
     validate_oracle_events(&oracle, &oracle_processes, &mut report);
-    report.oracle_well_formed = report.errors.len() == before_oracle_validation;
+    report.oracle_well_formed &= report.errors.len() == before_oracle_validation;
 
     let before_receipt_validation = report.errors.len();
     let observed_processes = validate_observed_processes(&receipt, &mut report);
@@ -309,7 +330,7 @@ pub fn audit_bytes(oracle_bytes: &[u8], receipt_bytes: &[u8]) -> ProcessLineageA
     validate_observed_lifecycle_order(&receipt, &observed_processes, &mut report);
     report.counts.computed_sequence_gaps = computed_gaps;
     report.event_sequence_integral = sequence_integral;
-    report.receipt_well_formed = report.errors.len() == before_receipt_validation;
+    report.receipt_well_formed &= report.errors.len() == before_receipt_validation;
 
     report.counts.pid_values_reused = count_reused_pids(oracle_processes.keys().map(|identity| identity.pid));
     let oracle_relations: BTreeMap<_, _> = oracle_processes.iter().map(|(identity, parent)| (identity.clone(), parent.clone())).collect();
