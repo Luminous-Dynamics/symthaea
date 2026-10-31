@@ -45,11 +45,65 @@ jobs:
           import json
           import math
           from pathlib import Path
-          from jsonschema import validate
+          from jsonschema import Draft202012Validator, ValidationError, validate
 
           report = json.loads(Path("/tmp/cmaq-018-report.json").read_text())
           schema = json.loads(Path("report.schema.json").read_text())
           validate(instance=report, schema=schema)
+
+          uncertainty_schema = json.loads(
+              Path("uncertainty-contract.v0.1.schema.json").read_text()
+          )
+          Draft202012Validator.check_schema(uncertainty_schema)
+          uncertainty_sample = {
+              "schema_version": "cmaq-018-uncertainty-contract-v0.1",
+              "claim_ceiling": "design_contract_only_no_model_calibration_result",
+              "forecast_interval": {
+                  "lower": 0.1, "upper": 0.4, "nominal_coverage": 0.9,
+                  "horizon_steps": 5, "uncertainty_source": "combined",
+                  "calibration_stratum": "in_support_h5"
+              },
+              "paired_effect_interval": {
+                  "left_action_id": 0, "right_action_id": 1,
+                  "lower": -0.1, "upper": 0.2, "nominal_coverage": 0.9,
+                  "horizon_steps": 5, "construction": "paired_joint_samples",
+                  "paired_sample_count": 128,
+                  "pairing_semantics": "same_history_same_joint_draw_index",
+                  "marginal_interval_subtraction": "prohibited"
+              },
+              "action_set": {
+                  "action_ids": [0, 1],
+                  "joint_uncertainty_method": "paired_joint_predictive_samples",
+                  "familywise_nominal_coverage": 0.9,
+                  "selected_action_id": 0,
+                  "selected_action_regret_upper_bound": 0.2,
+                  "certificate_requires_simultaneous_coverage": True
+              },
+              "memory_boundary": {
+                  "forecast_is_observation": False,
+                  "prediction_promoted_to_observation": False
+              }
+          }
+          validate(instance=uncertainty_sample, schema=uncertainty_schema)
+          assert uncertainty_sample["action_set"]["selected_action_id"] in (
+              uncertainty_sample["action_set"]["action_ids"]
+          )
+          invalid_uncertainty = json.loads(json.dumps(uncertainty_sample))
+          invalid_uncertainty["paired_effect_interval"]["marginal_interval_subtraction"] = "allowed"
+          try:
+              validate(instance=invalid_uncertainty, schema=uncertainty_schema)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError("uncertainty contract admitted marginal-interval subtraction")
+          invalid_uncertainty = json.loads(json.dumps(uncertainty_sample))
+          del invalid_uncertainty["paired_effect_interval"]["pairing_semantics"]
+          try:
+              validate(instance=invalid_uncertainty, schema=uncertainty_schema)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError("uncertainty contract admitted unpaired joint samples")
 
           assert report["schema_version"] == "cmaq-018-counterfactual-branch-fidelity-v0.1"
           assert report["episode_count"] == 64
