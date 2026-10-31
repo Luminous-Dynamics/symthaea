@@ -1273,6 +1273,23 @@ impl CognitiveLoopService {
 mod tests {
     use super::super::{CognitiveLoopConfig, CognitiveLoopService};
 
+    #[cfg(feature = "jepa")]
+    #[test]
+    fn jepa_engine_is_opt_in_and_uses_the_configured_cfc_input_dimension() {
+        let default_service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+        assert!(default_service.jepa_engine.is_none());
+
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_jepa = true;
+        let expected_input_dim = config.cfc_config.input_dim;
+        let enabled_service = CognitiveLoopService::new(config).unwrap();
+        let engine = enabled_service
+            .jepa_engine
+            .as_ref()
+            .expect("enable_jepa=true must construct a JEPA engine");
+        assert_eq!(engine.config().input_dim, expected_input_dim);
+    }
+
     #[test]
     fn constructor_opens_memory_db_path() {
         let path = std::env::temp_dir().join(format!(
