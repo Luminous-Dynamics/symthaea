@@ -302,6 +302,8 @@ struct OodClusterBootstrap {
     minimum_valid_replicates_for_interval: usize,
     roc_auc_95: Option<Interval>,
     average_precision_95: Option<Interval>,
+    false_ood_rate_on_in_domain_95: Option<Interval>,
+    held_out_domain_recall_95: Option<Interval>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1034,6 +1036,8 @@ fn ood_cluster_bootstrap(
             minimum_valid_replicates_for_interval: minimum_valid,
             roc_auc_95: None,
             average_precision_95: None,
+            false_ood_rate_on_in_domain_95: None,
+            held_out_domain_recall_95: None,
         };
     }
 
@@ -1042,6 +1046,8 @@ fn ood_cluster_bootstrap(
     if state == 0 { state = 1; }
     let mut auc = Vec::with_capacity(replicates);
     let mut average_precision = Vec::with_capacity(replicates);
+    let mut false_ood_rates = Vec::with_capacity(replicates);
+    let mut held_out_recalls = Vec::with_capacity(replicates);
     for _ in 0..replicates {
         let mut sample = Vec::with_capacity(rows.len());
         for _ in 0..cluster_rows.len() {
@@ -1058,6 +1064,22 @@ fn ood_cluster_bootstrap(
                 average_precision.push(ap);
             }
         }
+        let in_domain = sample.iter()
+            .filter(|row| row.is_ood_domain == Some(false))
+            .collect::<Vec<_>>();
+        let held_out = sample.iter()
+            .filter(|row| row.is_ood_domain == Some(true))
+            .collect::<Vec<_>>();
+        if !in_domain.is_empty() && !held_out.is_empty() {
+            let false_ood = in_domain.iter()
+                .filter(|row| row.ood_score.unwrap_or(0.0) >= 0.5)
+                .count();
+            let detected_ood = held_out.iter()
+                .filter(|row| row.ood_score.unwrap_or(0.0) >= 0.5)
+                .count();
+            false_ood_rates.push(false_ood as f64 / in_domain.len() as f64);
+            held_out_recalls.push(detected_ood as f64 / held_out.len() as f64);
+        }
     }
     OodClusterBootstrap {
         requested_replicates: replicates,
@@ -1065,6 +1087,8 @@ fn ood_cluster_bootstrap(
         minimum_valid_replicates_for_interval: minimum_valid,
         roc_auc_95: scalar_percentile_interval(auc, replicates),
         average_precision_95: scalar_percentile_interval(average_precision, replicates),
+        false_ood_rate_on_in_domain_95: scalar_percentile_interval(false_ood_rates, replicates),
+        held_out_domain_recall_95: scalar_percentile_interval(held_out_recalls, replicates),
     }
 }
 
@@ -2468,6 +2492,51 @@ mod tests {
     }
 
     #[test]
+    fn ood_cluster_bootstrap_reports_uncertainty_for_operating_point_rates() {
+        let mut rows = Vec::new();
+        for cluster in 0..3 {
+            for within in 0..2 {
+                let mut in_row = tagged_row(
+                    &format!("boot-in-{cluster}-{within}"),
+                    within == 0,
+                    0.5,
+                    "mouse",
+                    false,
+                    0.1 + cluster as f64 * 0.05,
+                );
+                in_row.cluster_id = format!("boot-in-cluster-{cluster}");
+                rows.push(in_row);
+                let mut out_row = tagged_row(
+                    &format!("boot-out-{cluster}-{within}"),
+                    within == 0,
+                    0.5,
+                    "zebrafish",
+                    true,
+                    0.9 - cluster as f64 * 0.05,
+                );
+                out_row.cluster_id = format!("boot-out-cluster-{cluster}");
+                rows.push(out_row);
+            }
+        }
+        let refs = rows.iter().collect::<Vec<_>>();
+        let first = ood_cluster_bootstrap(&refs, 500, "ood-operating-point");
+        let second = ood_cluster_bootstrap(&refs, 500, "ood-operating-point");
+        assert!(first.valid_replicates >= 400);
+        assert_eq!(
+            first.false_ood_rate_on_in_domain_95.map(|x| (x.lower, x.upper)),
+            second.false_ood_rate_on_in_domain_95.map(|x| (x.lower, x.upper))
+        );
+        assert_eq!(
+            first.held_out_domain_recall_95,
+            Some(Interval { lower: 1.0, upper: 1.0 })
+        );
+        assert_eq!(
+            first.false_ood_rate_on_in_domain_95,
+            Some(Interval { lower: 0.0, upper: 0.0 })
+        );
+    }
+
+    #[test]
     fn ood_cluster_bootstrap_refuses_single_class_cluster_resamples() {
         let mut in_domain = row("in", false, 0.1, 0.1, 1.0, 1.0, "merge");
         let mut ood = row("out", true, 0.9, 0.9, 1.0, 1.0, "merge");
@@ -2485,6 +2554,8 @@ mod tests {
         assert!(interval.valid_replicates < 400);
         assert_eq!(interval.roc_auc_95, None);
         assert_eq!(interval.average_precision_95, None);
+        assert_eq!(interval.false_ood_rate_on_in_domain_95, None);
+        assert_eq!(interval.held_out_domain_recall_95, None);
     }
 
     #[test]
