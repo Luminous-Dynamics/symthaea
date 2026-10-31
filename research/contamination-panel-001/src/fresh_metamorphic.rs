@@ -1364,6 +1364,100 @@ mod tests {
     }
 
     #[test]
+    fn all_metamorphic_schemas_match_top_level_and_nested_structs() {
+        let public_schema: Value = serde_json::from_str(include_str!(
+            "../schema/fresh-metamorphic-public-packet.schema.json"
+        )).unwrap();
+        let oracle_schema: Value = serde_json::from_str(include_str!(
+            "../schema/fresh-metamorphic-sealed-oracle.schema.json"
+        )).unwrap();
+        let manifest_schema: Value = serde_json::from_str(include_str!(
+            "../schema/fresh-metamorphic-manifest.schema.json"
+        )).unwrap();
+        let audit_schema: Value = serde_json::from_str(include_str!(
+            "../schema/fresh-metamorphic-audit.schema.json"
+        )).unwrap();
+        let submission_schema: Value = serde_json::from_str(include_str!(
+            "../schema/fresh-metamorphic-submission.schema.json"
+        )).unwrap();
+        let report_schema: Value = serde_json::from_str(include_str!(
+            "../schema/fresh-metamorphic-score-report.schema.json"
+        )).unwrap();
+
+        let base = base_bundle();
+        let bundle = generate_fresh_metamorphic_bundle(&base).unwrap();
+        let audit = audit_fresh_metamorphic_bundle(&base, &bundle).unwrap();
+        let submission = make_submission(&bundle, exact_responses(&bundle));
+        let report = score_fresh_metamorphic_submission(
+            &base,
+            &bundle,
+            &serde_json::to_vec(&submission).unwrap(),
+        ).unwrap();
+
+        for (schema, value, version) in [
+            (&public_schema, serde_json::to_value(&bundle.public_packet).unwrap(), FRESH_METAMORPHIC_PACKET_SCHEMA),
+            (&oracle_schema, serde_json::to_value(&bundle.sealed_oracle).unwrap(), FRESH_METAMORPHIC_ORACLE_SCHEMA),
+            (&manifest_schema, serde_json::to_value(&bundle.manifest).unwrap(), FRESH_METAMORPHIC_MANIFEST_SCHEMA),
+            (&audit_schema, serde_json::to_value(&audit).unwrap(), FRESH_METAMORPHIC_AUDIT_SCHEMA),
+            (&submission_schema, serde_json::to_value(&submission).unwrap(), FRESH_METAMORPHIC_SUBMISSION_SCHEMA),
+            (&report_schema, serde_json::to_value(&report).unwrap(), FRESH_METAMORPHIC_SCORE_SCHEMA),
+        ] {
+            assert_eq!(schema["properties"]["schema"]["const"].as_str(), Some(version));
+            let required: BTreeSet<String> = schema["required"].as_array().unwrap()
+                .iter().map(|field| field.as_str().unwrap().to_owned()).collect();
+            let properties: BTreeSet<String> = schema["properties"].as_object().unwrap()
+                .keys().cloned().collect();
+            let actual: BTreeSet<String> = value.as_object().unwrap()
+                .keys().cloned().collect();
+            assert_eq!(required, properties);
+            assert_eq!(actual, properties);
+        }
+
+        let nested_checks = [
+            (
+                &public_schema["properties"]["tasks"]["items"]["properties"],
+                serde_json::to_value(&bundle.public_packet.tasks[0]).unwrap(),
+            ),
+            (
+                &oracle_schema["properties"]["entries"]["items"]["properties"],
+                serde_json::to_value(&bundle.sealed_oracle.entries[0]).unwrap(),
+            ),
+            (
+                &oracle_schema["properties"]["entries"]["items"]["properties"]["parameters"]["properties"],
+                serde_json::to_value(&bundle.sealed_oracle.entries[0].parameters).unwrap(),
+            ),
+            (
+                &oracle_schema["properties"]["entries"]["items"]["properties"]["solution"]["properties"],
+                serde_json::to_value(&bundle.sealed_oracle.entries[0].solution).unwrap(),
+            ),
+            (
+                &submission_schema["properties"]["responses"]["items"]["properties"],
+                serde_json::to_value(&submission.responses[0]).unwrap(),
+            ),
+            (
+                &report_schema["properties"]["items"]["items"]["properties"],
+                serde_json::to_value(&report.items[0]).unwrap(),
+            ),
+            (
+                &report_schema["properties"]["groups"]["items"]["properties"],
+                serde_json::to_value(&report.groups[0]).unwrap(),
+            ),
+        ];
+        for (properties, value) in nested_checks {
+            let expected: BTreeSet<String> = properties.as_object().unwrap()
+                .keys().cloned().collect();
+            let actual: BTreeSet<String> = value.as_object().unwrap()
+                .keys().cloned().collect();
+            assert_eq!(expected, actual);
+        }
+        let public_text = serde_json::to_string(&bundle.public_packet).unwrap();
+        assert!(!public_text.contains("generation_seed_hex"));
+        assert!(!public_text.contains("sealed_oracle"));
+        assert!(!public_text.contains("normalized_determinant_margin_permille"));
+        assert!(!report.independently_verified);
+    }
+
+    #[test]
     fn generated_five_form_groups_preserve_exact_solution_and_margin() {
         let base = base_bundle();
         let bundle = generate_fresh_metamorphic_bundle(&base).unwrap();
