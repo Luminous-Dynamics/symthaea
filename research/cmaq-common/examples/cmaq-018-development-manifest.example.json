@@ -11,16 +11,16 @@
   },
   "repository": {
     "url": "https://github.com/Luminous-Dynamics/symthaea",
-    "commit": "9670889c6171b7bfd4f326076bc3314b0cf8b7e8",
+    "commit": "33fd007128075c108f4757e7b2f8d349a366a21c",
     "dirty_tree": false,
     "source_tree_sha256": null
   },
   "candidate": {
     "name": "CMAQ-018 synthetic predictor-arm suite",
     "kind": "synthetic_reference_arms",
-    "source_commit": "0aba6c5fd663522e0030540a417af8e4f4c84ce1",
+    "source_commit": "ca265279ac7addf8aeb8a3d86947c81bfed3763a",
     "artifact_sha256": null,
-    "config_sha256": "9c3d8a801e59693274d4b34cabd3c990c9ad4170903fc371edf4e10e5f3b181f",
+    "config_sha256": "356a6a75c0d201771385fc5f8e330a2b2a312c20d96b26f5a9a5411dfce22601",
     "weights_sha256": null,
     "adapter_sha256": null,
     "build_status": "source_only_not_compiled",
@@ -28,13 +28,13 @@
   },
   "generator": {
     "name": "CMAQ-018 deterministic same-history branch generator",
-    "source_commit": "0aba6c5fd663522e0030540a417af8e4f4c84ce1",
+    "source_commit": "ca265279ac7addf8aeb8a3d86947c81bfed3763a",
     "config_sha256": "cdc87841a4a5de86ebfe96e67de32695e685aec87b6fc9dde56d5162af9151e6",
     "config_path": "research/cmaq-common/examples/assets/cmaq018/generator-config.v0.1.json"
   },
   "evaluator": {
     "name": "CMAQ-018 branch-fidelity evaluator",
-    "source_commit": "0aba6c5fd663522e0030540a417af8e4f4c84ce1",
+    "source_commit": "ca265279ac7addf8aeb8a3d86947c81bfed3763a",
     "metric_bundle_sha256": "06cd78c23b2bc8bd350706e2da3335364b0c8a5f6bd38a9809685eb13cd2b143",
     "version": "0.1.0",
     "external_judge": null,
@@ -124,8 +124,8 @@
       "id": "point_outcome",
       "role": "primary",
       "kind": "world_model",
-      "source_commit": "0aba6c5fd663522e0030540a417af8e4f4c84ce1",
-      "config_sha256": "9c3d8a801e59693274d4b34cabd3c990c9ad4170903fc371edf4e10e5f3b181f",
+      "source_commit": "ca265279ac7addf8aeb8a3d86947c81bfed3763a",
+      "config_sha256": "356a6a75c0d201771385fc5f8e330a2b2a312c20d96b26f5a9a5411dfce22601",
       "eligibility": "diagnostic_only",
       "ineligibility_reason": "Synthetic fixed predictor; no trained model or compute-matched deployment claim.",
       "cost_accounting": "not_measured"
@@ -134,8 +134,8 @@
       "id": "explicit_effect_head",
       "role": "world_model_control",
       "kind": "world_model",
-      "source_commit": "0aba6c5fd663522e0030540a417af8e4f4c84ce1",
-      "config_sha256": "9c3d8a801e59693274d4b34cabd3c990c9ad4170903fc371edf4e10e5f3b181f",
+      "source_commit": "ca265279ac7addf8aeb8a3d86947c81bfed3763a",
+      "config_sha256": "356a6a75c0d201771385fc5f8e330a2b2a312c20d96b26f5a9a5411dfce22601",
       "eligibility": "diagnostic_only",
       "ineligibility_reason": "Pair-effect head has different query granularity from absolute branch prediction.",
       "cost_accounting": "not_measured"
@@ -144,8 +144,8 @@
       "id": "shuffled_action_labels",
       "role": "negative_control",
       "kind": "negative_control",
-      "source_commit": "0aba6c5fd663522e0030540a417af8e4f4c84ce1",
-      "config_sha256": "9c3d8a801e59693274d4b34cabd3c990c9ad4170903fc371edf4e10e5f3b181f",
+      "source_commit": "ca265279ac7addf8aeb8a3d86947c81bfed3763a",
+      "config_sha256": "356a6a75c0d201771385fc5f8e330a2b2a312c20d96b26f5a9a5411dfce22601",
       "eligibility": "diagnostic_only",
       "ineligibility_reason": "Intentional action-identity corruption; negative control only.",
       "cost_accounting": "not_measured"
@@ -154,8 +154,8 @@
       "id": "support_aware_point",
       "role": "world_model_control",
       "kind": "world_model",
-      "source_commit": "0aba6c5fd663522e0030540a417af8e4f4c84ce1",
-      "config_sha256": "9c3d8a801e59693274d4b34cabd3c990c9ad4170903fc371edf4e10e5f3b181f",
+      "source_commit": "ca265279ac7addf8aeb8a3d86947c81bfed3763a",
+      "config_sha256": "356a6a75c0d201771385fc5f8e330a2b2a312c20d96b26f5a9a5411dfce22601",
       "eligibility": "diagnostic_only",
       "ineligibility_reason": "Deterministic support rule is not a calibrated learned uncertainty model.",
       "cost_accounting": "not_measured"
@@ -164,8 +164,8 @@
       "id": "oracle",
       "role": "oracle_ceiling",
       "kind": "oracle",
-      "source_commit": "0aba6c5fd663522e0030540a417af8e4f4c84ce1",
-      "config_sha256": "9c3d8a801e59693274d4b34cabd3c990c9ad4170903fc371edf4e10e5f3b181f",
+      "source_commit": "ca265279ac7addf8aeb8a3d86947c81bfed3763a",
+      "config_sha256": "356a6a75c0d201771385fc5f8e330a2b2a312c20d96b26f5a9a5411dfce22601",
       "eligibility": "oracle_only",
       "ineligibility_reason": "Evaluator-owned truth; not candidate deployable.",
       "cost_accounting": "not_measured"
@@ -226,8 +226,7 @@
       "branch_state_mae",
       "terminal_false_safe_rate",
       "terminal_false_safe_rate_episode_count",
-      "terminal_false_safe_rate_ci95",
-      "forecast_kind_provenance"
+      "terminal_false_safe_rate_ci95"
     ],
     "cross_track_pooling": false
   },
