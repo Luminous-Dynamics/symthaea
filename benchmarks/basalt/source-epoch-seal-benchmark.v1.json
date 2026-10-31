@@ -70,6 +70,11 @@
       "id": "SEAL-013",
       "mutation": "Omit the required previous_seal_digest field instead of supplying null for generation 1",
       "expected": "reject_missing_required_field"
+    },
+    {
+      "id": "SEAL-014",
+      "mutation": "Create a self-consistent event chain with an event observation timestamp later than the declared consumer-drain acknowledgement",
+      "expected": "reject_event_after_drain"
     }
   ],
   "metrics": [
