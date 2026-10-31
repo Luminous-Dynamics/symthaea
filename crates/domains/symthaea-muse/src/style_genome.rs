@@ -2065,6 +2065,11 @@ fn gene_effect_audits_well_formed(
                         .as_ref()
                         .is_none_or(|value| !is_sha256_hex(value))
                     || pair.counterfactual_grammar_transformations.is_empty()
+                    || !pair.counterfactual_trace_integrity.is_complete()
+                    || !pair.counterfactual_semantic_trace_verified
+                    || pair.counterfactual_semantic_trace_checked_records == 0
+                    || pair.counterfactual_semantic_trace_checked_records
+                        != pair.counterfactual_semantic_trace_verified_records
                 {
                     return false;
                 }
@@ -2514,6 +2519,10 @@ mod tests {
         let mut corrupted = evaluation.clone();
         corrupted.gene_effect_audits[0].counterfactual_recipe_sha256 =
             Some("f".repeat(64));
+        assert!(!corrupted.verify_digest());
+
+        let mut corrupted = evaluation.clone();
+        corrupted.gene_effect_audits[0].paired_trials[0].counterfactual_semantic_trace_verified = false;
         assert!(!corrupted.verify_digest());
 
         let mut corrupted = evaluation.clone();
