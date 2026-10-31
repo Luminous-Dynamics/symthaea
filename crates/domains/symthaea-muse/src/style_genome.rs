@@ -33,10 +33,11 @@ use crate::analyst::{composer_trace_from_theory, verify_composer_trace};
 use crate::style_mixer::compile_hybrid_style;
 
 pub const STYLE_GENOME_SCHEMA: &str = "muse-style-genome-v1";
-pub const STYLE_GENOME_EVALUATION_SCHEMA: &str = "muse-style-genome-evaluation-v1";
-pub const STYLE_GENOME_ARCHIVE_SCHEMA: &str = "muse-style-genome-pareto-archive-v1";
+pub const STYLE_GENOME_EVALUATION_SCHEMA: &str = "muse-style-genome-evaluation-v2";
+pub const STYLE_GENOME_ARCHIVE_SCHEMA: &str = "muse-style-genome-pareto-archive-v2";
 pub const STYLE_GENOME_TRACE_REFERENCE_AUDIT_VERSION: &str = "muse-style-genome-trace-reference-audit-v1";
 pub const STYLE_GENOME_FINGERPRINT_VERSION: &str = "symthaea-music-theory-structural-fingerprint-v1";
+pub const STYLE_GENOME_GRAMMAR_PLAN_FINGERPRINT_VERSION: &str = "muse-grammar-plan-fingerprint-v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -281,7 +282,13 @@ pub struct GenomeTrial {
     pub semantic_trace_issues: Vec<GenomeTraceIssue>,
     pub grammar_plan_kind: String,
     pub grammar_plan_well_formed: bool,
+    /// Domain-separated, seed-normalized fingerprint of the family-native plan.
+    pub grammar_plan_signature: Option<String>,
+    /// Named operations extracted from the typed family plan.
+    pub grammar_transformations: Vec<String>,
+    /// Legacy topology signature for the generic Form representation.
     pub form_signature: Option<String>,
+    /// Motif-operation labels emitted by the generic structural trace.
     pub motif_transformations: Vec<String>,
     pub note_count: usize,
     pub score_duration_beats: f64,
@@ -294,23 +301,32 @@ pub struct GenomeObjectives {
     pub novelty_distance: Option<f64>,
     /// Mean pairwise structural distance between this genome's seeded trials.
     pub within_genome_diversity: f64,
-    /// Fraction of the four transformation labels currently emitted by the
-    /// PeriodSentence trace detector. This is trace-label diversity, not
-    /// proof that a listener recognizes the transformations.
-    pub motif_transformation_richness: f64,
-    /// Fraction of the three classical period-pipeline forms realized over
-    /// the seed set. Structural form is reported independently of preference.
-    pub form_variation: f64,
+    /// Fraction of the four generic motif-transformation labels observed.
+    /// None means the family did not emit that trace representation.
+    pub motif_transformation_richness: Option<f64>,
+    /// Legacy generic-Form variation. None means this grammar has no generic
+    /// Form object; dedicated plan topology is measured separately below.
+    pub form_variation: Option<f64>,
+    /// Fraction of distinct family-native grammar-plan topologies observed
+    /// across deterministic trials. Applicable to every qualified plan family.
+    pub grammar_topology_variation: f64,
+    /// Mean pairwise Jaccard distance between each trial's named grammar
+    /// operations. This compares process/chorus/cycle/fugal/dramatic operations
+    /// without converting them into listener preference.
+    pub grammar_operation_diversity: f64,
 }
 
 impl GenomeObjectives {
-    /// Objective axes are maximized separately; this is not a scalar reward.
-    pub fn axes(&self) -> [Option<f64>; 4] {
+    /// Objective axes are maximized separately; incomparable applicability
+    /// states remain incomparable instead of being silently scored as zero.
+    pub fn axes(&self) -> [Option<f64>; 6] {
         [
             self.novelty_distance,
             Some(self.within_genome_diversity),
-            Some(self.motif_transformation_richness),
-            Some(self.form_variation),
+            self.motif_transformation_richness,
+            self.form_variation,
+            Some(self.grammar_topology_variation),
+            Some(self.grammar_operation_diversity),
         ]
     }
 }
@@ -1039,8 +1055,13 @@ fn audit_trace(score: &Score, trace: &GrammarStructuralTrace) -> TraceIntegrity 
 }
 
 fn period_plan_well_formed(plan: &GrammarPlanEvidence) -> bool {
+    grammar_plan_well_formed(plan)
+}
+
+fn grammar_plan_well_formed(plan: &GrammarPlanEvidence) -> bool {
+    use symthaea_music_theory::grammar::GrammarPlanEvidence as G;
     match plan {
-        GrammarPlanEvidence::PeriodSentence(plan) => {
+        G::PeriodSentence(plan) => {
             plan.section_count > 0
                 && !plan.phrase_model.trim().is_empty()
                 && !plan.cadence_strategy.trim().is_empty()
@@ -1048,24 +1069,315 @@ fn period_plan_well_formed(plan: &GrammarPlanEvidence) -> bool {
                 && !plan.return_obligation.trim().is_empty()
                 && !plan.ending_strategy.trim().is_empty()
         }
-        // Compiler v1 only accepts PeriodSentence structural owners; all
-        // other variants should be impossible here and fail closed.
-        _ => false,
+        G::Contrapuntal(plan) => {
+            plan.engine_version == "compact-fugue-engine-v1"
+                && !plan.answer_class.trim().is_empty()
+                && plan.subject_entry_order.len() >= 3
+                && plan.countersubject
+                && plan.inversion
+                && plan.augmentation
+                && plan.stretto
+                && plan.controlled_dissonance
+                && plan.final_combination
+        }
+        G::GrooveCycle(plan) => {
+            plan.cycle_beats.is_finite()
+                && plan.cycle_beats > 0.0
+                && plan.total_cycles > 0
+                && !plan.sections.is_empty()
+                && plan.sections.first().is_some_and(|section| section.start_cycle == 0)
+                && plan.sections.iter().all(|section| section.cycles > 0)
+                && plan.sections.windows(2).all(|pair| {
+                    pair[0].start_cycle + pair[0].cycles == pair[1].start_cycle
+                })
+                && plan.sections.last().is_some_and(|section| {
+                    section.start_cycle + section.cycles == plan.total_cycles
+                })
+                && plan.phrase_boundary_cycles.iter().all(|cycle| *cycle < plan.total_cycles)
+                && plan.phrase_boundary_cycles.windows(2).all(|pair| pair[0] < pair[1])
+                && plan.phase_continuous
+                && !plan.obligations.is_empty()
+                && plan.obligations.iter().all(|obligation| obligation.fulfilled)
+        }
+        G::AdditiveProcess(plan) => {
+            !plan.prefix_lengths.is_empty()
+                && plan.prefix_lengths.len() == plan.cycle_starts.len()
+                && plan.prefix_lengths.iter().all(|length| *length > 0)
+                && plan.cycle_starts.first().is_some_and(|start| start.beats() == 0.0)
+                && plan.cycle_starts.iter().all(|start| start.beats().is_finite())
+                && plan.cycle_starts.windows(2).all(|pair| {
+                    pair[0].beats() < pair[1].beats()
+                })
+        }
+        G::ModalArc(plan) => {
+            plan.stage_repetitions.iter().all(|count| *count > 0)
+                && plan.alap_end.beats().is_finite()
+                && plan.jor_end.beats().is_finite()
+                && plan.jhala_end.beats().is_finite()
+                && 0.0 < plan.alap_end.beats()
+                && plan.alap_end.beats() < plan.jor_end.beats()
+                && plan.jor_end.beats() < plan.jhala_end.beats()
+        }
+        G::CallResponse(plan) => {
+            plan.requested_bars > 0
+                && plan.choruses > 0
+                && plan.bars_per_chorus == 12
+                && plan.realized_bars == plan.choruses * plan.bars_per_chorus
+                && plan.realized_bars >= plan.requested_bars
+                && plan.trajectory.len() == plan.choruses
+                && plan.trajectory.first().is_some_and(|role| {
+                    *role == symthaea_music_theory::call_response::ChorusRole::Statement
+                })
+                && plan.call_starts == vec![0, 4, 8]
+                && plan.response_starts == vec![2, 6, 10]
+        }
+        G::JazzChorus(plan) => {
+            plan.requested_bars > 0
+                && plan.choruses > 0
+                && plan.bars_per_chorus == 8
+                && plan.realized_bars == plan.choruses * plan.bars_per_chorus
+                && plan.realized_bars >= plan.requested_bars
+                && plan.trajectory.len() == plan.choruses
+                && plan.trajectory.first().is_some_and(|role| {
+                    *role == symthaea_music_theory::call_response::ChorusRole::Statement
+                })
+        }
+        G::ProgSuite(evidence) => {
+            let plan = &evidence.plan;
+            evidence.verification.all_verified()
+                && plan.sections.len() == 4
+                && plan.sections.iter().map(|section| section.meter).eq([4, 7, 5, 4])
+                && plan.sections.windows(2).all(|pair| {
+                    (pair[0].end.beats() - pair[1].start.beats()).abs() <= 1e-7
+                })
+        }
+        G::Sonata(evidence) => {
+            evidence.plan.sections.len() == 5
+                && !evidence.verification.is_empty()
+                && evidence.verification.iter().all(|item| item.verified)
+        }
+        G::Renaissance(evidence) => {
+            evidence.plan.total_bars == 9 && evidence.verification.all_verified()
+        }
+        G::Opera(evidence) => {
+            evidence.plan.total_bars == 9 && evidence.verification.all_verified()
+        }
+        G::Compatibility { .. } => false,
     }
 }
 
 fn grammar_plan_name(plan: &GrammarPlanEvidence) -> String {
+    use symthaea_music_theory::grammar::GrammarPlanEvidence as G;
     match plan {
-        GrammarPlanEvidence::PeriodSentence(_) => "period_sentence".into(),
-        GrammarPlanEvidence::Contrapuntal(_) => "contrapuntal".into(),
-        GrammarPlanEvidence::GrooveCycle(_) => "groove_cycle".into(),
-        GrammarPlanEvidence::AdditiveProcess(_) => "additive_process".into(),
-        GrammarPlanEvidence::ModalArc(_) => "modal_arc".into(),
-        GrammarPlanEvidence::CallResponse(_) => "call_response".into(),
-        GrammarPlanEvidence::JazzChorus(_) => "jazz_chorus".into(),
-        GrammarPlanEvidence::Compatibility { family, .. } => format!("compatibility:{family:?}"),
+        G::PeriodSentence(_) => "period_sentence".into(),
+        G::Contrapuntal(_) => "contrapuntal".into(),
+        G::GrooveCycle(_) => "groove_cycle".into(),
+        G::AdditiveProcess(_) => "additive_process".into(),
+        G::ModalArc(_) => "modal_arc".into(),
+        G::CallResponse(_) => "call_response".into(),
+        G::JazzChorus(_) => "jazz_chorus".into(),
+        G::ProgSuite(_) => "prog_suite".into(),
+        G::Sonata(_) => "sonata".into(),
+        G::Renaissance(_) => "renaissance".into(),
+        G::Opera(_) => "opera".into(),
+        G::Compatibility { family, .. } => format!("compatibility:{family:?}"),
     }
 }
+
+fn strip_seed_and_dynamic_fields(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(object) => {
+            object.remove("seed");
+            object.remove("energy");
+            object.remove("section_intensity");
+            for child in object.values_mut() {
+                strip_seed_and_dynamic_fields(child);
+            }
+        }
+        serde_json::Value::Array(values) => {
+            for child in values {
+                strip_seed_and_dynamic_fields(child);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Canonical, family-native fingerprint of a typed grammar plan. Random seed
+/// and non-structural intensity values are excluded; structural role order,
+/// cycle/chorus counts, section boundaries, transformations and obligations
+/// remain bound. Compatibility plans are deliberately unqualified.
+fn grammar_plan_signature(plan: &GrammarPlanEvidence) -> Option<String> {
+    if matches!(plan, GrammarPlanEvidence::Compatibility { .. }) {
+        return None;
+    }
+    let mut value = serde_json::to_value(plan).ok()?;
+    strip_seed_and_dynamic_fields(&mut value);
+    let bytes = serde_json::to_vec(&value).ok()?;
+    Some(domain_sha256(
+        b"symthaea:muse-grammar-plan-topology:v1\n",
+        &bytes,
+    ))
+}
+
+fn grammar_transformations(plan: &GrammarPlanEvidence) -> Vec<String> {
+    use symthaea_music_theory::call_response::ChorusRole;
+    use symthaea_music_theory::grammar::GrammarPlanEvidence as G;
+    use symthaea_music_theory::spec::FormKind;
+
+    let mut operations = BTreeSet::new();
+    match plan {
+        G::PeriodSentence(plan) => {
+            operations.insert(format!("phrase-model:{}", plan.phrase_model));
+            operations.insert(format!("continuation:{}", plan.continuation_strategy));
+        }
+        G::Contrapuntal(plan) => {
+            for (enabled, name) in [
+                (plan.countersubject, "countersubject"),
+                (plan.inversion, "inversion"),
+                (plan.augmentation, "augmentation"),
+                (plan.diminution, "diminution"),
+                (plan.stretto, "stretto"),
+                (plan.controlled_dissonance, "controlled_dissonance"),
+                (plan.final_combination, "final_combination"),
+            ] {
+                if enabled {
+                    operations.insert(format!("fugue:{name}"));
+                }
+            }
+        }
+        G::GrooveCycle(plan) => {
+            operations.insert(format!("cycle-kind:{:?}", plan.kind));
+            for section in &plan.sections {
+                operations.insert(format!("cycle-role:{:?}", section.role));
+            }
+            for obligation in &plan.obligations {
+                if obligation.fulfilled {
+                    operations.insert(format!("cycle-obligation:{}", obligation.code));
+                }
+            }
+        }
+        G::AdditiveProcess(plan) => {
+            operations.insert(format!("process-trajectory:{:?}", plan.trajectory_kind));
+            if plan.prefix_lengths.windows(2).any(|pair| pair[1] > pair[0]) {
+                operations.insert("process:prefix-growth".into());
+            }
+            if plan.prefix_lengths.windows(2).any(|pair| pair[1] < pair[0]) {
+                operations.insert("process:prefix-release".into());
+            }
+            if plan.prefix_lengths.windows(2).any(|pair| pair[1] == pair[0]) {
+                operations.insert("process:prefix-hold".into());
+            }
+        }
+        G::ModalArc(plan) => {
+            operations.insert(format!("modal-arc-profile:{:?}", plan.profile));
+            operations.insert("modal-arc:alap".into());
+            operations.insert("modal-arc:jor".into());
+            operations.insert("modal-arc:jhala".into());
+        }
+        G::CallResponse(plan) => {
+            for role in &plan.trajectory {
+                let label = match role {
+                    ChorusRole::Statement => "statement",
+                    ChorusRole::Variation => "variation",
+                    ChorusRole::Intensification => "intensification",
+                    ChorusRole::Breakdown => "breakdown",
+                    ChorusRole::Reconciliation => "reconciliation",
+                    ChorusRole::Coda => "coda",
+                };
+                operations.insert(format!("blues-chorus:{label}"));
+            }
+            operations.insert("blues:call-response".into());
+        }
+        G::JazzChorus(plan) => {
+            for role in &plan.trajectory {
+                let label = match role {
+                    ChorusRole::Statement => "statement",
+                    ChorusRole::Variation => "variation",
+                    ChorusRole::Intensification => "intensification",
+                    ChorusRole::Breakdown => "breakdown",
+                    ChorusRole::Reconciliation => "reconciliation",
+                    ChorusRole::Coda => "coda",
+                };
+                operations.insert(format!("jazz-chorus:{label}"));
+            }
+            operations.insert("jazz:head-and-chorus-development".into());
+        }
+        G::ProgSuite(evidence) => {
+            for section in &evidence.plan.sections {
+                operations.insert(format!("prog-section:{:?}", section.role));
+                if let Some(transform) = section.transform {
+                    let label = match transform {
+                        0 => "inversion",
+                        1 => "retrograde",
+                        2 => "retrograde-inversion",
+                        _ => "other",
+                    };
+                    operations.insert(format!("prog-transform:{label}"));
+                }
+            }
+        }
+        G::Sonata(evidence) => {
+            for section in &evidence.plan.sections {
+                operations.insert(format!("sonata-section:{:?}", section.kind));
+            }
+            for item in &evidence.verification {
+                if item.verified {
+                    operations.insert(format!("sonata-obligation:{}", item.obligation_id));
+                }
+            }
+        }
+        G::Renaissance(evidence) => {
+            operations.insert("renaissance:equal-voice-imitation".into());
+            operations.insert(format!("renaissance:point-one-{}", evidence.plan.point_one_entry_order.join("-")));
+            operations.insert(format!("renaissance:point-two-{}", evidence.plan.point_two_entry_order.join("-")));
+            operations.insert("renaissance:suspension-7-6".into());
+            operations.insert("renaissance:landini-7-6-8".into());
+            operations.insert("renaissance:tonic-close".into());
+        }
+        G::Opera(evidence) => {
+            for section in &evidence.plan.sections {
+                operations.insert(format!("opera-section:{}", section.id));
+            }
+            operations.insert("opera:two-theme-dialogue".into());
+            operations.insert("opera:one-bar-turn-taking".into());
+            operations.insert("opera:interruption".into());
+            operations.insert("opera:cadential-tag".into());
+        }
+        G::Compatibility { .. } => {}
+    }
+    operations.into_iter().collect()
+}
+
+fn jaccard_distance(left: &[String], right: &[String]) -> f64 {
+    let left: BTreeSet<_> = left.iter().collect();
+    let right: BTreeSet<_> = right.iter().collect();
+    let union = left.union(&right).count();
+    if union == 0 {
+        return 0.0;
+    }
+    let intersection = left.intersection(&right).count();
+    1.0 - intersection as f64 / union as f64
+}
+
+fn mean_pairwise_operation_diversity(trials: &[GenomeTrial]) -> f64 {
+    if trials.len() < 2 {
+        return 0.0;
+    }
+    let mut sum = 0.0;
+    let mut count = 0usize;
+    for left in 0..trials.len() {
+        for right in left + 1..trials.len() {
+            sum += jaccard_distance(
+                &trials[left].grammar_transformations,
+                &trials[right].grammar_transformations,
+            );
+            count += 1;
+        }
+    }
+    sum / count.max(1) as f64
+}
+
 
 fn mean_pairwise_distance(fingerprints: &[[f64; fingerprint::STRUCT_DIMS]]) -> f64 {
     if fingerprints.len() < 2 {
