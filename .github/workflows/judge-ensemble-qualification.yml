@@ -1,0 +1,27 @@
+name: Judge Ensemble Qualification
+
+on:
+  push:
+    paths:
+      - "research/judge-ensemble-001/**"
+      - ".github/workflows/judge-ensemble-qualification.yml"
+  pull_request:
+    paths:
+      - "research/judge-ensemble-001/**"
+      - ".github/workflows/judge-ensemble-qualification.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  std-only-synthetic-controls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Format exact crate
+        run: cargo fmt --manifest-path research/judge-ensemble-001/Cargo.toml -- --check
+      - name: Test synthetic known-answer controls
+        run: cargo test --locked --manifest-path research/judge-ensemble-001/Cargo.toml
