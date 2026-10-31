@@ -445,7 +445,7 @@ pub fn validate_mutation_validity_plan_fields(
             issues.push(format!("{} meaning-changing mutation requires a target_dimension", variant.mutation_id));
         }
         if variant.intended_relation == MutationSemanticRelationV1::Preserving
-            && variant.target_dimension.as_deref().is_some_and(|value| !value.trim().is_empty())
+            && variant.target_dimension.is_some()
         {
             issues.push(format!("{} semantics-preserving mutation must not declare a changed target_dimension", variant.mutation_id));
         }
@@ -1175,7 +1175,8 @@ mod tests {
     #[test]
     fn rejects_semantics_changing_plan_without_target_dimension() {
         let (plan, _) = make_plan_and_receipt();
-        let value: serde_json::Value = serde_json::from_slice(&plan).unwrap();
+        let mut value: serde_json::Value = serde_json::from_slice(&plan).unwrap();
+        value.as_object_mut().unwrap().remove("plan_commitment_sha256");
         let mut fields: MutationValidityPlanFieldsV1 = serde_json::from_value(value).unwrap();
         fields.variants[1].target_dimension = None;
         let issues = validate_mutation_validity_plan_fields(&fields).unwrap_err();
@@ -1217,8 +1218,9 @@ mod tests {
     fn rejects_more_reviewers_than_preregistered_slots() {
         let (plan, receipt) = make_plan_and_receipt();
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        let first_rating = value["observations"][0]["adjudications"][0].clone();
         value["observations"][0]["adjudications"].as_array_mut().unwrap()
-            .push(value["observations"][0]["adjudications"][0].clone());
+            .push(first_rating);
         assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
             .unwrap_err().contains("more adjudications than planned"));
     }
