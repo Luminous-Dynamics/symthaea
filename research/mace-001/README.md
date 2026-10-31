@@ -93,7 +93,7 @@ These tests are authored but have **not** been compiled or executed in this envi
 ## Limits
 
 - This is a finite smoke conformance set, not a benchmark leaderboard.
-- The TSV parser validates the harness contract; it does not run a general JSON Schema validator on the embedded payload. The JSON schema documents remain the richer interchange contract.
+- The minimal embedded-JSON scanner extracts selected top-level fields and checks exact pair deltas; it is not a general-purpose JSON parser or JSON Schema validator. The JSON schema documents remain the richer interchange contract.
 - A matching oracle label does not authenticate causal identification in the real world. The hidden simulator's actual SCM and intervention schedule must be defined independently for the full MACE track.
 - The current four examples are minimal falsification controls. The controlled-intervention example is a deterministic fixture assumption, not a statistical causal-effect estimate.
 - A hard-gate pass is limited to the supplied finite oracle cases; it is not a security certification or zero-risk guarantee.
