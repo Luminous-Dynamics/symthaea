@@ -326,6 +326,8 @@ pub struct GeneEffectPair {
     pub candidate_plan_signature: Option<String>,
     pub counterfactual_plan_signature: Option<String>,
     pub counterfactual_grammar_transformations: Vec<String>,
+    pub counterfactual_valid: bool,
+    pub counterfactual_failure_codes: Vec<String>,
     /// Non-empty means the ablated gene changed at least one declared dimension:
     /// symbolic_score, grammar_plan_topology, or grammar_operations.
     pub changed_dimensions: Vec<String>,
@@ -892,7 +894,12 @@ pub fn evaluate_genome(
         });
     }
 
+    let (gene_effect_audits, gene_effect_issues) =
+        audit_gene_effects(genome, base_intent, config, &trials);
+    issues.extend(gene_effect_issues);
+
     let eligible_for_archive = issues.is_empty()
+        && gene_effect_audits.iter().all(|audit| audit.status == GeneEffectStatus::Observed)
         && trials.iter().all(|trial| {
             trial.universal_invariant_passed
                 && trial.trace_integrity.is_complete()
@@ -1004,10 +1011,228 @@ pub fn evaluate_genome(
         mean_structural_fingerprint: mean_fingerprint,
         layer_coverage,
         trials,
+        gene_effect_audits,
         evaluation_sha256: String::new(),
     };
     evaluation.evaluation_sha256 = evaluation_digest(&evaluation)?;
     Ok(evaluation)
+}
+
+fn audit_gene_effects(
+    genome: &StyleGenome,
+    base_intent: &MusicalIntent,
+    config: &GenomeEvaluationConfig,
+    trials: &[GenomeTrial],
+) -> (Vec<GenomeGeneEffectAudit>, Vec<GenomeIssue>) {
+    let mut audits = Vec::new();
+    let mut issues = Vec::new();
+    let axes = [
+        GenomeAxis::Melody,
+        GenomeAxis::Rhythm,
+        GenomeAxis::Harmony,
+        GenomeAxis::Performance,
+        GenomeAxis::Ensemble,
+        GenomeAxis::Production,
+    ];
+
+    for axis in axes {
+        let Some(catalog_id) = axis.catalog_id(&genome.recipe) else {
+            continue;
+        };
+        let layer = match axis {
+            GenomeAxis::Ensemble | GenomeAxis::Production => GeneEffectLayer::Renderer,
+            _ => GeneEffectLayer::Symbolic,
+        };
+
+        if layer == GeneEffectLayer::Renderer {
+            let reason = format!(
+                "{} gene requires a renderer-stage counterfactual; symbolic score equality is not a valid test of this layer",
+                axis.layer_name()
+            );
+            issues.push(GenomeIssue::new(
+                "renderer_gene_effect_not_evaluated",
+                reason.clone(),
+            ));
+            audits.push(GenomeGeneEffectAudit {
+                axis,
+                catalog_id,
+                layer,
+                status: GeneEffectStatus::RendererPending,
+                seed_count: trials.len(),
+                changed_seed_count: 0,
+                reason: Some(reason),
+                paired_trials: Vec::new(),
+            });
+            continue;
+        }
+
+        let counterfactual_genome = match genome.replace_gene(axis, None) {
+            Ok(genome) => genome,
+            Err(issue) => {
+                let reason = format!("{}: {}", issue.code, issue.message);
+                issues.push(GenomeIssue::new(
+                    "gene_counterfactual_recipe_failed",
+                    reason.clone(),
+                ));
+                audits.push(GenomeGeneEffectAudit {
+                    axis,
+                    catalog_id,
+                    layer,
+                    status: GeneEffectStatus::CounterfactualUnavailable,
+                    seed_count: trials.len(),
+                    changed_seed_count: 0,
+                    reason: Some(reason),
+                    paired_trials: Vec::new(),
+                });
+                continue;
+            }
+        };
+
+        let counterfactual_compiled = match compile_hybrid_style(&counterfactual_genome.recipe) {
+            Ok(compiled) => compiled,
+            Err(mix_issues) => {
+                let reason = mix_issues
+                    .iter()
+                    .map(|problem| format!("{}: {}", problem.code, problem.message))
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                issues.push(GenomeIssue::new(
+                    "gene_counterfactual_compile_failed",
+                    format!("{} ablation failed: {reason}", axis.layer_name()),
+                ));
+                audits.push(GenomeGeneEffectAudit {
+                    axis,
+                    catalog_id,
+                    layer,
+                    status: GeneEffectStatus::CounterfactualUnavailable,
+                    seed_count: trials.len(),
+                    changed_seed_count: 0,
+                    reason: Some(reason),
+                    paired_trials: Vec::new(),
+                });
+                continue;
+            }
+        };
+
+        let mut paired_trials = Vec::with_capacity(trials.len());
+        let mut changed_seed_count = 0usize;
+        let mut invalid_seed_count = 0usize;
+
+        for trial in trials {
+            let mut intent = *base_intent;
+            intent.seed = trial.seed;
+            let counterfactual = compose_with_grammar_plan(
+                counterfactual_compiled.structural_style.grammar_profile(),
+                &intent,
+                &counterfactual_compiled.spec,
+            );
+            let report = validate_score(&counterfactual.score, &config.score_validation);
+            let mut failure_codes = report
+                .issues
+                .iter()
+                .filter(|problem| {
+                    problem.severity == ValidationSeverity::Fatal
+                        && is_universal_invariant(problem.rule)
+                })
+                .map(|problem| format!("{:?}", problem.rule))
+                .collect::<Vec<_>>();
+            if !grammar_plan_well_formed(&counterfactual.plan) {
+                failure_codes.push("grammar_plan_incomplete".into());
+            }
+
+            let score_bytes = match serde_json::to_vec(&counterfactual.score) {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    failure_codes.push(format!("score_serialization_failed:{error}"));
+                    Vec::new()
+                }
+            };
+            let counterfactual_score_sha256 = if score_bytes.is_empty() {
+                String::new()
+            } else {
+                domain_sha256(b"symthaea:muse-style-genome-score:v1\n", &score_bytes)
+            };
+            let counterfactual_plan_signature =
+                grammar_plan_signature(&counterfactual.plan);
+            let counterfactual_grammar_transformations =
+                grammar_transformations(&counterfactual.plan);
+
+            if !is_sha256_hex(&counterfactual_score_sha256)
+                || counterfactual_plan_signature.is_none()
+                || counterfactual_grammar_transformations.is_empty()
+            {
+                failure_codes.push("counterfactual_evidence_incomplete".into());
+            }
+            let counterfactual_valid = failure_codes.is_empty();
+            if !counterfactual_valid {
+                invalid_seed_count += 1;
+            }
+
+            let mut changed_dimensions = Vec::new();
+            if counterfactual_score_sha256 != trial.score_sha256 {
+                changed_dimensions.push("symbolic_score".into());
+            }
+            if counterfactual_plan_signature != trial.grammar_plan_signature {
+                changed_dimensions.push("grammar_plan_topology".into());
+            }
+            if counterfactual_grammar_transformations != trial.grammar_transformations {
+                changed_dimensions.push("grammar_operations".into());
+            }
+            if counterfactual_valid && !changed_dimensions.is_empty() {
+                changed_seed_count += 1;
+            }
+
+            paired_trials.push(GeneEffectPair {
+                seed: trial.seed,
+                candidate_score_sha256: trial.score_sha256.clone(),
+                counterfactual_score_sha256,
+                candidate_plan_signature: trial.grammar_plan_signature.clone(),
+                counterfactual_plan_signature,
+                counterfactual_grammar_transformations,
+                counterfactual_valid,
+                counterfactual_failure_codes: failure_codes,
+                changed_dimensions,
+            });
+        }
+
+        let (status, reason) = if invalid_seed_count > 0 {
+            let reason = format!(
+                "{} of {} paired counterfactual seeds failed universal score or native-plan validation",
+                invalid_seed_count,
+                trials.len()
+            );
+            issues.push(GenomeIssue::new(
+                "gene_counterfactual_invalid",
+                format!("{}: {reason}", axis.layer_name()),
+            ));
+            (GeneEffectStatus::CounterfactualUnavailable, Some(reason))
+        } else if changed_seed_count == 0 {
+            let reason = format!(
+                "removing {} did not change the symbolic score or family-native plan in any paired seed",
+                axis.layer_name()
+            );
+            issues.push(GenomeIssue::new(
+                "gene_no_observed_effect",
+                reason.clone(),
+            ));
+            (GeneEffectStatus::NoObservedEffect, Some(reason))
+        } else {
+            (GeneEffectStatus::Observed, None)
+        };
+
+        audits.push(GenomeGeneEffectAudit {
+            axis,
+            catalog_id,
+            layer,
+            status,
+            seed_count: trials.len(),
+            changed_seed_count,
+            reason,
+            paired_trials,
+        });
+    }
+
+    (audits, issues)
 }
 
 fn listen_bundle_for_score(
