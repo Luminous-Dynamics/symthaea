@@ -455,13 +455,14 @@ fn predicted_effect(
 fn rank_tau_b(
     concordant: usize,
     discordant: usize,
-    true_ties: usize,
-    predicted_ties: usize,
+    true_tied_pairs: usize,
+    predicted_tied_pairs: usize,
+    covered_pairs: usize,
 ) -> Option<f64> {
     let numerator = concordant as f64 - discordant as f64;
-    let left = (concordant + discordant + true_ties) as f64;
-    let right = (concordant + discordant + predicted_ties) as f64;
-    let denominator = (left * right).sqrt();
+    let untied_true_pairs = covered_pairs.saturating_sub(true_tied_pairs) as f64;
+    let untied_predicted_pairs = covered_pairs.saturating_sub(predicted_tied_pairs) as f64;
+    let denominator = (untied_true_pairs * untied_predicted_pairs).sqrt();
     (denominator > 0.0).then_some(numerator / denominator)
 }
 
@@ -508,8 +509,8 @@ fn evaluate_episode(
     let mut null_nonzero_count = 0usize;
     let mut concordant = 0usize;
     let mut discordant = 0usize;
-    let mut true_ties = 0usize;
-    let mut predicted_ties = 0usize;
+    let mut true_tied_pairs = 0usize;
+    let mut predicted_tied_pairs = 0usize;
 
     for left_index in 0..canonical.len() {
         for right_index in (left_index + 1)..canonical.len() {
@@ -540,16 +541,20 @@ fn evaluate_episode(
                     }
                 }
 
-                if true_delta.abs() <= SIGN_EPSILON {
-                    if predicted_delta.abs() > SIGN_EPSILON {
-                        true_ties += 1;
+                let true_tied = true_delta.abs() <= SIGN_EPSILON;
+                let predicted_tied = predicted_delta.abs() <= SIGN_EPSILON;
+                if true_tied {
+                    true_tied_pairs += 1;
+                }
+                if predicted_tied {
+                    predicted_tied_pairs += 1;
+                }
+                if !true_tied && !predicted_tied {
+                    if true_delta * predicted_delta > 0.0 {
+                        concordant += 1;
+                    } else {
+                        discordant += 1;
                     }
-                } else if predicted_delta.abs() <= SIGN_EPSILON {
-                    predicted_ties += 1;
-                } else if true_delta * predicted_delta > 0.0 {
-                    concordant += 1;
-                } else {
-                    discordant += 1;
                 }
             }
         }
@@ -632,7 +637,13 @@ fn evaluate_episode(
         sign_accuracy: (sign_count > 0).then_some(sign_correct as f64 / sign_count as f64),
         effect_magnitude_mae: (effect_error_count > 0)
             .then_some(effect_error_sum / effect_error_count as f64),
-        rank_tau_b: rank_tau_b(concordant, discordant, true_ties, predicted_ties),
+        rank_tau_b: rank_tau_b(
+            concordant,
+            discordant,
+            true_tied_pairs,
+            predicted_tied_pairs,
+            covered_pairs,
+        ),
         top1_regret,
         null_false_effect_rate: (scenario == Scenario::NullEffect && covered_pairs > 0)
             .then_some(null_nonzero_count as f64 / covered_pairs as f64),
@@ -1037,6 +1048,17 @@ mod tests {
             .predict_effect(&history, ACTIONS[4], ACTIONS[0])
             .expect("effect head produces a pairwise effect");
         assert!((delta - 0.62).abs() < 1e-12);
+    }
+
+
+    #[test]
+    fn kendall_tau_b_counts_both_sided_and_shared_ties() {
+        assert_eq!(rank_tau_b(3, 0, 0, 0, 3), Some(1.0));
+        assert_eq!(rank_tau_b(0, 3, 0, 0, 3), Some(-1.0));
+        assert_eq!(rank_tau_b(1, 1, 1, 1, 3), Some(0.0));
+        assert_eq!(rank_tau_b(0, 0, 3, 3, 3), None);
+        assert_eq!(rank_tau_b(1, 0, 2, 2, 3), Some(1.0));
+        assert_eq!(rank_tau_b(0, 0, 2, 0, 2), None);
     }
 
     #[test]
