@@ -32,7 +32,7 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 pub const COUNTERFACTUAL_SUPPORT_ADAPTER_VERSION: &str =
-    "mel-mr-eval-025-counterfactual-support-adapter-v1";
+    "mel-mr-eval-025-counterfactual-support-adapter-v2";
 const EVENT_EVIDENCE_DOMAIN: &[u8] =
     b"luminous-dynamics-mel-mr-eval-025-event-support-evidence-v1\0";
 const ADAPTER_REPORT_DOMAIN: &[u8] =
