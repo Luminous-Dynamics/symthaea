@@ -7,7 +7,7 @@
 //! any shared Foundry or learning corpus.
 
 use midly::{MetaMessage, MidiMessage, Smf, TrackEventKind};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use symthaea_muse_protocol::{
     ImportedMotifSummary, ImportedSectionSummary, ImportedWorkAnalysis, SymbolicImportFormat,
 };
@@ -49,7 +49,9 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
 
     for (track_index, track) in smf.tracks.iter().enumerate() {
         let mut tick = 0_u64;
-        let mut pending: HashMap<(u8, u8), (u64, u8)> = HashMap::new();
+        // MIDI 1.0 does not attach a unique note-instance ID to NoteOff.
+        // Preserve overlapping repeated pitches and pair releases FIFO.
+        let mut pending = BTreeMap::<(u8, u8), VecDeque<(u64, u8)>>::new();
         for event in track {
             tick = tick.saturating_add(u64::from(event.delta.as_int()));
             match event.kind {
@@ -67,12 +69,17 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                     let channel = channel.as_int();
                     match message {
                         MidiMessage::NoteOn { key, vel } if vel.as_int() > 0 => {
-                            pending.insert((channel, key.as_int()), (tick, vel.as_int()));
+                            pending
+                                .entry((channel, key.as_int()))
+                                .or_default()
+                                .push_back((tick, vel.as_int()));
                         }
                         MidiMessage::NoteOn { key, .. } | MidiMessage::NoteOff { key, .. } => {
-                            if let Some((onset, velocity)) =
-                                pending.remove(&(channel, key.as_int()))
-                            {
+                            let pending_key = (channel, key.as_int());
+                            let completed = pending
+                                .get_mut(&pending_key)
+                                .and_then(VecDeque::pop_front);
+                            if let Some((onset, velocity)) = completed {
                                 notes.push(RawNote {
                                     track: track_index,
                                     pitch: key.as_int(),
@@ -80,6 +87,12 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                                     duration: tick.saturating_sub(onset).max(1),
                                     velocity,
                                 });
+                                if pending
+                                    .get(&pending_key)
+                                    .is_some_and(VecDeque::is_empty)
+                                {
+                                    pending.remove(&pending_key);
+                                }
                             }
                         }
                         _ => {}
@@ -88,16 +101,21 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                 _ => {}
             }
         }
-        for ((_, pitch), (onset, velocity)) in pending {
-            notes.push(RawNote {
-                track: track_index,
-                pitch,
-                onset,
-                duration: tick.saturating_sub(onset).max(1),
-                velocity,
-            });
+        for ((_, pitch), open_notes) in pending {
+            for (onset, velocity) in open_notes {
+                notes.push(RawNote {
+                    track: track_index,
+                    pitch,
+                    onset,
+                    duration: tick.saturating_sub(onset).max(1),
+                    velocity,
+                });
+            }
         }
     }
+    // NoteOff order is not necessarily onset order (especially with repeated
+    // pitches). Return a stable chronological score independent of map order.
+    notes.sort_by_key(|note| (note.onset, note.track, note.pitch, note.duration, note.velocity));
     if notes.is_empty() {
         return Err("the MIDI file contains no pitched note events".into());
     }
@@ -393,6 +411,33 @@ pub fn analyze(score: &Score) -> ImportedWorkAnalysis {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preserves_overlapping_repeated_same_pitch_midi_notes_fifo() {
+        // Format 0, one track, 96 ticks/quarter:
+        // C4 on@0, C4 on@48, C4 off@96 (NoteOn vel=0),
+        // C4 off@144, end-of-track. NoteOff lacks a note-instance ID,
+        // so the importer documents and tests FIFO pairing.
+        let midi = [
+            0x4d, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06,
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x60,
+            0x4d, 0x54, 0x72, 0x6b, 0x00, 0x00, 0x00, 0x14,
+            0x00, 0x90, 0x3c, 0x5a,
+            0x30, 0x90, 0x3c, 0x46,
+            0x30, 0x90, 0x3c, 0x00,
+            0x30, 0x80, 0x3c, 0x00,
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let score = parse_midi(&midi).expect("valid repeated-pitch MIDI");
+        assert_eq!(score.notes.len(), 2);
+        assert_eq!(score.notes[0].pitch.midi(), 60);
+        assert_eq!(score.notes[1].pitch.midi(), 60);
+        assert!((score.notes[0].onset.beats() - 0.0).abs() < 1e-12);
+        assert!((score.notes[1].onset.beats() - 0.5).abs() < 1e-12);
+        assert!((score.notes[0].duration.beats() - 1.0).abs() < 1e-12);
+        assert!((score.notes[1].duration.beats() - 1.0).abs() < 1e-12);
+        assert!(score.has_part_identity());
+    }
 
     #[test]
     fn parses_minimal_musicxml_without_forcing_a_territory() {
