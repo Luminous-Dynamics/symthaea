@@ -12,7 +12,9 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::intervention_quality::analyze_intervention_quality;
+use crate::intervention_quality::{
+    analyze_intervention_quality, intervention_quality_plan_binding,
+};
 
 pub const TARGET_DELTA_PLAN_SCHEMA: &str =
     "symthaea.science_bench_refresh_intervention_target_delta_plan.v1";
@@ -381,6 +383,34 @@ pub fn validate_target_delta_plan_fields(
         issues.push("quality_plan_sha256 must bind the exact parent quality-plan bytes".to_owned());
     }
 
+    let (parent_plan_sha256, parent_commitment, parent_revision, parent_study_id, parent_purpose) =
+        match intervention_quality_plan_binding(quality_plan_bytes) {
+            Ok(binding) => binding,
+            Err(error) => {
+                issues.push(format!("parent quality plan failed independent commitment verification: {error}"));
+                (String::new(), String::new(), String::new(), String::new(), String::new())
+            }
+        };
+    if !valid_digest(&fields.quality_plan_sha256, allow_zero)
+        || fields.quality_plan_sha256 != parent_plan_sha256
+    {
+        issues.push("quality_plan_sha256 must bind the exact verified parent quality-plan bytes".to_owned());
+    }
+    if !valid_digest(&fields.quality_plan_commitment_sha256, allow_zero)
+        || fields.quality_plan_commitment_sha256 != parent_commitment
+    {
+        issues.push("quality_plan_commitment_sha256 differs from the verified parent quality plan".to_owned());
+    }
+    if parent_revision != fields.analyzer_source_revision {
+        issues.push("parent quality plan was committed by a different analyzer revision".to_owned());
+    }
+    if parent_study_id != fields.study_id {
+        issues.push("target-delta study_id differs from its parent quality study_id".to_owned());
+    }
+    let own_purpose = if fields.purpose.qualified() { "qualified_run" } else { "example_only" };
+    if parent_purpose != own_purpose {
+        issues.push("target-delta purpose differs from its parent quality-plan purpose".to_owned());
+    }
     let quality_plan: Value = match serde_json::from_slice(quality_plan_bytes) {
         Ok(value) => value,
         Err(error) => {
@@ -388,16 +418,6 @@ pub fn validate_target_delta_plan_fields(
             Value::Null
         }
     };
-    let parent_commitment = quality_plan.get("plan_commitment_sha256").and_then(Value::as_str).unwrap_or("");
-    if !valid_digest(&fields.quality_plan_commitment_sha256, allow_zero)
-        || fields.quality_plan_commitment_sha256 != parent_commitment
-    {
-        issues.push("quality_plan_commitment_sha256 differs from the parent quality plan".to_owned());
-    }
-    let parent_revision = quality_plan.get("analyzer_source_revision").and_then(Value::as_str).unwrap_or("");
-    if parent_revision != fields.analyzer_source_revision {
-        issues.push("parent quality plan was committed by a different analyzer revision".to_owned());
-    }
     let parent_candidates = quality_plan.get("candidates").and_then(Value::as_array);
     let Some(parent_candidates) = parent_candidates else {
         issues.push("parent quality plan has no candidate census".to_owned());
@@ -580,18 +600,13 @@ fn target_tuple_consensus(
     (Some(tuple), Some(consensus_ppm), tuple_matches, comparisons, transition_matches, comparisons)
 }
 
-fn final_validity(
-    global: RelationValidity,
+fn target_delta_validity(
     target: Option<&ObservedTargetTuple>,
     candidate: &TargetDeltaCandidateV1,
 ) -> (FinalCandidateValidityV1, bool) {
-    if global == RelationValidity::Invalid {
-        return (FinalCandidateValidityV1::Invalid, false);
-    }
-    if global == RelationValidity::Ambiguous || target.is_none() {
+    let Some(observed) = target else {
         return (FinalCandidateValidityV1::Ambiguous, false);
-    }
-    let observed = target.expect("checked some");
+    };
     let scope_matches = observed.changed_claims == candidate.expected_changed_claim_ids_sha256;
     if observed.change == candidate.expected_target_change
         && scope_matches
@@ -607,10 +622,19 @@ fn final_validity(
     }
 }
 
-fn report_commitment(fields: &TargetDeltaReportFieldsV1) -> Result<String, String> {
-    let payload = serde_json::to_vec(fields)
-        .map_err(|error| format!("cannot serialize target-delta report: {error}"))?;
-    digest_domain(REPORT_DOMAIN, &payload)
+fn combine_validity(
+    global: RelationValidity,
+    target: FinalCandidateValidityV1,
+) -> FinalCandidateValidityV1 {
+    match (global, target) {
+        (RelationValidity::Invalid, _) | (_, FinalCandidateValidityV1::Invalid) => {
+            FinalCandidateValidityV1::Invalid
+        }
+        (RelationValidity::Ambiguous, _) | (_, FinalCandidateValidityV1::Ambiguous) => {
+            FinalCandidateValidityV1::Ambiguous
+        }
+        (RelationValidity::Valid, FinalCandidateValidityV1::Valid) => FinalCandidateValidityV1::Valid,
+    }
 }
 
 fn ppm(numerator: u64, denominator: u64) -> Option<u32> {
@@ -818,7 +842,7 @@ pub fn analyze_intervention_target_delta(
         transition_matches += transition_pair_matches;
         transition_comparisons += transition_pair_comparisons;
         let (target_validity, scope_matches) =
-            final_validity(RelationValidity::Valid, observed_tuple.as_ref(), target_spec);
+            target_delta_validity(observed_tuple.as_ref(), target_spec);
         match target_validity {
             FinalCandidateValidityV1::Valid => target_valid += 1,
             FinalCandidateValidityV1::Invalid => target_invalid += 1,
@@ -828,7 +852,7 @@ pub fn analyze_intervention_target_delta(
         if observed_tuple.as_ref().is_some_and(|tuple| tuple.collateral == CollateralChangeV1::MaterialChangeOutsideAllowedScope) {
             collateral_changes += 1;
         }
-        let (finality, _) = final_validity(global_validity, observed_tuple.as_ref(), target_spec);
+        let finality = combine_validity(global_validity, target_validity);
         match finality {
             FinalCandidateValidityV1::Valid => final_valid += 1,
             FinalCandidateValidityV1::Invalid => final_invalid += 1,
