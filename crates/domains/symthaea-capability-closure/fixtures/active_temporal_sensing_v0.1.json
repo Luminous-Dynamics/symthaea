@@ -24,6 +24,7 @@
   },
   "policies": [
     "fixed_interval",
+    "jittered_interval",
     "multi_rate",
     "event_threshold",
     "novelty_threshold",
@@ -42,7 +43,9 @@
     "minimum_gap_defers_early_trigger",
     "observation_budget_exhaustion_explicit",
     "energy_budget_exhaustion_explicit",
-    "checked_timestamp_arithmetic"
+    "checked_timestamp_arithmetic",
+    "jitter_per_mille_less_than_1000",
+    "budget_block_reports_if_maximum_gap_deadline_has_been_missed"
   ],
   "adversarial_schedule_strata": [
     "uniform",
@@ -105,7 +108,7 @@
     "MLPerf_Tiny_v1_4": "https://mlcommons.org/2026/07/mlperf-tiny-v1-4-results/"
   },
   "implementation": {
-    "test_functions_authored": 13,
+    "test_functions_authored": 14,
     "tests_executed": false,
     "real_sensor_adapter": false,
     "calibrated_energy": false,
