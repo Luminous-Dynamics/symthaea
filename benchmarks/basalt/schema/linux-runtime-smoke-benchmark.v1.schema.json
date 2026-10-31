@@ -1,0 +1,359 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/basalt/linux-runtime-smoke-benchmark.v1.schema.json",
+  "title": "BASALT Linux runtime smoke benchmark protocol v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "suite_id",
+    "version",
+    "status",
+    "purpose",
+    "non_goals",
+    "comparison_arms",
+    "metrics",
+    "gates",
+    "statistical_protocol",
+    "required_disclosures",
+    "forbidden_claims",
+    "targets_are_proposed_not_measured"
+  ],
+  "properties": {
+    "suite_id": {
+      "const": "basalt-linux-runtime-smoke-benchmark-v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "status": {
+      "const": "protocol"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "non_goals": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "comparison_arms": {
+      "type": "array",
+      "minItems": 7,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "arm_id",
+          "role",
+          "description"
+        ],
+        "properties": {
+          "arm_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "enum": [
+              "baseline",
+              "reference",
+              "optional_reference",
+              "candidate",
+              "later_stage_reference"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "phase",
+          "definition",
+          "target",
+          "unit"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "phase": {
+            "enum": [
+              "safety",
+              "efficiency"
+            ]
+          },
+          "definition": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operator",
+              "value"
+            ],
+            "properties": {
+              "operator": {
+                "enum": [
+                  "=",
+                  "<=",
+                  ">="
+                ]
+              },
+              "value": {
+                "type": "number"
+              }
+            }
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "safety",
+        "efficiency",
+        "promotion_rule"
+      ],
+      "properties": {
+        "safety": {
+          "type": "array",
+          "minItems": 6,
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "efficiency": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "promotion_rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "statistical_protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "confidence_level",
+        "independence_unit",
+        "stratification",
+        "controls",
+        "splits",
+        "stopping"
+      ],
+      "properties": {
+        "confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "independence_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stratification": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "controls": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "splits": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stopping": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "required_disclosures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "forbidden_claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "targets_are_proposed_not_measured": {
+      "const": true
+    }
+  },
+  "allOf": [
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "operational_status_precision"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "errno_classification_accuracy"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "descriptor_cleanup_confirmation"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "unintended_side_effect_count"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "false_capture_or_qualification_claim_rate"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "report_schema_conformance"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "p95_smoke_latency_ms"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "p95_report_size_bytes"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

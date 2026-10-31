@@ -1,0 +1,399 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/basalt/linux-runtime-smoke.v1.schema.json",
+  "title": "BASALT Linux runtime smoke-test report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_version",
+    "suite_id",
+    "probe_id",
+    "observed_at_unix_ns",
+    "kernel",
+    "permission_class_probe_requested",
+    "probes",
+    "side_effects",
+    "observer_attached",
+    "workload_executed",
+    "event_capture_established",
+    "qualification_eligible",
+    "process_context"
+  ],
+  "properties": {
+    "report_version": {
+      "const": 1
+    },
+    "suite_id": {
+      "const": "basalt-linux-runtime-smoke-v1"
+    },
+    "probe_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observed_at_unix_ns": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "kernel": {
+      "$ref": "#/$defs/kernelIdentity"
+    },
+    "permission_class_probe_requested": {
+      "type": "boolean"
+    },
+    "probes": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "$ref": "#/$defs/probeObservation"
+      }
+    },
+    "side_effects": {
+      "$ref": "#/$defs/sideEffectClaims"
+    },
+    "observer_attached": {
+      "const": false
+    },
+    "workload_executed": {
+      "const": false
+    },
+    "event_capture_established": {
+      "const": false
+    },
+    "qualification_eligible": {
+      "const": false
+    },
+    "process_context": {
+      "$ref": "#/$defs/processSecurityContext"
+    }
+  },
+  "$defs": {
+    "kernelIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "release",
+        "kernel_machine",
+        "userspace_architecture",
+        "boot_id_digest"
+      ],
+      "properties": {
+        "release": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "boot_id_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "kernel_machine": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "userspace_architecture": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "probeObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "probe_id",
+        "status",
+        "detail",
+        "abi_version",
+        "errno",
+        "cleanup_status",
+        "resource_created",
+        "event_capture_attempted"
+      ],
+      "properties": {
+        "probe_id": {
+          "enum": [
+            "landlock_abi_version_query",
+            "fanotify_notification_group_init",
+            "fanotify_permission_class_group_init",
+            "bpf_lsm_load_attach",
+            "process_tracepoint_attach",
+            "cgroup_workload_scope"
+          ]
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "not_supported",
+            "invalid_request",
+            "operation_not_supported",
+            "permission_denied",
+            "not_attempted",
+            "failed"
+          ]
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1
+        },
+        "abi_version": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "errno": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cleanup_status": {
+          "enum": [
+            "not_required",
+            "closed",
+            "failed"
+          ]
+        },
+        "resource_created": {
+          "type": "boolean"
+        },
+        "event_capture_attempted": {
+          "const": false
+        }
+      }
+    },
+    "sideEffectClaims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bpf_programs_loaded_or_attached",
+        "tracepoints_enabled_or_attached",
+        "fanotify_marks_added",
+        "landlock_rulesets_created_or_enforced",
+        "cgroups_or_namespaces_created",
+        "host_policy_or_sysctls_changed",
+        "workload_processes_spawned"
+      ],
+      "properties": {
+        "bpf_programs_loaded_or_attached": {
+          "const": false
+        },
+        "tracepoints_enabled_or_attached": {
+          "const": false
+        },
+        "fanotify_marks_added": {
+          "const": false
+        },
+        "landlock_rulesets_created_or_enforced": {
+          "const": false
+        },
+        "cgroups_or_namespaces_created": {
+          "const": false
+        },
+        "host_policy_or_sysctls_changed": {
+          "const": false
+        },
+        "workload_processes_spawned": {
+          "const": false
+        }
+      }
+    },
+    "processSecurityContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "effective_uid",
+        "effective_gid",
+        "cap_eff_hex",
+        "cap_bnd_hex",
+        "no_new_privs",
+        "seccomp_mode",
+        "mount_namespace_inode",
+        "user_namespace_inode",
+        "pid_namespace_inode"
+      ],
+      "properties": {
+        "effective_uid": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "effective_gid": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cap_eff_hex": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]+$"
+        },
+        "cap_bnd_hex": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]+$"
+        },
+        "no_new_privs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "enum": [
+            0,
+            1,
+            null
+          ]
+        },
+        "seccomp_mode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "enum": [
+            0,
+            1,
+            2,
+            null
+          ]
+        },
+        "mount_namespace_inode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "user_namespace_inode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "pid_namespace_inode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "properties": {
+        "probes": {
+          "contains": {
+            "properties": {
+              "probe_id": {
+                "const": "landlock_abi_version_query"
+              }
+            },
+            "required": [
+              "probe_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "probes": {
+          "contains": {
+            "properties": {
+              "probe_id": {
+                "const": "fanotify_notification_group_init"
+              }
+            },
+            "required": [
+              "probe_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "probes": {
+          "contains": {
+            "properties": {
+              "probe_id": {
+                "const": "fanotify_permission_class_group_init"
+              }
+            },
+            "required": [
+              "probe_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "probes": {
+          "contains": {
+            "properties": {
+              "probe_id": {
+                "const": "bpf_lsm_load_attach"
+              }
+            },
+            "required": [
+              "probe_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "probes": {
+          "contains": {
+            "properties": {
+              "probe_id": {
+                "const": "process_tracepoint_attach"
+              }
+            },
+            "required": [
+              "probe_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "probes": {
+          "contains": {
+            "properties": {
+              "probe_id": {
+                "const": "cgroup_workload_scope"
+              }
+            },
+            "required": [
+              "probe_id"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
