@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/intervention-target-delta-plan.schema.json",
+  "title": "Symthaea Intervention Target Delta Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "analyzer_source_revision",
+    "purpose",
+    "study_id",
+    "quality_plan_sha256",
+    "quality_plan_commitment_sha256",
+    "reviewers_per_candidate",
+    "consensus_threshold_permille",
+    "candidates",
+    "plan_commitment_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_intervention_target_delta_plan.v1"
+    },
+    "analyzer_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "not": {
+        "pattern": "^0{40}$"
+      }
+    },
+    "purpose": {
+      "enum": [
+        "example_only",
+        "qualified_run"
+      ]
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "quality_plan_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "quality_plan_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "reviewers_per_candidate": {
+      "type": "integer",
+      "minimum": 3,
+      "maximum": 7
+    },
+    "consensus_threshold_permille": {
+      "type": "integer",
+      "minimum": 501,
+      "maximum": 1000
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    },
+    "plan_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "change": {
+      "enum": [
+        "unchanged",
+        "support_increased",
+        "support_decreased",
+        "contradiction_introduced",
+        "scope_changed",
+        "temporal_validity_changed",
+        "unit_changed",
+        "identity_changed",
+        "source_withdrawn",
+        "source_superseded",
+        "other_declared_change"
+      ]
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "target_identity_sha256",
+        "baseline_target_state_sha256",
+        "variant_target_state_sha256",
+        "expected_target_change",
+        "expected_changed_claim_ids_sha256",
+        "preserved_claim_ids_sha256"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "target_identity_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "baseline_target_state_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "variant_target_state_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "expected_target_change": {
+          "$ref": "#/$defs/change"
+        },
+        "expected_changed_claim_ids_sha256": {
+          "type": "array",
+          "maxItems": 10000,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/digest"
+          }
+        },
+        "preserved_claim_ids_sha256": {
+          "type": "array",
+          "maxItems": 10000,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/digest"
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "purpose": {
+            "const": "qualified_run"
+          }
+        },
+        "required": [
+          "purpose"
+        ]
+      },
+      "then": {
+        "properties": {
+          "quality_plan_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "quality_plan_commitment_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "plan_commitment_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "candidates": {
+            "items": {
+              "properties": {
+                "target_identity_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "baseline_target_state_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "variant_target_state_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
