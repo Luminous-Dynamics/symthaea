@@ -32,7 +32,7 @@ For each frozen observed history:
 7. Repeat the paired design across independent episode histories and held-out mechanism families. Bootstrap at the episode/history cluster; continuations are nested observations, not independent histories.
 8. Charge every candidate model evaluation and every physical/simulator continuation to the resource ledger.
 
-A starting continuation-count sweep is J = 1, 3, 5, 9 and 17, with the one-continuation arm retained as the intentionally optimistic reference. J=17 is motivated by the new paper's reported repeated-continuation protocol, not a universal minimum. Choose the actual qualification count using a blinded variance/sample-size pilot.
+A starting continuation-count sweep is J = 1, 3, 5, 9 and 17. J=1 is a naive single-continuation reference only; it cannot enter leave-one-continuation-out cross-fitting. The executable cross-fit diagnostic requires J ≥ 3. J=17 is motivated by the new paper's reported repeated-continuation protocol, not a universal minimum. Choose the actual qualification count using a blinded variance/sample-size pilot.
 
 ## Executable increment in this branch
 
