@@ -50,6 +50,8 @@ pub mod probe_policy_comparison;
 pub mod interaction_probe_plan;
 #[cfg(feature = "theory")]
 pub mod edit_contract;
+#[cfg(feature = "theory")]
+pub mod symbolic_edit_verifier;
 pub mod performed_event_map;
 pub mod renderer_execution_receipt;
 #[cfg(feature = "theory")]
