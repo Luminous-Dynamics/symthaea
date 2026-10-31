@@ -1593,17 +1593,20 @@ mod tests {
             .unwrap();
         assert_eq!(reservation.state, crate::resource_reservation::ReservationState::Committed);
         reservation_ledger.verify_integrity().unwrap();
-        // A second preflight made against the old reservation-ledger head cannot reserve
-        // again after the prior action has changed the ledger revision.
-        let stale_capability =
+        // Retrying the exact same action scope after losing the first response is
+        // idempotent: it returns the existing COMMITTED state and appends no event.
+        let retry_capability =
             prepare_measurement_reservation(&preflight_request).unwrap();
-        assert!(reservation_ledger
+        let event_count_before_retry = reservation_ledger.events().len();
+        let retry = reservation_ledger
             .reserve_measurement(
                 &scope.reservation_ledger_head_sha256,
-                stale_capability,
+                retry_capability,
                 30,
             )
-            .is_err());
+            .unwrap();
+        assert_eq!(retry.state, crate::resource_reservation::ReservationState::Committed);
+        assert_eq!(reservation_ledger.events().len(), event_count_before_retry);
         assert_eq!(reservation.state, crate::resource_reservation::ReservationState::Committed);
 
         let mut changed_manifest_scope = scope.clone();
