@@ -204,6 +204,22 @@ candidate severance matrices but does not evaluate their repertoire effects or s
 a minimum-information partition. These pieces are not by themselves proof of PyPhi
 conformance.
 
+## Certified system-phi invariant
+
+For binary units with a conditionally independent TPM and the ordinary
+directed-set-partition family that preserves self-connections, IIT 4.0
+(2023) has the certified upper bound phi_s <= n(n - 1) (Zaeemzadeh &
+Tononi, 2024, Table 2). The dense system-search path checks this bound on
+every completed scalar result and fails closed if it is exceeded.
+
+The helper returns no certificate when TotalCut is requested, because that
+special cut severs self-connections; it also returns no certificate for a
+one-unit system, where TotalCut is mandatory even when the flag is false.
+This invariant is a correctness alarm, not a pruning optimization or an
+independent proof of PyPhi parity.
+
+Reference: https://doi.org/10.1371/journal.pcbi.1012323
+
 ## Competitive benchmark gates (targets, not current results)
 
 Use two clearly separated upstream baselines:
@@ -509,10 +525,11 @@ exact canonical count must fail before recursive enumeration.
 
 ## Reproducible partition microbenchmark
 
-A standard-library-only Rust example records median/minimum elapsed nanoseconds
-alongside raw direction-label count, canonical representatives evaluated,
-redundant labelings pruned, and unique cuts for the two- through six-unit
-fixtures. Every warm-up and timed iteration must reproduce all frozen work counts;
+A standard-library-only Rust example records preflight-estimator median/minimum
+latency separately from cut-enumeration median/minimum latency, alongside raw
+direction-label count, canonical representatives evaluated, redundant labelings
+pruned, and unique cuts for the two- through seven-unit fixtures. Every warm-up
+and timed iteration must reproduce all frozen work counts;
 otherwise it exits nonzero.
 
 Run:
