@@ -11,7 +11,7 @@
 //!   hardsec_localization_audit --explanation explanation.json --graph graph.json \
 //!       --oracle evaluator-oracle.json --receipt receipt.json
 
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
@@ -49,9 +49,6 @@ fn sha256(bytes: &[u8]) -> String {
     digest.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-fn object<'a>(value: &'a Value, context: &str) -> Result<&'a Map<String, Value>, String> {
-    value.as_object().ok_or_else(|| format!("{context} must be a JSON object"))
-}
 
 fn string<'a>(value: &'a Value, key: &str, context: &str) -> Result<&'a str, String> {
     value.get(key).and_then(Value::as_str)
@@ -226,7 +223,7 @@ fn parse_regions(
     Ok(regions)
 }
 
-fn evaluate_budget(regions: &[Region], positive: &BTreeSet<String>, unit: &str, limit: usize) -> Value {
+fn evaluate_budget(regions: &[Region], edges: &BTreeMap<String, Edge>, positive: &BTreeSet<String>, unit: &str, limit: usize) -> Value {
     let mut selected_nodes = BTreeSet::new();
     let mut selected_edges = BTreeSet::new();
     let mut selected_regions = Vec::new();
@@ -244,7 +241,6 @@ fn evaluate_budget(regions: &[Region], positive: &BTreeSet<String>, unit: &str, 
                 used += 1;
             }
             "gates" => {
-                let remaining = limit - used;
                 let mut added = 0usize;
                 for node in &region.nodes {
                     if selected_nodes.insert(node.clone()) {
@@ -261,22 +257,20 @@ fn evaluate_budget(regions: &[Region], positive: &BTreeSet<String>, unit: &str, 
                 }
             }
             "edges" => {
-                let remaining = limit - used;
                 let mut added = 0usize;
                 for edge_id in &region.edges {
+                    if used + added >= limit {
+                        break;
+                    }
                     if selected_edges.insert(edge_id.clone()) {
                         added += 1;
-                        if used + added >= limit {
-                            break;
+                        if let Some(edge) = edges.get(edge_id) {
+                            selected_nodes.insert(edge.source.clone());
+                            selected_nodes.insert(edge.target.clone());
                         }
                     }
                 }
                 if added > 0 {
-                    for edge_id in &selected_edges {
-                        if let Some(edge) = regions.iter().flat_map(|r| r.edges.iter()).find(|id| *id == edge_id) {
-                            let _ = edge;
-                        }
-                    }
                     selected_regions.push(region.id.clone());
                     used += added;
                 }
@@ -430,8 +424,11 @@ fn audit_values(
         if !reference_paths_complete {
             return Err("complete path coverage cannot be claimed against an oracle path set not declared complete".to_owned());
         }
-        if path_matches.len() != oracle_paths.len() || oracle_paths.is_empty() {
-            return Err("complete path coverage requires every supplied reference path to be retained and matched".to_owned());
+        if path_matches.len() != oracle_paths.len()
+            || oracle_paths.is_empty()
+            || explanation_paths.len() != oracle_paths.len()
+        {
+            return Err("complete path coverage requires exactly the supplied reference paths, all retained and matched".to_owned());
         }
     }
     let reference_coverage = if oracle_paths.is_empty() { 0.0 } else { path_matches.len() as f64 / oracle_paths.len() as f64 };
@@ -441,9 +438,9 @@ fn audit_values(
         budgets.insert(value);
     }
     let curve: Vec<Value> = budgets.into_iter()
-        .map(|k| evaluate_budget(&regions, &positive, unit, k))
+        .map(|k| evaluate_budget(&regions, &edges, &positive, unit, k))
         .collect();
-    let requested_result = evaluate_budget(&regions, &positive, unit, limit);
+    let requested_result = evaluate_budget(&regions, &edges, &positive, unit, limit);
 
     Ok(json!({
         "schema_version": "hardsec-localization-receipt-v1",
