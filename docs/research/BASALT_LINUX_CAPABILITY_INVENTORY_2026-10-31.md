@@ -13,7 +13,7 @@ cargo run -p xtask --bin xtask -- basalt-linux-capability-probe \
 
 It records kernel release and architecture, active Linux Security Modules, a digest of `/sys/kernel/btf/vmlinux`, a digest of an accessible kernel config, relevant mount types, process scheduler tracepoint IDs, bpftool executable presence and binary digest, and cgroup membership. Kernel configuration is read only from well-known config files; absence or unreadability is `unknown`, not `disabled`.
 
-The report distinguishes `candidate_available`, `not_available`, `unknown`, and `inaccessible`. It stores a digest and bounded summary of `/proc/self/mountinfo`, not unrelated host mount paths. It writes the report using create-new semantics and does not overwrite an earlier report.
+The report distinguishes `candidate_available`, `not_available`, `unknown`, and `inaccessible`. It stores a digest and bounded summary of `/proc/self/mountinfo`, not unrelated host mount paths. The parser is capped at 16,384 lines; a larger inventory becomes `not_probed`, and mount-dependent capability statuses remain `unknown` rather than interpreting the truncated prefix as absence. It writes the report using create-new semantics and does not overwrite an earlier report.
 
 ## Non-goals and safety boundary
 
@@ -70,7 +70,7 @@ The capability inventory itself should be evaluated separately from observer qua
 
 Proposed targets (not results or external standards):
 - 100% precision for any `candidate_available` finding when compared to an actual later runtime smoke test;
-- 100% unknown classification for capabilities whose evidence is inaccessible or insufficient;
+- 100% unknown classification for capabilities whose evidence is inaccessible, truncated or insufficient;
 - zero side effects on host policy, mount, cgroup and BPF attachment state;
 - p95 preflight below 250 ms on a warm host;
 - deterministic stable-field report digest for repeated inventories on the same boot and namespace.
@@ -111,7 +111,7 @@ Targets include:
 - at least 99.9% reproducibility for stable report fields on the same boot and mount namespace;
 - p95 preflight latency no more than 250 ms and p95 report size no more than 64 KiB.
 
-These are proposed targets, not measured results or industry standards. Hosts, kernel boots and mount namespaces are the independent units; repeated reads from one host do not inflate sample size. Candidate availability remains weaker than successful runtime attach or capture.
+These are proposed targets, not measured results or industry standards. The Linux inventory module currently has 16 authored Rust tests, including a host preflight test and a truncation downgrade test; none has been compiled or executed here. Hosts, kernel boots and mount namespaces are the independent units; repeated reads from one host do not inflate sample size. Candidate availability remains weaker than successful runtime attach or capture.
 
 ## Next step after this inventory
 
