@@ -21,6 +21,7 @@ pub mod run_wide_pruning_risk;
 pub mod decision_focused_voc;
 pub mod pareto_regret_voc;
 pub mod hardware_objectives;
+pub mod pareto_hypervolume_qmc;
 
 const MATRIX_SCHEMA: &str = "symthaea.architecture-engineering.candidate-matrix";
 const MATRIX_VERSION: &str = "0.1.0";
