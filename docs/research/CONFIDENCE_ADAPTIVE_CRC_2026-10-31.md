@@ -27,7 +27,7 @@ The grouped-state expander enumerates every point-level assignment represented b
 
 For b=floor(2*((n+1)*alpha-1)), if at least b+2 active points are present, cap all breakpoints above the (b+2)-th smallest active leaf breakpoint tau. The paper establishes that this preserves all CRC baseline depths and all subsequent recertification depths. The implementation has a switch to disable capping and an uncapped oracle for regression parity.
 
-The tests compare all table cells between capped and uncapped recursion at baseline and after three successive recertification steps; comparing only the initial table would not be enough.
+The tests compare all table cells between capped and uncapped recursion at baseline and after three successive recertification steps; comparing only the initial table would not be enough. An additional deterministic randomized property test covers 12 small active-set layouts with repeated pair groups and mixed type-1/type-2 assignments. For every layout, grouped and ungrouped tables match at baseline and after two recertification updates; capped and uncapped tables also match at every cell through those rounds. All intermediate tables remain valid.
 
 ## Exact recertification
 
@@ -44,7 +44,7 @@ All held-out active points and both nonzero hypothetical labels are checked afte
 
 ## Local correctness tests
 
-8/8 tests passed in a local executable reference copy.
+9/9 tests passed in a local executable reference copy.
 
 The strengthened tests cover:
 - the ungrouped state count r*2^(r-1);
