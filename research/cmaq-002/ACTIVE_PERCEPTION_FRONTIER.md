@@ -120,3 +120,18 @@ These are proposed targets, not current results:
 ## Claim ceiling
 
 The CMAQ-002 v0.3 synthetic result is not a DEEP or ActiveArena score. The current allocator work unit is a synthetic accounting parameter, not measured FLOPs or joules. The synthetic probe safety envelope does not constitute a physical robot safety case. Adapter infeasibility or missing resource measurements must be reported as such, not replaced with a proxy score.
+
+
+## Observation custody schema and hostile fixtures
+
+The metadata-only adapter contract is now machine-readable at [activearena-adapter-contract.schema.json](activearena-adapter-contract.schema.json), with a non-benchmark fixture at [fixtures/activearena-adapter-contract.example.json](fixtures/activearena-adapter-contract.example.json). The focused CMAQ-002 workflow validates the fixture and rejects five hostile mutations:
+
+1. Candidate observation camera changed from head to side.
+2. Evaluator-only data made candidate-visible.
+3. A predicted future inserted into observation memory as though acquired.
+4. A model forecast marked as promoted into observation memory.
+5. The adapter marked qualification-ready while the dataset revision/checksum and separate license reviews remain unresolved.
+
+The schema makes the policy boundary explicit: only acquired head-camera evidence can become candidate-visible observation memory; forecast objects retain `model_forecast` provenance and `memory_promoted=false`; evaluator side/front views, ground truth and scoring labels remain evaluator-only. Resource fields record memory capacity, encoder calls, retrieval calls, allocator work, latency and energy when measured.
+
+This contract is metadata-only. Its synthetic hashes are fixture values; no ActiveArena dataset, robot assets, VLM weights or checkpoint bundle are downloaded. It is not a completed adapter or a physical safety case.
