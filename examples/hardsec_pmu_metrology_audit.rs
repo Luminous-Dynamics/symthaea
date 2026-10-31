@@ -579,7 +579,7 @@ fn audit_values(plan_value: &Value, observation_value: &Value, plan_bytes: &[u8]
     for (block_id, conditions) in &block_map {
         let baseline = conditions.get(&plan.baseline_condition).ok_or("missing baseline after block validation")?;
         let baseline_rate = baseline.work_units as f64 / baseline.elapsed_ns as f64;
-        for condition in CONDITIONS.iter().filter(|c| **c != plan.baseline_condition) {
+        for condition in CONDITIONS.iter().filter(|c| **c != plan.baseline_condition.as_str()) {
             let trial = conditions.get(*condition).ok_or("missing condition after block validation")?;
             let rate = trial.work_units as f64 / trial.elapsed_ns as f64;
             let degradation = 1.0 - (rate / baseline_rate);
