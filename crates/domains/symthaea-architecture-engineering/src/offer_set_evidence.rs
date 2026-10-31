@@ -824,6 +824,32 @@ mod tests {
     }
 
     #[test]
+    fn evidence_bound_plan_rejects_a_different_event_tape_set() {
+        let left_tape = tape("board");
+        let right_tape = tape("thompson");
+        let shared_state = OfferSetSourceState::new(
+            "campaign-1",
+            "0123456789abcdef0123456789abcdef01234567",
+            1,
+            None,
+            0,
+            vec!["A".into()],
+            true,
+            json!({"available_direction_ids": ["A"], "new_proposal_allowed": true, "state": {"verifier_epoch": 3}}),
+        ).unwrap();
+        let bundles = vec![
+            OfferSetEvidenceBundle::new(&left_tape, vec![shared_state.clone()]).unwrap(),
+            OfferSetEvidenceBundle::new(&right_tape, vec![shared_state]).unwrap(),
+        ];
+        let tapes = vec![left_tape, right_tape];
+        let mut plan = paired_plan(&tapes);
+        plan.campaign_event_tape_set_sha256 = "0".repeat(64);
+
+        let error = OfferSetEvidenceBoundPlan::new(plan, &tapes, &bundles).unwrap_err();
+        assert!(error.message.contains("exact supplied EventTape set"));
+    }
+
+    #[test]
     fn bundle_validation_rejects_tampered_retained_state() {
         let event_tape = tape("board");
         let state = OfferSetSourceState::new(
