@@ -195,7 +195,7 @@ fn parse_manifest(value: &Value) -> Result<(String, String, Vec<String>, Vec<Cas
             return Err(format!("duplicate holdout axis {axis}"));
         }
     }
-    for required in ["program", "execution", "adaptation_family"] {
+    for required in ["program", "execution", "attack_family", "adaptation_family"] {
         if !axes.contains(required) {
             return Err(format!("manifest.holdout_axes must include {required}"));
         }
@@ -493,6 +493,50 @@ fn audit_values(
     }
 
     let (adaptation_macro, adaptation_worst, adaptation_group_count) = macro_recall(&adaptation_groups);
+
+    // Calibration is for malicious-attempt versus benign labels, not for
+    // successful attack effects. It is unavailable unless every test case
+    // has a probability score.
+    let all_scores_available = test_ids.iter().all(|id| prediction_map.get(id).and_then(|p| p.score).is_some());
+    let mut brier_sum = 0.0f64;
+    let mut log_loss_sum = 0.0f64;
+    let mut ece_bins = vec![(0usize, 0.0f64, 0.0f64); 10];
+    if all_scores_available {
+        for case_id in &test_ids {
+            let predicted = prediction_map.get(case_id).and_then(|p| p.score).ok_or("score completeness check failed")?;
+            let actual = if truth_rows.get(case_id).ok_or("truth lookup failed")?.class == "malicious" { 1.0 } else { 0.0 };
+            let error = predicted - actual;
+            brier_sum += error * error;
+            let clipped = predicted.clamp(1e-15, 1.0 - 1e-15);
+            log_loss_sum += if actual == 1.0 { -clipped.ln() } else { -(1.0 - clipped).ln() };
+            let bin = ((predicted * 10.0).floor() as usize).min(9);
+            ece_bins[bin].0 += 1;
+            ece_bins[bin].1 += predicted;
+            ece_bins[bin].2 += actual;
+        }
+    }
+    let calibration = if all_scores_available {
+        let count = test_ids.len() as f64;
+        let ece = ece_bins.iter().filter(|bin| bin.0 > 0).map(|bin| {
+            (bin.0 as f64 / count) * ((bin.1 / bin.0 as f64) - (bin.2 / bin.0 as f64)).abs()
+        }).sum::<f64>();
+        json!({
+            "target_semantics":"malicious_attempt_vs_benign_not_successful_effect",
+            "scored_cases":test_ids.len(),
+            "brier_score":brier_sum/count,
+            "log_loss":log_loss_sum/count,
+            "ten_bin_ece":ece
+        })
+    } else {
+        json!({
+            "target_semantics":"malicious_attempt_vs_benign_not_successful_effect",
+            "scored_cases":test_ids.iter().filter(|id| prediction_map.get(*id).and_then(|p| p.score).is_some()).count(),
+            "brier_score":null,
+            "log_loss":null,
+            "ten_bin_ece":null,
+            "unavailable_reason":"at least one detector score is null or missing"
+        })
+    };
     let (program_macro, program_worst, program_group_count) = macro_recall(&program_groups);
     let (execution_macro, execution_worst, execution_group_count) = macro_recall(&execution_groups);
     let attack_recall = if success_attack_cases == 0 { None } else {
@@ -614,6 +658,7 @@ fn audit_values(
             "execution_group_count": execution_group_count,
             "benign_false_alert_by_program": benign_groups
         },
+        "calibration": calibration,
         "sensor_integrity": {
             "invalid_sensor_cases": invalid_sensor_cases,
             "invalid_sensor_clear_verdicts": invalid_sensor_clear_verdicts,
@@ -719,10 +764,6 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn digest(text: &str) -> String {
-        sha256(text.as_bytes())
-    }
 
     fn fixture_values() -> (Value, Value, Value, Vec<u8>, Vec<u8>, Vec<u8>) {
         let predictions = json!({
