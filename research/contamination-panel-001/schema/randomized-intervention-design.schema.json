@@ -19,6 +19,7 @@
     "shared_training_token_count",
     "total_training_token_budget",
     "training_steps",
+    "training_rng_seed_commitment_sha256",
     "training_code_sha256",
     "runtime_image_sha256",
     "tokenization_pipeline_sha256",
@@ -128,6 +129,9 @@
       "$ref": "#/$defs/sha256"
     },
     "tokenization_pipeline_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "training_rng_seed_commitment_sha256": {
       "$ref": "#/$defs/sha256"
     }
   },
