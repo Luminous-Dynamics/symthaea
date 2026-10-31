@@ -27,6 +27,7 @@ pub struct EpisodeContext {
     pub compute_budget: u64,
     pub refresh_budget: u64,
     pub observation_budget: u64,
+    pub energy_budget_nj: Option<u64>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -147,6 +148,8 @@ pub enum CounterfactualError {
     ComputeOutOfBudget { used: u64, budget: u64 },
     RefreshOutOfBudget { used: u64, budget: u64 },
     ObservationOutOfBudget { used: u64, budget: u64 },
+    EnergyMeasurementMissing,
+    EnergyOutOfBudget { used: u64, budget: u64 },
     ExposureExceedsEpisode { exposure_us: u64, episode_us: u64 },
     IncompleteSubsetEnumeration { expected: usize, actual: usize },
     DuplicateSubset { mask: u64 },
@@ -200,6 +203,12 @@ impl fmt::Display for CounterfactualError {
             }
             Self::ObservationOutOfBudget { used, budget } => {
                 write!(f, "observation count {used} exceeds observation budget {budget}")
+            }
+            Self::EnergyMeasurementMissing => {
+                write!(f, "episode declares an energy budget but calibrated energy measurement is absent")
+            }
+            Self::EnergyOutOfBudget { used, budget } => {
+                write!(f, "measured energy {used} nJ exceeds budget {budget} nJ")
             }
             Self::ExposureExceedsEpisode { exposure_us, episode_us } => write!(
                 f,
@@ -435,6 +444,13 @@ fn validate_run(
             budget: run.context.observation_budget,
         });
     }
+    match (run.context.energy_budget_nj, run.measured_cost.measured_energy_nj) {
+        (Some(_), None) => return Err(CounterfactualError::EnergyMeasurementMissing),
+        (Some(budget), Some(used)) if used > budget => {
+            return Err(CounterfactualError::EnergyOutOfBudget { used, budget });
+        }
+        _ => {}
+    }
     run.outcome.validate(run.context.total_exposure_us)?;
     Ok(())
 }
@@ -545,6 +561,7 @@ mod tests {
             compute_budget: 1_000,
             refresh_budget: 20,
             observation_budget: 30,
+            energy_budget_nj: Some(10_000),
         }
     }
 
@@ -696,6 +713,30 @@ mod tests {
             validate_run(&registry(), &invalid),
             Err(CounterfactualError::ExposureExceedsEpisode { .. })
         ));
+    }
+
+    #[test]
+    fn actual_compute_refresh_observation_and_energy_budgets_are_enforced() {
+        let mut invalid_compute = run(1, vec![], 0, ExposureOutcome::default());
+        invalid_compute.measured_cost.compute_used = 1_001;
+        assert!(matches!(
+            validate_run(&registry(), &invalid_compute),
+            Err(CounterfactualError::ComputeOutOfBudget { .. })
+        ));
+
+        let mut invalid_energy = run(2, vec![], 0, ExposureOutcome::default());
+        invalid_energy.measured_cost.measured_energy_nj = Some(10_001);
+        assert!(matches!(
+            validate_run(&registry(), &invalid_energy),
+            Err(CounterfactualError::EnergyOutOfBudget { .. })
+        ));
+
+        let mut missing_energy = run(3, vec![], 0, ExposureOutcome::default());
+        missing_energy.measured_cost.measured_energy_nj = None;
+        assert_eq!(
+            validate_run(&registry(), &missing_energy),
+            Err(CounterfactualError::EnergyMeasurementMissing)
+        );
     }
 
     #[test]
