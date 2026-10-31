@@ -8,7 +8,6 @@
 //! guessing from a preset name.
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -208,17 +207,15 @@ pub fn place_parts_within_validation_range(
     let config = ScoreValidationConfig::default();
     let (before_min, before_max) = score_pitch_bounds(score);
     let initial_report = validate_score(score, &config);
-    let initial_fatal: Vec<_> = initial_report
-        .issues
-        .iter()
-        .filter(|issue| {
-            issue.severity == ValidationSeverity::Fatal
-                && is_universal_invariant(issue.rule)
-        })
-        .map(|issue| issue.rule)
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect();
+    let mut initial_fatal = Vec::new();
+    for issue in &initial_report.issues {
+        if issue.severity == ValidationSeverity::Fatal
+            && is_universal_invariant(issue.rule)
+            && !initial_fatal.contains(&issue.rule)
+        {
+            initial_fatal.push(issue.rule);
+        }
+    }
 
     let receipt = |disposition, part_placements, after_min, after_max| {
         RegisterPlacementReceipt {
