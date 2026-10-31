@@ -9,6 +9,7 @@ use contamination_panel_bench::{
     fresh_scoring::{FreshScoreReportV1, score_fresh_submission, verify_fresh_score_report_integrity},
     search_time::{
         SearchTimeExposureTraceV1, SearchTimeExposureFindingsV1,
+        SEARCH_MAX_FINDINGS_BYTES, SEARCH_MAX_TRACE_BYTES,
         audit_search_time_trace, audit_search_time_findings,
     },
     DetectorSpecV1, PublicChallengePacketV1, SealedChallengeKeyV1,
@@ -289,7 +290,11 @@ fn audit_search_time_trace_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
                 .into(),
         );
     }
-    let trace: SearchTimeExposureTraceV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
+    let trace_bytes = fs::read(&args[1])?;
+    if trace_bytes.len() > SEARCH_MAX_TRACE_BYTES {
+        return Err("search-time trace exceeds 256 MiB safety bound".into());
+    }
+    let trace: SearchTimeExposureTraceV1 = serde_json::from_slice(&trace_bytes)?;
     let report = audit_search_time_trace(&trace).map_err(io::Error::other)?;
     write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
     println!(
@@ -316,8 +321,12 @@ fn audit_search_time_findings_cli(args: &[String]) -> Result<(), Box<dyn Error>>
     if !trace_audit.valid {
         return Err("search-time trace failed integrity audit".into());
     }
+    let findings_bytes = fs::read(&args[2])?;
+    if findings_bytes.len() > SEARCH_MAX_FINDINGS_BYTES {
+        return Err("search-time findings exceed 64 MiB safety bound".into());
+    }
     let findings: SearchTimeExposureFindingsV1 =
-        serde_json::from_slice(&fs::read(&args[2])?)?;
+        serde_json::from_slice(&findings_bytes)?;
     let report = audit_search_time_findings(&trace, &findings).map_err(io::Error::other)?;
     write_bytes(&args[3], &serde_json::to_vec_pretty(&report)?)?;
     println!(
