@@ -284,7 +284,7 @@ fn t_critical_975(df: usize) -> f64 {
         (16, 2.120), (17, 2.110), (18, 2.101), (19, 2.093), (20, 2.086),
         (21, 2.080), (22, 2.074), (23, 2.069), (24, 2.064), (25, 2.060),
         (26, 2.056), (27, 2.052), (28, 2.048), (29, 2.045), (30, 2.042),
-        (40, 2.021), (60, 2.000), (120, 1.980), (usize::MAX, 1.960),
+        (40, 2.021), (60, 2.000), (120, 1.980), (usize::MAX, 1.980),
     ];
     TABLE.iter()
         .find(|(upper_df, _)| df <= *upper_df)
@@ -1006,6 +1006,13 @@ mod tests {
             runs,
         });
         study
+    }
+
+    #[test]
+    fn large_sample_t_fallback_remains_conservative() {
+        assert_eq!(t_critical_975(120), 1.980);
+        assert_eq!(t_critical_975(121), 1.980);
+        assert_eq!(t_critical_975(10_000), 1.980);
     }
 
     #[test]
