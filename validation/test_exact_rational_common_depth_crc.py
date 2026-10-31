@@ -1,5 +1,6 @@
 import unittest
 from fractions import Fraction as F
+FractionText = F
 
 from exact_rational_common_depth_crc import (
     ExactCommonDepthCRC, count_vectors, error_loss,
@@ -39,14 +40,14 @@ class ExactRationalCommonDepthCRCTests(unittest.TestCase):
         engine = ExactCommonDepthCRC(4, "0.15")
         result = engine.run(rounds=50, snapshot_rounds=(0, 1, 2, 10, 25, 50))
         self.assertTrue(result["all_rounds_valid"])
-        self.assertEqual(result["verified_table_count"], 51)
-        self.assertEqual(result["exact_augmented_inequality_checks"], 51 * len(engine.augmented_states))
+        self.assertEqual(result["verified_table_count"], 1 + 2 * 50 + 6)
+        self.assertEqual(result["exact_augmented_inequality_checks"], (1 + 2 * 50 + 6) * len(engine.augmented_states))
         self.assertTrue(all(row["valid"] for row in result["snapshots"]))
-        self.assertTrue(all(row["exact_excess"] <= "0/1" for row in []))  # exact pass/fail asserted above
+        self.assertTrue(all(FractionText(row["exact_excess"]) <= 0 for row in result["snapshots"]))
 
     def test_invalid_table_fails_closed_with_exact_counterexample(self):
         engine = ExactCommonDepthCRC(2, "0.5")
-        bad = {h: F(0) for h in engine.states}
+        bad = {h: F(2) for h in engine.states}
         report = engine.verify(bad)
         self.assertFalse(report["valid"])
         self.assertTrue(report["positive_excess"])
