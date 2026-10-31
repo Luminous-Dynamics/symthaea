@@ -897,11 +897,22 @@ mod tests {
     #[test]
     fn closed_world_count_uses_user_speaker_and_excludes_assistant_advice() {
         let (inventory, admissions) = inventory_and_admissions();
+        let extraction = batch(&inventory);
+        let speakers = speaker_attributions(&inventory, &admissions);
+        let query = query();
         let result = enumerate_events_closed_world(
             &inventory,
-            &batch(&inventory),
+            &extraction,
             &admissions,
-            &query(),
+            &speakers,
+            &query,
+        ).unwrap();
+        result.verify_against(
+            &inventory,
+            &extraction,
+            &admissions,
+            &speakers,
+            &query,
         ).unwrap();
 
         assert_eq!(result.receipt.enumerated_source_count, 2);
@@ -941,12 +952,38 @@ mod tests {
         let mut extraction = batch(&inventory);
         extraction.rows[1].events[0].speaker_id = None;
         extraction.rows[1].events[0].speaker_role = EventSpeakerRole::Unknown;
+        let mut speakers = speaker_attributions(&inventory, &admissions);
+        let assistant = speakers.iter_mut()
+            .find(|speaker| speaker.evidence_id == "evidence-assistant")
+            .unwrap();
+        assistant.speaker_id = None;
+        assistant.speaker_role = EventSpeakerRole::Unknown;
+        assistant.attribution_receipt_sha256 =
+            assistant.computed_receipt_sha256().unwrap();
+
         let result = enumerate_events_closed_world(
-            &inventory, &extraction, &admissions, &speaker_attributions(&inventory, &admissions), &query()
+            &inventory, &extraction, &admissions, &speakers, &query()
         ).unwrap();
         assert_eq!(result.receipt.unattributed_relevant_event_count, 1);
         assert!(!result.receipt.speaker_attribution_complete);
         assert!(!result.receipt.answer_is_permitted);
+    }
+
+    #[test]
+    fn extractor_cannot_forge_user_speaker_for_assistant_source() {
+        let (inventory, admissions) = inventory_and_admissions();
+        let mut extraction = batch(&inventory);
+        extraction.rows[1].events[0].speaker_id = Some("user-1".into());
+        extraction.rows[1].events[0].speaker_role = EventSpeakerRole::User;
+        let speakers = speaker_attributions(&inventory, &admissions);
+
+        assert!(enumerate_events_closed_world(
+            &inventory,
+            &extraction,
+            &admissions,
+            &speakers,
+            &query(),
+        ).unwrap_err().contains("does not match trusted source attribution"));
     }
 
     #[test]
