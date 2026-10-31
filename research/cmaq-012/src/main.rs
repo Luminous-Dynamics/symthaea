@@ -386,7 +386,7 @@ impl<'a> JsonParser<'a> {
             self.position += 1;
             if matches!(self.bytes.get(self.position), Some(&b'+') | Some(&b'-')) { self.position += 1; }
             let exponent_start = self.position;
-            while self.bytes.get(self.position).is_some_and(u8::is_ascii_digit) {
+            while self.bytes.get(self.position).is_some_and(|byte| byte.is_ascii_digit()) {
                 self.position += 1;
             }
             if self.position == exponent_start {
@@ -427,8 +427,8 @@ impl<'a> JsonParser<'a> {
                     }
                     self.whitespace();
                     match self.bytes.get(self.position) {
-                        Some(b',') => self.position += 1,
-                        Some(b'}') => { self.position += 1; break; }
+                        Some(&b',') => self.position += 1,
+                        Some(&b'}') => { self.position += 1; break; }
                         _ => return Err(format!("expected comma or closing brace at byte {}", self.position)),
                     }
                 }
@@ -447,19 +447,19 @@ impl<'a> JsonParser<'a> {
                     self.whitespace();
                     match self.bytes.get(self.position) {
                         Some(b',') => self.position += 1,
-                        Some(b']') => { self.position += 1; break; }
+                        Some(&b']') => { self.position += 1; break; }
                         _ => return Err(format!("expected comma or closing bracket at byte {}", self.position)),
                     }
                 }
                 Ok(JsonValue::Array(values))
             }
-            Some(b't') if self.bytes.get(self.position..self.position + 4) == Some(b"true") => {
+            Some(b't') if self.bytes.get(self.position..self.position + 4).is_some_and(|bytes| bytes == b"true") => {
                 self.position += 4; Ok(JsonValue::Bool(true))
             }
-            Some(b'f') if self.bytes.get(self.position..self.position + 5) == Some(b"false") => {
+            Some(b'f') if self.bytes.get(self.position..self.position + 5).is_some_and(|bytes| bytes == b"false") => {
                 self.position += 5; Ok(JsonValue::Bool(false))
             }
-            Some(b'n') if self.bytes.get(self.position..self.position + 4) == Some(b"null") => {
+            Some(b'n') if self.bytes.get(self.position..self.position + 4).is_some_and(|bytes| bytes == b"null") => {
                 self.position += 4; Ok(JsonValue::Null)
             }
             Some(b'-' | b'0'..=b'9') => self.parse_number(),
