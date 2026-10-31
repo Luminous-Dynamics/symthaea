@@ -373,12 +373,9 @@ fn validate_receipt_shape(receipt: &Receipt, report: &mut CoverageAuditReport) {
     }
 }
 
-fn validate_platform(profile: &Profile, receipt: &Receipt, report: &mut CoverageAuditReport) {
-    if receipt.platform.os != profile.platform.os
-        || !profile.platform.architectures.contains(&receipt.platform.architecture)
-    {
-        push_error(report, "E_PLATFORM_OUT_OF_PROFILE", "receipt.platform", "runtime platform is outside the declared profile; completeness cannot be accepted");
-    }
+fn validate_platform(_profile: &Profile, receipt: &Receipt, report: &mut CoverageAuditReport) {
+    // A syntactically valid but unsupported platform can be truthfully reported
+    // as unsupported; it must not be promoted to complete_within_profile.
     if receipt.platform.kernel_release.trim().is_empty() {
         push_error(report, "E_KERNEL_RELEASE", "receipt.platform.kernel_release", "kernel_release must be recorded");
     }
@@ -499,7 +496,7 @@ fn valid_absolute_root(value: &str) -> bool {
     if value.len() > 1 && value.ends_with('/') {
         return false;
     }
-    value.split('/').skip(1).all(|component| !component.is_empty() && component != "." && component != "..")
+    value != "/" && value.split('/').skip(1).all(|component| !component.is_empty() && component != "." && component != "..")
 }
 
 fn read_bounded(path: &Path) -> anyhow::Result<Vec<u8>> {
@@ -731,6 +728,41 @@ mod tests {
             let report = audit_bytes(&profile, &serde_json::to_vec(&value).unwrap());
             assert!(report.overstated_claim);
         }
+    }
+
+    #[test]
+    fn rejects_complete_claim_with_an_unrecognized_extra_channel() {
+        let (profile, receipt) = encoded_pair("complete_within_profile");
+        let mut value: Value = serde_json::from_slice(&receipt).unwrap();
+        value["channels"].as_array_mut().unwrap().push(json!({
+            "channel_id":"unprofiled_channel",
+            "events":[]
+        }));
+        let report = audit_bytes(&profile, &serde_json::to_vec(&value).unwrap());
+        assert!(!report.receipt_well_formed);
+        assert!(!report.coverage_complete_within_profile);
+    }
+
+    #[test]
+    fn rejects_complete_claim_when_a_required_control_is_missing() {
+        let (profile, receipt) = encoded_pair("complete_within_profile");
+        let mut value: Value = serde_json::from_slice(&receipt).unwrap();
+        value["controls_active"].as_array_mut().unwrap().pop();
+        let report = audit_bytes(&profile, &serde_json::to_vec(&value).unwrap());
+        assert!(report.overstated_claim);
+        assert!(!report.coverage_complete_within_profile);
+    }
+
+    #[test]
+    fn accepts_an_out_of_profile_platform_only_as_unsupported() {
+        let (profile, receipt) = encoded_pair("unsupported");
+        let mut value: Value = serde_json::from_slice(&receipt).unwrap();
+        value["platform"]["os"] = json!("freebsd");
+        let report = audit_bytes(&profile, &serde_json::to_vec(&value).unwrap());
+        assert!(report.receipt_well_formed);
+        assert!(report.coverage_claim_consistent);
+        assert!(!report.coverage_complete_within_profile);
+        assert!(!report.qualification_eligible);
     }
 
     #[test]
