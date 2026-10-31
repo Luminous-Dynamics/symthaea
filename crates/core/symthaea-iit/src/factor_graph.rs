@@ -912,10 +912,10 @@ pub fn min_fill_log_sum_product_with_cutset(
 
     Ok(CutsetLogFactorEliminationReport {
         factor,
-        cutset_variables: canonical_cutset,
+        cutset_variables: canonical_cutset.to_vec(),
         cutset_assignments_evaluated: branch_count,
-        max_cutset_assignments,
-        max_factor_entries,
+        max_cutset_assignments: plan.max_cutset_assignments,
+        max_factor_entries: plan.remaining_elimination_plan.max_factor_entries,
         conditioned_factor_entries_written,
         branch_output_entries_accumulated,
         remaining_elimination_order: residual_plan.elimination_order.clone(),
