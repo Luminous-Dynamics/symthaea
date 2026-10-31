@@ -169,7 +169,9 @@ pub fn probe_linux() -> anyhow::Result<LinuxProbeReport> {
         .all(|item| item.status == EvidenceStatus::Collected);
     let trace_status = if tracefs_mount && trace_events_available {
         CapabilityStatus::CandidateAvailable
-    } else if !tracefs_mount && mount_text.status == EvidenceStatus::Collected {
+    } else if (tracefs_mount && trace_events.iter().any(|item| item.status == EvidenceStatus::Absent))
+        || (!tracefs_mount && mount_text.status == EvidenceStatus::Collected)
+    {
         CapabilityStatus::NotAvailable
     } else if trace_events.iter().any(|item| item.status == EvidenceStatus::Inaccessible) {
         CapabilityStatus::Inaccessible
@@ -648,20 +650,6 @@ fn sha256_file_bounded(path: &Path, max_bytes: u64) -> std::io::Result<String> {
                 std::io::ErrorKind::InvalidData,
                 "probe file exceeds hashing limit",
             ));
-        }
-        hasher.update(&buffer[..count]);
-    }
-    Ok(encode_digest(&hasher.finalize()))
-}
-
-fn sha256_file(path: &Path) -> std::io::Result<String> {
-    let mut file = File::open(path)?;
-    let mut hasher = Sha256::new();
-    let mut buffer = [0_u8; 64 * 1024];
-    loop {
-        let count = file.read(&mut buffer)?;
-        if count == 0 {
-            break;
         }
         hasher.update(&buffer[..count]);
     }
