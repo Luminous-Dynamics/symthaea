@@ -38,3 +38,6 @@ jobs:
             research/cmaq-common/frozen-run-manifest.schema.json \
             research/cmaq-common/examples/cmaq-018-development-manifest.example.json \
             research/cmaq-common/scripts/validate_manifest.py
+          find research/cmaq-common/examples/assets -type f -print0 \
+            | sort -z \
+            | xargs -0 sha256sum
