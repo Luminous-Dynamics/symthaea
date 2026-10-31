@@ -17,7 +17,7 @@
     103,
     104
   ],
-  "joint_draw_bank_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "joint_draw_bank_sha256": "47a1f2b937faef8235704f6907523967c946cad8184bf7c5f643916bd3441979",
   "coupling": "shared_posterior_and_world_noise",
   "outcome_samples": [
     [
