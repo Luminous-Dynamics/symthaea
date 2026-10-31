@@ -6,13 +6,20 @@
     "tests": "e4fa2e674a50a13f48b4690ba0821b245bfe4032"
   },
   "local_validation": {
-    "tests_passed": 8,
+    "tests_passed": 9,
     "total": 8,
     "execution": "local executable reference copy matching the committed recursion",
     "grouped_ungrouped_comparison": "baseline plus two recertification rounds, exhaustive expansion of every grouped state",
     "capped_uncapped_comparison": "baseline plus three recertification rounds, all table cells",
     "all_hypothetical_types_checked": true,
-    "remote_ci": "not run; no pass claimed"
+    "remote_ci": "not run; no pass claimed",
+    "tests_total": 9,
+    "randomized_property_cases": 12,
+    "randomized_property_scope": "grouped vs ungrouped all states at baseline and after two recertification updates; capped vs uncapped all states through the same rounds",
+    "latest_committed_blob_ids": {
+      "source": "0517f47ed3098d72901e52197208d276df4e287b",
+      "tests": "1785ff9ffcb66b8723289f7dbcc1b191d6e4e368"
+    }
   },
   "synthetic_compression_pilot": {
     "calibration_n": 12,
@@ -81,7 +88,18 @@
         "grouped_valid": true,
         "ungrouped_valid": true
       }
-    ]
+    ],
+    "randomized_cases": {
+      "count": 12,
+      "group_ungroup_differences": 0,
+      "cap_uncap_differences": 0,
+      "all_rounds_valid": true,
+      "rounds_checked": [
+        0,
+        1,
+        2
+      ]
+    }
   },
   "limitations": [
     "synthetic 12-point fixture only; no CIFAR classifier outputs",
