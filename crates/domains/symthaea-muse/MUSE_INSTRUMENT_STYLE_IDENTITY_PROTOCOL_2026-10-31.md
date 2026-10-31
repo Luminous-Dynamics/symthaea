@@ -1,0 +1,304 @@
+# Melothaea Instrument, Orchestration & Style Identity Protocol
+
+**Protocol:** MEL-MR-STYLE-001  
+**Issue:** #9397  
+**Status:** preregistration / design specification — no benchmark result claimed  
+**Date:** 2026-10-31
+
+## 1. Research objective
+
+Melothaea should produce instrumental music whose identity comes from the actual musical grammar and its performance—not merely from a genre label, an instrument preset, a SoundFont or a mastering chain.
+
+The qualification problem is to measure three interacting but separately attributable layers:
+
+- **Composition grammar:** form, phrase rhetoric, melody, motif development, harmony, rhythm, counterpoint and structural obligations.
+- **Performance and orchestration:** instrument assignment, register, technique, articulation, dynamics, phrasing, balance, doubling and microtiming.
+- **Rendering and production:** synthesizer/build, SoundFont or sample bank, controllers, effects topology, spatialization, sample rate and mastering.
+
+A listener's ability to identify a style from its timbre alone is not proof of compositional identity. A plausible instrument patch is not proof of idiomatic performance. A clean render is not proof of either.
+
+## 2. Main repository facts at protocol creation
+
+The following were checked on the default branch while preparing this protocol:
+
+| Area | Current evidence | Interpretation |
+|---|---|---|
+| Instrument vocabulary | 42 `Instrument` enum variants in `symthaea-muse/src/instruments.rs` | A vocabulary of timbre models, not 42 equally complete sampled instruments |
+| Instrument realization | Partial spectra, velocity response, sustain/decay classification, attack noise, vibrato, inharmonicity, FM / Karplus–Strong routing, GM programs and name mapping | Several tables are derived/estimated or fall back to shared tables; each model needs an evidence label |
+| Ensemble selection | Seeded, style-specific pools in `theory_realize.rs::instruments_for` | Deterministic variety exists, but it is not yet a complete score-conditioned orchestration decision |
+| Style vocabulary | 29 currently composer-backed `Style` variants | These are the actual engine routes to qualify first |
+| Style catalog | 152 target entries, 19 constellations; 29 composer-backed and 123 research-only according to the catalog document | Research-only entries must remain unavailable for composition until implemented and qualified |
+| MIDI output | Multi-track export, per-voice CC7/CC10, and style-gated channel-10 percussion already exist | Do not redo basic balance/panning/percussion; investigate expression and articulation beyond them |
+| Performance dialects | Existing ClassicalRubato, DanceLocked, ProcessExact, FolkLift and JazzLaidBack mechanisms | Audit coverage and style assignment; do not replace existing distinctions with a single new generic humanizer |
+
+The repository's older diversity review remains useful historical evidence, but its claims must be rechecked against current code before being treated as current defects. This protocol does not assume that all previously reported issues remain unfixed.
+
+## 3. Falsifiable hypotheses
+
+**H1 — Grammar survives timbre substitution.** A held-out listener or render-neutral evaluator can identify a supported style above a preregistered chance/control level when instrumentation is held constant across styles.
+
+**H2 — Timbre cannot impersonate grammar.** Changing only instruments or SoundFonts must not cause the symbolic grammar verifier to report a different style contract or an altered score.
+
+**H3 — Score-conditioned orchestration improves fit.** A planner using score register, density, role, sustain and articulation requirements reduces range violations and masking relative to the current seeded-pool baseline without degrading style identity or within-style diversity.
+
+**H4 — Expressive controls are renderer-specific.** Controller curves and articulation policies produce the declared effect only on the exact tested renderer/patch combinations; other combinations abstain or use a separately qualified fallback.
+
+**H5 — More variety need not mean style drift.** A family of compositions can be measurably diverse in motifs, phrase development, rhythmic cells, harmony, form and orchestration while retaining its frozen identity contract.
+
+The hypotheses are to be tested, not assumed true.
+
+## 4. Data model
+
+### 4.1 Instrument capability profile
+
+Introduce a versioned, serializable `InstrumentCapabilityProfile` whose fields separate *what an instrument is*, *what the model can do*, and *what a renderer supports*.
+
+Minimum fields:
+
+- stable instrument ID, display/canonical names, family and subfamily;
+- transposition and documented playable range / tessitura with source and confidence;
+- polyphonic or monophonic behavior and role suitability;
+- sustain, decay, attack and velocity behavior;
+- implemented articulation/technique set, with each technique linked to its implementation;
+- synthesis method: additive measured / additive derived / estimated, FM, Karplus–Strong, SoundFont program, SFZ or mapped sample;
+- renderer-specific program, bank, keyswitch, controller and effect support;
+- sample coverage by pitch, velocity layer, articulation, round-robin and release sample where applicable;
+- source URI, license, acquisition version, content digest and attribution;
+- evidence status: measured, source-cited model, derived, estimated or unverified.
+
+Do not fill unknown ranges or techniques with plausible-looking defaults. Unknown must remain unknown. A fallback instrument may be offered, but its use must be visible in the orchestration decision and render receipt.
+
+### 4.2 Renderer capability profile
+
+A control is not a property of an instrument name alone. It is a property of a particular renderer, patch/program, bank and configuration.
+
+A `RendererPatchCapability` should bind:
+
+- renderer executable/build identity;
+- SoundFont/SFZ/sample-bank digest;
+- bank and program (and keyswitch map if relevant);
+- sample rate, channels and output format;
+- effects, modulation and route configuration;
+- validated controller ranges and observed control response;
+- supported articulations and any patch-specific restrictions.
+
+CC1, CC2, CC11 and CC64 are candidates for experiments, not universal guarantees. CC7 and CC10 are already emitted by current theory MIDI export. Validate a proposed controller through paired renders and retain the measured result. A controller that does nothing on a patch must not be treated as expressive capability.
+
+### 4.3 Style contract
+
+Each engine-backed style should have a versioned `StyleIdentityContract`:
+
+- required and optional grammar features;
+- phrase rhetoric and melodic-development expectations;
+- rhythmic cell / meter / accent behavior;
+- harmonic syntax and cadence behavior;
+- form and long-range obligations;
+- allowed instrumentation / role substitutions;
+- performance dialect and technique expectations;
+- anti-features (e.g. a required drone must not become a changing chord progression);
+- culturally scoped terminology, provenance, expert review and attribution rules;
+- deterministic feature extractor and contract version.
+
+A named genre is not a single universal recipe. Contracts should describe a particular tradition, region, period or substyle where required. Do not promote styles requiring cultural review based only on generated examples or model-classifier confidence.
+
+### 4.4 Orchestration plan
+
+An `OrchestrationPlan` should be computed from the score and intent, not solely from `seed % pool.len()`.
+
+Candidate constraints and objectives:
+
+**Hard constraints**
+- instrument's documented pitch range and transposition;
+- monophony/polyphony limitations;
+- supported technique / articulation;
+- voice-role and required part coverage;
+- renderer/patch capability, if the selected output target is known.
+
+**Soft objectives**
+- register separation and masking risk;
+- ensemble blend and timbral contrast;
+- score density and sustained-energy budget;
+- idiomatic style fit;
+- dynamics and spatial balance;
+- resource footprint and render latency;
+- within-style variation.
+
+The planner must be deterministic for a frozen input/seed. It emits the chosen assignment, rejected alternatives, hard-constraint checks, objective contributions, evidence references and explicit abstentions. Hard constraints cannot be traded away for a higher diversity or novelty score.
+
+## 5. Factorial identity experiment
+
+Use a crossed design that isolates causes rather than confounding style, instrument and renderer.
+
+| Arm | Composition grammar | Ensemble / performance | Renderer |
+|---|---|---|---|
+| A. Native-style baseline | Style-specific | Style-specific | Fixed reference renderer |
+| B. Instrument-controlled | Style-specific | Same common ensemble across styles | Fixed reference renderer |
+| C. Ensemble-swap | Fixed source grammar | Swap among qualified ensembles | Fixed reference renderer |
+| D. Renderer-swap | Fixed MIDI/performance | Fixed | Multiple SoundFonts / renderers |
+| E. Grammar-swap | Swap style grammar | Same ensemble | Fixed reference renderer |
+| F. Full-system | Style-specific | Score-conditioned plan | Target renderer |
+
+The minimum analysis estimates:
+
+- style-grammar main effect;
+- instrumentation main effect;
+- renderer main effect;
+- grammar × instrumentation interaction;
+- grammar × renderer interaction;
+- instrumentation × renderer interaction.
+
+Do not infer style identity from Arm A alone: it confounds all three layers.
+
+### Renderer strata
+
+For the synthetic SMEBench-compatible work, test the available five SoundFonts named in EVAL-030: Arachno 1.0, FluidR3_GM, GeneralUser GS, General Montage and TimGM6mb. Check acquisition conditions, exact file identity and licensing before using each bank.
+
+Use identical source MIDI, performance events, sample rate, channel configuration and effects settings wherever the renderer allows. Retain the full configuration and audio digest. Different renderers are not expected to produce identical waveforms. The cross-render comparison is about retained musical properties and perceptual identity, not raw PCM equality.
+
+Compare NativeMuse and FluidSynth as distinct renderer strata. Do not pool their results without renderer-specific analysis.
+
+## 6. Benchmark battery
+
+### B1 — Blind style recognition
+
+Ask listeners to identify style from randomized audio, then repeat with a common instrumentation and with renderer cues controlled. Report per-style recall, macro-F1, balanced accuracy, confusion matrix, listener confidence, and human expertise. The primary result is the controlled-instrumentation result, not the easiest full-mix classification.
+
+### B2 — Grammar-only identity
+
+Evaluate score-derived/render-neutral descriptors and frozen contracts:
+- interval and melodic-contour vocabulary;
+- phrase lengths, boundaries, antecedent/consequent structures;
+- rhythmic-cell / accent / syncopation behavior;
+- harmonic vocabulary, progression and cadence;
+- motif recurrence/development;
+- form and long-range obligations;
+- contrapuntal entry, part identity and texture.
+
+This is not a claim that feature extraction fully captures music. It is a reproducible objective layer that can be checked against listening.
+
+### B3 — Instrument and orchestration fit
+
+Report:
+- range/tessitura violations and transposition errors;
+- role coverage and inappropriate doubling;
+- register overlap and masking proxy;
+- instrument-family recognition under renderer swap;
+- controller response coverage;
+- sample coverage holes and fallback incidence;
+- listener ratings of idiomaticity, balance and suitability.
+
+### B4 — Articulation and expression
+
+For every claimed technique, create paired fixtures:
+- intended technique present;
+- neutral/no-op control;
+- wrong technique;
+- wrong voice/region;
+- unsupported renderer/patch;
+- accidental collateral change.
+
+Measure attack, sustain and release envelopes; onset/offset timing; velocity/dynamic trajectories; controller response; acoustic tail; and blinded listener judgments. Technique claims must be scoped to the patches where they were verified.
+
+### B5 — Within-style diversity and identity retention
+
+Measure variation in motif, interval contour, rhythm, harmony, phrase rhetoric, form, register, ensemble and production separately. Report nearest-neighbor distances, exact/near duplicate rates, and whether the identity contract still passes. Do not reward novelty that violates the style.
+
+### B6 — Renderer robustness
+
+For each supported style/instrument/technique, report:
+- style-recognition and instrument-recognition changes across renderers;
+- preservation of symbolic/behavioral contracts;
+- controller effect sizes and confidence intervals;
+- failed, unsupported and abstained renderer/patch combinations;
+- rank stability with uncertainty;
+- p50/p95 latency and resource use.
+
+No universal cross-renderer waveform similarity threshold is valid.
+
+### B7 — Blinded perceptual study
+
+Randomize candidate order and blind system, style label and renderer where possible. Retain per-listener judgments for:
+- style recognition;
+- instrumental identity;
+- idiomaticity;
+- arrangement balance;
+- musical coherence;
+- perceived artifacts;
+- emotional-intent agreement;
+- preference and confidence.
+
+Use a pilot to estimate variance and sample size. Cluster uncertainty by composition lineage and listener, not by excerpts or repeated ratings treated as independent. Report trained-musician and non-expert strata separately.
+
+## 7. Baselines and external comparison
+
+Internal baselines:
+
+1. current seeded ensemble selection;
+2. common fixed ensemble;
+3. random valid ensemble;
+4. score-conditioned orchestration planner;
+5. no-expression MIDI baseline;
+6. renderer-qualified articulation/expression path;
+7. native renderer;
+8. FluidSynth reference path.
+
+External comparisons:
+
+- **SMEBench:** use as a controlled edit and paired-target reference where operations overlap; do not mislabel it as a genre-recognition benchmark.
+- **MMAE:** compare editing instruction-following only under its official task scope and frozen evaluator; do not claim that composition quality or instrumental idiom is captured by MMAE.
+- **Human instrumental references:** curate legally usable, source-attributed, instrument/technique-labeled corpora for the exact instrument/style question. Compare with commercial sample libraries only when license and evaluation access permit it.
+- **Music generation systems:** compare only on matched prompt, duration, output modality, human study and task. A symbolic score engine and an audio foundation model do not share the same input/output scope by default.
+
+This track's proposed differentiator is *controllability, compositional identity, transparent orchestration and verifiable preservation*, not a generic claim to beat every audio model at open-ended generation.
+
+## 8. Qualification policy
+
+The following are proposed gates, not measured results:
+
+- 100% reject known out-of-range notes, transposition errors, impossible role assignments and unsupported controller claims in deterministic fixtures.
+- 100% preserve frozen score invariants in renderer-only and ensemble-only counterfactuals.
+- Every instrument profile exposes measured / derived / estimated / unknown status and renderer scope.
+- Every technique claim has at least one positive, no-op and wrong-voice/wrong-region control.
+- No style can become Foundation without held-out blind listening and any expert review required by its catalog entry.
+- Style recognition must remain discriminable with instrumentation held constant; establish confidence intervals first, then freeze a threshold on the development split.
+- Every report includes worst-style and worst-renderer strata, abstention, fallback and error reasons.
+- No SOTA or cultural-authenticity statement without matched baselines, source lineage, qualified listeners and independently reviewable evidence.
+
+## 9. Data and licensing
+
+Use asset manifests, SHA-256 digests, provenance and license records before sample ingest or model fitting.
+
+Candidate sources:
+
+- **VCSL** (official project: https://github.com/sgossner/VCSL) describes its sample library as CC0. It is a promising instrument/articulation source; verify the exact acquired release, all included assets, metadata and license notices before redistribution or training.
+- **MAESTRO** (official dataset: https://magenta.tensorflow.org/datasets/maestro) provides aligned piano audio and MIDI useful for piano timing/expressive-performance experiments. Its published CC BY-NC-SA 4.0 terms are non-commercial; do not treat it as unrestricted commercial training data. It is not a multi-instrument coverage corpus.
+- Additional sample libraries must be reviewed asset-by-asset for license, provenance, instrument naming, articulation metadata and redistribution terms.
+
+Keep source audio private and restricted where licenses or contributor permissions require it. A user uploading a recording does not automatically grant global training, derivative or redistribution rights.
+
+## 10. Implementation order
+
+1. Code-grounded inventory and baseline receipts for all 42 instrument variants and 29 composer-backed styles.
+2. Capability profile schema plus complete machine-readable inventory; record gaps honestly.
+3. Style identity contracts for the 29 engine-backed styles; catalog research entries remain disabled.
+4. Renderer-patch capability probes for CC11, CC1, CC64, CC2 and relevant program/keyswitch behaviors.
+5. Deterministic score-conditioned orchestration planner with fail-closed constraints and replayable plan receipt.
+6. Per-instrument articulation and expressive performance profiles; add one technique/control at a time with positive and negative fixtures.
+7. Crossed factorial identity campaign, then pilot listening study and held-out confirmation.
+8. Promote only instrument / technique / style / renderer combinations whose evidence supports the claim.
+
+## 11. Related work and non-duplication
+
+- EVAL-030 #9284 — SMEBench / MMAE compatibility.
+- EVAL-031 #9300 / PR #9303 — benchmark source and composition lineage isolation.
+- EVAL-032 #9306 / PR #9312 — judge reliability / human calibration.
+- EVAL-033 #9307 — contract-valid equivalence.
+- EVAL-034 #9375 / PR #9380 — realized Score contract verification.
+- EVAL-035 #9337 / PR #9352 and #9381 / PR #9383 — topology-specific tail and replayable temporal support.
+- EVAL-036 #9355 — operation-specific symbolic counterfactual validation.
+
+MEL-MR-STYLE-001 consumes their verified evidence where relevant and does not weaken their gates.
+
+## 12. Claim boundary
+
+This protocol does not claim that the 42 instrument variants are sample-realistic, the 29 engine-backed styles are already distinguishable, the 152-style catalog is implemented, or any controller/technique works across all SoundFonts. It is a preregistered plan to generate that evidence. CI, compilation, benchmark execution and listener validation remain separate gates.
