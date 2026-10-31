@@ -182,3 +182,29 @@ The report distinguishes precision, recall, specificity, false-positive rate and
 
 Detector execution must never receive the sealed key. A detector adapter should consume the public packet and emit one score per opaque pair ID, bound to the exact packet digest. Evaluator-only code checks coverage and joins scores to the sealed key. For a model/API detector, additionally bind its exact model/provider version, prompt, runtime, model-access mode, token/call budget and any retrieval/network exposure through the separate score-validity disclosure workstream (#9493).
 
+
+
+## FTD-style statistical comparison kernel
+
+The crate also provides an FTD-style p-value/fusion kernel in src/ftd.rs. It is independent of model-specific score extraction: a PPL, Min-K, Min-K++, gradient, or other authorized adapter supplies per-item scores and a contaminated-reference score sample for each feature.
+
+Important paper-to-code audit:
+
+- ACL 2026 paper Eq. (4) prints the lower-tail reference probability, but the paper also states that low scores indicate contamination, defines contamination as the null, and selects BH rejections as clean. Those statements imply the upper-tail p-value for a detector whose high score is clean-like.
+- The official liano3/FTD implementation supports both score directions and uses the greater direction in its listed experiments: it counts reference scores greater than or equal to the observed test score. This makes high test scores yield small p-values and resolves the intended direction in code.
+- The paper's Eq. (7) describes normalized per-detector BH rejection counts. The official repository further applies temperature-scaled softmax sharpening (temperature 0.5 in its experiment path). These are implemented as distinct weighting policies.
+
+Sources:
+- ACL paper: https://aclanthology.org/2026.acl-long.1390/
+- Official reference implementation, pinned source: https://github.com/liano3/FTD/blob/412e6dc597e65b14ac5db3257265ed04102c2a89/src/FTD.py
+- Official clean-set selection stage: https://github.com/liano3/FTD/blob/412e6dc597e65b14ac5db3257265ed04102c2a89/src/clean_data.py
+
+The Rust kernel provides:
+- deterministic randomized-tie empirical reference p-values;
+- explicit greater/less tail direction;
+- single-feature BH rejection counts;
+- paper normalized-count weights and official softmax-sharpened weights;
+- weighted Cauchy p-value fusion and final BH selection.
+
+The statistical report does **not** claim that these calculations automatically guarantee FDR control. The reference sample must be representative of the contaminated null, the resulting p-values must be super-uniform under that null, and cross-hypothesis dependence must meet the relevant multiple-testing assumptions. This crate does not establish those conditions. It also does not yet implement PPL, Min-K, Min-K++ or model-serving adapters, so it is an aggregation/reproduction kernel rather than a full FTD reproduction.
+
