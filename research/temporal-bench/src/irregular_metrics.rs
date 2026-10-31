@@ -382,6 +382,43 @@ mod tests {
     }
 
     #[test]
+    fn constant_residuals_match_cse_and_exact_piecewise_linear_reference() {
+        let (task, oracle) = fixture();
+        let mut predictions = oracle_predictions(&task, &oracle);
+        for prediction in &mut predictions {
+            prediction.fast += 1.0;
+            prediction.medium -= 2.0;
+            prediction.slow += 0.5;
+        }
+        let scores = score_irregular_forecasts(
+            &task,
+            &oracle,
+            &predictions,
+            CseKernelConfig { bandwidth_us: 20_000 },
+        )
+        .unwrap();
+
+        for (channel, expected_mse, expected_mae) in [
+            (&scores.fast, 1.0, 1.0),
+            (&scores.medium, 4.0, 2.0),
+            (&scores.slow, 0.25, 0.5),
+        ] {
+            assert!((channel.mse - expected_mse).abs() < 1.0e-10);
+            assert!((channel.mae - expected_mae).abs() < 1.0e-10);
+            assert!((channel.cse - expected_mse).abs() < 1.0e-10);
+            assert!((channel.cae - expected_mae).abs() < 1.0e-10);
+        }
+        assert_eq!(
+            scores.piecewise_linear_reference.mean_squared_error,
+            [1.0, 4.0, 0.25]
+        );
+        assert_eq!(
+            scores.piecewise_linear_reference.mean_absolute_error,
+            [1.0, 2.0, 0.5]
+        );
+    }
+
+    #[test]
     fn zero_bandwidth_is_rejected() {
         let (task, oracle) = fixture();
         let predictions = oracle_predictions(&task, &oracle);
