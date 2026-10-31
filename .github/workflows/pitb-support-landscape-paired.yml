@@ -1,0 +1,30 @@
+name: PITB Matched-Seed Support Comparisons
+
+on:
+  pull_request:
+    paths:
+      - "scripts/research/pitb_support_landscape_v3.py"
+      - "scripts/research/pitb_support_landscape_paired_v0.py"
+      - ".github/workflows/pitb-support-landscape-paired.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  paired-support-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact proposed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Compile exact analyzers and run paired statistical controls
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/research/pitb_support_landscape_v3.py scripts/research/pitb_support_landscape_paired_v0.py
+          python scripts/research/pitb_support_landscape_paired_v0.py --self-test
