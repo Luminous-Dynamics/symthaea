@@ -34,14 +34,15 @@
     "rust_tests_authored": true,
     "oracle_trace_verifier_implemented": true,
     "oracle_process_isolation_implemented": false,
-    "rust_tests_authored_count": 48,
+    "rust_tests_authored_count": 66,
     "rust_tests_by_file": {
-      "research/temporal-bench/src/lib.rs": 9,
-      "research/temporal-bench/src/temporal.rs": 14,
-      "research/temporal-bench/src/dms.rs": 12,
-      "research/temporal-bench/src/evidence.rs": 13
+      "research/temporal-bench/src/digest.rs": 2,
+      "research/temporal-bench/src/lib.rs": 13,
+      "research/temporal-bench/src/temporal.rs": 18,
+      "research/temporal-bench/src/dms.rs": 16,
+      "research/temporal-bench/src/evidence.rs": 17
     },
-    "cryptographic_stream_digest_implemented": false,
+    "cryptographic_stream_digest_implemented": true,
     "reference_generators": {
       "delayed_cue": true,
       "multiscale_forecast_change_point": true,
@@ -51,7 +52,9 @@
       "irregular_missingness": false,
       "selective_retention": false,
       "phase_prediction": false
-    }
+    },
+    "cryptographic_oracle_digest_implemented": true,
+    "signed_evaluator_receipt_implemented": false
   },
   "workload_contract": {
     "sample_semantics": "Causal observations; no future samples; elapsed simulated time is explicit.",
@@ -61,10 +64,14 @@
     "failed_invalid_timed_out_runs_counted": true,
     "repeated_timesteps_are_independent_samples": false,
     "confirmatory_oracle_sealed_required": true,
-    "oracle_separation": "Task and oracle values are returned together by each generator; the evaluator-side verifiers are structural only and do not provide access isolation.",
-    "stream_id_semantics": "Deterministic 64-bit pairing identifier only; not cryptographic, not tamper evidence, and not a substitute for a SHA-256 content digest.",
+    "oracle_separation": "Public task and oracle are still generated/returned in one process; digest verification detects content mutation only relative to a protected commitment and does not authenticate or isolate the oracle.",
+    "stream_id_semantics": "Deterministic 64-bit pairing identifier only; not cryptographic and not tamper evidence.",
     "canonical_stream_digest_required": true,
-    "signed_evaluator_receipt_required": true
+    "signed_evaluator_receipt_required": true,
+    "canonical_encoding": "Versioned little-endian encoding with domain separation; SHA-256 produced by the sha2 crate.",
+    "canonical_public_stream_digest_implemented": true,
+    "canonical_oracle_digest_implemented": true,
+    "signed_evaluator_receipt_implemented": false
   },
   "temporal_axes": {
     "delayed_cue_steps": [
@@ -315,7 +322,7 @@
         "one_shot_confirmatory_evaluation"
       ],
       "audit_status": "public_reference_script_inspected; no score imported; paper-to-script exact revision match unverified",
-      "implementation_status": "rust_generator_and_structural_oracle_verifier_authored; not compiled or executed"
+      "implementation_status": "Rust generator, timing/oracle structural verifier, and SHA-256 public/oracle digests authored; not compiled or executed"
     },
     {
       "id": "T9_BRAINTRACE_EVIDENCE_ACCUMULATION",
@@ -357,7 +364,7 @@
         "separate_confirmatory_stream"
       ],
       "audit_status": "public_generator_and_trainer_inspected; training-only loop has no separate held-out test path; no score imported",
-      "implementation_status": "rust_generator_and_structural_oracle_verifier_authored; not compiled or executed"
+      "implementation_status": "Rust generator, timing/oracle structural verifier, and SHA-256 public/oracle digests authored; not compiled or executed"
     }
   ],
   "architecture_arms": [
