@@ -482,10 +482,10 @@
       },
       "primary_metrics": [
         "bitemporal_exact_match_by_valid_at_known_at",
-        "future_knowledge_leakage_rate",
-        "missed_correction_rate",
-        "stale_claim_use_after_retraction",
-        "historical_as_known_answer_preservation",
+        "future_knowledge_leakage_rate_over_eligible_pre_correction_queries",
+        "missed_correction_rate_over_eligible_post_correction_pre_retraction_queries",
+        "stale_answer_rate_over_eligible_post_retraction_queries",
+        "historical_as_known_preservation_rate_over_eligible_historical_queries",
         "abstention_and_missing_prediction_rate",
         "correction_propagation_latency"
       ],
@@ -514,10 +514,18 @@
           "wrong_answers",
           "abstentions",
           "missing_predictions",
+          "future_knowledge_eligible_queries",
           "future_knowledge_leaks",
+          "missed_correction_eligible_queries",
           "missed_corrections",
+          "stale_after_retraction_eligible_queries",
           "stale_answers_after_retraction",
-          "historical_as_known_preserved"
+          "historical_as_known_eligible_queries",
+          "historical_as_known_preserved",
+          "future_knowledge_leakage_rate",
+          "missed_correction_rate",
+          "stale_after_retraction_rate",
+          "historical_as_known_preservation_rate"
         ],
         "scorer": "score_knowledge_predictions in research/temporal-bench/src/knowledge_stream.rs"
       }
