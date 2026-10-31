@@ -151,6 +151,11 @@ status before emitting latency. Its work counters also show the expected
 reduction in baseline preparations, partition-repertoire preparations, and
 nested Eq. 4 receipt hashes.
 
+Every CSV row also binds the exact sparse model SHA-256, system-search request
+SHA-256, algorithm identifier, decimal precision, factor-entry ceiling, and
+partition/state-pair/score budgets. This lets a reported timing row be tied to
+the exact mathematical input and search policy that was validated.
+
 Run:
 
     cargo run --release --locked -p symthaea-iit --example sparse_system_search_reuse_sweep
