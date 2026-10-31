@@ -685,6 +685,15 @@ pub struct CognitiveLoopConfig {
     /// Default: false (desktop). Set true for mobile profiles.
     pub enable_thermal_adaptation: bool,
 
+    // ── JEPA observed-transition learning ────────────────────────────────
+    /// Enable the optional JEPA latent action-transition learner.
+    ///
+    /// When enabled, it predicts from the current CfC input plus the FEP-selected
+    /// action and trains against the next observed CfC input. Disabled by default.
+    #[cfg(feature = "jepa")]
+    #[serde(default)]
+    pub enable_jepa: bool,
+
     // ── Federation ──────────────────────────────────────────────────────
     /// Enable federated learning coordinator (requires async runtime).
     pub federation_enabled: bool,
@@ -1096,6 +1105,8 @@ impl Default for CognitiveLoopConfig {
             substrate_transition_alpha: super::thresholds::SUBSTRATE_TRANSITION_ALPHA_DEFAULT
                 as f32,
             enable_thermal_adaptation: true,
+            #[cfg(feature = "jepa")]
+            enable_jepa: false,
             federation_enabled: false,
             federation_round_interval_ms: 30_000,
             #[cfg(feature = "vision-manifold")]
