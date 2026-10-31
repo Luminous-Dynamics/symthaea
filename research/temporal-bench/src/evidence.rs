@@ -69,6 +69,11 @@ pub struct EvidenceTask {
     pub recall_steps: u32,
     pub cue_count: usize,
     pub input_channels: usize,
+    pub cue_bias_probability_bits: u64,
+    pub left_rate_hz_bits: u64,
+    pub right_rate_hz_bits: u64,
+    pub recall_rate_hz_bits: u64,
+    pub noise_rate_hz_bits: u64,
     /// SHA-256 over the versioned canonical public evidence stream.
     pub content_sha256: [u8; 32],
 }
@@ -86,6 +91,11 @@ pub fn evidence_content_digest(task: &EvidenceTask) -> [u8; 32] {
     hash.u32(task.recall_steps);
     hash.usize(task.cue_count);
     hash.usize(task.input_channels);
+    hash.u64(task.cue_bias_probability_bits);
+    hash.u64(task.left_rate_hz_bits);
+    hash.u64(task.right_rate_hz_bits);
+    hash.u64(task.recall_rate_hz_bits);
+    hash.u64(task.noise_rate_hz_bits);
     hash.usize(task.observations.len());
     for observation in &task.observations {
         hash.u32(observation.step);
@@ -100,6 +110,7 @@ pub fn evidence_content_digest(task: &EvidenceTask) -> [u8; 32] {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EvidenceOracle {
     pub stream_id: u64,
+    pub seed: u64,
     pub hidden_ground_truth: bool,
     pub cue_assignments: Vec<bool>,
     pub positive_cue_count: usize,
@@ -112,6 +123,7 @@ pub struct EvidenceOracle {
 pub fn evidence_oracle_digest(oracle: &EvidenceOracle) -> [u8; 32] {
     let mut hash = CanonicalHasher::new(b"symthaea.temporal.evidence-accumulation.oracle.v1");
     hash.u64(oracle.stream_id);
+    hash.u64(oracle.seed);
     hash.u8(u8::from(oracle.hidden_ground_truth));
     hash.usize(oracle.cue_assignments.len());
     for selected_left in &oracle.cue_assignments {
@@ -274,6 +286,11 @@ pub fn generate_evidence_task(
         recall_steps,
         cue_count: config.cue_count,
         input_channels: INPUT_CHANNELS,
+        cue_bias_probability_bits: config.cue_bias_probability.to_bits(),
+        left_rate_hz_bits: config.left_rate_hz.to_bits(),
+        right_rate_hz_bits: config.right_rate_hz.to_bits(),
+        recall_rate_hz_bits: config.recall_rate_hz.to_bits(),
+        noise_rate_hz_bits: config.noise_rate_hz.to_bits(),
         content_sha256: [0; 32],
     };
     public_task.content_sha256 = evidence_content_digest(&public_task);
@@ -300,6 +317,7 @@ pub enum EvidenceVerificationError {
     StreamIdMismatch,
     ContentDigestMismatch,
     OracleDigestMismatch,
+    ReproducibilityMismatch,
     InvalidTaskWindow,
     InvalidOracle,
     InvalidObservation { expected_step: u32 },
@@ -315,6 +333,7 @@ impl fmt::Display for EvidenceVerificationError {
             Self::StreamIdMismatch => write!(f, "evidence task and oracle stream IDs differ"),
             Self::ContentDigestMismatch => write!(f, "evidence public task SHA-256 digest does not match its contents"),
             Self::OracleDigestMismatch => write!(f, "evidence oracle SHA-256 digest does not match its contents"),
+            Self::ReproducibilityMismatch => write!(f, "evidence public stream/oracle does not match the seeded generator"),
             Self::InvalidTaskWindow => write!(f, "evidence task timing or input dimensions are invalid"),
             Self::InvalidOracle => write!(f, "evidence oracle assignments or majority label are invalid"),
             Self::InvalidObservation { expected_step } => {
@@ -429,6 +448,28 @@ pub fn verify_evidence_trace(
                 });
             }
         }
+    }
+
+    // Rebuild the exact public stream and hidden labels from the evaluator seed.
+    // This detects recommitted but seed-inconsistent sample/oracle changes.
+    let config = EvidenceConfig {
+        seed: oracle.seed,
+        dt_ms: task.dt_ms,
+        interval_ms: task.interval_steps.saturating_mul(task.dt_ms),
+        cue_ms: task.cue_steps.saturating_mul(task.dt_ms),
+        delay_ms: task.delay_steps.saturating_mul(task.dt_ms),
+        recall_ms: task.recall_steps.saturating_mul(task.dt_ms),
+        cue_count: task.cue_count,
+        cue_bias_probability: f64::from_bits(task.cue_bias_probability_bits),
+        left_rate_hz: f64::from_bits(task.left_rate_hz_bits),
+        right_rate_hz: f64::from_bits(task.right_rate_hz_bits),
+        recall_rate_hz: f64::from_bits(task.recall_rate_hz_bits),
+        noise_rate_hz: f64::from_bits(task.noise_rate_hz_bits),
+    };
+    let (expected_task, expected_oracle) =
+        generate_evidence_task(config).map_err(|_| EvidenceVerificationError::ReproducibilityMismatch)?;
+    if expected_task != *task || expected_oracle != *oracle {
+        return Err(EvidenceVerificationError::ReproducibilityMismatch);
     }
     Ok(())
 }
@@ -621,6 +662,27 @@ mod tests {
             verify_evidence_trace(&task, &oracle),
             Err(EvidenceVerificationError::InvalidTaskWindow)
         );
+    }
+
+    #[test]
+    fn verifier_rejects_recommitted_seed_inconsistent_observation() {
+        let config = EvidenceConfig::braintrace_reference(321);
+        let (mut task, oracle) = generate_evidence_task(config).unwrap();
+        task.observations[0].active_channels.push(99);
+        task.observations[0].active_channels.sort_unstable();
+        task.content_sha256 = evidence_content_digest(&task);
+        assert_eq!(
+            verify_evidence_trace(&task, &oracle),
+            Err(EvidenceVerificationError::ReproducibilityMismatch)
+        );
+    }
+
+    #[test]
+    fn oracle_digest_binds_the_generator_seed() {
+        let config = EvidenceConfig::braintrace_reference(322);
+        let (_, mut oracle) = generate_evidence_task(config).unwrap();
+        oracle.seed ^= 1;
+        assert_ne!(oracle.content_sha256, evidence_oracle_digest(&oracle));
     }
 
     #[test]
