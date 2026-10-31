@@ -14,8 +14,8 @@ use symthaea_muse_protocol::catalog::{
     CanonicalStyle, HybridStyleSpec, StyleStatus, catalog_entry,
 };
 use symthaea_music_theory::{
-    CompositionSpec, MusicalIntent, Score, Style, MUSIC_THEORY_ENGINE_VERSION,
-    compose_with_spec,
+    CompositionSpec, GrammarProfile, MusicalIntent, Score, Style, MUSIC_THEORY_ENGINE_VERSION,
+    compose_with_grammar_plan,
 };
 
 pub const HYBRID_STYLE_COMPILER_SCHEMA: &str = "muse-hybrid-style-compiler-v1";
@@ -63,6 +63,9 @@ pub struct StyleMixProvenance {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CompiledHybridStyle {
+    /// Retains the structural owner's dispatch family so dedicated engines
+    /// (groove-cycle, additive process, modal arc, fugue, etc.) stay active.
+    pub structural_style: Style,
     pub spec: CompositionSpec,
     pub provenance: StyleMixProvenance,
 }
@@ -260,6 +263,7 @@ pub fn compile_hybrid_style(
     let source_recipe_sha256 = format!("{:x}", hasher.finalize());
 
     Ok(CompiledHybridStyle {
+        structural_style,
         spec,
         provenance: StyleMixProvenance {
             schema: HYBRID_STYLE_COMPILER_SCHEMA.into(),
@@ -280,7 +284,15 @@ pub fn compose_hybrid_style(
     hybrid: &HybridStyleSpec,
 ) -> Result<HybridComposition, Vec<StyleMixIssue>> {
     let compiled = compile_hybrid_style(hybrid)?;
-    let score = compose_with_spec(intent, &compiled.spec);
+    // Keep the structural owner's grammar-family dispatch. In particular,
+    // dedicated engines must not be bypassed merely because the recipe is a
+    // hybrid CompositionSpec.
+    let score = compose_with_grammar_plan(
+        compiled.structural_style.grammar_profile(),
+        intent,
+        &compiled.spec,
+    )
+    .score;
     Ok(HybridComposition { score, compiled })
 }
 
