@@ -442,7 +442,7 @@ fn select_probe(
     probe_cost: f64,
     allocator_cost_per_evaluation: f64,
 ) -> Option<Query> {
-    let (available, _) = available_probe_queries(worlds, posterior, used);
+    let (available, _, _) = available_probe_queries(worlds, posterior, used);
     if available.is_empty() || posterior.len() <= 1 {
         return None;
     }
@@ -791,7 +791,7 @@ fn run() -> Result<(), String> {
             print!(",");
         }
         print!(
-            "{{\"strategy\":\"{}\",\"mean_probes\":{:.4},\"mean_posterior_size\":{:.4},\"mean_decision_utility\":{:.4},\"mean_net_utility\":{:.4},\"mean_regret\":{:.4},\"mean_net_regret\":{:.4},\"mean_decision_gain_vs_no_probe\":{:.4},\"mean_decision_flip_fraction\":{:.4},\"beneficial_flip_fraction\":{:.4},\"harmful_flip_fraction\":{:.4},\"mean_allocator_score_evaluations\":{:.4},\"mean_allocator_cost\":{:.4},\"mean_safety_blocked_candidates\":{:.4},\"unsafe_actions\":{},\"unsafe_probes\":{},\"contradictions\":{}}}",
+            "{{\"strategy\":\"{}\",\"mean_probes\":{:.4},\"mean_posterior_size\":{:.4},\"mean_decision_utility\":{:.4},\"mean_net_utility\":{:.4},\"mean_regret\":{:.4},\"mean_net_regret\":{:.4},\"mean_decision_gain_vs_no_probe\":{:.4},\"mean_decision_flip_fraction\":{:.4},\"beneficial_flip_fraction\":{:.4},\"harmful_flip_fraction\":{:.4},\"mean_allocator_score_evaluations\":{:.4},\"mean_allocator_cost\":{:.4},\"mean_authorization_blocked_candidates\":{:.4},\"mean_posterior_safety_blocked_candidates\":{:.4},\"unsafe_actions\":{},\"unsafe_probes\":{},\"contradictions\":{}}}",
             summary.strategy,
             summary.mean_probes,
             summary.mean_posterior_size,
@@ -967,7 +967,7 @@ mod tests {
             0.0,
         ).expect("at least one probe should have positive decision value");
         let chosen_gain = expected_value_of_probe(&worlds, &posterior, chosen);
-        let (safe_queries, _) = available_probe_queries(&worlds, &posterior, &used);
+        let (safe_queries, _, _) = available_probe_queries(&worlds, &posterior, &used);
         for query in safe_queries {
             assert!(chosen_gain + 1e-9 >= expected_value_of_probe(&worlds, &posterior, query));
         }
@@ -1059,12 +1059,36 @@ mod tests {
         let worlds = mechanisms();
         let posterior: Vec<usize> = (0..worlds.len()).collect();
         let used = BTreeSet::new();
-        let (safe, blocked) = available_probe_queries(&worlds, &posterior, &used);
+        let (safe, authorization_blocked, posterior_safety_blocked) =
+            available_probe_queries(&worlds, &posterior, &used);
         assert!(!safe.is_empty());
-        assert!(blocked > 0);
+        assert!(authorization_blocked > 0);
+        assert_eq!(authorization_blocked + posterior_safety_blocked, 6);
         assert!(safe.iter().all(|query| robustly_safe_probe(&worlds, &posterior, *query)));
         for query in all_queries().into_iter().filter(|query| !safe.contains(query)) {
             assert!(!robustly_safe_probe(&worlds, &posterior, query));
+        }
+    }
+
+    #[test]
+    fn preauthorized_probe_envelope_is_safe_across_catalog_and_heldout_families() {
+        let all_worlds: Vec<Mechanism> = mechanisms()
+            .into_iter()
+            .chain(heldout_mechanisms())
+            .collect();
+        let authorized: Vec<Query> = all_queries()
+            .into_iter()
+            .filter(|query| externally_authorized_probe(*query))
+            .collect();
+        assert_eq!(authorized.len(), 6);
+        for world in &all_worlds {
+            for query in &authorized {
+                assert!(
+                    world.sense(*query).safe,
+                    "preauthorized query {query:?} was unsafe in {}",
+                    world.id()
+                );
+            }
         }
     }
 
