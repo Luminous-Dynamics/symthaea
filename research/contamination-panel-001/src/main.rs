@@ -6,6 +6,7 @@ use contamination_panel_bench::{
         FreshPublicChallengePacketV1, SealedFreshOraclePacketV1,
         audit_fresh_challenge_bundle, generate_fresh_challenge_bundle,
     },
+    fresh_scoring::score_fresh_submission,
     DetectorSpecV1, PublicChallengePacketV1, SealedChallengeKeyV1,
     audit_blinded_adjudications, detectors::{evaluate_detector_run, score_public_packet},
     ftd::{
@@ -258,6 +259,38 @@ fn audit_intervention_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn score_fresh_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 6 {
+        return Err(
+            "usage: contamination-panel-bench score-fresh <public-packet.json> <sealed-oracle.json> <manifest.json> <answer-submission.json> <score-report.json>"
+                .into(),
+        );
+    }
+    let bundle = FreshChallengeBundleV1 {
+        public_packet: serde_json::from_slice::<FreshPublicChallengePacketV1>(&fs::read(&args[1])?)?,
+        sealed_oracle_packet: serde_json::from_slice::<SealedFreshOraclePacketV1>(&fs::read(&args[2])?)?,
+        manifest: serde_json::from_slice::<FreshChallengeManifestV1>(&fs::read(&args[3])?)?,
+    };
+    let submission_bytes = fs::read(&args[4])?;
+    let report = score_fresh_submission(&bundle, &submission_bytes).map_err(io::Error::other)?;
+    write_bytes(&args[5], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "run={} correct={}/{} accuracy={:.1}% coverage={:.1}% invalid={} abstained={}",
+        report.run_id,
+        report.correct_count,
+        report.item_count,
+        report.accuracy_over_all_permille / 10.0,
+        report.coverage_permille / 10.0,
+        report.invalid_format_count,
+        report.abstained_count
+    );
+    println!(
+        "execution receipt status: {}",
+        report.execution_receipt_verification
+    );
+    Ok(())
+}
+
 fn generate_fresh_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 6 {
         return Err(
@@ -417,9 +450,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
         Some("generate-fresh") => generate_fresh_cli(&args),
         Some("audit-fresh") => audit_fresh_cli(&args),
+        Some("score-fresh") => score_fresh_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
