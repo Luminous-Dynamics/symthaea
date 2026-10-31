@@ -45,7 +45,7 @@ For each scenario × budget × policy, the JSON report emits:
 - fraction of episodes selecting the predeclared exploit pocket;
 - candidate-sequence queries and model-head evaluations per episode;\n- uniform-grid MSE of the central point predictor, computed on 201 evaluator-only grid points per episode. These offline diagnostic evaluations are disclosed separately and are not included in the planner's candidate-query budget.
 
-Direct-policy and oracle controls have no model score or optimizer-optimism value; those report fields are null, not copied from environment truth. The prediction MSE is descriptive only. It is never substituted for selected-action error, realized utility or regret. The five-head policy's larger head-evaluation count is a real compute cost and must be included in any quality/cost comparison. Direct-policy and oracle controls have no selected model score or optimism gap; those fields are null rather than copied from environment truth.
+Direct-policy and oracle controls have no selected model score or optimism gap; those fields are null rather than copied from environment truth. The prediction MSE is descriptive only, not a replacement for selected-action error, realized utility or regret. The five-head policy's larger head-evaluation count is a real compute cost and must be included in any quality/cost comparison.
 
 ## Execution
 
