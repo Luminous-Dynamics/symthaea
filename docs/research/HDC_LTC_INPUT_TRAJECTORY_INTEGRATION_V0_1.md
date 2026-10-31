@@ -86,6 +86,30 @@ For U0, preserve the exact incumbent `evolve_closed_form` path. Candidate subste
 
 Do not change the learned `sigma_base` law or interpret it as a new ODE without derivation. Avoid changing running statistics by accident: internal substeps and external observation intervals must be recorded separately. An implementation should aggregate per-observation statistics according to an explicit policy rather than letting the number of hidden substeps change the statistics update frequency.
 
+## 5. Analytic scalar control before HDC integration
+
+Before using a 16K ContinuousHV state or a high-dimensional numerical reference, validate the time-path machinery on the scalar ODE:
+
+`dx/dt = (u(t) - x)/tau`
+
+with a linearly varying input over one completed interval `h = t_n - t_(n-1)`:
+
+`u(t) = u0 + (u1 - u0) * t/h`, for `0 <= t <= h`.
+
+Let `a = h/tau`. The exact endpoint is:
+
+`x(h) = exp(-a)*x0 + u0*(1-exp(-a)) + (u1-u0)*(1-(1-exp(-a))/a)`.
+
+The limit as `a -> 0` must be handled without cancellation or division-by-zero; use a numerically stable `expm1`/series implementation in any executable reference. Constant input (`u0 = u1`) reduces to the ordinary exponential-hold solution.
+
+Compare the exact endpoint with left-hold, midpoint-hold, right-hold and variable-input RK4 at 1/2/4/8/16 substeps. The synthetic fixture `hdc_ltc_input_trajectory_matrix_v0.1.json` includes four scalar cases with analytic outputs:
+- constant input, where all hold modes must agree;
+- unit linear ramp at `h/tau = 1`, where the exact endpoint is approximately 0.36787944117144233 (left and right holds are 0 and 0.6321205588285577);
+- short interval with a sign-changing ramp;
+- long interval where endpoint holds diverge substantially from the exact input-path solution.
+
+These values validate the scalar input-path and integration implementation only. They do not validate HDC equilibrium, learned gating, Fourier terms, or high-dimensional numerical stability. A candidate must pass this analytic control before being tested on the HDC-LTC model.
+
 ## 6. Time, missingness, and event contract
 
 - `dt` is derived from monotonic input timestamps; it is never wall-clock time or call count.
