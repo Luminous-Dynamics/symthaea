@@ -12,7 +12,7 @@
 use crate::{
     hash_domain,
     fresh_instance::{
-        task_text, ExactLinearSolutionV1, FreshChallengeBundleV1,
+        normalized_determinant_margin_permille, task_text, ExactLinearSolutionV1, FreshChallengeBundleV1,
         FreshChallengeManifestV1, FreshPublicChallengePacketV1,
         LinearSystemParametersV1, SealedFreshOraclePacketV1,
     },
@@ -324,6 +324,14 @@ fn validate_bundle(
         validate_digest(&entry.answer_sha256, "answer_sha256")?;
         if determinant(&entry.parameters) == 0 {
             return Err(format!("oracle item {} has a singular matrix", entry.item_id));
+        }
+        if normalized_determinant_margin_permille(&entry.parameters)
+            != entry.normalized_determinant_margin_permille
+        {
+            return Err(format!(
+                "oracle stability margin does not match matrix parameters for {}",
+                entry.item_id
+            ));
         }
         let parameter_bytes = serde_json::to_vec(&entry.parameters)
             .map_err(|error| format!("cannot serialize hidden parameters: {error}"))?;
@@ -646,6 +654,7 @@ mod tests {
             solution_component_min: -5,
             solution_component_max: 5,
             minimum_absolute_determinant: 1,
+            minimum_normalized_determinant_margin_permille: 50,
             model_checkpoint_sha256: digest("checkpoint"),
             checkpoint_freeze_receipt_sha256: digest("freeze"),
             checkpoint_frozen_at_utc: "2026-10-31T18:00:00Z".to_owned(),
@@ -908,6 +917,21 @@ mod tests {
             &bundle,
             &serde_json::to_vec(&build_submission(&bundle, exact_responses(&bundle))).unwrap()
         ).unwrap_err().contains("does not correspond to sealed oracle parameters"));
+    }
+
+    #[test]
+    fn scorer_rejects_rehashed_oracle_with_false_stability_margin() {
+        let mut bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
+        bundle.sealed_oracle_packet.entries[0].normalized_determinant_margin_permille = 1_000;
+        bundle.sealed_oracle_packet.sealed_oracle_sha256 =
+            sealed_oracle_digest(&bundle.sealed_oracle_packet).unwrap();
+        bundle.manifest.sealed_oracle_sha256 =
+            bundle.sealed_oracle_packet.sealed_oracle_sha256.clone();
+        bundle.manifest.manifest_sha256 = manifest_digest(&bundle.manifest).unwrap();
+        assert!(score_fresh_submission(
+            &bundle,
+            &serde_json::to_vec(&build_submission(&bundle, exact_responses(&bundle))).unwrap()
+        ).unwrap_err().contains("stability margin does not match matrix parameters"));
     }
 
     #[test]
