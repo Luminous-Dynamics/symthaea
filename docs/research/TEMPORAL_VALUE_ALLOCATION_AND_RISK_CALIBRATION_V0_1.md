@@ -202,6 +202,12 @@ These are target gates, not achieved results. The final CSE tolerance and minimu
 - **BITS:** an irregular-time benchmark proposal covering 11 datasets across nine domains and multiple irregularity dimensions. Use it as an external parity/adapter target after licensing, manifests and evaluation protocol are pinned; do not mix its metrics into synthetic CSE calibration. https://arxiv.org/abs/2609.33303
 - **CSE:** Li et al. (18 August 2026), arXiv:2608.17293, motivates separating sample-density effects from continuous-time predictive risk. The exact interpolant reference here is a local calibration oracle for a declared prediction path, not a replacement for the paper's statistical estimator. https://arxiv.org/abs/2608.17293
 
+### Multi-timescale SNN architecture comparator
+
+**PMSN — Parallel Multi-Compartment Spiking Neuron** (Chen et al., IEEE TNNLS, published 13 July 2026; DOI 10.1109/TNNLS.2026.3708510) is now a required named comparator, not a generic SNN fallback. It uses interacting, configurable neuronal compartments for multi-timescale processing and two training parallelization techniques that decouple temporal updates. The authors report more than 10× acceleration and a 30% accuracy improvement over LIF on their Sequential CIFAR-10 setup at comparable computational cost, plus a neuromorphic-hardware implementation. These are literature claims for their exact setup, not Symthaea measurements. [Paper](https://pubmed.ncbi.nlm.nih.gov/42441458/) · [Official code](https://github.com/xychen-comp/Parallel-Multi-compartment-Spiking-Neuron-PMSN)
+
+Required parity tasks: Sequential CIFAR-10 (including the exact 1,024-step configuration), S-MNIST/PS-MNIST and SHD where data encoding and training semantics can be matched. Sweep PMSN compartment count and temporal-parallelization mode against HDC-LTC fast/slow state under matched state bytes, parameter count, update budget, precision and hardware. Measure delay-conditioned capability, gradient/update cost, memory traffic and calibrated energy. Only combine PMSN with HDC summaries after each component is independently characterized.
+
 ### Named irregular-time forecasting competitors
 
 The initial GRU-D / Latent-ODE list is not a sufficient contemporary baseline. On compatible forecasting tasks, include:
