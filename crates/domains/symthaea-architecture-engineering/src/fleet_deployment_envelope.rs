@@ -12,7 +12,7 @@
 //! This is a deterministic table-evidence evaluator. It does not guarantee generalization to
 //! unseen boards, firmware, temperature, voltage, workloads or production device variation.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::error::Error;
 use std::fmt;
 
