@@ -139,6 +139,72 @@
               "flow_lpm": 12,
               "assignment": "treatment"
             }
+          },
+          {
+            "event_id": "E14",
+            "session_id": "S3",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "pump": "on",
+              "valve": "closed",
+              "flow_lpm": 2,
+              "assignment": "control"
+            }
+          },
+          {
+            "event_id": "E15",
+            "session_id": "S3",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "pump": "on",
+              "valve": "open",
+              "flow_lpm": 12,
+              "assignment": "treatment"
+            }
+          },
+          {
+            "event_id": "E16",
+            "session_id": "S3",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "pump": "on",
+              "valve": "closed",
+              "flow_lpm": 2,
+              "assignment": "control"
+            }
+          },
+          {
+            "event_id": "E17",
+            "session_id": "S3",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "pump": "on",
+              "valve": "open",
+              "flow_lpm": 12,
+              "assignment": "treatment"
+            }
+          },
+          {
+            "event_id": "E18",
+            "session_id": "S3",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "pump": "on",
+              "valve": "closed",
+              "flow_lpm": 2,
+              "assignment": "control"
+            }
+          },
+          {
+            "event_id": "E19",
+            "session_id": "S3",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "pump": "on",
+              "valve": "open",
+              "flow_lpm": 12,
+              "assignment": "treatment"
+            }
           }
         ],
         "current_state": {
@@ -199,6 +265,72 @@
             "event_kind": "irrelevant_metadata",
             "payload": {
               "operator_note": "used standard checklist"
+            }
+          },
+          {
+            "event_id": "E14",
+            "session_id": "S3",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "pump": "on",
+              "valve": "closed",
+              "flow_lpm": 2,
+              "assignment": "control"
+            }
+          },
+          {
+            "event_id": "E15",
+            "session_id": "S3",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "pump": "on",
+              "valve": "open",
+              "flow_lpm": 12,
+              "assignment": "treatment"
+            }
+          },
+          {
+            "event_id": "E16",
+            "session_id": "S3",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "pump": "on",
+              "valve": "closed",
+              "flow_lpm": 2,
+              "assignment": "control"
+            }
+          },
+          {
+            "event_id": "E17",
+            "session_id": "S3",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "pump": "on",
+              "valve": "open",
+              "flow_lpm": 12,
+              "assignment": "treatment"
+            }
+          },
+          {
+            "event_id": "E18",
+            "session_id": "S3",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "pump": "on",
+              "valve": "closed",
+              "flow_lpm": 2,
+              "assignment": "control"
+            }
+          },
+          {
+            "event_id": "E19",
+            "session_id": "S3",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "pump": "on",
+              "valve": "open",
+              "flow_lpm": 12,
+              "assignment": "treatment"
             }
           }
         ],
