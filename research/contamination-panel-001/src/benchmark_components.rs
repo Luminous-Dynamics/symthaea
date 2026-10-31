@@ -683,6 +683,27 @@ pub fn verify_benchmark_component_audit_integrity(
     if audit_report_digest(report)? != report.report_sha256 {
         return Err("benchmark component audit report digest mismatch".to_owned());
     }
+    let summary_consistent =
+        report.all_explicit_requirements_covered
+            == (report.uncovered_explicit_requirement_count == 0)
+        && report.all_requirement_preconditions_covered
+            == (report.uncovered_precondition_count == 0
+                && report.unknown_precondition_reference_count == 0)
+        && report.required_capabilities_available
+            == (report.missing_capability_count == 0)
+        && report.prohibited_capabilities_absent
+            == (report.exposed_prohibited_capability_count == 0)
+        && report.no_orphan_evaluator_checks
+            == (report.orphan_evaluator_check_count == 0)
+        && report.no_unknown_requirement_references
+            == (report.unknown_requirement_reference_count == 0)
+        && report.no_unknown_precondition_references
+            == (report.unknown_precondition_reference_count == 0)
+        && (report.unresolved_blocker_count == 0
+            || !report.valid);
+    if !summary_consistent {
+        return Err("benchmark component audit summary counts disagree with status flags".to_owned());
+    }
     if report.valid
         != (report.all_four_components_present
             && report.component_artifact_digests_valid
@@ -873,6 +894,17 @@ mod tests {
     }
 
     #[test]
+    fn rehashed_report_cannot_claim_coverage_with_nonzero_uncovered_count() {
+        let manifest = manifest();
+        let mut report = audit_benchmark_components(&manifest).unwrap();
+        report.uncovered_explicit_requirement_count = 1;
+        report.report_sha256.clear();
+        report.report_sha256 = audit_report_digest(&report).unwrap();
+        assert!(verify_benchmark_component_audit_integrity(&report).unwrap_err()
+            .contains("summary counts disagree"));
+    }
+
+    #[test]
     fn explicit_uncovered_requirement_is_counted_not_silently_dropped() {
         let mut manifest = manifest();
         manifest.evaluator_checks[0].covered_requirement_ids.clear();
@@ -983,6 +1015,7 @@ mod tests {
         let report = audit_benchmark_components(&manifest).unwrap();
         assert_eq!(report.model_triage_finding_count, 1);
         assert!(report.issues.iter().any(|issue| issue.contains("cannot self-assert human confirmation")));
+        assert!(!report.valid);
         assert!(!report.reviewer_attestations_authenticated);
         assert!(!report.qualified_for_confirmatory_use);
     }
