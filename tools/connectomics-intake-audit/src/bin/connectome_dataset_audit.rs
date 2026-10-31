@@ -1104,6 +1104,20 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_modality_cohort_manifest_matches_deterministic_synthetic_output() {
+        let bytes = include_bytes!("../../../../docs/neuroscience/examples/CONNECTOMEBENCH2_V2_METADATA_LINEAGE.example.jsonl");
+        let rows = parse_rows(bytes).expect("metadata JSONL fixture should parse");
+        let revision = "a".repeat(40);
+        let sidecar_digest = "b".repeat(64);
+        let manifest = build_cohort_manifest(&rows, &revision, &sidecar_digest);
+        let actual = serde_json::to_value(manifest).expect("manifest should serialize");
+        let expected: Value = serde_json::from_slice(
+            include_bytes!("../../../../docs/neuroscience/examples/CONNECTOME_MODALITY_COHORT_MANIFEST.example.json")
+        ).expect("cohort manifest example should parse");
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     fn cohort_manifest_does_not_promote_empty_cohorts_to_zero_coverage() {
         let rows = valid_dataset();
         let manifest = build_cohort_manifest(&rows, &"a".repeat(40), &"b".repeat(64));
