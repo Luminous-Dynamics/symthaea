@@ -426,6 +426,12 @@ mod tests {
     }
 
     #[test]
+    fn fixture_declares_an_independent_workspace_root() {
+        let manifest = FIXTURE.iter().find(|(p, _)| *p == "Cargo.toml").unwrap().1;
+        assert!(manifest.lines().any(|line| line.trim() == "[workspace]"));
+    }
+
+    #[test]
     fn fixture_is_dependency_free_and_lockfile_pinned() {
         let manifest = FIXTURE.iter().find(|(p, _)| *p == "Cargo.toml").unwrap().1;
         let lockfile = FIXTURE.iter().find(|(p, _)| *p == "Cargo.lock").unwrap().1;
