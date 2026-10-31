@@ -744,6 +744,27 @@ fn create_profile_unsigned(
     if !is_sha256(benchmark_manifest_sha256) || !is_sha256(benchmark_audit_sha256) {
         return Err(TailProfileError::InvalidDigest("benchmark lineage audit"));
     }
+    if !topology_attestation.route_graph_complete
+        || topology_attestation.version != TOPOLOGY_VERSION
+        || topology_digest(topology_attestation)? != context.topology_attestation_sha256
+        || topology_attestation.renderer_identity_sha256 != context.renderer_identity_sha256
+        || topology_attestation.renderer_executable_sha256 != context.renderer_executable_sha256
+        || topology_attestation.soundfont_sha256 != context.soundfont_sha256
+        || topology_attestation.renderer_config_sha256 != context.renderer_config_sha256
+        || topology_attestation.render_config_sha256 != context.render_config_sha256
+        || topology_attestation.effects_group_assignment != context.effects_group_assignment
+        || topology_attestation.effect_settings_sha256 != context.effect_settings_sha256
+        || topology_attestation.reverb_settings_sha256 != context.reverb_settings_sha256
+        || topology_attestation.chorus_settings_sha256 != context.chorus_settings_sha256
+        || topology_attestation.route_graph_sha256 != context.route_graph_sha256
+        || topology_attestation.output_chain_sha256 != context.output_chain_sha256
+        || topology_attestation.sample_rate_hz != context.sample_rate_hz
+        || topology_attestation.channels != context.channels
+        || topology_attestation.bits_per_sample != context.bits_per_sample
+        || topology_attestation.sample_format != context.sample_format
+    {
+        return Err(TailProfileError::RendererContextMismatch);
+    }
     let required_lineages = minimum_lineages_for_upper_quantile_bound(
         spec.quantile_micros,
         spec.confidence_micros,
@@ -1435,7 +1456,7 @@ mod tests {
     fn recomputed_statistics_reject_a_resigned_but_forged_guard() {
         let key = signing_key();
         let attestation = topology_attestation("profile-publisher-v1", &key);
-        let mut profile = signed_test_profile(context(&attestation), "profile-publisher-v1", &key);
+        let mut profile = signed_test_profile(attestation.clone(), "profile-publisher-v1", &key);
         profile.statistics.guard_frames += 1;
         let changed_digest = profile_digest(&profile).unwrap();
         profile.profile_sha256 = changed_digest.clone();
