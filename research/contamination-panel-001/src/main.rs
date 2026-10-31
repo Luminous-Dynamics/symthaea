@@ -1,6 +1,8 @@
 use contamination_panel_bench::{
-    ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, PublicChallengePacketV1,
-    audit_blinded_adjudications, generate_challenge_bundle, GeneratorConfigV1,
+    ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, DetectorEvaluationReportV1,
+    DetectorRunV1, DetectorSpecV1, PublicChallengePacketV1, SealedChallengeKeyV1,
+    audit_blinded_adjudications, detectors::{evaluate_detector_run, score_public_packet},
+    generate_challenge_bundle, GeneratorConfigV1,
 };
 use std::{
     env,
@@ -69,6 +71,50 @@ fn generate(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn score_builtins(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 4 {
+        return Err(
+            "usage: contamination-panel-bench score <public-packet.json> <detector-spec.json> <detector-run.json>"
+                .into(),
+        );
+    }
+    let packet: PublicChallengePacketV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
+    let spec: DetectorSpecV1 = serde_json::from_slice(&fs::read(&args[2])?)?;
+    let run = score_public_packet(&packet, &spec).map_err(io::Error::other)?;
+    let bytes = serde_json::to_vec_pretty(&run)?;
+    write_bytes(&args[3], &bytes)?;
+    println!(
+        "detector_id={} pairs_scored={} public_packet_sha256={}",
+        run.detector_id,
+        run.scores.len(),
+        run.public_packet_sha256
+    );
+    Ok(())
+}
+
+fn evaluate_run(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 5 {
+        return Err(
+            "usage: contamination-panel-bench evaluate <public-packet.json> <sealed-key.json> <detector-run.json> <evaluation-report.json>"
+                .into(),
+        );
+    }
+    let packet: PublicChallengePacketV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
+    let key: SealedChallengeKeyV1 = serde_json::from_slice(&fs::read(&args[2])?)?;
+    let run: DetectorRunV1 = serde_json::from_slice(&fs::read(&args[3])?)?;
+    let report = evaluate_detector_run(&packet, &key, &run).map_err(io::Error::other)?;
+    let bytes = serde_json::to_vec_pretty(&report)?;
+    write_bytes(&args[4], &bytes)?;
+    println!(
+        "detector_id={} tiers={} pairs={} report_schema={}",
+        report.detector_id,
+        report.metrics_by_tier.len(),
+        report.pair_count,
+        report.schema
+    );
+    Ok(())
+}
+
 fn audit_adjudications(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 4 {
         return Err(
@@ -114,9 +160,11 @@ fn run() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("generate") => generate(&args),
+        Some("score") => score_builtins(&args),
+        Some("evaluate") => evaluate_run(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
