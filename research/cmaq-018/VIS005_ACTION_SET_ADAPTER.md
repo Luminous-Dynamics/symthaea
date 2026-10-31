@@ -143,3 +143,10 @@ The metric layer now exposes `select_interval_dominant_action`. It returns a cer
 The selector validates the whole interval set and requires a common nominal level. Its certificate is conditional on simultaneous action-set coverage, is not a physical safety proof, and must never bypass the independent authority gate. New tests cover unique dominance, overlapping intervals, boundary ambiguity, mixed nominal levels and undersized action sets.
 
 The current benchmark plan is in [INDUSTRY_BENCHMARK_MATRIX_2026-11-01.md](INDUSTRY_BENCHMARK_MATRIX_2026-11-01.md). It separates P0 visual fidelity from P5 decision advantage and P6 robustness; requires D0/D1/W1/W2/W3 matched-budget comparators; and scores action-set coverage, selected regret, false dominance, abstention utility and net decision value.
+
+
+## Net decision value from matched episodes
+
+The new `evaluate_net_decision_value` primitive accepts a costed realized outcome for the world-model arm, D0 and D1 on every matched episode. Each arm's net utility subtracts inference, acquisition and failure/recovery costs, all already normalized to the preregistered common utility scale. It reports paired gross/net advantages and net win rates. It rejects negative costs and non-finite outcomes.
+
+A synthetic 3-episode known-answer fixture checks the arithmetic: +2.333 gross but only +0.333 net versus D0; +1.5 gross and +0.167 net versus D1. These are deliberately just test values, not a real benchmark result. The production result must include episode-level confidence intervals and an equal-compute comparison.
