@@ -127,9 +127,9 @@ mod tests {
         action.acknowledgement_lost().unwrap();
         let entry = journal.action("action-1").unwrap();
         assert_eq!(entry.phase(), crate::recovery::ActionPhase::UnknownOutcome);
-        assert!(matches!(entry.events()[0], crate::recovery::JournalEvent::Prepared { sequence: 1 }));
-        assert!(matches!(entry.events()[1], crate::recovery::JournalEvent::Dispatched { attempt: 1 }));
-        assert!(matches!(entry.events()[2], crate::recovery::JournalEvent::AcknowledgementLost));
+        assert!(matches!(entry.events().first(), Some(crate::recovery::JournalEvent::Prepared { sequence: 1 })));
+        assert!(matches!(entry.events().get(1), Some(crate::recovery::JournalEvent::Dispatched { attempt: 1 })));
+        assert!(matches!(entry.events().get(2), Some(crate::recovery::JournalEvent::AcknowledgementLost)));
     }
 
     #[test]
