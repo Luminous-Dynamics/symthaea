@@ -108,7 +108,7 @@ Sixteen authored Rust tests currently cover:
 13. replay identity binding for posterior/portfolio/QMC splits;
 14. rejection of too-small selection/validation scramble split;
 15. rejection of candidate-configuration and objective-registry replay mismatch;
-16. rejection of objective-column order mismatch and digest-bound replay.
+16. rejection of sorted-but-semantically-mismatched objective-column IDs.
 
 The environment has no `cargo`, `rustc` or `rustfmt`; these are authored test declarations only until compiled, formatted and executed.
 
