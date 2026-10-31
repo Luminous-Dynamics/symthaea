@@ -24,6 +24,22 @@ At each possible split location, it compares one linear fit over a symmetric loc
 
 This is deliberately a baseline, not a learned detector. It can be fooled by abrupt within-neuron compartment transitions, boutons, or acquisition artifacts. Such cases must remain hard negative controls; the output is only a review hypothesis.
 
+## Optional V2 physical-arclength mode
+
+The detector configuration schema now supports two optional fields:
+- `resample_interval_nm`: fixed uniform physical arclength spacing for a deterministic resampled profile;
+- `half_window_nm`: physical half-window used by the same local fit after resampling.
+
+Both fields must be present together. Rust validation requires finite positive values, at least three grid samples per half-window, and an integer ratio `half_window_nm / resample_interval_nm`. Source samples may be irregularly spaced but must have strictly increasing physical coordinates. All four input feature channels are linearly interpolated onto the same declared arclength grid. Grid generation starts at the first source coordinate and includes only points at or before the last source coordinate; the full source interval is retained separately in the report's cable-length denominator.
+
+When configured, the tool preserves the V1 sample-index radius-only and multifeature results and appends two explicitly named physical-mode results:
+- `physical_arclength_radius_only_piecewise_linear`;
+- `physical_arclength_multifeature_piecewise_linear`.
+
+The report records the interval, physical half-window, effective resampled half-window sample count, interpolation policy and per-track original/resampled sample counts. This allows a reviewer to confirm that all compared profiles used the same physical receptive field. Keep the resampling interval, half-window, feature transforms, thresholds and minimum separation identical across a sampling-density metamorphic comparison.
+
+The physical mode fixes the sample-index receptive-field problem; it does **not** solve statistical calibration. The score threshold remains a heuristic based on supplied scalar noise scales, features are still treated as independently scaled SSE gains, and an abrupt morphology transition is not proof of neuronal identity change. The physical variant must be calibrated on a disjoint same-neuron null set and lockbox before biological use. V1 remains the transparent control.
+
 ## Reproducible run
 
 ```sh
