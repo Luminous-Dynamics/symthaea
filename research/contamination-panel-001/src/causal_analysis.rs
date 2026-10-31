@@ -877,6 +877,7 @@ pub fn analyze_replicated_causal_study(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
 
     fn digest(label: &str) -> String {
         hash_domain(b"causal-analysis-test", label.as_bytes())
@@ -1039,6 +1040,47 @@ mod tests {
             randomization_test_seed_hex: hex(&vec![0xA7; 32]),
             replicates: vec![make_replicate(1), make_replicate(2)],
         }
+    }
+
+    #[test]
+    fn causal_study_and_report_schemas_match_rust_struct_fields() {
+        let study_schema: Value = serde_json::from_str(include_str!(
+            "../schema/replicated-causal-study.schema.json"
+        )).unwrap();
+        let report_schema: Value = serde_json::from_str(include_str!(
+            "../schema/replicated-causal-report.schema.json"
+        )).unwrap();
+        let study = study_fixture();
+        let report = analyze_replicated_causal_study(&study).unwrap();
+        let study_value = serde_json::to_value(&study).unwrap();
+        let report_value = serde_json::to_value(&report).unwrap();
+
+        assert_eq!(
+            study_schema["properties"]["schema"]["const"].as_str(),
+            Some(CAUSAL_STUDY_SCHEMA)
+        );
+        assert_eq!(
+            report_schema["properties"]["schema"]["const"].as_str(),
+            Some(CAUSAL_REPORT_SCHEMA)
+        );
+        let study_required: BTreeSet<String> = study_schema["required"].as_array().unwrap()
+            .iter().map(|v| v.as_str().unwrap().to_owned()).collect();
+        let study_properties: BTreeSet<String> = study_schema["properties"].as_object().unwrap()
+            .keys().cloned().collect();
+        assert_eq!(study_required, study_properties);
+        assert_eq!(
+            study_value.as_object().unwrap().keys().cloned().collect::<BTreeSet<_>>(),
+            study_properties
+        );
+        let report_required: BTreeSet<String> = report_schema["required"].as_array().unwrap()
+            .iter().map(|v| v.as_str().unwrap().to_owned()).collect();
+        let report_properties: BTreeSet<String> = report_schema["properties"].as_object().unwrap()
+            .keys().cloned().collect();
+        assert_eq!(report_required, report_properties);
+        assert_eq!(
+            report_value.as_object().unwrap().keys().cloned().collect::<BTreeSet<_>>(),
+            report_properties
+        );
     }
 
     #[test]
