@@ -632,7 +632,8 @@ mod tests {
     #[test]
     fn duplicate_scenario_id_fails_closed() {
         let mut input = fixture();
-        input.scenarios[1].scenario_id = input.scenarios[0].scenario_id.clone();
+        let duplicate_id = input.scenarios[0].scenario_id.clone();
+        input.scenarios[1].scenario_id = duplicate_id;
         assert!(validate(&input).unwrap_err().contains("scenario IDs"));
     }
 
