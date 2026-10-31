@@ -189,7 +189,7 @@ def select_capacity_aware_sequence(
     costs: Sequence[int | float | str | Fraction],
     cumulative_capacity: Sequence[int | float | str | Fraction],
     *,
-    exhaustive_limit: int = 16,
+    exhaustive_limit: int = 10,
 ) -> dict:
     """Select a nested, cumulative-capacity-feasible sequence from e-closure.
 
