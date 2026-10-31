@@ -1124,6 +1124,8 @@ impl DirectionCampaignRun {
         })
         .map_err(|error| error.to_string())?;
 
+        let mut evaluations_per_direction = BTreeMap::<String, u64>::new();
+        let mut proposal_index = 0u64;
         for action in &self.actions {
             let slot = u64::try_from(action.slot)
                 .map_err(|_| "action slot does not fit u64".to_owned())?;
@@ -1132,6 +1134,9 @@ impl DirectionCampaignRun {
             }
             let event_id = format!("{}:event:{slot}", tape.header.campaign_id);
             let (intent, outcome) = if action.is_new_proposal {
+                proposal_index = proposal_index
+                    .checked_add(1)
+                    .ok_or_else(|| "proposal index overflow".to_owned())?;
                 let disposition = match action.proposal_disposition {
                     Some(NewDirectionDisposition::Admitted) => {
                         ProposalDisposition::Admitted {
@@ -1156,7 +1161,7 @@ impl DirectionCampaignRun {
                 };
                 let descriptor_sha256 = digest(&format!(
                     "synthetic-direction-descriptor:{}:{}",
-                    landscape_id, action.slot
+                    landscape_id, proposal_index
                 ));
                 (
                     ActionIntent::ProposeDirection {
@@ -1170,7 +1175,7 @@ impl DirectionCampaignRun {
                         verifier_sha256: verifier_sha256.clone(),
                         verifier_receipt_sha256: digest(&format!(
                             "synthetic-verifier-receipt:{}:{}",
-                            landscape_id, action.slot
+                            landscape_id, proposal_index
                         )),
                         disposition,
                     },
@@ -1188,9 +1193,15 @@ impl DirectionCampaignRun {
                         action.slot
                     )
                 })?;
+                let evaluation_index = evaluations_per_direction
+                    .entry(action.arm_id.clone())
+                    .or_default();
+                *evaluation_index = evaluation_index
+                    .checked_add(1)
+                    .ok_or_else(|| "direction evaluation index overflow".to_owned())?;
                 let candidate_sha256 = digest(&format!(
                     "synthetic-candidate:{}:{}:{}",
-                    landscape_id, action.arm_id, action.slot
+                    landscape_id, action.arm_id, evaluation_index
                 ));
                 let semantic_delta_sha256 =
                     digest(&format!("synthetic-delta:{}:{}", landscape_id, action.arm_id));
@@ -1210,7 +1221,7 @@ impl DirectionCampaignRun {
                         uncertainty: None,
                         evidence_sha256: Some(digest(&format!(
                             "synthetic-evidence:{}:{}:{score:.17}",
-                            candidate_sha256, action.slot
+                            candidate_sha256, evaluation_index
                         ))),
                     },
                 )
