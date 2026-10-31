@@ -71,6 +71,7 @@ pub struct ScoreDemandProfile {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ScoreDemandError {
     EmptyScore,
+    ZeroMeter,
     NonFiniteTempo,
     NonPositiveTempo,
     NonFiniteDeclaredSpan,
@@ -98,6 +99,9 @@ pub fn analyze_score_demand(
 ) -> Result<ScoreDemandProfile, ScoreDemandError> {
     if score.notes.is_empty() {
         return Err(ScoreDemandError::EmptyScore);
+    }
+    if score.meter == 0 {
+        return Err(ScoreDemandError::ZeroMeter);
     }
 
     let has_complete_part_identity = score.has_part_identity();
@@ -543,6 +547,13 @@ mod tests {
         let first = analyze_score_demand(&score()).unwrap();
         let second = analyze_score_demand(&score()).unwrap();
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn rejects_zero_meter_before_computing_bar_density() {
+        let mut invalid = score();
+        invalid.meter = 0;
+        assert_eq!(analyze_score_demand(&invalid), Err(ScoreDemandError::ZeroMeter));
     }
 
     #[test]
