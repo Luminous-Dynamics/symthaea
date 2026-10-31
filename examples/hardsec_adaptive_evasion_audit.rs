@@ -1204,7 +1204,10 @@ mod tests {
         assert!((point - 0.9).abs() < 1e-12);
         let lower = first["lower_95"].as_f64().unwrap();
         let upper = first["upper_95"].as_f64().unwrap();
+        assert!((lower - 0.7).abs() < 1e-12);
+        assert!((upper - 1.0).abs() < 1e-12);
         assert!(lower <= point && point <= upper);
+        assert_eq!(first["seed_sha256"], "007ff034591a1d49060b43c806029957ad4fe125dcd33c3cf96e4b6fe65a1b7e");
         assert_eq!(first["bootstrap_replicates"], GROUP_BOOTSTRAP_REPLICATES);
         assert_eq!(first["resampling_unit"], "caller_declared_independent_group");
     }
