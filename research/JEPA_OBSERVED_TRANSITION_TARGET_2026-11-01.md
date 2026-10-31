@@ -62,17 +62,20 @@ The cognitive loop now stages x_t in the CfC planning phase and binds the select
 
 These are unit-level contract tests; no exact-head CI pass is claimed until the focused GitHub workflow completes.
 
-## Action semantics and claim boundary
+## Action semantics, time alignment and claim boundary
 
-The current cognitive-loop caller binds the FEP-selected action index. This fixes temporal pairing and makes the JEPA objective depend on the selected token, but it does not by itself prove that the token was executed as an external actuator command.
+The current cognitive-loop caller binds the FEP-selected action index. This fixes the previous source/action/target misalignment and makes JEPA depend on the action token selected after the source observation. It does not by itself prove that the token was executed as an external actuator command.
+
+This version is **one cognitive-loop transition per observation**. It does not yet pass elapsed duration or action hold time into the JEPA predictor. If observations arrive at irregular intervals, the same action token may correspond to different physical durations. A future physical adapter should add an explicit duration/horizon input and validate event-time alignment instead of assuming equal time steps.
 
 For a physical/action-conditioned world-model claim, the environment adapter must:
-- bind the FEP action ID to the canonical executed command;
-- record action dispatch/acknowledgement and the transition interval;
+- bind the FEP action ID to the canonical executed command and action-space version;
+- record action dispatch/acknowledgement, source timestamp, next-observation timestamp and the transition interval;
 - reject, invalidate or explicitly mark unexecuted/overridden actions;
-- ensure the next input is actually subsequent sensory evidence from that interval.
+- ensure the next input is actually subsequent sensory evidence from that interval;
+- include elapsed duration / action hold-time in the predictor or stratify evaluation by it.
 
-Until that adapter is independently verified, describe this as action-token-conditioned observed-transition learning, not as physical counterfactual fidelity or a deployed action-conditioned visual world model.
+Until that adapter is independently verified, describe this as FEP-action-token-conditioned observed-transition learning, not as physical counterfactual fidelity or a deployed action-conditioned visual world model.
 
 ## Next evaluation
 
