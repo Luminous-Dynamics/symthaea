@@ -148,19 +148,17 @@ pub fn probe_linux() -> anyhow::Result<LinuxProbeReport> {
         ),
     };
 
-    let bpf_lsm_active = active_lsm.value.as_deref()
-        .is_some_and(|value| value.split(',').any(|name| name.trim() == "bpf"));
+    let bpf_lsm_active = has_active_lsm(active_lsm.value.as_deref(), "bpf");
     let btf_available = btf_vmlinux.status == EvidenceStatus::Collected;
     let bpf_config = config.flags.get("CONFIG_BPF_LSM").copied();
     let bpf_syscall_config = config.flags.get("CONFIG_BPF_SYSCALL").copied();
-    let bpf_status = match (bpf_lsm_active, btf_available, bpf_config, bpf_syscall_config) {
-        (true, true, Some(false), _) | (_, _, _, Some(false)) => CapabilityStatus::NotAvailable,
-        (true, true, _, _) => CapabilityStatus::CandidateAvailable,
-        (false, _, Some(false), _) => CapabilityStatus::NotAvailable,
-        (false, _, Some(true), _) if active_lsm.status == EvidenceStatus::Collected => CapabilityStatus::NotAvailable,
-        (_, _, _, _) if active_lsm.status == EvidenceStatus::Inaccessible => CapabilityStatus::Inaccessible,
-        _ => CapabilityStatus::Unknown,
-    };
+    let bpf_status = assess_bpf_lsm(
+        bpf_lsm_active,
+        active_lsm.status,
+        btf_available,
+        bpf_config,
+        bpf_syscall_config,
+    );
 
     let tracefs_mount = mounts.iter().any(|mount| {
         mount.filesystem == "tracefs"
@@ -315,6 +313,33 @@ pub fn probe_linux() -> anyhow::Result<LinuxProbeReport> {
         observer_attached: false,
         workload_executed: false,
     })
+}
+
+fn has_active_lsm(active_lsm: Option<&str>, target: &str) -> Option<bool> {
+    active_lsm.map(|value| value.split(',').any(|name| name.trim() == target))
+}
+
+fn assess_bpf_lsm(
+    active: Option<bool>,
+    active_lsm_status: EvidenceStatus,
+    btf_available: bool,
+    bpf_lsm_config: Option<bool>,
+    bpf_syscall_config: Option<bool>,
+) -> CapabilityStatus {
+    if bpf_syscall_config == Some(false) || bpf_lsm_config == Some(false) {
+        return if active == Some(true) {
+            CapabilityStatus::Unknown
+        } else {
+            CapabilityStatus::NotAvailable
+        };
+    }
+    match active {
+        Some(false) => CapabilityStatus::NotAvailable,
+        Some(true) if btf_available => CapabilityStatus::CandidateAvailable,
+        Some(true) => CapabilityStatus::Unknown,
+        None if active_lsm_status == EvidenceStatus::Inaccessible => CapabilityStatus::Inaccessible,
+        None => CapabilityStatus::Unknown,
+    }
 }
 
 fn read_kernel_config(release: &str) -> ConfigEvidence {
@@ -711,6 +736,37 @@ mod tests {
         let modules = "capability,landlock,yama,apparmor,bpf";
         assert!(modules.split(',').any(|item| item == "bpf"));
         assert!(!"capability,apparmor".split(',').any(|item| item == "bpf"));
+    }
+
+    #[test]
+    fn bpf_lsm_candidate_requires_active_module_and_btf() {
+        assert_eq!(
+            assess_bpf_lsm(Some(true), EvidenceStatus::Collected, true, Some(true), Some(true)),
+            CapabilityStatus::CandidateAvailable
+        );
+        assert_eq!(
+            assess_bpf_lsm(Some(true), EvidenceStatus::Collected, false, Some(true), Some(true)),
+            CapabilityStatus::Unknown
+        );
+        assert_eq!(
+            assess_bpf_lsm(Some(false), EvidenceStatus::Collected, true, Some(true), Some(true)),
+            CapabilityStatus::NotAvailable
+        );
+    }
+
+    #[test]
+    fn contradictory_bpf_configuration_does_not_promote_a_candidate() {
+        assert_eq!(
+            assess_bpf_lsm(Some(true), EvidenceStatus::Collected, true, Some(false), Some(true)),
+            CapabilityStatus::Unknown
+        );
+    }
+
+    #[test]
+    fn active_lsm_parser_distinguishes_present_absent_and_unknown() {
+        assert_eq!(has_active_lsm(Some("capability,landlock,bpf"), "bpf"), Some(true));
+        assert_eq!(has_active_lsm(Some("capability,apparmor"), "bpf"), Some(false));
+        assert_eq!(has_active_lsm(None, "bpf"), None);
     }
 
     #[test]
