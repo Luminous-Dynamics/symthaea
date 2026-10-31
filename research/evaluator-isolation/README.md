@@ -89,7 +89,7 @@ Run these with the candidate UID, then preserve stdout/stderr, exit status and t
 6. Attempt to replace oracle/task/prediction after commitment and replay a receipt against a different run/task/model/config digest.
 7. Verify unsupported namespaces or missing openat2 produce an explicit failed qualification, never a permissive fallback.
 
-Systemd's private network namespace does not block every AF_UNIX connection. The module hides common system sockets but the host's actual socket inventory must be inspected. Filesystem namespace controls can also be unavailable or degrade on some kernels or service-manager configurations. A successful systemd-analyze security score is diagnostic only, not evidence of confidentiality. Validate with real access attempts under the exact target NixOS generation, kernel and systemd release.
+Systemd's private network namespace does not block every AF_UNIX connection. The module hides common system sockets, including the D-Bus/systemd sockets, the Nix daemon socket, Docker/containerd, udev, NetworkManager, Avahi and Podman endpoints. The host's actual socket inventory must still be inspected. Filesystem namespace controls can also be unavailable or degrade on some kernels or service-manager configurations. A successful systemd-analyze security score is diagnostic only, not evidence of confidentiality. Validate with real access attempts under the exact target NixOS generation, kernel and systemd release.
 
 ## Claim ceiling
 
