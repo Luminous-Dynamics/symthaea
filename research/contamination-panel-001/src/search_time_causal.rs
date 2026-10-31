@@ -910,6 +910,60 @@ mod tests {
         study
     }
 
+    fn two_block_fixture_study() -> SearchTimeAccessTrialStudyV1 {
+        let mut study = fixture_study();
+        let source_block = study.blocks[0].clone();
+        let block_id = "block-002".to_owned();
+        let seed = decode_seed_hex(&study.run_order_seed_hex).unwrap();
+        let order = expected_condition_order(&seed, &block_id).unwrap();
+        let commitment = order_commitment(&seed, &block_id, &order).unwrap();
+        let mut runs = Vec::new();
+        for condition in &order {
+            let source = source_block.runs.iter()
+                .find(|run| run.condition == *condition).unwrap();
+            let mut run = source.clone();
+            let suffix = format!("{block_id}-{condition:?}");
+            run.run_id = format!("run-{suffix}");
+            run.order_position = (order.iter().position(|candidate| candidate == condition).unwrap() + 1) as u8;
+            run.sandbox_namespace_sha256 = digest(&format!("sandbox-{suffix}"));
+            run.agent_memory_namespace_sha256 = digest(&format!("memory-{suffix}"));
+            run.cache_namespace_sha256 = digest(&format!("cache-{suffix}"));
+            run.state_reset_receipt_sha256 = digest(&format!("reset-{suffix}"));
+            run.run_execution_receipt_sha256 = digest(&format!("execution-{suffix}"));
+            run.condition_policy_sha256 = digest(&format!("policy-{suffix}"));
+            run.trace.run_id = run.run_id.clone();
+            run.trace.network_policy_sha256 = run.condition_policy_sha256.clone();
+            for event in &mut run.trace.events {
+                event.invocation_id = format!("{}-{}", suffix, event.sequence);
+            }
+            crate::search_time::seal_search_time_trace(&mut run.trace).unwrap();
+
+            run.findings.run_id = run.run_id.clone();
+            run.findings.trace_root_sha256 = run.trace.trace_root_sha256.clone();
+            run.findings.findings_sha256.clear();
+            let findings_bytes = serde_json::to_vec(&run.findings).unwrap();
+            run.findings.findings_sha256 =
+                hash_domain(b"search-time-findings.v1", &findings_bytes);
+
+            run.score_report.run_id = run.run_id.clone();
+            run.score_report.run_execution_receipt_sha256 =
+                run.run_execution_receipt_sha256.clone();
+            run.score_report.submission_sha256 = digest(&format!("submission-{suffix}"));
+            run.score_report.report_sha256.clear();
+            let report_bytes = serde_json::to_vec(&run.score_report).unwrap();
+            run.score_report.report_sha256 =
+                hash_domain(b"fresh-instance-score-report.v1", &report_bytes);
+            runs.push(run);
+        }
+        study.blocks.push(SearchTrialBlockV1 {
+            block_id,
+            randomized_condition_order: order,
+            order_seed_commitment_sha256: commitment,
+            runs,
+        });
+        study
+    }
+
     #[test]
     fn order_is_deterministic_and_block_scoped() {
         let seed = decode_seed_hex(&"12".repeat(32)).unwrap();
@@ -925,17 +979,17 @@ mod tests {
 
     #[test]
     fn block_budget_must_match_and_condition_order_is_verified() {
-        let mut study = fixture_study();
+        let mut study = two_block_fixture_study();
         study.blocks[0].runs[0].budget_spec_sha256 = digest("wrong-budget");
         assert!(analyze_search_time_access_trial(&study).unwrap_err().contains("budget specification"));
-        let mut study = fixture_study();
+        let mut study = two_block_fixture_study();
         study.blocks[0].randomized_condition_order.swap(0, 1);
         assert!(analyze_search_time_access_trial(&study).unwrap_err().contains("condition order"));
     }
 
     #[test]
     fn independent_run_namespaces_must_never_be_reused() {
-        let mut study = fixture_study();
+        let mut study = two_block_fixture_study();
         study.blocks[0].runs[1].cache_namespace_sha256 =
             study.blocks[0].runs[0].cache_namespace_sha256.clone();
         assert!(analyze_search_time_access_trial(&study).unwrap_err().contains("unique across run arms"));
@@ -943,7 +997,7 @@ mod tests {
 
     #[test]
     fn model_identity_must_be_constant_across_conditions() {
-        let mut study = fixture_study();
+        let mut study = two_block_fixture_study();
         study.blocks[0].runs[1].score_report.model_name = "different-model".to_owned();
         study.blocks[0].runs[1].score_report.report_sha256.clear();
         let bytes = serde_json::to_vec(&study.blocks[0].runs[1].score_report).unwrap();
@@ -955,11 +1009,11 @@ mod tests {
 
     #[test]
     fn incomplete_or_over_budget_run_is_rejected() {
-        let mut study = fixture_study();
+        let mut study = two_block_fixture_study();
         study.blocks[0].runs[0].status = SearchTrialRunStatusV1::Partial;
         assert!(analyze_search_time_access_trial(&study)
             .unwrap_err().contains("is not completed"));
-        let mut study = fixture_study();
+        let mut study = two_block_fixture_study();
         study.blocks[0].runs[0].score_report.output_token_count =
             study.budget.max_output_tokens + 1;
         study.blocks[0].runs[0].score_report.report_sha256.clear();
@@ -972,12 +1026,12 @@ mod tests {
 
     #[test]
     fn condition_trace_and_score_bindings_are_enforced() {
-        let mut study = fixture_study();
+        let mut study = two_block_fixture_study();
         study.blocks[0].runs[0].trace.access_mode = SearchAccessModeV1::Unrestricted;
         crate::search_time::seal_search_time_trace(&mut study.blocks[0].runs[0].trace).unwrap();
         assert!(analyze_search_time_access_trial(&study).unwrap_err().contains("does not match the declared condition"));
 
-        let mut study = fixture_study();
+        let mut study = two_block_fixture_study();
         study.blocks[0].runs[0].score_report.model_checkpoint_sha256 = digest("wrong-checkpoint");
         study.blocks[0].runs[0].score_report.report_sha256.clear();
         assert!(analyze_search_time_access_trial(&study).unwrap_err().contains("score report does not match"));
@@ -985,10 +1039,10 @@ mod tests {
 
     #[test]
     fn score_changes_are_summarized_across_independent_run_blocks() {
-        let study = fixture_study();
+        let study = two_block_fixture_study();
         let mut expanded = study.clone();
         let block0 = expanded.blocks[0].clone();
-        for index in 2..=20 {
+        for index in 3..=20 {
             let block_id = format!("block-{index:03}");
             let order = expected_condition_order(
                 &decode_seed_hex(&expanded.run_order_seed_hex).unwrap(),
@@ -1053,43 +1107,8 @@ mod tests {
             "../schema/search-time-access-trial-report.schema.json"
         )).unwrap();
         let study = fixture_study();
-        let report = analyze_search_time_access_trial(&{
-            let mut study = study.clone();
-            while study.blocks.len() < 2 {
-                let mut block = study.blocks[0].clone();
-                block.block_id.push_str("-extra");
-                let seed = decode_seed_hex(&study.run_order_seed_hex).unwrap();
-                let order = expected_condition_order(&seed, &block.block_id).unwrap();
-                block.randomized_condition_order = order.clone();
-                block.order_seed_commitment_sha256 = order_commitment(&seed, &block.block_id, &order).unwrap();
-                for (i, run) in block.runs.iter_mut().enumerate() {
-                    let condition = run.condition;
-                    run.order_position = (order.iter().position(|x| *x == condition).unwrap() + 1) as u8;
-                    run.run_id.push_str("-extra");
-                    run.trace.run_id = run.run_id.clone();
-                    run.trace.network_policy_sha256 = digest(&format!("extra-policy-{:?}", run.condition));
-                    run.condition_policy_sha256 = run.trace.network_policy_sha256.clone();
-                    run.sandbox_namespace_sha256 = digest("extra-sandbox");
-                    run.agent_memory_namespace_sha256 = digest("extra-memory");
-                    run.cache_namespace_sha256 = digest("extra-cache");
-                    run.state_reset_receipt_sha256 = digest("extra-reset");
-                    run.run_execution_receipt_sha256 = digest("extra-exec");
-                    crate::search_time::seal_search_time_trace(&mut run.trace).unwrap();
-                    run.findings.run_id = run.run_id.clone();
-                    run.findings.trace_root_sha256 = run.trace.trace_root_sha256.clone();
-                    run.findings.findings_sha256.clear();
-                    let bytes = serde_json::to_vec(&run.findings).unwrap();
-                    run.findings.findings_sha256 = hash_domain(b"search-time-findings.v1", &bytes);
-                    run.score_report.run_id = run.run_id.clone();
-                    run.score_report.run_execution_receipt_sha256 = run.run_execution_receipt_sha256.clone();
-                    run.score_report.report_sha256.clear();
-                    let bytes = serde_json::to_vec(&run.score_report).unwrap();
-                    run.score_report.report_sha256 = hash_domain(b"fresh-instance-score-report.v1", &bytes);
-                }
-                study.blocks.push(block);
-            }
-            study
-        }).unwrap();
+        let study = two_block_fixture_study();
+        let report = analyze_search_time_access_trial(&study).unwrap();
         for (schema, value, version) in [
             (&study_schema, serde_json::to_value(&study).unwrap(), SEARCH_TRIAL_STUDY_SCHEMA),
             (&report_schema, serde_json::to_value(&report).unwrap(), SEARCH_TRIAL_REPORT_SCHEMA),
