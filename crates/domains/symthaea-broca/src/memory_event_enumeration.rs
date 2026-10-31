@@ -94,6 +94,65 @@ impl ExtractedMemoryEvent {
     }
 }
 
+/// Speaker identity/role resolved by a trusted source adapter from the
+/// original immutable message envelope, not inferred from event text.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrustedSpeakerAttribution {
+    pub evidence_id: String,
+    pub source_revision_id: String,
+    pub source_sha256: String,
+    pub source_pointer: String,
+    pub source_trajectory_id: String,
+    pub speaker_id: Option<String>,
+    pub speaker_role: EventSpeakerRole,
+    pub attribution_receipt_sha256: String,
+}
+
+impl TrustedSpeakerAttribution {
+    pub fn computed_receipt_sha256(&self) -> Result<String, String> {
+        hash_serializable(
+            &(
+                &self.evidence_id,
+                &self.source_revision_id,
+                &self.source_sha256,
+                &self.source_pointer,
+                &self.source_trajectory_id,
+                &self.speaker_id,
+                self.speaker_role,
+            ),
+            "trusted speaker attribution",
+        )
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        for (field, value) in [
+            ("evidence_id", self.evidence_id.as_str()),
+            ("source_revision_id", self.source_revision_id.as_str()),
+            ("source_pointer", self.source_pointer.as_str()),
+            ("source_trajectory_id", self.source_trajectory_id.as_str()),
+        ] {
+            require_non_empty(value, field)?;
+        }
+        validate_sha256(&self.source_sha256, "source_sha256")?;
+        validate_sha256(&self.attribution_receipt_sha256, "attribution_receipt_sha256")?;
+        match (self.speaker_role, self.speaker_id.as_deref()) {
+            (EventSpeakerRole::Unknown, None) => {}
+            (EventSpeakerRole::Unknown, Some(_)) => {
+                return Err("unknown trusted speaker role cannot carry a speaker ID".into());
+            }
+            (_, Some(speaker_id)) => require_non_empty(speaker_id, "speaker_id")?,
+            (_, None) => {
+                return Err("trusted speaker role requires a speaker ID".into());
+            }
+        }
+        if self.computed_receipt_sha256()? != self.attribution_receipt_sha256 {
+            return Err("trusted speaker attribution receipt digest mismatch".into());
+        }
+        Ok(())
+    }
+}
+
 /// Exactly one row must exist for each item in the evidence inventory.
 /// An empty events vector with Complete status means that the extractor
 /// examined the source and found no event under its extraction contract.
@@ -123,6 +182,7 @@ impl EventExtractionBatch {
         &self,
         inventory: &EvidenceInventorySnapshot,
         admissions: &[ProofCandidateAdmission],
+        speaker_attributions: &[TrustedSpeakerAttribution],
         principal_id: &str,
     ) -> Result<EventExtractionCoverage, String> {
         inventory.verify_internal_consistency()?;
@@ -193,6 +253,29 @@ impl EventExtractionBatch {
             .iter()
             .map(|item| (item.record.evidence_id.as_str(), &item.record))
             .collect();
+        let mut speaker_by_id = BTreeMap::<&str, &TrustedSpeakerAttribution>::new();
+        for speaker in speaker_attributions {
+            speaker.validate()?;
+            if speaker_by_id.insert(&speaker.evidence_id, speaker).is_some() {
+                return Err(format!("duplicate trusted speaker attribution {:?}", speaker.evidence_id));
+            }
+            let record = inventory_by_id.get(speaker.evidence_id.as_str())
+                .ok_or_else(|| format!("speaker attribution is outside the inventory: {:?}", speaker.evidence_id))?;
+            let admission = admission_by_id.get(speaker.evidence_id.as_str())
+                .ok_or_else(|| format!("speaker attribution has no trusted source admission: {:?}", speaker.evidence_id))?;
+            if speaker.source_revision_id != admission.source_revision_id
+                || speaker.source_sha256 != record.source.source_sha256
+                || speaker.source_pointer != record.source.source_pointer
+                || speaker.source_trajectory_id != record.source.trajectory_id
+                || speaker.source_trajectory_id != admission.source_trajectory_id
+            {
+                return Err(format!("trusted speaker attribution source binding mismatch for {:?}", speaker.evidence_id));
+            }
+        }
+        if speaker_by_id.len() != inventory.items.len() {
+            return Err("trusted speaker attribution must cover every inventoried source exactly".into());
+        }
+
         let mut rows_by_id = BTreeMap::<&str, &EventExtractionRow>::new();
         let mut event_ids = BTreeSet::new();
         let mut all_rows_complete = true;
@@ -241,8 +324,17 @@ impl EventExtractionBatch {
                 ));
             }
             all_rows_complete &= row.status == EventExtractionStatus::Complete;
+            let trusted_speaker = speaker_by_id[row.source_evidence_id.as_str()];
             for event in &row.events {
                 event.validate()?;
+                if event.speaker_id != trusted_speaker.speaker_id
+                    || event.speaker_role != trusted_speaker.speaker_role
+                {
+                    return Err(format!(
+                        "extracted event speaker does not match trusted source attribution for {:?}",
+                        row.source_evidence_id
+                    ));
+                }
                 if !event_ids.insert(event.event_id.as_str()) {
                     return Err(format!("duplicate extracted event ID {:?}", event.event_id));
                 }
@@ -436,10 +528,13 @@ impl EventEnumerationResult {
         inventory: &EvidenceInventorySnapshot,
         batch: &EventExtractionBatch,
         admissions: &[ProofCandidateAdmission],
+        speaker_attributions: &[TrustedSpeakerAttribution],
         query: &EventEnumerationQuery,
     ) -> Result<(), String> {
         self.verify_internal_consistency()?;
-        let recomputed = enumerate_events_closed_world(inventory, batch, admissions, query)?;
+        let recomputed = enumerate_events_closed_world(
+            inventory, batch, admissions, speaker_attributions, query
+        )?;
         if &recomputed != self {
             return Err("event enumeration result does not match independent recomputation".into());
         }
@@ -454,6 +549,7 @@ pub fn enumerate_events_closed_world(
     inventory: &EvidenceInventorySnapshot,
     batch: &EventExtractionBatch,
     admissions: &[ProofCandidateAdmission],
+    speaker_attributions: &[TrustedSpeakerAttribution],
     query: &EventEnumerationQuery,
 ) -> Result<EventEnumerationResult, String> {
     query.validate()?;
@@ -463,7 +559,12 @@ pub fn enumerate_events_closed_world(
     {
         return Err("event enumeration query does not match evidence inventory coordinates".into());
     }
-    let coverage = batch.validate_against(inventory, admissions, &query.principal_id)?;
+    let coverage = batch.validate_against(
+        inventory,
+        admissions,
+        speaker_attributions,
+        &query.principal_id,
+    )?;
     let admission_by_id: BTreeMap<&str, &ProofCandidateAdmission> = admissions
         .iter()
         .map(|admission| (admission.evidence_id.as_str(), admission))
@@ -702,6 +803,35 @@ mod tests {
         }
     }
 
+    fn speaker_attributions(
+        inventory: &EvidenceInventorySnapshot,
+        admissions: &[ProofCandidateAdmission],
+    ) -> Vec<TrustedSpeakerAttribution> {
+        inventory.items.iter().map(|item| {
+            let admission = admissions.iter()
+                .find(|admission| admission.evidence_id == item.record.evidence_id)
+                .unwrap();
+            let (speaker_id, speaker_role) = if item.record.evidence_id == "evidence-user" {
+                (Some("user-1".into()), EventSpeakerRole::User)
+            } else {
+                (Some("assistant".into()), EventSpeakerRole::Assistant)
+            };
+            let mut attribution = TrustedSpeakerAttribution {
+                evidence_id: item.record.evidence_id.clone(),
+                source_revision_id: admission.source_revision_id.clone(),
+                source_sha256: item.record.source.source_sha256.clone(),
+                source_pointer: item.record.source.source_pointer.clone(),
+                source_trajectory_id: item.record.source.trajectory_id.clone(),
+                speaker_id,
+                speaker_role,
+                attribution_receipt_sha256: String::new(),
+            };
+            attribution.attribution_receipt_sha256 =
+                attribution.computed_receipt_sha256().unwrap();
+            attribution
+        }).collect()
+    }
+
     fn batch(inventory: &EvidenceInventorySnapshot) -> EventExtractionBatch {
         let mut rows = Vec::new();
         for item in &inventory.items {
@@ -789,7 +919,7 @@ mod tests {
         let mut extraction = batch(&inventory);
         extraction.rows.pop();
         assert!(enumerate_events_closed_world(
-            &inventory, &extraction, &admissions, &query()
+            &inventory, &extraction, &admissions, &speaker_attributions(&inventory, &admissions), &query()
         ).unwrap_err().contains("omitted inventoried source records"));
     }
 
@@ -799,7 +929,7 @@ mod tests {
         let mut extraction = batch(&inventory);
         extraction.rows[1].status = EventExtractionStatus::ParseFailure;
         let result = enumerate_events_closed_world(
-            &inventory, &extraction, &admissions, &query()
+            &inventory, &extraction, &admissions, &speaker_attributions(&inventory, &admissions), &query()
         ).unwrap();
         assert!(!result.receipt.extraction_complete);
         assert!(!result.receipt.answer_is_permitted);
@@ -812,7 +942,7 @@ mod tests {
         extraction.rows[1].events[0].speaker_id = None;
         extraction.rows[1].events[0].speaker_role = EventSpeakerRole::Unknown;
         let result = enumerate_events_closed_world(
-            &inventory, &extraction, &admissions, &query()
+            &inventory, &extraction, &admissions, &speaker_attributions(&inventory, &admissions), &query()
         ).unwrap();
         assert_eq!(result.receipt.unattributed_relevant_event_count, 1);
         assert!(!result.receipt.speaker_attribution_complete);
@@ -824,13 +954,13 @@ mod tests {
         let (inventory, mut admissions) = inventory_and_admissions();
         admissions[0].recorded_at_unix_ms = inventory.receipt.known_at_unix_ms + 1;
         assert!(enumerate_events_closed_world(
-            &inventory, &batch(&inventory), &admissions, &query()
+            &inventory, &batch(&inventory), &admissions, &speaker_attributions(&inventory, &admissions), &query()
         ).unwrap_err().contains("not current at the inventory known_at"));
 
         let (inventory, mut admissions) = inventory_and_admissions();
         admissions[0].valid_until_unix_ms = Some(50);
         assert!(enumerate_events_closed_world(
-            &inventory, &batch(&inventory), &admissions, &query()
+            &inventory, &batch(&inventory), &admissions, &speaker_attributions(&inventory, &admissions), &query()
         ).unwrap_err().contains("source identity mismatch"));
     }
 
@@ -839,7 +969,7 @@ mod tests {
         let (inventory, mut admissions) = inventory_and_admissions();
         admissions[0].index_state_sha256 = digest("another snapshot");
         assert!(enumerate_events_closed_world(
-            &inventory, &batch(&inventory), &admissions, &query()
+            &inventory, &batch(&inventory), &admissions, &speaker_attributions(&inventory, &admissions), &query()
         ).unwrap_err().contains("different EvidenceIndex snapshot"));
     }
 
@@ -849,9 +979,9 @@ mod tests {
         let extraction = batch(&inventory);
         let query = query();
         let result = enumerate_events_closed_world(
-            &inventory, &extraction, &admissions, &query
+            &inventory, &extraction, &admissions, &speaker_attributions(&inventory, &admissions), &query
         ).unwrap();
-        result.verify_against(&inventory, &extraction, &admissions, &query).unwrap();
+        result.verify_against(&inventory, &extraction, &admissions, &speaker_attributions(&inventory, &admissions), &query).unwrap();
 
         let mut tampered = result.clone();
         tampered.receipt.unattributed_relevant_event_count = 0;
@@ -859,7 +989,7 @@ mod tests {
         tampered.receipt.answer_is_permitted = false;
         tampered.receipt.receipt_sha256 = event_receipt_digest(&tampered.receipt).unwrap();
         assert!(tampered
-            .verify_against(&inventory, &extraction, &admissions, &query)
+            .verify_against(&inventory, &extraction, &admissions, &speaker_attributions(&inventory, &admissions), &query)
             .unwrap_err()
             .contains("independent recomputation"));
     }
@@ -868,7 +998,7 @@ mod tests {
     fn receipt_detects_mutated_matching_event() {
         let (inventory, admissions) = inventory_and_admissions();
         let mut result = enumerate_events_closed_world(
-            &inventory, &batch(&inventory), &admissions, &query()
+            &inventory, &batch(&inventory), &admissions, &speaker_attributions(&inventory, &admissions), &query()
         ).unwrap();
         result.matching_events[0].event.event_id = "forged-event".into();
         assert!(result.verify_internal_consistency().is_err());
