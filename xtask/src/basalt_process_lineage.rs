@@ -306,6 +306,7 @@ pub fn audit_bytes(oracle_bytes: &[u8], receipt_bytes: &[u8]) -> ProcessLineageA
     let before_receipt_validation = report.errors.len();
     let observed_processes = validate_observed_processes(&receipt, &mut report);
     let (observed_event_keys, sequence_integral, computed_gaps) = validate_observed_events(&receipt, &observed_processes, &mut report);
+    validate_observed_lifecycle_order(&receipt, &observed_processes, &mut report);
     report.counts.computed_sequence_gaps = computed_gaps;
     report.event_sequence_integral = sequence_integral;
     report.receipt_well_formed = report.errors.len() == before_receipt_validation;
@@ -576,6 +577,49 @@ fn validate_observed_events(
     (keys, integral, gaps)
 }
 
+fn validate_observed_lifecycle_order(
+    receipt: &ProcessLineageReceipt,
+    processes: &BTreeMap<ProcessIdentity, Option<ProcessIdentity>>,
+    report: &mut ProcessLineageAuditReport,
+) {
+    let mut times = BTreeMap::<ProcessIdentity, Vec<(u64, u8)>>::new();
+    for event in &receipt.events {
+        let rank = match event.kind {
+            ProcessEventKind::RootStart | ProcessEventKind::Fork | ProcessEventKind::Clone | ProcessEventKind::Vfork => 0,
+            ProcessEventKind::Exec => 1,
+            ProcessEventKind::Exit => 2,
+        };
+        times.entry(event.process.clone()).or_default().push((event.observed_at_monotonic_ns, rank));
+    }
+    for (identity, lifecycle) in &mut times {
+        lifecycle.sort();
+        if lifecycle.windows(2).any(|pair| pair[0].1 > pair[1].1) {
+            error(report, "E_RECEIPT_LIFECYCLE_ORDER", "receipt.events", &format!("observer lifecycle for PID {} start {} is not creation -> exec -> exit", identity.pid, identity.start_time_ticks));
+        }
+    }
+    for (child, parent) in processes {
+        if let Some(parent) = parent {
+            let child_birth = receipt.events.iter().filter(|event| {
+                event.process == *child && matches!(event.kind,
+                    ProcessEventKind::Fork | ProcessEventKind::Clone | ProcessEventKind::Vfork)
+            }).map(|event| event.observed_at_monotonic_ns).min();
+            let parent_birth = receipt.events.iter().filter(|event| {
+                event.process == *parent && event.kind == ProcessEventKind::RootStart
+            }).map(|event| event.observed_at_monotonic_ns).min();
+            if child_birth.zip(parent_birth).is_none_or(|(child_time, parent_time)| child_time <= parent_time) {
+                error(report, "E_RECEIPT_PARENT_BIRTH_ORDER", "receipt.events", "observed child creation must follow observed parent creation");
+            }
+            if receipt.reported_tree_closed {
+                let child_exit = receipt.events.iter().find(|event| event.process == *child && event.kind == ProcessEventKind::Exit).map(|event| event.observed_at_monotonic_ns);
+                let parent_exit = receipt.events.iter().find(|event| event.process == *parent && event.kind == ProcessEventKind::Exit).map(|event| event.observed_at_monotonic_ns);
+                if child_exit.zip(parent_exit).is_none_or(|(child_time, parent_time)| child_time > parent_time) {
+                    error(report, "E_RECEIPT_CHILD_EXIT_ORDER", "receipt.events", "observed child exit must precede or coincide with parent exit");
+                }
+            }
+        }
+    }
+}
+
 fn event_key_oracle(event: &OracleEvent) -> EventKey {
     EventKey { kind: event.kind, process: event.process.clone() }
 }
@@ -826,6 +870,16 @@ mod tests {
         let report=audit(&oracle,&receipt);
         assert!(!report.oracle_well_formed);
         assert!(report.errors.iter().any(|e|e.code=="E_ORACLE_PARENT_BIRTH_ORDER"));
+    }
+
+    #[test]
+    fn observed_child_exit_after_parent_exit_is_rejected() {
+        let (oracle, mut receipt)=fixtures();
+        receipt["events"][4]["observed_at_monotonic_ns"]=json!(980);
+        receipt["events"][5]["observed_at_monotonic_ns"]=json!(970);
+        let report=audit(&oracle,&receipt);
+        assert!(!report.lineage_audit_passed);
+        assert!(report.errors.iter().any(|e|e.code=="E_RECEIPT_CHILD_EXIT_ORDER"));
     }
 
     #[test]
