@@ -46,10 +46,10 @@ fn quarter_note_meter(numerator: u8, denominator: u32, source: &str) -> Result<u
     let beats = quarter_note_units / denominator;
     u8::try_from(beats)
         .ok()
-        .filter(|beats| *beats > 0)
+        .filter(|beats| (1..=16).contains(beats))
         .ok_or_else(|| {
             format!(
-                "{source} time signature {numerator}/{denominator} exceeds the legacy Score meter range"
+                "{source} time signature {numerator}/{denominator} is outside the supported legacy Score meter range 1..=16"
             )
         })
 }
@@ -63,6 +63,36 @@ fn midi_time_signature_meter(numerator: u8, denominator_exponent: u8) -> Result<
             )
         })?;
     quarter_note_meter(numerator, denominator, "MIDI")
+}
+
+/// The legacy Score carries one constant tempo. Preserve repeated identical
+/// declarations, but do not flatten a changing tempo map to the last value.
+fn musicxml_tempo_bpm(document: &roxmltree::Document<'_>) -> Result<f32, String> {
+    let mut tempo = None::<f32>;
+    for sound in document
+        .descendants()
+        .filter(|node| node.has_tag_name("sound"))
+    {
+        let Some(raw) = sound.attribute("tempo") else {
+            continue;
+        };
+        let value = raw
+            .parse::<f32>()
+            .map_err(|_| format!("MusicXML sound tempo {raw:?} is not numeric"))?;
+        if !value.is_finite() || value <= 0.0 {
+            return Err(format!(
+                "MusicXML sound tempo {raw:?} must be finite and positive"
+            ));
+        }
+        if tempo.is_some_and(|previous| previous.to_bits() != value.to_bits()) {
+            return Err(
+                "MusicXML tempo changes are not representable by the legacy single-tempo Score"
+                    .into(),
+            );
+        }
+        tempo = Some(value);
+    }
+    Ok(tempo.unwrap_or(120.0))
 }
 
 fn musicxml_time_signature_meter(
@@ -130,7 +160,7 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
     if ticks_per_beat == 0 {
         return Err("MIDI metrical timing declares zero ticks per beat".into());
     }
-    let mut tempo_bpm = 120.0_f32;
+    let mut tempo_microseconds_per_beat = None::<u32>;
     let mut meter = 4_u8;
     let mut midi_time_signature = None::<(u8, u8)>;
     let mut fifths = 0_i8;
@@ -143,17 +173,28 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
         // Preserve overlapping repeated pitches and pair releases FIFO.
         let mut pending = BTreeMap::<(u8, u8), VecDeque<(u64, u8)>>::new();
         for event in track {
-            tick = tick.saturating_add(u64::from(event.delta.as_int()));
+            tick = tick
+                .checked_add(u64::from(event.delta.as_int()))
+                .filter(|value| *value <= i64::MAX as u64)
+                .ok_or_else(|| {
+                    "MIDI track event timeline exceeds the supported signed rational duration range"
+                        .to_string()
+                })?;
             match event.kind {
                 TrackEventKind::Meta(MetaMessage::Tempo(value)) => {
                     let microseconds_per_beat = value.as_int();
                     if microseconds_per_beat == 0 {
                         return Err("MIDI tempo event encodes zero microseconds per beat".into());
                     }
-                    tempo_bpm = 60_000_000.0 / microseconds_per_beat as f32;
-                    if !tempo_bpm.is_finite() || tempo_bpm <= 0.0 {
-                        return Err("MIDI tempo event does not encode a finite positive tempo".into());
+                    if tempo_microseconds_per_beat
+                        .is_some_and(|previous| previous != microseconds_per_beat)
+                    {
+                        return Err(
+                            "MIDI tempo changes are not representable by the legacy single-tempo Score"
+                                .into(),
+                        );
                     }
+                    tempo_microseconds_per_beat = Some(microseconds_per_beat);
                 }
                 TrackEventKind::Meta(MetaMessage::TimeSignature(
                     numerator,
@@ -237,8 +278,17 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
     } else {
         Key::major(tonic)
     };
-    let mut score = Score::new(key, tempo_bpm.clamp(20.0, 320.0), meter.clamp(1, 16));
+    let tempo_bpm = tempo_microseconds_per_beat
+        .map(|value| 60_000_000.0 / value as f32)
+        .unwrap_or(120.0);
+    let ticks_per_beat_i64 = i64::try_from(ticks_per_beat)
+        .map_err(|_| "MIDI ticks per beat exceed the score's signed rational range".to_string())?;
+    let mut score = Score::new(key, tempo_bpm, meter);
     for note in notes {
+        let onset = i64::try_from(note.onset)
+            .map_err(|_| "MIDI note onset exceeds the score's signed rational range".to_string())?;
+        let duration = i64::try_from(note.duration)
+            .map_err(|_| "MIDI note duration exceeds the score's signed rational range".to_string())?;
         score.push(ScoreNote {
             // Real part identity, taken from the source format rather than
             // inferred: a MIDI track / MusicXML <part> IS the continuing line.
@@ -250,8 +300,8 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                 .map(PartId)
                 .unwrap_or(PartId::UNASSIGNED),
             pitch: Pitch::from_midi(note.pitch),
-            onset: Duration::new(note.onset as i64, ticks_per_beat as i64),
-            duration: Duration::new(note.duration as i64, ticks_per_beat as i64),
+            onset: Duration::new(onset, ticks_per_beat_i64),
+            duration: Duration::new(duration, ticks_per_beat_i64),
             velocity: (note.velocity as f32 / 127.0).clamp(0.05, 1.0),
             role: roles
                 .get(&note.track)
@@ -313,7 +363,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
     let mut fifths = 0_i32;
     let mut minor = false;
     let meter = musicxml_time_signature_meter(&document)?;
-    let mut tempo = 120.0_f32;
+    let tempo = musicxml_tempo_bpm(&document)?;
     let mut raw = Vec::<(usize, u8, i64, i64)>::new();
 
     for (part_index, part) in parts.iter().enumerate() {
@@ -326,10 +376,6 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 fifths = node_i64(child).unwrap_or(i64::from(fifths)) as i32;
             } else if child.has_tag_name("mode") {
                 minor = child.text().is_some_and(|value| value.trim() == "minor");
-            } else if child.has_tag_name("sound") {
-                if let Some(value) = child.attribute("tempo").and_then(|v| v.parse().ok()) {
-                    tempo = value;
-                }
             } else if child.has_tag_name("backup") {
                 let amount = child
                     .children()
@@ -373,7 +419,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
     } else {
         Key::major(tonic)
     };
-    let mut score = Score::new(key, tempo.clamp(20.0, 320.0), meter);
+    let mut score = Score::new(key, tempo, meter);
     let part_count = parts.len();
     for (part, midi, onset, duration) in raw {
         let role = if part_count == 1 || part == 0 {
@@ -613,6 +659,60 @@ mod tests {
             0x00, 0xff, 0x2f, 0x00,
         ];
         assert!(parse_midi(&midi).is_err());
+    }
+
+    #[test]
+    fn midi_constant_tempo_above_legacy_clamp_is_preserved() {
+        // 150,000 microseconds per beat = 400 BPM.
+        let midi = [
+            0x4d, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06,
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x60,
+            0x4d, 0x54, 0x72, 0x6b, 0x00, 0x00, 0x00, 0x13,
+            0x00, 0xff, 0x51, 0x03, 0x02, 0x49, 0xf0,
+            0x00, 0x90, 0x3c, 0x64,
+            0x3c, 0x80, 0x3c, 0x00,
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let score = parse_midi(&midi).expect("valid constant-tempo MIDI");
+        assert!((score.tempo_bpm - 400.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn midi_tempo_change_is_rejected_instead_of_applying_the_last_tempo_globally() {
+        let midi = [
+            0x4d, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06,
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x60,
+            0x4d, 0x54, 0x72, 0x6b, 0x00, 0x00, 0x00, 0x1a,
+            0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20,
+            0x00, 0x90, 0x3c, 0x64,
+            0x3c, 0xff, 0x51, 0x03, 0x03, 0xd0, 0x90,
+            0x3c, 0x80, 0x3c, 0x00,
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        assert!(parse_midi(&midi).is_err());
+    }
+
+    #[test]
+    fn musicxml_constant_tempo_above_legacy_clamp_is_preserved() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <direction><sound tempo="400"/></direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let score = parse_musicxml(xml).unwrap();
+        assert!((score.tempo_bpm - 400.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn musicxml_tempo_change_is_rejected_instead_of_applying_the_last_tempo_globally() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><sound tempo="120"/></direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            <direction><sound tempo="90"/></direction>
+            <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        assert!(parse_musicxml(xml).is_err());
     }
 
     #[test]
