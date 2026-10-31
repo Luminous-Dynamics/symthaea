@@ -123,8 +123,11 @@ partition-dependent inference and state-pair score lookup:
 - Each directed cut is applied once. Its partitioned Eq. 4 likelihood vector
   and Eq. 3 effect repertoire are computed once and reused across every tied
   cause/effect specified-state pair.
-- Only the indexed scalar GID terms, combined score, and receipt are produced
-  per state-pair × partition combination.
+- The baseline and per-partition Eq. 4 likelihood-vector receipts are hashed
+  once at preparation time, then their digests are reused in every scalar score
+  receipt. The state-pair-specific outer receipt is still computed separately. 
+- Only the indexed scalar GID terms, combined score, and state-pair-specific
+  outer receipt are produced per state-pair × partition combination.
 
 This does **not** reuse a cut posterior across different cuts: the original
 uncut posterior factors and normalizer are shared, while each target-specific
@@ -135,11 +138,18 @@ for the changed report and search contracts.
 
 The regression test compares the sparse analyzer's complete state-pair winners
 against the dense analyzer on a small system, then compares cached partition
-terms against independently prepared single-partition scores. The
-`sparse_system_search_reuse_sweep` benchmark compares the optimized full
+terms and their final score receipts against independently prepared
+single-partition scores. The system-result receipt now carries the exact dense
+or sparse algorithm identifier; the identifier is part of the versioned receipt
+rather than inferred from the request hash.
+
+The `sparse_system_search_reuse_sweep` benchmark compares the optimized full
 analyzer with a deliberately uncached exhaustive loop that calls the
 single-partition API once for every state pair × partition. It checks every
-state-pair winner, cut matrix, and score before emitting latency.
+state-pair winner, cut matrix, tie outcome, score, and final `phi_s` qualification
+status before emitting latency. Its work counters also show the expected
+reduction in baseline preparations, partition-repertoire preparations, and
+nested Eq. 4 receipt hashes.
 
 Run:
 
