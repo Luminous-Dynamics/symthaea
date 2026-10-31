@@ -279,58 +279,68 @@ class RandomizedCommonDepthCRC:
     def verify_certificate(self, certificate: dict,
                            probabilities: np.ndarray,
                            tolerance: float=1e-7) -> dict:
+        """Fail-closed verifier for a serialized policy, validity and LP-optimality receipt."""
+        if not isinstance(certificate,dict):
+            return {"valid":False,"reason":"certificate must be a mapping"}
         if certificate.get("schema")!="symthaea-risk-certificate-v1":
             return {"valid":False,"reason":"unsupported certificate schema"}
         if certificate.get("certificate_type")!="RandomizedFiniteExchangeabilityCRC":
             return {"valid":False,"reason":"certificate type mismatch"}
         if certificate.get("proof_lane")!="ExactFiniteExchangeabilityPlusLPOptimality":
             return {"valid":False,"reason":"proof lane mismatch"}
-        if certificate.get("scope",{}).get("n_calibration")!=self.n:
-            return {"valid":False,"reason":"calibration scope mismatch"}
-        if certificate.get("risk_target",{}).get("level")!=self.alpha:
-            return {"valid":False,"reason":"risk target mismatch"}
-        verification=self.verify(probabilities)
+        optimization=certificate.get("optimization_receipt")
+        if not isinstance(optimization,dict):
+            return {"valid":False,"reason":"optimization receipt is malformed"}
+        kkt_summary=optimization.get("kkt_summary")
+        dual_witness=optimization.get("dual_witness")
+        if not isinstance(kkt_summary,dict) or not isinstance(dual_witness,dict):
+            return {"valid":False,"reason":"LP optimality evidence is malformed"}
+        try:
+            if certificate.get("scope",{}).get("n_calibration")!=self.n:
+                return {"valid":False,"reason":"calibration scope mismatch"}
+            if certificate.get("risk_target",{}).get("level")!=self.alpha:
+                return {"valid":False,"reason":"risk target mismatch"}
+            verification=self.verify(probabilities)
+        except (TypeError,ValueError,KeyError,IndexError) as exc:
+            return {"valid":False,"reason":f"invalid certificate policy or scope: {exc}"}
         if not verification["valid"]:
             return {"valid":False,"reason":"exact augmented-state verification failed",
                     "verification":verification}
         expected=self.build_certificate(
-            probabilities,verification,
-            certificate.get("optimization_receipt",{}).get("kkt_summary",{}),
-            certificate.get("optimization_receipt",{}).get("dual_witness",{})
+            probabilities,verification,kkt_summary,dual_witness
         )
-        expected_digests=expected["evidence_digests"]
-        actual_digests=certificate.get("evidence_digests",{})
-        for name,value in expected_digests.items():
-            if actual_digests.get(name)!=value:
+        for name,value in expected["evidence_digests"].items():
+            if certificate.get("evidence_digests",{}).get(name)!=value:
                 return {"valid":False,"reason":f"evidence digest mismatch: {name}"}
-        for field in ("risk_target","assumption_contract","scope","verifier_receipt"):
+        for field in ("proof_lane","risk_target","assumption_contract","scope","verifier_receipt"):
             if certificate.get(field)!=expected.get(field):
                 return {"valid":False,"reason":f"certificate field mismatch: {field}"}
-        optimization=certificate.get("optimization_receipt",{})
-        if not isinstance(optimization,dict) or optimization.get("status")!="pass":
+        if optimization.get("solver")!="HiGHS":
+            return {"valid":False,"reason":"unsupported optimization solver receipt"}
+        if optimization.get("status")!="pass":
             return {"valid":False,"reason":"optimization receipt is not marked pass"}
-        dual=self.verify_optimality_witness(
-            optimization.get("dual_witness",{}),probabilities,tolerance
-        )
+        dual=self.verify_optimality_witness(dual_witness,probabilities,tolerance)
         if not dual.get("valid",False):
             return {"valid":False,"reason":"LP dual witness failed KKT checks",
                     "optimality":dual}
-        reported_kkt=optimization.get("kkt_summary",{})
-        if not isinstance(reported_kkt,dict):
-            return {"valid":False,"reason":"KKT summary is malformed"}
         for name,value in dual.items():
-            if name=="valid":continue
-            if name not in reported_kkt:
+            if name=="valid":
+                continue
+            if name not in kkt_summary:
                 return {"valid":False,"reason":f"KKT summary missing field: {name}"}
             try:
-                reported_value=float(reported_kkt[name])
+                reported_value=float(kkt_summary[name])
             except (TypeError,ValueError):
                 return {"valid":False,"reason":f"KKT summary malformed field: {name}"}
-            if not np.isclose(reported_value,float(value),atol=tolerance,rtol=0.0):
+            if not math.isfinite(reported_value) or not np.isclose(
+                reported_value,float(value),atol=tolerance,rtol=0.0
+            ):
                 return {"valid":False,"reason":f"KKT summary mismatch: {name}"}
+        if kkt_summary.get("valid") is not True:
+            return {"valid":False,"reason":"reported KKT summary is not marked valid"}
         return {
-            "valid":bool(dual.get("valid",False)),
-            "reason":None if dual.get("valid",False) else "LP dual witness failed KKT checks",
+            "valid":True,
+            "reason":None,
             "exact_validity":verification,
             "optimality":dual,
         }
