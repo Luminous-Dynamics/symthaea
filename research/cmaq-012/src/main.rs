@@ -1467,6 +1467,138 @@ mod tests {
     use super::*;
 
     fn test_digest(value: u64) -> String { format!("{value:064x}") }
+
+    fn artifact_fixture(input: &str) -> (PathBuf, String) {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        let root = env::temp_dir().join(format!(
+            "cmaq-012-artifact-fixture-{}-{}",
+            process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(root.join("profiles")).unwrap();
+        fs::create_dir_all(root.join("receipts")).unwrap();
+
+        let profile = r#"{
+  "schema_version": "cmaq-012-resource-profile-v0.1",
+  "resource_measurement_method": "operator_trace",
+  "hardware": {
+    "os_arch": "synthetic-fixture",
+    "cpu_model": "synthetic",
+    "logical_cpu_count": 1,
+    "accelerator_model": null,
+    "accelerator_driver": null,
+    "memory_bytes": 1048576,
+    "device_clock_policy": "fixed-fixture"
+  },
+  "software": {
+    "source_commit": "fixture-only",
+    "binary_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "compiler": "fixture",
+    "runtime": "fixture",
+    "dependency_lock_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "instrumentation": {
+    "profiler_name": "fixture-profiler",
+    "profiler_version": "1",
+    "profiler_binary_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "measurement_scope": "unit-test-only",
+    "synchronization_policy": "none",
+    "warmup_iterations": 0,
+    "measured_repetitions": 1,
+    "instrumentation_overhead_policy": "not-measured"
+  },
+  "compute_work_unit_definition": {
+    "unit_name": "normalized_compute_work_unit",
+    "counting_semantics": "synthetic unit-test counters",
+    "accepted_methods": ["operator_trace"],
+    "not_counted": []
+  },
+  "latency_measurement": {
+    "clock_source": "fixture",
+    "start_event": "start",
+    "end_event": "end",
+    "includes_synchronization": false,
+    "unit": "milliseconds"
+  },
+  "memory_measurement": {
+    "scope": "fixture",
+    "unit": "bytes",
+    "peak_policy": "synthetic"
+  },
+  "energy_measurement": {
+    "source": "unavailable",
+    "sampling_policy": "not measured",
+    "unit": "millijoules",
+    "calibration": "not measured"
+  },
+  "tolerances": {
+    "compute_work_relative": 0.05,
+    "latency_relative": 0.05,
+    "peak_memory_relative": 0.1
+  },
+  "claim_ceiling": "measurement_profile_contract_only_receipt_bytes_must_be_independently_verified",
+  "fixture_only": true
+}
+"#;
+        let profile_digest = sha256_hex(profile.as_bytes());
+        fs::write(
+            root.join("profiles").join(format!("{profile_digest}.json")),
+            profile,
+        ).unwrap();
+
+        let mut output = Vec::new();
+        let mut lines = input.lines();
+        output.push(lines.next().unwrap_or_default().to_string());
+        for line in lines {
+            let mut fields: Vec<String> = line.split('\t').map(str::to_string).collect();
+            fields[19] = profile_digest.clone();
+            let receipt = format!(
+                concat!(
+                    "{{\n",
+                    "  \"schema_version\": \"cmaq-012-profiling-receipt-v0.1\",\n",
+                    "  \"resource_profile_sha256\": \"{}\",\n",
+                    "  \"task\": \"{}\",\n",
+                    "  \"capability\": \"{}\",\n",
+                    "  \"split\": \"{}\",\n",
+                    "  \"seed\": {},\n",
+                    "  \"arm\": \"{}\",\n",
+                    "  \"measurement_method\": \"{}\",\n",
+                    "  \"latency_ms\": {},\n",
+                    "  \"compute_work_units\": {},\n",
+                    "  \"peak_memory_bytes\": {},\n",
+                    "  \"energy_millijoules\": {},\n",
+                    "  \"direct_value_calls\": {},\n",
+                    "  \"world_model_forward_calls\": {},\n",
+                    "  \"world_model_transition_calls\": {},\n",
+                    "  \"oracle_transition_calls\": {},\n",
+                    "  \"environment_transition_calls\": {},\n",
+                    "  \"optimizer_iterations\": {},\n",
+                    "  \"recorder_id\": \"synthetic-fixture-no-independent-recorder\",\n",
+                    "  \"claim_ceiling\": \"artifact_content_integrity_verified_profiler_and_hardware_origin_unattested\",\n",
+                    "  \"fixture_only\": true\n",
+                    "}}\n"
+                ),
+                profile_digest, fields[0], fields[1], fields[2], fields[3], fields[4], fields[21],
+                fields[18], fields[22], fields[23], fields[24], fields[25], fields[26],
+                fields[27], fields[28], fields[29], fields[30]
+            );
+            let receipt_digest = sha256_hex(receipt.as_bytes());
+            fs::write(
+                root.join("receipts").join(format!("{receipt_digest}.json")),
+                receipt,
+            ).unwrap();
+            fields[20] = receipt_digest;
+            output.push(fields.join("\t"));
+        }
+        (root, output.join("\n") + "\n")
+    }
+
+    fn cleanup_artifact_fixture(root: &Path) {
+        let _ = fs::remove_dir_all(root);
+    }
+
+
     fn synthetic_tsv(n: usize, d0: f64, d1: f64, w1: f64, w2: f64, w3: f64) -> String {
         let mut text = format!("{HEADER}\n");
         let values = [d0, d1, w1, w2, w3];
@@ -1554,6 +1686,86 @@ mod tests {
     fn sha256_known_answer() {
         assert_eq!(sha256_hex(b"abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     }
+
+    #[test]
+    fn strict_json_parser_handles_nested_values_and_rejects_duplicate_keys() {
+        let parsed = parse_json(r#"{"s":"line\n\u263a","n":12,"a":[true,null,1.25]}"#).unwrap();
+        assert_eq!(parsed.get("s").unwrap().as_str("s").unwrap(), "line\n☺");
+        assert_eq!(parsed.get("n").unwrap().as_u64("n").unwrap(), 12);
+        assert!(matches!(parsed.get("a").unwrap(), JsonValue::Array(_)));
+        assert!(parse_json(r#"{"x":1,"x":2}"#).is_err());
+        assert!(parse_json("{} trailing").is_err());
+    }
+
+    #[test]
+    fn actual_profile_and_receipt_bytes_are_bound_to_each_paired_row() {
+        let input = synthetic_tsv(2,1.0,2.0,4.0,2.0,5.0);
+        let (root, enriched) = artifact_fixture(&input);
+        let report = build_report_with_artifacts(&enriched,100,42,Some(&root),true).unwrap();
+        assert_eq!(report.artifact_verification.status, "synthetic_fixture_content_verified_origin_unattested");
+        assert_eq!(report.artifact_verification.profiles_verified, 1);
+        assert_eq!(report.artifact_verification.receipts_verified, 10);
+        assert!(report.artifact_verification.fixture_only);
+        assert_eq!(report.groups[0].resource_match.receipt_verification_status,
+            "synthetic_fixture_content_verified_origin_unattested");
+        assert_eq!(report.groups[0].eligibility, "smoke_only");
+        assert!(build_report_with_artifacts(&enriched,100,42,Some(&root),false)
+            .unwrap_err().contains("without explicit --allow-fixtures"));
+        cleanup_artifact_fixture(&root);
+    }
+
+    #[test]
+    fn receipt_byte_tampering_is_rejected_even_when_tsv_digest_is_unchanged() {
+        let input = synthetic_tsv(1,1.0,2.0,4.0,2.0,5.0);
+        let (root, enriched) = artifact_fixture(&input);
+        let first_row = enriched.lines().nth(1).unwrap();
+        let receipt_digest = first_row.split('\t').nth(20).unwrap();
+        let path = root.join("receipts").join(format!("{receipt_digest}.json"));
+        let mut bytes = fs::read(&path).unwrap();
+        bytes.push(b' ');
+        fs::write(&path, bytes).unwrap();
+        let error = build_report_with_artifacts(&enriched,100,42,Some(&root),true).unwrap_err();
+        assert!(error.contains("artifact digest mismatch"));
+        cleanup_artifact_fixture(&root);
+    }
+
+    #[test]
+    fn receipt_field_tampering_is_rejected_after_rehashing_bytes() {
+        let input = synthetic_tsv(1,1.0,2.0,4.0,2.0,5.0);
+        let (root, enriched) = artifact_fixture(&input);
+        let mut lines: Vec<String> = enriched.lines().map(str::to_string).collect();
+        let mut fields: Vec<String> = lines[2].split('\t').map(str::to_string).collect();
+        let old_digest = fields[20].clone();
+        let path = root.join("receipts").join(format!("{old_digest}.json"));
+        let receipt = fs::read_to_string(&path).unwrap();
+        let mutated = receipt.replacen("\"compute_work_units\": 100000", "\"compute_work_units\": 999", 1);
+        assert_ne!(receipt, mutated);
+        let new_digest = sha256_hex(mutated.as_bytes());
+        fs::write(root.join("receipts").join(format!("{new_digest}.json")), mutated).unwrap();
+        fields[20] = new_digest;
+        lines[2] = fields.join("\t");
+        let modified_tsv = lines.join("\n") + "\n";
+        let error = build_report_with_artifacts(&modified_tsv,100,42,Some(&root),true).unwrap_err();
+        assert!(error.contains("compute or memory does not match TSV row"));
+        cleanup_artifact_fixture(&root);
+    }
+
+    #[test]
+    fn profile_bytes_are_hash_checked_and_referenced_by_every_receipt() {
+        let input = synthetic_tsv(1,1.0,2.0,4.0,2.0,5.0);
+        let (root, enriched) = artifact_fixture(&input);
+        let row = enriched.lines().nth(1).unwrap();
+        let profile_digest = row.split('\t').nth(19).unwrap();
+        let path = root.join("profiles").join(format!("{profile_digest}.json"));
+        let mut profile = fs::read(&path).unwrap();
+        profile.push(b' ');
+        fs::write(&path, profile).unwrap();
+        let error = build_report_with_artifacts(&enriched,100,42,Some(&root),true).unwrap_err();
+        assert!(error.contains("resource profile artifact digest mismatch"));
+        cleanup_artifact_fixture(&root);
+    }
+
+
     #[test]
     fn positive_null_and_negative_advantage_are_distinguished() {
         let positive = build_report(&synthetic_tsv(20,1.0,2.0,4.0,2.0,5.0),500,7).unwrap();
