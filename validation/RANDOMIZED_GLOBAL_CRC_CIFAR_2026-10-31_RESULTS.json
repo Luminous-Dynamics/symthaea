@@ -161,23 +161,28 @@
     "local execution used an independent Python reference driver; exact committed module not executed from a clean checkout; no CI pass claimed"
   ],
   "local_validation": {
-    "tests_authored": 11,
-    "tests_total": 11,
-    "execution": "independent local Python reference implementation of committed LP equations; exact branch blob not run from a clean checkout",
-    "all_alpha_augmented_constraints": true,
-    "piecewise_convexification_check": "eight interior action values; risk, specificity and node-size all match endpoint mixtures",
-    "primal_dual_receipts": {
-      "max_primal_inequality_violation": 3.3306690738754696e-14,
-      "max_primal_equality_residual": 2.930988785010413e-14,
-      "max_dual_sign_violation": 1.411197713268445e-15,
-      "max_stationarity_residual": 1.734723475976807e-18,
-      "max_complementarity_residual": 1.3133141493127644e-18,
-      "max_primal_dual_gap": 5.551115123125783e-16
+    "tests_authored": 16,
+    "tests_executed_against_exact_committed_module": false,
+    "exact_committed_module_execution": "pending clean local runtime",
+    "independent_reference_checks": {
+      "four_alpha_lp_solutions": true,
+      "all_augmented_state_constraints": true,
+      "piecewise_convexification_interior_depths": 8,
+      "kkt_receipts_checked_for_all_four_alpha": true,
+      "certificate_tamper_api_tests": "authored; not yet executed against exact module"
+    },
+    "max_kkt_residuals": {
+      "primal_inequality": 3.3306690738754696e-14,
+      "primal_equality": 2.930988785010413e-14,
+      "dual_sign": 1.4111977136197945e-15,
+      "stationarity": 1.734723475976807e-18,
+      "complementarity": 1.3133141493127644e-18,
+      "duality_gap": 5.551115123125783e-16
     },
     "remote_ci": "not run; no pass claimed",
     "committed_blobs": {
-      "source": "00d0632109c68f02d692a11b6cf5bcb97c5cf00d",
-      "tests": "53db4558b56170c938cb66fecb927b639c70cdc7"
+      "source": "01211f4362c70504532b82d55180fe889d783d76",
+      "tests": "e58f78ce8dad78ea6ab461a8291e0db4889f9556"
     }
   },
   "kkt_by_alpha": {
@@ -225,5 +230,36 @@
       "complementarity": 6.813356484056072e-19,
       "duality_gap": 5.551115123125783e-16
     }
+  },
+  "certificate_design": {
+    "schema": "symthaea-risk-certificate-v1",
+    "kind": "RandomizedFiniteExchangeabilityCRC",
+    "proof_lanes": [
+      "ExactFiniteExchangeability",
+      "ExactLPOptimalityKKT"
+    ],
+    "digests": [
+      "decision_output_sha256",
+      "constraint_domain_sha256",
+      "objective_reference_sha256"
+    ],
+    "verifier_checks": [
+      "all augmented state expected losses",
+      "risk target and assumption contract",
+      "action/state scope",
+      "dual signs",
+      "stationarity",
+      "complementarity",
+      "primal-dual gap"
+    ],
+    "tamper_controls_authored": [
+      "policy table",
+      "alpha/risk target",
+      "augmented state count",
+      "dual witness",
+      "assumption contract",
+      "verifier receipt"
+    ],
+    "signature": "not signed; hashes bind content but do not authenticate an issuer"
   }
 }
