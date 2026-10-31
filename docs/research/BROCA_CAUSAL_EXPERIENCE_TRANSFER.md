@@ -186,6 +186,9 @@ Publish vector scorecards and Pareto frontiers. Do not use one weighted average 
 - Zero claimed action effects without reconciled outcome evidence.
 - 100% prediction-before-action receipt coverage on the controlled simulator track.
 - On matched dependent tasks, at least +10 percentage points in final-chain success over no-memory, with paired cluster-aware confidence intervals excluding zero; stretch target +15 pp.
+- **AMA-Bench:** reproduce AMA-Agent's paper protocol and 57.22% reference first; then target at least 62.2% under the same exact split, answer/evaluator setup and action/tool budget, with paired uncertainty excluding zero. The published 57.22% and +11.16 pp belong to AMA-Bench only; do not compare with conversational QA scores.
+- **Continual Learning Exam:** reproduce the paper's best 47.7% level-completion result first; then target at least 52.7% of progressive levels and at least 28% of tasks completing all five levels, with equal feedback/revision budget and no-memory / replay / memory ablations. These are stretch targets against a preprint result, not expected deployment rates.
+- **WorldMemArena:** publish separate write, maintain, retrieve and use results. Target a measurable improvement in each stage under the same split/backbone/reader budget, while keeping worst-stratum performance non-inferior within a pre-registered 1 percentage point. A stronger write score may not compensate for weaker maintenance or use.
 - At equal action/model-call budget, improve cumulative regret over episodic-summary and similarity-retrieval baselines.
 - Under regime shift, lower worst-group regret than unguarded causal-graph reuse, without unacceptable abstention inflation.
 - Compression preserves at least 99% of decisions on a frozen proof-sensitive query panel at 10x memory reduction; individually explain all divergent cases. This is a stretch target, not a current result.
