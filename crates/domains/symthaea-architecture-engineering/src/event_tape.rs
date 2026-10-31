@@ -39,6 +39,8 @@ pub enum ExecutionMode {
 pub struct ExecutionContract {
     pub mode: ExecutionMode,
     pub worker_count: u32,
+    /// Number of advisory action seats required for a complete batch round.
+    pub seats_per_round: u32,
     /// Maximum claims per canonical direction during the first round.
     pub first_round_claim_cap: Option<u32>,
     /// Maximum claims per canonical direction in later rounds.
@@ -704,6 +706,28 @@ impl EventTape {
     /// explicit unknowns; such tapes cannot be used in matched-budget claims.
     pub fn validate(&self) -> Result<EventTapeSummary, EventTapeError> {
         let summary = self.validate_integrity()?;
+        if self.header.execution.mode == ExecutionMode::Batched {
+            if let Some(last_event) = self.events.last() {
+                let last_batch_id = last_event.payload.batch_id.as_deref().ok_or_else(|| {
+                    EventTapeError::new("events", "batched tape ends without a batch ID")
+                })?;
+                let completed_seats = self
+                    .events
+                    .iter()
+                    .rev()
+                    .take_while(|event| event.payload.batch_id.as_deref() == Some(last_batch_id))
+                    .count();
+                if completed_seats != self.header.execution.seats_per_round as usize {
+                    return Err(EventTapeError::new(
+                        "events.last_batch",
+                        format!(
+                            "last batch has {completed_seats} actions; expected {} advisory seats",
+                            self.header.execution.seats_per_round
+                        ),
+                    ));
+                }
+            }
+        }
         if !summary.fully_metered || summary.total_charged_budget_microunits.is_none() {
             return Err(EventTapeError::new(
                 "events.resources",
@@ -853,6 +877,15 @@ fn validate_schedule_event(
                 .is_some_and(|batch| batch.id == batch_id);
             if !active_matches {
                 if let Some(previous) = active_batch.take() {
+                    if previous.workers.len() != contract.seats_per_round as usize {
+                        return Err(EventTapeError::new(
+                            format!("{path}.batch_id"),
+                            format!(
+                                "previous batch completed {} of {} advisory seats",
+                                previous.workers.len(), contract.seats_per_round
+                            ),
+                        ));
+                    }
                     seen_batches.insert(previous.id);
                 }
                 if seen_batches.contains(batch_id) {
@@ -1020,13 +1053,17 @@ fn validate_header(header: &EventTapeHeader) -> Result<(), EventTapeError> {
         ));
     }
     match header.execution.mode {
-        ExecutionMode::Sequential if header.execution.worker_count != 1 => {
+        ExecutionMode::Sequential
+            if header.execution.worker_count != 1 || header.execution.seats_per_round != 1 => {
             return Err(EventTapeError::new(
                 "header.execution.worker_count",
                 "sequential mode requires exactly one worker",
             ));
         }
-        ExecutionMode::Batched if header.execution.worker_count < 2 => {
+        ExecutionMode::Batched
+            if header.execution.worker_count < 2
+                || header.execution.seats_per_round == 0
+                || header.execution.seats_per_round > header.execution.worker_count => {
             return Err(EventTapeError::new(
                 "header.execution.worker_count",
                 "batched mode requires at least two workers",
@@ -1224,6 +1261,7 @@ mod tests {
             execution: ExecutionContract {
                 mode,
                 worker_count,
+                seats_per_round: if mode == ExecutionMode::Sequential { 1 } else { worker_count },
                 first_round_claim_cap: None,
                 steady_state_claim_cap: None,
             },
@@ -1538,4 +1576,27 @@ mod tests {
             .is_err());
         assert_eq!(tape.events.len(), 1);
     }
+    #[test]
+    fn incomplete_final_batch_cannot_qualify() {
+        let mut tape = EventTape::new(header(ExecutionMode::Batched, 4, 20)).unwrap();
+        let (intent, outcome) = verified_evaluation("A", H5);
+        tape.append(event("w0", 0, 1, Some("batch-1"), 0, intent, outcome, 5))
+            .unwrap();
+        assert!(tape.validate_integrity().is_ok());
+        assert!(tape.validate().is_err(), "one-of-four partial batch cannot qualify");
+    }
+
+    #[test]
+    fn previous_batch_must_be_complete_before_next_round() {
+        let mut tape = EventTape::new(header(ExecutionMode::Batched, 2, 20)).unwrap();
+        let (intent, outcome) = verified_evaluation("A", H5);
+        tape.append(event("w0", 0, 1, Some("batch-1"), 0, intent, outcome, 5))
+            .unwrap();
+        let (intent, outcome) = verified_evaluation("B", H4);
+        assert!(tape
+            .append(event("w0-round2", 0, 2, Some("batch-2"), 1, intent, outcome, 5))
+            .is_err());
+        assert_eq!(tape.events().len(), 1);
+    }
+
 }
