@@ -18,6 +18,7 @@ pub mod analytical_benchmark;
 pub mod direction_board;
 pub mod direction_board_benchmark;
 pub mod event_tape;
+pub mod matched_campaign;
 pub mod coral_baseline;
 pub mod resource_pareto;
 
