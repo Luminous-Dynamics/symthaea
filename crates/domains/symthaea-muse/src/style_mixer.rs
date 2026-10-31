@@ -97,10 +97,11 @@ pub struct HybridComposition {
 /// Compile an explicit catalogue-layer recipe to the actual composer's
 /// declarative spec. V1 supports PeriodSentence owners using
 /// Ternary/Rondo/Variations, GrooveCycle owners with cycle-safe
-/// accompaniment pools, and ProcessAdditive owners whose motif-cell donor
-/// preserves the process engine's per-seed trajectory. Other dedicated
-/// engines remain fail-closed until family-specific donor-consumption
-/// adapters exist. Unsupported meter transfers, cycle incompatibilities,
+/// accompaniment pools, ProcessAdditive owners with shape-preserving
+/// motif-cell donors, and the dedicated BluesCallResponse/JazzChorus engines
+/// with family-specific melody, rhythm, harmony and tempo transfer contracts.
+/// Other dedicated engines remain fail-closed until their own donor-consumption
+/// contracts exist. Unsupported meter transfers, cycle incompatibilities,
 /// process-cell mismatches and unknown/unimplemented routes fail closed.
 pub fn compile_hybrid_style(
     hybrid: &HybridStyleSpec,
@@ -152,13 +153,13 @@ pub fn compile_hybrid_style(
         return Err(issues);
     };
 
-    // Dedicated engines consume different subsets of CompositionSpec. The
-    // first additional adapter is GrooveCycle: it is safe only when every
-    // selectable accompaniment is a cycle-bearing cell, because the engine
-    // chooses from the whole pool by seed and its resolver rejects ordinary
-    // textures. Validate the full pool, not the one item a fixture happens to
-    // select. Other dedicated engines remain fail-closed until their own
-    // consumption contracts and negative fixtures exist.
+    // Dedicated engines consume different subsets of CompositionSpec.
+    // Validate each family's real contract before transferring fields:
+    // GrooveCycle requires every selectable accompaniment to be a
+    // cycle-bearing cell; ProcessAdditive consumes the actual motif cell;
+    // BluesCallResponse and JazzChorus each own a fixed 4/4 chorus structure.
+    // Other dedicated engines remain fail-closed until their own consumption
+    // contracts and negative fixtures exist.
     let mut spec = structural_style.spec();
     let structural_family = structural_style.grammar_family();
     match structural_family {
@@ -194,13 +195,33 @@ pub fn compile_hybrid_style(
                 });
             }
         }
+        GrammarFamily::BluesCallResponse => {
+            if spec.meter != 4 {
+                issues.push(StyleMixIssue {
+                    code: "blues_call_response_meter_adapter_required".into(),
+                    layer: Some(StyleMixLayer::Structure),
+                    catalog_id: Some(structural_entry.id),
+                    message: "the current 12-bar BluesCallResponse realization is qualified only for 4/4; non-4/4 requires an explicit chorus/tala adapter".into(),
+                });
+            }
+        }
+        GrammarFamily::JazzChorus => {
+            if spec.meter != 4 {
+                issues.push(StyleMixIssue {
+                    code: "jazz_chorus_meter_adapter_required".into(),
+                    layer: Some(StyleMixLayer::Structure),
+                    catalog_id: Some(structural_entry.id),
+                    message: "the current 8-bar JazzChorus realization is qualified only for 4/4; non-4/4 requires an explicit chorus adapter".into(),
+                });
+            }
+        }
         family => {
             issues.push(StyleMixIssue {
                 code: "structural_engine_adapter_required".into(),
                 layer: Some(StyleMixLayer::Structure),
                 catalog_id: Some(structural_entry.id),
                 message: format!(
-                    "the {} structural grammar ({family:?}) requires its own hybrid donor adapter; compiler v1 supports PeriodSentence and GrooveCycle",
+                    "the {} structural grammar ({family:?}) requires its own hybrid donor adapter; compiler v1 supports PeriodSentence, GrooveCycle, ProcessAdditive, BluesCallResponse and JazzChorus",
                     structural_entry.display_name
                 ),
             });
@@ -299,6 +320,20 @@ pub fn compile_hybrid_style(
                 catalog_id: Some(entry.id),
                 message: "ProcessAdditive preserves a static tonic/fifth field and does not consume progression or general harmonic-texture fields; an explicit modal/pitch-hierarchy adapter is required".into(),
             });
+        } else if matches!(
+            structural_family,
+            GrammarFamily::BluesCallResponse | GrammarFamily::JazzChorus
+        ) {
+            // These engines consume the key mode and progression directly.
+            // JazzChorus additionally passes seventh_chords into its
+            // harmony realizer; BluesCallResponse explicitly passes false.
+            // General drone/planing/stasis and mode-pool controls are not
+            // consumed by either dedicated engine and are not copied.
+            spec.progression = donor.progression;
+            spec.mode = donor.mode;
+            if structural_family == GrammarFamily::JazzChorus {
+                spec.texture.seventh_chords = donor.texture.seventh_chords;
+            }
         } else {
             spec.progression = donor.progression;
             spec.mode = donor.mode;
@@ -329,6 +364,14 @@ pub fn compile_hybrid_style(
                 catalog_id: Some(entry.id),
                 message: "ProcessAdditive currently consumes tempo_range and attitude only; the general rhetoric/texture bundle is not safe to claim until a process-specific performance contract is tested".into(),
             });
+        } else if matches!(
+            structural_family,
+            GrammarFamily::BluesCallResponse | GrammarFamily::JazzChorus
+        ) {
+            // Their dedicated engines read tempo_range but not the generic
+            // rhetoric/swing/entrance/damage bundle. Admit only the field
+            // that changes the actual score tempo.
+            spec.tempo_range = donor.tempo_range;
         } else {
             spec.tempo_range = donor.tempo_range;
             spec.rhetoric = donor.rhetoric;
@@ -810,6 +853,207 @@ mod tests {
         assert!(issues.iter().any(|issue| {
             issue.code == "process_melody_cell_shape_mismatch"
         }));
+    }
+
+    #[test]
+    fn blues_call_response_accepts_score_consumed_donors() {
+        let cases = [
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("Blues"),
+                    melodic_style_id: Some(id_for_composer_style("JazzBallad")),
+                    rhythmic_style_id: None,
+                    harmonic_style_id: None,
+                    ensemble_style_id: None,
+                    performance_style_id: None,
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "melodic",
+            ),
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("Blues"),
+                    melodic_style_id: None,
+                    rhythmic_style_id: Some(id_for_composer_style("Tango")),
+                    harmonic_style_id: None,
+                    ensemble_style_id: None,
+                    performance_style_id: None,
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "rhythmic",
+            ),
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("Blues"),
+                    melodic_style_id: None,
+                    rhythmic_style_id: None,
+                    harmonic_style_id: Some(id_for_composer_style("Classical")),
+                    ensemble_style_id: None,
+                    performance_style_id: None,
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "harmonic",
+            ),
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("Blues"),
+                    melodic_style_id: None,
+                    rhythmic_style_id: None,
+                    harmonic_style_id: None,
+                    ensemble_style_id: None,
+                    performance_style_id: Some(id_for_composer_style("JazzBallad")),
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "tempo",
+            ),
+        ];
+
+        for (hybrid, axis) in cases {
+            let intent = MusicalIntent {
+                bars: 24,
+                seed: 13,
+                ..MusicalIntent::default()
+            };
+            let baseline = symthaea_music_theory::compose_with_grammar_plan(
+                Style::Blues.grammar_profile(),
+                &intent,
+                &Style::Blues.spec(),
+            );
+            let candidate = compose_hybrid_style(&intent, &hybrid)
+                .unwrap_or_else(|issues| panic!("{axis} donor rejected: {issues:?}"));
+            assert_ne!(
+                baseline.score, candidate.score,
+                "{axis} donor did not change the Blues score"
+            );
+            match (&baseline.plan, &candidate.grammar_plan) {
+                (
+                    GrammarPlanEvidence::CallResponse(expected),
+                    GrammarPlanEvidence::CallResponse(actual),
+                ) => {
+                    assert_eq!(actual.bars_per_chorus, 12);
+                    assert_eq!(actual.call_starts, vec![0, 4, 8]);
+                    assert_eq!(actual.response_starts, vec![2, 6, 10]);
+                    assert_eq!(actual.trajectory, expected.trajectory);
+                }
+                (expected, actual) => {
+                    panic!("wrong Blues grammar plans: {expected:?} vs {actual:?}")
+                }
+            }
+            assert!(!candidate.grammar_trace.structures.is_empty());
+        }
+    }
+
+    #[test]
+    fn jazz_chorus_accepts_score_consumed_donors() {
+        let cases = [
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("JazzBallad"),
+                    melodic_style_id: Some(id_for_composer_style("Blues")),
+                    rhythmic_style_id: None,
+                    harmonic_style_id: None,
+                    ensemble_style_id: None,
+                    performance_style_id: None,
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "melodic",
+            ),
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("JazzBallad"),
+                    melodic_style_id: None,
+                    rhythmic_style_id: Some(id_for_composer_style("Tango")),
+                    harmonic_style_id: None,
+                    ensemble_style_id: None,
+                    performance_style_id: None,
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "rhythmic",
+            ),
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("JazzBallad"),
+                    melodic_style_id: None,
+                    rhythmic_style_id: None,
+                    harmonic_style_id: Some(id_for_composer_style("Classical")),
+                    ensemble_style_id: None,
+                    performance_style_id: None,
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "harmonic",
+            ),
+            (
+                HybridStyleSpec {
+                    structural_style_id: id_for_composer_style("JazzBallad"),
+                    melodic_style_id: None,
+                    rhythmic_style_id: None,
+                    harmonic_style_id: None,
+                    ensemble_style_id: None,
+                    performance_style_id: Some(id_for_composer_style("Blues")),
+                    production_style_id: None,
+                    culturally_qualified_sources_acknowledged: true,
+                },
+                "tempo",
+            ),
+        ];
+
+        for (hybrid, axis) in cases {
+            let intent = MusicalIntent {
+                bars: 24,
+                seed: 19,
+                ..MusicalIntent::default()
+            };
+            let baseline = symthaea_music_theory::compose_with_grammar_plan(
+                Style::JazzBallad.grammar_profile(),
+                &intent,
+                &Style::JazzBallad.spec(),
+            );
+            let candidate = compose_hybrid_style(&intent, &hybrid)
+                .unwrap_or_else(|issues| panic!("{axis} donor rejected: {issues:?}"));
+            assert_ne!(
+                baseline.score, candidate.score,
+                "{axis} donor did not change the JazzChorus score"
+            );
+            match (&baseline.plan, &candidate.grammar_plan) {
+                (
+                    GrammarPlanEvidence::JazzChorus(expected),
+                    GrammarPlanEvidence::JazzChorus(actual),
+                ) => {
+                    assert_eq!(actual.bars_per_chorus, 8);
+                    assert_eq!(actual.choruses, 3);
+                    assert_eq!(actual.trajectory, expected.trajectory);
+                }
+                (expected, actual) => {
+                    panic!("wrong JazzChorus grammar plans: {expected:?} vs {actual:?}")
+                }
+            }
+            assert!(!candidate.grammar_trace.structures.is_empty());
+        }
+    }
+
+    #[test]
+    fn blues_and_jazz_chorus_reject_unqualified_meter_donors() {
+        for structural_style in ["Blues", "JazzBallad"] {
+            let hybrid = HybridStyleSpec {
+                structural_style_id: id_for_composer_style(structural_style),
+                melodic_style_id: None,
+                rhythmic_style_id: Some(id_for_composer_style("Flamenco")),
+                harmonic_style_id: None,
+                ensemble_style_id: None,
+                performance_style_id: None,
+                production_style_id: None,
+                culturally_qualified_sources_acknowledged: true,
+            };
+            let issues = compile_hybrid_style(&hybrid).unwrap_err();
+            assert!(issues.iter().any(|issue| issue.code == "rhythm_meter_mismatch"));
+        }
     }
 
     #[test]
