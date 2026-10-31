@@ -1,0 +1,264 @@
+{
+  "schema": "symthaea.spatiotemporal_state_budget_bakeoff",
+  "version": "0.1.0",
+  "tracking_issue": 9459,
+  "status": "preregistered_not_executed",
+  "base_temporal_suite_pr": 9395,
+  "baseline_sources": {
+    "STDL": {
+      "repository": "https://github.com/ChenxiangMA/STDL",
+      "commit": "e5e483332ade02c94d8354583ab46aa63e99ecf1",
+      "audit_document": "docs/research/STDL_REFERENCE_AUDIT_V0_1.md",
+      "applicable_tasks": [
+        "CIFAR10DVS",
+        "DVS_Gesture",
+        "SHD",
+        "SSC",
+        "CIFAR10",
+        "CIFAR100",
+        "ImageNet"
+      ],
+      "code_revision_match_to_final_paper_verified": false
+    },
+    "BrainTrace": {
+      "repository": "https://github.com/chaobrain/braintrace",
+      "package_commit": "4fd426e1ec58a61a11d47a8d95c32346778e8b11",
+      "experiment_commit": "81332436b3a0167bc83059878e43a0f0e2eb62c7",
+      "audit_document": "docs/research/BRAINTRACE_REFERENCE_AUDIT_V0_1.md",
+      "methods": [
+        "D_RTRL",
+        "pp_prop_ES_D_RTRL",
+        "EProp"
+      ],
+      "pp_prop_is_exact_gradient": false
+    }
+  },
+  "budget_contract": {
+    "total_components": [
+      "backbone",
+      "auxiliary",
+      "temporal_state",
+      "eligibility_trace",
+      "optimizer",
+      "activation",
+      "temporary",
+      "runtime"
+    ],
+    "relative_to_matched_bptt_peak_memory": [
+      0.25,
+      0.5,
+      0.75,
+      1
+    ],
+    "include_peak_gpu_allocated": true,
+    "include_peak_gpu_reserved": true,
+    "include_peak_host_rss": true,
+    "include_temporary_buffers": true,
+    "include_optimizer_state": true,
+    "include_data_pipeline": true,
+    "measured_budget_not_config_label": true
+  },
+  "stage0": {
+    "name": "small exact-gradient dependency oracle",
+    "modules": [
+      2,
+      4
+    ],
+    "temporal_scales": [
+      2,
+      3
+    ],
+    "full_bptt_reference": true,
+    "tests": [
+      "gradient_direction_cosine",
+      "relative_update_norm_error",
+      "per_parameter_gradient_coverage",
+      "cross_boundary_dependency_coverage"
+    ],
+    "arms": [
+      "BPTT",
+      "temporal_detachment_only",
+      "STDL_local_auxiliary_minimal",
+      "STDL_local_auxiliary_downstream_context",
+      "BrainTrace_D_RTRL",
+      "BrainTrace_pp_prop",
+      "HDC_fast_only_boundary_summary",
+      "HDC_slow_only_boundary_summary",
+      "HDC_fast_slow_fixed_cadence",
+      "HDC_fast_slow_novelty_refresh",
+      "HDC_plus_STDL_local_auxiliary",
+      "HDC_plus_BrainTrace_online_trace",
+      "BrainTrace_pp_prop_firing_rate_sensitivity"
+    ],
+    "implementation": {
+      "path": "research/temporal-bench/src/gradient_oracle.rs",
+      "model": "scalar two-module recurrent recurrence h_t=alpha*h_(t-1)+w*x_t; g_t=beta*g_(t-1)+v*h_t; y=c*g_T",
+      "methods": [
+        "exact_reverse_mode_BPTT",
+        "centered_finite_difference",
+        "hidden_temporal_detachment",
+        "downstream_temporal_detachment",
+        "local_auxiliary_head_gradient"
+      ],
+      "tests_authored": 20,
+      "tests_executed": false,
+      "scope_limit": "Small scalar gradient-path control only; not STDL, BrainTrace, HDC-LTC, or a multi-module/event-vision benchmark.",
+      "verification_controls": [
+        "centered_finite_difference_for_all_five_parameters",
+        "independent_known_answer_gradient_vector",
+        "no_detachment_matches_full_BPTT_input_gradient",
+        "hidden_detachment_changes_long_horizon_credit",
+        "double_detachment_keeps_only_final_step_input_credit",
+        "local_auxiliary_objective_is_distinct_from_global_BPTT"
+      ],
+      "chain_oracle": {
+        "path": "research/temporal-bench/src/chain_oracle.rs",
+        "modules_supported": [
+          2,
+          4
+        ],
+        "model": "Scalar recurrent chain with per-module temporal recurrence and feedforward coupling.",
+        "methods": [
+          "full_reverse_mode_BPTT",
+          "centered_finite_difference",
+          "per_module_temporal_stop_gradient",
+          "STDL_style_spatial_cut",
+          "separate_local_auxiliary_objective"
+        ],
+        "tests_authored": 11,
+        "tests_executed": false,
+        "claim_ceiling": "Analytic scalar chain only; it is not a reproduction or implementation of STDL, BrainTrace, HDC-LTC, or an event-vision model.",
+        "verification_controls": [
+          "two_module_BPTT_matches_centered_finite_difference",
+          "four_module_BPTT_matches_centered_finite_difference",
+          "all_temporal_modules_attached_matches_full_BPTT",
+          "temporal_detachment_changes_credit_coverage",
+          "spatial_cut_blocks_global_gradient_to_upstream_modules",
+          "local_auxiliary_restores_upstream_signal",
+          "local_auxiliary_gradient_matches_independent_finite_difference",
+          "downstream_global_gradients_match_full_BPTT",
+          "local_auxiliary_readout_gradient_reported_separately"
+        ]
+      }
+    },
+    "sensitivity_factors": {
+      "braintrace_pp_prop": {
+        "network_depth": [
+          2,
+          4,
+          8
+        ],
+        "firing_statistics": [
+          "sparse",
+          "intermediate",
+          "dense"
+        ],
+        "trace_configuration": "Sweep only parameters exposed by pinned BrainTrace API and preregister exact values; do not invent rank controls.",
+        "report": [
+          "held_out_task_quality",
+          "gradient_cosine_vs_BPTT",
+          "relative_update_norm_error",
+          "trace_memory_bytes",
+          "update_throughput",
+          "time_to_target_quality"
+        ]
+      },
+      "rationale": {
+        "paper_memory_complexity": {
+          "pp_prop": "O(B*N)",
+          "d_rtrl": "O(B*P)"
+        },
+        "paper_lif_gesture_reference": {
+          "pp_prop_memory_gb": 0.5,
+          "d_rtrl_memory_gb": 17.5,
+          "reported_memory_ratio": 35,
+          "reported_speedup_vs_d_rtrl": 10,
+          "scope": "Published paper's specific LIF-Gesture setup; literature reference only, not Symthaea measurement."
+        },
+        "source": "Wang et al., Nature Communications 17, 1745 (2026-01-19), DOI 10.1038/s41467-026-68453-w.",
+        "limitations": "Paper states pp-prop approximation quality can depend on firing statistics and network depth."
+      }
+    }
+  },
+  "stage1": {
+    "name": "event and static vision parity",
+    "event_vision": [
+      "CIFAR10DVS",
+      "DVS_Gesture",
+      "SHD",
+      "SSC"
+    ],
+    "static_vision_controls": [
+      "CIFAR10",
+      "CIFAR100",
+      "ImageNet",
+      "SVHN"
+    ],
+    "split_requirements": [
+      "train_dev_calibration_confirmatory",
+      "group_by_recording_or_subject_before_windowing",
+      "no_overlapping_source_windows_across_partitions",
+      "one_shot_confirmatory"
+    ],
+    "paired_seeds_pilot_min": 10,
+    "paired_seeds_confirmatory_min": 30
+  },
+  "stage2": {
+    "name": "adaptive boundary allocation",
+    "methods": [
+      "fixed_even_boundaries",
+      "STDL_fixed_memory_constrained_context",
+      "greedy_marginal_value_per_byte_on_dev",
+      "HDC_novelty_similarity_refresh",
+      "joint_spatial_temporal_trace_selector"
+    ],
+    "objective": "Report Pareto frontier across held-out development quality, measured bytes, compute and energy; no mandatory blended utility score."
+  },
+  "qualification_targets": {
+    "within_1_percentage_point_of_BPTT_at_25_percent_peak_training_memory": true,
+    "no_more_than_2_percent_relative_quality_loss_under_temporal_shift": true,
+    "at_least_2x_wall_clock_to_fixed_quality_or_30_percent_less_joules_per_correct_update": true,
+    "p95_p99_latency_regression_max_percent": 5,
+    "status": "targets_not_results"
+  },
+  "execution_state": {
+    "protocol_authored": true,
+    "fixture_authored": true,
+    "code_implemented": true,
+    "tests_executed": false,
+    "benchmark_executed": false,
+    "hardware_energy_measured": false,
+    "results_present": false,
+    "STDL_reproduced": false,
+    "BrainTrace_reproduced": false,
+    "gradient_oracle_implemented": true,
+    "gradient_oracle_path": "research/temporal-bench/src/gradient_oracle.rs",
+    "gradient_oracle_tests_authored": 9,
+    "gradient_oracle_tests_executed": false,
+    "full_multimodule_oracle_implemented": false,
+    "stdl_implemented": false,
+    "braintrace_implemented": false,
+    "braintrace_sensitivity_sweep_implemented": false,
+    "chain_oracle_implemented": true,
+    "chain_oracle_tests_authored": 11,
+    "chain_oracle_tests_executed": false,
+    "nonlinear_multimodule_oracle_implemented": false,
+    "stdl_training_implemented": false,
+    "braintrace_training_implemented": false,
+    "braintrace_pp_prop_sensitivity_implemented": false,
+    "all_stage0_oracle_tests_authored": 20,
+    "all_stage0_oracle_tests_executed": false
+  },
+  "caveats": [
+    "STDL's public code snapshot predates journal publication; exact paper runner mapping unverified.",
+    "STDL public test-as-validation behavior must be replaced by separate dev and one-shot confirmatory data.",
+    "BrainTrace pp-prop is a factorized approximation, not an exact D-RTRL/BPTT gradient.",
+    "No energy inference from GPU memory or simulator operation counts.",
+    "Oracle isolation and signed evaluator receipts are separate prerequisite work in #9437."
+  ],
+  "next_implementation_steps": [
+    "Extend scalar oracle to two-/four-module nonlinear and delayed-dependency cases.",
+    "Add gradient coverage and memory accounting for explicit local-boundary and HDC summary arms.",
+    "Only after independent correctness checks, connect STDL/BrainTrace adapters and matched dataset loaders."
+  ]
+}
