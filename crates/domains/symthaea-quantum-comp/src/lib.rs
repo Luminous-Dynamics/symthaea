@@ -75,6 +75,7 @@ pub mod architecture_portfolio;
 pub mod architecture_routing;
 pub mod architecture_evidence;
 pub mod architecture_regime;
+pub mod architecture_memory;
 pub mod stability;
 pub mod statistics;
 pub mod substrate;
@@ -157,7 +158,8 @@ pub use replay::{ReplayCommand, ReplayPlan, ReplayScope, supported_replay_scopes
 pub use reporting::{ReportTable, robustness_to_markdown};
 pub use robustness::{MethodRobustness, NoiseRobustnessSummary};
 pub use schema::{
-    ARCHITECTURE_EVIDENCE_RECEIPT_SCHEMA, ARCHITECTURE_WORKLOAD_REGIME_SCHEMA,
+    ARCHITECTURE_EVIDENCE_RECEIPT_SCHEMA, ARCHITECTURE_MEMORY_TOPOLOGY_SCHEMA,
+    ARCHITECTURE_WORKLOAD_REGIME_SCHEMA,
     BINDING_PROBE_SCHEMA, CRATE_VERSION,
     EXPERIMENT_MATRIX_SCHEMA, FIXTURE_CATALOG_SCHEMA,
     INTEGRATION_DECLARATION_SCHEMA, NOISE_SWEEP_SCHEMA, RELEASE_GATE_SCHEMA, REPLAY_PLAN_SCHEMA,
@@ -201,6 +203,15 @@ pub use architecture_regime::{
     WorkloadRegimeError,
     WorkloadRegimeQuery,
     WorkloadTemporalPattern,
+};
+pub use architecture_memory::{
+    validate_memory_topology, validate_memory_topology_binding,
+    validate_memory_topology_for_comparison, ArchitectureMemoryTopology,
+    MemoryCoherenceModel, MemoryConsistencyModel, MemoryPlacementMode,
+    MemoryPersistence, MemoryRegion, MemoryResidencyMode, MemoryRoute,
+    MemoryScope, MemoryStatePlacement, MemoryTier, MemoryTopologyError,
+    MemoryTopologyScenario, MemoryTopologySource, MemoryTopologySourceOrigin,
+    MemoryTransferDirection, MemoryTransferEdge, MemoryTransferFabric,
 };
 pub use architecture_evidence::{
     compare_architecture_evidence_records, select_architecture_candidate_from_evidence,

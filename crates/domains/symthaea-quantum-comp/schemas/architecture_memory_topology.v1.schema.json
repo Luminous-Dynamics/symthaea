@@ -12,12 +12,12 @@
     "workload_fingerprint",
     "workload_regime_profile_id",
     "comparison_contract_fingerprint",
-    "architecture_evidence_receipt_id",
     "source",
     "memory_regions",
     "transfer_edges",
     "state_placements",
-    "scenarios"
+    "scenarios",
+    "routes"
   ],
   "properties": {
     "schema_version": {
@@ -44,10 +44,6 @@
       "minLength": 1
     },
     "comparison_contract_fingerprint": {
-      "type": "string",
-      "minLength": 1
-    },
-    "architecture_evidence_receipt_id": {
       "type": "string",
       "minLength": 1
     },
@@ -141,6 +137,12 @@
     },
     "notes": {
       "type": "string"
+    },
+    "routes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/memory_route"
+      }
     }
   },
   "$defs": {
@@ -245,10 +247,26 @@
           ]
         },
         "capacity_bytes": {
-          "$ref": "#/$defs/byte_interval"
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lower_bytes",
+            "upper_bytes"
+          ],
+          "properties": {
+            "lower_bytes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "upper_bytes": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         },
         "occupancy_bytes": {
-          "$ref": "#/$defs/byte_interval"
+          "$ref": "#/$defs/byte_interval",
+          "description": "Existing reserved/background occupancy and allocations in this region, excluding all state_placements in this topology record. This is added to placement live-byte bounds when proving guaranteed capacity."
         },
         "read_latency_seconds": {
           "$ref": "#/$defs/positive_interval"
@@ -339,7 +357,8 @@
         },
         "communication_boundary_id": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Identity of the QARCH-021 physical accounting boundary. May be shared by exactly one read and one reverse-direction write edge for a full-duplex pair; any other reuse is duplicate accounting."
         },
         "conversion_latency_seconds": {
           "$ref": "#/$defs/positive_interval"
@@ -419,6 +438,58 @@
             "transactional",
             "not_applicable"
           ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "residency_mode": {
+                "const": "guaranteed"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "live_bytes"
+            ]
+          }
+        }
+      ]
+    },
+    "memory_route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "route_id",
+        "source_region_id",
+        "destination_region_id",
+        "edge_ids",
+        "require_acyclic"
+      ],
+      "properties": {
+        "route_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_region_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "destination_region_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "edge_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "require_acyclic": {
+          "type": "boolean"
         }
       }
     }

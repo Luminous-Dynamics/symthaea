@@ -1,6 +1,6 @@
 # QARCH-022: Memory topology and state-placement contract
 
-**Status:** research contract / schema proposal  
+**Status:** typed Rust validator + schema proposal  
 **Version:** `symthaea.quantum_comp.architecture_memory_topology.v1`  
 **Parent evidence model:** QARCH-020 receipts (#9305)  
 **Workload-side descriptor:** QARCH-021 regimes (#9317)  
@@ -44,7 +44,7 @@ A topology contains three typed collections.
 **Memory regions (nodes)** describe where bytes can reside:
 - tier/medium: registers, scratchpad, L1/L2/L3, SRAM, HBM, DDR/LPDDR, CXL-attached memory, persistent storage, remote memory, or a named other tier;
 - scope: thread, core, cluster, package, device, host, rack, or remote;
-- optional capacity and occupancy/high-water intervals;
+- optional capacity and occupancy/high-water intervals; occupancy is the existing reserved/background allocation excluding logical state placements in this record, so it can be added to the placements when proving a guaranteed fit;
 - directional read/write access latency and sustained bandwidth;
 - optional directly measured energy per byte;
 - optional access granularity, persistence/volatility, and coherence model.
@@ -82,7 +82,8 @@ A schema-valid description is not a measured result. Published specifications, a
 3. The overall topology may contain cycles (for example, coherent cache fabrics). A *declared route* must be finite, ordered and internally connected; cycle rejection applies only where the route or algorithm contract requires an acyclic path.
 4. Region capacity and observed occupancy are distinct quantities. Unknown capacity is not unbounded capacity.
 5. Capacity arithmetic is checked; report capacity headroom and high-water marks rather than assuming all declared regions are simultaneously available.
-6. One physical transfer is counted once at its named boundary. A host read that fetches a line from DRAM through cache hierarchy must not be added again as though each level transferred the full line independently unless the actual bytes at each boundary were separately observed.
+6. One physical transfer is counted once at its named boundary. A boundary may have one read edge and one reverse-direction write edge to describe distinct full-duplex traffic; duplicate edges in the same direction or overlapping accounting are rejected. A host read that fetches a line from DRAM through cache hierarchy must not be added again as though each level transferred the full line independently unless the actual bytes at each boundary were separately observed.
+7. Capacity admission adds the region's existing/background occupancy (excluding the named placements) to the aggregate live bytes of the placements. Guaranteed residency requires known capacity, known background occupancy and known live-set bounds; an unknown occupancy cannot be treated as zero.
 7. Cache hit rate, reuse distance and residency claims require trace-backed or instrumented evidence. A synthetic trace can validate code and schema, not certify hardware behavior.
 8. Preserve p50/p95/p99 latency or a raw distribution where possible. A mean cannot hide queueing and tail stalls.
 9. Cold load, warm steady state, concurrent pressure, capacity overflow, eviction, spill, migration, fallback, and recovery are separate scenarios.
@@ -130,10 +131,11 @@ For HDC retrieval, reuse the existing proposed target from #7864 as a preregiste
 - Semantic validation tests for duplicate IDs, missing endpoints, disconnected routes, prohibited route cycles, double counting, capacity overflow, absent/unknown metrics, invalid units, placement mismatch and source provenance.
 - Synthetic values are explicitly labelled and never enter measured architecture rankings.
 
-**Stage 1 — typed Rust model**
-- Typed memory region, transfer edge, route and state placement structs.
-- Cross-record validation against architecture evidence, workload-regime profile and exact comparison contract.
-- Unknowns remain absent; invalid or incomplete evidence fails closed.
+**Stage 1 — typed Rust model (initial implementation in `architecture_memory.rs`)**
+- Typed memory region, transfer edge, explicit route and state placement structs.
+- Structural checks for unique IDs, valid endpoints, route connectivity, optional acyclicity, non-overlapping boundary accounting (with one explicit reverse-direction read/write pair allowed), interval domains and capacity feasibility including background occupancy.
+- Cross-record validation against the QARCH-020 evidence record and QARCH-021 workload-regime profile, including exact observation/architecture/workload/contract/precision identity.
+- Synthetic fixtures are rejected by the comparison validator. Unknowns remain absent; invalid or incomplete evidence fails closed.
 
 **Stage 2 — one canonical consumer**
 - Integrate with an existing #7864 or #7749 run without creating a new runner.
@@ -142,6 +144,10 @@ For HDC retrieval, reuse the existing proposed target from #7864 as a preregiste
 **Stage 3 — measured comparison**
 - Report per-regime Pareto frontiers and confidence/coverage; do not collapse to a universal “best architecture.”
 - Promote only when correctness/quality and hard constraints pass, with a measured gain on identical full-path boundaries.
+
+## Current implementation boundary
+
+The typed API is an initial contract validator, not a hardware collector or benchmark runner. It validates declared topology records and joins their identities to existing QARCH records. The schema and fixture values remain synthetic; no physical memory bandwidth, occupancy, cache hit rate, latency, or energy is asserted. Integration with the existing HDC retrieval or HDC-LTC run owners is still required before any comparison result can be produced.
 
 ## References
 

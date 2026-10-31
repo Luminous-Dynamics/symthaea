@@ -50,6 +50,10 @@ pub const ARCHITECTURE_EVIDENCE_RECEIPT_SCHEMA: &str =
 pub const ARCHITECTURE_WORKLOAD_REGIME_SCHEMA: &str =
     "symthaea.quantum_comp.architecture_workload_regime.v1";
 
+/// Schema label for source-bound candidate memory topology and state placement.
+pub const ARCHITECTURE_MEMORY_TOPOLOGY_SCHEMA: &str =
+    "symthaea.quantum_comp.architecture_memory_topology.v1";
+
 /// Returns all known alpha.10 schema labels.
 pub fn known_schema_labels() -> &'static [&'static str] {
     &[
