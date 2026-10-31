@@ -480,6 +480,240 @@ fn group_failure_bound(
     })
 }
 
+fn group_metric_map(
+    receipt: &Value,
+    section: &str,
+    group_id_key: &str,
+    metric_key: &str,
+    context: &str,
+) -> Result<BTreeMap<String, f64>, String> {
+    let rows = receipt.get("generalization")
+        .and_then(|value| value.get(section))
+        .and_then(Value::as_array)
+        .ok_or_else(|| format!("{context} group rows are unavailable"))?;
+    let mut output = BTreeMap::new();
+    for (index, row) in rows.iter().enumerate() {
+        let row_context = format!("{context}[{index}]");
+        let group_id = str_field(row, group_id_key, &row_context)?.to_owned();
+        let metric = row.get(metric_key).and_then(Value::as_f64)
+            .ok_or_else(|| format!("{row_context}.{metric_key} must be numeric"))?;
+        if !metric.is_finite() || !(0.0..=1.0).contains(&metric) {
+            return Err(format!("{row_context}.{metric_key} must be finite and within [0, 1]"));
+        }
+        if output.insert(group_id.clone(), metric).is_some() {
+            return Err(format!("{context} contains duplicate group ID {group_id}"));
+        }
+    }
+    Ok(output)
+}
+
+fn paired_group_metric_delta(
+    candidate: &BTreeMap<String, f64>,
+    baseline: &BTreeMap<String, f64>,
+    campaign_id: &str,
+    axis: &str,
+    metric: &str,
+    higher_is_better: bool,
+) -> Result<Value, String> {
+    let candidate_ids: BTreeSet<&String> = candidate.keys().collect();
+    let baseline_ids: BTreeSet<&String> = baseline.keys().collect();
+    if candidate_ids != baseline_ids {
+        return Err(format!(
+            "paired comparison requires identical {axis} group IDs; candidate={} baseline={}",
+            candidate_ids.len(),
+            baseline_ids.len()
+        ));
+    }
+    if candidate.is_empty() {
+        return Err(format!("paired comparison has no {axis} groups"));
+    }
+
+    let mut deltas = Vec::with_capacity(candidate.len());
+    let mut by_group = Vec::with_capacity(candidate.len());
+    for (group_id, candidate_value) in candidate {
+        let baseline_value = baseline.get(group_id)
+            .ok_or_else(|| format!("baseline missing paired {axis} group {group_id}"))?;
+        let improvement = if higher_is_better {
+            candidate_value - baseline_value
+        } else {
+            baseline_value - candidate_value
+        };
+        deltas.push(improvement);
+        by_group.push(json!({
+            "group_id": group_id,
+            "candidate_value": candidate_value,
+            "baseline_value": baseline_value,
+            "improvement_delta": improvement
+        }));
+    }
+
+    let group_count = deltas.len();
+    let point = deltas.iter().sum::<f64>() / group_count as f64;
+    let seed_material = format!(
+        "{campaign_id}|{axis}|{metric}|hardsec-paired-group-bootstrap-v1"
+    );
+    let seed_digest = Sha256::digest(seed_material.as_bytes());
+    let seed_sha256 = seed_digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+
+    let (lower, upper, status) = if group_count < MIN_GROUPS_FOR_BOOTSTRAP_INTERVAL {
+        (None, None, "unavailable_insufficient_independent_groups")
+    } else {
+        let mut state = u64::from_le_bytes(
+            seed_digest[..8]
+                .try_into()
+                .expect("SHA-256 has at least eight bytes"),
+        );
+        if state == 0 {
+            state = 0x9E37_79B9_7F4A_7C15;
+        }
+        let mut samples = Vec::with_capacity(GROUP_BOOTSTRAP_REPLICATES);
+        for _ in 0..GROUP_BOOTSTRAP_REPLICATES {
+            let mut sum = 0.0f64;
+            for _ in 0..group_count {
+                let draw = next_bootstrap_u64(&mut state);
+                let index = ((draw as u128 * group_count as u128) >> 64) as usize;
+                sum += deltas[index];
+            }
+            samples.push(sum / group_count as f64);
+        }
+        samples.sort_by(f64::total_cmp);
+        let lower_index = (((GROUP_BOOTSTRAP_REPLICATES - 1) as f64) * 0.025).floor() as usize;
+        let upper_index = (((GROUP_BOOTSTRAP_REPLICATES - 1) as f64) * 0.975).ceil() as usize;
+        (
+            Some(samples[lower_index]),
+            Some(samples[upper_index]),
+            "available_paired_group_bootstrap_interval",
+        )
+    };
+
+    let candidate_macro = candidate.values().sum::<f64>() / group_count as f64;
+    let baseline_macro = baseline.values().sum::<f64>() / group_count as f64;
+    Ok(json!({
+        "metric": metric,
+        "direction": if higher_is_better { "higher_is_better" } else { "lower_is_better" },
+        "status": status,
+        "independent_group_count": group_count,
+        "candidate_macro_estimate": candidate_macro,
+        "baseline_macro_estimate": baseline_macro,
+        "improvement_point_estimate": point,
+        "improvement_lower_95": lower,
+        "improvement_upper_95": upper,
+        "bootstrap_replicates": GROUP_BOOTSTRAP_REPLICATES,
+        "minimum_independent_groups": MIN_GROUPS_FOR_BOOTSTRAP_INTERVAL,
+        "seed_sha256": seed_sha256,
+        "seed_scope": "campaign_id + grouping_axis + metric + algorithm_version",
+        "resampling_unit": "paired_independent_group_delta",
+        "assumption": "candidate and baseline values are paired on identical caller-declared independent exchangeable groups",
+        "interpretation": "Positive improvement favors the candidate. The interval is descriptive and conditional on group independence/exchangeability.",
+        "by_group": by_group
+    }))
+}
+
+fn paired_model_comparison(
+    candidate_receipt: &Value,
+    baseline_receipt: &Value,
+    campaign_id: &str,
+    baseline_predictions_sha256: &str,
+) -> Result<Value, String> {
+    let candidate_campaign = candidate_receipt.get("campaign")
+        .ok_or("candidate receipt campaign section missing")?;
+    let baseline_campaign = baseline_receipt.get("campaign")
+        .ok_or("baseline receipt campaign section missing")?;
+    if str_field(candidate_campaign, "campaign_id", "candidate.campaign")? != campaign_id
+        || str_field(baseline_campaign, "campaign_id", "baseline.campaign")? != campaign_id
+    {
+        return Err("candidate and baseline campaign IDs must match".to_owned());
+    }
+    let candidate_model = str_field(candidate_campaign, "model_id", "candidate.campaign")?;
+    let baseline_model = str_field(baseline_campaign, "model_id", "baseline.campaign")?;
+    let candidate_domain = str_field(candidate_campaign, "evidence_domain", "candidate.campaign")?;
+    let baseline_domain = str_field(baseline_campaign, "evidence_domain", "baseline.campaign")?;
+    if candidate_domain != baseline_domain {
+        return Err("paired candidate/baseline evidence domains must match".to_owned());
+    }
+
+    let comparisons = [
+        (
+            "attack_family_level",
+            "attack_family_id",
+            "attack_effect_recall",
+            true,
+        ),
+        (
+            "adaptation_family_level",
+            "adaptation_family_and_level",
+            "attack_effect_recall",
+            true,
+        ),
+        (
+            "adaptation_family",
+            "adaptation_family_id",
+            "attack_effect_recall",
+            true,
+        ),
+        (
+            "program_group_level",
+            "program_group_id",
+            "attack_effect_recall",
+            true,
+        ),
+        (
+            "execution_group_level",
+            "execution_group_id",
+            "attack_effect_recall",
+            true,
+        ),
+        (
+            "benign_false_alert_by_program",
+            "program_group_id",
+            "false_alert_rate",
+            false,
+        ),
+    ];
+    let mut group_metrics = serde_json::Map::new();
+    for (section, group_key, metric_key, higher_is_better) in comparisons {
+        let candidate_values = group_metric_map(
+            candidate_receipt,
+            section,
+            group_key,
+            metric_key,
+            &format!("candidate.{section}"),
+        )?;
+        let baseline_values = group_metric_map(
+            baseline_receipt,
+            section,
+            group_key,
+            metric_key,
+            &format!("baseline.{section}"),
+        )?;
+        let delta = paired_group_metric_delta(
+            &candidate_values,
+            &baseline_values,
+            campaign_id,
+            section,
+            metric_key,
+            higher_is_better,
+        )?;
+        group_metrics.insert(section.to_owned(), delta);
+    }
+    Ok(json!({
+        "schema_version": "hardsec-paired-model-comparison-v1",
+        "result": "paired",
+        "campaign_id": campaign_id,
+        "evidence_domain": candidate_domain,
+        "candidate_model_id": candidate_model,
+        "baseline_model_id": baseline_model,
+        "baseline_predictions_sha256": baseline_predictions_sha256,
+        "pairing_rule": "same manifest, oracle, test case IDs and exact ordered independent group IDs for each metric",
+        "group_metrics": group_metrics,
+        "limitations": [
+            "This compares the supplied prediction ledgers on the same cases and group IDs; it does not authenticate either model or its threshold selection.",
+            "Group bootstrap intervals are descriptive and conditional on caller-declared independent/exchangeable groups.",
+            "A positive paired delta is not a SOTA claim; matched platform, tuning, acquisition and detector operating budgets are separate obligations."
+        ]
+    }))
+}
+
 fn percentile(sorted: &[u64], q: f64) -> Option<u64> {
     if sorted.is_empty() {
         return None;
