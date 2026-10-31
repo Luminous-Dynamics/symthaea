@@ -267,6 +267,8 @@ pub struct TrialResult {
     pub mandatory_required_mask: u8,
     pub mandatory_verified_mask: u8,
     pub missed_mandatory_count: u32,
+    pub rejected_candidate_count: u32,
+    pub rejected_candidate_cost: u32,
     pub redundant_operation_count: u32,
     pub wasted_operation_cost: u32,
     pub correct_abstention: bool,
@@ -416,6 +418,8 @@ pub fn run_trial(case: &TaskCase, policy: Policy, budget: u32, seed: u64) -> Tri
     let mut claimed_mask = 0u8;
     let mut mandatory_verified_mask = 0u8;
     let mut operations = 0usize;
+    let mut rejected_candidate_count = 0u32;
+    let mut rejected_candidate_cost = 0u32;
     let mut redundant_operation_count = 0u32;
     let mut wasted_operation_cost = 0u32;
     let mut cost_to_first_sufficient_proof = None;
@@ -432,6 +436,7 @@ pub fn run_trial(case: &TaskCase, policy: Policy, budget: u32, seed: u64) -> Tri
         let Some(index) = choose_next(case, policy, &attempted, unresolved, spent, budget, seed) else {
             break;
         };
+        let unresolved_before = case.required_mask & !verified_mask;
         let operation = &case.operations[index];
         attempted[index] = true;
         operations += 1;
@@ -451,8 +456,17 @@ pub fn run_trial(case: &TaskCase, policy: Policy, budget: u32, seed: u64) -> Tri
         }
 
         if newly_verified == 0 && operation.public.mandatory_mask == 0 {
-            redundant_operation_count += 1;
-            wasted_operation_cost = wasted_operation_cost.saturating_add(operation.public.cost);
+            if operation.public.advertised_mask & unresolved_before != 0 {
+                // The attempted operation targeted an open obligation, but
+                // independent verification rejected its proposed support.
+                rejected_candidate_count += 1;
+                rejected_candidate_cost = rejected_candidate_cost.saturating_add(operation.public.cost);
+            } else {
+                // The operation could not address any currently open proof
+                // obligation, so its cost is redundant/irrelevant in this task.
+                redundant_operation_count += 1;
+                wasted_operation_cost = wasted_operation_cost.saturating_add(operation.public.cost);
+            }
         }
 
         if verified_mask & case.required_mask == case.required_mask
@@ -475,7 +489,7 @@ pub fn run_trial(case: &TaskCase, policy: Policy, budget: u32, seed: u64) -> Tri
     };
     let false_support_count = popcount(claimed_mask & !verified_mask & case.required_mask);
     let false_completion = reported_complete && !completion_verified;
-    let correct_abstention = !reported_complete && !completion_verified;
+    let correct_abstention = !reported_complete && !completion_verified && false_support_count == 0;
     let missed_mandatory_count = popcount(case.mandatory_mask() & !mandatory_verified_mask);
     let (oracle_min_cost, cost_regret) = match oracle_subset(case) {
         Some((_, minimum)) => {
@@ -504,6 +518,8 @@ pub fn run_trial(case: &TaskCase, policy: Policy, budget: u32, seed: u64) -> Tri
         mandatory_required_mask: case.mandatory_mask(),
         mandatory_verified_mask,
         missed_mandatory_count,
+        rejected_candidate_count,
+        rejected_candidate_cost,
         redundant_operation_count,
         wasted_operation_cost,
         correct_abstention,
@@ -549,6 +565,8 @@ mod tests {
         assert!(result.completion_verified);
         assert_eq!(result.false_support_count, 0);
         assert_eq!(result.missed_mandatory_count, 0);
+        assert!(result.rejected_candidate_count > 0);
+        assert!(result.rejected_candidate_cost > 0);
     }
 
     #[test]
@@ -630,10 +648,15 @@ mod tests {
     }
 
     #[test]
-    fn redundant_operation_cost_is_reported_separately() {
-        let case = build_cases().remove(0);
-        let result = run_trial(&case, Policy::FixedDepth, 14, 10);
-        assert!(result.redundant_operation_count > 0);
-        assert!(result.wasted_operation_cost > 0);
+    fn rejected_evidence_and_irrelevant_computation_have_separate_costs() {
+        let cases = build_cases();
+        let stale = cases.iter().find(|c| c.id == "attractive_but_stale_evidence").unwrap();
+        let rejected = run_trial(stale, Policy::ProofObligationGuided, 10, 10);
+        assert!(rejected.rejected_candidate_count > 0);
+        assert!(rejected.rejected_candidate_cost > 0);
+
+        let redundant = run_trial(&cases[0], Policy::FixedDepth, 14, 10);
+        assert!(redundant.redundant_operation_count > 0);
+        assert!(redundant.wasted_operation_cost > 0);
     }
 }
