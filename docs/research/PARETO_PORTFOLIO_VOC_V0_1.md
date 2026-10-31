@@ -20,6 +20,8 @@ This quantity is explicitly **portfolio-class regret**. It is exact only relativ
 
 The posterior stores:
 - sorted candidate IDs;
+- sorted objective IDs defining the exact coordinate order;
+- objective-registry SHA-256 binding value units, directions, normalization, protocols and acquisition-cost models;
 - exact per-candidate architecture configuration SHA-256 digests;
 - hard device/profile feasibility flags;
 - joint posterior particles, each containing a probability and one optional objective vector per candidate.
@@ -56,7 +58,7 @@ A measurement action binds:
 - outcome-likelihood-model digest;
 - mutually exclusive labelled outcomes and one likelihood per posterior particle.
 
-Outcome likelihood arrays must normalize to one for each particle. Outcome IDs are unique. The action outcome taxonomy is canonicalized by label when computing the digest. Registry, objective, protocol, hardware profile, resource unit, candidate configuration and exact likelihood model must all match the current posterior/registry.
+Outcome likelihood arrays must normalize to one for each particle. Outcome IDs are unique. The action outcome taxonomy is canonicalized by label when computing the digest. Registry, sorted objective-coordinate order, objective, protocol, hardware profile, resource unit, candidate configuration and exact likelihood model must all match the current posterior/registry. The posterior cannot be reused under a changed unit, normalization or acquisition-cost definition.
 
 For each non-zero-probability outcome, particle weights are updated by Bayes' rule and the portfolio-class decision is recomputed. The evaluator returns:
 - current held-out portfolio-class regret;
@@ -71,7 +73,7 @@ This version is a diagnostic action evaluator, not an operational scheduler: it 
 ## 5. Replay identity
 
 Decision outputs bind:
-- exact joint posterior digest;
+- exact joint posterior digest (including objective-coordinate order, objective registry and candidate configuration digests);
 - canonical portfolio-family/config digest;
 - immutable full QMC design digest;
 - exact disjoint selection and validation scramble subset digests.
@@ -90,7 +92,7 @@ The code tests this as a QMC approximate comparison with tolerances; it does not
 
 ## 7. Test inventory
 
-Fourteen authored Rust tests currently cover:
+Sixteen authored Rust tests currently cover:
 1. portfolio regret against all-candidate oracle;
 2. explicit hard infeasibility without fabricated objective vector;
 3. hard minimum utility filtering;
@@ -104,7 +106,9 @@ Fourteen authored Rust tests currently cover:
 11. candidate-configuration mismatch;
 12. objective-registry mismatch;
 13. replay identity binding for posterior/portfolio/QMC splits;
-14. rejection of too-small selection/validation scramble split.
+14. rejection of too-small selection/validation scramble split;
+15. rejection of candidate-configuration and objective-registry replay mismatch;
+16. rejection of objective-column order mismatch and digest-bound replay.
 
 The environment has no `cargo`, `rustc` or `rustfmt`; these are authored test declarations only until compiled, formatted and executed.
 
