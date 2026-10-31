@@ -25,10 +25,10 @@ const METRIC_ID: &str = "held_out_capability";
 const TARGET_SCORE: f64 = 0.90;
 const BOARD_EXPLORATION_COEFFICIENT: f64 = 0.55;
 const NEW_DIRECTION_CREDIT: f64 = 0.20;
-const GLOBAL_UCB_EXPLORATION: f64 = 0.55;
-const DISCOUNTED_UCB_GAMMA: f64 = 0.90;
-const GAUSSIAN_THOMPSON_PRIOR_VARIANCE: f64 = 0.25;
-const GAUSSIAN_THOMPSON_OBSERVATION_VARIANCE: f64 = 0.25;
+pub(super) const GLOBAL_UCB_EXPLORATION: f64 = 0.55;
+pub(super) const DISCOUNTED_UCB_GAMMA: f64 = 0.90;
+pub(super) const GAUSSIAN_THOMPSON_PRIOR_VARIANCE: f64 = 0.25;
+pub(super) const GAUSSIAN_THOMPSON_OBSERVATION_VARIANCE: f64 = 0.25;
 
 /// Independent payoff families. The no-new-direction family is a null control.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -689,7 +689,7 @@ fn action_reward(action: &DirectionCampaignAction) -> f64 {
 }
 
 /// Weighted reward sum and effective count for an arm under exponential recency discount.
-fn discounted_arm_statistics(
+pub(super) fn discounted_arm_statistics(
     arm_id: &str,
     actions: &[DirectionCampaignAction],
     discount: f64,
@@ -743,7 +743,7 @@ fn select_discounted_ucb(
 
 /// Normal-Normal posterior for normalized continuous rewards. The variance assumptions
 /// are fixed constants in this baseline, not fitted on the hidden landscape.
-fn gaussian_thompson_posterior(
+pub(super) fn gaussian_thompson_posterior(
     arm_id: &str,
     actions: &[DirectionCampaignAction],
 ) -> (f64, f64) {
@@ -767,7 +767,7 @@ fn open_unit_interval(state: &mut u64) -> f64 {
     (mantissa as f64 + 0.5) / ((1_u64 << 53) as f64)
 }
 
-fn sample_standard_normal(state: &mut u64) -> f64 {
+pub(super) fn sample_standard_normal(state: &mut u64) -> f64 {
     let u1 = open_unit_interval(state);
     let u2 = open_unit_interval(state);
     (-2.0 * u1.ln()).sqrt() * (std::f64::consts::TAU * u2).cos()
@@ -876,7 +876,7 @@ fn landscape_has_new_operator(landscape: DirectionLandscapeFamily) -> bool {
     landscape == DirectionLandscapeFamily::NewOperatorBreakthrough
 }
 
-fn oracle_best_score(landscape: DirectionLandscapeFamily) -> f64 {
+pub(super) fn oracle_best_score(landscape: DirectionLandscapeFamily) -> f64 {
     let mut best = ["A", "B", "C"]
         .iter()
         .map(|id| maximum_future_payoff(landscape, id, 0))
@@ -887,7 +887,7 @@ fn oracle_best_score(landscape: DirectionLandscapeFamily) -> f64 {
     best
 }
 
-fn maximum_future_payoff(
+pub(super) fn maximum_future_payoff(
     landscape: DirectionLandscapeFamily,
     direction_id: &str,
     evaluation_index: usize,
@@ -910,7 +910,7 @@ fn maximum_future_payoff(
         )
 }
 
-fn payoff(
+pub(super) fn payoff(
     landscape: DirectionLandscapeFamily,
     direction_id: &str,
     evaluation_index: usize,
@@ -951,7 +951,7 @@ fn digest(value: &str) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
-fn next_random(state: &mut u64) -> u64 {
+pub(super) fn next_random(state: &mut u64) -> u64 {
     *state = splitmix64(*state);
     *state
 }
