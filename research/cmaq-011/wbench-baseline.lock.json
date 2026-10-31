@@ -33,7 +33,8 @@
       "text_conditioned": "text prompt plus first-frame image; 289 cases",
       "camera_conditioned": "first-frame image plus 6-DoF camera pose; 158 Navi cases",
       "action_conditioned": "first-frame image plus discrete action; 158 Navi cases"
-    }
+    },
+    "model_count_reported_from_pinned_readme": 39
   },
   "score_semantics": {
     "navi": "158-case subset intended for camera/action navigation interfaces",
@@ -115,7 +116,8 @@
     "judge": "Pin VLM judge and exact endpoint/model version. The README warns scores from different judges are not directly comparable.",
     "compute": "GPU-heavy preprocessing includes SAM2, DA3, MegaSAM, and VLM phases; measure generation and evaluation separately.",
     "data": "The README indicates MIT for code and data; model weights retain their original licenses. Review each model/checkpoint's original license before reproduction.",
-    "no_composite_claims": "Do not compare the mixed-provenance VWA-World score as though all 19 metrics were independently organizer evaluated."
+    "no_composite_claims": "Do not compare the mixed-provenance VWA-World score as though all 19 metrics were independently organizer evaluated.",
+    "current_page_model_count_note": "Pinned repository README describes 39 models; current public leaderboard page lists 45 entries (13 text, 21 camera, 11 action). Keep source-revision count and live page snapshot distinct."
   },
   "source_files": {
     "README.md": "5e6c04ae19f5d50c33b9b081ec539212fe55869a",
@@ -126,5 +128,39 @@
     "assets/submissions/gd_world/provenance.json": "07b948611e85b3ea5fdbc728a3a77ba46616c01c"
   },
   "reproduction_status": "pinned_reference_not_reproduced",
-  "claim_ceiling": "Public leaderboard reference only. Scores have mixed self/organizer provenance and separate action/camera interfaces. No Symthaea score or SOTA claim."
+  "claim_ceiling": "Public leaderboard reference only. Scores have mixed self/organizer provenance and separate action/camera interfaces. No Symthaea score or SOTA claim.",
+  "live_leaderboard_snapshot": {
+    "observed_at": "2026-10-31",
+    "site_last_updated": "2026-10-12",
+    "total_model_entries": 45,
+    "interface_counts": {
+      "text": 13,
+      "camera": 21,
+      "action": 11
+    },
+    "split": "Navi (158 cases)",
+    "selected_overall_rows": [
+      {
+        "model": "Alaya-EVOKE-Turbo",
+        "average": 82,
+        "rank": 1
+      },
+      {
+        "model": "XGEN-Jing",
+        "average": 81.9,
+        "rank": 2
+      },
+      {
+        "model": "Enuma",
+        "average": 81.7,
+        "rank": 3
+      },
+      {
+        "model": "VWA-World",
+        "average": 81.7,
+        "rank": 4
+      }
+    ],
+    "provenance_note": "The table combines model interfaces; do not read overall Navi rank as an action-conditioned-only ranking. VWA-World's published report provenance records 16 submitter-evaluated metrics plus three organizer-evaluated VLM metrics."
+  }
 }
