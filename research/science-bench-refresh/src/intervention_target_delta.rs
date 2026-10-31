@@ -1113,7 +1113,7 @@ mod tests {
         });
         let quality_receipt_bytes = serde_json::to_vec_pretty(&quality_receipt_value).unwrap();
 
-        let mut invariant_changed = Vec::<String>::new();
+        let invariant_changed = Vec::<String>::new();
         let mut invariant_preserved = vec![invariant_target_id.clone(), invariant_control_id];
         invariant_preserved.sort();
         let mut changed_claims = vec![changed_target_id.clone()];
@@ -1309,24 +1309,62 @@ mod tests {
     #[test]
     fn rejects_target_plan_scope_and_parent_binding_tampering() {
         let (quality_plan, quality_receipt, target_plan, target_receipt, changed_id, _) = fixtures();
-        let mut plan = parse_receipt(&target_plan);
-        plan["candidates"][1]["expected_changed_claim_ids_sha256"] = json!([digest("unrelated claim"), changed_id]);
-        let plan_fields: TargetDeltaPlanFieldsV1 = {
-            let fields_value = {
-                let mut value = plan.clone();
-                value.as_object_mut().unwrap().remove("plan_commitment_sha256");
-                value
-            };
-            serde_json::from_value(fields_value).unwrap()
+        let mut target_plan_value = parse_receipt(&target_plan);
+        let mut expanded_changed_scope = vec![changed_id, digest("unrelated material claim")];
+        expanded_changed_scope.sort();
+        target_plan_value["candidates"][1]["expected_changed_claim_ids_sha256"] =
+            json!(expanded_changed_scope);
+        let fields_value = {
+            let mut value = target_plan_value.clone();
+            value.as_object_mut().unwrap().remove("plan_commitment_sha256");
+            value
         };
-        assert!(validate_target_delta_plan_fields(&plan_fields, &quality_plan).unwrap_err()
-            .iter().any(|issue| issue.contains("changed/preserved") || issue.contains("target identity")));
+        let fields: TargetDeltaPlanFieldsV1 = serde_json::from_value(fields_value).unwrap();
+        let fields_bytes = serde_json::to_vec(&fields).unwrap();
+        let new_commitment =
+            compute_target_delta_plan_commitment(&fields_bytes, &quality_plan).unwrap();
+        target_plan_value["plan_commitment_sha256"] = json!(new_commitment);
+        let altered_target_plan = serde_json::to_vec_pretty(&target_plan_value).unwrap();
+        let mut altered_target_receipt = parse_receipt(&target_receipt);
+        altered_target_receipt["target_plan_sha256"] = json!(sha256_hex(&altered_target_plan));
+        altered_target_receipt["target_plan_commitment_sha256"] = json!(new_commitment);
+        let altered_target_receipt = serde_json::to_vec(&altered_target_receipt).unwrap();
+        let result = report(
+            &quality_plan,
+            &quality_receipt,
+            &altered_target_plan,
+            &altered_target_receipt,
+        );
+        assert_eq!(result.fields.target_delta_invalid_count, 1);
+        assert_eq!(result.fields.final_invalid_count, 1);
+        assert_eq!(result.fields.exact_changed_scope_match_count, 1);
 
-        let mut altered = parse_receipt(&target_receipt);
-        altered["quality_plan_sha256"] = json!(digest("wrong parent plan"));
-        let altered = serde_json::to_vec(&altered).unwrap();
-        assert!(analyze_intervention_target_delta(&quality_plan,&quality_receipt,&target_plan,&altered)
-            .unwrap_err().contains("exact target and parent quality artifacts"));
+        let mut wrong_parent = parse_receipt(&target_receipt);
+        wrong_parent["quality_plan_sha256"] = json!(digest("wrong parent plan"));
+        let wrong_parent = serde_json::to_vec(&wrong_parent).unwrap();
+        assert!(analyze_intervention_target_delta(
+            &quality_plan,
+            &quality_receipt,
+            &target_plan,
+            &wrong_parent
+        )
+        .unwrap_err()
+        .contains("exact target and parent quality artifacts"));
+    }
+
+    #[test]
+    fn rejects_a_target_delta_plan_bound_to_another_parent_study() {
+        let (quality_plan, _, target_plan, _, _, _) = fixtures();
+        let mut plan = parse_receipt(&target_plan);
+        plan["study_id"] = json!("different-study");
+        let fields_value = {
+            let mut value = plan.clone();
+            value.as_object_mut().unwrap().remove("plan_commitment_sha256");
+            value
+        };
+        let fields: TargetDeltaPlanFieldsV1 = serde_json::from_value(fields_value).unwrap();
+        let issues = validate_target_delta_plan_fields(&fields, &quality_plan).unwrap_err();
+        assert!(issues.iter().any(|issue| issue.contains("study_id differs")));
     }
 
     #[test]
