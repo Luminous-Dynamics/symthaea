@@ -649,12 +649,13 @@ impl Timeline {
 /// the pitched voices — a straight-clock drum grid under rubato'd melody
 /// and harmony would drift audibly out of sync within one ritardando.
 ///
-/// `percussion.rs` (full kick/snare/hat synthesis + humanization) was wired
-/// only into the streaming path; the theory path had no pulse at all —
-/// conspicuous for the rhythmic styles. Style honesty: Classical and Waltz
-/// get NO drums (a chamber ensemble has no kit — the waltz's rhythm lives in
-/// its oom-pah accompaniment); Folk gets a light kick + brushed-hat pulse;
-/// Cinematic a sparse low pulse on each barline; Playful a full backbeat.
+/// Percussion is kept as a separate rhythmic layer on the same performed
+/// timeline as pitched voices. Chamber styles can remain kit-free; Folk uses
+/// a light pulse, Cinematic a sparse bar pulse, and Playful a full backbeat.
+/// Afro-Cuban, Flamenco and Bossa Nova use dedicated world-percussion policies
+/// aligned to their existing Montuno, CompasGait and BossaComp grammar cells.
+/// New procedural voices are deliberately stylized placeholders pending
+/// sample-backed and qualified listener evaluation.
 fn drum_hits(
     score: &TheoryScore,
     policy: symthaea_music_theory::DrumPolicy,
