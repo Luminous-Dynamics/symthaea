@@ -1715,6 +1715,18 @@ mod tests {
     }
 
     #[test]
+    fn strict_json_parser_rejects_malformed_numbers_escapes_and_surrogates() {
+        assert!(parse_json(r#"{"n":01}"#).is_err());
+        assert!(parse_json(r#"{"n":1.}"#).is_err());
+        assert!(parse_json(r#"{"n":1e}"#).is_err());
+        assert!(parse_json(r#"{"n":1e9999}"#).is_err());
+        assert!(parse_json(r#"{"s":"\\q"}"#).is_err());
+        assert!(parse_json(r#"{"s":"\\uD800"}"#).is_err());
+        assert!(parse_json(r#"{"s":"\\uDC00"}"#).is_err());
+        assert!(parse_json(r#"{"x":[1,]}"#).is_err());
+    }
+
+    #[test]
     fn actual_profile_and_receipt_bytes_are_bound_to_each_paired_row() {
         let input = synthetic_tsv(2,1.0,2.0,4.0,2.0,5.0);
         let (root, enriched) = artifact_fixture(&input);
@@ -1764,6 +1776,43 @@ mod tests {
         let modified_tsv = lines.join("\n") + "\n";
         let error = build_report_with_artifacts(&modified_tsv,100,42,Some(&root),true).unwrap_err();
         assert!(error.contains("compute or memory does not match TSV row"));
+        cleanup_artifact_fixture(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn artifact_verifier_rejects_symlinked_root_directory_and_receipt_file() {
+        use std::os::unix::fs::symlink;
+
+        let input = synthetic_tsv(1,1.0,2.0,4.0,2.0,5.0);
+        let (root, enriched) = artifact_fixture(&input);
+
+        let root_link = root.with_extension("root-link");
+        symlink(&root, &root_link).unwrap();
+        let root_error = build_report_with_artifacts(&enriched,100,42,Some(&root_link),true).unwrap_err();
+        assert!(root_error.contains("must be a real directory"));
+        fs::remove_file(&root_link).unwrap();
+
+        let receipts_dir = root.join("receipts");
+        let real_receipts_dir = root.join("receipts-real");
+        fs::rename(&receipts_dir, &real_receipts_dir).unwrap();
+        symlink(&real_receipts_dir, &receipts_dir).unwrap();
+        let directory_error = build_report_with_artifacts(&enriched,100,42,Some(&root),true).unwrap_err();
+        assert!(directory_error.contains("must be a real directory"));
+        fs::remove_file(&receipts_dir).unwrap();
+        fs::rename(&real_receipts_dir, &receipts_dir).unwrap();
+
+        let first_row = enriched.lines().nth(1).unwrap();
+        let receipt_digest = first_row.split('\\t').nth(20).unwrap();
+        let receipt_path = receipts_dir.join(format!("{receipt_digest}.json"));
+        let receipt_target = root.join("receipt-target.json");
+        fs::rename(&receipt_path, &receipt_target).unwrap();
+        symlink(&receipt_target, &receipt_path).unwrap();
+        let file_error = build_report_with_artifacts(&enriched,100,42,Some(&root),true).unwrap_err();
+        assert!(file_error.contains("must be a regular non-symlink file"));
+        fs::remove_file(&receipt_path).unwrap();
+        fs::rename(&receipt_target, &receipt_path).unwrap();
+
         cleanup_artifact_fixture(&root);
     }
 
