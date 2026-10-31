@@ -166,3 +166,12 @@ The `paired_inference` module now distinguishes `Pilot` from `Confirmatory` anal
 `event_tape_set_sha256` hashes the complete, strictly qualified policy tape set in sorted policy-ID order. `analyze_paired_metric_bound_to_tapes` rejects a plan whose preregistered digest differs from the exact supplied tapes and verifies that both named policies and campaign identity are present.
 
 The new `analyze_qualified_paired_metric` composes the pipeline: it requires `qualify_mechanism_matched_campaign` to pass common-contract reconciliation, exact offer-set matching/action eligibility, complete schedules, fully known raw meters, recomputed charges, and equal realized normalized spend; it then checks the tape-set digest and runs the preregistered inference. Its successful result means **matched execution plus statistical analysis** only. It does not certify evaluator independence, scientific novelty, causal mechanism, held-out transfer or SOTA.
+
+
+## Synthetic stochastic reward semantics
+
+The direction campaign now includes a seeded stochastic heteroscedastic family. For each direction and within-direction evaluation index, the evaluator derives a deterministic random draw from the campaign seed and arm identity. This is a common-random-numbers design: all policies receive the same potential reward for a given arm/seed/index, independent of the order in which they select arms. The eight deterministic fixtures remain unchanged.
+
+The campaign artifact keeps two distinct values for every candidate evaluation: `observed_score` is the noisy value revealed to the policy; `expected_score` is evaluator-side truth and is not copied into the policy-visible event outcome. The run reports the maximum observed score and the maximum expected score among tested candidates separately. Simple regret uses the latter against the oracle's expected optimum, avoiding a lucky high-variance observation being mistaken for a better mechanism. Paired comparisons now report both observed-score deltas and expected-score deltas.
+
+This remains a synthetic noise model with seeded pseudo-random draws; it is not a calibrated model of any real scientific instrument. Stochastic landscape seeds must still be paired across policies, and uncertainty must be clustered at independent landscape/template level.
