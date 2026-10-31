@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-evaluator-isolation"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Linux openat2 intake primitive for an isolated Symthaea evaluator"
+
+[dependencies]
+libc = "0.2"
+sha2 = "0.10"
+
+[dev-dependencies]
+tempfile = "3"
+
+[workspace]
