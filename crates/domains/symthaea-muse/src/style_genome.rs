@@ -35,6 +35,8 @@ use crate::style_mixer::compile_hybrid_style;
 pub const STYLE_GENOME_SCHEMA: &str = "muse-style-genome-v1";
 pub const STYLE_GENOME_EVALUATION_SCHEMA: &str = "muse-style-genome-evaluation-v1";
 pub const STYLE_GENOME_ARCHIVE_SCHEMA: &str = "muse-style-genome-pareto-archive-v1";
+pub const STYLE_GENOME_TRACE_REFERENCE_AUDIT_VERSION: &str = "muse-style-genome-trace-reference-audit-v1";
+pub const STYLE_GENOME_FINGERPRINT_VERSION: &str = "symthaea-music-theory-structural-fingerprint-v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -274,6 +276,7 @@ pub struct GenomeTrial {
     pub warning_count: usize,
     pub trace_integrity: TraceIntegrity,
     pub semantic_trace_verified: bool,
+    pub semantic_trace_verifier_version: String,
     pub semantic_trace_checked_records: usize,
     pub semantic_trace_issues: Vec<GenomeTraceIssue>,
     pub grammar_plan_kind: String,
@@ -317,6 +320,9 @@ pub struct GenomeEvaluation {
     pub schema: String,
     pub genome: StyleGenome,
     pub compiler_schema: String,
+    pub theory_validation_version: String,
+    pub trace_reference_audit_version: String,
+    pub fingerprint_version: String,
     pub compiled_spec_sha256: String,
     pub evaluation_config: GenomeEvaluationConfig,
     pub evaluation_config_sha256: String,
@@ -504,7 +510,7 @@ impl GenomeArchive {
         }
         self.entries.retain(|entry| !removed.contains(&entry.genome_id));
 
-        if removed.is_empty() && self.config.near_clone_threshold.is_some_and(|threshold| {
+        if self.config.near_clone_threshold.is_some_and(|threshold| {
             self.entries.iter().any(|entry| {
                 mean_fingerprint_array(&entry.mean_structural_fingerprint)
                     .is_some_and(|existing| normalized_distance(&candidate, &existing) <= threshold)
@@ -698,6 +704,7 @@ pub fn evaluate_genome(
             warning_count,
             trace_integrity,
             semantic_trace_verified,
+            semantic_trace_verifier_version: semantic_verification.verifier_version.clone(),
             semantic_trace_checked_records: semantic_verification.checked_records,
             semantic_trace_issues,
             grammar_plan_kind: grammar_plan_name(&realization.plan),
@@ -773,6 +780,9 @@ pub fn evaluate_genome(
         schema: STYLE_GENOME_EVALUATION_SCHEMA.into(),
         genome: genome.clone(),
         compiler_schema: crate::style_mixer::HYBRID_STYLE_COMPILER_SCHEMA.into(),
+        theory_validation_version: symthaea_music_theory::THEORY_VALIDATION_VERSION.into(),
+        trace_reference_audit_version: STYLE_GENOME_TRACE_REFERENCE_AUDIT_VERSION.into(),
+        fingerprint_version: STYLE_GENOME_FINGERPRINT_VERSION.into(),
         compiled_spec_sha256: compiled.provenance.compiled_spec_sha256.clone(),
         evaluation_config: config.clone(),
         evaluation_config_sha256,
@@ -1125,6 +1135,10 @@ impl GenomeEvaluation {
             None => self.reference_population_member_count == 0,
         };
         self.schema == STYLE_GENOME_EVALUATION_SCHEMA
+            && self.compiler_schema == crate::style_mixer::HYBRID_STYLE_COMPILER_SCHEMA
+            && self.theory_validation_version == symthaea_music_theory::THEORY_VALIDATION_VERSION
+            && self.trace_reference_audit_version == STYLE_GENOME_TRACE_REFERENCE_AUDIT_VERSION
+            && self.fingerprint_version == STYLE_GENOME_FINGERPRINT_VERSION
             && self.genome.verify_id()
             && is_sha256_hex(&self.evaluation_config_sha256)
             && config_digest(&self.evaluation_config).is_ok_and(|expected| {
@@ -1249,6 +1263,22 @@ mod tests {
         // The archive gate does not incorrectly treat a classical-rule
         // warning/failure as a universal structural defect in another style.
         assert_eq!(evaluation.abstention_reasons.len(), 0);
+    }
+
+    #[test]
+    fn reference_population_digest_is_order_independent_and_content_bound() {
+        let first = [0.0; fingerprint::STRUCT_DIMS];
+        let mut second = [0.0; fingerprint::STRUCT_DIMS];
+        second[0] = 0.25;
+        let left = reference_population_digest(&[first, second]).unwrap();
+        let reordered = reference_population_digest(&[second, first]).unwrap();
+        let changed = {
+            let mut third = second;
+            third[0] = 0.5;
+            reference_population_digest(&[first, third]).unwrap()
+        };
+        assert_eq!(left, reordered);
+        assert_ne!(left, changed);
     }
 
     #[test]
