@@ -16,6 +16,7 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const MAX_TEXT_BYTES: u64 = 8 * 1024 * 1024;
+const MAX_HASHED_FILE_BYTES: u64 = 128 * 1024 * 1024;
 const MAX_MOUNT_ENTRIES: usize = 16_384;
 const RELEVANT_MOUNTS: &[&str] = &[
     "bpf", "tracefs", "cgroup2",
@@ -127,14 +128,15 @@ pub fn probe_linux() -> anyhow::Result<LinuxProbeReport> {
     let mount_text = read_text_evidence("mountinfo", Path::new("/proc/self/mountinfo"));
     let mounts = mount_text.value.as_deref().map(parse_relevant_mounts).unwrap_or_default();
 
-    let bpftool = find_executable("bpftool");
-    let bpftool_evidence = match bpftool {
-        Some(path) => executable_evidence("bpftool", &path),
-        None => missing_evidence("bpftool", "bpftool"),
-    };
-    let bpftool_version = match bpftool_evidence.path.as_deref() {
-        Some(path) => command_version_evidence("bpftool_version", Path::new(path)),
-        None => not_probed_evidence("bpftool_version", "bpftool"),
+    let (bpftool_evidence, bpftool_version) = match find_executable("bpftool") {
+        Some(path) => (
+            executable_evidence("bpftool", &path),
+            command_version_evidence("bpftool_version", &path),
+        ),
+        None => (
+            missing_evidence("bpftool", "bpftool"),
+            not_probed_evidence("bpftool_version", "bpftool not found in PATH"),
+        ),
     };
 
     let bpf_lsm_active = active_lsm.value.as_deref()
@@ -151,7 +153,10 @@ pub fn probe_linux() -> anyhow::Result<LinuxProbeReport> {
         _ => CapabilityStatus::Unknown,
     };
 
-    let tracefs_mount = mounts.iter().any(|mount| mount.filesystem == "tracefs");
+    let tracefs_mount = mounts.iter().any(|mount| {
+        mount.filesystem == "tracefs"
+            || (mount.filesystem == "debugfs" && mount.mount_point == "/sys/kernel/debug")
+    });
     let trace_events = trace_event_evidence();
     let trace_events_available = trace_events.iter()
         .all(|item| item.status == EvidenceStatus::Collected);
@@ -422,7 +427,7 @@ fn read_text_evidence(key: &str, path: &Path) -> ProbeEvidence {
 }
 
 fn digest_file_evidence(key: &str, path: &Path) -> ProbeEvidence {
-    match sha256_file(path) {
+    match sha256_file_bounded(path, MAX_HASHED_FILE_BYTES) {
         Ok(digest) => ProbeEvidence {
             key: key.to_string(),
             status: EvidenceStatus::Collected,
@@ -448,7 +453,7 @@ fn digest_file_evidence(key: &str, path: &Path) -> ProbeEvidence {
 }
 
 fn executable_evidence(key: &str, path: &Path) -> ProbeEvidence {
-    match sha256_file(path) {
+    match sha256_file_bounded(path, MAX_HASHED_FILE_BYTES) {
         Ok(digest) => ProbeEvidence {
             key: key.to_string(),
             status: EvidenceStatus::Collected,
@@ -587,6 +592,28 @@ fn read_bounded_text(path: &Path) -> std::io::Result<String> {
     ))
 }
 
+fn sha256_file_bounded(path: &Path, max_bytes: u64) -> std::io::Result<String> {
+    let mut file = File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    let mut total = 0_u64;
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        total = total.saturating_add(count as u64);
+        if total > max_bytes {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "probe file exceeds hashing limit",
+            ));
+        }
+        hasher.update(&buffer[..count]);
+    }
+    Ok(encode_digest(&hasher.finalize()))
+}
+
 fn sha256_file(path: &Path) -> std::io::Result<String> {
     let mut file = File::open(path)?;
     let mut hasher = Sha256::new();
@@ -616,7 +643,7 @@ fn encode_digest(bytes: &[u8]) -> String {
 }
 
 fn write_new(path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
-    if let Some(parent) = path.parent() {
+    if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
         fs::create_dir_all(parent)
             .with_context(|| format!("creating probe report directory {}", parent.display()))?;
     }
@@ -717,6 +744,21 @@ mod tests {
         assert!(!report.qualification_eligible);
         assert!(!report.observer_attached);
         assert!(!report.workload_executed);
+    }
+
+    #[test]
+    fn recognizes_debugfs_tracing_fallback_as_a_trace_mount() {
+        let input = "22 1 0:21 / /sys/kernel/debug rw - debugfs debugfs rw\n";
+        let mounts = parse_relevant_mounts(input);
+        assert!(mounts.iter().any(|mount| {
+            mount.filesystem == "debugfs" && mount.mount_point == "/sys/kernel/debug"
+        }));
+    }
+
+    #[test]
+    fn bounds_are_nonzero_and_restrict_large_pseudo_file_reads() {
+        assert!(MAX_TEXT_BYTES > 0);
+        assert!(MAX_HASHED_FILE_BYTES >= MAX_TEXT_BYTES);
     }
 
     #[test]
