@@ -130,7 +130,7 @@ The input JSONL contains one row per unique source operation:
 {"sample_id":"source-op-002","group":"fly:split","cluster_id":"fly-cube-204","label_is_error":false,"p_error":0.12,"review_priority_score":0.07,"review_minutes":1.5,"impact_weight":0.0}
 ```
 
-- `cluster_id` is the declared dependency unit for uncertainty estimation (e.g. source volume/spatial cube/neuron); choose the unit that matches the sampling and intended generalization claim. Multiple rows from one cluster are resampled together. A cluster ID is not proof that clusters are independent.
+- `cluster_id` is the declared dependency unit for uncertainty estimation (e.g. source volume/spatial cube/neuron); choose the unit that matches the sampling and intended generalization claim. Multiple rows from one cluster are resampled together. A cluster ID is not proof that clusters are independent. For a domain-shift run, one cluster ID may not span two domain IDs; IDs must be globally unique or domain-qualified. An OOD audit with only in-domain or only held-out rows is `OOD_NOT_ESTIMABLE`, not a scored positive result.
 - `label_is_error` is an **evaluation-only** adjudicated label, normalized so `true` means a genuine reconstruction error requiring correction. `mapping_reference` must point to the reviewed task/label contract.
 - `p_error` is the model's error probability; the scorer reports balanced accuracy at 0.5, AUROC, tie-aware average precision, Brier score, log loss, and group-level metrics.
 - `review_priority_score` is the frozen policy ranking for which candidate an expert should review next. The evaluator measures error yield and impact-weight capture at fixed item and review-minute budgets.
