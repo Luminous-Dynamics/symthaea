@@ -497,8 +497,8 @@ fn pair_digest(pair: &PublicPairV1) -> Result<String, String> {
 }
 
 fn recipe_digest(seed: &[u8], ordinal: u64, side: u64, same: bool) -> String {
-    let (recipe_ordinal, recipe_slot) = if same { (0, 0) } else { (ordinal, side) };
-    keyed_id(seed, b"recipe-family", recipe_ordinal, recipe_slot)
+    let recipe_slot = if same { 0 } else { side };
+    keyed_id(seed, b"recipe-family", ordinal, recipe_slot)
 }
 
 fn source_digest(seed: &[u8], ordinal: u64, side: u64, same: bool) -> String {
@@ -963,6 +963,33 @@ mod tests {
                 2
             );
         }
+    }
+
+    #[test]
+    fn shared_recipe_commitments_are_pair_local_not_global() {
+        let bundle = generate_challenge_bundle(&config(), &seed(12)).unwrap();
+        let key: SealedChallengeKeyV1 = serde_json::from_slice(&bundle.sealed_key_bytes).unwrap();
+        let t1_positive: Vec<_> = key
+            .pair_truth
+            .iter()
+            .filter(|row| {
+                row.target_tier == TierV1::T1Exact
+                    && row.target_control_label == TargetControlLabelV1::PositiveForTargetTier
+            })
+            .collect();
+        assert_eq!(t1_positive.len(), 2);
+        assert_eq!(
+            t1_positive[0].left_recipe_family_sha256,
+            t1_positive[0].right_recipe_family_sha256
+        );
+        assert_eq!(
+            t1_positive[1].left_recipe_family_sha256,
+            t1_positive[1].right_recipe_family_sha256
+        );
+        assert_ne!(
+            t1_positive[0].left_recipe_family_sha256,
+            t1_positive[1].left_recipe_family_sha256
+        );
     }
 
     #[test]
