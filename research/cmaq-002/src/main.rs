@@ -442,7 +442,7 @@ fn select_probe(
     rng: &mut SplitMix64,
     decision_horizon: usize,
     probe_cost: f64,
-    allocator_cost_per_evaluation: f64,
+    allocator_cost_per_work_unit: f64,
 ) -> Option<Query> {
     let (available, _, _) = available_probe_queries(worlds, posterior, used);
     if available.is_empty() || posterior.len() <= 1 {
@@ -480,7 +480,7 @@ fn select_probe(
                     .then_with(|| right.cmp(left))
             })?;
             let gain = expected_value_of_probe(worlds, posterior, best);
-            let allocator_cost = available_count as f64 * allocator_cost_per_evaluation;
+            let allocator_cost = available_count as f64 * allocator_cost_per_work_unit;
             if gain * decision_horizon as f64 > probe_cost + allocator_cost {
                 Some(best)
             } else {
@@ -566,7 +566,7 @@ fn evaluate_strategy(
     probe_budget: usize,
     decision_horizon: usize,
     probe_cost: f64,
-    allocator_cost_per_evaluation: f64,
+    allocator_cost_per_work_unit: f64,
 ) -> Summary {
     let worlds = mechanisms();
     let all_indices: Vec<usize> = (0..worlds.len()).collect();
@@ -611,7 +611,7 @@ fn evaluate_strategy(
                 posterior_safety_blocked_candidate_total += posterior_safety_blocked;
                 let score_evaluations = allocator_work_units(strategy, safe_candidates.len());
                 allocator_work_unit_total += score_evaluations;
-                let selection_cost = score_evaluations as f64 * allocator_cost_per_evaluation;
+                let selection_cost = score_evaluations as f64 * allocator_cost_per_work_unit;
                 episode_allocator_cost += selection_cost;
                 allocator_cost_total += selection_cost;
 
@@ -623,7 +623,7 @@ fn evaluate_strategy(
                     &mut rng,
                     decision_horizon,
                     probe_cost,
-                    allocator_cost_per_evaluation,
+                    allocator_cost_per_work_unit,
                 ) else {
                     break;
                 };
