@@ -657,7 +657,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -680,7 +680,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -703,7 +703,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -726,7 +726,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -749,7 +749,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -772,7 +772,7 @@
       "next_gate": "M0d_measure_existing_routes_then_prototype_elegy",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -795,7 +795,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -818,7 +818,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -841,7 +841,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -864,7 +864,7 @@
       "next_gate": "prototype_one_dance_form_with_phrase_and_meter_contract",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -887,7 +887,7 @@
       "next_gate": "prototype_one_dance_form_with_phrase_and_meter_contract",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -910,7 +910,7 @@
       "next_gate": "prototype_one_dance_form_with_phrase_and_meter_contract",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -933,7 +933,7 @@
       "next_gate": "prototype_one_dance_form_with_phrase_and_meter_contract",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -956,7 +956,7 @@
       "next_gate": "prototype_one_dance_form_with_phrase_and_meter_contract",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -979,7 +979,7 @@
       "next_gate": "prototype_one_dance_form_with_phrase_and_meter_contract",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1002,7 +1002,7 @@
       "next_gate": "prototype_one_dance_form_with_phrase_and_meter_contract",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1025,7 +1025,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1048,7 +1048,7 @@
       "next_gate": "declare_section_obligations_and_counterexample_fixtures",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1071,7 +1071,7 @@
       "next_gate": "declare_section_obligations_and_counterexample_fixtures",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1094,7 +1094,7 @@
       "next_gate": "declare_section_obligations_and_counterexample_fixtures",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1117,7 +1117,7 @@
       "next_gate": "declare_section_obligations_and_counterexample_fixtures",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1140,7 +1140,7 @@
       "next_gate": "declare_section_obligations_and_counterexample_fixtures",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1163,7 +1163,7 @@
       "next_gate": "declare_section_obligations_and_counterexample_fixtures",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1186,7 +1186,7 @@
       "next_gate": "declare_section_obligations_and_counterexample_fixtures",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1209,7 +1209,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1232,7 +1232,7 @@
       "next_gate": "add_per_form_voice_entry_and_independence_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1255,7 +1255,7 @@
       "next_gate": "add_per_form_voice_entry_and_independence_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1278,7 +1278,7 @@
       "next_gate": "add_per_form_voice_entry_and_independence_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1301,7 +1301,7 @@
       "next_gate": "add_per_form_voice_entry_and_independence_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1324,7 +1324,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1347,7 +1347,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1370,7 +1370,7 @@
       "next_gate": "add_per_form_voice_entry_and_independence_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1393,7 +1393,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1416,7 +1416,7 @@
       "next_gate": "test_ground_identity_and_transformation_invariants",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1439,7 +1439,7 @@
       "next_gate": "test_ground_identity_and_transformation_invariants",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1462,7 +1462,7 @@
       "next_gate": "test_ground_identity_and_transformation_invariants",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1485,7 +1485,7 @@
       "next_gate": "test_ground_identity_and_transformation_invariants",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1508,7 +1508,7 @@
       "next_gate": "test_ground_identity_and_transformation_invariants",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1531,7 +1531,7 @@
       "next_gate": "test_ground_identity_and_transformation_invariants",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1554,7 +1554,7 @@
       "next_gate": "test_ground_identity_and_transformation_invariants",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1577,7 +1577,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1600,7 +1600,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1623,7 +1623,7 @@
       "next_gate": "declare_song_section_and_vocal_role_contract",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1646,7 +1646,7 @@
       "next_gate": "declare_song_section_and_vocal_role_contract",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1669,7 +1669,7 @@
       "next_gate": "declare_song_section_and_vocal_role_contract",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1692,7 +1692,7 @@
       "next_gate": "declare_song_section_and_vocal_role_contract",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1715,7 +1715,7 @@
       "next_gate": "declare_song_section_and_vocal_role_contract",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1738,7 +1738,7 @@
       "next_gate": "declare_song_section_and_vocal_role_contract",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1761,7 +1761,7 @@
       "next_gate": "add_track_specific_groove_and_phrase_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1785,7 +1785,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1809,7 +1809,7 @@
       "next_gate": "add_track_specific_groove_and_phrase_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1833,7 +1833,7 @@
       "next_gate": "add_track_specific_groove_and_phrase_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1857,7 +1857,7 @@
       "next_gate": "add_track_specific_groove_and_phrase_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1881,7 +1881,7 @@
       "next_gate": "add_track_specific_groove_and_phrase_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1905,7 +1905,7 @@
       "next_gate": "add_track_specific_groove_and_phrase_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1929,7 +1929,7 @@
       "next_gate": "add_track_specific_groove_and_phrase_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1953,7 +1953,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -1977,7 +1977,7 @@
       "next_gate": "define_style_specific_phrase_harmony_and_swing_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2001,7 +2001,7 @@
       "next_gate": "define_style_specific_phrase_harmony_and_swing_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2025,7 +2025,7 @@
       "next_gate": "define_style_specific_phrase_harmony_and_swing_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2049,7 +2049,7 @@
       "next_gate": "define_style_specific_phrase_harmony_and_swing_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2073,7 +2073,7 @@
       "next_gate": "define_style_specific_phrase_harmony_and_swing_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2097,7 +2097,7 @@
       "next_gate": "define_style_specific_phrase_harmony_and_swing_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2121,7 +2121,7 @@
       "next_gate": "define_style_specific_phrase_harmony_and_swing_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2145,7 +2145,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2169,7 +2169,7 @@
       "next_gate": "define_cycle_phase_accent_and_phrase_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2193,7 +2193,7 @@
       "next_gate": "define_cycle_phase_accent_and_phrase_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2217,7 +2217,7 @@
       "next_gate": "define_cycle_phase_accent_and_phrase_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2241,7 +2241,7 @@
       "next_gate": "define_cycle_phase_accent_and_phrase_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2265,7 +2265,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2289,7 +2289,7 @@
       "next_gate": "define_cycle_phase_accent_and_phrase_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2313,7 +2313,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2337,7 +2337,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2361,7 +2361,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2385,7 +2385,7 @@
       "next_gate": "prototype_regional_tune_set_with_meter_and_strain_rules",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2409,7 +2409,7 @@
       "next_gate": "prototype_regional_tune_set_with_meter_and_strain_rules",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2433,7 +2433,7 @@
       "next_gate": "prototype_regional_tune_set_with_meter_and_strain_rules",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2457,7 +2457,7 @@
       "next_gate": "prototype_regional_tune_set_with_meter_and_strain_rules",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2481,7 +2481,7 @@
       "next_gate": "prototype_regional_tune_set_with_meter_and_strain_rules",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2505,7 +2505,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2529,7 +2529,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2553,7 +2553,7 @@
       "next_gate": "partition_tracks_and_define_pitch_hierarchy_and_temporal_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2577,7 +2577,7 @@
       "next_gate": "partition_tracks_and_define_pitch_hierarchy_and_temporal_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2601,7 +2601,7 @@
       "next_gate": "partition_tracks_and_define_pitch_hierarchy_and_temporal_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2625,7 +2625,7 @@
       "next_gate": "partition_tracks_and_define_pitch_hierarchy_and_temporal_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2649,7 +2649,7 @@
       "next_gate": "partition_tracks_and_define_pitch_hierarchy_and_temporal_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2673,7 +2673,7 @@
       "next_gate": "partition_tracks_and_define_pitch_hierarchy_and_temporal_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2697,7 +2697,7 @@
       "next_gate": "partition_tracks_and_define_pitch_hierarchy_and_temporal_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2721,7 +2721,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2745,7 +2745,7 @@
       "next_gate": "separate_hindustani_and_carnatic_contracts_with_expert_review",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2769,7 +2769,7 @@
       "next_gate": "separate_hindustani_and_carnatic_contracts_with_expert_review",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2793,7 +2793,7 @@
       "next_gate": "separate_hindustani_and_carnatic_contracts_with_expert_review",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2817,7 +2817,7 @@
       "next_gate": "separate_hindustani_and_carnatic_contracts_with_expert_review",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2841,7 +2841,7 @@
       "next_gate": "separate_hindustani_and_carnatic_contracts_with_expert_review",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2865,7 +2865,7 @@
       "next_gate": "separate_hindustani_and_carnatic_contracts_with_expert_review",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2889,7 +2889,7 @@
       "next_gate": "separate_hindustani_and_carnatic_contracts_with_expert_review",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2913,7 +2913,7 @@
       "next_gate": "one_tradition_at_a_time_source_model_then_expert_review",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2937,7 +2937,7 @@
       "next_gate": "one_tradition_at_a_time_source_model_then_expert_review",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2961,7 +2961,7 @@
       "next_gate": "one_tradition_at_a_time_source_model_then_expert_review",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -2985,7 +2985,7 @@
       "next_gate": "one_tradition_at_a_time_source_model_then_expert_review",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3009,7 +3009,7 @@
       "next_gate": "one_tradition_at_a_time_source_model_then_expert_review",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3033,7 +3033,7 @@
       "next_gate": "one_tradition_at_a_time_source_model_then_expert_review",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3057,7 +3057,7 @@
       "next_gate": "one_tradition_at_a_time_source_model_then_expert_review",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3081,7 +3081,7 @@
       "next_gate": "one_tradition_at_a_time_source_model_then_expert_review",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3105,7 +3105,7 @@
       "next_gate": "measure_style_specific_bass_drum_percussion_and_phrase_roles",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3129,7 +3129,7 @@
       "next_gate": "measure_style_specific_bass_drum_percussion_and_phrase_roles",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3153,7 +3153,7 @@
       "next_gate": "measure_style_specific_bass_drum_percussion_and_phrase_roles",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3177,7 +3177,7 @@
       "next_gate": "measure_style_specific_bass_drum_percussion_and_phrase_roles",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3201,7 +3201,7 @@
       "next_gate": "measure_style_specific_bass_drum_percussion_and_phrase_roles",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3225,7 +3225,7 @@
       "next_gate": "measure_style_specific_bass_drum_percussion_and_phrase_roles",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3249,7 +3249,7 @@
       "next_gate": "measure_style_specific_bass_drum_percussion_and_phrase_roles",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3273,7 +3273,7 @@
       "next_gate": "measure_style_specific_bass_drum_percussion_and_phrase_roles",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3297,7 +3297,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3320,7 +3320,7 @@
       "next_gate": "formalize_process_state_and_reproducibility_receipts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3343,7 +3343,7 @@
       "next_gate": "formalize_process_state_and_reproducibility_receipts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3366,7 +3366,7 @@
       "next_gate": "formalize_process_state_and_reproducibility_receipts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3389,7 +3389,7 @@
       "next_gate": "formalize_process_state_and_reproducibility_receipts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3412,7 +3412,7 @@
       "next_gate": "formalize_process_state_and_reproducibility_receipts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3435,7 +3435,7 @@
       "next_gate": "formalize_process_state_and_reproducibility_receipts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3458,7 +3458,7 @@
       "next_gate": "formalize_process_state_and_reproducibility_receipts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3481,7 +3481,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3504,7 +3504,7 @@
       "next_gate": "define_long_horizon_density_and_texture_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3527,7 +3527,7 @@
       "next_gate": "define_long_horizon_density_and_texture_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3550,7 +3550,7 @@
       "next_gate": "define_long_horizon_density_and_texture_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3573,7 +3573,7 @@
       "next_gate": "define_long_horizon_density_and_texture_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3596,7 +3596,7 @@
       "next_gate": "define_long_horizon_density_and_texture_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3619,7 +3619,7 @@
       "next_gate": "define_long_horizon_density_and_texture_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3642,7 +3642,7 @@
       "next_gate": "define_long_horizon_density_and_texture_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3665,7 +3665,7 @@
       "next_gate": "implement_track_specific_grid_groove_and_section_transitions",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3689,7 +3689,7 @@
       "next_gate": "implement_track_specific_grid_groove_and_section_transitions",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3713,7 +3713,7 @@
       "next_gate": "implement_track_specific_grid_groove_and_section_transitions",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3737,7 +3737,7 @@
       "next_gate": "implement_track_specific_grid_groove_and_section_transitions",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3761,7 +3761,7 @@
       "next_gate": "implement_track_specific_grid_groove_and_section_transitions",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3785,7 +3785,7 @@
       "next_gate": "implement_track_specific_grid_groove_and_section_transitions",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3809,7 +3809,7 @@
       "next_gate": "implement_track_specific_grid_groove_and_section_transitions",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3833,7 +3833,7 @@
       "next_gate": "implement_track_specific_grid_groove_and_section_transitions",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3857,7 +3857,7 @@
       "next_gate": "define_section_hook_riff_and_arrangement_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3880,7 +3880,7 @@
       "next_gate": "define_section_hook_riff_and_arrangement_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3903,7 +3903,7 @@
       "next_gate": "define_section_hook_riff_and_arrangement_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3926,7 +3926,7 @@
       "next_gate": "define_section_hook_riff_and_arrangement_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3949,7 +3949,7 @@
       "next_gate": "define_section_hook_riff_and_arrangement_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3972,7 +3972,7 @@
       "next_gate": "define_section_hook_riff_and_arrangement_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -3995,7 +3995,7 @@
       "next_gate": "define_section_hook_riff_and_arrangement_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -4018,7 +4018,7 @@
       "next_gate": "define_section_hook_riff_and_arrangement_metrics",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -4041,7 +4041,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -4064,7 +4064,7 @@
       "next_gate": "define_cue_state_transition_and_reproducibility_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -4087,7 +4087,7 @@
       "next_gate": "M0d_measure_existing_route_and_capture_actual_behavior",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -4110,7 +4110,7 @@
       "next_gate": "define_cue_state_transition_and_reproducibility_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -4133,7 +4133,7 @@
       "next_gate": "define_cue_state_transition_and_reproducibility_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -4156,7 +4156,7 @@
       "next_gate": "define_cue_state_transition_and_reproducibility_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -4179,7 +4179,7 @@
       "next_gate": "define_cue_state_transition_and_reproducibility_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -4202,7 +4202,7 @@
       "next_gate": "define_cue_state_transition_and_reproducibility_contracts",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -4225,7 +4225,7 @@
       "next_gate": "expert_reviewed_sources_and_distinct_track_contracts_before_any_route",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -4249,7 +4249,7 @@
       "next_gate": "expert_reviewed_sources_and_distinct_track_contracts_before_any_route",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -4273,7 +4273,7 @@
       "next_gate": "expert_reviewed_sources_and_distinct_track_contracts_before_any_route",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -4297,7 +4297,7 @@
       "next_gate": "expert_reviewed_sources_and_distinct_track_contracts_before_any_route",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -4321,7 +4321,7 @@
       "next_gate": "expert_reviewed_sources_and_distinct_track_contracts_before_any_route",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -4345,7 +4345,7 @@
       "next_gate": "expert_reviewed_sources_and_distinct_track_contracts_before_any_route",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -4369,7 +4369,7 @@
       "next_gate": "expert_reviewed_sources_and_distinct_track_contracts_before_any_route",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
@@ -4393,7 +4393,7 @@
       "next_gate": "expert_reviewed_sources_and_distinct_track_contracts_before_any_route",
       "minimum_evidence_gates": [
         "versioned grammar/recipe contract names target behavior and known limits",
-        "one-factor response curves run through the actual routed composition path",
+        "one-factor response curves run through actual routed composition path",
         "candidate non-target invariants reported separately from target fidelity",
         "fixed-seed response and exact source/artifact digests are complete",
         "nearest-neighbor distinctness/collision analysis is published",
