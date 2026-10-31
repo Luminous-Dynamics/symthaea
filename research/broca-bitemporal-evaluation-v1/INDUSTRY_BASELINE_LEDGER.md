@@ -1,6 +1,6 @@
 # Broca industry baseline ledger
 
-**As of:** 30 October 2026  
+**As of:** 31 October 2026  
 **Status:** research registry; no Broca performance score is claimed.
 
 This ledger prevents a recurring benchmarking error: treating numbers from different answer models, judges, prompts, corpus splits, context limits and benchmark revisions as if they were directly comparable.
@@ -22,6 +22,7 @@ The machine-readable registry is \`industry-baseline-ledger-v1.json\`.
 | Vera-Life | Vera-Life-Eval | 62.3% LifeEM (1,500 subset); 61.1% full | Peer-reviewed workshop paper | Qwen3-8B; action-conditioned lifecycle decisions; 8,500 questions / 41,203 evidence pieces |
 | AgentMemory BM25 | LongMemEval-S | 84.7% strict recall-all@5 (398/470) | Project component report with per-question receipts | Retrieval only; no answer model, no abstention score; multi-session strict recall 71.1% |
 | past.dev | BEAM | 92.08% / 89.63% / 90.65% / 85.03% at 100K / 500K / 1M / 10M | Vendor self-report / published leaderboard | 10M multi-session reasoning 28.17% (20 questions); 10M overall 85.03% (200 questions, 10 conversations) |
+| Mastra Observational Memory | BEAM | 83.3% / 80.6% / 66.4% at 100K / 1M / 10M | Vendor self-report, two-run mean | 500K not run; 10M ±5.8 pp; 10M multi-session reasoning 25% (20 questions); Opus 5.5 answers, Gemini 3 Flash judge |
 | Exabase M-1 | BEAM | 76.9% / 75.0% / 68.0% at 100K / 1M / 10M | Vendor-published result aggregated by leaderboard | 500K not published; separate vendor run, not common harness |
 | Hindsight | BEAM | 86.2% / 80.1% / 79.1% / 64.1% at 100K / 500K / 1M / 10M | Vendor-published result aggregated by leaderboard | Separate vendor run; model/judge/configuration differ |
 | Mem0 Platform | BEAM | 64.1% at 1M; 48.6% at 10M | Vendor self-report | Managed platform; top-200 retrieval budget; separate run |
@@ -38,6 +39,43 @@ Two independent shared-harness snapshots are also informative but should not be 
 
 - An 18 October 2026 pilot using Gemini Flash-Lite reported Mem0 at 64.3% on 42 LongMemEval questions, Letta at 70.0% on 40, and Graphiti at 63.6% on only 11 completed questions. The sample was small and Graphiti's run incomplete.
 - A 23 September 2026 run on 419 turns and 120 probes reported recall and adversarial-refusal rates across GoodMem, Letta, Mem0, LangMem and Graphiti. It is a different workload and metric, useful for restraint diagnostics—not an answer-accuracy comparison with LoCoMo or LongMemEval.
+
+## Same-harness BEAM comparison: keep it separate from vendor self-reports
+
+OmniMemEval publishes a shared-harness cohort for BEAM using the same dataset, prompts, answer model (`gpt-4.1-mini`), judge (`gpt-4o-mini`) and nugget-score pipeline. Its maintainer is MemTensor, the maker of MemOS; adapters follow product documentation and are not guaranteed to be product-optimally tuned. This is substantially more useful for within-cohort comparisons than a collage of vendor scores, but it is not independent certification.
+
+| Backend | BEAM 100K | BEAM 10M |
+|---|---:|---:|
+| LCM-X* | 71.84% | 63.32% |
+| Hindsight | 70.22% | 59.75% |
+| Viking | 70.76% | 58.14% |
+| mem9 | 65.75% | 57.30% |
+| Zep / Graphiti | 68.70% | 56.11% |
+| MemOS | 66.87% | 56.75% |
+| Cognee | 59.30% | 56.02% |
+| Letta | 69.22% | 52.30% |
+| Supermemory | 65.98% | 52.49% |
+| MemMachine | 64.80% | 51.90% |
+| EverOS | 58.64% | 47.73% |
+| Mem0 | 70.41% | 43.33% |
+
+*LCM-X is a contributor-run result: the 10M cell is a separate 22 October run, using LCM-X v0.28.0 and local BGE embeddings. The harness requested dated `gpt-4.1-mini-2025-04-14` via OpenRouter; receipts resolved to `gpt-4.1-mini`, but do not establish the exact dated revision. Keep it marked separately.
+
+These numbers are BEAM nugget scores, not a direct apples-to-apples comparison with the vendor-reported table above. In particular, do not compare the OmniMemEval 63.32% LCM-X result to past.dev's 85.03% or Mastra's 66.4% without matching answer/judge models, prompts, memory formation and token budgets. The discrepancy is the reason to report both classes rather than selecting whichever leaderboard makes a system look best.
+
+### What Mastra adds to the diagnosis
+
+Mastra's 29 October run reports two-run means of 83.3% at 100K, 80.6% at 1M and 66.4% at 10M; it did not run 500K. Its 10M mean is based on 67.2% and 65.5%, with a stated ±5.8-point error bar. Its main run uses Claude Opus 5.5 as answer model, Gemini 3 Flash as judge, and Gemini 3.8 Flash for observer/reflector. When Gemini 3.8 Flash also answers, its reported scores fall to 78.4%, 72.8% and 57.8% for 100K, 1M and 10M. The answer model materially affects the result.
+
+Mastra reports multi-session reasoning falling from 74% at 1M to 25% at 10M (20-question slice). It describes the mechanism: retrieval returns the closest few notes, but counting questions require finding *all* matching instances; the agent has no indication that more matches may exist. It also reports speaker misattribution when assistant-generated advice is mistaken for user-authored evidence. These are two distinct failure modes: incomplete enumeration and provenance attribution.
+
+The 25% figure and past.dev's 28.17% figure are close but not a same-harness comparison. Mastra's article also says the only other public score it knew was 9.6%, which does not reconcile with past.dev's published 28.17% 10M ability score. Preserve this discrepancy in the ledger; do not select one as an authoritative multi-session leaderboard.
+
+### Judge sensitivity is a first-order confounder
+
+Mastra reports an experiment in which identical saved answers received 82.4% from Gemini 3 Flash but 71.5% from Claude Sonnet 5 on BEAM-100K (10.9 percentage-point spread). Therefore Broca's release gate must pin the judge and score prompt, retain raw answers, and ideally publish a blinded second-judge sensitivity report. A single judge score is not ground truth.
+
+Sources: [OmniMemEval canonical results](https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md); [Mastra Observational Memory BEAM methodology and failures](https://mastra.ai/research/observational-memory-beam); [BEAM paper, ICLR 2026](https://proceedings.iclr.cc/paper_files/paper/2026/hash/d7f0cfa0fe759b033d5262e1bb7d4065-Abstract-Conference.html).
 
 ## Broca's comparison strategy
 
