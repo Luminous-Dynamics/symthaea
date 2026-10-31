@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luminousdynamics.io/schemas/mace-evaluator-oracle-v0.1.schema.json",
   "title": "MACE Evaluator Oracle v0.1",
-  "description": "Evaluator-only expected outcomes and intervention-pair metadata. Never mount this file into an agent context or prompt.",
+  "description": "Evaluator-only expected outcomes, scenario families and intervention-pair metadata. Never mount this file into an agent context or prompt.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -21,13 +21,22 @@
         "additionalProperties": false,
         "required": [
           "case_id",
+          "family",
           "pair",
           "evaluator_oracle"
         ],
         "properties": {
           "case_id": {
             "type": "string",
-            "pattern": "^MACE-[A-Z][0-9]{2}$"
+            "pattern": "^MACE-[0-9]{3}$"
+          },
+          "family": {
+            "enum": [
+              "observational_confounding",
+              "controlled_intervention",
+              "regime_shift",
+              "outcome_misattribution"
+            ]
           },
           "pair": {
             "type": "object",
