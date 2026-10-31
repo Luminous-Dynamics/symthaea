@@ -1047,7 +1047,11 @@ fn splitmix64(mut value: u64) -> u64 {
 /// Unknown. The resulting tape is integrity-checkable but cannot pass the qualified
 /// matched-budget gate until those resource dimensions are instrumented.
 impl DirectionCampaignRun {
-    pub fn to_event_tape(&self) -> Result<EventTape, String> {
+    pub fn to_event_tape(
+        &self,
+        source_commit: &str,
+        execution_environment_sha256: &str,
+    ) -> Result<EventTape, String> {
         if self.action_count != self.actions.len() {
             return Err("action_count does not match the recorded action list".to_owned());
         }
@@ -1100,6 +1104,8 @@ impl DirectionCampaignRun {
             schema: "symthaea.ar5b4.event-tape".to_owned(),
             version: "0.1.0".to_owned(),
             campaign_id,
+            source_commit: source_commit.to_owned(),
+            execution_environment_sha256: execution_environment_sha256.to_owned(),
             comparison_mode: ComparisonMode::MechanismMatched,
             proposal_source_id: "synthetic-direction-campaign-v0.1".to_owned(),
             proposal_stream_sha256: Some(proposal_stream_sha256),
@@ -1107,6 +1113,8 @@ impl DirectionCampaignRun {
             comparison_profile_sha256: PROFILE_SHA256.to_owned(),
             evaluator_sha256: evaluator_sha256.clone(),
             verifier_sha256: verifier_sha256.clone(),
+            budget_model_id: "synthetic-one-unit-per-action-v0.1".to_owned(),
+            budget_model_sha256: digest("synthetic-one-unit-per-action-v0.1"),
             budget_limit_microunits,
             initial_direction_ids: vec!["A".to_owned(), "B".to_owned(), "C".to_owned()],
             execution: ExecutionContract {
@@ -1522,7 +1530,10 @@ mod tests {
         )
         .expect("synthetic campaign should run");
         let tape = run
-            .to_event_tape()
+            .to_event_tape(
+                "0123456789abcdef0123456789abcdef01234567",
+                &digest("synthetic-test-environment-v0.1"),
+            )
             .expect("campaign should convert to the common event tape");
         let summary = tape
             .validate_integrity()
