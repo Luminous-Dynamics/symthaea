@@ -986,6 +986,87 @@ mod tests {
         DirectionLandscapeFamily::RankReversal,
     ];
 
+    fn synthetic_action(slot: usize, arm_id: &str, score: f64) -> DirectionCampaignAction {
+        DirectionCampaignAction {
+            slot,
+            arm_id: arm_id.to_owned(),
+            is_new_proposal: false,
+            observed_score: Some(score),
+            proposal_disposition: None,
+            cost_units: 1,
+        }
+    }
+
+    #[test]
+    fn discounted_ucb_statistics_recover_after_a_rank_reversal() {
+        // A led early, but its recent performance collapsed. B has only a recent
+        // observation. The exponential recency weighting must reflect that change.
+        let actions = vec![
+            synthetic_action(1, "A", 0.95),
+            synthetic_action(2, "B", 0.80),
+            synthetic_action(3, "A", 0.10),
+            synthetic_action(4, "A", 0.10),
+            synthetic_action(5, "A", 0.10),
+        ];
+        let (a_reward, a_count) = discounted_arm_statistics("A", &actions, DISCOUNTED_UCB_GAMMA);
+        let (b_reward, b_count) = discounted_arm_statistics("B", &actions, DISCOUNTED_UCB_GAMMA);
+        let a_mean = (a_reward + 0.5) / (a_count + 1.0);
+        let b_mean = (b_reward + 0.5) / (b_count + 1.0);
+        assert!(b_mean > a_mean, "recent arm should overtake the stale early leader");
+    }
+
+    #[test]
+    fn gaussian_thompson_posterior_moves_toward_evidence_and_contracts_variance() {
+        let prior = gaussian_thompson_posterior("A", &[]);
+        let observed = gaussian_thompson_posterior(
+            "A",
+            &[synthetic_action(1, "A", 0.9), synthetic_action(2, "A", 0.8)],
+        );
+        assert!((prior.0 - 0.5).abs() < 1e-12);
+        assert!((prior.1 - GAUSSIAN_THOMPSON_PRIOR_VARIANCE).abs() < 1e-12);
+        assert!(observed.0 > prior.0);
+        assert!(observed.1 < prior.1);
+    }
+
+    #[test]
+    fn new_arm_reward_uses_the_same_frozen_admission_credit_as_global_ucb() {
+        let admitted = DirectionCampaignAction {
+            slot: 1,
+            arm_id: "NEW".to_owned(),
+            is_new_proposal: true,
+            observed_score: None,
+            proposal_disposition: Some(NewDirectionDisposition::Admitted),
+            cost_units: 1,
+        };
+        let duplicate = DirectionCampaignAction {
+            proposal_disposition: Some(NewDirectionDisposition::Duplicate),
+            ..admitted.clone()
+        };
+        assert!((action_reward(&admitted) - NEW_DIRECTION_CREDIT).abs() < f64::EPSILON);
+        assert_eq!(action_reward(&duplicate), 0.0);
+    }
+
+    #[test]
+    fn adaptive_bandit_baselines_do_not_create_novelty_on_the_no_new_null() {
+        for policy in [
+            DirectionCampaignPolicy::DiscountedUcb,
+            DirectionCampaignPolicy::GaussianThompsonSampling,
+        ] {
+            let run = run_direction_campaign(
+                DirectionLandscapeFamily::NoNewDirection,
+                policy,
+                96,
+                0x5eed,
+            )
+            .unwrap();
+            assert_eq!(run.admitted_new_directions, 0);
+            assert!(run.final_best_score < TARGET_SCORE);
+            assert!(run.actions.iter().filter(|action| action.is_new_proposal).all(
+                |action| action.proposal_disposition == Some(NewDirectionDisposition::Rejected)
+            ));
+        }
+    }
+
     #[test]
     fn every_policy_obeys_exact_unit_action_budget() {
         for landscape in LANDSCAPES {
