@@ -135,3 +135,10 @@ The metadata-only adapter contract is now machine-readable at [activearena-adapt
 The schema makes the policy boundary explicit: only acquired head-camera evidence can become candidate-visible observation memory; forecast objects retain `model_forecast` provenance and `memory_promoted=false`; evaluator side/front views, ground truth and scoring labels remain evaluator-only. Resource fields record memory capacity, encoder calls, retrieval calls, allocator work, latency and energy when measured.
 
 This contract is metadata-only. Its synthetic hashes are fixture values; no ActiveArena dataset, robot assets, VLM weights or checkpoint bundle are downloaded. It is not a completed adapter or a physical safety case.
+
+
+## Programme ownership
+
+The full visual active-perception / current-frame compute-escalation adapter belongs under **VIS-DVPC issue [#8156](https://github.com/Luminous-Dynamics/symthaea/issues/8156)**. That programme already owns the DEEP-style fixed-budget perception escalation experiment and explicitly distinguishes spending compute on the current frame from acquiring a causally new viewpoint/sample. The ActiveArena lock and custody schema added here are reusable baseline/provenance artifacts for #8156; they are not a second CMAQ-002 visual benchmark implementation.
+
+CMAQ-002 remains the finite-mechanism causal-probe and EVoI benchmark. Its six synthetic probe permissions are not a camera-movement or robot-actuation allowlist. Any actual ActiveArena policy adapter must be implemented and qualified under #8156, preserve ActiveArena's native head-camera and 18D action semantics, and consume the separate lock/custody gates described above.
