@@ -1,6 +1,6 @@
 {
   "schema_version": "broca-industry-baseline-ledger-v1",
-  "created_at": "2026-10-30",
+  "created_at": "2026-10-31",
   "purpose": "Evidence-graded registry of external agent-memory results. This is not a unified leaderboard. Scores remain scoped to their original benchmark revision, dataset split, answer model, judge, prompts, memory corpus, and budgets.",
   "comparability_policy": {
     "direct_comparison_requires": [
@@ -20,7 +20,8 @@
       "retrieval-only results with end-to-end answer results",
       "vendor self-reports with independent matched-harness runs"
     ],
-    "broca_status": "No Broca score is entered until the exact runner, commit, dataset digest, model, judge, budgets, and raw per-item outputs are recorded."
+    "broca_status": "No Broca score is entered until the exact runner, commit, dataset digest, model, judge, budgets, and raw per-item outputs are recorded.",
+    "same_harness_note": "OmniMemEval cohort results use shared benchmark data/prompts, gpt-4.1-mini answer model, gpt-4o-mini judge, and one score pipeline, but the harness is maintained by MemTensor (maker of MemOS) and public-doc adapters may not be product-optimally tuned. Keep these same-harness results in a separate comparison class from vendor self-reports."
   },
   "results": [
     {
@@ -565,6 +566,278 @@
       "evidence_grade": "vendor-result-aggregated-by-provider-leaderboard",
       "comparison_notes": "Past.dev's BEAM page attributes these figures to Exabase M-1 and says the vendor figures were separately published full-split runs using different models, judges and configurations. This is not a common-harness result or a Broca baseline reproduced under an identical setup.",
       "source": "https://www.past.dev/benchmarks/beam"
+    },
+    {
+      "id": "mastra-observational-memory-beam-2026-10-29",
+      "system": "Mastra Observational Memory",
+      "category": "vendor-self-report-two-run-average",
+      "benchmark": "BEAM",
+      "benchmark_revision": "BEAM 100K/1M/10M tiers; 500K not run",
+      "metric": "BEAM nugget answer score",
+      "value_percent": 66.4,
+      "reported_date": "2026-10-29",
+      "sample_size": 200,
+      "answer_model": "Claude Opus 5.5",
+      "judge": "Gemini 3 Flash",
+      "memory_models": "Gemini 3.8 Flash observer and reflector",
+      "secondary_metrics": {
+        "accuracy_100k_percent": 83.3,
+        "accuracy_1m_percent": 80.6,
+        "accuracy_10m_percent": 66.4,
+        "accuracy_500k_percent": null,
+        "run_10m_1_percent": 67.2,
+        "run_10m_2_percent": 65.5,
+        "reported_10m_error_bar_plus_minus_points": 5.8,
+        "multi_session_reasoning_1m_percent": 74,
+        "multi_session_reasoning_10m_percent": 25,
+        "multi_session_reasoning_10m_questions": 20,
+        "gemini_3_8_flash_answering_100k_percent": 78.4,
+        "gemini_3_8_flash_answering_1m_percent": 72.8,
+        "gemini_3_8_flash_answering_10m_percent": 57.8
+      },
+      "evidence_grade": "vendor-self-report-with-two-run-mean-and-methodology-disclosed",
+      "comparison_notes": "Mastra reports two-run means over the same memory for each tier: 83.3% at 100K, 80.6% at 1M and 66.4% at 10M. The 10M run average is 66.4% (67.2/65.5) with a reported ±5.8-point error bar, described as within noise of Exabase's 68.0%. This is not a same-answer-model comparison: Mastra answers with Claude Opus 5.5, while Exabase used Gemini 3 Flash; judge is Gemini 3 Flash and memory observer/reflector use Gemini 3.8 Flash. With Gemini 3.8 Flash as the answering model, Mastra reports 78.4/72.8/57.8 at 100K/1M/10M. Its own ability analysis reports 25% 10M multi-session reasoning versus 74% at 1M. Mastra's page says the only other public multi-session score it knew was 9.6%, which is not reconciled there with past.dev's previously published 28.17% result; treat cross-vendor 10M ability comparisons cautiously.",
+      "source": "https://mastra.ai/research/observational-memory-beam"
+    },
+    {
+      "id": "omnimemeval-mem0-beam-shared-harness-2026-10-31",
+      "system": "Mem0",
+      "category": "same-harness-vendor-evaluation",
+      "benchmark": "BEAM",
+      "benchmark_revision": "OmniMemEval current public results snapshot; same BEAM data, prompts, answer model, judge and nugget metric across cohort",
+      "metric": "BEAM 10M nugget score",
+      "value_percent": 43.33,
+      "reported_date": "2026-10-31",
+      "sample_size": 200,
+      "answer_model": "gpt-4.1-mini (requested dated model gpt-4.1-mini-2025-04-14 via OpenRouter; receipts establish gpt-4.1-mini identifier but not exact dated revision)",
+      "judge": "gpt-4o-mini-2024-07-18",
+      "secondary_metrics": {
+        "accuracy_100k_percent": 70.41,
+        "accuracy_10m_percent": 43.33
+      },
+      "evidence_grade": "same-harness-third-party-adapter-reproduction",
+      "comparison_notes": "OmniMemEval reports this backend as evaluated in one shared harness with the same data, prompts, answer model gpt-4.1-mini and judge gpt-4o-mini; its owner is MemTensor, maker of MemOS, and adapters follow public product documentation, not necessarily optimized product-specific configurations. Treat this as more comparable within the cohort than vendor self-reports, not as independent third-party certification or a global leaderboard.",
+      "source": "https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md"
+    },
+    {
+      "id": "omnimemeval-zep-graphiti-beam-shared-harness-2026-10-31",
+      "system": "Zep / Graphiti",
+      "category": "same-harness-vendor-evaluation",
+      "benchmark": "BEAM",
+      "benchmark_revision": "OmniMemEval current public results snapshot; same BEAM data, prompts, answer model, judge and nugget metric across cohort",
+      "metric": "BEAM 10M nugget score",
+      "value_percent": 56.11,
+      "reported_date": "2026-10-31",
+      "sample_size": 200,
+      "answer_model": "gpt-4.1-mini (requested dated model gpt-4.1-mini-2025-04-14 via OpenRouter; receipts establish gpt-4.1-mini identifier but not exact dated revision)",
+      "judge": "gpt-4o-mini-2024-07-18",
+      "secondary_metrics": {
+        "accuracy_100k_percent": 68.7,
+        "accuracy_10m_percent": 56.11
+      },
+      "evidence_grade": "same-harness-third-party-adapter-reproduction",
+      "comparison_notes": "OmniMemEval reports this backend as evaluated in one shared harness with the same data, prompts, answer model gpt-4.1-mini and judge gpt-4o-mini; its owner is MemTensor, maker of MemOS, and adapters follow public product documentation, not necessarily optimized product-specific configurations. Treat this as more comparable within the cohort than vendor self-reports, not as independent third-party certification or a global leaderboard.",
+      "source": "https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md"
+    },
+    {
+      "id": "omnimemeval-supermemory-beam-shared-harness-2026-10-31",
+      "system": "Supermemory",
+      "category": "same-harness-vendor-evaluation",
+      "benchmark": "BEAM",
+      "benchmark_revision": "OmniMemEval current public results snapshot; same BEAM data, prompts, answer model, judge and nugget metric across cohort",
+      "metric": "BEAM 10M nugget score",
+      "value_percent": 52.49,
+      "reported_date": "2026-10-31",
+      "sample_size": 200,
+      "answer_model": "gpt-4.1-mini (requested dated model gpt-4.1-mini-2025-04-14 via OpenRouter; receipts establish gpt-4.1-mini identifier but not exact dated revision)",
+      "judge": "gpt-4o-mini-2024-07-18",
+      "secondary_metrics": {
+        "accuracy_100k_percent": 65.98,
+        "accuracy_10m_percent": 52.49
+      },
+      "evidence_grade": "same-harness-third-party-adapter-reproduction",
+      "comparison_notes": "OmniMemEval reports this backend as evaluated in one shared harness with the same data, prompts, answer model gpt-4.1-mini and judge gpt-4o-mini; its owner is MemTensor, maker of MemOS, and adapters follow public product documentation, not necessarily optimized product-specific configurations. Treat this as more comparable within the cohort than vendor self-reports, not as independent third-party certification or a global leaderboard.",
+      "source": "https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md"
+    },
+    {
+      "id": "omnimemeval-viking-beam-shared-harness-2026-10-31",
+      "system": "Viking",
+      "category": "same-harness-vendor-evaluation",
+      "benchmark": "BEAM",
+      "benchmark_revision": "OmniMemEval current public results snapshot; same BEAM data, prompts, answer model, judge and nugget metric across cohort",
+      "metric": "BEAM 10M nugget score",
+      "value_percent": 58.14,
+      "reported_date": "2026-10-31",
+      "sample_size": 200,
+      "answer_model": "gpt-4.1-mini (requested dated model gpt-4.1-mini-2025-04-14 via OpenRouter; receipts establish gpt-4.1-mini identifier but not exact dated revision)",
+      "judge": "gpt-4o-mini-2024-07-18",
+      "secondary_metrics": {
+        "accuracy_100k_percent": 70.76,
+        "accuracy_10m_percent": 58.14
+      },
+      "evidence_grade": "same-harness-third-party-adapter-reproduction",
+      "comparison_notes": "OmniMemEval reports this backend as evaluated in one shared harness with the same data, prompts, answer model gpt-4.1-mini and judge gpt-4o-mini; its owner is MemTensor, maker of MemOS, and adapters follow public product documentation, not necessarily optimized product-specific configurations. Treat this as more comparable within the cohort than vendor self-reports, not as independent third-party certification or a global leaderboard.",
+      "source": "https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md"
+    },
+    {
+      "id": "omnimemeval-cognee-beam-shared-harness-2026-10-31",
+      "system": "Cognee",
+      "category": "same-harness-vendor-evaluation",
+      "benchmark": "BEAM",
+      "benchmark_revision": "OmniMemEval current public results snapshot; same BEAM data, prompts, answer model, judge and nugget metric across cohort",
+      "metric": "BEAM 10M nugget score",
+      "value_percent": 56.02,
+      "reported_date": "2026-10-31",
+      "sample_size": 200,
+      "answer_model": "gpt-4.1-mini (requested dated model gpt-4.1-mini-2025-04-14 via OpenRouter; receipts establish gpt-4.1-mini identifier but not exact dated revision)",
+      "judge": "gpt-4o-mini-2024-07-18",
+      "secondary_metrics": {
+        "accuracy_100k_percent": 59.3,
+        "accuracy_10m_percent": 56.02
+      },
+      "evidence_grade": "same-harness-third-party-adapter-reproduction",
+      "comparison_notes": "OmniMemEval reports this backend as evaluated in one shared harness with the same data, prompts, answer model gpt-4.1-mini and judge gpt-4o-mini; its owner is MemTensor, maker of MemOS, and adapters follow public product documentation, not necessarily optimized product-specific configurations. Treat this as more comparable within the cohort than vendor self-reports, not as independent third-party certification or a global leaderboard.",
+      "source": "https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md"
+    },
+    {
+      "id": "omnimemeval-letta-beam-shared-harness-2026-10-31",
+      "system": "Letta",
+      "category": "same-harness-vendor-evaluation",
+      "benchmark": "BEAM",
+      "benchmark_revision": "OmniMemEval current public results snapshot; same BEAM data, prompts, answer model, judge and nugget metric across cohort",
+      "metric": "BEAM 10M nugget score",
+      "value_percent": 52.3,
+      "reported_date": "2026-10-31",
+      "sample_size": 200,
+      "answer_model": "gpt-4.1-mini (requested dated model gpt-4.1-mini-2025-04-14 via OpenRouter; receipts establish gpt-4.1-mini identifier but not exact dated revision)",
+      "judge": "gpt-4o-mini-2024-07-18",
+      "secondary_metrics": {
+        "accuracy_100k_percent": 69.22,
+        "accuracy_10m_percent": 52.3
+      },
+      "evidence_grade": "same-harness-third-party-adapter-reproduction",
+      "comparison_notes": "OmniMemEval reports this backend as evaluated in one shared harness with the same data, prompts, answer model gpt-4.1-mini and judge gpt-4o-mini; its owner is MemTensor, maker of MemOS, and adapters follow public product documentation, not necessarily optimized product-specific configurations. Treat this as more comparable within the cohort than vendor self-reports, not as independent third-party certification or a global leaderboard.",
+      "source": "https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md"
+    },
+    {
+      "id": "omnimemeval-hindsight-beam-shared-harness-2026-10-31",
+      "system": "Hindsight",
+      "category": "same-harness-vendor-evaluation",
+      "benchmark": "BEAM",
+      "benchmark_revision": "OmniMemEval current public results snapshot; same BEAM data, prompts, answer model, judge and nugget metric across cohort",
+      "metric": "BEAM 10M nugget score",
+      "value_percent": 59.75,
+      "reported_date": "2026-10-31",
+      "sample_size": 200,
+      "answer_model": "gpt-4.1-mini (requested dated model gpt-4.1-mini-2025-04-14 via OpenRouter; receipts establish gpt-4.1-mini identifier but not exact dated revision)",
+      "judge": "gpt-4o-mini-2024-07-18",
+      "secondary_metrics": {
+        "accuracy_100k_percent": 70.22,
+        "accuracy_10m_percent": 59.75
+      },
+      "evidence_grade": "same-harness-third-party-adapter-reproduction",
+      "comparison_notes": "OmniMemEval reports this backend as evaluated in one shared harness with the same data, prompts, answer model gpt-4.1-mini and judge gpt-4o-mini; its owner is MemTensor, maker of MemOS, and adapters follow public product documentation, not necessarily optimized product-specific configurations. Treat this as more comparable within the cohort than vendor self-reports, not as independent third-party certification or a global leaderboard.",
+      "source": "https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md"
+    },
+    {
+      "id": "omnimemeval-everos-beam-shared-harness-2026-10-31",
+      "system": "EverOS",
+      "category": "same-harness-vendor-evaluation",
+      "benchmark": "BEAM",
+      "benchmark_revision": "OmniMemEval current public results snapshot; same BEAM data, prompts, answer model, judge and nugget metric across cohort",
+      "metric": "BEAM 10M nugget score",
+      "value_percent": 47.73,
+      "reported_date": "2026-10-31",
+      "sample_size": 200,
+      "answer_model": "gpt-4.1-mini (requested dated model gpt-4.1-mini-2025-04-14 via OpenRouter; receipts establish gpt-4.1-mini identifier but not exact dated revision)",
+      "judge": "gpt-4o-mini-2024-07-18",
+      "secondary_metrics": {
+        "accuracy_100k_percent": 58.64,
+        "accuracy_10m_percent": 47.73
+      },
+      "evidence_grade": "same-harness-third-party-adapter-reproduction",
+      "comparison_notes": "OmniMemEval reports this backend as evaluated in one shared harness with the same data, prompts, answer model gpt-4.1-mini and judge gpt-4o-mini; its owner is MemTensor, maker of MemOS, and adapters follow public product documentation, not necessarily optimized product-specific configurations. Treat this as more comparable within the cohort than vendor self-reports, not as independent third-party certification or a global leaderboard.",
+      "source": "https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md"
+    },
+    {
+      "id": "omnimemeval-memmachine-beam-shared-harness-2026-10-31",
+      "system": "MemMachine",
+      "category": "same-harness-vendor-evaluation",
+      "benchmark": "BEAM",
+      "benchmark_revision": "OmniMemEval current public results snapshot; same BEAM data, prompts, answer model, judge and nugget metric across cohort",
+      "metric": "BEAM 10M nugget score",
+      "value_percent": 51.9,
+      "reported_date": "2026-10-31",
+      "sample_size": 200,
+      "answer_model": "gpt-4.1-mini (requested dated model gpt-4.1-mini-2025-04-14 via OpenRouter; receipts establish gpt-4.1-mini identifier but not exact dated revision)",
+      "judge": "gpt-4o-mini-2024-07-18",
+      "secondary_metrics": {
+        "accuracy_100k_percent": 64.8,
+        "accuracy_10m_percent": 51.9
+      },
+      "evidence_grade": "same-harness-third-party-adapter-reproduction",
+      "comparison_notes": "OmniMemEval reports this backend as evaluated in one shared harness with the same data, prompts, answer model gpt-4.1-mini and judge gpt-4o-mini; its owner is MemTensor, maker of MemOS, and adapters follow public product documentation, not necessarily optimized product-specific configurations. Treat this as more comparable within the cohort than vendor self-reports, not as independent third-party certification or a global leaderboard.",
+      "source": "https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md"
+    },
+    {
+      "id": "omnimemeval-mem9-beam-shared-harness-2026-10-31",
+      "system": "mem9",
+      "category": "same-harness-vendor-evaluation",
+      "benchmark": "BEAM",
+      "benchmark_revision": "OmniMemEval current public results snapshot; same BEAM data, prompts, answer model, judge and nugget metric across cohort",
+      "metric": "BEAM 10M nugget score",
+      "value_percent": 57.3,
+      "reported_date": "2026-10-31",
+      "sample_size": 200,
+      "answer_model": "gpt-4.1-mini (requested dated model gpt-4.1-mini-2025-04-14 via OpenRouter; receipts establish gpt-4.1-mini identifier but not exact dated revision)",
+      "judge": "gpt-4o-mini-2024-07-18",
+      "secondary_metrics": {
+        "accuracy_100k_percent": 65.75,
+        "accuracy_10m_percent": 57.3
+      },
+      "evidence_grade": "same-harness-third-party-adapter-reproduction",
+      "comparison_notes": "OmniMemEval reports this backend as evaluated in one shared harness with the same data, prompts, answer model gpt-4.1-mini and judge gpt-4o-mini; its owner is MemTensor, maker of MemOS, and adapters follow public product documentation, not necessarily optimized product-specific configurations. Treat this as more comparable within the cohort than vendor self-reports, not as independent third-party certification or a global leaderboard.",
+      "source": "https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md"
+    },
+    {
+      "id": "omnimemeval-memos-beam-shared-harness-2026-10-31",
+      "system": "MemOS",
+      "category": "same-harness-vendor-evaluation",
+      "benchmark": "BEAM",
+      "benchmark_revision": "OmniMemEval current public results snapshot; same BEAM data, prompts, answer model, judge and nugget metric across cohort",
+      "metric": "BEAM 10M nugget score",
+      "value_percent": 56.75,
+      "reported_date": "2026-10-31",
+      "sample_size": 200,
+      "answer_model": "gpt-4.1-mini (requested dated model gpt-4.1-mini-2025-04-14 via OpenRouter; receipts establish gpt-4.1-mini identifier but not exact dated revision)",
+      "judge": "gpt-4o-mini-2024-07-18",
+      "secondary_metrics": {
+        "accuracy_100k_percent": 66.87,
+        "accuracy_10m_percent": 56.75
+      },
+      "evidence_grade": "same-harness-third-party-adapter-reproduction",
+      "comparison_notes": "OmniMemEval reports this backend as evaluated in one shared harness with the same data, prompts, answer model gpt-4.1-mini and judge gpt-4o-mini; its owner is MemTensor, maker of MemOS, and adapters follow public product documentation, not necessarily optimized product-specific configurations. Treat this as more comparable within the cohort than vendor self-reports, not as independent third-party certification or a global leaderboard.",
+      "source": "https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md"
+    },
+    {
+      "id": "omnimemeval-lcmx-beam-shared-harness-2026-10-31",
+      "system": "LCM-X",
+      "category": "same-harness-contributor-run",
+      "benchmark": "BEAM",
+      "benchmark_revision": "OmniMemEval current public results snapshot; same BEAM data, prompts, answer model, judge and nugget metric across cohort",
+      "metric": "BEAM 10M nugget score",
+      "value_percent": 63.32,
+      "reported_date": "2026-10-31",
+      "sample_size": 200,
+      "answer_model": "gpt-4.1-mini (requested dated model gpt-4.1-mini-2025-04-14 via OpenRouter; receipts establish gpt-4.1-mini identifier but not exact dated revision)",
+      "judge": "gpt-4o-mini-2024-07-18",
+      "secondary_metrics": {
+        "accuracy_100k_percent": 71.84,
+        "accuracy_10m_percent": 63.32
+      },
+      "evidence_grade": "same-harness-contributor-run-with-model-resolution-limitations",
+      "comparison_notes": "OmniMemEval reports LCM-X as a contributor run using the unchanged harness/prompt pipeline, LCM-X v0.28.0-rc1 executable-equivalent to v0.28.0 and local BAAI/bge-small-en-v1.5 embeddings. Its 10M cell is a separate 22 October contributor run. OpenRouter receipts resolve the answer model to gpt-4.1-mini but do not prove exact dated revision. OmniMemEval is run by MemTensor, maker of MemOS; adapters are configured from public docs and may not be product-optimally tuned.",
+      "source": "https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md"
     }
   ],
   "broca_targets": {
