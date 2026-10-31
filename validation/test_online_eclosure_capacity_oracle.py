@@ -30,6 +30,46 @@ class OnlineEclosureCapacityTests(unittest.TestCase):
         # The receipt is canonical-JSON-friendly for immutable replay.
         json.dumps(result, sort_keys=True, separators=(",", ":"))
 
+    def test_independent_verifier_rejects_valid_but_suboptimal_set(self):
+        import copy
+
+        result = select_capacity_aware_sequence(
+            [4, 4],
+            [Fraction(1, 2), Fraction(1, 2)],
+            Fraction(1, 2),
+            [10, 5],
+            [1, 1],
+            [1, 2],
+        )
+        tampered = copy.deepcopy(result["decisions"])
+        # {1} remains a valid closed-eBH rejection set at t=2, but
+        # {1,2} has strictly greater value under the same capacity.
+        tampered[1]["rejection_mask"] = 0b01
+        tampered[1]["rejections"] = [1]
+        tampered[1]["utility"] = [10, 1]
+        tampered[1]["cumulative_cost"] = [1, 1]
+        tampered[1]["minimum_closure_slack"] = [0, 1]
+        tampered[1]["worst_intersection_mask"] = 0
+        tampered[1]["intersections_checked_for_selected_set"] = 4
+        check = verify_decision_sequence(
+            tampered,
+            [4, 4],
+            [Fraction(1, 2), Fraction(1, 2)],
+            Fraction(1, 2),
+            [10, 5],
+            [1, 1],
+            [1, 2],
+        )
+        self.assertFalse(check["valid"])
+        self.assertFalse(check["optimality_verified"])
+        self.assertTrue(
+            any(
+                isinstance(failure, tuple)
+                and failure[0] == "utility_optimality_failure"
+                for failure in check["failures"]
+            )
+        )
+
     def test_invalid_new_hypothesis_is_not_added_even_with_capacity(self):
         result = select_capacity_aware_sequence(
             [4, Fraction(1, 10)],
