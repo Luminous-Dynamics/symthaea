@@ -655,18 +655,32 @@ mod tests {
         let _ = (nodes, edges);
         let explanation = json!({
             "schema_version":"hardsec-localization-explanation-v1",
-            "grouping":{"design_id":"design-alpha-01"},
+            "grouping":{
+                "dataset_id":"fixture-dataset","split_protocol":"not_applicable","split":"not_applicable",
+                "host_family_id":"fixture-host","design_id":"design-alpha-01",
+                "insertion_source_id":"fixture-author","trojan_family_id":"fixture-family",
+                "synthesis_toolchain_id":"fixture-toolchain","cell_library_id":"fixture-library"
+            },
             "source":{
+                "artifact_id":"fixture-source-01","source_path":"fixture-source-01.json",
                 "source_sha256":graph_sha,
                 "node_edge_map_sha256":map_sha
             },
-            "model":{"model_sha256":"c".repeat(64)},
-            "explainer":{"explainer_id":"fixture-domain-property"},
-            "decision":{"disposition":"suspect"},
+            "model":{
+                "model_sha256":"c".repeat(64),"config_sha256":"d".repeat(64),
+                "training_lineage_sha256":"e".repeat(64)
+            },
+            "explainer":{
+                "explainer_id":"fixture-domain-property","method":"domain_property",
+                "version":"0.1.0","config_sha256":"f".repeat(64)
+            },
+            "decision":{
+                "disposition":"suspect","score":0.87,"threshold_profile_sha256":"1".repeat(64)
+            },
             "review_budget":{"unit":"regions","limit":1},
             "candidate_regions":[
-                {"region_id":"region-r1","rank":1,"node_ids":["g17","g18"],"edge_ids":["e17-18"]},
-                {"region_id":"region-r2","rank":2,"node_ids":["g99","g100"],"edge_ids":["e99-100"]}
+                {"region_id":"region-r1","rank":1,"score":0.87,"node_ids":["g17","g18"],"edge_ids":["e17-18"],"support_claim_ids":["fixture-claim-1"]},
+                {"region_id":"region-r2","rank":2,"score":0.31,"node_ids":["g99","g100"],"edge_ids":["e99-100"],"support_claim_ids":["fixture-claim-2"]}
             ],
             "paths":[
                 {"path_id":"path-trigger-observe-01","status":"retained","source_sha256":graph_sha,"edge_ids":["e17-18"],"reason":""}
