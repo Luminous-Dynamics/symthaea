@@ -300,6 +300,9 @@
     },
     "claim_ceiling": {
       "const": "measurement_profile_contract_only_receipt_bytes_must_be_independently_verified"
+    },
+    "fixture_only": {
+      "type": "boolean"
     }
   }
 }
