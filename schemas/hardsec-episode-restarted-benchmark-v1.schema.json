@@ -13,7 +13,8 @@
     "holdout_axes",
     "metrics",
     "aspirational_targets",
-    "claim_rules"
+    "claim_rules",
+    "reference_implementations"
   ],
   "properties": {
     "schema_version": {
@@ -32,7 +33,7 @@
     },
     "baselines": {
       "type": "array",
-      "minItems": 9,
+      "minItems": 13,
       "uniqueItems": true,
       "items": {
         "type": "string"
@@ -130,6 +131,43 @@
         },
         "synthetic_results_not_detector_performance": {
           "const": true
+        }
+      }
+    },
+    "reference_implementations": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "url",
+          "version",
+          "scope",
+          "implementation"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1
+          },
+          "implementation": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     }
