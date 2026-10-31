@@ -271,7 +271,7 @@ impl ClaimEval {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct GraphSuite {
     planner_cases: Vec<PlannerCase>,
     // Private and deliberately omitted from all planner-facing records.
