@@ -1735,6 +1735,20 @@ mod tests {
         assert_ne!(first.actions, other_seed.actions);
         assert_eq!(first.action_count, 64);
         assert_eq!(first.total_cost_units, 64);
+        assert_eq!(
+            first.simple_regret,
+            (first.oracle_best_score - first.final_best_expected_score).max(0.0),
+            "simple regret must use expected reward, not a lucky noisy observation"
+        );
+        assert_eq!(
+            first.final_best_expected_score,
+            first
+                .actions
+                .iter()
+                .filter_map(|action| action.expected_score)
+                .max_by(f64::total_cmp)
+                .unwrap()
+        );
     }
 
     #[test]
