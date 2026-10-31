@@ -90,13 +90,13 @@ const ACTIONS: [Intervention; ACTION_COUNT] = [
 
 #[derive(Clone, Copy, Debug)]
 struct ObservedHistory {
-    id: u64,
     x: f64,
     v: f64,
 }
 
 #[derive(Clone, Copy, Debug)]
 struct EpisodeCase {
+    history_id: u64,
     history: ObservedHistory,
     hidden_regime_positive: bool,
     common_disturbance: f64,
@@ -187,8 +187,8 @@ impl SplitMix64 {
 fn make_episode_case(seed: u64) -> EpisodeCase {
     let mut rng = SplitMix64::new(seed ^ 0x018B_12A7);
     EpisodeCase {
+        history_id: seed,
         history: ObservedHistory {
-            id: seed,
             x: -0.35 + 0.70 * rng.unit(),
             v: -0.25 + 0.50 * rng.unit(),
         },
@@ -359,7 +359,7 @@ fn evaluate_episode(
     let branches: Vec<BranchObservation> = canonical
         .iter()
         .map(|action| BranchObservation {
-            history_id: case.history.id,
+            history_id: case.history_id,
             action_id: action.id,
             outcome: true_outcome(case, scenario, *action),
         })
@@ -495,7 +495,7 @@ fn evaluate_episode(
     });
 
     // These assertions make same-history identity and action identity evaluator-owned invariants.
-    debug_assert!(branches.iter().all(|branch| branch.history_id == case.history.id));
+    debug_assert!(branches.iter().all(|branch| branch.history_id == case.history_id));
     debug_assert_eq!(
         branches
             .iter()
@@ -784,7 +784,7 @@ mod tests {
             - true_outcome(negative, Scenario::HiddenRegime, ACTIONS[0]).utility;
         assert!(positive_delta > 0.0);
         assert!(negative_delta < 0.0);
-        assert_eq!(positive.history.id, negative.history.id);
+        assert_eq!(positive.history_id, negative.history_id);
         assert_eq!(positive.history.x, negative.history.x);
     }
 
@@ -794,12 +794,12 @@ mod tests {
         let branches: Vec<_> = ACTIONS
             .iter()
             .map(|action| BranchObservation {
-                history_id: case.history.id,
+                history_id: case.history_id,
                 action_id: action.id,
                 outcome: true_outcome(case, Scenario::Monotone, *action),
             })
             .collect();
-        assert!(branches.iter().all(|branch| branch.history_id == case.history.id));
+        assert!(branches.iter().all(|branch| branch.history_id == case.history_id));
         assert_eq!(
             branches
                 .iter()
