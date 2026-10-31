@@ -974,7 +974,7 @@ mod tests {
             run.cache_namespace_sha256 = digest(&format!("cache-{suffix}"));
             run.state_reset_receipt_sha256 = digest(&format!("reset-{suffix}"));
             run.run_execution_receipt_sha256 = digest(&format!("execution-{suffix}"));
-            run.condition_policy_sha256 = digest(&format!("policy-{suffix}"));
+            run.condition_policy_sha256 = expected_policy_digest(&study, run.condition).to_owned();
             run.trace.run_id = run.run_id.clone();
             run.trace.network_policy_sha256 = run.condition_policy_sha256.clone();
             for event in &mut run.trace.events {
