@@ -1,0 +1,24 @@
+{
+  "schema":"symthaea-rc-ebh-full-lp-oracle-v1",
+  "status":"LOCAL_EXACT_SMALL_FAMILY_OPTIMALITY_CHECK_NOT_A_GENERAL_PROOF",
+  "reference":"Bai & Ramdas (2026), arXiv:2610.35821, Proposition 4.2(iii), Appendix C.4",
+  "local_validation":{"tests_passed":5,"tests_total":5,"random_families":200,"K_range":[1,5],
+    "alphas":[0.01,0.025,0.05,0.1,0.2,0.5],
+    "source_local_path":"/mnt/data/rc_ebh_lp_oracle.py",
+    "tests_local_path":"/mnt/data/test_rc_ebh_lp_oracle.py"},
+  "random_lp_checks":{"max_absolute_objective_gap":4.440892098500626e-16,
+    "max_tail_max_abs_difference":3.3306690738754696e-16,
+    "max_rc_full_subset_violation":3.3306690738754696e-16,
+    "maximum_full_lp_constraint_count":41},
+  "boundary_vectors":{
+    "tested":["[0]","[1]","[0,0]","[1,1]","[100,1]","five equal e-values","log-spread 1e-8 to 1e8","zero and positive mix","descending orders of magnitude"],
+    "all_objectives_match":true
+  },
+  "interpretation":[
+    "RC-eBH's expected rejection count matched the optimum of an LP containing every nonempty subset certificate constraint for all 200 random families with K<=5.",
+    "The LP and RC-eBH tails also matched to floating-point precision in these tested instances.",
+    "This is strong independent computational corroboration of the formula and a useful regression oracle.",
+    "It does not prove Proposition 4.2(iii) for arbitrary K or validate the paper's LP-duality argument in general."
+  ],
+  "scope":["offline fixed-family expected rejection optimization","arbitrary dependence at the theorem level assuming marginal e-values valid","not sequential SupFDR","small finite K computational check only"]
+}
