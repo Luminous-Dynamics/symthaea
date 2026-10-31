@@ -158,6 +158,8 @@ pub struct TailProfileStatistics {
     pub required_confidence_micros: u32,
     pub independent_lineage_count: usize,
     pub empirical_quantile_frames: u64,
+    pub empirical_raw_tail_quantile_frames: u64,
+    pub empirical_hysteresis_tail_quantile_frames: u64,
     /// Distribution-free upper confidence bound: the maximum independent
     /// lineage-cluster tail duration, provided its order-statistic coverage
     /// meets the requested confidence.
@@ -416,6 +418,7 @@ pub fn verify_renderer_topology_attestation(
 struct LineageTail {
     raw_tail_frames: u64,
     hysteresis_tail_frames: u64,
+    observed_tail_frames: u64,
 }
 
 fn distribution_free_upper_bound_coverage(
@@ -474,8 +477,9 @@ fn operation_family_from_report(
 ) -> Result<String, TailProfileError> {
     let mut families = BTreeSet::new();
     for event in &report.events {
-        let family = match event.intervention {
+        let family = match &event.intervention {
             crate::counterfactual_influence::EventIntervention::Remove => "remove",
+            _ => return Err(TailProfileError::InvalidField("unsupported intervention family")),
         };
         families.insert(family.to_owned());
     }
@@ -615,6 +619,7 @@ fn aggregate_lineage_tails(
             .or_insert(LineageTail {
                 raw_tail_frames: 0,
                 hysteresis_tail_frames: 0,
+                observed_tail_frames: 0,
             });
         let raw = observation.raw_measured_end_frame
             .map(|end| end.saturating_sub(observation.final_note_off_frame))
@@ -624,6 +629,7 @@ fn aggregate_lineage_tails(
             .unwrap_or(0);
         entry.raw_tail_frames = entry.raw_tail_frames.max(raw);
         entry.hysteresis_tail_frames = entry.hysteresis_tail_frames.max(hysteresis);
+        entry.observed_tail_frames = entry.observed_tail_frames.max(raw.max(hysteresis));
     }
     if grouped.len() > MAX_PROFILE_LINEAGES {
         return Err(TailProfileError::InvalidField("too many lineage clusters"));
@@ -672,6 +678,14 @@ fn create_profile_unsigned(
 
     let calibration_values: Vec<u64> = calibration
         .values()
+        .map(|tail| tail.observed_tail_frames)
+        .collect();
+    let raw_calibration_values: Vec<u64> = calibration
+        .values()
+        .map(|tail| tail.raw_tail_frames)
+        .collect();
+    let hysteresis_calibration_values: Vec<u64> = calibration
+        .values()
         .map(|tail| tail.hysteresis_tail_frames)
         .collect();
     let empirical_quantile_frames = nearest_rank_quantile(&calibration_values, spec.quantile_micros)?;
@@ -687,7 +701,7 @@ fn create_profile_unsigned(
 
     let qualification_values: Vec<u64> = qualification
         .values()
-        .map(|tail| tail.hysteresis_tail_frames)
+        .map(|tail| tail.observed_tail_frames)
         .collect();
     let maximum_held_out_tail_frames = qualification_values.iter().copied().max().unwrap_or(0);
     let missed_lineage_count = qualification_values
@@ -695,8 +709,8 @@ fn create_profile_unsigned(
         .filter(|tail| **tail > guard_frames)
         .count();
     let qualified = missed_lineage_count == 0;
-    let mut calibration_lineages: BTreeSet<String> = calibration.keys().cloned().collect();
-    let mut qualification_lineages: BTreeSet<String> = qualification.keys().cloned().collect();
+    let calibration_lineages: BTreeSet<String> = calibration.keys().cloned().collect();
+    let qualification_lineages: BTreeSet<String> = qualification.keys().cloned().collect();
     if !calibration_lineages.is_disjoint(&qualification_lineages) {
         return Err(TailProfileError::CrossSplitLineageLeakage);
     }
@@ -707,17 +721,15 @@ fn create_profile_unsigned(
     let qualification_lineage_set_sha256 =
         lineage_set_digest(&qual_domain, &qualification_lineages);
 
-    let mut builder_hasher = Sha256::new();
-    builder_hasher.update(BUILDER_DOMAIN);
-    hash_component(&mut builder_hasher, &spec.builder_version.as_bytes());
-    hash_component(&mut builder_hasher, &serde_json::to_vec(spec).map_err(|_| TailProfileError::SerializationFailure)?);
-    let builder_spec_sha256 = format!("{:x}", builder_hasher.finalize());
+    let builder_spec_sha256 = builder_spec_digest(spec)?;
     let event_evidence_set_sha256 = event_set_digest(observations);
     let statistics = TailProfileStatistics {
         selected_quantile_micros: spec.quantile_micros,
         required_confidence_micros: spec.confidence_micros,
         independent_lineage_count: calibration.len(),
         empirical_quantile_frames,
+        empirical_raw_tail_quantile_frames: nearest_rank_quantile(&raw_calibration_values, spec.quantile_micros)?,
+        empirical_hysteresis_tail_quantile_frames: nearest_rank_quantile(&hysteresis_calibration_values, spec.quantile_micros)?,
         upper_confidence_bound_frames: maximum_observed_tail_frames,
         confidence_coverage_lower_bound_micros: coverage,
         maximum_observed_tail_frames,
@@ -790,6 +802,29 @@ pub fn verify_tail_profile(
         || !is_sha256(&profile.qualification_lineage_set_sha256)
         || !is_sha256(&profile.event_evidence_set_sha256)
         || !is_sha256(&profile.builder_spec_sha256)
+        || !is_sha256(&profile.context.renderer_identity_sha256)
+        || !is_sha256(&profile.context.renderer_executable_sha256)
+        || !is_sha256(&profile.context.soundfont_sha256)
+        || !is_sha256(&profile.context.renderer_config_sha256)
+        || !is_sha256(&profile.context.render_config_sha256)
+        || !is_sha256(&profile.context.effect_settings_sha256)
+        || !is_sha256(&profile.context.reverb_settings_sha256)
+        || !is_sha256(&profile.context.chorus_settings_sha256)
+        || !is_sha256(&profile.context.route_graph_sha256)
+        || !is_sha256(&profile.context.output_chain_sha256)
+        || !is_sha256(&profile.context.topology_attestation_sha256)
+        || !is_sha256(&profile.context.segmentation_config_sha256)
+        || !verify_effects_group_assignment(&profile.context.effects_group_assignment)
+        || profile.context.sample_rate_hz == 0
+        || profile.context.channels == 0
+        || profile.statistics.guard_frames
+            != profile.statistics.upper_confidence_bound_frames.saturating_add(profile.statistics.safety_margin_frames)
+        || profile.statistics.independent_lineage_count == 0
+        || profile.statistics.confidence_coverage_lower_bound_micros
+            < profile.statistics.required_confidence_micros
+        || profile.qualification.independent_lineage_count == 0
+        || profile.qualification.missed_lineage_count != 0
+        || profile.statistics.guard_frames > MAX_GUARD_FRAMES
     {
         return Err(TailProfileError::ProfileReceiptInvalid);
     }
