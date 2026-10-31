@@ -53,6 +53,20 @@ The largest additional specificity is only 0.013 percentage points at alpha .10.
 
 The optimized policy randomizes across two or three depth actions for roughly 45-52% of calibration states. LP solve time is about 25-37 ms per alpha in the local reference run. Maximum augmented-state budget residual is below 3.4e-14.
 
+
+
+## Proof-carrying certificate
+
+The module now emits a `symthaea-risk-certificate-v1` manifest binding:
+- the randomized policy table, action grid and canonical calibration-state order;
+- the loss family, risk target and complete augmented-state domain;
+- the objective-reference pool and conditional test-type distribution;
+- the finite-exchangeability assumption contract and expected-risk scope;
+- the exact verifier receipt and full LP dual witness.
+
+The independent verifier recomputes the policy/constraint/objective digests, rechecks all augmented-state inequalities, validates the scope and risk target, and recomputes dual feasibility, stationarity, complementarity and the primal-dual gap. Regression tests are authored for tampering with policy rows, alpha, state-domain counts, assumptions, verifier receipts and dual marginals. Those exact committed module tests have not yet been run in a clean checkout; the certificate API is not claimed as validated yet. Hashes bind content but do not authenticate an issuer; signing/attestation remains a separate layer.
+
+The module now contains 16 authored tests. The local reference arithmetic checks cover all four alpha values and all primal/dual residual families.
 ## Interpretation
 
 This is a small improvement, but an important scientific result:
