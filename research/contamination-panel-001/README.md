@@ -281,6 +281,8 @@ Additional fixtures:
 
 The simulator also compares ordinary Benjamini–Hochberg with Benjamini–Yekutieli final selection. BY is more conservative and is included as a dependence-robust multiple-testing comparator, conditional on valid input p-values. It does not repair a misspecified contaminated-reference distribution.
 
+The simulator also compares ordinary Benjamini–Hochberg with Benjamini–Yekutieli final selection. BY is a more conservative dependence-robust multiple-testing comparator, conditional on valid input p-values; it does not repair a misspecified contaminated-reference distribution.
+
 The report separately estimates:
 - mean false-discovery proportion across runs (the Monte Carlo analogue of FDR);
 - frequency of individual runs whose FDP exceeds the target alpha;
@@ -295,7 +297,7 @@ The run-level exceedance rate is **not** the FDR definition. A high exceedance r
 
 The paper's Section 4.2 Eq. (4) and Theorem 1 both print a lower-tail p-value. However, the paper's Section 4.1 convention says low scores indicate contamination, while Theorem 2's power premise requires clean items to have small p-values. For high-score-clean detectors, that direction requires the upper tail. The official FTD implementation uses the upper-tail greater direction in its reported experiment path.
 
-A lower-tail empirical p-value can still be uniform under the contaminated null when test and reference scores are exchangeable and continuous. So the printed lower-tail direction does not by itself disprove the null-uniformity/FDR argument. It does, however, reverse which alternative is powerful under the stated score semantics. The reproduction record therefore treats the official code direction as the operational comparator, preserves the lower-tail option for audit, and tests the power reversal explicitly.
+The lower-tail expression appears in both Eq. (4) and Theorem 1, while Theorem 2's power premise requires clean items to have small p-values. A lower-tail empirical p-value can still be uniform under the contaminated null when test and reference scores are exchangeable and continuous, so the printed lower-tail direction does not by itself disprove the null-uniformity/FDR argument. It does, however, reverse which alternative is powerful under the stated score semantics. The reproduction record therefore treats the official code direction as the operational comparator, preserves the lower-tail option for audit, and tests the power reversal explicitly.
 
 The simulation is a falsification tool, not a proof. A passing synthetic grid does not establish reference exchangeability, real-data null super-uniformity, cross-item dependence assumptions, semantic validity, or any universal FDR guarantee. Any scenario with reference shift or task clustering that exceeds the target blocks an FDR guarantee claim for that scope.
 
