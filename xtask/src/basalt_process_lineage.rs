@@ -382,7 +382,10 @@ pub fn audit_bytes(oracle_bytes: &[u8], receipt_bytes: &[u8]) -> ProcessLineageA
         && receipt.reported_tree_closed
         && all_processes_have_exit_events(&oracle.processes, &oracle.events)
         && all_processes_have_exit_observed(&receipt.processes, &receipt.events);
-    report.process_tree_closed = required_closed;
+    report.process_tree_closed = required_closed
+        && report.event_loss_free
+        && report.process_graph_reconciled
+        && report.event_set_reconciled;
 
     report.lineage_audit_passed = report.oracle_well_formed
         && report.receipt_well_formed
@@ -586,6 +589,10 @@ fn validate_observed_events(
         events.sort_by_key(|item| item.0);
         for (index, item) in events.iter().enumerate() {
             let expected = (index as u64) + 1;
+            if index > 0 && item.0 <= events[index - 1].0 {
+                integral = false;
+                error(report, "E_EVENT_SEQUENCE_DUPLICATE", "receipt.events", &format!("event source {source} has a repeated or decreasing sequence number {}", item.0));
+            }
             if item.0 != expected {
                 integral = false;
                 if item.0 > expected {
@@ -836,17 +843,30 @@ mod tests {
     }
 
     #[test]
-    fn pid_only_identity_merging_is_caught_as_missing_and_unexpected() {
+    fn wrong_process_start_time_is_caught_as_missing_and_unexpected() {
         let (oracle, mut receipt) = fixtures();
-        receipt["processes"][1]["identity"]["start_time_ticks"]=json!(1000);
-        receipt["events"][2]["process"]["start_time_ticks"]=json!(1000);
-        receipt["events"][3]["process"]["start_time_ticks"]=json!(1000);
-        receipt["events"][4]["process"]["start_time_ticks"]=json!(1000);
+        receipt["processes"][1]["identity"]["start_time_ticks"]=json!(1011);
+        receipt["events"][2]["process"]["start_time_ticks"]=json!(1011);
+        receipt["events"][3]["process"]["start_time_ticks"]=json!(1011);
+        receipt["events"][4]["process"]["start_time_ticks"]=json!(1011);
         let report=audit(&oracle,&receipt);
         assert!(!report.lineage_audit_passed);
         assert!(!report.process_graph_reconciled);
         assert!(report.counts.missing_processes>0);
         assert!(report.counts.unexpected_processes>0);
+    }
+
+    #[test]
+    fn pid_only_collision_merging_two_incarnations_is_rejected() {
+        let (oracle, mut receipt) = fixtures();
+        receipt["processes"][1]["identity"]["start_time_ticks"]=json!(1000);
+        for index in 2..=4 {
+            receipt["events"][index]["process"]["start_time_ticks"]=json!(1000);
+        }
+        let report=audit(&oracle,&receipt);
+        assert!(!report.lineage_audit_passed);
+        assert!(!report.receipt_well_formed);
+        assert!(report.errors.iter().any(|e|e.code=="E_PROCESS_DUPLICATE"));
     }
 
     #[test]
