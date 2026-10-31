@@ -7,6 +7,7 @@ mod basalt_observer_result;
 mod basalt_fixture;
 mod basalt_cargo_fixture;
 mod basalt_cargo_mtime_fixture;
+mod basalt_coverage;
 mod basalt_validate;
 mod crate_status;
 mod duplicate_scan;
@@ -86,6 +87,15 @@ enum Commands {
         catalog: PathBuf,
         #[arg(long)]
         out_dir: PathBuf,
+    },
+    /// Audit an observer coverage envelope against a separately pinned candidate profile.
+    BasaltCoverageEnvelopeAudit {
+        /// Path to the exact versioned coverage profile.
+        #[arg(long)]
+        profile: PathBuf,
+        /// Path to the run-level coverage envelope JSON.
+        #[arg(long)]
+        receipt: PathBuf,
     },
     /// Validate a BASALT versioned run record and its cross-record evidence invariants.
     BasaltValidate {
@@ -204,6 +214,13 @@ fn main() -> anyhow::Result<()> {
         Commands::BasaltCargoEnvironmentFixtureRun { catalog, out_dir } => {
             let report = basalt_cargo_mtime_fixture::run_environment(&catalog, &out_dir)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Commands::BasaltCoverageEnvelopeAudit { profile, receipt } => {
+            let report = basalt_coverage::audit_files(&profile, &receipt)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if !report.coverage_claim_consistent {
+                anyhow::bail!("BASALT observer coverage envelope is malformed, unbound or overclaims completeness");
+            }
         }
         Commands::BasaltValidate { input, manifest, spec_root } => {
             let report = basalt_validate::validate_file(&input, &manifest, &spec_root)?;
