@@ -129,5 +129,5 @@ jobs:
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Test intake, dataset lineage/modality cohorts, frozen-prediction scoring, domain-shift calibration/OOD cluster-bootstrap and exact split-manifest membership/leakage, query-impact, synaptic-completeness stopping, reviewer outcome, multi-rater, spatial-frame/mask, candidate-pool sampling, candidate-generation coverage, query-certificate, correction-portfolio, physical-arclength co-linear-boundary, and finite query-ensemble audits
+      - name: Test intake, dataset lineage/modality cohorts, frozen-prediction scoring, domain-shift calibration/OOD cluster-bootstrap, exact split-manifest membership/leakage and development-derived OOD threshold selection, query-impact, synaptic-completeness stopping, reviewer outcome, multi-rater, spatial-frame/mask, candidate-pool sampling, candidate-generation coverage, query-certificate, correction-portfolio, physical-arclength co-linear-boundary, and finite query-ensemble audits
         run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml
