@@ -1037,6 +1037,31 @@ mod tests {
     }
 
     #[test]
+    fn planner_artifact_excludes_truth_and_gold_records() {
+        let suite=generate_poar_graph_suite(123,DatasetSplit::Test);
+        let planner=encode_planner_artifact_v1(&suite,"unit-test-generator-revision").expect("planner encoding");
+        let oracle=encode_oracle_artifact_v1(&suite,"unit-test-generator-revision",&"a".repeat(64)).expect("oracle encoding");
+        assert!(planner.starts_with("HEADER\tPOAR-TSV/1\t"));
+        assert!(!planner.lines().any(|line| line.starts_with("TRUTH\t")));
+        assert!(!planner.lines().any(|line| line.starts_with("GOLD_CLAIM\t")));
+        assert!(!planner.lines().any(|line| line.starts_with("GOLD_PATH\t")));
+        assert!(!planner.contains("supports_assertion"));
+        assert!(oracle.starts_with(&format!("ORACLE_HEADER\tPOAR-TSV/1\t{}\t","a".repeat(64))));
+        assert!(oracle.lines().any(|line| line.starts_with("TRUTH\t")));
+        assert!(oracle.lines().any(|line| line.starts_with("GOLD_CLAIM\t")));
+        assert!(oracle.lines().any(|line| line.starts_with("GOLD_PATH\t")));
+    }
+
+    #[test]
+    fn oracle_artifact_rejects_noncanonical_planner_digests() {
+        let suite=generate_poar_graph_suite(123,DatasetSplit::Test);
+        assert!(encode_oracle_artifact_v1(&suite,"rev","ABCDEF").is_err());
+        assert!(encode_oracle_artifact_v1(&suite,"rev",&"g".repeat(64)).is_err());
+        assert!(encode_oracle_artifact_v1(&suite,"rev",&"A".repeat(64)).is_err());
+        assert!(encode_oracle_artifact_v1(&suite,"",&"a".repeat(64)).is_err());
+    }
+
+    #[test]
     fn split_graph_depths_are_held_out_in_difficulty_order() {
         fn chain_depth(suite: &GraphSuite) -> usize {
             let case = suite.planner_cases().iter().find(|c| c.id.contains("long-chain-")).expect("chain fixture exists");
