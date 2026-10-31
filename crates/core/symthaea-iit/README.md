@@ -344,7 +344,7 @@ Use two clearly separated upstream baselines:
 |---|---|---|
 | IIT 4.0 (2023) system `phi_s` | End-to-end analyzer | Bounded binary system search implemented; qualification still limited to named published anchors and dense/sparse reference fixtures |
 | IIT 4.0 (2026) system `phi_s` | Implemented, including intrinsic-information requirement | Formalism identity exists; 2026 calculation is not implemented |
-| Full cause-effect structure, distinctions, relations, big `Phi` | Full structure pipeline; analytical relation summaries avoid mandatory relation enumeration | Not implemented; no Composition-level tie escalation |
+| Full cause-effect structure, distinctions, relations, big `Phi` | Full structure pipeline; analytical relation summaries avoid mandatory relation enumeration | Not implemented; no Composition-level tie escalation; tracked in [#9600](https://github.com/Luminous-Dynamics/symthaea/issues/9600) |
 | Heterogeneous multi-valued units | End-to-end support, including mixed alphabets and per-node factored TPMs | Binary-only; tracked in [#9596](https://github.com/Luminous-Dynamics/symthaea/issues/9596) |
 | Macro units and grain search | Coarse-graining, black-boxing, intrinsic-unit criteria, bounded grain search | Not implemented |
 | Actual causation | Dedicated pipeline | Not implemented |
