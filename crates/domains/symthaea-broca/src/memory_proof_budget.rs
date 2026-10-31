@@ -1321,6 +1321,7 @@ pub fn verify_proof_budget_result(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::memory_evidence::{EvidenceIndex, EvidenceRecord, EvidenceSource, EvidencePayload, EvidenceLifecycle};
 
     fn digest(byte: char) -> String {
         std::iter::repeat(byte).take(64).collect()
@@ -1927,6 +1928,147 @@ mod tests {
         assert_eq!(result.status, ProofBudgetStatus::Supported);
         result.evidence[0].source_speaker = Some(EvidenceSpeakerRole::Assistant);
         assert!(verify_proof_budget_result(&req, &result).is_err());
+    }
+
+    fn insert_enumeration_test_record(
+        index: &mut EvidenceIndex,
+        hdc_id: u64,
+        evidence_id: &str,
+        session_id: &str,
+        step_id: &str,
+        text: &str,
+    ) {
+        let source_bytes = serde_json::to_vec(&serde_json::json!({"evidence": text})).unwrap();
+        let record = EvidenceRecord {
+            schema_version: crate::memory_evidence::EVIDENCE_SCHEMA_VERSION.into(),
+            evidence_id: evidence_id.into(),
+            hdc_id,
+            scope_id: "scope-1".into(),
+            source: EvidenceSource {
+                trajectory_id: session_id.into(),
+                step_id: Some(step_id.into()),
+                step_index: step_id.rsplit('-').next().and_then(|s| s.parse().ok()),
+                source_sha256: sha256_hex(&source_bytes),
+                source_pointer: "/evidence".into(),
+            },
+            payload: EvidencePayload::Text { value: text.into() },
+            content_sha256: sha256_hex(text.as_bytes()),
+            lifecycle: EvidenceLifecycle::Active,
+            occurred_at_unix_ms: Some(100),
+            valid_from_unix_ms: None,
+            valid_until_unix_ms: None,
+            superseded_by: None,
+        };
+        index.insert(record, &source_bytes).unwrap();
+    }
+
+    #[test]
+    fn complete_enumeration_receipt_requires_every_match_in_the_selected_proof() {
+        let mut index = EvidenceIndex::new();
+        insert_enumeration_test_record(&mut index, 1, "E1", "S1", "user-0", "invoice paid in March");
+        insert_enumeration_test_record(&mut index, 2, "E2", "S2", "assistant-1", "invoice paid suggestion");
+        insert_enumeration_test_record(&mut index, 3, "E3", "S3", "user-2", "invoice paid in April");
+        insert_enumeration_test_record(&mut index, 4, "E4", "S4", "credit issued in May");
+
+        let enumeration = index.enumerate_exact_lexical_all_terms_at_snapshot(
+            "invoice paid",
+            "scope-1",
+            200,
+            300,
+            None,
+        ).unwrap();
+        assert_eq!(enumeration.receipt.matching_record_count, 3);
+
+        let mut obligation = ProofObligation {
+            conclusion_id: "count-invoice-events".into(),
+            alternatives: Vec::new(),
+            minimum_independent_families: 2,
+            minimum_distinct_sessions: 2,
+            minimum_user_authored_evidence: 2,
+            required_complete_evidence_ids: BTreeSet::new(),
+            enumeration_receipt_sha256: None,
+            selection_overhead_tokens: 1,
+        };
+        obligation.bind_verified_complete_enumeration(
+            &index,
+            &enumeration,
+            "all-invoice-events",
+        ).unwrap();
+        assert_eq!(
+            obligation.required_complete_evidence_ids,
+            BTreeSet::from(["E1".into(), "E2".into(), "E3".into()])
+        );
+        assert_eq!(
+            obligation.enumeration_receipt_sha256.as_deref(),
+            Some(enumeration.receipt.receipt_sha256.as_str())
+        );
+
+        let mut e1 = candidate("E1", "family-1", 1);
+        e1.source_session_id = Some("S1".into());
+        e1.source_speaker = Some(EvidenceSpeakerRole::User);
+        let mut e2 = candidate("E2", "family-2", 1);
+        e2.source_session_id = Some("S2".into());
+        e2.source_speaker = Some(EvidenceSpeakerRole::Assistant);
+        let mut e3 = candidate("E3", "family-3", 1);
+        e3.source_session_id = Some("S3".into());
+        e3.source_speaker = Some(EvidenceSpeakerRole::User);
+
+        let req = request(vec![e1, e2, e3], vec![obligation.clone()], 32);
+        let result = solve_proof_budget(req.clone()).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        assert_eq!(
+            result.evidence.iter().map(|item| item.evidence_id.as_str()).collect::<Vec<_>>(),
+            vec!["E1", "E2", "E3"]
+        );
+        verify_proof_budget_result(&req, &result).unwrap();
+
+        // A tempting partial packet still satisfies the family, session and
+        // user-source floors, but omits one exact match from the enumeration.
+        // Both optimizer and independent verifier must refuse to support it.
+        let mut partial = obligation;
+        partial.alternatives[0].evidence_dependencies = vec!["E1".into(), "E3".into()];
+        let partial_req = request(
+            req.candidates.clone(),
+            vec![partial],
+            32,
+        );
+        let partial_result = solve_proof_budget(partial_req).unwrap();
+        assert_eq!(partial_result.status, ProofBudgetStatus::NoEligibleProof);
+        assert!(partial_result.justification_rejections.iter().any(|rejection| {
+            rejection.reason == JustificationRejectionReason::CompleteEnumerationEvidenceOmitted
+        }));
+    }
+
+    #[test]
+    fn complete_enumeration_binding_rejects_tampered_or_empty_enumerations() {
+        let mut index = EvidenceIndex::new();
+        insert_enumeration_test_record(&mut index, 1, "E1", "S1", "user-0", "invoice paid");
+        let valid = index.enumerate_exact_lexical_all_terms_at_snapshot(
+            "invoice paid", "scope-1", 200, 300, None,
+        ).unwrap();
+
+        let mut tampered = valid.clone();
+        tampered.matches.clear();
+        let mut obligation = ProofObligation {
+            conclusion_id: "claim-1".into(),
+            alternatives: Vec::new(),
+            minimum_independent_families: 1,
+            minimum_distinct_sessions: 0,
+            minimum_user_authored_evidence: 0,
+            required_complete_evidence_ids: BTreeSet::new(),
+            enumeration_receipt_sha256: None,
+            selection_overhead_tokens: 0,
+        };
+        assert!(obligation.bind_verified_complete_enumeration(
+            &index, &tampered, "all-matches"
+        ).is_err());
+
+        let empty = index.enumerate_exact_lexical_all_terms_at_snapshot(
+            "never-present", "scope-1", 200, 300, None,
+        ).unwrap();
+        assert!(obligation.bind_verified_complete_enumeration(
+            &index, &empty, "empty-enumeration"
+        ).unwrap_err().contains("proof-of-absence"));
     }
 
     #[test]
