@@ -129,3 +129,12 @@ The additive design and executable metric primitives in UNCERTAINTY_CALIBRATION.
 ## Claim ceiling
 
 A synthetic pass demonstrates only the branch identity, known-answer intervention and metric contracts implemented by this generator. It does not establish real-world counterfactual correctness, physical safety, learned Symthaea world-model reliability, or SOTA. No physical robot intervention or actuator-control authority is enabled.
+
+
+## VIS-005 joint action-set adapter bridge
+
+This branch adds an executable same-history joint action-bank primitive for the future VIS-005 predictor adapter. See [VIS005_ACTION_SET_ADAPTER.md](VIS005_ACTION_SET_ADAPTER.md), [joint-action-bank.v0.1.schema.json](joint-action-bank.v0.1.schema.json) and the synthetic [joint-action-bank fixture](fixtures/joint-action-bank.example.json).
+
+The payload binds one observed-history digest, forecast horizon, canonical action-manifest digest, scalar outcome channel, unique action identities, unique shared draw IDs, joint-draw-bank digest and a matrix whose columns share the same joint draw across all action rows. Rust validates matrix cardinality and provenance digest syntax, computes per-action intervals and constructs paired differences directly from shared draw columns. Action-row permutation does not change an action-ID-defined effect interval.
+
+This is the interface seam VIS-005 needs for CfC/vision dynamics or a later learned predictor. It is not a production predictor, and the code cannot authenticate that the declared coupling was actually used; the action manifest, draw spec and raw sample bytes still need independent adapter provenance. Predictions remain Predicted/Counterfactual and never become observations.
