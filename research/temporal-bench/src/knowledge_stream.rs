@@ -467,20 +467,30 @@ pub fn verify_knowledge_stream(
     if oracle.content_sha256 != knowledge_oracle_digest(oracle) {
         return Err(KnowledgeVerificationError::OracleDigestMismatch);
     }
+    let expected_event_count = oracle
+        .answers
+        .len()
+        .saturating_add(oracle.target_fact_id as usize)
+        .saturating_add(2);
     if task.target_entity_id != oracle.target_entity_id
         || task.target_predicate_id != oracle.target_predicate_id
-        || oracle.target_fact_id == 0
+        || oracle.target_fact_id != 1
         || oracle.correction_valid_from >= oracle.retraction_valid_from
         || oracle.correction_observed_at >= oracle.retraction_observed_at
         || oracle.retraction_observed_at >= task.query_issued_at
         || oracle.answers.len() != 5
+        || task.events.len() < oracle.answers.len().saturating_add(3)
     {
         return Err(KnowledgeVerificationError::InvalidTimeline);
     }
 
     let mut previous_key = None;
     let mut revisions: std::collections::BTreeMap<u64, u32> = std::collections::BTreeMap::new();
+    let mut fact_entities = BTreeSet::new();
+    let mut fact_ids = BTreeSet::new();
     let mut query_answers = std::collections::BTreeMap::new();
+    let mut query_count = 0_usize;
+    let mut target_revision_count = 0_usize;
 
     for (index, event) in task.events.iter().enumerate() {
         let key = (event.observed_at, event.ordinal);
@@ -501,6 +511,23 @@ pub fn verify_knowledge_stream(
                     });
                 }
                 revisions.insert(*fact_id, *revision);
+                if *fact_id == oracle.target_fact_id {
+                    target_revision_count = target_revision_count.saturating_add(1);
+                } else {
+                    let distance = (*entity_id ^ oracle.target_entity_id).count_ones();
+                    if *revision != 0
+                        || *valid_from != 0
+                        || *operation != KnowledgeOperation::Assert
+                        || value.is_none()
+                        || !(1..=4).contains(&distance)
+                        || !fact_entities.insert(*entity_id)
+                        || !fact_ids.insert(*fact_id)
+                    {
+                        return Err(KnowledgeVerificationError::InvalidRevision {
+                            fact_id: *fact_id, revision: *revision,
+                        });
+                    }
+                }
                 match operation {
                     KnowledgeOperation::Assert if *revision == 0 && value.is_some() => {}
                     KnowledgeOperation::Correct if *revision > 0 && value.is_some() => {}
@@ -509,13 +536,31 @@ pub fn verify_knowledge_stream(
                         fact_id: *fact_id, revision: *revision,
                     }),
                 }
-                if *entity_id == oracle.target_entity_id
-                    && *predicate_id == oracle.target_predicate_id
-                    && *fact_id == oracle.target_fact_id
-                {
-                    if (*revision == 0 && (*valid_from != 0 || value != &Some(oracle.initial_value)))
-                        || (*revision == 1 && (*valid_from != oracle.correction_valid_from || value != &Some(oracle.corrected_value)))
-                        || (*revision == 2 && (*valid_from != oracle.retraction_valid_from || value.is_some()))
+                if *fact_id == oracle.target_fact_id {
+                    let expected = match *revision {
+                        0 => (0, KnowledgeOperation::Assert, Some(oracle.initial_value), 0),
+                        1 => (
+                            oracle.correction_valid_from,
+                            KnowledgeOperation::Correct,
+                            Some(oracle.corrected_value),
+                            oracle.correction_observed_at,
+                        ),
+                        2 => (
+                            oracle.retraction_valid_from,
+                            KnowledgeOperation::Retract,
+                            None,
+                            oracle.retraction_observed_at,
+                        ),
+                        _ => return Err(KnowledgeVerificationError::InvalidRevision {
+                            fact_id: *fact_id, revision: *revision,
+                        }),
+                    };
+                    if *entity_id != oracle.target_entity_id
+                        || *predicate_id != oracle.target_predicate_id
+                        || *valid_from != expected.0
+                        || *operation != expected.1
+                        || *value != expected.2
+                        || event.observed_at != expected.3
                     {
                         return Err(KnowledgeVerificationError::InvalidRevision {
                             fact_id: *fact_id, revision: *revision,
@@ -533,17 +578,55 @@ pub fn verify_knowledge_stream(
                 {
                     return Err(KnowledgeVerificationError::InvalidQuery { query_id: *query_id });
                 }
-                query_answers.insert(*query_id, (*valid_at, *known_at));
+                query_count = query_count.saturating_add(1);
+                if query_answers.insert(*query_id, (*valid_at, *known_at)).is_some() {
+                    return Err(KnowledgeVerificationError::InvalidQuery { query_id: *query_id });
+                }
             }
         }
     }
 
-    if query_answers.len() != oracle.answers.len() {
+    if query_answers.len() != oracle.answers.len()
+        || query_count != oracle.answers.len()
+        || target_revision_count != 3
+        || fact_ids.len() != task.events.len().saturating_sub(oracle.answers.len() + 3)
+    {
         return Err(KnowledgeVerificationError::InvalidTimeline);
     }
 
     // Independent verification: scan the public history for the highest
     // revision eligible at both valid_at and known_at, then compare the answer.
+    let expected_query_coordinates = [
+        (
+            1_u64,
+            oracle.correction_valid_from.saturating_add(1),
+            oracle.correction_observed_at.saturating_sub(1),
+        ),
+        (
+            2_u64,
+            oracle.correction_valid_from.saturating_add(1),
+            oracle.correction_observed_at,
+        ),
+        (
+            3_u64,
+            oracle.retraction_valid_from.saturating_add(1),
+            oracle.retraction_observed_at.saturating_sub(1),
+        ),
+        (
+            4_u64,
+            oracle.retraction_valid_from.saturating_add(1),
+            oracle.retraction_observed_at,
+        ),
+        (5_u64, oracle.correction_valid_from / 2, task.query_issued_at),
+    ];
+    for (query_id, expected_valid_at, expected_known_at) in expected_query_coordinates {
+        if query_answers.get(&query_id).copied()
+            != Some((expected_valid_at, expected_known_at))
+        {
+            return Err(KnowledgeVerificationError::InvalidQuery { query_id });
+        }
+    }
+
     for answer in &oracle.answers {
         let Some((valid_at, known_at)) = query_answers.get(&answer.query_id).copied() else {
             return Err(KnowledgeVerificationError::InvalidQuery { query_id: answer.query_id });
@@ -736,7 +819,7 @@ mod tests {
         task.content_sha256 = knowledge_task_digest(&task);
         assert_eq!(
             verify_knowledge_stream_seeded(&task, &oracle, cfg),
-            Err(KnowledgeVerificationError::InvalidEventOrder { index: 0 })
+            Err(KnowledgeVerificationError::SeedReplayMismatch)
         );
     }
 
