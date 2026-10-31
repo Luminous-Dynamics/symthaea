@@ -86,7 +86,8 @@ The module contains tests for:
 4. verifier rejection being retained and charged without promoting evidence level;
 5. duplicate decision bytes being rejected under a second candidate ID;
 6. overlapping event intervals and mismatched verifier evidence being rejected;
-7. receipt tampering being rejected by deterministic reconstruction.
+7. target reference-front ordering being canonicalized to one digest;
+8. receipt tampering being rejected by deterministic reconstruction.
 
 These tests are authored only. They have not been compiled or executed in this environment.
 
@@ -94,7 +95,7 @@ These tests are authored only. They have not been compiled or executed in this e
 
 - Sequential accounting only. Any overlapping event intervals are rejected; parallel, batched, and asynchronous work is not qualified.
 - The three optimizer runners do not yet emit this event history. The module API exists, but evaluation-history instrumentation is a separate integration task.
-- No candidate artifact-byte resolver, immutable object-store retrieval, verifier signature check, or independent evidence-bundle validator is present yet.
+- No candidate artifact-byte resolver, immutable object-store retrieval, verifier signature check, or independent evidence-bundle validator is present yet. The event chain detects post-capture alteration but cannot prove that submitted resource counters are truthful; resource receipt attestation remains a separate integration.
 - One successful measurement per candidate ID per run. Replicate aggregation is not yet defined.
 - No multi-run empirical attainment surface or cluster-level target-cost inference yet.
 - Exact hypervolume target analysis inherits the shared 2–4 objective limit.
