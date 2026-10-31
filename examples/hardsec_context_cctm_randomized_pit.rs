@@ -1309,7 +1309,7 @@ mod tests {
         }
         assert!(ks <= 0.000051, "randomized PIT stratified-grid KS error {ks}");
         assert_eq!(naive, vec![0.5,0.8,1.0]);
-        assert_eq!(naive.iter().copied().collect::<BTreeSet<_>>().len(),3);
+        assert!(naive[0] < naive[1] && naive[1] < naive[2]);
     }
 
     #[test]
