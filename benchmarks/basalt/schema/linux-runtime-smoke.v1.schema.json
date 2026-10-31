@@ -73,7 +73,8 @@
       "additionalProperties": false,
       "required": [
         "release",
-        "architecture",
+        "kernel_machine",
+        "userspace_architecture",
         "boot_id_digest"
       ],
       "properties": {
@@ -83,16 +84,23 @@
             "null"
           ]
         },
-        "architecture": {
-          "type": "string",
-          "minLength": 1
-        },
         "boot_id_digest": {
           "type": [
             "string",
             "null"
           ],
           "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "kernel_machine": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "userspace_architecture": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
