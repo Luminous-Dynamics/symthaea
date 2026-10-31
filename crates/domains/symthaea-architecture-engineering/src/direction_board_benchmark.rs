@@ -87,7 +87,10 @@ pub struct DirectionCampaignAction {
     pub slot: usize,
     pub arm_id: String,
     pub is_new_proposal: bool,
+    /// Score revealed to the policy by the evaluator.
     pub observed_score: Option<f64>,
+    /// Evaluator-side expected reward for this exact candidate; never a policy observation.
+    pub expected_score: Option<f64>,
     pub proposal_disposition: Option<NewDirectionDisposition>,
     pub cost_units: u64,
 }
@@ -123,7 +126,10 @@ pub struct DirectionCampaignRun {
     pub total_cost_units: u64,
     pub target_score: f64,
     pub actions_to_target: Option<usize>,
+    /// Best realized observation (can be lucky under noisy rewards).
     pub final_best_score: f64,
+    /// Best expected reward among evaluated candidates, computed from evaluator truth.
+    pub final_best_expected_score: f64,
     pub final_best_direction: String,
     pub oracle_best_score: f64,
     pub simple_regret: f64,
@@ -144,6 +150,7 @@ pub struct DirectionCampaignAggregate {
     pub seed_count: usize,
     pub mean_final_best_score: f64,
     pub final_best_score_sample_sd: f64,
+    pub mean_final_best_expected_score: f64,
     pub mean_simple_regret: f64,
     pub target_hit_rate: f64,
     /// Mean actions-to-target among target-hitting runs only.
@@ -161,9 +168,11 @@ pub struct DirectionCampaignPairedComparison {
     pub baseline_policy: DirectionCampaignPolicy,
     pub action_budget: usize,
     pub pair_count: usize,
-    /// Positive values favor the candidate policy.
+    /// Difference in best realized observations; can be noise-sensitive.
     pub mean_final_score_delta: f64,
     pub final_score_delta_sample_sd: f64,
+    /// Difference in evaluator-side expected scores, not sampled noisy observations.
+    pub mean_final_expected_score_delta: f64,
     /// Positive values mean the candidate reduced simple regret.
     pub mean_simple_regret_reduction: f64,
     pub candidate_win_rate: f64,
@@ -310,6 +319,7 @@ pub fn run_direction_campaign(
                 arm_id: "NEW".to_owned(),
                 is_new_proposal: true,
                 observed_score: None,
+                expected_score: None,
                 proposal_disposition: Some(disposition),
                 cost_units: 1,
             });
@@ -332,6 +342,11 @@ pub fn run_direction_campaign(
     let final_board_sha256 = board.digest().map_err(|error| error.to_string())?;
     let (final_best_direction, final_best_score) =
         best_observed_direction(&observations)?;
+    let final_best_expected_score = actions
+        .iter()
+        .filter_map(|action| action.expected_score)
+        .max_by(f64::total_cmp)
+        .ok_or_else(|| "campaign has no expected-score evaluation receipts".to_owned())?;
     let oracle_best_score = oracle_best_score(landscape);
     let policy_config = DirectionCampaignPolicyConfig {
         target_score: TARGET_SCORE,
@@ -365,9 +380,10 @@ pub fn run_direction_campaign(
         target_score: TARGET_SCORE,
         actions_to_target,
         final_best_score,
+        final_best_expected_score,
         final_best_direction,
         oracle_best_score,
-        simple_regret: (oracle_best_score - final_best_score).max(0.0),
+        simple_regret: (oracle_best_score - final_best_expected_score).max(0.0),
         admitted_new_directions,
         duplicate_new_proposals,
         rejected_new_proposals,
@@ -457,6 +473,11 @@ pub fn aggregate_direction_campaign_runs(
             seed_count: group.len(),
             mean_final_best_score: mean,
             final_best_score_sample_sd: sample_variance.sqrt(),
+            mean_final_best_expected_score: group
+                .iter()
+                .map(|run| run.final_best_expected_score)
+                .sum::<f64>()
+                / count,
             mean_simple_regret: group.iter().map(|run| run.simple_regret).sum::<f64>() / count,
             target_hit_rate: hit_runs.len() as f64 / count,
             mean_actions_to_target,
@@ -531,7 +552,7 @@ pub fn compare_paired_direction_campaign_runs(
 
     let mut paired: BTreeMap<
         (DirectionLandscapeFamily, DirectionCampaignPolicy, usize),
-        Vec<(f64, f64)>,
+        Vec<(f64, f64, f64)>,
     > = BTreeMap::new();
     for ((landscape, budget, _seed), policies) in &cells {
         let candidate = policies
@@ -547,6 +568,7 @@ pub fn compare_paired_direction_campaign_runs(
                 .push((
                     candidate.final_best_score - baseline.final_best_score,
                     baseline.simple_regret - candidate.simple_regret,
+                    candidate.final_best_expected_score - baseline.final_best_expected_score,
                 ));
         }
     }
@@ -557,18 +579,20 @@ pub fn compare_paired_direction_campaign_runs(
             continue;
         }
         let count = deltas.len() as f64;
-        let mean_delta = deltas.iter().map(|(score, _)| *score).sum::<f64>() / count;
+        let mean_delta = deltas.iter().map(|(score, _, _)| *score).sum::<f64>() / count;
+        let mean_expected_delta =
+            deltas.iter().map(|(_, _, expected)| *expected).sum::<f64>() / count;
         let variance = if deltas.len() < 2 {
             0.0
         } else {
             deltas
                 .iter()
-                .map(|(score, _)| (score - mean_delta).powi(2))
+                .map(|(score, _, _)| (score - mean_delta).powi(2))
                 .sum::<f64>()
                 / (deltas.len() - 1) as f64
         };
-        let wins = deltas.iter().filter(|(score, _)| *score > 1e-12).count();
-        let ties = deltas.iter().filter(|(score, _)| score.abs() <= 1e-12).count();
+        let wins = deltas.iter().filter(|(score, _, _)| *score > 1e-12).count();
+        let ties = deltas.iter().filter(|(score, _, _)| score.abs() <= 1e-12).count();
         comparisons.push(DirectionCampaignPairedComparison {
             landscape,
             candidate_policy,
@@ -577,9 +601,10 @@ pub fn compare_paired_direction_campaign_runs(
             pair_count: deltas.len(),
             mean_final_score_delta: mean_delta,
             final_score_delta_sample_sd: variance.sqrt(),
+            mean_final_expected_score_delta: mean_expected_delta,
             mean_simple_regret_reduction: deltas
                 .iter()
-                .map(|(_, regret_reduction)| *regret_reduction)
+                .map(|(_, regret_reduction, _)| *regret_reduction)
                 .sum::<f64>()
                 / count,
             candidate_win_rate: wins as f64 / count,
@@ -637,6 +662,7 @@ fn evaluate_direction(
         arm_id: direction_id.to_owned(),
         is_new_proposal: false,
         observed_score: Some(score),
+        expected_score: Some(payoff(landscape, direction_id, evaluation_index)),
         proposal_disposition: None,
         cost_units: 1,
     });
