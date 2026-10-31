@@ -299,8 +299,12 @@ impl fmt::Display for KnowledgeVerificationError {
             Self::StreamIdMismatch => write!(f, "knowledge task/oracle stream IDs differ"),
             Self::PublicDigestMismatch => write!(f, "knowledge public SHA-256 digest mismatch"),
             Self::OracleDigestMismatch => write!(f, "knowledge oracle SHA-256 digest mismatch"),
-            Self::SeedReplayMismatch => write!(f, "knowledge task/oracle differ from evaluator-held seed/configuration"),
-            Self::InvalidEventOrder { index } => write!(f, "knowledge event {index} is not strictly ordered"),
+            Self::SeedReplayMismatch => {
+                write!(f, "knowledge task/oracle differ from evaluator-held seed/configuration")
+            }
+            Self::InvalidEventOrder { index } => {
+                write!(f, "knowledge event {index} is not strictly ordered")
+            }
             Self::InvalidRevision { fact_id, revision } => {
                 write!(f, "fact {fact_id} has invalid or non-monotonic revision {revision}")
             }
@@ -308,7 +312,9 @@ impl fmt::Display for KnowledgeVerificationError {
                 write!(f, "fact {fact_id} revision {revision} has an invalid operation/value pair")
             }
             Self::InvalidQuery { query_id } => write!(f, "knowledge query {query_id} is invalid"),
-            Self::InvalidAnswer { query_id } => write!(f, "bitemporal oracle answer for query {query_id} is incorrect"),
+            Self::InvalidAnswer { query_id } => {
+                write!(f, "bitemporal oracle answer for query {query_id} is incorrect")
+            }
             Self::InvalidTimeline => write!(f, "knowledge stream timeline is invalid"),
         }
     }
@@ -970,7 +976,10 @@ mod tests {
         let predictions = [
             KnowledgePrediction { query_id: 1, answer: KnowledgeCandidateAnswer::Abstain },
             KnowledgePrediction { query_id: 2, answer: KnowledgeCandidateAnswer::NoFact },
-            KnowledgePrediction { query_id: 3, answer: KnowledgeCandidateAnswer::Value(oracle.corrected_value) },
+            KnowledgePrediction {
+                query_id: 3,
+                answer: KnowledgeCandidateAnswer::Value(oracle.corrected_value),
+            },
             KnowledgePrediction { query_id: 4, answer: KnowledgeCandidateAnswer::NoFact },
         ];
         let score = score_knowledge_predictions(&oracle, &predictions).unwrap();
@@ -991,7 +1000,10 @@ mod tests {
             score_knowledge_predictions(&oracle, &duplicate),
             Err(KnowledgeScoringError::DuplicatePrediction { query_id: 1 })
         );
-        let unknown = [KnowledgePrediction { query_id: 99, answer: KnowledgeCandidateAnswer::NoFact }];
+        let unknown = [KnowledgePrediction {
+            query_id: 99,
+            answer: KnowledgeCandidateAnswer::NoFact,
+        }];
         assert_eq!(
             score_knowledge_predictions(&oracle, &unknown),
             Err(KnowledgeScoringError::UnknownQuery { query_id: 99 })
@@ -1054,7 +1066,9 @@ mod tests {
         let (task, oracle) = generate_knowledge_stream(config()).unwrap();
         let revisions: Vec<_> = task.events.iter().filter_map(|event| match &event.kind {
             KnowledgeEventKind::Version { fact_id, revision, valid_from, .. }
-                if *fact_id == oracle.target_fact_id => Some((event.observed_at, *valid_from, *revision)),
+                if *fact_id == oracle.target_fact_id => {
+                    Some((event.observed_at, *valid_from, *revision))
+                },
             _ => None,
         }).collect();
         assert_eq!(revisions, vec![
