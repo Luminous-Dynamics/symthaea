@@ -2229,9 +2229,10 @@ mod tests {
             .system_intrinsic_specification_iit4(&candidate, &current_state, 6, 1 << 16)
             .unwrap();
         let pairs = intrinsic.state_pairs();
-        for partition in partitions.iter().take(3) {
+        assert!(!pairs.is_empty());
+        for partition in &partitions {
             let cached_terms = sparse.prepare_iit4_partition_terms(partition, &baseline).unwrap();
-            for system_state in pairs.iter().take(3) {
+            for system_state in &pairs {
                 let cached = sparse
                     .score_iit4_system_partition_from_terms(
                         partition,
@@ -2248,8 +2249,26 @@ mod tests {
                         1 << 16,
                     )
                     .unwrap();
-                assert!((cached.score.signed_phi - independently_prepared.score.signed_phi).abs() <= 1e-12);
-                assert!((cached.score.normalized_phi - independently_prepared.score.normalized_phi).abs() <= 1e-12);
+                for (cached_value, independent_value) in [
+                    (cached.score.phi, independently_prepared.score.phi),
+                    (cached.score.signed_phi, independently_prepared.score.signed_phi),
+                    (cached.score.normalized_phi, independently_prepared.score.normalized_phi),
+                    (cached.score.signed_normalized_phi, independently_prepared.score.signed_normalized_phi),
+                    (cached.score.cause.signed_phi, independently_prepared.score.cause.signed_phi),
+                    (cached.score.effect.signed_phi, independently_prepared.score.effect.signed_phi),
+                    (cached.score.cause.selectivity, independently_prepared.score.cause.selectivity),
+                    (cached.score.cause.forward_probability, independently_prepared.score.cause.forward_probability),
+                    (cached.score.cause.partitioned_forward_probability, independently_prepared.score.cause.partitioned_forward_probability),
+                    (cached.score.effect.selectivity, independently_prepared.score.effect.selectivity),
+                    (cached.score.effect.forward_probability, independently_prepared.score.effect.forward_probability),
+                    (cached.score.effect.partitioned_forward_probability, independently_prepared.score.effect.partitioned_forward_probability),
+                    (cached.score.normalization_factor, independently_prepared.score.normalization_factor),
+                ] {
+                    assert!(
+                        (cached_value - independent_value).abs() <= 1e-12,
+                        "cached score {cached_value:.17} differs from independently prepared {independent_value:.17}"
+                    );
+                }
                 assert_eq!(
                     cached.score.severed_connections,
                     independently_prepared.score.severed_connections
