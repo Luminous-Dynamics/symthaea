@@ -1121,7 +1121,10 @@ pub fn analyze_anytime_history(history: &AnytimeHistory) -> Result<AnytimeRunRec
         target: target.clone(),
         first: None,
         final_snapshot: MetricSnapshot {
-            metric_value: None,
+            metric_value: match target.metric {
+                AnytimeTargetMetric::Hypervolume => Some(0.0),
+                AnytimeTargetMetric::IgdPlus | AnytimeTargetMetric::AdditiveEpsilon => None,
+            },
             archive_sha256: empty_archive_sha.clone(),
         },
         final_resources: ResourceCost::zero(),
@@ -1135,6 +1138,11 @@ pub fn analyze_anytime_history(history: &AnytimeHistory) -> Result<AnytimeRunRec
             objective_attempts = objective_attempts.checked_add(1)
                 .ok_or_else(|| AnytimeError::new("receipt.objective_evaluation_attempt_count", "counter overflow"))?;
         }
+        // The candidate archive changes only when a successful evaluation is admitted or a
+        // verification level first makes that candidate eligible for a target. Failed actions,
+        // retries, rejections, and auxiliary events still cost resources but do not trigger a
+        // full Pareto recomputation.
+        let mut newly_eligible_range: Option<(Option<EvidenceLevel>, EvidenceLevel)> = None;
         match &event.action {
             AnytimeAction::CandidateEvaluation {
                 candidate_id, outcome: EvaluationOutcome::Succeeded,
@@ -1153,13 +1161,16 @@ pub fn analyze_anytime_history(history: &AnytimeHistory) -> Result<AnytimeRunRec
                     evidence_level: EvidenceLevel::Recorded,
                     verification_rejected: false,
                 });
+                newly_eligible_range = Some((None, EvidenceLevel::Recorded));
             }
             AnytimeAction::CandidateVerification { candidate_id, level, .. } => {
                 let state = candidates.get_mut(candidate_id).ok_or_else(|| AnytimeError::new(
                     "history.candidate_verification",
                     "validated history lost a verified candidate",
                 ))?;
+                let previous_level = state.evidence_level;
                 state.evidence_level = *level;
+                newly_eligible_range = Some((Some(previous_level), *level));
             }
             AnytimeAction::CandidateVerificationRejected { candidate_id, .. } => {
                 let state = candidates.get_mut(candidate_id).ok_or_else(|| AnytimeError::new(
@@ -1174,29 +1185,34 @@ pub fn analyze_anytime_history(history: &AnytimeHistory) -> Result<AnytimeRunRec
         let resource_qualified = header.required_resource_meters.iter()
             .all(|meter| totals.meter_is_known(*meter));
         for item in &mut progress {
-            let snapshot = metric_snapshot(
-                header, &candidates, item.target.minimum_evidence_level, item.target.metric,
-            )?;
-            item.final_snapshot = snapshot.clone();
+            let target_became_eligible = newly_eligible_range.is_some_and(|(previous, current)| {
+                let was_eligible = previous.is_some_and(|level| level.meets(item.target.minimum_evidence_level));
+                !was_eligible && current.meets(item.target.minimum_evidence_level)
+            });
+            if target_became_eligible {
+                item.final_snapshot = metric_snapshot(
+                    header, &candidates, item.target.minimum_evidence_level, item.target.metric,
+                )?;
+                if item.first.is_none()
+                    && target_is_reached(item.target.metric, item.target.threshold, item.final_snapshot.metric_value)
+                {
+                    item.first = Some(TargetCrossing {
+                        event_ordinal: event.ordinal,
+                        objective_evaluation_attempt_count: objective_attempts,
+                        elapsed_wall_millis: event.completed_elapsed_millis,
+                        metric_value: item.final_snapshot.metric_value.ok_or_else(|| AnytimeError::new(
+                            "receipt.target.metric_value",
+                            "a reached target must have a metric value",
+                        ))?,
+                        archive_sha256: item.final_snapshot.archive_sha256.clone(),
+                        resources: totals.clone(),
+                        resource_qualified,
+                    });
+                }
+            }
             item.final_resources = totals.clone();
             item.final_elapsed_wall_millis = event.completed_elapsed_millis;
             item.final_resource_qualified = resource_qualified;
-            if item.first.is_none()
-                && target_is_reached(item.target.metric, item.target.threshold, snapshot.metric_value)
-            {
-                item.first = Some(TargetCrossing {
-                    event_ordinal: event.ordinal,
-                    objective_evaluation_attempt_count: objective_attempts,
-                    elapsed_wall_millis: event.completed_elapsed_millis,
-                    metric_value: snapshot.metric_value.ok_or_else(|| AnytimeError::new(
-                        "receipt.target.metric_value",
-                        "a reached target must have a metric value",
-                    ))?,
-                    archive_sha256: snapshot.archive_sha256,
-                    resources: totals.clone(),
-                    resource_qualified,
-                });
-            }
         }
     }
 
