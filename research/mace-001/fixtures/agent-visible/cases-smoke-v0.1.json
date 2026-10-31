@@ -260,14 +260,6 @@
             }
           },
           {
-            "event_id": "E6",
-            "session_id": "S4",
-            "event_kind": "irrelevant_metadata",
-            "payload": {
-              "operator_note": "used standard checklist"
-            }
-          },
-          {
             "event_id": "E14",
             "session_id": "S3",
             "event_kind": "controlled_intervention",
@@ -331,6 +323,14 @@
               "valve": "open",
               "flow_lpm": 12,
               "assignment": "treatment"
+            }
+          },
+          {
+            "event_id": "E6",
+            "session_id": "S4",
+            "event_kind": "irrelevant_metadata",
+            "payload": {
+              "operator_note": "used standard checklist"
             }
           }
         ],
