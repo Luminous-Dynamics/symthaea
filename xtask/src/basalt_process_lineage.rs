@@ -776,6 +776,8 @@ mod tests {
     fn pid_reuse_is_a_distinct_process_instance_not_a_pid_duplicate() {
         let (mut oracle, mut receipt) = fixtures();
         let reused = json!({"pid":101,"start_time_ticks":1100});
+        oracle["events"][4]["observed_at_monotonic_ns"]=json!(150);
+        receipt["events"][4]["observed_at_monotonic_ns"]=json!(151);
         oracle["processes"].as_array_mut().unwrap().push(json!({
             "identity":reused,"parent":{"relation":"parent","identity":{"pid":100,"start_time_ticks":1000}}
         }));
@@ -947,14 +949,15 @@ mod tests {
 
     #[test]
     fn pid_reuse_count_is_scoped_to_same_pid_with_different_start_ticks() {
-        let (mut oracle, receipt)=fixtures();
-        let reused=json!({"pid":100,"start_time_ticks":1200});
+        let (mut oracle, mut receipt2)=fixtures();
+        let reused=json!({"pid":101,"start_time_ticks":1100});
+        oracle["events"][4]["observed_at_monotonic_ns"]=json!(150);
+        receipt2["events"][4]["observed_at_monotonic_ns"]=json!(151);
         oracle["processes"].as_array_mut().unwrap().push(json!({"identity":reused,"parent":{"relation":"parent","identity":{"pid":100,"start_time_ticks":1000}}}));
         oracle["events"].as_array_mut().unwrap().extend([
           json!({"kind":"fork","process":reused,"observed_at_monotonic_ns":200}),
           json!({"kind":"exit","process":reused,"observed_at_monotonic_ns":800})
         ]);
-        let mut receipt2=receipt;
         receipt2["processes"].as_array_mut().unwrap().push(json!({"identity":reused,"parent":{"relation":"parent","identity":{"pid":100,"start_time_ticks":1000}}}));
         receipt2["events"].as_array_mut().unwrap().extend([
           json!({"source_id":"proc","sequence":7,"kind":"fork","process":reused,"observed_at_monotonic_ns":201,"evidence_digest":digest(14)}),
