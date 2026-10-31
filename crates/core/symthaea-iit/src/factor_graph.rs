@@ -449,6 +449,10 @@ pub struct CutsetLogFactorEliminationReport {
     pub cutset_assignments_evaluated: usize,
     pub max_cutset_assignments: usize,
     pub max_factor_entries: usize,
+    /// Total log-table entries materialized while conditioning factor scopes.
+    pub conditioned_factor_entries_written: usize,
+    /// Pointwise log-add-exp operations used to combine conditioned branches.
+    pub branch_output_entries_accumulated: usize,
     pub remaining_elimination_order: Vec<usize>,
     pub induced_width: usize,
     pub predicted_peak_factor_entries: usize,
@@ -792,6 +796,8 @@ pub fn min_fill_log_sum_product_with_cutset(
     let mut accumulated: Option<BinaryLogFactor> = None;
     let mut peak_factor_entries = original_peak;
     let mut factor_multiplications = 0usize;
+    let mut conditioned_factor_entries_written = 0usize;
+    let mut branch_output_entries_accumulated = 0usize;
 
     for branch in 0..branch_count {
         let mut conditioned_factors = Vec::with_capacity(factors.len());
@@ -802,7 +808,13 @@ pub fn min_fill_log_sum_product_with_cutset(
             .map(|(slot, variable)| (variable, ((branch >> slot) & 1) != 0))
             .collect::<Vec<_>>();
         for factor in factors {
-            conditioned_factors.push(factor.condition_many(&cutset_assignment)?);
+            let conditioned = factor.condition_many(&cutset_assignment)?;
+            if conditioned.variables != factor.variables {
+                conditioned_factor_entries_written = conditioned_factor_entries_written
+                    .checked_add(conditioned.log_values.len())
+                    .ok_or(FactorGraphError::IndexOverflow)?;
+            }
+            conditioned_factors.push(conditioned);
         }
 
         let report = min_fill_log_sum_product_with_plan(&conditioned_factors, &plan)?;
@@ -819,6 +831,9 @@ pub fn min_fill_log_sum_product_with_cutset(
         match &mut accumulated {
             None => accumulated = Some(report.factor),
             Some(previous) => {
+                branch_output_entries_accumulated = branch_output_entries_accumulated
+                    .checked_add(report.factor.log_values.len())
+                    .ok_or(FactorGraphError::IndexOverflow)?;
                 for (left, right) in previous
                     .log_values
                     .iter_mut()
@@ -841,6 +856,8 @@ pub fn min_fill_log_sum_product_with_cutset(
         cutset_assignments_evaluated: branch_count,
         max_cutset_assignments,
         max_factor_entries,
+        conditioned_factor_entries_written,
+        branch_output_entries_accumulated,
         remaining_elimination_order: plan.elimination_order,
         induced_width: plan.induced_width,
         predicted_peak_factor_entries,
@@ -1653,6 +1670,8 @@ mod tests {
         assert_eq!(report.factor.variables(), &[RETAINED]);
         assert_eq!(report.cutset_variables, cutset);
         assert_eq!(report.cutset_assignments_evaluated, 1 << cutset.len());
+        assert!(report.conditioned_factor_entries_written > 0);
+        assert_eq!(report.branch_output_entries_accumulated, 30);
         assert!(report.induced_width <= 2);
         assert_eq!(report.predicted_peak_factor_entries, report.peak_factor_entries);
         assert!(report.peak_factor_entries <= MAX_FACTOR_ENTRIES);
