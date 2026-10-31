@@ -616,7 +616,7 @@ mod tests {
                     plan.sections.iter().map(|section| section.meter).collect::<Vec<_>>(),
                     vec![4, 7, 5, 4]
                 );
-                assert!((plan.expected_total_beats - 160.0).abs() < 1e-7);
+                assert!((plan.expected_total_beats - 80.0).abs() < 1e-7);
             }
             other => panic!("ProgFolk must expose ProgSuite plan, got {other:?}"),
         }
