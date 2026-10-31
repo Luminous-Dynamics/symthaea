@@ -578,7 +578,7 @@ pub fn run_direction_campaign(
     let policy_config_bytes = serde_json::to_vec(&policy_config)
         .map_err(|error| format!("policy config serialization failed: {error}"))?;
     let policy_config_sha256 = digest_bytes(&policy_config_bytes);
-    Ok(DirectionCampaignRun {
+    let mut run = DirectionCampaignRun {
         schema: "symthaea.direction-campaign.run".to_owned(),
         version: "0.1.0".to_owned(),
         landscape,
@@ -601,7 +601,11 @@ pub fn run_direction_campaign(
         inconclusive_new_proposals,
         final_board_sha256,
         actions,
-    })
+        action_tape_sha256: String::new(),
+    };
+    let action_tape = run.to_campaign_tape()?;
+    run.action_tape_sha256 = action_tape.tape_sha256.clone();
+    Ok(run)
 }
 
 /// Run the full policy × landscape matrix over a caller-supplied seed set.
@@ -644,6 +648,10 @@ pub fn aggregate_direction_campaign_runs(
             || run.total_cost_units != run.action_budget as u64
         {
             return Err("run action/cost accounting does not reconcile with its budget".to_owned());
+        }
+        let tape = run.to_campaign_tape()?;
+        if tape.tape_sha256 != run.action_tape_sha256 {
+            return Err("run action tape digest does not match its deterministic reconstruction".to_owned());
         }
         groups
             .entry((run.landscape, run.policy, run.action_budget))
@@ -1298,6 +1306,65 @@ mod tests {
         DirectionLandscapeFamily::NewOperatorBreakthrough,
         DirectionLandscapeFamily::RankReversal,
     ];
+
+    #[test]
+    fn every_policy_run_has_a_reconstructable_action_tape() {
+        for policy in POLICIES {
+            let run = run_direction_campaign(
+                DirectionLandscapeFamily::NewOperatorBreakthrough,
+                policy,
+                48,
+                0x1234,
+            ).expect("campaign should run");
+            let tape = run.to_campaign_tape().expect("event tape should reconstruct");
+            assert_eq!(tape.tape_sha256, run.action_tape_sha256);
+            assert_eq!(tape.events.len(), run.action_count);
+            assert_eq!(tape.totals().unwrap().action_units, 48);
+            assert_eq!(tape.totals().unwrap().cpu_millis, None);
+            assert_eq!(tape.events[0].round_id, 1);
+            assert_eq!(tape.events[1].round_id, 1);
+            assert_eq!(tape.events[2].round_id, 1);
+            assert_eq!(tape.events[3].round_id, 2);
+            assert_eq!(tape.events[0].policy_visible_through_sequence, 0);
+            assert_eq!(tape.events[2].policy_visible_through_sequence, 0);
+            assert_eq!(tape.events[3].policy_visible_through_sequence, 3);
+        }
+    }
+
+    #[test]
+    fn matched_policy_runs_share_the_same_tape_envelope() {
+        let left = run_direction_campaign(
+            DirectionLandscapeFamily::DelayedBreakthrough,
+            DirectionCampaignPolicy::DiscountedUcb,
+            48,
+            0x55,
+        ).unwrap().to_campaign_tape().unwrap();
+        let right = run_direction_campaign(
+            DirectionLandscapeFamily::DelayedBreakthrough,
+            DirectionCampaignPolicy::ThompsonSampling,
+            48,
+            0x55,
+        ).unwrap().to_campaign_tape().unwrap();
+        super::super::campaign_tape::validate_matched_tape_headers(&[left, right]).unwrap();
+    }
+
+    #[test]
+    fn admitted_new_direction_is_bound_to_canonical_tape_identity() {
+        let run = run_direction_campaign(
+            DirectionLandscapeFamily::NewOperatorBreakthrough,
+            DirectionCampaignPolicy::VerifierGroundedDirectionBoard,
+            48,
+            0x9191,
+        ).unwrap();
+        let tape = run.to_campaign_tape().unwrap();
+        assert!(tape.events.iter().any(|event| matches!(
+            &event.payload,
+            CampaignEventPayload::DirectionProposal {
+                disposition: DirectionProposalDisposition::Admitted { canonical_direction_id },
+                ..
+            } if canonical_direction_id == "D"
+        )));
+    }
 
     #[test]
     fn every_policy_obeys_exact_unit_action_budget() {
