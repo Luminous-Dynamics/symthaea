@@ -309,13 +309,14 @@ pub fn verify_checkpoint_quorum(
     }
 
     let mut seen = BTreeSet::new();
-    let mut current_epoch_matching = 0_u16;
-    let mut stale_witnesses = 0_u16;
     let mut highest_witness_epoch = 0_u64;
+    let mut groups = BTreeMap::<(u64, [u8; 32], [u8; 32]), u16>::new();
 
     for attestation in attestations {
         let payload = &attestation.payload;
-        let trusted_key = trusted.get(&payload.witness_id).ok_or(CheckpointError::UnknownWitness)?;
+        let trusted_key = trusted
+            .get(&payload.witness_id)
+            .ok_or(CheckpointError::UnknownWitness)?;
         if !seen.insert(payload.witness_id) {
             return Err(CheckpointError::DuplicateWitnessResponse);
         }
@@ -331,39 +332,55 @@ pub fn verify_checkpoint_quorum(
         if payload.challenge != challenge {
             return Err(CheckpointError::WitnessChallengeMismatch);
         }
+
         highest_witness_epoch = highest_witness_epoch.max(payload.checkpoint_epoch);
-        if payload.checkpoint_epoch > local.payload.epoch {
-            return Err(CheckpointError::LocalLedgerBehindWitness {
-                local_epoch: local.payload.epoch,
-                witnessed_epoch: payload.checkpoint_epoch,
-            });
-        }
-        if payload.checkpoint_epoch < local.payload.epoch {
-            stale_witnesses = stale_witnesses
-                .checked_add(1)
-                .ok_or(CheckpointError::ArithmeticOverflow)?;
-            continue;
-        }
-        if payload.checkpoint_sha256 != local_digest
-            || payload.previous_checkpoint_sha256 != local.payload.previous_checkpoint_sha256
-        {
-            return Err(CheckpointError::WitnessCheckpointConflict {
-                epoch: local.payload.epoch,
-            });
-        }
-        current_epoch_matching = current_epoch_matching
-            .checked_add(1)
-            .ok_or(CheckpointError::ArithmeticOverflow)?;
+        let key = (
+            payload.checkpoint_epoch,
+            payload.checkpoint_sha256,
+            payload.previous_checkpoint_sha256,
+        );
+        let count = groups.entry(key).or_insert(0);
+        *count = count.checked_add(1).ok_or(CheckpointError::ArithmeticOverflow)?;
     }
 
-    if highest_witness_epoch == 0 {
-        return Err(CheckpointError::InsufficientWitnessQuorum {
-            required: policy.threshold,
-            matching: 0,
-            stale: stale_witnesses,
+    let mut current_epoch_matching = 0_u16;
+    let mut stale_witnesses = 0_u16;
+    let mut higher_epoch_quorum = None;
+    let mut conflicting_current_quorum = false;
+
+    for ((epoch, checkpoint_digest, previous_digest), count) in groups {
+        if epoch < local.payload.epoch {
+            stale_witnesses = stale_witnesses
+                .checked_add(count)
+                .ok_or(CheckpointError::ArithmeticOverflow)?;
+        } else if epoch > local.payload.epoch {
+            if count >= policy.threshold {
+                higher_epoch_quorum = Some(higher_epoch_quorum.unwrap_or(0_u64).max(epoch));
+            }
+        } else if checkpoint_digest == local_digest
+            && previous_digest == local.payload.previous_checkpoint_sha256
+        {
+            current_epoch_matching = count;
+        } else if count >= policy.threshold {
+            conflicting_current_quorum = true;
+        }
+    }
+
+    // A single Byzantine witness must not be able to force rollback rejection
+    // or conflicting-head denial. Require the configured 2f+1 witness quorum
+    // to attest a newer or conflicting checkpoint before acting on it.
+    if let Some(witnessed_epoch) = higher_epoch_quorum {
+        return Err(CheckpointError::LocalLedgerBehindWitness {
+            local_epoch: local.payload.epoch,
+            witnessed_epoch,
         });
     }
-    if highest_witness_epoch < local.payload.epoch {
+    if conflicting_current_quorum {
+        return Err(CheckpointError::WitnessCheckpointConflict {
+            epoch: local.payload.epoch,
+        });
+    }
+    if highest_witness_epoch < local.payload.epoch && highest_witness_epoch != 0 {
         return Err(CheckpointError::WitnessesBehindLocal {
             local_epoch: local.payload.epoch,
             highest_witness_epoch,
