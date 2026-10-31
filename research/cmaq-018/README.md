@@ -71,7 +71,7 @@ Reported independently for each scenario/model pair:
 - Kendall tau-b action-ranking agreement, including explicit tie handling, per-metric episode denominator and a 95% percentile-bootstrap interval.
 - Top-1 regret against the best action in the same frozen branch bank, with per-metric episode denominator and a 95% percentile-bootstrap interval.
 - Terminal false-safe rate with a 95% percentile-bootstrap interval where actual terminal branches have predictions.
-- Null-effect false-positive rate: predicted nonzero effects when all true effects are zero.
+- Null-effect false-positive rate: predicted nonzero effects when all true effects are zero, with per-metric episode denominator and a 95% percentile-bootstrap interval.
 - Pair-coverage and branch-prediction coverage, so abstention is not hidden.
 - Absolute branch-utility MAE and next-state MAE where the model emits branch predictions.
 - Branch prediction evaluations, direct pair-effect evaluations, and oracle branch evaluations, reported separately.
