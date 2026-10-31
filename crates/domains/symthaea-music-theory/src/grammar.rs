@@ -8,6 +8,7 @@
 //! guessing from a preset name.
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -138,12 +139,219 @@ pub struct ContrapuntalPlan {
     pub final_combination: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RegisterPlacementDisposition {
+    AlreadyWithinBounds,
+    OctaveRebalanced,
+    BlockedByOtherInvariant,
+    NoLegalOctavePlacement,
+    RepairRejectedByValidator,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PartRegisterPlacement {
+    pub part_id: u16,
+    pub before_min_midi: u8,
+    pub before_max_midi: u8,
+    /// Signed semitone shift; the canonical algorithm emits multiples of 12.
+    pub semitone_shift: i16,
+    pub after_min_midi: u8,
+    pub after_max_midi: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RegisterPlacementReceipt {
+    pub schema: String,
+    pub validation_version: String,
+    pub min_midi: u8,
+    pub max_midi: u8,
+    pub before_min_midi: Option<u8>,
+    pub before_max_midi: Option<u8>,
+    pub after_min_midi: Option<u8>,
+    pub after_max_midi: Option<u8>,
+    pub initial_fatal_universal_rules: Vec<crate::score_validation::ScoreValidationRule>,
+    pub disposition: RegisterPlacementDisposition,
+    pub part_placements: Vec<PartRegisterPlacement>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct GrammarRealization {
     pub score: crate::score::Score,
     pub form: Option<crate::form::Form>,
     pub plan: GrammarPlanEvidence,
     pub trace: crate::grammar_trace::GrammarStructuralTrace,
+    /// Proof record for the final renderer-independent octave placement pass.
+    pub register_placement: Option<RegisterPlacementReceipt>,
+}
+
+/// Apply the smallest deterministic octave-only correction that makes every
+/// part's notes fit the canonical MIDI bounds.
+///
+/// This is a last-mile score-feasibility transform, not a composer and not a
+/// reason to loosen validation. It runs only when the original report's
+/// fatal universal-invariant defects are exclusively NoteBounds. Every part
+/// is shifted as a unit by a multiple of 12 semitones, preserving pitch
+/// classes, within-part intervals, onsets, durations, velocity, emphasis and
+/// section intensity. The candidate is committed only if the same independent
+/// validator reports no fatal universal-invariant defects; otherwise the
+/// original score is restored.
+pub fn place_parts_within_validation_range(
+    score: &mut crate::score::Score,
+) -> RegisterPlacementReceipt {
+    use crate::score_validation::{
+        ScoreValidationConfig, ScoreValidationRule, ValidationSeverity,
+        THEORY_VALIDATION_VERSION, is_universal_invariant, validate_score,
+    };
+
+    const SCHEMA: &str = "muse-register-placement-v1";
+    let config = ScoreValidationConfig::default();
+    let (before_min, before_max) = score_pitch_bounds(score);
+    let initial_report = validate_score(score, &config);
+    let initial_fatal: Vec<_> = initial_report
+        .issues
+        .iter()
+        .filter(|issue| {
+            issue.severity == ValidationSeverity::Fatal
+                && is_universal_invariant(issue.rule)
+        })
+        .map(|issue| issue.rule)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+
+    let receipt = |disposition, part_placements, after_min, after_max| {
+        RegisterPlacementReceipt {
+            schema: SCHEMA.into(),
+            validation_version: THEORY_VALIDATION_VERSION.into(),
+            min_midi: config.min_midi,
+            max_midi: config.max_midi,
+            before_min_midi: before_min,
+            before_max_midi: before_max,
+            after_min_midi: after_min,
+            after_max_midi: after_max,
+            initial_fatal_universal_rules: initial_fatal.clone(),
+            disposition,
+            part_placements,
+        }
+    };
+
+    if initial_fatal.is_empty() {
+        return receipt(
+            RegisterPlacementDisposition::AlreadyWithinBounds,
+            Vec::new(),
+            before_min,
+            before_max,
+        );
+    }
+
+    if initial_fatal
+        .iter()
+        .any(|rule| *rule != ScoreValidationRule::NoteBounds)
+    {
+        return receipt(
+            RegisterPlacementDisposition::BlockedByOtherInvariant,
+            Vec::new(),
+            before_min,
+            before_max,
+        );
+    }
+
+    let mut part_ids: Vec<u16> = score.notes.iter().map(|note| note.part.0).collect();
+    part_ids.sort_unstable();
+    part_ids.dedup();
+
+    let mut placements = Vec::with_capacity(part_ids.len());
+    for part_id in part_ids {
+        let mut part_min = u8::MAX;
+        let mut part_max = 0u8;
+        for note in score.notes.iter().filter(|note| note.part.0 == part_id) {
+            let midi = note.pitch.midi();
+            part_min = part_min.min(midi);
+            part_max = part_max.max(midi);
+        }
+
+        // Minimize absolute movement. Ties are resolved toward the lower
+        // octave, making the result deterministic across platforms.
+        let chosen_shift = (-10i16..=10)
+            .map(|octaves| octaves * 12)
+            .filter(|shift| {
+                let low = i16::from(part_min) + *shift;
+                let high = i16::from(part_max) + *shift;
+                low >= i16::from(config.min_midi) && high <= i16::from(config.max_midi)
+            })
+            .min_by_key(|shift| (shift.abs(), *shift));
+
+        let Some(semitone_shift) = chosen_shift else {
+            return receipt(
+                RegisterPlacementDisposition::NoLegalOctavePlacement,
+                Vec::new(),
+                before_min,
+                before_max,
+            );
+        };
+
+        placements.push(PartRegisterPlacement {
+            part_id,
+            before_min_midi: part_min,
+            before_max_midi: part_max,
+            semitone_shift,
+            after_min_midi: (i16::from(part_min) + semitone_shift) as u8,
+            after_max_midi: (i16::from(part_max) + semitone_shift) as u8,
+        });
+    }
+
+    let original = score.clone();
+    for placement in &placements {
+        if placement.semitone_shift == 0 {
+            continue;
+        }
+        for note in score
+            .notes
+            .iter_mut()
+            .filter(|note| note.part.0 == placement.part_id)
+        {
+            note.pitch = note.pitch.transpose(i32::from(placement.semitone_shift));
+        }
+    }
+
+    let repaired_report = validate_score(score, &config);
+    let remaining_fatal_universal = repaired_report.issues.iter().any(|issue| {
+        issue.severity == ValidationSeverity::Fatal && is_universal_invariant(issue.rule)
+    });
+    if remaining_fatal_universal {
+        *score = original;
+        return receipt(
+            RegisterPlacementDisposition::RepairRejectedByValidator,
+            placements,
+            before_min,
+            before_max,
+        );
+    }
+
+    let (after_min, after_max) = score_pitch_bounds(score);
+    let changed = placements.iter().any(|placement| placement.semitone_shift != 0);
+    receipt(
+        if changed {
+            RegisterPlacementDisposition::OctaveRebalanced
+        } else {
+            RegisterPlacementDisposition::RepairRejectedByValidator
+        },
+        placements,
+        after_min,
+        after_max,
+    )
+}
+
+fn score_pitch_bounds(score: &crate::score::Score) -> (Option<u8>, Option<u8>) {
+    let mut min_midi = None::<u8>;
+    let mut max_midi = None::<u8>;
+    for note in &score.notes {
+        let midi = note.pitch.midi();
+        min_midi = Some(min_midi.map_or(midi, |value| value.min(midi)));
+        max_midi = Some(max_midi.map_or(midi, |value| value.max(midi)));
+    }
+    (min_midi, max_midi)
 }
 
 /// Compose with an explicit grammar owner and retain its planning evidence.
@@ -192,6 +400,7 @@ pub fn compose_with_grammar_plan(
                     ending_strategy: "motif-related cadential liquidation".into(),
                 }),
                 trace: Default::default(),
+                register_placement: None,
             }
         }
         GrammarFamily::Contrapuntal => {
@@ -236,6 +445,7 @@ pub fn compose_with_grammar_plan(
                     final_combination: true,
                 }),
                 trace: Default::default(),
+                register_placement: None,
             }
         }
         GrammarFamily::GrooveCycle => {
@@ -245,6 +455,7 @@ pub fn compose_with_grammar_plan(
                 form: None,
                 plan: GrammarPlanEvidence::GrooveCycle(realized.plan),
                 trace: Default::default(),
+                register_placement: None,
             }
         }
         GrammarFamily::ProcessAdditive => {
@@ -254,6 +465,7 @@ pub fn compose_with_grammar_plan(
                 form: None,
                 plan: GrammarPlanEvidence::AdditiveProcess(realized.plan),
                 trace: Default::default(),
+                register_placement: None,
             }
         }
         GrammarFamily::RagaModalArc => {
@@ -263,6 +475,7 @@ pub fn compose_with_grammar_plan(
                 form: None,
                 plan: GrammarPlanEvidence::ModalArc(realized.plan),
                 trace: Default::default(),
+                register_placement: None,
             }
         }
         GrammarFamily::BluesCallResponse => {
@@ -272,6 +485,7 @@ pub fn compose_with_grammar_plan(
                 form: None,
                 plan: GrammarPlanEvidence::CallResponse(realized.plan),
                 trace: Default::default(),
+                register_placement: None,
             }
         }
         GrammarFamily::JazzChorus => {
@@ -281,6 +495,7 @@ pub fn compose_with_grammar_plan(
                 form: None,
                 plan: GrammarPlanEvidence::JazzChorus(realized.plan),
                 trace: Default::default(),
+                register_placement: None,
             }
         }
         family => {
@@ -297,6 +512,7 @@ pub fn compose_with_grammar_plan(
                 },
                 form,
                 trace: Default::default(),
+                register_placement: None,
             }
         }
     };
@@ -307,6 +523,12 @@ pub fn compose_with_grammar_plan(
     // after it both see the corrected score, not a pre-correction one.
     crate::composer::deoverlap_all_voices(&mut realized.score);
     crate::composer::sync_total_beats(&mut realized.score);
+    // The period/sentence path already folds melody phrases before score
+    // emission. Direct grammar engines (notably the Fugue) have their own
+    // register logic and must pass through the same final feasibility gate.
+    realized.register_placement = Some(place_parts_within_validation_range(
+        &mut realized.score,
+    ));
     realized.trace = crate::grammar_trace::build_grammar_trace(
         profile.family,
         &realized.score,
