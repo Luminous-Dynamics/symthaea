@@ -1870,6 +1870,65 @@ mod tests {
     }
 
     #[test]
+    fn cutset_preflight_exposes_canonical_separator_and_residual_cost_before_execution() {
+        const SIDE: usize = 4;
+        let mut factors = Vec::new();
+        for row in 0..SIDE {
+            for column in 0..SIDE {
+                let here = row * SIDE + column;
+                if column + 1 < SIDE {
+                    factors.push(vec![here, here + 1]);
+                }
+                if row + 1 < SIDE {
+                    factors.push(vec![here, here + SIDE]);
+                }
+            }
+        }
+        let eliminate = (0..SIDE * SIDE - 1).collect::<Vec<_>>();
+        let cutset = [7, 5, 6, 4]; // Deliberately not canonical input order.
+        let plan = plan_min_fill_cutset_elimination(
+            &factors,
+            &eliminate,
+            &cutset,
+            8,
+            16,
+        ).unwrap();
+
+        assert_eq!(plan.cutset_variables, vec![4, 5, 6, 7]);
+        assert_eq!(plan.cutset_assignments, 16);
+        assert_eq!(plan.max_cutset_assignments, 16);
+        assert_eq!(plan.largest_input_factor_entries, 4);
+        assert_eq!(plan.remaining_elimination_plan.induced_width, 2);
+        assert_eq!(plan.remaining_elimination_plan.predicted_peak_factor_entries, 8);
+        assert_eq!(plan.predicted_peak_factor_entries, 8);
+        assert_eq!(plan.remaining_elimination_plan.max_factor_entries, 8);
+
+        assert!(matches!(
+            plan_min_fill_cutset_elimination(
+                &factors,
+                &eliminate,
+                &cutset,
+                8,
+                15,
+            ),
+            Err(FactorGraphError::CutsetAssignmentBudgetExceeded {
+                assignments: 16,
+                maximum: 15
+            })
+        ));
+        assert!(matches!(
+            plan_min_fill_cutset_elimination(
+                &factors,
+                &eliminate,
+                &cutset,
+                7,
+                16,
+            ),
+            Err(FactorGraphError::IntermediateTooLarge { limit: 7, .. })
+        ));
+    }
+
+    #[test]
     fn cutset_conditioning_counts_absent_variables_and_rejects_invalid_budgets() {
         let factor = BinaryLogFactor::new(vec![0], vec![0.25_f64.ln(), 0.75_f64.ln()]).unwrap();
         let ordinary = min_fill_log_sum_product(&[factor.clone()], &[1], 2).unwrap();
