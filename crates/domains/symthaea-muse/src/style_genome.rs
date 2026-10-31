@@ -298,6 +298,51 @@ pub struct GenomeTrial {
     pub score_duration_beats: f64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GeneEffectLayer {
+    Symbolic,
+    Renderer,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GeneEffectStatus {
+    /// At least one paired seed changed the score or its declared grammar phenotype.
+    Observed,
+    /// No paired seed changed the score or its declared grammar phenotype.
+    NoObservedEffect,
+    /// The ablated recipe could not be compiled or generated as a valid control.
+    CounterfactualUnavailable,
+    /// The gene belongs to arrangement/rendering and has not yet been audited there.
+    RendererPending,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GeneEffectPair {
+    pub seed: u64,
+    pub candidate_score_sha256: String,
+    pub counterfactual_score_sha256: String,
+    pub candidate_plan_signature: Option<String>,
+    pub counterfactual_plan_signature: Option<String>,
+    pub counterfactual_grammar_transformations: Vec<String>,
+    /// Non-empty means the ablated gene changed at least one declared dimension:
+    /// symbolic_score, grammar_plan_topology, or grammar_operations.
+    pub changed_dimensions: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GenomeGeneEffectAudit {
+    pub axis: GenomeAxis,
+    pub catalog_id: u16,
+    pub layer: GeneEffectLayer,
+    pub status: GeneEffectStatus,
+    pub seed_count: usize,
+    pub changed_seed_count: usize,
+    pub reason: Option<String>,
+    pub paired_trials: Vec<GeneEffectPair>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GenomeObjectives {
     /// Mean k-nearest structural distance from a separately supplied
@@ -356,7 +401,9 @@ pub struct GenomeEvaluation {
     pub mean_structural_fingerprint: Vec<f64>,
     pub layer_coverage: Vec<LayerCoverage>,
     pub trials: Vec<GenomeTrial>,
-    /// Hash binds the genome, evaluation config and all trial receipts.
+    /// One-gene-at-a-time same-seed counterfactuals for every present donor axis.
+    pub gene_effect_audits: Vec<GenomeGeneEffectAudit>,
+    /// Hash binds the genome, evaluation config, plan receipts and gene-effect audits.
     pub evaluation_sha256: String,
 }
 
