@@ -204,6 +204,7 @@ struct DomainEvaluation {
 
 #[derive(Debug, Serialize)]
 struct OodDetectionMetrics {
+    status: &'static str,
     n: usize,
     independent_cluster_count: usize,
     in_domain_count: usize,
@@ -471,6 +472,7 @@ fn parse_jsonl(bytes: &[u8]) -> Result<Vec<Prediction>, String> {
         return Err("ood_score must be present for every row or for none; partial novelty scores are invalid".into());
     }
     let mut domain_contracts = BTreeMap::<String, (String, bool)>::new();
+    let mut cluster_domain_contracts = BTreeMap::<String, String>::new();
     let mut axes = BTreeSet::<String>::new();
     for row in &records {
         if let (Some(domain), Some(axis), Some(is_ood)) = (&row.domain_id, &row.shift_axis, row.is_ood_domain) {
@@ -479,6 +481,16 @@ fn parse_jsonl(bytes: &[u8]) -> Result<Vec<Prediction>, String> {
             if let Some(previous) = domain_contracts.insert(domain.clone(), contract.clone()) {
                 if previous != contract {
                     return Err(format!("domain_id {:?} has inconsistent shift_axis or is_ood_domain declarations", domain));
+                }
+            }
+            if let Some(previous_domain) =
+                cluster_domain_contracts.insert(row.cluster_id.clone(), domain.clone())
+            {
+                if previous_domain.as_str() != domain.as_str() {
+                    return Err(format!(
+                        "cluster_id {:?} crosses domain_id values {:?} and {:?}; use a domain-qualified dependency-cluster identity or a split that preserves the dependency block",
+                        row.cluster_id, previous_domain, domain
+                    ));
                 }
             }
         }
@@ -1315,7 +1327,15 @@ fn ood_detection_metrics(
     });
 
     let cluster_count = rows.iter().map(|row| row.cluster_id.as_str()).collect::<BTreeSet<_>>().len();
+    let status = if in_domain_count > 0 && held_out_domain_count > 0
+        && roc_auc.is_some() && average_precision.is_some()
+    {
+        "ESTIMABLE"
+    } else {
+        "NOT_ESTIMABLE"
+    };
     OodDetectionMetrics {
+        status,
         n: rows.len(),
         independent_cluster_count: cluster_count,
         in_domain_count,
@@ -1409,7 +1429,11 @@ fn domain_shift_evaluation(
     } else {
         None
     };
-    let status = if ood_detection.is_some() { "OOD_SCORED" } else { "DOMAIN_STRATIFIED_ONLY" };
+    let status = match ood_detection.as_ref() {
+        Some(metrics) if metrics.status == "ESTIMABLE" => "OOD_SCORED",
+        Some(_) => "OOD_NOT_ESTIMABLE",
+        None => "DOMAIN_STRATIFIED_ONLY",
+    };
     Ok((
         status,
         Some(axis),
@@ -1692,6 +1716,28 @@ mod tests {
         let calibration = calibration_diagnostics(&zebrafish);
         assert_eq!(calibration.high_confidence_at_90.false_accept_count, 1);
         assert_eq!(calibration.low_confidence_below_10.missed_error_count, 0);
+    }
+
+    #[test]
+    fn ood_metric_status_is_not_estimable_without_both_domain_classes() {
+        let rows = vec![
+            tagged_row("only-in-1", true, 0.8, "mouse", false, 0.1),
+            tagged_row("only-in-2", false, 0.2, "mouse", false, 0.2),
+        ];
+        let refs = rows.iter().collect::<Vec<_>>();
+        let metrics = ood_detection_metrics(&refs, Some(0.5), 500, "single-domain-ood");
+        assert_eq!(metrics.status, "NOT_ESTIMABLE");
+        assert_eq!(metrics.roc_auc, None);
+        assert_eq!(metrics.held_out_domain_recall, None);
+    }
+
+    #[test]
+    fn parser_rejects_dependency_cluster_reused_across_domains() {
+        let first = tagged_row("cross-1", true, 0.9, "mouse", false, 0.1);
+        let mut second = tagged_row("cross-2", false, 0.1, "zebrafish", true, 0.9);
+        second.cluster_id = first.cluster_id.clone();
+        let input = format!("{}\n{}", serde_json::to_string(&first).unwrap(), serde_json::to_string(&second).unwrap());
+        assert!(parse_jsonl(input.as_bytes()).unwrap_err().contains("crosses domain_id"));
     }
 
     #[test]
