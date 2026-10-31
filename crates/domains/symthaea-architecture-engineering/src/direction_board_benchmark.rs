@@ -14,6 +14,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use super::event_tape::{
+    ActionEvent, ActionIntent, ActionOutcome, CandidateDisposition, ComparisonMode,
+    EventTape, EventTapeHeader, ExecutionContract, ExecutionMode, MeterValue,
+    PolicySnapshot, ProposalDisposition, ResourceReceipt,
+};
+
 use super::direction_board::{
     AllocationArm, AttemptDisposition, DirectionAttempt, DirectionBoard, DirectionBoardConfig,
     DirectionDescriptor, NewDirectionDisposition, NewDirectionProposal,
@@ -1030,6 +1036,232 @@ fn splitmix64(mut value: u64) -> u64 {
     z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
     z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
     z ^ (z >> 31)
+}
+
+
+/// Convert this synthetic campaign into the common AR-5B4 event tape.
+///
+/// This adapter intentionally marks unmeasured host/accelerator/energy/token dimensions as
+/// Unknown. The resulting tape is integrity-checkable but cannot pass the qualified
+/// matched-budget gate until those resource dimensions are instrumented.
+impl DirectionCampaignRun {
+    pub fn to_event_tape(&self) -> Result<EventTape, String> {
+        if self.action_count != self.actions.len() {
+            return Err("action_count does not match the recorded action list".to_owned());
+        }
+        if self.action_count > self.action_budget {
+            return Err("recorded actions exceed the declared action budget".to_owned());
+        }
+        let summed_cost = self.actions.iter().try_fold(0u64, |sum, action| {
+            sum.checked_add(action.cost_units)
+                .ok_or_else(|| "synthetic action cost overflow".to_owned())
+        })?;
+        if summed_cost != self.total_cost_units {
+            return Err("recorded action costs do not reconcile to total_cost_units".to_owned());
+        }
+
+        let landscape_id = serde_json::to_value(self.landscape)
+            .map_err(|error| format!("landscape serialization failed: {error}"))?
+            .as_str()
+            .ok_or_else(|| "landscape serialization was not a string".to_owned())?
+            .to_owned();
+        let policy_id = serde_json::to_value(self.policy)
+            .map_err(|error| format!("policy serialization failed: {error}"))?
+            .as_str()
+            .ok_or_else(|| "policy serialization was not a string".to_owned())?
+            .to_owned();
+        let config = serde_json::to_value(&self.policy_config)
+            .map_err(|error| format!("policy config serialization failed: {error}"))?;
+        let config_sha256 = digest_bytes(
+            &serde_json::to_vec(&config)
+                .map_err(|error| format!("policy config encoding failed: {error}"))?,
+        );
+        if config_sha256 != self.policy_config_sha256 {
+            return Err("policy configuration digest does not match the run snapshot".to_owned());
+        }
+
+        let campaign_id = format!(
+            "ar5b4-synthetic-{landscape_id}-seed-{}-budget-{}",
+            self.seed, self.action_budget
+        );
+        let task_recipe_sha256 = digest("symthaea.synthetic-direction.recipe.v0.1");
+        let evaluator_sha256 = digest("symthaea.synthetic-direction.evaluator.v0.1");
+        let verifier_sha256 = digest("symthaea.synthetic-direction.verifier.v0.1");
+        let proposal_stream_sha256 =
+            digest(&format!("synthetic-payoff-stream:{landscape_id}:{}", self.seed));
+        let budget_limit_microunits = u64::try_from(self.action_budget)
+            .map_err(|_| "action budget does not fit u64".to_owned())?
+            .checked_mul(1_000_000)
+            .ok_or_else(|| "normalized action budget overflow".to_owned())?;
+
+        let mut tape = EventTape::new(EventTapeHeader {
+            schema: "symthaea.ar5b4.event-tape".to_owned(),
+            version: "0.1.0".to_owned(),
+            campaign_id,
+            comparison_mode: ComparisonMode::MechanismMatched,
+            proposal_source_id: "synthetic-direction-campaign-v0.1".to_owned(),
+            proposal_stream_sha256: Some(proposal_stream_sha256),
+            task_recipe_sha256: task_recipe_sha256.clone(),
+            comparison_profile_sha256: PROFILE_SHA256.to_owned(),
+            evaluator_sha256: evaluator_sha256.clone(),
+            verifier_sha256: verifier_sha256.clone(),
+            budget_limit_microunits,
+            initial_direction_ids: vec!["A".to_owned(), "B".to_owned(), "C".to_owned()],
+            execution: ExecutionContract {
+                mode: ExecutionMode::Sequential,
+                worker_count: 1,
+                first_round_claim_cap: None,
+                steady_state_claim_cap: None,
+            },
+            policy: PolicySnapshot {
+                policy_id: policy_id.clone(),
+                algorithm_id: format!("symthaea-direction-policy-{policy_id}-v0.1"),
+                config_sha256,
+                config,
+                has_hidden_oracle_access: self.policy
+                    == DirectionCampaignPolicy::OracleUpperBound,
+            },
+        })
+        .map_err(|error| error.to_string())?;
+
+        for action in &self.actions {
+            let slot = u64::try_from(action.slot)
+                .map_err(|_| "action slot does not fit u64".to_owned())?;
+            if slot == 0 || slot != tape.events.len() as u64 + 1 {
+                return Err("action slots must be contiguous and start at one".to_owned());
+            }
+            let event_id = format!("{}:event:{slot}", tape.header.campaign_id);
+            let (intent, outcome) = if action.is_new_proposal {
+                let disposition = match action.proposal_disposition {
+                    Some(NewDirectionDisposition::Admitted) => {
+                        ProposalDisposition::Admitted {
+                            canonical_direction_id: "D".to_owned(),
+                        }
+                    }
+                    Some(NewDirectionDisposition::Duplicate) => {
+                        ProposalDisposition::Duplicate {
+                            canonical_direction_id: "D".to_owned(),
+                        }
+                    }
+                    Some(NewDirectionDisposition::Rejected) => ProposalDisposition::Rejected,
+                    Some(NewDirectionDisposition::Inconclusive) => {
+                        ProposalDisposition::Inconclusive
+                    }
+                    None => {
+                        return Err(format!(
+                            "NEW proposal at action slot {} lacks verifier disposition",
+                            action.slot
+                        ));
+                    }
+                };
+                let descriptor_sha256 = digest(&format!(
+                    "synthetic-direction-descriptor:{}:{}",
+                    landscape_id, action.slot
+                ));
+                (
+                    ActionIntent::ProposeDirection {
+                        descriptor_sha256: descriptor_sha256.clone(),
+                        parent_direction_id: None,
+                        semantic_delta_sha256: descriptor_sha256,
+                    },
+                    ActionOutcome::DirectionVerification {
+                        task_recipe_sha256: task_recipe_sha256.clone(),
+                        comparison_profile_sha256: PROFILE_SHA256.to_owned(),
+                        verifier_sha256: verifier_sha256.clone(),
+                        verifier_receipt_sha256: digest(&format!(
+                            "synthetic-verifier-receipt:{}:{}",
+                            landscape_id, action.slot
+                        )),
+                        disposition,
+                    },
+                )
+            } else {
+                if action.proposal_disposition.is_some() {
+                    return Err(format!(
+                        "candidate evaluation at action slot {} has a proposal disposition",
+                        action.slot
+                    ));
+                }
+                let score = action.observed_score.ok_or_else(|| {
+                    format!(
+                        "candidate evaluation at action slot {} lacks a verified score",
+                        action.slot
+                    )
+                })?;
+                let candidate_sha256 = digest(&format!(
+                    "synthetic-candidate:{}:{}:{}",
+                    landscape_id, action.arm_id, action.slot
+                ));
+                let semantic_delta_sha256 =
+                    digest(&format!("synthetic-delta:{}:{}", landscape_id, action.arm_id));
+                (
+                    ActionIntent::EvaluateCandidate {
+                        candidate_sha256: candidate_sha256.clone(),
+                        parent_candidate_sha256: None,
+                        semantic_delta_sha256,
+                        direction_id: action.arm_id.clone(),
+                    },
+                    ActionOutcome::CandidateEvaluation {
+                        task_recipe_sha256: task_recipe_sha256.clone(),
+                        comparison_profile_sha256: PROFILE_SHA256.to_owned(),
+                        evaluator_sha256: evaluator_sha256.clone(),
+                        disposition: CandidateDisposition::Verified,
+                        score: Some(score),
+                        uncertainty: None,
+                        evidence_sha256: Some(digest(&format!(
+                            "synthetic-evidence:{}:{}:{score:.17}",
+                            candidate_sha256, action.slot
+                        ))),
+                    },
+                )
+            };
+            let charge = action
+                .cost_units
+                .checked_mul(1_000_000)
+                .ok_or_else(|| "normalized action charge overflow".to_owned())?;
+            let unknown = |reason: &str| MeterValue::Unknown {
+                reason: reason.to_owned(),
+            };
+            let resources = ResourceReceipt {
+                host_cpu_millis: unknown("synthetic campaign does not meter host CPU"),
+                accelerator_millis: unknown("synthetic campaign does not meter accelerator time"),
+                peak_memory_bytes: unknown("synthetic campaign does not meter peak memory"),
+                energy_millijoules: unknown("synthetic campaign does not meter energy"),
+                input_tokens: unknown("synthetic campaign does not meter model tokens"),
+                output_tokens: unknown("synthetic campaign does not meter model tokens"),
+                tool_calls: unknown("synthetic campaign does not meter external tool calls"),
+                evaluator_calls: meter_value(1),
+                verifier_calls: meter_value(u64::from(action.is_new_proposal)),
+                charged_budget_microunits: meter_value(charge),
+            };
+            tape.append(ActionEvent {
+                event_id,
+                policy_id: policy_id.clone(),
+                worker_id: 0,
+                round_id: slot,
+                batch_id: None,
+                observed_through_sequence: slot - 1,
+                visible_history_sha256: String::new(),
+                retry_of_event_id: None,
+                intent,
+                outcome,
+                resources,
+            })
+            .map_err(|error| error.to_string())?;
+        }
+
+        let summary = tape.validate_integrity().map_err(|error| error.to_string())?;
+        if summary.total_charged_budget_microunits
+            != Some(self.total_cost_units.saturating_mul(1_000_000))
+        {
+            return Err("event-tape charge does not reconcile to the campaign cost".to_owned());
+        }
+        Ok(tape)
+    }
+}
+
+fn meter_value(value: u64) -> MeterValue {
+    MeterValue::Measured { value }
 }
 
 #[cfg(test)]
