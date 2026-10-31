@@ -1,0 +1,78 @@
+{
+  "schema_version": "symthaea.research.hdc_ltc_input_trajectory_scalar_controls.v0.1",
+  "matrix_id": "HDC-LTC-INPUT-PATH-001",
+  "synthetic_only": true,
+  "analytic_ode": {
+    "equation": "dx/dt = (u(t)-x)/tau",
+    "input_path": "u(t)=u0+(u1-u0)*t/dt for 0<=t<=dt",
+    "dimensionless_step": "a=dt/tau",
+    "endpoint_solution": "exp(-a)*x0 + u0*(1-exp(-a)) + (u1-u0)*(1-(1-exp(-a))/a)",
+    "numerical_note": "Use stable expm1/series handling for small a; this fixture's finite cases do not define behavior at a=0.",
+    "scope": "Scalar numerical-control fixture only. It does not validate HDC binding, learned gating, Fourier terms, or high-dimensional trajectories."
+  },
+  "cases": [
+    {
+      "id": "constant_input_tau1_dt1",
+      "tau": 1,
+      "dt": 1,
+      "x0": 0,
+      "u0": 2,
+      "u1": 2,
+      "a": 1,
+      "exact_linear_input": 1.2642411176571153,
+      "left_hold": 1.2642411176571153,
+      "midpoint_hold": 1.2642411176571153,
+      "right_hold": 1.2642411176571153,
+      "linear_coefficient": 0.36787944117144233
+    },
+    {
+      "id": "linear_ramp_tau1_dt1",
+      "tau": 1,
+      "dt": 1,
+      "x0": 0,
+      "u0": 0,
+      "u1": 1,
+      "a": 1,
+      "exact_linear_input": 0.36787944117144233,
+      "left_hold": 0,
+      "midpoint_hold": 0.31606027941427883,
+      "right_hold": 0.6321205588285577,
+      "linear_coefficient": 0.36787944117144233
+    },
+    {
+      "id": "short_interval_ramp",
+      "tau": 2,
+      "dt": 0.2,
+      "x0": -0.25,
+      "u0": -1,
+      "u1": 1,
+      "a": 0.1,
+      "exact_linear_input": -0.22462357575384,
+      "left_hold": -0.32137193647303036,
+      "midpoint_hold": -0.22620935450898988,
+      "right_hold": -0.1310467725449494,
+      "linear_coefficient": 0.048374180359595176
+    },
+    {
+      "id": "long_interval_ramp",
+      "tau": 0.5,
+      "dt": 2,
+      "x0": 0.5,
+      "u0": 0.2,
+      "u1": 1.2,
+      "a": 4,
+      "exact_linear_input": 0.9600736013888038,
+      "left_hold": 0.20549469166662024,
+      "midpoint_hold": 0.6963368722222532,
+      "right_hold": 1.187179052777886,
+      "linear_coefficient": 0.7545789097221836
+    }
+  ],
+  "required_checks": [
+    "constant-input case: left, midpoint and right holds equal the analytic endpoint",
+    "linear ramp case: variable-input RK4 converges toward exact_linear_input as substeps refine",
+    "left/right hold error signs and magnitudes are evaluated separately",
+    "small positive dt/tau does not cause catastrophic cancellation",
+    "invalid dt and non-finite inputs reject rather than emit output"
+  ]
+}
