@@ -358,3 +358,13 @@ cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml \
 ```
 
 See `docs/neuroscience/CONNECTOME_QUERY_ENSEMBLE_AUDIT.schema.json` and `CONNECTOME_QUERY_ENSEMBLE_AUDIT_PROTOCOL_V1.md` for the exact input and scope contract. The checked-in fixture contains a query that changes across plausible graphs and two decision-stable controls. All results are synthetic.
+
+## Domain-shift calibration and OOD referral audit
+
+The frozen proofreading-score evaluator accepts an optional, complete domain tuple on every prediction row: domain_id, shift_axis, and is_ood_domain. Keep task/error-family group separate from the domain identity. A single run evaluates one declared shift axis; run separate inputs for species, region, source volume/archive, acquisition protocol, segmentation lineage, modality availability, or morphology regime.
+
+Optional ood_score values are the frozen novelty model output, independent of p_error. When present they must be present on every row. The report includes per-domain classification/reliability metrics, ten fixed-width calibration bins, ECE/MCE, high-confidence false-accept rates at 0.90 and 0.95, low-confidence missed-error mass, and novelty AUROC/AUPRC. A frozen --ood-score-threshold adds false-OOD rate and held-out-domain recall; never choose this threshold on confirmatory labels.
+
+    cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin proofreading-score -- --input docs/neuroscience/examples/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT.example.jsonl --mapping-reference docs/neuroscience/CONNECTOMEBENCH2_V2_INTAKE_MANIFEST.schema.json --dataset-revision-commit-sha EXACT_40_CHARACTER_V2_COMMIT --policy-id domain-shift-fixture-v1 --prediction-profile-sha256 EXACT_64_CHARACTER_PROFILE_DIGEST --evaluation-partition development --review-time-basis synthetic-proxy --require-domain-shift-audit --ood-score-threshold 0.50 --output domain-shift-report.json
+
+See docs/neuroscience/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT_PROTOCOL_V1.md and the input schema. The fixture is synthetic. The current extension reports descriptive calibration and OOD point metrics plus domain cluster counts; it does not yet supply cluster-bootstrap intervals for ECE/MCE/OOD AUROC. Those metrics are not promotion evidence until the uncertainty extension and a pinned real-data lockbox evaluation exist.
