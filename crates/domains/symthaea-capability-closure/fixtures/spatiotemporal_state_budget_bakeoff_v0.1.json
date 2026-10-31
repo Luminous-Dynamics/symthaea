@@ -99,9 +99,17 @@
         "downstream_temporal_detachment",
         "local_auxiliary_head_gradient"
       ],
-      "tests_authored": 8,
+      "tests_authored": 9,
       "tests_executed": false,
-      "scope_limit": "Small scalar gradient-path control only; not STDL, BrainTrace, HDC-LTC, or a multi-module/event-vision benchmark."
+      "scope_limit": "Small scalar gradient-path control only; not STDL, BrainTrace, HDC-LTC, or a multi-module/event-vision benchmark.",
+      "verification_controls": [
+        "centered_finite_difference_for_all_five_parameters",
+        "independent_known_answer_gradient_vector",
+        "no_detachment_matches_full_BPTT_input_gradient",
+        "hidden_detachment_changes_long_horizon_credit",
+        "double_detachment_keeps_only_final_step_input_credit",
+        "local_auxiliary_objective_is_distinct_from_global_BPTT"
+      ]
     }
   },
   "stage1": {
@@ -157,7 +165,7 @@
     "BrainTrace_reproduced": false,
     "gradient_oracle_implemented": true,
     "gradient_oracle_path": "research/temporal-bench/src/gradient_oracle.rs",
-    "gradient_oracle_tests_authored": 8,
+    "gradient_oracle_tests_authored": 9,
     "gradient_oracle_tests_executed": false,
     "full_multimodule_oracle_implemented": false,
     "stdl_implemented": false,
