@@ -2,8 +2,7 @@
   "schema_version": "mace-agent-inputs-v0.1",
   "cases": [
     {
-      "case_id": "MACE-A01",
-      "family": "observational_confounding",
+      "case_id": "MACE-104",
       "agent_view": {
         "scenario_context": {
           "environment": "microgrid-lab",
@@ -53,8 +52,7 @@
       }
     },
     {
-      "case_id": "MACE-A02",
-      "family": "observational_confounding",
+      "case_id": "MACE-287",
       "agent_view": {
         "scenario_context": {
           "environment": "microgrid-lab",
@@ -113,8 +111,7 @@
       }
     },
     {
-      "case_id": "MACE-B01",
-      "family": "controlled_intervention",
+      "case_id": "MACE-319",
       "agent_view": {
         "scenario_context": {
           "environment": "microgrid-lab",
@@ -166,8 +163,7 @@
       }
     },
     {
-      "case_id": "MACE-B02",
-      "family": "controlled_intervention",
+      "case_id": "MACE-604",
       "agent_view": {
         "scenario_context": {
           "environment": "microgrid-lab",
@@ -228,8 +224,7 @@
       }
     },
     {
-      "case_id": "MACE-C01",
-      "family": "regime_shift",
+      "case_id": "MACE-622",
       "agent_view": {
         "scenario_context": {
           "environment": "thermal-lab",
@@ -284,8 +279,7 @@
       }
     },
     {
-      "case_id": "MACE-C02",
-      "family": "regime_shift",
+      "case_id": "MACE-731",
       "agent_view": {
         "scenario_context": {
           "environment": "thermal-lab",
@@ -349,8 +343,7 @@
       }
     },
     {
-      "case_id": "MACE-D01",
-      "family": "outcome_misattribution",
+      "case_id": "MACE-845",
       "agent_view": {
         "scenario_context": {
           "environment": "device-lab",
@@ -404,8 +397,7 @@
       }
     },
     {
-      "case_id": "MACE-D02",
-      "family": "outcome_misattribution",
+      "case_id": "MACE-902",
       "agent_view": {
         "scenario_context": {
           "environment": "device-lab",
