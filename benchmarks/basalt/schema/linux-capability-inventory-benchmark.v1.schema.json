@@ -1,0 +1,296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT Linux capability inventory benchmark protocol v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "suite_id",
+    "unit_of_analysis",
+    "scoring_policy",
+    "comparison_arms",
+    "metrics",
+    "gates",
+    "statistical_protocol",
+    "reporting"
+  ],
+  "properties": {
+    "format_version": {
+      "const": 1
+    },
+    "suite_id": {
+      "const": "basalt-linux-capability-inventory-benchmark-v1"
+    },
+    "unit_of_analysis": {
+      "const": "host_kernel_boot_namespace"
+    },
+    "scoring_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "composite_score",
+        "safety_before_efficiency",
+        "promote_only_when_all_safety_gates_pass",
+        "independent_sample_unit",
+        "repeated_reads_on_one_host_are_not_independent_samples"
+      ],
+      "properties": {
+        "composite_score": {
+          "const": "prohibited"
+        },
+        "safety_before_efficiency": {
+          "const": true
+        },
+        "promote_only_when_all_safety_gates_pass": {
+          "const": true
+        },
+        "independent_sample_unit": {
+          "const": "host_kernel_boot_namespace"
+        },
+        "repeated_reads_on_one_host_are_not_independent_samples": {
+          "const": true
+        }
+      }
+    },
+    "comparison_arms": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "arm_id",
+          "role",
+          "description"
+        ],
+        "properties": {
+          "arm_id": {
+            "enum": [
+              "kernel_config_only",
+              "sysfs_procfs_mount_inventory",
+              "bpftool_feature_probe",
+              "runtime_capability_smoke_tests",
+              "basalt_read_only_inventory"
+            ]
+          },
+          "role": {
+            "enum": [
+              "baseline",
+              "reference",
+              "candidate"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "phase",
+          "definition",
+          "numerator",
+          "denominator",
+          "target",
+          "unit"
+        ],
+        "properties": {
+          "metric_id": {
+            "enum": [
+              "capability_status_accuracy",
+              "unknown_false_promotion_rate",
+              "report_schema_conformance",
+              "host_identity_binding",
+              "non_interference_side_effects",
+              "stable_field_reproducibility",
+              "p95_preflight_latency_ms",
+              "p95_report_size_bytes"
+            ]
+          },
+          "phase": {
+            "enum": [
+              "safety",
+              "selectivity",
+              "efficiency"
+            ]
+          },
+          "definition": {
+            "type": "string",
+            "minLength": 1
+          },
+          "numerator": {
+            "type": "string",
+            "minLength": 1
+          },
+          "denominator": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operator",
+              "value"
+            ],
+            "properties": {
+              "operator": {
+                "enum": [
+                  "=",
+                  "<=",
+                  ">="
+                ]
+              },
+              "value": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          },
+          "unit": {
+            "enum": [
+              "proportion",
+              "scenario_count",
+              "milliseconds",
+              "bytes"
+            ]
+          }
+        }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "safety",
+        "selectivity",
+        "efficiency",
+        "promotion_rule"
+      ],
+      "properties": {
+        "safety": {
+          "type": "array",
+          "minItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "capability_status_accuracy",
+              "unknown_false_promotion_rate",
+              "report_schema_conformance",
+              "host_identity_binding",
+              "non_interference_side_effects"
+            ]
+          }
+        },
+        "selectivity": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "const": "stable_field_reproducibility"
+          }
+        },
+        "efficiency": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "p95_preflight_latency_ms",
+              "p95_report_size_bytes"
+            ]
+          }
+        },
+        "promotion_rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "statistical_protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "confidence_level",
+        "independence_unit",
+        "clustering",
+        "split",
+        "stopping"
+      ],
+      "properties": {
+        "confidence_level": {
+          "const": 0.95
+        },
+        "independence_unit": {
+          "const": "host_kernel_boot_namespace"
+        },
+        "clustering": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stopping": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "reporting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_strata",
+        "required_costs",
+        "required_disclosures",
+        "forbidden_claims"
+      ],
+      "properties": {
+        "required_strata": {
+          "type": "array",
+          "minItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "required_costs": {
+          "type": "array",
+          "minItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "required_disclosures": {
+          "type": "array",
+          "minItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "forbidden_claims": {
+          "type": "array",
+          "minItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
