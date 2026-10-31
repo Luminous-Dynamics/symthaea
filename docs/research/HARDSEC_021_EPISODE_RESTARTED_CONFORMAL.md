@@ -104,7 +104,7 @@ Inputs:
 - Plan: `schemas/hardsec-episode-restarted-plan-v1.schema.json`
 - Episode/window stream: `schemas/hardsec-episode-window-stream-v1.schema.json`
 - Benchmark plan: `schemas/hardsec-episode-restarted-benchmark-v1.schema.json`
-- Rust executable: `examples/hardsec_episode_restarted_monitor.rs` (28 authored Rust tests)
+- Rust executable: `examples/hardsec_episode_restarted_monitor.rs` (30 authored Rust tests)
 - PMU acquisition prerequisite: `examples/hardsec_pmu_metrology_audit.rs` and the HARDSEC-018 metrology plan/observations
 - Fixtures: `tests/fixtures/hardsec/episode-restarted-v1/`
 
@@ -223,4 +223,4 @@ A confirmatory episode update now depends on three independently versioned evide
 2. **HARDSEC-020 context assignment:** the truth-free, digest-bound, per-window assignment map. It establishes that the current context mapping is consistent with the separately evaluated assignment output; it does not authenticate the classifier or prove context exogeneity.
 3. **HARDSEC-021 episode manifest:** one fixed four-window episode per execution group, with unique source trace/window identities, contiguous source offsets, fixed score/model/randomizer digests and a single selected context. It establishes the declared grouping and mapping consistency; it does not authenticate the raw trace or prove successive executions independent.
 
-The sequential update is blocked unless all three inputs agree on the exact platform/workload/score/context/episode identities. This is an evidence-lineage gate, not a signed hardware attestation. The monitor's statistical claim remains conditional on independent/exchangeable episode scores, independent randomizers, fixed scoring, exogenous context assignment and non-informative episode abstention.
+The sequential update is blocked unless all three inputs agree on the exact platform/workload/score/context/episode identities. It additionally reconciles the PMU receipt's reported trial and matched-block counts against the hashed observations bytes, rejects duplicated event qualification rows, and checks all four acquisition conditions plus per-trial platform/workload identity. This is an evidence-lineage gate, not a signed hardware attestation. The monitor's statistical claim remains conditional on independent/exchangeable episode scores, independent randomizers, fixed scoring, exogenous context assignment and non-informative episode abstention.
