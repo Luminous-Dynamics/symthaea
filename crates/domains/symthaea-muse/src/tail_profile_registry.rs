@@ -186,6 +186,8 @@ pub struct TailProfile {
     pub version: String,
     pub profile_id: String,
     pub dataset_revision: String,
+    pub benchmark_manifest_sha256: String,
+    pub benchmark_audit_sha256: String,
     pub context: TailProfileContext,
     pub statistics: TailProfileStatistics,
     pub qualification: TailProfileQualification,
@@ -492,7 +494,8 @@ fn operation_family_from_report(
 fn observations_from_verified_report(
     verified_report: &VerifiedCounterfactualSupportAdapterReport,
     topology: &VerifiedRendererTopology,
-    lineage_assignments: &[TailProfileLineageAssignment],
+    source_lineage_sha256: &str,
+    split: TailProfileSplit,
 ) -> Result<(TailProfileContext, Vec<TailProfileEventObservation>), TailProfileError> {
     let report = verified_report.report();
     if !report.receipt_is_intact() {
@@ -517,10 +520,10 @@ fn observations_from_verified_report(
     {
         return Err(TailProfileError::RendererContextMismatch);
     }
-    if lineage_assignments.len() != report.event_count || report.event_count == 0 {
-        return Err(TailProfileError::EventCountMismatch);
+    if !is_sha256(source_lineage_sha256) || report.event_count == 0 {
+        return Err(TailProfileError::InvalidLineageAssignment);
     }
-    if lineage_assignments.len() > MAX_PROFILE_EVENTS {
+    if report.event_count > MAX_PROFILE_EVENTS {
         return Err(TailProfileError::InvalidField("too many profile events"));
     }
 
@@ -532,30 +535,8 @@ fn observations_from_verified_report(
         return Err(TailProfileError::RendererContextMismatch);
     }
 
-    let mut assignment_by_index = BTreeMap::new();
-    let mut lineage_splits = BTreeMap::<String, TailProfileSplit>::new();
-    for assignment in lineage_assignments {
-        if !is_sha256(&assignment.source_lineage_sha256)
-            || assignment.source_event_index >= report.event_count
-            || assignment_by_index.insert(assignment.source_event_index, assignment).is_some()
-        {
-            return Err(TailProfileError::InvalidLineageAssignment);
-        }
-        if let Some(previous) = lineage_splits.insert(
-            assignment.source_lineage_sha256.clone(),
-            assignment.split,
-        ) {
-            if previous != assignment.split {
-                return Err(TailProfileError::CrossSplitLineageLeakage);
-            }
-        }
-    }
-
     let mut observations = Vec::with_capacity(report.event_count);
     for (index, event) in report.events.iter().enumerate() {
-        let assignment = assignment_by_index
-            .get(&index)
-            .ok_or(TailProfileError::InvalidLineageAssignment)?;
         if event.source_event_index != index
             || !is_sha256(&event.evidence_sha256)
             || event.tail_guard_was_clipped
@@ -574,8 +555,8 @@ fn observations_from_verified_report(
         observations.push(TailProfileEventObservation {
             source_event_index: index,
             source_event_id: event.source_event_id.clone(),
-            source_lineage_sha256: assignment.source_lineage_sha256.clone(),
-            split: assignment.split,
+            source_lineage_sha256: source_lineage_sha256.to_owned(),
+            split,
             event_evidence_sha256: event.evidence_sha256.clone(),
             final_note_off_frame: event.final_note_off_frame,
             raw_measured_end_frame: raw_end,
