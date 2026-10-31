@@ -189,23 +189,51 @@ Publish paired comparisons on identical held-out designs, identical review budge
 
 These fixtures qualify evaluator semantics only. They are not a hardware-detector score, physical-silicon result or security certification.
 
-## 11. Machine-readable detector-facing contract
+## 11. Machine-readable contract and executable semantic audit
 
-The initial JSON contract is at `schemas/hardsec-localization-explanation-v1.schema.json`, with a non-production known-answer example at `tests/fixtures/hardsec/localization-explanation-v1.json`.
+Three separate contracts are now versioned:
 
-The record binds source/netlist and node-edge-map digests, design/source grouping, model and training-lineage digests, explainer/configuration identity, frozen threshold profile, candidate regions, exact path references, counterevidence, uncertainty and review-budget/cost semantics.
+- Detector-facing explanation: `schemas/hardsec-localization-explanation-v1.schema.json`.
+- Source graph: `schemas/hardsec-source-graph-v1.schema.json`.
+- Evaluator-controlled insertion-footprint oracle: `schemas/hardsec-localization-oracle-v1.schema.json`.
 
-Ground-truth Trojan labels and evaluator-oracle answers are intentionally absent from the detector-facing schema. They belong in a separately access-controlled evaluator input and must never be passed to the explainer/model being scored.
+The detector-facing explanation never includes ground-truth labels or oracle answers. The oracle is supplied as a separate evaluator input and must remain inaccessible to the detector/explainer during inference and explanation generation. Merely putting it in a different file does not enforce access control; the campaign runner/operator must enforce that trust boundary.
 
-The JSON Schema validates record shape and local field constraints. It cannot by itself prove:
-- region node/edge IDs exist in the source graph;
-- edge endpoints form a continuous path;
-- a path set is complete;
-- group IDs truthfully describe source lineage;
-- equivalence evidence is valid;
-- the model or explanation was produced by the declared digest.
+### 11.1 Rust receipt auditor
 
-Those are semantic-auditor obligations. The fixture is a schema example, not a valid detector result or a benchmark score.
+The first semantic auditor is implemented at `examples/hardsec_localization_audit.rs` and compiled through an isolated nested workspace at `tools/hardsec-localization-audit-harness`. It:
+- hashes exact explanation, graph and oracle bytes;
+- computes a canonical node/edge-map digest;
+- verifies design and source identity bindings;
+- rejects unknown candidate nodes/edges, duplicate region IDs/ranks, duplicate graph IDs and discontinuous retained paths;
+- checks retained declared paths against the separately supplied reference-path oracle;
+- only permits a `complete` path-coverage claim when the caller declares the oracle reference-path set complete and every supplied reference path is matched;
+- reports insertion-footprint precision/recall over region, gate or edge review budgets, including a fixed review-budget curve;
+- preserves unknown/contradicted path status and rejects causal/mechanism claims from an insertion-footprint-only oracle;
+- writes a deterministic unsigned no-overwrite receipt outside input directories.
+
+Example command:
+
+```bash
+cargo run --locked \
+  --manifest-path tools/hardsec-localization-audit-harness/Cargo.toml \
+  --features hardsec-localization-audit \
+  --example hardsec_localization_audit -- \
+  --explanation tests/fixtures/hardsec/localization-audit-v1/explanation.json \
+  --graph tests/fixtures/hardsec/localization-audit-v1/source-graph.json \
+  --oracle tests/fixtures/hardsec/localization-audit-v1/evaluator-oracle.json \
+  --receipt /tmp/hardsec-localization-receipt.json
+```
+
+The receipt's score is an evaluator result, not a `pass`. The tool does not parse RTL, prove equivalence, independently validate a graph extractor, authenticate the oracle, or prove that the reference-path set is exhaustive. A `cut_and_reported` status is retained as a caller-declared status; this first version does not independently replay the partitioner or verify an external path-retention receipt.
+
+### 11.2 Deterministic fixtures and focused workflow
+
+The known-answer fixture labels nodes `g17` and `g18` as insertion-footprint positives; the top-ranked candidate region contains both, yielding precision 1.0 and recall 2/3 at a one-region review budget. A separate benign decoy region is included. This is synthetic evaluator-mechanics evidence only.
+
+Fourteen focused unit tests are authored for known-answer scoring, source digest mutation, unknown node mutation, discontinuous paths, incomplete-oracle completeness claims, causal-claim rejection, duplicate ranks, unknown oracle labels, retained-path mismatch, edge review budgets, unknown path handling, exact complete-path matching, empty path sets and review-curve emission. The dedicated workflow runs rustfmt, the locked Cargo suite and the known-answer CLI receipt assertion.
+
+The JSON schemas describe record shape; the semantic auditor is responsible for cross-record ID/path checks. Neither alone proves the truth or authority of source lineage, labels, equivalence certificates or completeness statements.
 
 ## 12. Implementation sequence
 
