@@ -387,7 +387,6 @@ mod tests {
     use crate::pareto_moead::{run_moead_zdt1, MoeadWeightMode};
     use crate::pareto_nsga2::run_nsga2_zdt1;
     use crate::pareto_smsemoa::run_smsemoa_zdt1;
-    use serde_json::json;
 
     fn objective_specs() -> Vec<ParetoObjectiveSpec> {
         vec![
@@ -485,10 +484,19 @@ mod tests {
         let ref_front = reference_front();
 
         let mut unequal = runs.clone();
-        if let ParetoBaselineRun::SmsEmoa { config, report } = &mut unequal[2] {
-            config.offspring_evaluations = 41;
-            report.objective_evaluations += 1;
-        }
+        let mut different_budget_config = match &unequal[2] {
+            ParetoBaselineRun::SmsEmoa { config, .. } => config.clone(),
+            _ => unreachable!(),
+        };
+        different_budget_config.offspring_evaluations = 41;
+        let different_budget_report = super::super::pareto_smsemoa::run_smsemoa_zdt1(
+            &different_budget_config,
+            10,
+        ).unwrap();
+        unequal[2] = ParetoBaselineRun::SmsEmoa {
+            config: different_budget_config,
+            report: different_budget_report,
+        };
         assert!(compare_pareto_baselines(&unequal, &specs, &[-0.1, -0.1], &ref_front).is_err());
 
         let mut duplicate = runs.clone();
