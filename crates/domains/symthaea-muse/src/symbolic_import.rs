@@ -126,6 +126,33 @@ fn musicxml_key_signature(document: &roxmltree::Document<'_>) -> Result<(i8, boo
     Ok(signatures.into_iter().next().unwrap_or((0, false)))
 }
 
+/// The legacy MusicXML importer has one divisions-per-quarter value for
+/// the whole document. Reject files that change it rather than interpreting
+/// every measure using whichever value happened to appear last.
+fn musicxml_divisions(document: &roxmltree::Document<'_>) -> Result<i64, String> {
+    let mut divisions = None::<i64>;
+    for node in document
+        .descendants()
+        .filter(|node| node.has_tag_name("divisions"))
+    {
+        let value = node
+            .text()
+            .and_then(|raw| raw.trim().parse::<i64>().ok())
+            .filter(|value| *value > 0)
+            .ok_or_else(|| {
+                "MusicXML divisions must be a positive integer".to_string()
+            })?;
+        if divisions.is_some_and(|previous| previous != value) {
+            return Err(
+                "MusicXML divisions changes are not representable by the legacy single-divisions importer"
+                    .into(),
+            );
+        }
+        divisions = Some(value);
+    }
+    Ok(divisions.unwrap_or(1))
+}
+
 /// The legacy Score carries one constant tempo. Preserve repeated identical
 /// declarations, but do not flatten a changing tempo map to the last value.
 fn musicxml_tempo_bpm(document: &roxmltree::Document<'_>) -> Result<f32, String> {
@@ -429,7 +456,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
     if parts.is_empty() {
         return Err("MusicXML contains no score parts".into());
     }
-    let mut divisions = 1_i64;
+    let divisions = musicxml_divisions(&document)?;
     let (fifths, minor) = musicxml_key_signature(&document)?;
     let meter = musicxml_time_signature_meter(&document)?;
     let tempo = musicxml_tempo_bpm(&document)?;
@@ -439,38 +466,59 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
         let mut cursor = 0_i64;
         let mut previous_onset = 0_i64;
         for child in part.descendants().filter(|node| node.is_element()) {
-            if child.has_tag_name("divisions") {
-                divisions = node_i64(child).unwrap_or(divisions).max(1);
-            } else if child.has_tag_name("backup") {
+            if child.has_tag_name("backup") {
                 let amount = child
                     .children()
                     .find(|node| node.has_tag_name("duration"))
                     .and_then(node_i64)
-                    .unwrap_or(0);
-                cursor = cursor.saturating_sub(amount);
+                    .filter(|amount| *amount > 0)
+                    .ok_or_else(|| {
+                        "MusicXML backup requires a positive integer duration".to_string()
+                    })?;
+                cursor = cursor
+                    .checked_sub(amount)
+                    .filter(|value| *value >= 0)
+                    .ok_or_else(|| {
+                        "MusicXML backup moves the part cursor before the start of the score"
+                            .to_string()
+                    })?;
             } else if child.has_tag_name("forward") {
                 let amount = child
                     .children()
                     .find(|node| node.has_tag_name("duration"))
                     .and_then(node_i64)
-                    .unwrap_or(0);
-                cursor += amount;
+                    .filter(|amount| *amount > 0)
+                    .ok_or_else(|| {
+                        "MusicXML forward requires a positive integer duration".to_string()
+                    })?;
+                cursor = cursor.checked_add(amount).ok_or_else(|| {
+                    "MusicXML forward exceeds the supported signed duration range".to_string()
+                })?;
             } else if child.has_tag_name("note") {
                 let duration = child
                     .children()
                     .find(|node| node.has_tag_name("duration"))
                     .and_then(node_i64)
-                    .unwrap_or(divisions)
-                    .max(1);
+                    .filter(|duration| *duration > 0)
+                    .ok_or_else(|| {
+                        "MusicXML note requires a positive duration; grace-note timing is not supported"
+                            .to_string()
+                    })?;
                 let chord = child.children().any(|node| node.has_tag_name("chord"));
                 let rest = child.children().any(|node| node.has_tag_name("rest"));
                 let onset = if chord { previous_onset } else { cursor };
-                if !rest && let Some(midi) = musicxml_pitch(child) {
+                if !rest {
+                    let midi = musicxml_pitch(child).ok_or_else(|| {
+                        "MusicXML pitched note contains an unsupported or malformed pitch"
+                            .to_string()
+                    })?;
                     raw.push((part_index, midi, onset, duration));
                 }
                 previous_onset = onset;
                 if !chord {
-                    cursor += duration;
+                    cursor = cursor.checked_add(duration).ok_or_else(|| {
+                        "MusicXML note exceeds the supported signed duration range".to_string()
+                    })?;
                 }
             }
         }
@@ -778,6 +826,38 @@ mod tests {
             0x00, 0xff, 0x2f, 0x00,
         ];
         assert!(parse_midi(&midi).is_err());
+    }
+
+    #[test]
+    fn musicxml_divisions_changes_are_rejected_instead_of_rescaling_all_measures() {
+        let xml = br#"<score-partwise><part id="P1">
+            <measure number="1"><attributes><divisions>1</divisions></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure>
+            <measure number="2"><attributes><divisions>2</divisions></attributes>
+                <note><pitch><step>D</step><octave>4</octave></pitch><duration>2</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        assert!(parse_musicxml(xml).is_err());
+    }
+
+    #[test]
+    fn musicxml_backup_before_score_start_is_rejected() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <backup><duration>1</duration></backup>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        assert!(parse_musicxml(xml).is_err());
+    }
+
+    #[test]
+    fn musicxml_missing_note_duration_is_not_silently_invented() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch></note>
+        </measure></part></score-partwise>"#;
+        assert!(parse_musicxml(xml).is_err());
     }
 
     #[test]
