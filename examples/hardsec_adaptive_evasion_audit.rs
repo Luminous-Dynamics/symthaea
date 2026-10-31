@@ -322,6 +322,53 @@ fn next_bootstrap_u64(state: &mut u64) -> u64 {
 /// Deterministic equal-group percentile bootstrap. The seed deliberately
 /// depends only on campaign ID, grouping axis and algorithm version, so
 /// matched model arms with the same ordered group IDs use common resamples.
+/// Finite-sample two-sided Hoeffding interval for a mean of independent
+/// bounded group-level observations. This is conservative but has a
+/// distribution-free coverage guarantee conditional on group independence.
+fn hoeffding_mean_interval(
+    values: &[f64],
+    lower_bound: f64,
+    upper_bound: f64,
+    alpha: f64,
+    assumption: &str,
+) -> Value {
+    if values.is_empty() || !(lower_bound < upper_bound) || !(0.0 < alpha && alpha < 1.0) {
+        return json!({
+            "method": "two_sided_hoeffding_bounded_group_mean_v1",
+            "status": "unavailable_invalid_or_empty_support",
+            "group_count": values.len(),
+            "lower": null,
+            "upper": null
+        });
+    }
+    if values.iter().any(|value| !value.is_finite() || *value < lower_bound || *value > upper_bound) {
+        return json!({
+            "method": "two_sided_hoeffding_bounded_group_mean_v1",
+            "status": "unavailable_values_outside_declared_bounds",
+            "group_count": values.len(),
+            "lower": null,
+            "upper": null
+        });
+    }
+    let count = values.len();
+    let point = values.iter().sum::<f64>() / count as f64;
+    let epsilon = (upper_bound - lower_bound)
+        * ((2.0 / alpha).ln() / (2.0 * count as f64)).sqrt();
+    json!({
+        "method": "two_sided_hoeffding_bounded_group_mean_v1",
+        "status": "available_finite_sample_bound",
+        "point_estimate": point,
+        "group_count": count,
+        "confidence_level": 1.0 - alpha,
+        "lower": (point - epsilon).max(lower_bound),
+        "upper": (point + epsilon).min(upper_bound),
+        "declared_value_bounds": [lower_bound, upper_bound],
+        "epsilon": epsilon,
+        "assumption": assumption,
+        "interpretation": "Finite-sample distribution-free bound for the mean of independent bounded group-level observations. Independence/exchangeability of caller-declared groups is not proven by this evaluator."
+    })
+}
+
 fn group_bootstrap_interval(
     groups: &BTreeMap<String, RecallCounts>,
     campaign_id: &str,
@@ -337,6 +384,13 @@ fn group_bootstrap_interval(
     let seed_material = format!("{campaign_id}|{axis}|hardsec-group-bootstrap-v1");
     let seed_digest = Sha256::digest(seed_material.as_bytes());
     let seed_sha256 = seed_digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+    let hoeffding = hoeffding_mean_interval(
+        &values,
+        0.0,
+        1.0,
+        0.05,
+        "caller-declared independent group-level rates bounded to [0,1]",
+    );
 
     if group_count < MIN_GROUPS_FOR_BOOTSTRAP_INTERVAL {
         return json!({
@@ -353,7 +407,9 @@ fn group_bootstrap_interval(
             "seed_scope": "campaign_id + grouping_axis + algorithm_version",
             "resampling_unit": "caller_declared_independent_group",
             "assumption": "group identifiers encode independent exchangeable units",
-            "interpretation": "No interval is reported below the minimum group count; case/window counts do not substitute for independent groups."
+            "coverage_guarantee": false,
+            "interpretation": "No percentile-bootstrap interval is reported below the minimum group count; this is a descriptive resampling interval, not a finite-sample coverage guarantee. The separate Hoeffding bound is the conservative distribution-free interval conditional on independent bounded groups.",
+            "distribution_free_hoeffding_95": hoeffding
         });
     }
 
@@ -386,15 +442,17 @@ fn group_bootstrap_interval(
         "independent_group_count": group_count,
         "minimum_independent_groups": MIN_GROUPS_FOR_BOOTSTRAP_INTERVAL,
         "bootstrap_replicates": GROUP_BOOTSTRAP_REPLICATES,
-        "confidence_level": 0.95,
+        "nominal_percentile_level": 0.95,
         "lower_95": bootstrap_means[lower_index],
         "upper_95": bootstrap_means[upper_index],
         "quantile_rule": "lower_floor_upper_ceil_order_statistic",
+        "coverage_guarantee": false,
         "seed_sha256": seed_sha256,
         "seed_scope": "campaign_id + grouping_axis + algorithm_version",
         "resampling_unit": "caller_declared_independent_group",
         "assumption": "group identifiers encode independent exchangeable units",
-        "interpretation": "Descriptive cluster-bootstrap interval conditional on caller-declared groups; not proof of independence or a family-wise population guarantee."
+        "interpretation": "Descriptive cluster-bootstrap percentile range only; it is not a finite-sample 95% coverage guarantee. Use the separate Hoeffding bound for a conservative distribution-free interval conditional on independent bounded groups.",
+        "distribution_free_hoeffding_95": hoeffding
     })
 }
 
@@ -555,6 +613,13 @@ fn paired_group_metric_delta(
     );
     let seed_digest = Sha256::digest(seed_material.as_bytes());
     let seed_sha256 = seed_digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+    let hoeffding = hoeffding_mean_interval(
+        &deltas,
+        -1.0,
+        1.0,
+        0.05,
+        "paired candidate-minus-baseline group deltas bounded to [-1,1], independent across declared groups",
+    );
 
     let (lower, upper, status) = if group_count < MIN_GROUPS_FOR_BOOTSTRAP_INTERVAL {
         (None, None, "unavailable_insufficient_independent_groups")
@@ -599,13 +664,15 @@ fn paired_group_metric_delta(
         "improvement_point_estimate": point,
         "improvement_lower_95": lower,
         "improvement_upper_95": upper,
+        "bootstrap_coverage_guarantee": false,
+        "distribution_free_hoeffding_95": hoeffding,
         "bootstrap_replicates": GROUP_BOOTSTRAP_REPLICATES,
         "minimum_independent_groups": MIN_GROUPS_FOR_BOOTSTRAP_INTERVAL,
         "seed_sha256": seed_sha256,
         "seed_scope": "campaign_id + grouping_axis + metric + algorithm_version",
         "resampling_unit": "paired_independent_group_delta",
         "assumption": "candidate and baseline values are paired on identical caller-declared independent exchangeable groups",
-        "interpretation": "Positive improvement favors the candidate. The interval is descriptive and conditional on group independence/exchangeability.",
+        "interpretation": "Positive improvement favors the candidate. The percentile-bootstrap interval is descriptive only; the separate Hoeffding bound is finite-sample distribution-free conditional on independent paired groups.",
         "by_group": by_group
     }))
 }
@@ -1551,6 +1618,33 @@ mod tests {
         assert_eq!(interval["independent_group_count"], 9);
         assert_eq!(interval["lower_95"], Value::Null);
         assert_eq!(interval["upper_95"], Value::Null);
+        assert_eq!(interval["distribution_free_hoeffding_95"]["status"], "available_finite_sample_bound");
+        assert_eq!(interval["distribution_free_hoeffding_95"]["group_count"], 9);
+        assert_eq!(interval["coverage_guarantee"], false);
+    }
+
+    #[test]
+    fn hoeffding_interval_matches_finite_sample_known_answer() {
+        let values = vec![1.0; 9].into_iter().chain(std::iter::once(0.0)).collect::<Vec<_>>();
+        let interval = hoeffding_mean_interval(
+            &values,
+            0.0,
+            1.0,
+            0.05,
+            "independent bounded groups",
+        );
+        assert_eq!(interval["group_count"], 10);
+        assert_eq!(interval["confidence_level"], 0.95);
+        assert!((interval["lower"].as_f64().unwrap() - 0.47053059165326244).abs() < 1e-12);
+        assert_eq!(interval["upper"], 1.0);
+    }
+
+    #[test]
+    fn hoeffding_interval_suppresses_invalid_support() {
+        assert_eq!(
+            hoeffding_mean_interval(&[], 0.0, 1.0, 0.05, "empty").get("status").unwrap(),
+            "unavailable_invalid_or_empty_support"
+        );
     }
 
     #[test]
@@ -1726,6 +1820,10 @@ mod tests {
         assert_eq!(delta["improvement_lower_95"], 0.0);
         assert_eq!(delta["improvement_upper_95"], 0.0);
         assert_eq!(delta["resampling_unit"], "paired_independent_group_delta");
+        assert_eq!(delta["distribution_free_hoeffding_95"]["status"], "available_finite_sample_bound");
+        assert!((delta["distribution_free_hoeffding_95"]["lower"].as_f64().unwrap() + 0.8589388166934752).abs() < 1e-12);
+        assert!((delta["distribution_free_hoeffding_95"]["upper"].as_f64().unwrap() - 0.8589388166934752).abs() < 1e-12);
+        assert_eq!(delta["bootstrap_coverage_guarantee"], false);
     }
 
     #[test]
