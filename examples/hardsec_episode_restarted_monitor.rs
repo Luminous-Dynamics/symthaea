@@ -568,6 +568,14 @@ fn parse_context_receipt(
     Ok(map)
 }
 
+fn score_cmp(left: f64, right: f64) -> Ordering {
+    if left == right {
+        Ordering::Equal
+    } else {
+        left.total_cmp(&right)
+    }
+}
+
 fn avl_height(node: &Option<Box<OrderStatisticNode>>) -> i32 {
     node.as_ref().map_or(0, |n| n.height)
 }
@@ -640,7 +648,7 @@ fn avl_insert_node(
         });
     };
 
-    match key.total_cmp(&node.key) {
+    match score_cmp(key, node.key) {
         Ordering::Less => {
             node.left = Some(avl_insert_node(node.left.take(), key));
         }
@@ -675,7 +683,7 @@ impl OrderStatisticAvl {
         let mut less = 0usize;
         let mut cursor = self.root.as_deref();
         while let Some(node) = cursor {
-            match key.total_cmp(&node.key) {
+            match score_cmp(key, node.key) {
                 Ordering::Less => cursor = node.left.as_deref(),
                 Ordering::Equal => {
                     less += avl_count(&node.left);
@@ -1202,6 +1210,43 @@ mod tests {
         assert_eq!(r["statistical_guarantees"]["randomizer_independence_status"],"assumption_not_verified");
         assert_eq!(r["statistical_guarantees"]["theorem_guarantee_status"],"not_established_from_input_receipts");
         assert_eq!(r["statistical_guarantees"]["effective_sample_size_estimate"],Value::Null);
+    }
+
+    #[test]
+    fn order_statistic_avl_matches_linear_rank_and_tie_counts() {
+        let values = [2.0, 1.0, 2.0, 5.0, -1.0, 2.0, 4.0, 4.0, 0.0, -0.0];
+        let mut tree = OrderStatisticAvl::default();
+        let mut reference = Vec::new();
+        for value in values {
+            let transformed = -value;
+            let query = if value == 0.0 { 0.0 } else { transformed };
+            let (tree_less, tree_equal) = tree.rank_and_equal(query).unwrap();
+            let reference_less = reference.iter().filter(|x: &&f64| **x < query).count();
+            let reference_equal = reference.iter().filter(|x: &&f64| **x == query).count();
+            assert_eq!(tree_less, reference_less);
+            assert_eq!(tree_equal, reference_equal);
+            let p_tree = randomized_conformal_p_from_counts(
+                tree_less, tree_equal, reference.len() + 1, 0.37
+            ).unwrap();
+            let p_linear = online_randomized_conformal_p(&reference, -query, 0.37).unwrap();
+            assert!((p_tree - p_linear).abs() < 1e-12);
+            tree.insert(query).unwrap();
+            reference.push(query);
+            assert_eq!(tree.total_count, reference.len());
+        }
+    }
+
+    #[test]
+    fn order_statistic_avl_height_is_logarithmic_under_sorted_insertions() {
+        let mut tree = OrderStatisticAvl::default();
+        for value in 0..10_000 {
+            tree.insert(value as f64).unwrap();
+        }
+        assert_eq!(tree.total_count, 10_000);
+        assert!(tree.height() <= 20, "AVL height {}", tree.height());
+        let (less, equal) = tree.rank_and_equal(5_000.0).unwrap();
+        assert_eq!(less, 5_000);
+        assert_eq!(equal, 1);
     }
 
     #[test]
