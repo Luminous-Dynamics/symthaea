@@ -51,7 +51,6 @@ pub struct OfferSetSourceState {
     pub schema: String,
     pub version: String,
     pub campaign_id: String,
-    pub policy_id: String,
     pub source_commit: String,
     pub round_id: u64,
     pub batch_id: Option<String>,
@@ -67,7 +66,6 @@ impl OfferSetSourceState {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         campaign_id: impl Into<String>,
-        policy_id: impl Into<String>,
         source_commit: impl Into<String>,
         round_id: u64,
         batch_id: Option<String>,
@@ -81,7 +79,6 @@ impl OfferSetSourceState {
             schema: SCHEMA.to_owned(),
             version: VERSION.to_owned(),
             campaign_id: campaign_id.into(),
-            policy_id: policy_id.into(),
             source_commit: source_commit.into(),
             round_id,
             batch_id,
@@ -100,7 +97,6 @@ impl OfferSetSourceState {
         }
         for (path, value) in [
             ("campaign_id", self.campaign_id.as_str()),
-            ("policy_id", self.policy_id.as_str()),
             ("source_commit", self.source_commit.as_str()),
         ] {
             if value.trim().is_empty() {
@@ -259,7 +255,6 @@ impl OfferSetEvidenceBundle {
             })?;
             let state = &artifact.state;
             if state.campaign_id != tape.header().campaign_id
-                || state.policy_id != tape.header().policy.policy_id
                 || state.source_commit != tape.header().source_commit
             {
                 return Err(OfferSetEvidenceError::new(
@@ -439,7 +434,6 @@ mod tests {
     fn source_state(ids: Vec<String>, evaluator_state: Value) -> OfferSetSourceState {
         OfferSetSourceState::new(
             "campaign-1",
-            "policy-1",
             "0123456789abcdef0123456789abcdef01234567",
             1,
             None,
@@ -493,7 +487,7 @@ mod tests {
     #[test]
     fn duplicate_or_non_object_source_state_is_rejected() {
         assert!(OfferSetSourceState::new(
-            "campaign-1", "policy-1", "0123456789abcdef0123456789abcdef01234567",
+            "campaign-1", "0123456789abcdef0123456789abcdef01234567",
             1, None, 0, vec!["A".into(), "A".into()], true, json!({"eligible": ["A"]}),
         ).is_err());
         assert!(OfferSetSourceState::new(
