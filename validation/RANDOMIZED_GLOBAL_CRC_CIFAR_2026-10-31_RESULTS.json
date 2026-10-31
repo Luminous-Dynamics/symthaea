@@ -1,0 +1,163 @@
+{
+  "schema": "symthaea-randomized-global-common-depth-crc-v1",
+  "status": "LOCAL_FINITE_POPULATION_REFERENCE_EXECUTION_NOT_DEPLOYMENT_RESULT",
+  "protocol": {
+    "pool_counts": [
+      7300,
+      969,
+      1731
+    ],
+    "n_calibration": 50,
+    "alphas": [
+      0.02,
+      0.05,
+      0.1,
+      0.15
+    ],
+    "calibration_weights": "exact multivariate hypergeometric",
+    "test_type_weights": "residual population conditional on calibration count vector",
+    "action_support": [
+      0,
+      1,
+      2
+    ],
+    "policy": "draw one common depth per calibration sample from P(action|calibration counts), then reuse for its test batch",
+    "utility": "expected correct hierarchy specificity",
+    "validity": "all 1,378 augmented multiset expected-loss constraints checked for each alpha"
+  },
+  "results": [
+    {
+      "alpha": 0.02,
+      "envelope": {
+        "risk": 0.019993189285508674,
+        "specificity": 0.12417582615759053,
+        "node_size": 78.06773103740161
+      },
+      "recertified_500": {
+        "risk": 0.01999629344865259,
+        "specificity": 0.12418022567816557,
+        "node_size": 78.06763931840338
+      },
+      "randomized_global": {
+        "risk": 0.019996293448655274,
+        "specificity": 0.12418022567816572,
+        "node_size": 78.06763931840413
+      },
+      "max_augmented_violation": 3.33e-14,
+      "runtime_seconds": 0.028084677,
+      "support_histogram": {
+        "1": 635,
+        "2": 682,
+        "3": 9
+      },
+      "global_gain_vs_recertified": {
+        "risk": 2.6853519408120974e-15,
+        "specificity": 1.5265566588595902e-16,
+        "node_size": 7.531752999057062e-13
+      }
+    },
+    {
+      "alpha": 0.05,
+      "envelope": {
+        "risk": 0.04971003267338825,
+        "specificity": 0.30660292475285295,
+        "node_size": 45.94698766563294
+      },
+      "recertified_500": {
+        "risk": 0.04993339557210867,
+        "specificity": 0.3069199044825269,
+        "node_size": 45.940382159985255
+      },
+      "randomized_global": {
+        "risk": 0.04997805349757716,
+        "specificity": 0.3069832942831663,
+        "node_size": 45.93906113255066
+      },
+      "max_augmented_violation": 8.88e-15,
+      "runtime_seconds": 0.024629297,
+      "support_histogram": {
+        "1": 676,
+        "2": 644,
+        "3": 6
+      },
+      "global_gain_vs_recertified": {
+        "risk": 0.00004465792546849007,
+        "specificity": 0.00006338980063941291,
+        "node_size": -0.0013210274345922812
+      }
+    },
+    {
+      "alpha": 0.1,
+      "envelope": {
+        "risk": 0.0973810205128521,
+        "specificity": 0.5276077611934622,
+        "node_size": 10.395067033538206
+      },
+      "recertified_500": {
+        "risk": 0.09979405103348589,
+        "specificity": 0.5310382212595375,
+        "node_size": 10.3236197949113
+      },
+      "randomized_global": {
+        "risk": 0.09988545174891446,
+        "specificity": 0.5311683725558989,
+        "node_size": 10.320910868783072
+      },
+      "max_augmented_violation": 7.99e-15,
+      "runtime_seconds": 0.037176818,
+      "support_histogram": {
+        "1": 695,
+        "2": 628,
+        "3": 3
+      },
+      "global_gain_vs_recertified": {
+        "risk": 0.00009140071542856898,
+        "specificity": 0.00013015129636140266,
+        "node_size": -0.0027089261282284838
+      }
+    },
+    {
+      "alpha": 0.15,
+      "envelope": {
+        "risk": 0.14492535981395835,
+        "specificity": 0.6202610825371366,
+        "node_size": 3.4122402589730854
+      },
+      "recertified_500": {
+        "risk": 0.1480429968382174,
+        "specificity": 0.6246973389141381,
+        "node_size": 3.31987364771329
+      },
+      "randomized_global": {
+        "risk": 0.14804819036206493,
+        "specificity": 0.6247047542442163,
+        "node_size": 3.319719446725533
+      },
+      "max_augmented_violation": 4.44e-15,
+      "runtime_seconds": 0.025330936999921505,
+      "support_histogram": {
+        "1": 730,
+        "2": 595,
+        "3": 1
+      },
+      "global_gain_vs_recertified": {
+        "risk": 0.000005193523847535353,
+        "specificity": 0.000007415330078197613,
+        "node_size": -0.00015420098775686952
+      }
+    }
+  ],
+  "interpretation": [
+    "Global randomized LP is exactly feasible under all augmented-state constraints.",
+    "It yields only tiny increments over the 500-round equal-share common-depth controller: effectively 0 pp at alpha .02, +0.00634 pp at alpha .05, +0.01302 pp at alpha .10, and +0.00074 pp at alpha .15.",
+    "Equal-share recertification is already close to globally optimal for this common-depth action family and reference utility.",
+    "Roughly 45-52% of calibration-state policies randomize over 2 or 3 action support points."
+  ],
+  "limitations": [
+    "objective uses published full-pool aggregate type counts; this is an oracle benchmark and not deployable unless such weights are independently frozen",
+    "common-depth family only, not confidence-adaptive",
+    "expected-risk guarantee only, not a high-probability risk guarantee",
+    "no distribution-shift guarantee",
+    "local execution used an independent Python reference driver; exact committed module not executed from a clean checkout; no CI pass claimed"
+  ]
+}
