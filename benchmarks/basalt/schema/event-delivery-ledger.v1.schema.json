@@ -1,0 +1,290 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT event delivery ledger v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "suite_id",
+    "run_id",
+    "observer_binary_digest",
+    "observer_configuration_digest",
+    "capture_start_monotonic_ns",
+    "capture_end_monotonic_ns",
+    "source_epochs",
+    "events",
+    "classified_ranges"
+  ],
+  "properties": {
+    "format_version": {
+      "const": 1
+    },
+    "suite_id": {
+      "const": "basalt-event-delivery-ledger-v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "observer_binary_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "observer_configuration_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "capture_start_monotonic_ns": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "capture_end_monotonic_ns": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "source_epochs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4096,
+      "items": {
+        "$ref": "#/$defs/sourceEpoch"
+      }
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "classified_ranges": {
+      "type": "array",
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/classifiedRange"
+      }
+    }
+  },
+  "$defs": {
+    "sourceEpoch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "epoch_id",
+        "partition_id",
+        "first_attempted_sequence",
+        "last_attempted_sequence",
+        "reported_published_count",
+        "reported_lost_count",
+        "reported_discarded_required_count",
+        "reported_discarded_excluded_count",
+        "restart_count",
+        "unmonitored_producer_count",
+        "producer_quiesced",
+        "consumer_drained",
+        "close_fence_digest"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "epoch_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "partition_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "first_attempted_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "last_attempted_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reported_published_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reported_lost_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reported_discarded_required_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reported_discarded_excluded_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "restart_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unmonitored_producer_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "producer_quiesced": {
+          "type": "boolean"
+        },
+        "consumer_drained": {
+          "type": "boolean"
+        },
+        "close_fence_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "epoch_id",
+        "partition_id",
+        "sequence",
+        "observed_at_monotonic_ns",
+        "event_digest"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "epoch_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "partition_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "observed_at_monotonic_ns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "classifiedRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "epoch_id",
+        "partition_id",
+        "first_sequence",
+        "last_sequence",
+        "disposition",
+        "reason"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "epoch_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "partition_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "first_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "last_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "disposition": {
+          "enum": [
+            "lost",
+            "discarded_required",
+            "discarded_excluded"
+          ]
+        },
+        "reason": {
+          "enum": [
+            "ringbuf_reservation_failure_unknown",
+            "perf_buffer_lost_sample",
+            "consumer_queue_overrun",
+            "exporter_drop",
+            "decoder_rejection",
+            "observer_restart",
+            "intentional_policy_suppression",
+            "unknown"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "discarded_excluded"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reason": {
+                "const": "intentional_policy_suppression"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "lost"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reason": {
+                "not": {
+                  "const": "intentional_policy_suppression"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
