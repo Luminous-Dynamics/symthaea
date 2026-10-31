@@ -316,21 +316,6 @@ pub fn compile_hybrid_style(
 
     if let Some((_entry, style)) = ensemble {
         let donor = style.spec();
-        spec.progression = donor.progression;
-        spec.mode = donor.mode;
-        spec.mode_pool = donor.mode_pool;
-        spec.texture.deceptive_close = donor.texture.deceptive_close;
-        spec.texture.drone = donor.texture.drone;
-        spec.texture.planing = donor.texture.planing;
-        spec.texture.suspension_rate = donor.texture.suspension_rate;
-        spec.texture.seventh_chords = donor.texture.seventh_chords;
-        spec.texture.harmonic_sequence = donor.texture.harmonic_sequence;
-        spec.texture.harmonic_stasis = donor.texture.harmonic_stasis;
-        spec.texture.full_drone = donor.texture.full_drone;
-    }
-
-    if let Some((_entry, style)) = ensemble {
-        let donor = style.spec();
         spec.ensemble_pool = donor.ensemble_pool;
         spec.counter_instrument = donor.counter_instrument;
     }
@@ -750,9 +735,10 @@ mod tests {
         assert_eq!(compiled.spec.motifs_busy, Style::Playful.spec().motifs_busy);
         assert!(compiled.spec.texture.additive_process);
 
-        // Every seed keeps the structural owner's process trajectory, but
-        // the donor must alter the actual emitted cell/score. Matching bank
-        // shapes ensure prefix lengths and cycle starts remain identical.
+        // Every seed keeps the structural owner's process trajectory,
+        // including its cycle event-count schedule. Donor durations are
+        // allowed to change elapsed cycle-start times; those must remain
+        // strictly increasing rather than being frozen to the owner's timing.
         for seed in 0..8 {
             let intent = MusicalIntent {
                 bars: 8,
@@ -774,7 +760,11 @@ mod tests {
                 ) => {
                     assert_eq!(actual.trajectory_kind, expected.trajectory_kind);
                     assert_eq!(actual.prefix_lengths, expected.prefix_lengths);
-                    assert_eq!(actual.cycle_starts, expected.cycle_starts);
+                    assert_eq!(actual.cycle_starts.len(), expected.cycle_starts.len());
+                    assert!(
+                        actual.cycle_starts.windows(2).all(|pair| pair[0] < pair[1]),
+                        "process donor must preserve a monotonic cycle timeline"
+                    );
                 }
                 (expected, actual) => panic!("wrong process grammar plans: {expected:?} vs {actual:?}"),
             }
