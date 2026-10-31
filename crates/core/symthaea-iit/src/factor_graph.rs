@@ -815,6 +815,68 @@ mod tests {
     }
 
     #[test]
+    fn preflight_plan_matches_observed_peak_and_rejects_before_contraction() {
+        let chain_scopes = vec![vec![0, 1], vec![1, 2], vec![2, 3]];
+        let plan = plan_min_fill_elimination(&chain_scopes, &[0, 1, 2], 8).unwrap();
+        assert_eq!(plan.induced_width, 1);
+        assert_eq!(plan.predicted_peak_factor_entries, 4);
+        assert_eq!(plan.max_factor_entries, 8);
+
+        let factors = vec![
+            BinaryFactor::new(vec![0, 1], vec![0.9, 0.1, 0.2, 0.8]).unwrap(),
+            BinaryFactor::new(vec![1, 2], vec![0.7, 0.3, 0.4, 0.6]).unwrap(),
+            BinaryFactor::new(vec![2, 3], vec![0.6, 0.4, 0.3, 0.7]).unwrap(),
+        ];
+        let report = min_fill_sum_product(&factors, &[0, 1, 2], 8).unwrap();
+        assert_eq!(report.predicted_peak_factor_entries, 4);
+        assert_eq!(report.peak_factor_entries, plan.predicted_peak_factor_entries);
+
+        assert!(matches!(
+            plan_min_fill_elimination(&chain_scopes, &[0, 1, 2], 3),
+            Err(FactorGraphError::IntermediateTooLarge { entries: 4, limit: 3 })
+        ));
+        assert!(matches!(
+            min_fill_sum_product(&factors, &[0, 1, 2], 3),
+            Err(FactorGraphError::IntermediateTooLarge { entries: 4, limit: 3 })
+        ));
+    }
+
+    #[test]
+    fn preflight_plan_handles_unary_and_unrepresented_variables() {
+        let unary = plan_min_fill_elimination(&[vec![0]], &[0], 2).unwrap();
+        assert_eq!(unary.induced_width, 0);
+        assert_eq!(unary.predicted_peak_factor_entries, 2);
+
+        let scalar = plan_min_fill_elimination(&[vec![]], &[9], 1).unwrap();
+        assert_eq!(scalar.induced_width, 0);
+        assert_eq!(scalar.predicted_peak_factor_entries, 1);
+    }
+
+    #[test]
+    fn log_contraction_reports_preflight_peak() {
+        let factors = vec![
+            BinaryLogFactor::new(vec![0, 1], vec![0.0, -1.0, -2.0, -3.0]).unwrap(),
+            BinaryLogFactor::new(vec![1, 2], vec![0.0, -1.0, -2.0, -3.0]).unwrap(),
+        ];
+        let report = min_fill_log_sum_product(&factors, &[0, 1], 4).unwrap();
+        assert_eq!(report.induced_width, 1);
+        assert_eq!(report.predicted_peak_factor_entries, 4);
+        assert_eq!(report.peak_factor_entries, 4);
+    }
+
+    #[test]
+    fn preflight_plan_rejects_invalid_scopes_and_duplicate_elimination() {
+        assert!(matches!(
+            plan_min_fill_elimination(&[vec![1, 0]], &[0], 4),
+            Err(FactorGraphError::ScopeNotStrictlyAscending { .. })
+        ));
+        assert!(matches!(
+            plan_min_fill_elimination(&[vec![0]], &[0, 0], 4),
+            Err(FactorGraphError::DuplicateEliminationVariable { variable: 0 })
+        ));
+    }
+
+    #[test]
     fn min_fill_sum_product_matches_brute_force_on_binary_chain() {
         // f0(x0,x1) with x0 as the low bit; f1(x1,x2) with x1 as low bit.
         let f0 = BinaryFactor::new(vec![0, 1], vec![0.9, 0.1, 0.2, 0.8]).unwrap();
