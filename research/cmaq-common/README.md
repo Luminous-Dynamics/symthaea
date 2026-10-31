@@ -2,6 +2,8 @@
 
 **Status:** v0.1 schema and CMAQ-018 development example; no benchmark result is included.
 
+The manifest's `repository.commit` identifies the exact repository snapshot containing the manifest-side frozen artifacts. Track-specific `candidate.source_commit`, `generator.source_commit` and `evaluator.source_commit` independently identify the implementation revisions under test; they are not required to equal the manifest repository commit.
+
 ## Why this exists
 
 CMAQ-011, -017 and -018 now have separate scientific estimands and their own reports. A local schema pass in each track does not prove their runs used compatible candidate versions, data splits, action semantics, compute budgets, baselines or statistical units.
