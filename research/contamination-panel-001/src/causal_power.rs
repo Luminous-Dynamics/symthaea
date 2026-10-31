@@ -331,7 +331,6 @@ fn run_scenario(
             if rng.uniform_open01() < failure_probability {
                 continue;
             }
-            let actual_exposure_fraction = f64::from(config.exposure_fraction_permille) / 1_000.0;
             pair_effects.push(simulated_pair_effect(
                 config,
                 rng,
