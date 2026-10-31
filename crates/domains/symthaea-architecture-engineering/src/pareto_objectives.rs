@@ -648,6 +648,133 @@ fn digest_serializable<T: Serialize>(value: &T) -> Result<String, ParetoError> {
     Ok(digest.iter().map(|byte| format!("{byte:02x}")).collect())
 }
 
+/// Inverted generational distance plus in maximization-utility coordinates.
+///
+/// For each reference point, this averages the nearest one-sided distance from the reference
+/// point to the approximation set. A point that is better than the reference in every
+/// objective has zero one-sided distance. The caller must supply a frozen reference set.
+pub fn inverted_generational_distance_plus(
+    approximation_utility: &[Vec<f64>],
+    reference_utility: &[Vec<f64>],
+) -> Result<f64, ParetoError> {
+    let dimensions = validate_indicator_fronts(approximation_utility, reference_utility)?;
+    let mut total_distance = 0.0;
+
+    for (reference_index, reference) in reference_utility.iter().enumerate() {
+        let mut nearest = f64::INFINITY;
+        for (approximation_index, approximation) in approximation_utility.iter().enumerate() {
+            let mut squared_distance = 0.0;
+            for dimension in 0..dimensions {
+                let gap = (reference[dimension] - approximation[dimension]).max(0.0);
+                squared_distance += gap * gap;
+            }
+            if !squared_distance.is_finite() {
+                return Err(ParetoError::new(
+                    format!("approximation_utility[{approximation_index}]"),
+                    "IGD+ squared distance overflowed",
+                ));
+            }
+            nearest = nearest.min(squared_distance.sqrt());
+        }
+        total_distance += nearest;
+        if !total_distance.is_finite() {
+            return Err(ParetoError::new(
+                format!("reference_utility[{reference_index}]"),
+                "IGD+ aggregation overflowed",
+            ));
+        }
+    }
+    let result = total_distance / reference_utility.len() as f64;
+    if !result.is_finite() {
+        return Err(ParetoError::new("igd_plus", "IGD+ result is not finite"));
+    }
+    Ok(result)
+}
+
+/// Additive epsilon indicator I_epsilon+(A, R) in maximization-utility coordinates.
+///
+/// Returns the smallest additive utility shift required for the approximation set A to
+/// weakly cover every point in the frozen reference set R. Negative values mean the
+/// approximation set strictly exceeds the reference set under this indicator.
+pub fn additive_epsilon_indicator(
+    approximation_utility: &[Vec<f64>],
+    reference_utility: &[Vec<f64>],
+) -> Result<f64, ParetoError> {
+    let dimensions = validate_indicator_fronts(approximation_utility, reference_utility)?;
+    let mut worst_reference_gap = f64::NEG_INFINITY;
+
+    for (reference_index, reference) in reference_utility.iter().enumerate() {
+        let mut best_approximation_gap = f64::INFINITY;
+        for (approximation_index, approximation) in approximation_utility.iter().enumerate() {
+            let mut maximum_gap = f64::NEG_INFINITY;
+            for dimension in 0..dimensions {
+                let gap = reference[dimension] - approximation[dimension];
+                if !gap.is_finite() {
+                    return Err(ParetoError::new(
+                        format!("approximation_utility[{approximation_index}]"),
+                        "additive epsilon difference overflowed",
+                    ));
+                }
+                maximum_gap = maximum_gap.max(gap);
+            }
+            best_approximation_gap = best_approximation_gap.min(maximum_gap);
+        }
+        worst_reference_gap = worst_reference_gap.max(best_approximation_gap);
+        if !worst_reference_gap.is_finite() {
+            return Err(ParetoError::new(
+                format!("reference_utility[{reference_index}]"),
+                "additive epsilon aggregation overflowed",
+            ));
+        }
+    }
+    Ok(worst_reference_gap)
+}
+
+fn validate_indicator_fronts(
+    approximation_utility: &[Vec<f64>],
+    reference_utility: &[Vec<f64>],
+) -> Result<usize, ParetoError> {
+    if approximation_utility.is_empty() {
+        return Err(ParetoError::new(
+            "approximation_utility",
+            "approximation set cannot be empty",
+        ));
+    }
+    if reference_utility.is_empty() {
+        return Err(ParetoError::new(
+            "reference_utility",
+            "reference set cannot be empty",
+        ));
+    }
+    let dimensions = reference_utility[0].len();
+    if !(MIN_DIMENSIONS..=MAX_EXACT_HYPERVOLUME_DIMENSIONS).contains(&dimensions) {
+        return Err(ParetoError::new(
+            "reference_utility",
+            "indicator dimensions must be between two and four",
+        ));
+    }
+    for (set_name, points) in [
+        ("approximation_utility", approximation_utility),
+        ("reference_utility", reference_utility),
+    ] {
+        for (index, point) in points.iter().enumerate() {
+            if point.len() != dimensions {
+                return Err(ParetoError::new(
+                    format!("{set_name}[{index}]"),
+                    "point dimension differs from the reference front",
+                ));
+            }
+            if point.iter().any(|value| !value.is_finite()) {
+                return Err(ParetoError::new(
+                    format!("{set_name}[{index}]"),
+                    "indicator coordinates must be finite",
+                ));
+            }
+        }
+    }
+    Ok(dimensions)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -842,6 +969,38 @@ mod tests {
         assert!(analyze_reference_sensitivity(
             &benchmark,
             &[vec![-0.0, 0.0, -0.0]],
+        ).is_err());
+    }
+
+    #[test]
+    fn igd_plus_and_additive_epsilon_match_known_maximization_case() {
+        let reference = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
+        let approximation = vec![vec![0.8, 0.0], vec![0.0, 0.8]];
+        let igd = inverted_generational_distance_plus(&approximation, &reference).unwrap();
+        let epsilon = additive_epsilon_indicator(&approximation, &reference).unwrap();
+        assert!((igd - 0.2).abs() < 1e-12);
+        assert!((epsilon - 0.2).abs() < 1e-12);
+    }
+
+    #[test]
+    fn igd_plus_and_epsilon_reward_reference_coverage_without_scalarization() {
+        let reference = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
+        let exact = reference.clone();
+        assert_eq!(inverted_generational_distance_plus(&exact, &reference).unwrap(), 0.0);
+        assert_eq!(additive_epsilon_indicator(&exact, &reference).unwrap(), 0.0);
+
+        let better = vec![vec![1.1, 0.0], vec![0.0, 1.1]];
+        assert_eq!(inverted_generational_distance_plus(&better, &reference).unwrap(), 0.0);
+        assert!((additive_epsilon_indicator(&better, &reference).unwrap() + 0.1).abs() < 1e-12);
+    }
+
+    #[test]
+    fn indicators_reject_empty_or_inconsistent_reference_sets() {
+        assert!(inverted_generational_distance_plus(&[], &[vec![0.0, 1.0]]).is_err());
+        assert!(additive_epsilon_indicator(&[vec![0.0, 1.0]], &[]).is_err());
+        assert!(inverted_generational_distance_plus(
+            &[vec![0.0, 1.0, 0.5]],
+            &[vec![0.0, 1.0]],
         ).is_err());
     }
 
