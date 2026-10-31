@@ -1,0 +1,10 @@
+[package]
+name = "anytime-imperfect-judge-cert"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Time-uniform confidence bounds for binary certification with imperfect judges"
+
+[lib]
+path = "src/lib.rs"
