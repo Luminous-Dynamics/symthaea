@@ -135,6 +135,8 @@ pub struct TailProfileBuildSpec {
     /// Minimum independent qualification lineages; calibration minimum is
     /// derived from the selected quantile/confidence requirement.
     pub minimum_qualification_lineages: usize,
+    /// Number of consecutive all-channel quiet windows required after the final influence window.
+    pub minimum_trailing_quiet_windows: usize,
     pub builder_version: String,
 }
 
@@ -149,6 +151,8 @@ pub struct TailProfileEventObservation {
     pub raw_measured_end_frame: Option<u64>,
     pub hysteresis_support_end_frame: Option<u64>,
     pub observed_tail_frames: u64,
+    pub trailing_quiet_windows: usize,
+    pub total_windows: usize,
     pub output_frame_count: u64,
 }
 
@@ -189,6 +193,8 @@ pub struct TailProfileLineageSummary {
     pub maximum_raw_tail_frames: u64,
     pub maximum_hysteresis_tail_frames: u64,
     pub maximum_observed_tail_frames: u64,
+    pub minimum_trailing_quiet_windows: usize,
+    pub minimum_total_windows: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -559,6 +565,38 @@ fn observations_from_verified_report(
         }
         let raw_end = event.raw_measured_intervals.iter().map(|interval| interval.end_frame).max();
         let hysteresis_end = event.hysteresis_support_intervals.iter().map(|interval| interval.end_frame).max();
+        let channels = report.channels;
+        if channels == 0 || report.window_segmentation.is_empty()
+            || report.window_segmentation.len() % channels != 0
+        {
+            return Err(TailProfileError::TailWindowCensored);
+        }
+        let mut quiet_by_window = BTreeMap::<usize, (usize, bool)>::new();
+        for window in &report.window_segmentation {
+            if window.channel >= channels {
+                return Err(TailProfileError::TailWindowCensored);
+            }
+            let entry = quiet_by_window.entry(window.window_index).or_insert((0, true));
+            entry.0 += 1;
+            entry.1 &= !window.onset_triggered
+                && !window.release_triggered
+                && !window.hysteresis_active;
+        }
+        let total_windows = quiet_by_window.len();
+        if total_windows == 0
+            || quiet_by_window.keys().copied().ne(0..total_windows)
+            || quiet_by_window.values().any(|(channel_count, _)| *channel_count != channels)
+        {
+            return Err(TailProfileError::TailWindowCensored);
+        }
+        let mut trailing_quiet_windows = 0usize;
+        for window_index in (0..total_windows).rev() {
+            if quiet_by_window.get(&window_index).is_some_and(|(_, quiet)| *quiet) {
+                trailing_quiet_windows += 1;
+            } else {
+                break;
+            }
+        }
         let raw_tail = raw_end
             .map(|end| end.saturating_sub(event.final_note_off_frame))
             .unwrap_or(0);
@@ -575,6 +613,8 @@ fn observations_from_verified_report(
             raw_measured_end_frame: raw_end,
             hysteresis_support_end_frame: hysteresis_end,
             observed_tail_frames: hysteresis_tail.max(raw_tail),
+            trailing_quiet_windows,
+            total_windows,
             output_frame_count: event.output_frame_count,
         });
     }
@@ -634,13 +674,15 @@ fn aggregate_lineage_tails(
 fn lineage_summaries(
     observations: &[TailProfileEventObservation],
 ) -> Result<Vec<TailProfileLineageSummary>, TailProfileError> {
-    let mut grouped = BTreeMap::<(TailProfileSplit, String), (usize, u64, u64, u64)>::new();
+    let mut grouped = BTreeMap::<(TailProfileSplit, String), (usize, u64, u64, u64, usize, usize)>::new();
     for observation in observations {
         if !is_sha256(&observation.source_lineage_sha256)
             || !is_sha256(&observation.event_evidence_sha256)
             || observation.source_event_id.trim().is_empty()
             || observation.output_frame_count == 0
             || observation.final_note_off_frame > observation.output_frame_count
+            || observation.total_windows == 0
+            || observation.trailing_quiet_windows > observation.total_windows
             || observation.raw_measured_end_frame.is_some_and(|end| end > observation.output_frame_count)
             || observation.hysteresis_support_end_frame.is_some_and(|end| end > observation.output_frame_count)
         {
@@ -651,7 +693,7 @@ fn lineage_summaries(
         }
         let entry = grouped
             .entry((observation.split, observation.source_lineage_sha256.clone()))
-            .or_insert((0, 0, 0, 0));
+            .or_insert((0, 0, 0, 0, usize::MAX, usize::MAX));
         entry.0 += 1;
         let raw = observation.raw_measured_end_frame
             .map(|end| end.saturating_sub(observation.final_note_off_frame))
@@ -662,10 +704,12 @@ fn lineage_summaries(
         entry.1 = entry.1.max(raw);
         entry.2 = entry.2.max(hysteresis);
         entry.3 = entry.3.max(raw.max(hysteresis));
+        entry.4 = entry.4.min(observation.trailing_quiet_windows);
+        entry.5 = entry.5.min(observation.total_windows);
     }
     let mut summaries = grouped
         .into_iter()
-        .map(|((split, lineage), (event_count, raw, hysteresis, observed))| {
+        .map(|((split, lineage), (event_count, raw, hysteresis, observed, trailing_quiet, total_windows))| {
             TailProfileLineageSummary {
                 source_lineage_sha256: lineage,
                 split,
@@ -673,6 +717,8 @@ fn lineage_summaries(
                 maximum_raw_tail_frames: raw,
                 maximum_hysteresis_tail_frames: hysteresis,
                 maximum_observed_tail_frames: observed,
+                minimum_trailing_quiet_windows: trailing_quiet,
+                minimum_total_windows: total_windows,
             }
         })
         .collect::<Vec<_>>();
@@ -707,12 +753,16 @@ fn create_profile_unsigned(
         || !valid_label(&spec.builder_version)
         || !valid_label(signer_key_id)
         || spec.minimum_qualification_lineages == 0
+        || spec.minimum_trailing_quiet_windows == 0
         || spec.safety_margin_frames > MAX_GUARD_FRAMES
     {
         return Err(TailProfileError::InvalidField("profile builder specification"));
     }
     if observations.is_empty() {
         return Err(TailProfileError::EventCountMismatch);
+    }
+    if observations.iter().any(|observation| observation.trailing_quiet_windows < spec.minimum_trailing_quiet_windows) {
+        return Err(TailProfileError::TailWindowCensored);
     }
     if !is_sha256(benchmark_manifest_sha256) || !is_sha256(benchmark_audit_sha256) {
         return Err(TailProfileError::InvalidDigest("benchmark lineage audit"));
@@ -1145,6 +1195,7 @@ mod tests {
             confidence_micros: 950_000,
             safety_margin_frames: 64,
             minimum_qualification_lineages: 30,
+            minimum_trailing_quiet_windows: 3,
             builder_version: "tail-profile-builder-v1".to_owned(),
         }
     }
@@ -1173,6 +1224,8 @@ mod tests {
                     raw_measured_end_frame: Some(220),
                     hysteresis_support_end_frame: Some(220),
                     observed_tail_frames: 120,
+                    trailing_quiet_windows: 4,
+                    total_windows: 10,
                     output_frame_count: 1_000,
                 });
             }
@@ -1204,6 +1257,8 @@ mod tests {
             raw_measured_end_frame: Some(100 + tail),
             hysteresis_support_end_frame: Some(100 + tail),
             observed_tail_frames: tail,
+            trailing_quiet_windows: 4,
+            total_windows: 10,
             output_frame_count: 10_000,
         }
     }
