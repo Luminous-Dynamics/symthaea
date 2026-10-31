@@ -328,3 +328,55 @@ Primary estimands should include intent-to-treat score inflation, dose-response,
 
 The current code does not train models or attest checkpoint provenance. It is the deterministic randomization, budget-matching and replay-validation layer. A valid allocation manifest is not evidence that the declared corpus was actually consumed by a trainer.
 
+
+
+## Paired treatment/placebo training execution receipts
+
+The module src/training_receipt.rs validates a paired treatment/placebo execution receipt against the exact intervention design and sealed randomization manifest.
+
+### What each arm must attest
+
+For each training run, the receipt binds:
+- arm identity, run ID and completed/partial/failed status;
+- base and parent checkpoint digests, plus output checkpoint digest;
+- exact treatment or placebo corpus digest and the shared corpus digest;
+- intervention manifest and assignment digests;
+- canonical digest of the selected treatment payload or matched placebo payload;
+- declared and observed shared/intervention/total token counts;
+- requested and observed training steps;
+- training code, runtime image, tokenization pipeline, hyperparameters and optimizer schedule;
+- corpus shard manifest and post-tokenization manifest;
+- trainer-job execution receipt, checkpoint-custody receipt and runner-attestation receipt digests;
+- UTC start/completion timestamps and compute/wall-time counters.
+
+The validator recomputes the intervention design digest using the same canonical serialization as the randomization module. It replays the assignment, derives treatment and placebo payload digests from the selected cluster records, and verifies both arm receipts against those exact values.
+
+### Paired-run invariants
+
+Both arms must use the same base/parent checkpoint, shared corpus, training code, runtime image, tokenizer, optimizer, hyperparameters, requested steps and total token budget. Treatment and placebo runs must use their respective preregistered corpus digests and exact matched intervention payloads. The output checkpoint digests and run IDs must be distinct.
+
+Completed runs must report the exact declared token and step budgets. Partial/failed runs can be represented, but are not execution-consistent or ready for confirmatory analysis.
+
+### CLI validation
+
+~~~sh
+cargo run --locked -- audit-training-receipt \
+  /secure/evaluator/intervention-design.json \
+  /secure/evaluator/sealed-intervention-manifest.json \
+  "$seed_hex" \
+  /secure/evaluator/paired-training-receipt.json \
+  /secure/evaluator/paired-training-audit.json
+~~~
+
+Schemas:
+- schema/paired-training-execution-receipt.schema.json
+- schema/paired-training-execution-audit.schema.json
+
+### The crucial authentication boundary
+
+The validator checks SHA-256 digest formats and exact cross-artifact bindings. It does **not** cryptographically verify signatures, authenticate runner identities, authenticate checkpoint-custody issuers, prove a trainer actually read the declared data, or verify the hardware/TEE environment.
+
+The report therefore always sets independently_verified=false and labels external attestation as digest-present-but-not-cryptographically-verified. It can report ready_for_independent_attestation_verification when all structural and cross-arm checks pass, but a separate trust-root/signature verifier must be built before receipts can be treated as independently authenticated.
+
+A structurally valid paired receipt is evidence that the supplied claims are consistent with the preregistered design—not proof that the claims are true.
+
