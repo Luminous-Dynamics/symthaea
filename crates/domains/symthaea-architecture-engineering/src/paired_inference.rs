@@ -53,6 +53,8 @@ pub struct PairedInferencePlan {
     pub schema: String,
     pub version: String,
     pub campaign_id: String,
+    /// Digest of the sorted, frozen EventTape set used to derive the observations.
+    pub campaign_event_tape_set_sha256: String,
     pub baseline_policy_id: String,
     pub challenger_policy_id: String,
     pub metric_id: String,
@@ -81,6 +83,8 @@ pub struct PairedMetricObservation {
     pub landscape_id: String,
     pub seed: u64,
     pub metric_id: String,
+    /// Digest of the archived aggregate artifact that produced this landscape/seed metric.
+    pub source_artifact_sha256: String,
     pub value: f64,
 }
 
@@ -193,6 +197,10 @@ pub fn analyze_paired_metric(
                 "observation policy is neither the frozen baseline nor challenger",
             ));
         }
+        validate_sha256(
+            &observation.source_artifact_sha256,
+            &format!("{path}.source_artifact_sha256"),
+        )?;
         if observation.landscape_id.trim().is_empty() {
             return Err(PairedInferenceError::new(
                 format!("{path}.landscape_id"),
@@ -404,6 +412,10 @@ fn validate_plan(plan: &PairedInferencePlan) -> Result<(), PairedInferenceError>
             "unsupported paired-inference schema/version",
         ));
     }
+    validate_sha256(
+        &plan.campaign_event_tape_set_sha256,
+        "plan.campaign_event_tape_set_sha256",
+    )?;
     for (path, value) in [
         ("campaign_id", plan.campaign_id.as_str()),
         ("baseline_policy_id", plan.baseline_policy_id.as_str()),
@@ -619,6 +631,20 @@ impl DeterministicRng {
     }
 }
 
+fn validate_sha256(value: &str, path: &str) -> Result<(), PairedInferenceError> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(PairedInferenceError::new(
+            path,
+            "expected a lowercase 64-character SHA-256 digest",
+        ));
+    }
+    Ok(())
+}
+
 fn digest_serializable<T: Serialize>(value: &T) -> Result<String, PairedInferenceError> {
     let bytes = serde_json::to_vec(value).map_err(|error| {
         PairedInferenceError::new(
@@ -639,6 +665,7 @@ mod tests {
             schema: SCHEMA.to_owned(),
             version: VERSION.to_owned(),
             campaign_id: "ar5b4-paired-test".to_owned(),
+            campaign_event_tape_set_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned(),
             baseline_policy_id: "baseline".to_owned(),
             challenger_policy_id: "challenger".to_owned(),
             metric_id: "verified_improvement_rate".to_owned(),
@@ -675,6 +702,7 @@ mod tests {
                         landscape_id: format!("landscape-{landscape:03}"),
                         seed: seed as u64,
                         metric_id: "verified_improvement_rate".to_owned(),
+                        source_artifact_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
                         value,
                     });
                 }
@@ -762,6 +790,22 @@ mod tests {
             right.paired_randomization_p_value
         );
         assert_eq!(left.inference_receipt_sha256, right.inference_receipt_sha256);
+    }
+
+    #[test]
+    fn metric_observation_requires_a_verifiable_source_artifact_digest() {
+        let plan = plan(MetricDirection::HigherIsBetter);
+        let mut rows = observations(MetricDirection::HigherIsBetter, 6, 4, 0.05);
+        rows[0].source_artifact_sha256 = "not-a-digest".to_owned();
+        assert!(analyze_paired_metric(&plan, &rows).is_err());
+    }
+
+    #[test]
+    fn inference_plan_requires_an_event_tape_set_digest() {
+        let mut plan = plan(MetricDirection::HigherIsBetter);
+        plan.campaign_event_tape_set_sha256 = "missing".to_owned();
+        let rows = observations(MetricDirection::HigherIsBetter, 6, 4, 0.05);
+        assert!(analyze_paired_metric(&plan, &rows).is_err());
     }
 
 }
