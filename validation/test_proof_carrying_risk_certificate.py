@@ -122,6 +122,55 @@ class ProofCarryingCertificateTests(unittest.TestCase):
         with self.assertRaises(CertificateError):
             build_certificate(manifest, receipt)
 
+
+    def test_receipt_budget_must_match_manifest_risk_target(self):
+        manifest, receipt = crc_fixture()
+        receipt["checks"]["budget"] = "52/10"
+        with self.assertRaises(CertificateError):
+            build_certificate(manifest, receipt)
+
+    def test_exact_check_count_must_reconcile(self):
+        manifest, receipt = crc_fixture()
+        receipt["checks"]["exact_inequality_checks"] = 1
+        with self.assertRaises(CertificateError):
+            build_certificate(manifest, receipt)
+
+    def test_fixed_family_fdr_certificate_is_not_supfdr(self):
+        manifest, _ = crc_fixture()
+        manifest["risk_target"] = {
+            "kind": "fdr", "metric": "false_discovery_rate",
+            "level": "1/20", "time_uniform": False
+        }
+        manifest["method"] = {"name": "rc_ebh", "version": "research-2026-10-31"}
+        manifest["assumptions"] = {
+            "marginal_evalues_valid": True,
+            "dependence_scope": "arbitrary_dependence"
+        }
+        manifest["scope"] = {
+            "fixed_family": True, "time_uniform": False, "family_size": 5
+        }
+        manifest["proof_lane"] = "analytical_fdr_theorem"
+        receipt = {
+            "status": "pass", "proof_lane": "analytical_fdr_theorem",
+            "evidence_digests": manifest["evidence"],
+            "verifier": {"name": "paper-theorem-contract-checker"},
+            "checks": {
+                "theorem_reference": "Bai-Ramdas-2026-Proposition-4.2",
+                "assumption_contract_checked": True
+            }
+        }
+        cert = build_certificate(manifest, receipt)
+        self.assertEqual(verify_certificate(cert)["risk_kind"], "fdr")
+        # Reusing the same offline receipt as a time-uniform SupFDR certificate is forbidden.
+        cert["manifest"]["risk_target"]["kind"] = "supfdr"
+        cert["manifest"]["risk_target"]["time_uniform"] = True
+        cert["manifest"]["scope"]["fixed_family"] = False
+        cert["manifest"]["scope"]["online"] = True
+        cert["manifest"]["scope"]["horizon"] = 100
+        cert["manifest"]["proof_lane"] = "theorem_backed_eprocess"
+        with self.assertRaises(CertificateError):
+            verify_certificate(cert)
+
     def test_raw_calibration_payloads_are_rejected(self):
         manifest, receipt = crc_fixture()
         manifest["scope"]["calibration_examples"] = [{"x": [1,2,3]}]
