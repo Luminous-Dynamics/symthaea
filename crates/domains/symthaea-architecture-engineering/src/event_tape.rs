@@ -581,6 +581,16 @@ impl EventTape {
                             "candidate verifier digest differs from the frozen header",
                         ));
                     }
+                    require_minimum_meter(
+                        &payload.resources.evaluator_calls,
+                        1,
+                        &format!("{path}.resources.evaluator_calls"),
+                    )?;
+                    require_minimum_meter(
+                        &payload.resources.verifier_calls,
+                        1,
+                        &format!("{path}.resources.verifier_calls"),
+                    )?;
                     match disposition {
                         CandidateDisposition::Verified => {
                             let value = score.ok_or_else(|| {
@@ -660,6 +670,11 @@ impl EventTape {
                     validate_sha256(
                         verifier_receipt_sha256,
                         &format!("{path}.outcome.verifier_receipt_sha256"),
+                    )?;
+                    require_minimum_meter(
+                        &payload.resources.verifier_calls,
+                        1,
+                        &format!("{path}.resources.verifier_calls"),
                     )?;
                     match disposition {
                         ProposalDisposition::Admitted {
@@ -1012,6 +1027,25 @@ fn validate_claim_caps(
                     format!("direction claim count {count} exceeds configured cap {cap}"),
                 ));
             }
+        }
+    }
+    Ok(())
+}
+
+
+/// Check mandatory call accounting when a meter is known. Unknown values remain structurally
+/// inspectable, but strict qualification rejects them through the complete-resource gate.
+fn require_minimum_meter(
+    meter: &MeterValue,
+    minimum: u64,
+    path: &str,
+) -> Result<(), EventTapeError> {
+    if let MeterValue::Measured { value } = meter {
+        if *value < minimum {
+            return Err(EventTapeError::new(
+                path,
+                format!("this action semantics require at least {minimum} measured calls"),
+            ));
         }
     }
     Ok(())
@@ -1705,6 +1739,16 @@ mod tests {
             algorithm_id: "different-build".to_owned(),
         };
         assert!(tape.verify_policy_replay(&adapter).is_err());
+    }
+
+    #[test]
+    fn known_receipts_cannot_omit_required_evaluator_or_verifier_calls() {
+        let mut tape = EventTape::new(header(ExecutionMode::Sequential, 1, 20)).unwrap();
+        let (intent, outcome) = verified_evaluation("A", H5);
+        let mut action = event("e1", 0, 1, None, 0, intent, outcome, 5);
+        action.resources.evaluator_calls = meter(0);
+        assert!(tape.append(action).is_err());
+        assert!(tape.events().is_empty());
     }
 
 }
