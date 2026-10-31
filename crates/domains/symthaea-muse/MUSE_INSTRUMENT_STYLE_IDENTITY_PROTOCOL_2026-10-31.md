@@ -319,3 +319,59 @@ MEL-MR-STYLE-001 consumes their verified evidence where relevant and does not we
 ## 12. Claim boundary
 
 This protocol does not claim that the 42 instrument variants are sample-realistic, the 29 engine-backed styles are already distinguishable, the 152-style catalog is implemented, or any controller/technique works across all SoundFonts. It is a preregistered plan to generate that evidence. CI, compilation, benchmark execution and listener validation remain separate gates.
+
+
+## 9. Competitive frontier and human-preference protocol (2026-10-31)
+
+### 9.1 Public instrumental reference
+
+The current Artificial Analysis AA-Music-Instrumental v1.1 page was checked on 2026-10-31. It lists Suno v6 at Elo 1148 (95% interval 1126–1170; 2,208 samples), Suno v6-mini 1114 (1093–1135; 2,332), Mureka V9.5 1084 (1063–1105; 2,297), Mureka V9 1083 (1062–1104; 2,322), Lyria 3 Pro 1080 (1059–1101; 2,329), and MusicGen 868 (845–891; 2,130). This is a live external leaderboard snapshot, not a direct head-to-head result for Melothaea.
+
+Its methodology uses blind same-prompt pairwise comparison, a minimum 10-second listen per sample, Bradley–Terry maximum-likelihood ratings, 95% confidence intervals, genre slices, and audio normalization (static gain toward -16 LUFS, capped at -1 dBTP, then 44.1 kHz / 320 kbps MP3). The default study uses one output per prompt and seed 42 where exposed; model-specific settings are held constant within each provider.
+
+Primary sources:
+- https://artificialanalysis.ai/music/leaderboard/instrumental
+- https://artificialanalysis.ai/methodology/music
+
+### 9.2 Current research frontiers
+
+- Grötschla et al., ICASSP 2025, report 6,000 songs from 12 systems, 15,600 pairwise comparisons and more than 2,500 participants; their work finds significant disagreement between objective metrics and human preference. https://arxiv.org/abs/2506.19085
+- The Qwen-Music report (2026-07-13) describes a semantic-token LLM + generative stereo renderer pipeline, Melody-CoT planning, >5 million hours of training data, and SFT → offline DPO → online GSPO alignment. Its authors report 13/16 best objective results and a professional-rater blind A/B study using 50 experts and three judgments per pair on 600 Chinese/English prompts; they report 50.3% vs 49.7% against Suno V5.5 and meaningful genre differences. This is an author-reported frontier reference, not independent replication, and must not be conflated with the instrumental-only Arena. https://arxiv.org/abs/2607.11699
+- MIREX 2026 instrument-recognition results report SSR macro-F1 0.801 on the OpenMIC public test but 0.488 on a hidden MedleyDB set (the baseline is 0.497 on that hidden set). This is evidence that instrument recognition is distribution-sensitive; classifiers are a diagnostic, not an authority on timbral authenticity. https://music-ir.org/mirex/wiki/2026:Audio_Instrument_Recognition_Results
+
+### 9.3 What this means for Melothaea
+
+Do not compete only on a single prompt-to-audio Elo. Foundation systems have large-scale semantic-token generation and generative stereo renderers; the reported Qwen system trains on >5 million hours. That is a different scaling regime from a symbolic, renderer-grounded Rust system.
+
+Melothaea's credible competitive wedge is **directable instrumental composition with inspectable musical structure**:
+1. generate multiple *symbolic identities* before paying for full arrangements;
+2. reject invalid candidates using independent musical constraints;
+3. select and score-condition instruments from measured capabilities;
+4. render through qualified, replayable asset/renderer paths;
+5. let a musician request localized transformations while immutable score fields remain unchanged;
+6. use listener preference to rank valid alternatives, never as a substitute for musical validity or human authorship.
+
+This is a two-loop architecture: a composition/constraint loop and a human preference loop. The preference learner can rank and suggest; it cannot silently rewrite the authoritative score, invent a technique, or override a hard failure.
+
+### 9.4 Competitive benchmark minimum
+
+The new [MUSE-EVAL-IND-001 #9453](https://github.com/Luminous-Dynamics/symthaea/issues/9453) specification defines six separate scorecard tracks:
+- blind instrumental preference, with model/version/prompt/output provenance;
+- requested intent and hard-constraint fidelity;
+- grammar × ensemble × renderer factorial identity;
+- long-range musical structure;
+- localized edit preservation and musician agency;
+- latency, real-time factor, memory and reliability.
+
+The 150-prompt confirmatory set is stratified over at least 10 instrumental/style families and three density levels. Pilot data must not leak into confirmatory evaluation. Reference-provider access and supported parameter settings are recorded per run; missing access is disclosed rather than simulated.
+
+Proposed (not measured) success gates:
+- 100% of requests accounted for; 0 silent fallback; 0 unsupported instrument/technique claims.
+- Every hard symbolic invariant either passes or produces an explicit abstention.
+- ≥95% exact preservation of non-target events on localized edits, and 100% preservation of fields explicitly declared immutable by the operation contract.
+- 0 NaN/Inf, unintended clipping or silent output for a result claimed as a successful render.
+- Against the leading accessible instrumental baseline, a confirmatory pairwise win rate whose 95% interval has a lower bound >50%; ≥55% on a separately held-out prompt set is a stretch target. If the interval overlaps parity, claim parity/uncertainty, not superiority.
+- Human musicality features must deliver a preregistered, statistically supported improvement in at least one desired listening dimension without unacceptable regressions in the others.
+
+Use Bradley–Terry or an equivalent paired-comparison model with prompt and rater structure, not a raw win percentage alone. Keep expert and non-expert cohorts separately reportable. Include blinded duplicates, hidden reference pairs, fixed prompt cards, exact audio digests, and analysis code. Metrics such as FAD, CLAP similarity, aesthetic predictors, instrument classifiers and symbolic scores must be calibrated to the human corpus; no single automated metric becomes a quality authority.
+
