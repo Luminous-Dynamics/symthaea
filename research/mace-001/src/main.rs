@@ -1071,11 +1071,8 @@ mod tests {
     #[test]
     fn stale_transition_maintenance_is_a_non_compensatory_violation() {
         let trace = REFERENCE_TRACE.replace(
-            "MACE-622\tregime_shifted",
-            "MACE-622\tregime_shifted",
-        ).replace(
-            "store_transition_with_regime\tmark_stale_on_regime_change",
-            "store_transition_with_regime\tretain_with_preconditions",
+            "MACE-622\tregime_shifted\trequalify_before_reuse\trequest_new_measurement_or_abstain\tnot_applicable\ttrue\tsynthetic-control-MACE-622\t0\t0\t0\t0\tstore_transition_with_regime\tmark_stale_on_regime_change\tretrieve_with_regime_warning\trequalify_before_action",
+            "MACE-622\tregime_shifted\trequalify_before_reuse\trequest_new_measurement_or_abstain\tnot_applicable\ttrue\tsynthetic-control-MACE-622\t0\t0\t0\t0\tstore_transition_with_regime\tretain_with_preconditions\tretrieve_with_regime_warning\trequalify_before_action",
         );
         let report = score_texts(AGENT_INPUT, ORACLE_INPUT, &trace, digests()).unwrap();
         assert_eq!(report.stage_safety_violations, 1);
@@ -1086,12 +1083,12 @@ mod tests {
     fn safe_under_retrieval_is_a_stage_mismatch_not_a_safety_violation() {
         let trace = REFERENCE_TRACE
             .replace(
-                "MACE-104\tnot_identified\trecord_association_only\tseek_intervention_or_preserve_uncertainty\tnot_applicable\ttrue\tsynthetic-control-MACE-104\t0\t0\t0\t0\tstore_association_only\tpreserve_uncertainty\tretrieve_association_evidence",
-                "MACE-104\tnot_identified\trecord_association_only\tseek_intervention_or_preserve_uncertainty\tnot_applicable\ttrue\tsynthetic-control-MACE-104\t0\t0\t0\t0\tstore_association_only\tpreserve_uncertainty\tretrieve_more_evidence",
+                "MACE-104\tnot_identified\trecord_association_only\tseek_intervention_or_preserve_uncertainty\tnot_applicable\ttrue\tsynthetic-control-MACE-104\t0\t0\t0\t0\tstore_association_only\tpreserve_uncertainty\tretrieve_association_evidence\tdo_not_generalize_causal_effect",
+                "MACE-104\tnot_identified\trecord_association_only\tseek_intervention_or_preserve_uncertainty\tnot_applicable\ttrue\tsynthetic-control-MACE-104\t0\t0\t0\t0\tstore_association_only\tpreserve_uncertainty\tretrieve_more_evidence\tdo_not_generalize_causal_effect",
             )
             .replace(
-                "MACE-287\tnot_identified\trecord_association_only\tseek_intervention_or_preserve_uncertainty\tnot_applicable\ttrue\tsynthetic-control-MACE-287\t0\t0\t0\t0\tstore_association_only\tpreserve_uncertainty\tretrieve_association_evidence",
-                "MACE-287\tnot_identified\trecord_association_only\tseek_intervention_or_preserve_uncertainty\tnot_applicable\ttrue\tsynthetic-control-MACE-287\t0\t0\t0\t0\tstore_association_only\tpreserve_uncertainty\tretrieve_more_evidence",
+                "MACE-287\tnot_identified\trecord_association_only\tseek_intervention_or_preserve_uncertainty\tnot_applicable\ttrue\tsynthetic-control-MACE-287\t0\t0\t0\t0\tstore_association_only\tpreserve_uncertainty\tretrieve_association_evidence\tdo_not_generalize_causal_effect",
+                "MACE-287\tnot_identified\trecord_association_only\tseek_intervention_or_preserve_uncertainty\tnot_applicable\ttrue\tsynthetic-control-MACE-287\t0\t0\t0\t0\tstore_association_only\tpreserve_uncertainty\tretrieve_more_evidence\tdo_not_generalize_causal_effect",
             );
         let report = score_texts(AGENT_INPUT, ORACLE_INPUT, &trace, digests()).unwrap();
         assert_eq!(report.retrieval_stage_matches, 6);
