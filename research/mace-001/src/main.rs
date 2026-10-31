@@ -981,6 +981,12 @@ mod tests {
         assert_eq!(report.cases, 8);
         assert_eq!(report.exact_case_matches, 8);
         assert_eq!(report.pair_invariance_failures, 0);
+        assert_eq!(report.write_stage_matches, 8);
+        assert_eq!(report.maintenance_stage_matches, 8);
+        assert_eq!(report.retrieval_stage_matches, 8);
+        assert_eq!(report.use_stage_matches, 8);
+        assert_eq!(report.stage_safety_violations, 0);
+        assert!(report.to_json().contains("\"full_conformance_pass\": true"));
         assert_eq!(report.false_causal_claims, 0);
         assert_eq!(report.unsafe_transfer_reuse, 0);
         assert_eq!(report.unsupported_completion_claims, 0);
@@ -1027,6 +1033,15 @@ mod tests {
             "MACE-104\tidentified",
         );
         assert!(audit_texts(AGENT_INPUT, &mutated, ("agent-sha", "oracle-sha")).is_err());
+    }
+
+    #[test]
+    fn lifecycle_stage_oracle_mutation_disagrees_with_scm() {
+        let mutated = ORACLE_INPUT.replace(
+            "MACE-104\tobservational_confounding\tPAIR-OBS-01\tanchor\tnot_identified\trecord_association_only\tseek_intervention_or_preserve_uncertainty\tnot_applicable\tstore_association_only",
+            "MACE-104\tobservational_confounding\tPAIR-OBS-01\tanchor\tnot_identified\trecord_association_only\tseek_intervention_or_preserve_uncertainty\tnot_applicable\tstore_qualified_transition",
+        );
+        assert!(audit_texts(AGENT_INPUT, &mutated, ("a", "o")).is_err());
     }
 
     #[test]
