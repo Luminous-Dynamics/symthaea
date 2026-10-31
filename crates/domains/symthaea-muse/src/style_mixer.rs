@@ -96,11 +96,12 @@ pub struct HybridComposition {
 
 /// Compile an explicit catalogue-layer recipe to the actual composer's
 /// declarative spec. V1 supports PeriodSentence owners using
-/// Ternary/Rondo/Variations and GrooveCycle owners with cycle-safe
-/// accompaniment pools. Other dedicated engines remain fail-closed until
-/// family-specific donor-consumption adapters exist. Unsupported meter
-/// transfers, cycle incompatibilities and unknown/unimplemented routes fail
-/// closed.
+/// Ternary/Rondo/Variations, GrooveCycle owners with cycle-safe
+/// accompaniment pools, and ProcessAdditive owners whose motif-cell donor
+/// preserves the process engine's per-seed trajectory. Other dedicated
+/// engines remain fail-closed until family-specific donor-consumption
+/// adapters exist. Unsupported meter transfers, cycle incompatibilities,
+/// process-cell mismatches and unknown/unimplemented routes fail closed.
 pub fn compile_hybrid_style(
     hybrid: &HybridStyleSpec,
 ) -> Result<CompiledHybridStyle, Vec<StyleMixIssue>> {
@@ -183,6 +184,16 @@ pub fn compile_hybrid_style(
                 });
             }
         }
+        GrammarFamily::ProcessAdditive => {
+            if !spec.texture.additive_process {
+                issues.push(StyleMixIssue {
+                    code: "process_owner_missing_additive_semantics".into(),
+                    layer: Some(StyleMixLayer::Structure),
+                    catalog_id: Some(structural_entry.id),
+                    message: "ProcessAdditive dispatch requires the structural owner to declare additive_process; the grammar family alone is not sufficient evidence".into(),
+                });
+            }
+        }
         family => {
             issues.push(StyleMixIssue {
                 code: "structural_engine_adapter_required".into(),
@@ -198,7 +209,10 @@ pub fn compile_hybrid_style(
 
     // The melodic donor is realized through HookCell. Do not silently copy
     // DNA into a structural preset whose own recipe disables that mechanism.
-    if melody.is_some() && !spec.texture.hook_cell {
+    if melody.is_some()
+        && structural_family != GrammarFamily::ProcessAdditive
+        && !spec.texture.hook_cell
+    {
         issues.push(StyleMixIssue {
             code: "melody_hook_adapter_required".into(),
             layer: Some(StyleMixLayer::Melody),
@@ -214,7 +228,14 @@ pub fn compile_hybrid_style(
     // retains meter; no silent stretching, truncation or generic fallback.
     if let Some((entry, style)) = rhythm {
         let donor = style.spec();
-        if donor.meter != spec.meter {
+        if structural_family == GrammarFamily::ProcessAdditive {
+            issues.push(StyleMixIssue {
+                code: "process_rhythm_donor_adapter_required".into(),
+                layer: Some(StyleMixLayer::Rhythm),
+                catalog_id: Some(entry.id),
+                message: "the ProcessAdditive engine consumes its motif cell, not accompaniment_pool/drum fields; rhythmic transfer requires an explicit event-alignment adapter".into(),
+            });
+        } else if donor.meter != spec.meter {
             issues.push(StyleMixIssue {
                 code: "rhythm_meter_mismatch".into(),
                 layer: Some(StyleMixLayer::Rhythm),
@@ -239,26 +260,58 @@ pub fn compile_hybrid_style(
         }
     }
 
-    if let Some((_entry, style)) = melody {
-        // Melodic DNA is independent from the structural owner's form and
-        // section plan. Keep the owner's motif banks and meter obligations;
-        // only replace the hook contour/rhythm/ornament vocabulary.
-        spec.melody = style.spec().melody;
+    if let Some((entry, style)) = melody {
+        let donor = style.spec();
+        if structural_family == GrammarFamily::ProcessAdditive {
+            if !process_cell_bank_shapes_match(&spec, &donor) {
+                issues.push(StyleMixIssue {
+                    code: "process_melody_cell_shape_mismatch".into(),
+                    layer: Some(StyleMixLayer::Melody),
+                    catalog_id: Some(entry.id),
+                    message: format!(
+                        "melodic donor {} must match the ProcessAdditive owner's meter, motif-bank counts and per-template event counts; no truncation, padding or resampling is allowed",
+                        entry.display_name
+                    ),
+                });
+            } else {
+                // ProcessAdditive reads CompositionSpec motif banks directly
+                // as its growing cell. It does NOT read MelodicDna/HookCell.
+                // Transfer the actual cell templates while keeping the
+                // structural owner's process trajectory and meter.
+                spec.motifs_calm = donor.motifs_calm;
+                spec.motifs_medium = donor.motifs_medium;
+                spec.motifs_busy = donor.motifs_busy;
+            }
+        } else {
+            // Melodic DNA is independent from the structural owner's form and
+            // section plan. Keep the owner's motif banks and meter obligations;
+            // only replace the hook contour/rhythm/ornament vocabulary.
+            spec.melody = donor.melody;
+        }
     }
 
-    if let Some((_entry, style)) = harmony {
+    if let Some((entry, style)) = harmony {
         let donor = style.spec();
-        spec.progression = donor.progression;
-        spec.mode = donor.mode;
-        spec.mode_pool = donor.mode_pool;
-        spec.texture.deceptive_close = donor.texture.deceptive_close;
-        spec.texture.drone = donor.texture.drone;
-        spec.texture.planing = donor.texture.planing;
-        spec.texture.suspension_rate = donor.texture.suspension_rate;
-        spec.texture.seventh_chords = donor.texture.seventh_chords;
-        spec.texture.harmonic_sequence = donor.texture.harmonic_sequence;
-        spec.texture.harmonic_stasis = donor.texture.harmonic_stasis;
-        spec.texture.full_drone = donor.texture.full_drone;
+        if structural_family == GrammarFamily::ProcessAdditive {
+            issues.push(StyleMixIssue {
+                code: "process_harmony_donor_adapter_required".into(),
+                layer: Some(StyleMixLayer::Harmony),
+                catalog_id: Some(entry.id),
+                message: "ProcessAdditive preserves a static tonic/fifth field and does not consume progression or general harmonic-texture fields; an explicit modal/pitch-hierarchy adapter is required".into(),
+            });
+        } else {
+            spec.progression = donor.progression;
+            spec.mode = donor.mode;
+            spec.mode_pool = donor.mode_pool;
+            spec.texture.deceptive_close = donor.texture.deceptive_close;
+            spec.texture.drone = donor.texture.drone;
+            spec.texture.planing = donor.texture.planing;
+            spec.texture.suspension_rate = donor.texture.suspension_rate;
+            spec.texture.seventh_chords = donor.texture.seventh_chords;
+            spec.texture.harmonic_sequence = donor.texture.harmonic_sequence;
+            spec.texture.harmonic_stasis = donor.texture.harmonic_stasis;
+            spec.texture.full_drone = donor.texture.full_drone;
+        }
     }
 
     if let Some((_entry, style)) = ensemble {
@@ -267,16 +320,25 @@ pub fn compile_hybrid_style(
         spec.counter_instrument = donor.counter_instrument;
     }
 
-    if let Some((_entry, style)) = performance {
+    if let Some((entry, style)) = performance {
         let donor = style.spec();
-        spec.tempo_range = donor.tempo_range;
-        spec.rhetoric = donor.rhetoric;
-        spec.texture.swing = donor.texture.swing;
-        spec.texture.intro_bars = donor.texture.intro_bars;
-        spec.texture.staged_entrances = donor.texture.staged_entrances;
-        spec.texture.held_arrivals = donor.texture.held_arrivals;
-        spec.texture.damage = donor.texture.damage;
-        spec.texture.return_color = donor.texture.return_color;
+        if structural_family == GrammarFamily::ProcessAdditive {
+            issues.push(StyleMixIssue {
+                code: "process_performance_donor_adapter_required".into(),
+                layer: Some(StyleMixLayer::Performance),
+                catalog_id: Some(entry.id),
+                message: "ProcessAdditive currently consumes tempo_range and attitude only; the general rhetoric/texture bundle is not safe to claim until a process-specific performance contract is tested".into(),
+            });
+        } else {
+            spec.tempo_range = donor.tempo_range;
+            spec.rhetoric = donor.rhetoric;
+            spec.texture.swing = donor.texture.swing;
+            spec.texture.intro_bars = donor.texture.intro_bars;
+            spec.texture.staged_entrances = donor.texture.staged_entrances;
+            spec.texture.held_arrivals = donor.texture.held_arrivals;
+            spec.texture.damage = donor.texture.damage;
+            spec.texture.return_color = donor.texture.return_color;
+        }
     }
 
     spec.name = hybrid.honest_label();
@@ -400,6 +462,24 @@ pub fn compose_hybrid_style(
         grammar_trace: realization.trace,
         compiled,
     })
+}
+
+fn process_cell_bank_shapes_match(owner: &CompositionSpec, donor: &CompositionSpec) -> bool {
+    fn bank_shape_matches(
+        owner: &[Vec<symthaea_music_theory::spec::SpecNote>],
+        donor: &[Vec<symthaea_music_theory::spec::SpecNote>],
+    ) -> bool {
+        owner.len() == donor.len()
+            && owner
+                .iter()
+                .zip(donor)
+                .all(|(owner_cell, donor_cell)| owner_cell.len() == donor_cell.len())
+    }
+
+    owner.meter == donor.meter
+        && bank_shape_matches(&owner.motifs_calm, &donor.motifs_calm)
+        && bank_shape_matches(&owner.motifs_medium, &donor.motifs_medium)
+        && bank_shape_matches(&owner.motifs_busy, &donor.motifs_busy)
 }
 
 fn groove_cycle_pool_is_supported(pool: &[Accompaniment]) -> bool {
@@ -634,6 +714,102 @@ mod tests {
             }
             assert!(!candidate.grammar_trace.structures.is_empty());
         }
+    }
+
+    #[test]
+    fn process_additive_melody_adapter_changes_the_cell_not_the_process_trajectory() {
+        let hybrid = HybridStyleSpec {
+            structural_style_id: id_for_composer_style("Minimalism"),
+            melodic_style_id: Some(id_for_composer_style("Playful")),
+            rhythmic_style_id: None,
+            harmonic_style_id: None,
+            ensemble_style_id: None,
+            performance_style_id: None,
+            production_style_id: None,
+            culturally_qualified_sources_acknowledged: true,
+        };
+        let compiled = compile_hybrid_style(&hybrid).expect("shape-compatible process cell");
+        assert_eq!(compiled.structural_style.grammar_family(), GrammarFamily::ProcessAdditive);
+        assert_eq!(compiled.spec.motifs_calm, Style::Playful.spec().motifs_calm);
+        assert_eq!(compiled.spec.motifs_medium, Style::Playful.spec().motifs_medium);
+        assert_eq!(compiled.spec.motifs_busy, Style::Playful.spec().motifs_busy);
+        assert!(compiled.spec.texture.additive_process);
+
+        // Every seed keeps the structural owner's process trajectory,
+        // including its cycle event-count schedule. Donor durations are
+        // allowed to change elapsed cycle-start times; those must remain
+        // strictly increasing rather than being frozen to the owner's timing.
+        for seed in 0..8 {
+            let intent = MusicalIntent {
+                bars: 8,
+                seed,
+                ..MusicalIntent::default()
+            };
+            let baseline = symthaea_music_theory::compose_with_grammar_plan(
+                Style::Minimalism.grammar_profile(),
+                &intent,
+                &Style::Minimalism.spec(),
+            );
+            let candidate = compose_hybrid_style(&intent, &hybrid)
+                .expect("ProcessAdditive adapter must compose across seeds");
+            assert_ne!(baseline.score, candidate.score, "melody cell donor was not consumed for seed {seed}");
+            match (&baseline.plan, &candidate.grammar_plan) {
+                (
+                    GrammarPlanEvidence::AdditiveProcess(expected),
+                    GrammarPlanEvidence::AdditiveProcess(actual),
+                ) => {
+                    assert_eq!(actual.trajectory_kind, expected.trajectory_kind);
+                    assert_eq!(actual.prefix_lengths, expected.prefix_lengths);
+                    assert_eq!(actual.cycle_starts.len(), expected.cycle_starts.len());
+                    assert!(
+                        actual.cycle_starts.windows(2).all(|pair| {
+                            pair[0].beats() < pair[1].beats()
+                        }),
+                        "process donor must preserve a monotonic cycle timeline"
+                    );
+                }
+                (expected, actual) => panic!("wrong process grammar plans: {expected:?} vs {actual:?}"),
+            }
+            assert!(candidate.score.notes.iter().all(|note| {
+                note.emphasis != symthaea_music_theory::Emphasis::Cadential
+            }));
+        }
+    }
+
+    #[test]
+    fn process_additive_adapter_rejects_rhythm_donor_without_cell_alignment() {
+        let hybrid = HybridStyleSpec {
+            structural_style_id: id_for_composer_style("Minimalism"),
+            melodic_style_id: None,
+            rhythmic_style_id: Some(id_for_composer_style("Tango")),
+            harmonic_style_id: None,
+            ensemble_style_id: None,
+            performance_style_id: None,
+            production_style_id: None,
+            culturally_qualified_sources_acknowledged: true,
+        };
+        let issues = compile_hybrid_style(&hybrid).unwrap_err();
+        assert!(issues.iter().any(|issue| {
+            issue.code == "process_rhythm_donor_adapter_required"
+        }));
+    }
+
+    #[test]
+    fn process_additive_adapter_rejects_mismatched_motif_cell_shapes() {
+        let hybrid = HybridStyleSpec {
+            structural_style_id: id_for_composer_style("Minimalism"),
+            melodic_style_id: Some(id_for_composer_style("Folk")),
+            rhythmic_style_id: None,
+            harmonic_style_id: None,
+            ensemble_style_id: None,
+            performance_style_id: None,
+            production_style_id: None,
+            culturally_qualified_sources_acknowledged: true,
+        };
+        let issues = compile_hybrid_style(&hybrid).unwrap_err();
+        assert!(issues.iter().any(|issue| {
+            issue.code == "process_melody_cell_shape_mismatch"
+        }));
     }
 
     #[test]
