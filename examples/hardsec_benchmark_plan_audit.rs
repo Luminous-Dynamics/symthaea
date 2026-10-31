@@ -150,6 +150,46 @@ fn required_arm_ids(
     Ok(found.len())
 }
 
+fn required_dataset_sources(plan: &Value) -> Result<usize, String> {
+    let records = plan.get("dataset_sources").and_then(Value::as_array)
+        .ok_or_else(|| fail("plan", "dataset_sources must be an array"))?;
+    let expected = [
+        ("harpy-v-physical-v2", "10.34810/DATA2538", "physical_hardware"),
+        ("harpy-v-gem5-v1-1", "10.34810/DATA2711", "simulator"),
+        ("harpy-v-gem5-100c", "10.34810/DATA3542", "simulator"),
+    ];
+    let mut seen_ids = BTreeSet::new();
+    let mut seen_dois = BTreeSet::new();
+    for (index, record) in records.iter().enumerate() {
+        let context = format!("plan.dataset_sources[{index}]");
+        let _ = object(record, &context)?;
+        let id = str_value(record, "id", &context)?;
+        let doi = str_value(record, "doi", &context)?;
+        let domain = str_value(record, "evidence_domain", &context)?;
+        let status = str_value(record, "availability_status", &context)?;
+        if !seen_ids.insert(id.to_owned()) || !seen_dois.insert(doi.to_owned()) {
+            return Err(fail(&context, "dataset IDs and DOIs must be unique"));
+        }
+        if !matches!(status, "metadata_discovered_archive_unverified" | "archive_bytes_verified" | "provenance_verified") {
+            return Err(fail(&context, "unsupported dataset availability_status"));
+        }
+    }
+    for (id, doi, domain) in expected {
+        let matching = records.iter().any(|record| {
+            record.get("id").and_then(Value::as_str) == Some(id)
+                && record.get("doi").and_then(Value::as_str) == Some(doi)
+                && record.get("evidence_domain").and_then(Value::as_str) == Some(domain)
+        });
+        if !matching {
+            return Err(fail("plan.dataset_sources", &format!("missing or mismatched dataset {id}")));
+        }
+    }
+    if records.len() != expected.len() {
+        return Err(fail("plan.dataset_sources", "v1 requires exactly the three catalogued HARPY-V source datasets"));
+    }
+    Ok(records.len())
+}
+
 fn zero_failure_groups(alpha: f64, risk: f64) -> Result<usize, String> {
     if !(0.0..1.0).contains(&alpha) || !(0.0..1.0).contains(&risk) {
         return Err("alpha and risk must be strictly between zero and one".to_owned());
@@ -175,10 +215,11 @@ fn audit_plan(plan: &Value, plan_bytes: &[u8]) -> Result<Value, String> {
     if str_value(plan, "status", "plan")? != "planned" {
         return Err(fail("plan", "this auditor currently accepts status=planned only"));
     }
-    if root.len() != 16 {
+    if root.len() != 17 {
         return Err(fail("plan", "top-level field count does not match the v1 contract"));
     }
 
+    let dataset_source_count = required_dataset_sources(plan)?;
     let domains = required_string_set(plan, "evidence_domains",
         &["synthetic_fixture", "simulator", "physical_hardware"], "plan")?;
     let separation = plan.get("evidence_separation").ok_or("plan.evidence_separation missing")?;
@@ -266,6 +307,7 @@ fn audit_plan(plan: &Value, plan_bytes: &[u8]) -> Result<Value, String> {
         "inputs":{"plan_sha256":sha256(plan_bytes)},
         "coverage":{
             "evidence_domain_count":domains,
+            "dataset_source_count":dataset_source_count,
             "baseline_arm_count":baseline_count,
             "candidate_arm_count":candidate_count,
             "split_count":split_count,
@@ -382,12 +424,22 @@ mod tests {
         let (plan, bytes) = fixture();
         let receipt = audit_plan(&plan, &bytes).unwrap();
         assert_eq!(receipt["result"], "plan_validated");
+        assert_eq!(receipt["coverage"]["dataset_source_count"], 3);
         assert_eq!(receipt["coverage"]["baseline_arm_count"], 10);
         assert_eq!(receipt["coverage"]["candidate_arm_count"], 3);
         assert_eq!(receipt["coverage"]["split_count"], 8);
         assert_eq!(receipt["statistical_support"]["six_endpoint_zero_failure_groups_for_5_percent_risk"], 94);
         assert_eq!(receipt["statistical_support"]["six_endpoint_zero_failure_groups_for_1_percent_risk"], 477);
         assert_eq!(receipt["statistical_support"]["effective_sample_size_estimate"], Value::Null);
+    }
+
+
+    #[test]
+    fn rejects_missing_harpy_v_gem5_100c_source_record() {
+        let (mut plan, _) = fixture();
+        plan["dataset_sources"].as_array_mut().unwrap().retain(|v| v["id"] != "harpy-v-gem5-100c");
+        let bytes = encoded(&plan);
+        assert!(audit_plan(&plan, &bytes).unwrap_err().contains("missing or mismatched dataset harpy-v-gem5-100c"));
     }
 
     #[test]
