@@ -62,22 +62,25 @@
     "benchmark_executed": false,
     "hardware_energy_measured": false,
     "result_values_present": false,
-    "generator_scope": "Implemented Rust task generators: T1 always-on sparse event/quiet idle; T2 delayed cue; T3/T4 multi-timescale forecasting/change-point; T5 irregular/missingness; T6 selective retention/invalidation; T7 phase prediction; T8 BrainTrace DMS task semantics; T9 BrainTrace evidence accumulation; T10 bitemporal continual-knowledge stream. All have deterministic generation, canonical SHA-256 digests, semantic verifiers and evaluator-held seed/config replay checks. The OAKS external adapter, streaming runner, OS-level oracle isolation, signed receipts, real-dataset adapter, model baselines and system measurements remain unimplemented.",
+    "generator_scope": "Implemented Rust task generators: T1 always-on sparse event/quiet idle; T2 delayed cue; T3/T4 multi-timescale forecasting/change-point; T5 irregular/missingness plus CSE/CAE; T6 selective retention/invalidation; T7 phase prediction; T8 BrainTrace DMS task semantics; T9 BrainTrace evidence accumulation; T10 bitemporal stream plus repeated-checkpoint current/historical trajectories and Temporal Error Debt scoring. Runner, OS-level oracle isolation, signed receipts, real-dataset adapter, baseline training and system measurements remain unimplemented.",
     "rust_tests_authored": true,
     "oracle_trace_verifier_implemented": true,
     "oracle_process_isolation_implemented": false,
-    "rust_tests_authored_count": 176,
+    "rust_tests_authored_count": 208,
     "rust_tests_by_file": {
       "research/temporal-bench/src/digest.rs": 2,
       "research/temporal-bench/src/lib.rs": 18,
-      "research/temporal-bench/src/temporal.rs": 23,
+      "research/temporal-bench/src/temporal.rs": 25,
       "research/temporal-bench/src/dms.rs": 18,
       "research/temporal-bench/src/evidence.rs": 19,
       "research/temporal-bench/src/irregular.rs": 14,
-      "research/temporal-bench/src/retention.rs": 16,
-      "research/temporal-bench/src/fast_event.rs": 22,
+      "research/temporal-bench/src/retention.rs": 17,
+      "research/temporal-bench/src/fast_event.rs": 23,
       "research/temporal-bench/src/phase.rs": 24,
-      "research/temporal-bench/src/knowledge_stream.rs": 20
+      "research/temporal-bench/src/knowledge_stream.rs": 20,
+      "research/temporal-bench/src/temporal_error_debt.rs": 13,
+      "research/temporal-bench/src/knowledge_trajectory.rs": 8,
+      "research/temporal-bench/src/irregular_metrics.rs": 7
     },
     "cryptographic_stream_digest_implemented": true,
     "reference_generators": {
@@ -109,7 +112,13 @@
     "knowledge_stream_scoring_implemented": true,
     "knowledge_stream_seed_replay_implemented": true,
     "phase_time_dilation_transform_implemented": true,
-    "phase_missing_prediction_accounting_implemented": true
+    "phase_missing_prediction_accounting_implemented": true,
+    "temporal_error_debt_scorer_implemented": true,
+    "temporal_error_debt_repeated_query_generator_implemented": true,
+    "temporal_error_debt_oscillation_metric_implemented": true,
+    "cse_cae_metric_implemented": true,
+    "temporal_error_debt_runner_integration_implemented": false,
+    "cse_bandwidth_preregistering_required": true
   },
   "workload_contract": {
     "sample_semantics": "Causal observations; no future samples; elapsed simulated time is explicit.",
@@ -126,7 +135,13 @@
     "canonical_encoding": "Versioned little-endian encoding with domain separation; SHA-256 produced by the sha2 crate.",
     "canonical_public_stream_digest_implemented": true,
     "canonical_oracle_digest_implemented": true,
-    "signed_evaluator_receipt_implemented": false
+    "signed_evaluator_receipt_implemented": false,
+    "cse_method": "Self-normalized inverse-density CSE/CAE estimates based on leave-one-out Gaussian KDE over observed timestamps; report MSE/MAE in parallel, preregister the bandwidth, and report effective sample size.",
+    "cse_is_exact_integral": false,
+    "temporal_error_debt_checkpoint_schedule": "gcd(update_interval, max(1, floor(update_interval/4))) so the checkpoint cadence exactly divides update intervals; final checkpoint is held for one stride.",
+    "temporal_error_debt_window_generator_implemented": true,
+    "temporal_error_debt_scorer_implemented": true,
+    "temporal_error_debt_oracle_isolation": false
   },
   "temporal_axes": {
     "delayed_cue_steps": [
@@ -315,10 +330,29 @@
         "quality_by_gap",
         "quality_by_missingness",
         "calibration_error",
-        "invalid_timestamp_rejection"
+        "invalid_timestamp_rejection",
+        "observation_weighted_MSE",
+        "observation_weighted_MAE",
+        "continuous_time_squared_error_CSE_leave_one_out_Gaussian_KDE",
+        "continuous_time_absolute_error_CAE_leave_one_out_Gaussian_KDE",
+        "CSE_effective_sample_size",
+        "CSE_preregistered_bandwidth_us"
       ],
       "oracle": "Underlying continuous-time synthetic process",
-      "implementation_status": "Fixed-point irregular-time/missingness Rust generator, latent oracle, schedule/noise verifier, and SHA-256 digests authored; not compiled or executed"
+      "implementation_status": "Fixed-point irregular-time/missingness Rust generator, latent oracle, schedule/noise verifier, SHA-256 digests, and sampling-aware CSE/CAE scorer authored; not compiled or executed",
+      "scoring_method": {
+        "implementation": "research/temporal-bench/src/irregular_metrics.rs",
+        "estimator": "Self-normalized inverse-density weighting from leave-one-out Gaussian KDE over observed timestamps.",
+        "reference": "Li et al., Beyond MSE: Rethinking the Evaluation Metric and Benchmarking for Irregular Time Series Forecasting (2026), arXiv:2608.17293",
+        "requirements": [
+          "report_MSE_and_MAE_alongside_CSE_and_CAE",
+          "preregister_KDE_bandwidth_in_microseconds",
+          "report_effective_sample_size",
+          "do_not_call_estimated_CSE_an_exact_time_integral",
+          "evaluate_bandwidth_sensitivity_on_development_data_only"
+        ],
+        "status": "Implemented Rust metric scorer and seven tests authored; not compiled or executed."
+      }
     },
     {
       "id": "T6_SELECTIVE_RETENTION",
@@ -473,7 +507,7 @@
     {
       "id": "T10_BITEMPORAL_KNOWLEDGE_STREAM",
       "name": "Continual facts with retroactive correction and bitemporal queries",
-      "implementation_status": "Rust event-stream generator, independent bitemporal answer verifier, SHA-256 content/oracle digests, and seed-bound replay authored; not compiled or executed",
+      "implementation_status": "Rust event-stream generator, independent bitemporal answer verifier, SHA-256 digests, seed-bound replay, repeated current/historical query trajectory generator, checkpoint-window manifest, and Temporal Error Debt scorer authored; not compiled or executed",
       "related_issues": [
         9075,
         9149,
@@ -542,23 +576,52 @@
           "stale_after_retraction_rate",
           "historical_as_known_preservation_rate"
         ],
-        "scorer": "score_knowledge_predictions in research/temporal-bench/src/knowledge_stream.rs"
+        "scorer": [
+          "score_knowledge_predictions in research/temporal-bench/src/knowledge_stream.rs",
+          "score_temporal_error_debt in research/temporal-bench/src/temporal_error_debt.rs"
+        ]
       },
       "proposed_extensions": {
         "temporal_error_debt": {
           "tracking_issue": 9492,
-          "status": "specified_not_implemented",
-          "required_query_stream": "Repeated predictions for the same valid_at coordinate at every evidence/update checkpoint.",
+          "status": "Repeated-checkpoint generator and scorer authored but not run.",
+          "required_query_stream": "Two lanes (current valid-time and historical-as-known) queried at every deterministic checkpoint. Checkpoint stride exactly divides source update interval and targets approximately four checkpoints per update interval.",
           "measures": [
-            "wrong_belief_exposure_time",
-            "abstention_exposure_time",
-            "missing_prediction_exposure_time",
-            "time_to_first_correct_state_after_correction",
-            "time_to_first_no_fact_after_retraction",
-            "area_under_per_chunk_error_curve"
+            "wrong_belief_exposure",
+            "abstention_exposure",
+            "missing_prediction_exposure",
+            "future_knowledge_leak_exposure",
+            "missed_correction_exposure",
+            "stale_after_retraction_exposure",
+            "correction_latency",
+            "retraction_latency",
+            "answer_oscillations"
           ],
-          "boundary": "Not part of current T10 v0.1 scores or official OAKS scores; source timestamps required for seconds, otherwise use chunk-time units."
+          "boundary": "Not part of current T10 v0.1 scores or official OAKS scores; source timestamps required for seconds, otherwise use chunk-time units.",
+          "runner_integration": "not_implemented"
         }
+      },
+      "repeated_checkpoint_trajectory": {
+        "implementation": "research/temporal-bench/src/knowledge_trajectory.rs",
+        "lanes": [
+          "current_valid_time_just_after_retraction",
+          "historical_valid_time_before_correction"
+        ],
+        "checkpoint_stride": "gcd(update_interval, max(1, floor(update_interval/4)))",
+        "final_checkpoint_hold": "one checkpoint stride",
+        "outputs": [
+          "wrong_belief_exposure",
+          "abstention_exposure",
+          "missing_output_exposure",
+          "future_knowledge_leak_exposure",
+          "missed_correction_exposure",
+          "stale_after_retraction_exposure",
+          "correction_latency",
+          "retraction_latency",
+          "answer_oscillations"
+        ],
+        "status": "Repeated-checkpoint task generator, two query lanes, canonical digests, semantic verification, evaluator-held seed replay, and eight tests authored; not compiled or executed.",
+        "preserves_original_five_anchor_queries": true
       }
     }
   ],
@@ -676,7 +739,10 @@
     "temporal_error_debt_wrong_belief_exposure_time",
     "temporal_error_debt_abstention_exposure_time",
     "temporal_error_debt_missing_prediction_exposure_time",
-    "temporal_error_debt_area_under_error_curve"
+    "temporal_error_debt_area_under_error_curve",
+    "cse_bandwidth_us",
+    "cse_effective_sample_size",
+    "temporal_error_debt_answer_oscillations"
   ],
   "statistical_design": {
     "pilot_paired_seeds_min": 10,
