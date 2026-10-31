@@ -91,7 +91,7 @@ The report includes:
 - accepted / rejected / abstained dispositions cross-tabulated by final validity;
 - exact changed-scope match count and material collateral-change count;
 - reviewer pairwise full-tuple agreement and transition-only agreement;
-- transformation-family strata;
+- transformation-family strata, including unique semantic-cluster counts per family;
 - generation tokens, micro-USD cost and elapsed time;
 - unique final-valid accepted semantic-cluster yield per 1,000 generation tokens and per USD.
 
