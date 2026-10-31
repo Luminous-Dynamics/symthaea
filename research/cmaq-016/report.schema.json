@@ -56,13 +56,13 @@
           "candidate_budget",
           "policy",
           "mean_true_return",
-          "mean_reference_model_return",
           "mean_optimizer_optimism_gap",
           "mean_selected_action_regret",
           "selected_pocket_rate",
-          "mean_selected_action_error",
           "uniform_grid_prediction_mse",
-          "mean_candidate_queries_per_episode"
+          "mean_candidate_queries_per_episode",
+          "mean_selected_model_score",
+          "mean_model_head_evaluations_per_episode"
         ],
         "properties": {
           "scenario": {
@@ -92,7 +92,10 @@
             "type": "number"
           },
           "mean_optimizer_optimism_gap": {
-            "type": "number"
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "mean_selected_action_regret": {
             "type": "number",
@@ -103,17 +106,21 @@
             "minimum": 0,
             "maximum": 1
           },
-          "mean_selected_action_error": {
-            "type": "number"
-          },
           "uniform_grid_prediction_mse": {
             "type": "number",
             "minimum": 0
           },
-          "mean_reference_model_return": {
-            "type": "number"
-          },
           "mean_candidate_queries_per_episode": {
+            "type": "number",
+            "minimum": 0
+          },
+          "mean_selected_model_score": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "mean_model_head_evaluations_per_episode": {
             "type": "number",
             "minimum": 0
           }
