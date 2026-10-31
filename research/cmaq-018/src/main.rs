@@ -276,18 +276,109 @@ fn true_outcome(case: EpisodeCase, scenario: Scenario, action: Intervention) -> 
     }
 }
 
-fn point_outcome_prediction(history: ObservedHistory, action: Intervention) -> BranchPrediction {
-    // A deliberately simple misspecified predictor with a common-mode offset.
-    // The common offset should cancel when taking same-history branch differences.
-    let common_bias = 0.20 * history.x + 0.10 * history.v;
-    BranchPrediction {
-        utility: 1.0 - 0.08 * history.x.powi(2) - 0.03 * history.v.powi(2)
-            + common_bias
-            + 0.45 * action.force
-            + 0.10 * action.grip,
-        next_x: history.x + 0.12 * action.force + 0.03 * action.grip,
-        next_v: 0.75 * history.v + 0.08 * action.force - 0.04 * action.grip,
-        terminal: false,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ForecastKind {
+    Predicted,
+    Counterfactual,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct CandidateForecast {
+    outcome: BranchPrediction,
+    kind: ForecastKind,
+}
+
+/// Candidate-facing action-conditioned forecast boundary.
+///
+/// This trait deliberately accepts only observed history and a hypothetical
+/// action. It has no access to scenario IDs, evaluator history IDs, hidden
+/// regime labels, disturbances, realized outcomes, or observation-memory
+/// mutation APIs.
+trait CandidateBranchPredictor {
+    fn predict(
+        &self,
+        observed_history: &ObservedHistory,
+        hypothetical_action: Intervention,
+    ) -> Option<CandidateForecast>;
+}
+
+/// Separate pairwise interface for models that predict action effects directly.
+trait CandidateEffectPredictor {
+    fn predict_effect(
+        &self,
+        observed_history: &ObservedHistory,
+        left_action: Intervention,
+        right_action: Intervention,
+    ) -> Option<f64>;
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct PointOutcomePredictor;
+
+impl CandidateBranchPredictor for PointOutcomePredictor {
+    fn predict(
+        &self,
+        history: &ObservedHistory,
+        action: Intervention,
+    ) -> Option<CandidateForecast> {
+        // A deliberately simple misspecified predictor with a common-mode offset.
+        // The common offset should cancel when taking same-history differences.
+        let common_bias = 0.20 * history.x + 0.10 * history.v;
+        Some(CandidateForecast {
+            outcome: BranchPrediction {
+                utility: 1.0 - 0.08 * history.x.powi(2) - 0.03 * history.v.powi(2)
+                    + common_bias
+                    + 0.45 * action.force
+                    + 0.10 * action.grip,
+                next_x: history.x + 0.12 * action.force + 0.03 * action.grip,
+                next_v: 0.75 * history.v + 0.08 * action.force - 0.04 * action.grip,
+                terminal: false,
+            },
+            kind: ForecastKind::Counterfactual,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct ShuffledActionLabelsPredictor;
+
+impl CandidateBranchPredictor for ShuffledActionLabelsPredictor {
+    fn predict(
+        &self,
+        history: &ObservedHistory,
+        action: Intervention,
+    ) -> Option<CandidateForecast> {
+        PointOutcomePredictor.predict(history, shuffled_action(action))
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct SupportAwarePointPredictor;
+
+impl CandidateBranchPredictor for SupportAwarePointPredictor {
+    fn predict(
+        &self,
+        history: &ObservedHistory,
+        action: Intervention,
+    ) -> Option<CandidateForecast> {
+        supported_intervention(action)
+            .then(|| PointOutcomePredictor.predict(history, action))
+            .flatten()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct ExplicitEffectHeadPredictor;
+
+impl CandidateEffectPredictor for ExplicitEffectHeadPredictor {
+    fn predict_effect(
+        &self,
+        history: &ObservedHistory,
+        left: Intervention,
+        right: Intervention,
+    ) -> Option<f64> {
+        let slope = if history.x < 0.0 { 0.62 } else { -0.62 };
+        Some(slope * (left.force - right.force) + 0.12 * (left.grip - right.grip))
     }
 }
 
@@ -300,16 +391,22 @@ fn branch_predictions(
     history: ObservedHistory,
     actions: &[Intervention],
 ) -> Vec<Option<BranchPrediction>> {
+    let predictor: Option<&dyn CandidateBranchPredictor> = match model {
+        Model::PointOutcome => Some(&PointOutcomePredictor),
+        Model::ShuffledActionLabels => Some(&ShuffledActionLabelsPredictor),
+        Model::SupportAwarePoint => Some(&SupportAwarePointPredictor),
+        Model::ExplicitEffectHead | Model::Oracle => None,
+    };
+
     actions
         .iter()
-        .map(|action| match model {
-            Model::PointOutcome => Some(point_outcome_prediction(history, *action)),
-            Model::ExplicitEffectHead | Model::Oracle => None,
-            Model::ShuffledActionLabels => {
-                Some(point_outcome_prediction(history, shuffled_action(*action)))
-            }
-            Model::SupportAwarePoint => supported_intervention(*action)
-                .then(|| point_outcome_prediction(history, *action)),
+        .map(|action| {
+            predictor
+                .and_then(|model| model.predict(&history, *action))
+                .map(|forecast| {
+                    debug_assert_eq!(forecast.kind, ForecastKind::Counterfactual);
+                    forecast.outcome
+                })
         })
         .collect()
 }
@@ -341,10 +438,7 @@ fn predicted_effect(
     predictions: &[Option<BranchPrediction>],
 ) -> Option<f64> {
     if model == Model::ExplicitEffectHead {
-        let slope = if history.x < 0.0 { 0.62 } else { -0.62 };
-        return Some(
-            slope * (left.force - right.force) + 0.12 * (left.grip - right.grip),
-        );
+        return ExplicitEffectHeadPredictor.predict_effect(&history, left, right);
     }
 
     let left_prediction = predictions[usize::from(left.id)]?;
@@ -898,6 +992,41 @@ mod tests {
         let interval = bootstrap_mean_ci(&values, BASE_SEED).unwrap();
         assert!((interval.0 - 0.5).abs() < 1e-12);
         assert!((interval.1 - 0.5).abs() < 1e-12);
+    }
+
+
+    #[test]
+    fn candidate_predictor_trait_exposes_only_observed_history_and_hypothetical_action() {
+        let history = ObservedHistory { x: -0.2, v: 0.1 };
+        let forecast = PointOutcomePredictor
+            .predict(&history, ACTIONS[3])
+            .expect("point predictor produces a forecast");
+        assert_eq!(forecast.kind, ForecastKind::Counterfactual);
+        assert!(!forecast.outcome.terminal);
+    }
+
+    #[test]
+    fn candidate_predictors_abstain_without_access_to_evaluator_truth() {
+        let history = ObservedHistory { x: -0.2, v: 0.1 };
+        assert!(
+            SupportAwarePointPredictor
+                .predict(&history, ACTIONS[4])
+                .is_none()
+        );
+        assert!(
+            SupportAwarePointPredictor
+                .predict(&history, ACTIONS[5])
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn explicit_effect_interface_returns_only_pairwise_effect() {
+        let history = ObservedHistory { x: -0.2, v: 0.1 };
+        let delta = ExplicitEffectHeadPredictor
+            .predict_effect(&history, ACTIONS[4], ACTIONS[0])
+            .expect("effect head produces a pairwise effect");
+        assert!((delta - 0.62).abs() < 1e-12);
     }
 
     #[test]
