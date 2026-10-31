@@ -7,7 +7,7 @@
 //! for the production proof-DAG or persistent ledger.
 
 use super::{digest::CanonicalHasher, mix64, SplitMix64};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 const MAX_KNOWLEDGE_DISTRACTORS: usize = 10_000;
@@ -100,6 +100,162 @@ pub struct KnowledgeStreamOracle {
     pub retraction_valid_from: u64,
     pub answers: Vec<KnowledgeExpectedAnswer>,
     pub content_sha256: [u8; 32],
+}
+
+/// Candidate-visible answer states. `NoFact` is a substantive answer;
+/// `Abstain` means the candidate declined to provide an answer.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum KnowledgeCandidateAnswer {
+    Value(i64),
+    NoFact,
+    Abstain,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct KnowledgePrediction {
+    pub query_id: u64,
+    pub answer: KnowledgeCandidateAnswer,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum KnowledgeScoringError {
+    DuplicatePrediction { query_id: u64 },
+    UnknownQuery { query_id: u64 },
+}
+
+impl fmt::Display for KnowledgeScoringError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::DuplicatePrediction { query_id } => {
+                write!(f, "candidate submitted duplicate prediction for query {query_id}")
+            }
+            Self::UnknownQuery { query_id } => {
+                write!(f, "candidate submitted prediction for unknown query {query_id}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for KnowledgeScoringError {}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KnowledgeScore {
+    pub query_count: usize,
+    pub predictions_received: usize,
+    pub exact_matches: usize,
+    pub wrong_answers: usize,
+    pub abstentions: usize,
+    pub missing_predictions: usize,
+    pub future_knowledge_leaks: usize,
+    pub missed_corrections: usize,
+    pub stale_answers_after_retraction: usize,
+    pub historical_as_known_preserved: usize,
+}
+
+impl KnowledgeScore {
+    pub fn exact_match_rate(&self) -> Option<f64> {
+        (self.query_count > 0)
+            .then(|| self.exact_matches as f64 / self.query_count as f64)
+    }
+
+    pub fn prediction_coverage(&self) -> Option<f64> {
+        (self.query_count > 0)
+            .then(|| self.predictions_received as f64 / self.query_count as f64)
+    }
+}
+
+/// Score per-query outputs without collapsing the temporal failure modes.
+///
+/// A missing prediction is not silently converted into a correct abstention.
+/// Returning `NoFact` is distinct from abstaining: after a known retraction it
+/// is the correct result; for a still-valid fact it is an incorrect answer.
+pub fn score_knowledge_predictions(
+    oracle: &KnowledgeStreamOracle,
+    predictions: &[KnowledgePrediction],
+) -> Result<KnowledgeScore, KnowledgeScoringError> {
+    let known_queries: BTreeSet<_> = oracle.answers.iter().map(|answer| answer.query_id).collect();
+    let mut by_query = BTreeMap::new();
+    for prediction in predictions {
+        if !known_queries.contains(&prediction.query_id) {
+            return Err(KnowledgeScoringError::UnknownQuery {
+                query_id: prediction.query_id,
+            });
+        }
+        if by_query.insert(prediction.query_id, prediction.answer).is_some() {
+            return Err(KnowledgeScoringError::DuplicatePrediction {
+                query_id: prediction.query_id,
+            });
+        }
+    }
+
+    let mut score = KnowledgeScore {
+        query_count: oracle.answers.len(),
+        predictions_received: by_query.len(),
+        exact_matches: 0,
+        wrong_answers: 0,
+        abstentions: 0,
+        missing_predictions: 0,
+        future_knowledge_leaks: 0,
+        missed_corrections: 0,
+        stale_answers_after_retraction: 0,
+        historical_as_known_preserved: 0,
+    };
+
+    for expected in &oracle.answers {
+        let Some(prediction) = by_query.get(&expected.query_id).copied() else {
+            score.missing_predictions = score.missing_predictions.saturating_add(1);
+            continue;
+        };
+
+        match prediction {
+            KnowledgeCandidateAnswer::Abstain => {
+                score.abstentions = score.abstentions.saturating_add(1);
+            }
+            KnowledgeCandidateAnswer::NoFact => {
+                if expected.expected_value.is_none() {
+                    score.exact_matches = score.exact_matches.saturating_add(1);
+                } else {
+                    score.wrong_answers = score.wrong_answers.saturating_add(1);
+                }
+            }
+            KnowledgeCandidateAnswer::Value(value) => {
+                if expected.expected_value == Some(value) {
+                    score.exact_matches = score.exact_matches.saturating_add(1);
+                } else {
+                    score.wrong_answers = score.wrong_answers.saturating_add(1);
+                }
+
+                if expected.known_at < oracle.correction_observed_at
+                    && expected.valid_at >= oracle.correction_valid_from
+                    && value == oracle.corrected_value
+                {
+                    score.future_knowledge_leaks =
+                        score.future_knowledge_leaks.saturating_add(1);
+                }
+                if expected.known_at >= oracle.correction_observed_at
+                    && expected.valid_at >= oracle.correction_valid_from
+                    && value == oracle.initial_value
+                {
+                    score.missed_corrections = score.missed_corrections.saturating_add(1);
+                }
+                if expected.known_at >= oracle.retraction_observed_at
+                    && expected.valid_at >= oracle.retraction_valid_from
+                {
+                    score.stale_answers_after_retraction =
+                        score.stale_answers_after_retraction.saturating_add(1);
+                }
+                if expected.known_at >= oracle.correction_observed_at
+                    && expected.valid_at < oracle.correction_valid_from
+                    && value == oracle.initial_value
+                {
+                    score.historical_as_known_preserved =
+                        score.historical_as_known_preserved.saturating_add(1);
+                }
+            }
+        }
+    }
+
+    Ok(score)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -747,6 +903,99 @@ mod tests {
             distractor_count: 32,
             interval_steps: 16,
         }
+    }
+
+    fn perfect_predictions(oracle: &KnowledgeStreamOracle) -> Vec<KnowledgePrediction> {
+        oracle
+            .answers
+            .iter()
+            .map(|answer| KnowledgePrediction {
+                query_id: answer.query_id,
+                answer: match answer.expected_value {
+                    Some(value) => KnowledgeCandidateAnswer::Value(value),
+                    None => KnowledgeCandidateAnswer::NoFact,
+                },
+            })
+            .collect()
+    }
+
+    #[test]
+    fn perfect_bitemporal_predictions_score_all_queries() {
+        let (_, oracle) = generate_knowledge_stream(config()).unwrap();
+        let score = score_knowledge_predictions(&oracle, &perfect_predictions(&oracle)).unwrap();
+        assert_eq!(score.query_count, 5);
+        assert_eq!(score.exact_matches, 5);
+        assert_eq!(score.wrong_answers, 0);
+        assert_eq!(score.future_knowledge_leaks, 0);
+        assert_eq!(score.stale_answers_after_retraction, 0);
+        assert_eq!(score.missed_corrections, 0);
+        assert_eq!(score.historical_as_known_preserved, 1);
+        assert_eq!(score.exact_match_rate(), Some(1.0));
+        assert_eq!(score.prediction_coverage(), Some(1.0));
+    }
+
+    #[test]
+    fn scorer_separately_counts_future_knowledge_leakage() {
+        let (_, oracle) = generate_knowledge_stream(config()).unwrap();
+        let mut predictions = perfect_predictions(&oracle);
+        predictions[0].answer = KnowledgeCandidateAnswer::Value(oracle.corrected_value);
+        let score = score_knowledge_predictions(&oracle, &predictions).unwrap();
+        assert_eq!(score.future_knowledge_leaks, 1);
+        assert_eq!(score.exact_matches, 4);
+    }
+
+    #[test]
+    fn scorer_counts_stale_answer_after_known_retraction() {
+        let (_, oracle) = generate_knowledge_stream(config()).unwrap();
+        let mut predictions = perfect_predictions(&oracle);
+        predictions[3].answer = KnowledgeCandidateAnswer::Value(oracle.corrected_value);
+        let score = score_knowledge_predictions(&oracle, &predictions).unwrap();
+        assert_eq!(score.stale_answers_after_retraction, 1);
+        assert_eq!(score.wrong_answers, 1);
+    }
+
+    #[test]
+    fn scorer_counts_missed_correction_and_preserved_history_separately() {
+        let (_, oracle) = generate_knowledge_stream(config()).unwrap();
+        let mut predictions = perfect_predictions(&oracle);
+        predictions[1].answer = KnowledgeCandidateAnswer::Value(oracle.initial_value);
+        let score = score_knowledge_predictions(&oracle, &predictions).unwrap();
+        assert_eq!(score.missed_corrections, 1);
+        assert_eq!(score.historical_as_known_preserved, 1);
+    }
+
+    #[test]
+    fn scorer_distinguishes_abstention_from_missing_prediction_and_no_fact() {
+        let (_, oracle) = generate_knowledge_stream(config()).unwrap();
+        let predictions = [
+            KnowledgePrediction { query_id: 1, answer: KnowledgeCandidateAnswer::Abstain },
+            KnowledgePrediction { query_id: 2, answer: KnowledgeCandidateAnswer::NoFact },
+            KnowledgePrediction { query_id: 3, answer: KnowledgeCandidateAnswer::Value(oracle.corrected_value) },
+            KnowledgePrediction { query_id: 4, answer: KnowledgeCandidateAnswer::NoFact },
+        ];
+        let score = score_knowledge_predictions(&oracle, &predictions).unwrap();
+        assert_eq!(score.abstentions, 1);
+        assert_eq!(score.missing_predictions, 1);
+        assert_eq!(score.wrong_answers, 2);
+        assert_eq!(score.predictions_received, 4);
+    }
+
+    #[test]
+    fn scorer_rejects_duplicate_and_unknown_query_predictions() {
+        let (_, oracle) = generate_knowledge_stream(config()).unwrap();
+        let duplicate = [
+            KnowledgePrediction { query_id: 1, answer: KnowledgeCandidateAnswer::NoFact },
+            KnowledgePrediction { query_id: 1, answer: KnowledgeCandidateAnswer::NoFact },
+        ];
+        assert_eq!(
+            score_knowledge_predictions(&oracle, &duplicate),
+            Err(KnowledgeScoringError::DuplicatePrediction { query_id: 1 })
+        );
+        let unknown = [KnowledgePrediction { query_id: 99, answer: KnowledgeCandidateAnswer::NoFact }];
+        assert_eq!(
+            score_knowledge_predictions(&oracle, &unknown),
+            Err(KnowledgeScoringError::UnknownQuery { query_id: 99 })
+        );
     }
 
     #[test]
