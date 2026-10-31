@@ -956,6 +956,26 @@ mod tests {
     }
 
     #[test]
+    fn relevant_current_state_change_in_control_is_rejected() {
+        let changed = AGENT_INPUT
+            .lines()
+            .map(|line| {
+                if line.starts_with("MACE-287\\t") {
+                    line.replace(
+                        "\\\"current_state\\\":{\\\"pump\\\":\\\"on\\\"",
+                        "\\\"current_state\\\":{\\\"pump\\\":\\\"off\\\"",
+                    )
+                } else {
+                    line.to_owned()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\\n")
+            + "\\n";
+        assert!(audit_texts(&changed, ORACLE_INPUT, ("a", "o")).is_err());
+    }
+
+    #[test]
     fn task_prompt_pair_mismatch_is_rejected() {
         let changed = AGENT_INPUT
             .replace(
