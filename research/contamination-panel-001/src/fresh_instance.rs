@@ -661,6 +661,7 @@ pub fn audit_fresh_challenge_bundle(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
 
     fn digest(label: &str) -> String {
         hash_domain(b"fresh-instance-test", label.as_bytes())
@@ -694,6 +695,57 @@ mod tests {
 
     fn seed() -> Vec<u8> {
         (0..32).map(|value| value as u8).collect()
+    }
+
+    #[test]
+    fn strict_schemas_match_serialized_fixture_bundle_fields() {
+        let config_schema: Value = serde_json::from_str(include_str!(
+            "../schema/fresh-instance-config.schema.json"
+        )).unwrap();
+        let public_schema: Value = serde_json::from_str(include_str!(
+            "../schema/fresh-instance-public-packet.schema.json"
+        )).unwrap();
+        let oracle_schema: Value = serde_json::from_str(include_str!(
+            "../schema/fresh-instance-sealed-oracle.schema.json"
+        )).unwrap();
+        let manifest_schema: Value = serde_json::from_str(include_str!(
+            "../schema/fresh-instance-manifest.schema.json"
+        )).unwrap();
+        let audit_schema: Value = serde_json::from_str(include_str!(
+            "../schema/fresh-instance-audit.schema.json"
+        )).unwrap();
+        let config: FreshChallengeConfigV1 = serde_json::from_str(include_str!(
+            "../fixtures/fresh-instance-linear-system-config.json"
+        )).unwrap();
+        let bundle = generate_fresh_challenge_bundle(&config, &seed()).unwrap();
+        let audit = audit_fresh_challenge_bundle(&config, &seed(), &bundle).unwrap();
+
+        for (schema, value, version) in [
+            (&config_schema, serde_json::to_value(&config).unwrap(), FRESH_CONFIG_SCHEMA),
+            (&public_schema, serde_json::to_value(&bundle.public_packet).unwrap(), FRESH_PUBLIC_SCHEMA),
+            (&oracle_schema, serde_json::to_value(&bundle.sealed_oracle_packet).unwrap(), FRESH_ORACLE_SCHEMA),
+            (&manifest_schema, serde_json::to_value(&bundle.manifest).unwrap(), FRESH_MANIFEST_SCHEMA),
+            (&audit_schema, serde_json::to_value(&audit).unwrap(), FRESH_AUDIT_SCHEMA),
+        ] {
+            assert_eq!(schema["properties"]["schema"]["const"].as_str(), Some(version));
+            let required: BTreeSet<String> = schema["required"].as_array().unwrap()
+                .iter().map(|item| item.as_str().unwrap().to_owned()).collect();
+            let properties: BTreeSet<String> = schema["properties"].as_object().unwrap()
+                .keys().cloned().collect();
+            let actual: BTreeSet<String> = value.as_object().unwrap().keys().cloned().collect();
+            assert_eq!(required, properties);
+            assert_eq!(actual, properties);
+        }
+
+        let public_task_properties: BTreeSet<String> =
+            public_schema["properties"]["tasks"]["items"]["properties"]
+                .as_object().unwrap().keys().cloned().collect();
+        let actual_public_task: BTreeSet<String> = serde_json::to_value(
+            &bundle.public_packet.tasks[0]
+        ).unwrap().as_object().unwrap().keys().cloned().collect();
+        assert_eq!(public_task_properties, actual_public_task);
+        assert!(!public_task_properties.contains("solution"));
+        assert!(!public_task_properties.contains("generation_seed_hex"));
     }
 
     #[test]
