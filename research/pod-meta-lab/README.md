@@ -10,7 +10,12 @@ This lab is intentionally outside the root Cargo workspace and has zero third-pa
 cargo test --manifest-path research/pod-meta-lab/Cargo.toml
 cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin pod-meta-demo
 cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-v1
+mkdir -p /tmp/poar-export
+cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-graph-export -- 1729 test /tmp/poar-export/planner.poar /tmp/poar-export/oracle.poar.sealed "$(git rev-parse HEAD)"
+sha256sum /tmp/poar-export/planner.poar /tmp/poar-export/oracle.poar.sealed
 ```
+
+The oracle artifact contains hidden labels and gold proof paths; do not give it to the planner or publish it as an ordinary public artifact.
 
 ## What is implemented
 
