@@ -1,0 +1,77 @@
+name: CMAQ-016 adaptive search exploitability benchmark
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/cmaq-016/**"
+      - ".github/workflows/cmaq-016.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/cmaq-016/**"
+      - ".github/workflows/cmaq-016.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  search-exploitability:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-016
+        run: cargo test --locked
+      - name: Generate deterministic report
+        working-directory: research/cmaq-016
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --release --locked > /tmp/cmaq-016-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-016-report.json").read_text())
+          assert report["schema_version"] == "cmaq-016-search-exploitability-v0.1"
+          assert report["episode_count"] == 256
+          assert report["evaluator_diagnostic_grid_points"] == 201
+          assert report["candidate_budgets"] == [8, 32, 128, 512]
+          assert report["scenarios"] == ["benign_iid_noise", "narrow_optimism_pocket"]
+          assert len(report["summary"]) == 2 * 4 * 5
+          rows = {(row["scenario"], row["candidate_budget"], row["policy"]): row
+                  for row in report["summary"]}
+          assert len(rows) == len(report["summary"])
+          for row in rows.values():
+              for field in ["mean_true_return", "mean_candidate_queries_per_episode",
+                            "mean_model_head_evaluations_per_episode",
+                            "mean_selected_action_regret", "selected_pocket_rate",
+                            "uniform_grid_point_model_mse"]:
+                  assert isinstance(row[field], (int, float))
+                  assert abs(row[field]) < 1e6
+              assert 0.0 <= row["selected_pocket_rate"] <= 1.0
+              assert row["candidate_budget"] in report["candidate_budgets"]
+              if row["policy"] in ("direct_policy", "oracle"):
+                  assert row["mean_candidate_queries_per_episode"] == 0.0
+                  assert row["mean_model_head_evaluations_per_episode"] == 0.0
+                  assert row["mean_selected_model_score"] is None
+                  assert row["mean_optimizer_optimism_gap"] is None
+              else:
+                  assert row["mean_candidate_queries_per_episode"] == row["candidate_budget"]
+                  expected_heads = row["candidate_budget"] * (
+                      5 if row["policy"] == "pessimistic_ensemble_cem" else 1
+                  )
+                  assert row["mean_model_head_evaluations_per_episode"] == expected_heads
+                  assert isinstance(row["mean_selected_model_score"], (int, float))
+                  assert isinstance(row["mean_optimizer_optimism_gap"], (int, float))
+                  assert abs(row["mean_optimizer_optimism_gap"]) < 1e6
+          # Oracle is exact and direct-policy output is independent of model-error lane.
+          for budget in report["candidate_budgets"]:
+              for scenario in report["scenarios"]:
+                  assert rows[(scenario, budget, "oracle")]["mean_selected_action_regret"] == 0.0
+          assert rows[("narrow_optimism_pocket", 512, "pessimistic_ensemble_cem")]["selected_pocket_rate"] < 0.10
+          PY

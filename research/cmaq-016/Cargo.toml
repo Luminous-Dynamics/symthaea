@@ -1,0 +1,11 @@
+[package]
+name = "cmaq-016-search-exploitability"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Synthetic benchmark for adaptive optimizer exploitation of localized world-model error"
+
+[dependencies]
+
+[workspace]
