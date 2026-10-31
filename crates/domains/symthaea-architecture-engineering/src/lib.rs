@@ -22,6 +22,7 @@ pub mod decision_focused_voc;
 pub mod pareto_regret_voc;
 pub mod hardware_objectives;
 pub mod fleet_deployment_envelope;
+pub mod deployment_artifact;
 pub mod pareto_hypervolume_qmc;
 pub mod pareto_portfolio_voc;
 pub mod multi_resource_budget;
