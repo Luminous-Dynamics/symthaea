@@ -57,6 +57,16 @@ pub enum StyleCoverageState {
     /// The axis currently relies on a shared engine default rather than
     /// a style-specific CompositionSpec value.
     SharedEngineDefault,
+    /// A source-specific score/audio corpus has been checked and pinned.
+    SourceVerified,
+    /// Declared sample assets have been decoded and audited.
+    AssetDecoded,
+    /// A specific pitch/velocity/technique/renderer cell has been rendered
+    /// and mechanically verified.
+    RenderCellVerified,
+    /// Independent perceptual or knowledgeable-practitioner qualification
+    /// exists for the exact scoped claim.
+    PerceptuallyOrExpertQualified,
     /// No qualified per-style renderer / production recipe is present here.
     NotRendererQualified,
 }
