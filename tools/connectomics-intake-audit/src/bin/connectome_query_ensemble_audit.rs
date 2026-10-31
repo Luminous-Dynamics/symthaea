@@ -600,6 +600,22 @@ mod tests {
     }
 
     #[test]
+    fn unanimous_negative_decision_is_reported_separately_from_reconstruction_sensitivity() {
+        let mut input = fixture();
+        for scenario in &mut input.scenarios {
+            scenario.edges.retain(|edge| !(edge.source == 2 && edge.target == 3));
+            scenario.graph_sha256 = graph_sha(&scenario.edges);
+        }
+        let report = run(&input, b"synthetic-input").unwrap();
+        let path = report.queries.iter()
+            .find(|query| query.query_id == "critical-path-1-to-4")
+            .unwrap();
+        assert_eq!(path.decision_status, "ROBUST_DECISION_NOT_MET");
+        assert_eq!(path.scenarios_meeting_decision, 0);
+        assert_eq!(path.scenarios_not_meeting_decision, 3);
+    }
+
+    #[test]
     fn scenario_order_does_not_change_canonical_scenario_set_digest() {
         let mut input = fixture();
         let before = scenario_set_sha256(&input.scenarios).unwrap().0;
