@@ -67,6 +67,9 @@ pub struct DmsTask {
     pub delay_steps: u32,
     pub input_channels: usize,
     pub rotation_steps: u8,
+    pub firing_rate_hz_bits: u64,
+    pub background_rate_hz_bits: u64,
+    pub kappa_bits: u64,
     /// SHA-256 over the versioned canonical public DMS stream.
     pub content_sha256: [u8; 32],
 }
@@ -83,6 +86,9 @@ pub fn dms_content_digest(task: &DmsTask) -> [u8; 32] {
     hash.u32(task.delay_steps);
     hash.usize(task.input_channels);
     hash.u8(task.rotation_steps);
+    hash.u64(task.firing_rate_hz_bits);
+    hash.u64(task.background_rate_hz_bits);
+    hash.u64(task.kappa_bits);
     hash.usize(task.observations.len());
     for observation in &task.observations {
         hash.u32(observation.step);
@@ -97,6 +103,7 @@ pub fn dms_content_digest(task: &DmsTask) -> [u8; 32] {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DmsOracle {
     pub stream_id: u64,
+    pub seed: u64,
     pub is_match: bool,
     pub sample_direction: u8,
     pub test_direction: u8,
@@ -113,6 +120,7 @@ pub fn dms_oracle_digest(oracle: &DmsOracle) -> [u8; 32] {
     hash.u8(oracle.sample_direction);
     hash.u8(oracle.test_direction);
     hash.u8(oracle.expected_label);
+    hash.u64(oracle.seed);
     hash.finish()
 }
 
@@ -292,6 +300,7 @@ pub enum DmsVerificationError {
     StreamIdMismatch,
     ContentDigestMismatch,
     OracleDigestMismatch,
+    ReproducibilityMismatch,
     InvalidDecisionWindow,
     InvalidOracle,
     InvalidObservation { expected_step: u32 },
@@ -305,6 +314,7 @@ impl fmt::Display for DmsVerificationError {
             Self::StreamIdMismatch => write!(f, "DMS public task and oracle stream IDs differ"),
             Self::ContentDigestMismatch => write!(f, "DMS public task SHA-256 digest does not match its contents"),
             Self::OracleDigestMismatch => write!(f, "DMS oracle SHA-256 digest does not match its contents"),
+            Self::ReproducibilityMismatch => write!(f, "DMS public stream does not match the seeded generator"),
             Self::InvalidDecisionWindow => write!(f, "DMS decision window or observation length is invalid"),
             Self::InvalidOracle => write!(f, "DMS oracle direction or match relation is invalid"),
             Self::InvalidObservation { expected_step } => {
@@ -380,6 +390,27 @@ pub fn verify_dms_trace(
             }
             previous = Some(*channel);
         }
+    }
+
+    let config = DmsConfig {
+        seed: oracle.seed,
+        dt_ms: task.dt_ms,
+        fixation_ms: task.sample_start_step.saturating_mul(task.dt_ms),
+        sample_ms: task.sample_end_step.saturating_sub(task.sample_start_step)
+            .saturating_mul(task.dt_ms),
+        delay_ms: task.delay_steps.saturating_mul(task.dt_ms),
+        test_ms: task.test_end_step.saturating_sub(task.test_start_step)
+            .saturating_mul(task.dt_ms),
+        input_channels: task.input_channels,
+        firing_rate_hz: f64::from_bits(task.firing_rate_hz_bits),
+        background_rate_hz: f64::from_bits(task.background_rate_hz_bits),
+        kappa: f64::from_bits(task.kappa_bits),
+        rotation_steps: task.rotation_steps,
+    };
+    let (expected_task, expected_oracle) =
+        generate_dms_task(config).map_err(|_| DmsVerificationError::ReproducibilityMismatch)?;
+    if expected_task != *task || expected_oracle != *oracle {
+        return Err(DmsVerificationError::ReproducibilityMismatch);
     }
     Ok(())
 }
@@ -561,6 +592,27 @@ mod tests {
         let config = DmsConfig::braintrace_reference(93);
         let (task, _) = generate_dms_task(config).unwrap();
         assert_eq!(task.content_sha256, dms_content_digest(&task));
+    }
+
+    #[test]
+    fn verifier_rejects_recommitted_seed_inconsistent_sample() {
+        let config = DmsConfig::braintrace_reference(93);
+        let (mut task, oracle) = generate_dms_task(config).unwrap();
+        task.observations[0].active_channels.push(0);
+        task.observations[0].active_channels.sort_unstable();
+        task.content_sha256 = dms_content_digest(&task);
+        assert_eq!(
+            verify_dms_trace(&task, &oracle),
+            Err(DmsVerificationError::ReproducibilityMismatch)
+        );
+    }
+
+    #[test]
+    fn oracle_digest_binds_the_generator_seed() {
+        let config = DmsConfig::braintrace_reference(94);
+        let (_, mut oracle) = generate_dms_task(config).unwrap();
+        oracle.seed ^= 1;
+        assert_ne!(oracle.content_sha256, dms_oracle_digest(&oracle));
     }
 
     #[test]
