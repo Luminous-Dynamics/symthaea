@@ -171,6 +171,17 @@ class ProofCarryingCertificateTests(unittest.TestCase):
         with self.assertRaises(CertificateError):
             verify_certificate(cert)
 
+
+    def test_simulation_only_can_be_recorded_as_inconclusive(self):
+        manifest, receipt = crc_fixture()
+        manifest["proof_lane"] = "simulation_only"
+        receipt["proof_lane"] = "simulation_only"
+        receipt["status"] = "inconclusive"
+        cert = build_certificate(manifest, receipt)
+        result = verify_certificate(cert)
+        self.assertFalse(result["valid"])
+        self.assertEqual(result["receipt_status"], "inconclusive")
+
     def test_raw_calibration_payloads_are_rejected(self):
         manifest, receipt = crc_fixture()
         manifest["scope"]["calibration_examples"] = [{"x": [1,2,3]}]
