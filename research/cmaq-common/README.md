@@ -26,11 +26,11 @@ The manifest is not a run result and does not attest that a run actually happene
 
 ## Contract
 
-The strict schema is `frozen-run-manifest.schema.json`. Its top-level fields bind:
+The strict schema is `frozen-run-manifest.schema.json`. The example validator recomputes SHA-256 from repository-relative candidate, generator, metric bundle, data manifest, observation/action/reward schema and wrapper-stack artifacts; hash-shaped strings alone are not accepted. It rejects traversal, symlink and out-of-repository artifact paths. Its top-level fields bind:
 
 - **Track and claim:** one CMAQ lane, protocol version and maximum scientific claim.
 - **Repository and candidate:** immutable source commit, candidate artifact digest (nullable only when a source-only development fixture is explicitly marked), config/weights/adapter digests and build state.
-- **Generator and evaluator:** their source revisions, configuration/metric bundle digests and external judge identity/version where relevant.
+- **Generator and evaluator:** their source revisions, repository-relative configuration/metric-bundle paths and digests, plus external judge identity/version where relevant.
 - **Data sources:** exact revision, split, manifest digest, license, candidate visibility and permitted candidate-facing fields.
 - **Task semantics:** observation/action schemas, reward definition, wrapper stack, action repeat, simulator-step cadence, controller horizon and terminal behavior.
 - **Sample and split custody:** episode count, seed-schedule commitment, analysis unit, mechanism-family split and paired-seed declaration.
