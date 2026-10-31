@@ -445,6 +445,12 @@ pub fn validate_score_validity_disclosure(
             "metric.metric_definition_digest",
             &mut unknown_count,
         )?;
+        count_status(
+            metric.metric_definition_digest.status,
+            &mut controlled_count,
+            &mut not_controlled_count,
+            &mut not_applicable_count,
+        )?;
         if metric.metric_definition_digest.status == DisclosureStatusV1::Unknown {
             add_checked(&mut missing_count, 1, "missing field count")?;
         }
@@ -467,6 +473,11 @@ pub fn validate_score_validity_disclosure(
             }
             validate_text_status(stratum.task_family.status, stratum.task_family.value.as_deref(), "stratum.task_family", &mut unknown_count)?;
             validate_text_status(stratum.source_family.status, stratum.source_family.value.as_deref(), "stratum.source_family", &mut unknown_count)?;
+            count_status(stratum.task_family.status, &mut controlled_count, &mut not_controlled_count, &mut not_applicable_count)?;
+            count_status(stratum.source_family.status, &mut controlled_count, &mut not_controlled_count, &mut not_applicable_count)?;
+            if stratum.task_family.status == DisclosureStatusV1::Unknown || stratum.source_family.status == DisclosureStatusV1::Unknown {
+                add_checked(&mut missing_count, 1, "missing field count")?;
+            }
             add_checked(&mut task_count_total, stratum.task_count, "total task count")?;
             add_checked(&mut observed_count_total, stratum.observed_count, "total observed count")?;
         }
@@ -513,6 +524,8 @@ pub fn validate_score_validity_disclosure(
             DisclosureStatusV1::Controlled => {
                 validate_digest_status(&control.method_digest, "threat.method_digest", &mut unknown_count)?;
                 validate_digest_status(&control.evidence_receipt_digest, "threat.evidence_receipt_digest", &mut unknown_count)?;
+                count_status(control.method_digest.status, &mut controlled_count, &mut not_controlled_count, &mut not_applicable_count)?;
+                count_status(control.evidence_receipt_digest.status, &mut controlled_count, &mut not_controlled_count, &mut not_applicable_count)?;
                 if control.method_digest.status != DisclosureStatusV1::Controlled
                     || control.evidence_receipt_digest.status != DisclosureStatusV1::Controlled
                 {
@@ -531,6 +544,7 @@ pub fn validate_score_validity_disclosure(
         }
         count_status(control.status, &mut controlled_count, &mut not_controlled_count, &mut not_applicable_count)?;
         validate_text_status(control.notes.status, control.notes.value.as_deref(), "threat.notes", &mut unknown_count)?;
+        count_status(control.notes.status, &mut controlled_count, &mut not_controlled_count, &mut not_applicable_count)?;
     }
     if observed_threats.len() != required_dataset_threats.len()
         || required_dataset_threats.iter().any(|value| !observed_threats.contains(value))
@@ -544,6 +558,10 @@ pub fn validate_score_validity_disclosure(
     let tools_ok = validate_boundary_layer(&acquired.tools, "acquired.tools", &mut unknown_count)?;
     let environment_ok = validate_boundary_layer(&acquired.environment, "acquired.environment", &mut unknown_count)?;
     validate_digest_status(&acquired.independent_monitor_receipt_digest, "acquired.independent_monitor_receipt_digest", &mut unknown_count)?;
+    count_status(acquired.independent_monitor_receipt_digest.status, &mut controlled_count, &mut not_controlled_count, &mut not_applicable_count)?;
+    for layer_status in [acquired.network.status, acquired.filesystem.status, acquired.tools.status, acquired.environment.status] {
+        count_status(layer_status, &mut controlled_count, &mut not_controlled_count, &mut not_applicable_count)?;
+    }
     let acquired_exposure_independently_monitored =
         acquired.independent_monitor_receipt_digest.status == DisclosureStatusV1::Controlled;
     let all_boundaries_controlled = network_ok && filesystem_ok && tools_ok && environment_ok;
@@ -579,6 +597,10 @@ pub fn validate_score_validity_disclosure(
         (&regeneration.generator_version, "regeneration.generator_version"),
     ] {
         validate_text_status(field.status, field.value.as_deref(), label, &mut unknown_count)?;
+        count_status(field.status, &mut controlled_count, &mut not_controlled_count, &mut not_applicable_count)?;
+        if field.status == DisclosureStatusV1::Unknown {
+            add_checked(&mut missing_count, 1, "missing field count")?;
+        }
         if field.status != DisclosureStatusV1::Controlled {
             regeneration_complete = false;
         }
@@ -590,6 +612,10 @@ pub fn validate_score_validity_disclosure(
         (&regeneration.cohort_manifest_digest, "regeneration.cohort_manifest_digest"),
     ] {
         validate_digest_status(field, label, &mut unknown_count)?;
+        count_status(field.status, &mut controlled_count, &mut not_controlled_count, &mut not_applicable_count)?;
+        if field.status == DisclosureStatusV1::Unknown {
+            add_checked(&mut missing_count, 1, "missing field count")?;
+        }
         if field.status != DisclosureStatusV1::Controlled {
             regeneration_complete = false;
         }
