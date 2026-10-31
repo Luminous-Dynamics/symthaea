@@ -62,7 +62,7 @@ Defaults are a 0.5 release ratio and two persistence windows. They are research 
 
 ## EVAL-025 adapter v2 integration
 
-The support adapter consumes replay-verified v0.2 segmented reports. Each event evidence record retains raw measured, hysteresis, tail-guard and conservative intervals. EVAL-019 receives only the conservative union. The aggregate receipt commits to all interval categories and tail clipping state.
+The support adapter consumes replay-verified v0.2 segmented reports. Each event evidence record retains raw measured, hysteresis, tail-guard and conservative intervals, the final performed note-off frame, and the number of consecutive all-channel quiet windows beginning after that note-off. The quiet-window count is computed from the verified per-channel window trace and included in the per-event digest. EVAL-019 receives only the conservative union. The aggregate receipt commits to all interval categories, quiet-window evidence and tail clipping state.
 
 The adapter returns an opaque verified aggregate token only after replaying all original per-event EVAL-017 inputs. Its planner-support accessor returns an error when the tail guard was clipped.
 
