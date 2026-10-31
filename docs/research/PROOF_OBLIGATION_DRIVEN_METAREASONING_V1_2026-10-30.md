@@ -237,7 +237,7 @@ Report independently:
 - dependency retraction recall and unaffected-claim stability;
 - source-family generalization and split leakage checks;
 - AND/OR proof-path correctness, cycle rejection, and witness independence-group count;
-- temporal coverage/precision across valid-time and known-time windows, including future-known leakage;
+- temporal evidence retrieval coverage@3 / precision@3, separately from final proof citations, across valid-time and known-time windows, including future-known leakage;
 - scope, authority, source-integrity, revocation, and citation-completeness violations;
 - stale-receipt replay rejection and transactional all-or-nothing behavior for mixed-currentness multi-obligation receipts;
 - contradiction detection and resolution/abstention quality;
