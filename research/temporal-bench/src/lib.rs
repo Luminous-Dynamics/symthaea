@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 pub mod dms;
+pub mod evidence;
 pub mod temporal;
 
 const MAX_DISTRACTORS: usize = 10_000;
