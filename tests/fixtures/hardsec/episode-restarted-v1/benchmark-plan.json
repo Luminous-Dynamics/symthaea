@@ -1,0 +1,74 @@
+{
+  "schema_version": "hardsec-episode-restarted-benchmark-v1",
+  "benchmark_id": "hs021-episode-restarted-conformal-late-change",
+  "status": "planned",
+  "baselines": [
+    "static_threshold",
+    "ewma",
+    "page_hinkley_cusum",
+    "fixed_start_power_mixture_cmm",
+    "hardsec_019_dkw_cctm",
+    "fixed_reference_conformal",
+    "authors_official_python_cctm_pinned",
+    "weighted_restarted_sum_near_harmonic",
+    "weighted_restarted_max_near_harmonic"
+  ],
+  "scenarios": [
+    "iid_episode_null",
+    "iid_episode_shift_at_10",
+    "iid_episode_shift_at_100",
+    "iid_episode_shift_at_1000",
+    "dependent_ar1_episode_null",
+    "shared_latent_episode_null",
+    "within_execution_correlated_windows",
+    "same_episode_split_attack",
+    "cross_execution_window_reuse",
+    "mixed_context_episode",
+    "unknown_context",
+    "invalid_window_sensor",
+    "unqualified_pmu",
+    "randomizer_reuse",
+    "randomizer_score_leakage",
+    "late_small_effect",
+    "late_large_effect",
+    "device_and_program_shift"
+  ],
+  "holdout_axes": [
+    "execution_group",
+    "program_binary",
+    "device_configuration",
+    "attack_family",
+    "adaptation_family"
+  ],
+  "metrics": [
+    "episode_level_pfa",
+    "false_alarms_per_1000_executions",
+    "median_detection_delay_episodes",
+    "p95_detection_delay_episodes",
+    "within_episode_detection_delay_ms",
+    "abstention_coverage",
+    "worst_context_recall",
+    "worst_attack_family_recall",
+    "source_window_overlap_rate",
+    "randomizer_reuse_rate",
+    "cpu_time_per_episode",
+    "peak_memory",
+    "episode_aggregation_overhead"
+  ],
+  "aspirational_targets": {
+    "iid_episode_null_pfa_max": 0.05,
+    "p95_delay_episodes_at_small_effect_target": 20,
+    "p95_delay_improvement_vs_fixed_start_min": 0.25,
+    "invalid_or_unassigned_episode_silent_updates_max": 0,
+    "cross_execution_window_reuse_max": 0,
+    "variable_length_episode_acceptance_max": 0,
+    "decision_layer_overhead_p95_ms": 2
+  },
+  "claim_rules": {
+    "episode_independence_is_assumption_not_proven": true,
+    "randomizer_independence_is_assumption_not_proven": true,
+    "correlated_windows_collapsed_before_testing": true,
+    "delay_units_are_episodes": true,
+    "synthetic_results_not_detector_performance": true
+  }
+}
