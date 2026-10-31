@@ -6,7 +6,7 @@
 //! reproduce the BrainTrace network/training code. The public task and oracle
 //! are returned together for prototype testing; this is not process isolation.
 
-use super::{mix64, SplitMix64};
+use super::{digest::CanonicalHasher, mix64, SplitMix64};
 use std::fmt;
 
 const MAX_DMS_STEPS: usize = 500_000;
@@ -67,6 +67,31 @@ pub struct DmsTask {
     pub delay_steps: u32,
     pub input_channels: usize,
     pub rotation_steps: u8,
+    /// SHA-256 over the versioned canonical public DMS stream.
+    pub content_sha256: [u8; 32],
+}
+
+/// Domain-separated canonical SHA-256 of the DMS public stream.
+pub fn dms_content_digest(task: &DmsTask) -> [u8; 32] {
+    let mut hash = CanonicalHasher::new(b"symthaea.temporal.dms.public.v1");
+    hash.u64(task.stream_id);
+    hash.u32(task.dt_ms);
+    hash.u32(task.sample_start_step);
+    hash.u32(task.sample_end_step);
+    hash.u32(task.test_start_step);
+    hash.u32(task.test_end_step);
+    hash.u32(task.delay_steps);
+    hash.usize(task.input_channels);
+    hash.u8(task.rotation_steps);
+    hash.usize(task.observations.len());
+    for observation in &task.observations {
+        hash.u32(observation.step);
+        hash.usize(observation.active_channels.len());
+        for channel in &observation.active_channels {
+            hash.u16(*channel);
+        }
+    }
+    hash.finish()
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -217,19 +242,23 @@ pub fn generate_dms_task(
         });
     }
 
+    let mut public_task = DmsTask {
+        stream_id,
+        dt_ms: config.dt_ms,
+        observations,
+        sample_start_step: sample_start,
+        sample_end_step: sample_end,
+        test_start_step: test_start,
+        test_end_step: test_end,
+        delay_steps,
+        input_channels: config.input_channels,
+        rotation_steps: config.rotation_steps,
+        content_sha256: [0; 32],
+    };
+    public_task.content_sha256 = dms_content_digest(&public_task);
+
     Ok((
-        DmsTask {
-            stream_id,
-            dt_ms: config.dt_ms,
-            observations,
-            sample_start_step: sample_start,
-            sample_end_step: sample_end,
-            test_start_step: test_start,
-            test_end_step: test_end,
-            delay_steps,
-            input_channels: config.input_channels,
-            rotation_steps: config.rotation_steps,
-        },
+        public_task,
         DmsOracle {
             stream_id,
             is_match,
@@ -243,6 +272,7 @@ pub fn generate_dms_task(
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DmsVerificationError {
     StreamIdMismatch,
+    ContentDigestMismatch,
     InvalidDecisionWindow,
     InvalidOracle,
     InvalidObservation { expected_step: u32 },
@@ -254,6 +284,7 @@ impl fmt::Display for DmsVerificationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::StreamIdMismatch => write!(f, "DMS public task and oracle stream IDs differ"),
+            Self::ContentDigestMismatch => write!(f, "DMS public task SHA-256 digest does not match its contents"),
             Self::InvalidDecisionWindow => write!(f, "DMS decision window or observation length is invalid"),
             Self::InvalidOracle => write!(f, "DMS oracle direction or match relation is invalid"),
             Self::InvalidObservation { expected_step } => {
@@ -278,6 +309,9 @@ pub fn verify_dms_trace(
 ) -> Result<(), DmsVerificationError> {
     if task.stream_id != oracle.stream_id {
         return Err(DmsVerificationError::StreamIdMismatch);
+    }
+    if task.content_sha256 != dms_content_digest(task) {
+        return Err(DmsVerificationError::ContentDigestMismatch);
     }
     if task.sample_start_step >= task.sample_end_step
         || task.sample_end_step.saturating_add(task.delay_steps) != task.test_start_step
@@ -479,6 +513,26 @@ mod tests {
         let config = DmsConfig::braintrace_reference(93);
         let (task, oracle) = generate_dms_task(config).unwrap();
         assert_eq!(verify_dms_trace(&task, &oracle), Ok(()));
+    }
+
+    #[test]
+    fn generated_public_stream_has_valid_sha256() {
+        let config = DmsConfig::braintrace_reference(93);
+        let (task, _) = generate_dms_task(config).unwrap();
+        assert_eq!(task.content_sha256, dms_content_digest(&task));
+    }
+
+    #[test]
+    fn verifier_rejects_post_generation_stream_mutation() {
+        let config = DmsConfig::braintrace_reference(93);
+        let (mut task, oracle) = generate_dms_task(config).unwrap();
+        if let Some(observation) = task.observations.iter_mut().find(|row| !row.active_channels.is_empty()) {
+            observation.active_channels.pop();
+        }
+        assert_eq!(
+            verify_dms_trace(&task, &oracle),
+            Err(DmsVerificationError::ContentDigestMismatch)
+        );
     }
 
     #[test]
