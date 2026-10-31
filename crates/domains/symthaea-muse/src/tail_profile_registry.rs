@@ -567,43 +567,6 @@ fn observations_from_verified_report(
         }
         let raw_end = event.raw_measured_intervals.iter().map(|interval| interval.end_frame).max();
         let hysteresis_end = event.hysteresis_support_intervals.iter().map(|interval| interval.end_frame).max();
-        let channels = report.channels;
-        if channels == 0 || report.window_segmentation.is_empty()
-            || report.window_segmentation.len() % channels != 0
-        {
-            return Err(TailProfileError::TailWindowCensored);
-        }
-        let mut quiet_by_window = BTreeMap::<usize, (usize, bool, usize)>::new();
-        for window in &report.window_segmentation {
-            if window.channel >= channels {
-                return Err(TailProfileError::TailWindowCensored);
-            }
-            let entry = quiet_by_window.entry(window.window_index).or_insert((0, true, window.start_frame));
-            if entry.2 != window.start_frame {
-                return Err(TailProfileError::TailWindowCensored);
-            }
-            entry.0 += 1;
-            entry.1 &= !window.onset_triggered
-                && !window.release_triggered
-                && !window.hysteresis_active;
-        }
-        let total_windows = quiet_by_window.len();
-        if total_windows == 0
-            || quiet_by_window.keys().copied().ne(0..total_windows)
-            || quiet_by_window.values().any(|(channel_count, _, _)| *channel_count != channels)
-        {
-            return Err(TailProfileError::TailWindowCensored);
-        }
-        let mut trailing_quiet_windows = 0usize;
-        for window_index in (0..total_windows).rev() {
-            if quiet_by_window.get(&window_index).is_some_and(|(_, quiet, start_frame)| {
-                *quiet && (*start_frame as u64) >= event.final_note_off_frame
-            }) {
-                trailing_quiet_windows += 1;
-            } else {
-                break;
-            }
-        }
         let raw_tail = raw_end
             .map(|end| end.saturating_sub(event.final_note_off_frame))
             .unwrap_or(0);
@@ -620,8 +583,8 @@ fn observations_from_verified_report(
             raw_measured_end_frame: raw_end,
             hysteresis_support_end_frame: hysteresis_end,
             observed_tail_frames: hysteresis_tail.max(raw_tail),
-            trailing_quiet_windows,
-            total_windows,
+            trailing_quiet_windows: event.trailing_quiet_windows,
+            total_windows: event.total_windows,
             output_frame_count: event.output_frame_count,
         });
     }
