@@ -918,7 +918,7 @@ mod tests {
             assert_eq!(before.5, after.emphasis);
             assert_eq!(
                 i16::from(after.pitch.midi()) - i16::from(before.1.midi()),
-                i16::from(melody_shift) * i16::from(before.0.0 == 0),
+                if before.0.0 == 0 { melody_shift } else { 0 },
                 "each part must receive its own uniform octave offset"
             );
         }
