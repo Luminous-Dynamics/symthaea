@@ -363,5 +363,22 @@
       "expected_error": "EvidenceOriginMismatch"
     }
   ],
-  "note": "All sample numeric values, region capacities and rates are invented to exercise the proposed schema. They must never be used in architecture rankings, papers, hardware claims, or product comparisons."
+  "note": "All sample numeric values, region capacities and rates are invented to exercise the proposed schema. They must never be used in architecture rankings, papers, hardware claims, or product comparisons.",
+  "companion_regime_profile": {
+    "profile_id": "synthetic-regime-hdc-retrieval-v1",
+    "observation_record_id": "synthetic-observation-cpu-and-gpu-comparison",
+    "workload_fingerprint": "synthetic-hdc-retrieval-workload-v1",
+    "comparison_contract_fingerprint": "synthetic-comparison-contract-v1",
+    "communication_boundary_ids": [
+      "synthetic-boundary-ddr-to-l3",
+      "synthetic-boundary-l3-to-ddr",
+      "synthetic-boundary-hbm-to-sram",
+      "synthetic-boundary-sram-to-hbm"
+    ],
+    "state_class_ids": [
+      "hdc_codebook",
+      "query_fast_state"
+    ],
+    "note": "Synthetic companion only. A production validator must check these identities against the QARCH-021 profile and exact observation rather than trusting this fixture registry."
+  }
 }
