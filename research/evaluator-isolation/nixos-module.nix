@@ -22,6 +22,9 @@ let
     PrivateTmp = true;
     PrivateDevices = true; # CPU-only qualification profile; GPU requires a separately reviewed device allow-list.
     PrivateNetwork = true;
+    PrivateIPC = true;
+    ProtectHostname = true;
+    RestrictAddressFamilies = [ "AF_UNIX" ];
 
     NoNewPrivileges = true;
     CapabilityBoundingSet = "";
@@ -168,6 +171,7 @@ in
       "d ${state}/exchange 2710 symthaea-temporal-candidate symthaea-temporal-exchange -"
       "d ${state}/candidate-work 0700 symthaea-temporal-candidate symthaea-temporal-candidate -"
       "d ${state}/evaluator-private 0700 symthaea-temporal-evaluator symthaea-temporal-evaluator -"
+      "d ${state}/evaluator-private/replay-ledger 0700 symthaea-temporal-evaluator symthaea-temporal-evaluator -"
       "d ${state}/receipts 0700 symthaea-temporal-evaluator symthaea-temporal-evaluator -"
     ];
 
