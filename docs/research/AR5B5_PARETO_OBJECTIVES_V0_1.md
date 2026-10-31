@@ -10,7 +10,9 @@ A research candidate may improve quality while consuming more energy, improve ro
 
 ## Implemented API
 
-File: crates/domains/symthaea-architecture-engineering/src/pareto_objectives.rs
+Files:
+- crates/domains/symthaea-architecture-engineering/src/pareto_objectives.rs
+- crates/domains/symthaea-architecture-engineering/src/pareto_benchmarks.rs
 
 - ObjectiveDirection::{Maximize, Minimize}: each raw objective has an explicit direction.
 - ParetoObjectiveSpec: freezes objective ID and finite scale anchors.
@@ -21,6 +23,7 @@ File: crates/domains/symthaea-architecture-engineering/src/pareto_objectives.rs
 - inverted_generational_distance_plus and additive_epsilon_indicator: companion set-quality metrics in the same maximization-utility coordinates.
 - analyze_reference_front_indicators: computes IGD+ and additive epsilon against a unique, mutually nondominated reference front and returns a receipt binding the plan, approximation front and canonical reference front.
 - ParetoIndicatorReceipt: retains digests for the plan, approximation front and reference front alongside the two companion metrics.
+- pareto_benchmarks: deterministic ZDT1 and three-objective DTLZ2 objective generators with analytic reference-front samplers.
 
 ### Objective transformation
 
@@ -63,6 +66,7 @@ Reference sensitivity is a separate output. A single HV value is never presented
 ## Tests authored
 
 - mixed maximize/minimize transformation and known dominance witness;
+- ZDT1 and DTLZ2 benchmark-function geometry, reference-front sampling, and ZDT1-to-Pareto-analysis integration;
 - exact two-dimensional and three-dimensional hypervolume fixtures;
 - exact four-dimensional single-box volume;
 - reference-clipped volume;
@@ -146,7 +150,7 @@ The goal is not simply a bigger hypervolume. The target is a better verified Par
 1. Add an EventTape adapter that derives each candidate's objective vector and resource dimensions from independently verified candidate outcomes and complete resource receipts.
 2. Retain candidate evidence bytes or content-addressed artifact locators, not only digest strings.
 3. Add R2, attainment-based analysis and uncertainty intervals with frozen reference sets.
-4. Add deterministic DTLZ/ZDT/WFG fixtures and baseline adapters in a separate benchmark module.
+4. Extend the current ZDT1/DTLZ2 generators with WFG and constrained DTLZ fixtures, then add pinned baseline adapters in a separate benchmark module.
 5. Add multi-run cluster inference and correction across the preregistered indicator family.
 6. Extend beyond four objectives only with an explicitly versioned algorithm and approximation-error tests.
 
