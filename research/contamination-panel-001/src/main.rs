@@ -6,6 +6,7 @@ use contamination_panel_bench::{
         empirical_reference_p_values, ftd_weighted_cauchy_bh, FeaturePValuesV1,
         FtdWeightPolicyV1, ReferenceTailV1, ScoreObservationV1,
     },
+    ftd_calibration::{FtdCalibrationConfigV1, run_ftd_calibration},
     generate_challenge_bundle, GeneratorConfigV1,
 };
 use std::{
@@ -197,6 +198,36 @@ fn ftd_fuse(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn ftd_calibrate(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 4 {
+        return Err(
+            "usage: contamination-panel-bench ftd-calibrate <calibration-config.json> <seed-hex> <report.json>"
+                .into(),
+        );
+    }
+    let config: FtdCalibrationConfigV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
+    let seed = decode_hex(&args[2]).map_err(io::Error::other)?;
+    let report = run_ftd_calibration(&config, &seed).map_err(io::Error::other)?;
+    let bytes = serde_json::to_vec_pretty(&report)?;
+    write_bytes(&args[3], &bytes)?;
+    println!(
+        "repetitions={} hypotheses_per_run={} features={} mean_fdr={:.5} run_fdr_exceedance={:.5} mean_power={}",
+        report.repetitions_completed,
+        report.config.hypothesis_count,
+        report.config.feature_count,
+        report.mean_false_discovery_proportion.estimate,
+        report.run_level_fdr_exceedance_rate.estimate,
+        report.mean_clean_sample_power.as_ref()
+            .map(|estimate| format!("{:.5}", estimate.estimate))
+            .unwrap_or_else(|| "not_estimable".to_owned())
+    );
+    println!(
+        "FDR guarantee status: {}",
+        report.nominal_fdr_guarantee
+    );
+    Ok(())
+}
+
 fn audit_adjudications(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 4 {
         return Err(
@@ -246,9 +277,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("evaluate") => evaluate_run(&args),
         Some("ftd-pvalues") => ftd_pvalues(&args),
         Some("ftd-fuse") => ftd_fuse(&args),
+        Some("ftd-calibrate") => ftd_calibrate(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | ftd-pvalues | ftd-fuse | ftd-calibrate | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }

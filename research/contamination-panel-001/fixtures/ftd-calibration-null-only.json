@@ -1,0 +1,17 @@
+{
+  "repetitions": 250,
+  "hypothesis_count": 128,
+  "reference_count_per_hypothesis": 256,
+  "feature_count": 3,
+  "clean_fraction_permille": 0,
+  "reference_shift_permille": 0,
+  "reference_design": "shared_per_feature_bank",
+  "item_cluster_size": 8,
+  "item_cluster_correlation_permille": 500,
+  "feature_correlation_permille": 500,
+  "tail_direction": "greater",
+  "weight_policy": "paper_normalized_rejection_counts",
+  "softmax_temperature_milli": null,
+  "alpha_permille": 50,
+  "final_multiple_testing": "benjamini_yekutieli"
+}

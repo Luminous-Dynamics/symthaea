@@ -6,10 +6,13 @@
 //! super-uniformity under the contaminated null and the cross-hypothesis
 //! dependence conditions must be independently qualified.
 //!
-//! The ACL paper's printed Eq. (4) shows a lower-tail reference probability,
-//! while its stated score direction (low = more contaminated) and official
-//! implementation use the upper tail for the experiments. Both directions are
-//! explicit here; Greater is the official code direction for those experiments.
+//! The ACL paper's printed Eq. (4) and Theorem 1 show a lower-tail reference
+//! probability, while the paper's high-score-clean semantics, Theorem 2 power
+//! premise, and official implementation point to the upper tail. Either tail
+//! can yield uniform p-values under an exchangeable continuous contaminated
+//! null, so this is not by itself a refutation of the FDR argument; it reverses
+//! power direction for the stated clean alternative. Both directions are
+//! explicit here; Greater is the official code direction for reported runs.
 
 use crate::hmac_sha256;
 use serde::{Deserialize, Serialize};
