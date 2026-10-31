@@ -297,6 +297,10 @@ pub(crate) fn realize_prog_suite_with_plan(
             })
             .collect()
     };
+    let opening_melody =
+        melody_signature(plan.sections[0].start.beats(), plan.sections[0].end.beats());
+    let return_melody =
+        melody_signature(plan.sections[3].start.beats(), plan.sections[3].end.beats());
     let theme_return_identical = plan.sections.len() == 4
         && plan.sections[0].role == SectionRole::A
         && plan.sections[3].role == SectionRole::ReturnA
@@ -304,8 +308,15 @@ pub(crate) fn realize_prog_suite_with_plan(
         && plan.sections[0].meter == plan.sections[3].meter
         && plan.sections[0].transform.is_none()
         && plan.sections[3].transform.is_none()
-        && melody_signature(plan.sections[0].start.beats(), plan.sections[0].end.beats())
-            == melody_signature(plan.sections[3].start.beats(), plan.sections[3].end.beats());
+        && opening_melody.len() == return_melody.len()
+        && opening_melody
+            .iter()
+            .zip(&return_melody)
+            .all(|(left, right)| {
+                left.0 == right.0
+                    && (left.1 - right.1).abs() <= 1e-7
+                    && (left.2 - right.2).abs() <= 1e-7
+            });
     let verification = ProgSuiteVerification {
         meter_sequence_valid,
         section_boundaries_contiguous,
