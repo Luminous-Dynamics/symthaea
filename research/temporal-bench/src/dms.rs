@@ -649,8 +649,13 @@ mod tests {
     fn verifier_rejects_wrong_direction_relation() {
         let config = DmsConfig::braintrace_reference(93);
         let (task, mut oracle) = generate_dms_task(config).unwrap();
-        oracle.test_direction =
+        let rotated_sample =
             (oracle.sample_direction + config.rotation_steps) % MOTION_CHOICES;
+        oracle.test_direction = if oracle.is_match {
+            (rotated_sample + 1) % MOTION_CHOICES
+        } else {
+            rotated_sample
+        };
         oracle.content_sha256 = dms_oracle_digest(&oracle);
         assert_eq!(
             verify_dms_trace(&task, &oracle),
