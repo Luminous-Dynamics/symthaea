@@ -750,10 +750,20 @@ fn synaptic_completeness_tail(
     } else {
         stability(&[], tail_window, relative_tolerance, absolute_tolerance)
     };
+    let tail_records_present = snapshots.len() >= tail_window
+        && tail_records.iter().all(|snapshot| snapshot.synaptic_completeness.is_some());
+    let zero_denominator_in_tail = tail_records.iter().any(|snapshot| {
+        snapshot.synaptic_completeness.as_ref()
+            .is_some_and(|evidence| evidence.total_synapse_count == 0)
+    });
     let status = if observed.is_empty() {
         "NOT_PROVIDED"
     } else if snapshots.len() < tail_window {
         "INSUFFICIENT_TAIL_HISTORY"
+    } else if !tail_records_present {
+        "INCOMPLETE_TAIL"
+    } else if zero_denominator_in_tail {
+        "ZERO_DENOMINATOR_NOT_ESTIMABLE"
     } else if !tail_complete {
         "INCOMPLETE_TAIL"
     } else {
@@ -937,6 +947,7 @@ mod tests {
                 edit_log_sha256: format!("{:0>64}", format!("{:x}", index + 1)),
                 query_evaluation_profile_sha256: "d".repeat(64),
             },
+            synaptic_completeness: None,
         }
     }
 
@@ -1016,6 +1027,22 @@ mod tests {
         assert_eq!(report.synaptic_completeness.latest_fraction, None);
         assert_eq!(report.synaptic_completeness.stability.stable_under_declared_tolerance, None);
         assert_eq!(report.recommendation, "CONTINUE_REVIEW");
+    }
+
+    #[test]
+    fn zero_synapse_denominator_is_not_reported_as_zero_completeness() {
+        let mut snapshots = vec![
+            snapshot(0, 0, &"1".repeat(64), None, 1.0, 12.0),
+            snapshot(1, 1, &"2".repeat(64), Some(&"1".repeat(64)), 1.0, 12.0),
+            snapshot(2, 2, &"3".repeat(64), Some(&"2".repeat(64)), 1.0, 12.0),
+        ];
+        for item in &mut snapshots {
+            item.synaptic_completeness = Some(completeness(item.snapshot.sequence_index, 0, 0));
+        }
+        let report = build_report(&jsonl(&snapshots), &snapshots, &args(3));
+        assert_eq!(report.synaptic_completeness.status, "ZERO_DENOMINATOR_NOT_ESTIMABLE");
+        assert_eq!(report.synaptic_completeness.latest_fraction, None);
+        assert_eq!(report.synaptic_completeness.stability.stable_under_declared_tolerance, None);
     }
 
     #[test]
