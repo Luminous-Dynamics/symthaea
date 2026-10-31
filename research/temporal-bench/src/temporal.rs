@@ -134,6 +134,7 @@ pub enum TemporalVerificationError {
     StreamIdMismatch,
     ContentDigestMismatch,
     OracleDigestMismatch,
+    InvalidOracleModel,
     OracleLengthMismatch,
     InvalidOracleTarget { source_step: u64 },
     MissingObservation { step: u64 },
@@ -149,6 +150,7 @@ impl fmt::Display for TemporalVerificationError {
             Self::StreamIdMismatch => write!(f, "public task and oracle stream IDs differ"),
             Self::ContentDigestMismatch => write!(f, "multiscale public task SHA-256 digest does not match its contents"),
             Self::OracleDigestMismatch => write!(f, "multiscale oracle SHA-256 digest does not match its contents"),
+            Self::InvalidOracleModel => write!(f, "multiscale oracle parameters are outside the generator contract"),
             Self::OracleLengthMismatch => write!(f, "oracle target count differs from observation count"),
             Self::InvalidOracleTarget { source_step } => {
                 write!(f, "oracle target record is invalid at source step {source_step}")
@@ -193,6 +195,45 @@ pub fn verify_multiscale_trace(
     }
 
     let target_count = u64::try_from(oracle.targets.len()).unwrap_or(u64::MAX);
+    if task.forecast_horizon == 0
+        || task.feedback_delay == 0
+        || oracle.hidden_periods[0] < 2
+        || oracle.hidden_periods[0] > 8
+        || oracle.hidden_periods[1] < 9
+        || oracle.hidden_periods[1] > 24
+        || oracle.hidden_periods[2] < 25
+        || oracle.hidden_periods[2] > 64
+        || oracle
+            .hidden_phases
+            .iter()
+            .zip(oracle.hidden_periods)
+            .any(|(phase, period)| *phase >= period)
+        || oracle
+            .weights_before
+            .iter()
+            .chain(oracle.weights_after.iter())
+            .any(|weight| *weight == 0 || !(-4..=4).contains(weight))
+    {
+        return Err(TemporalVerificationError::InvalidOracleModel);
+    }
+    let expected_after = [
+        oracle.weights_before[2],
+        -oracle.weights_before[1],
+        oracle.weights_before[0],
+    ];
+    match oracle.hidden_change_step {
+        Some(change)
+            if change < target_count / 3
+                || change > target_count.saturating_mul(2) / 3
+                || oracle.weights_after != expected_after =>
+        {
+            return Err(TemporalVerificationError::InvalidOracleModel);
+        }
+        None if oracle.weights_after != oracle.weights_before => {
+            return Err(TemporalVerificationError::InvalidOracleModel);
+        }
+        _ => {}
+    }
     if target_count != oracle.targets.len() as u64 {
         return Err(TemporalVerificationError::OracleLengthMismatch);
     }
@@ -203,6 +244,18 @@ pub fn verify_multiscale_trace(
             || target.target_step != source_step.saturating_add(task.forecast_horizon)
             || !(-1..=1).contains(&target.label)
             || target.label == 0
+            || target.label
+                != target_label(
+                    target.target_step,
+                    oracle.hidden_periods,
+                    oracle.hidden_phases,
+                    weights_for_step(
+                        target.target_step,
+                        oracle.hidden_change_step,
+                        oracle.weights_before,
+                        oracle.weights_after,
+                    ),
+                )
         {
             return Err(TemporalVerificationError::InvalidOracleTarget { source_step });
         }
@@ -570,6 +623,19 @@ mod tests {
     fn generated_oracle_has_valid_sha256() {
         let (_, oracle) = generate_multiscale_task(config(true)).unwrap();
         assert_eq!(oracle.content_sha256, multiscale_oracle_digest(&oracle));
+    }
+
+    #[test]
+    fn verifier_recomputes_labels_from_hidden_periods_and_weights() {
+        let (task, mut oracle) = generate_multiscale_task(config(true)).unwrap();
+        oracle.hidden_periods[0] = 8;
+        // Recommit the modified oracle digest; validation must still reject
+        // an internally inconsistent oracle, not just a changed digest.
+        oracle.content_sha256 = multiscale_oracle_digest(&oracle);
+        assert_eq!(
+            verify_multiscale_trace(&task, &oracle),
+            Err(TemporalVerificationError::InvalidOracleTarget { source_step: 0 })
+        );
     }
 
     #[test]
