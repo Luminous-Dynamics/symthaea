@@ -101,9 +101,10 @@ fn greatest_common_divisor(mut left: u64, mut right: u64) -> u64 {
 /// - lane 2 holds valid_at before the correction's valid-from time; its
 ///   correct answer remains the initial value even after later updates arrive.
 ///
-/// Each checkpoint is placed at 0, interval, 2*interval, ... through the
-/// original T10 query-issue horizon. Each lane's output is held for one
-/// interval, including the final checkpoint. The seed/config is evaluator-only.
+/// Checkpoints are placed at multiples of an exact divisor of the source
+/// update interval (approximately four opportunities per update where the
+/// integer interval permits). Each lane's output is held for one checkpoint
+/// stride, including the final checkpoint. The seed/config is evaluator-only.
 pub fn generate_knowledge_trajectory(
     config: KnowledgeStreamConfig,
 ) -> Result<(KnowledgeTrajectoryTask, KnowledgeStreamOracle), KnowledgeTrajectoryError> {
@@ -483,6 +484,17 @@ mod tests {
             distractor_count: 4,
             interval_steps: 16,
         }
+    }
+
+    #[test]
+    fn checkpoint_stride_exactly_divides_update_interval() {
+        for update_interval in 1_u64..=256 {
+            let stride = checkpoint_interval(update_interval);
+            assert!(stride > 0);
+            assert_eq!(update_interval % stride, 0);
+            assert!(stride <= (update_interval / 4).max(1));
+        }
+        assert_eq!(checkpoint_interval(16), 4);
     }
 
     #[test]
