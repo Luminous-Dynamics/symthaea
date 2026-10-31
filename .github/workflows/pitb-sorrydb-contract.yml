@@ -221,8 +221,10 @@ jobs:
                   result.append("active branches exceed branches started")
               if actual["peak_lean_queries"] > budget["max_lean_queries"]:
                   result.append("Lean-query cap exceeded")
-              if actual["peak_lean_queries"] > actual["branches_started"] and actual["branches_started"] == 0:
+              if actual["peak_lean_queries"] > 0 and actual["branches_started"] == 0:
                   result.append("Lean queries recorded without a started branch")
+              if actual["wall_ms"] > 0 and actual["branches_started"] == 0:
+                  result.append("elapsed execution time recorded without a started branch")
               additive_caps = {
                   "tokens": "max_tokens",
                   "model_calls": "max_model_calls",

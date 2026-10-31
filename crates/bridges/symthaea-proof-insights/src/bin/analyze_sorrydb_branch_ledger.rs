@@ -415,7 +415,10 @@ fn validate(ledger: &Ledger) -> Result<()> {
                 .replay_verifier_id
                 .as_deref()
                 .context("promotion has no replay verifier identity")?;
-            if checker_id.trim().is_empty() || replay_id.trim().is_empty() || checker_id == replay_id {
+            if checker_id.trim().is_empty()
+                || replay_id.trim().is_empty()
+                || checker_id == replay_id
+            {
                 bail!("checker and replay must be distinct verifier identities");
             }
         }
@@ -533,7 +536,10 @@ fn self_test(path: &PathBuf) -> Result<()> {
         bail!("parallel wall-work test does not exceed elapsed wall time");
     }
     println!(
-        "PITB_SPECULATIVE_BRANCH_PROMOTION_PASS: exact candidate joins; 180 branch-ms / 120 elapsed-ms"
+        concat!(
+            "PITB_SPECULATIVE_BRANCH_PROMOTION_PASS: exact candidate joins; ",
+            "180 branch-ms / 120 elapsed-ms"
+        )
     );
 
     let mut bad = success.clone();
@@ -545,7 +551,8 @@ fn self_test(path: &PathBuf) -> Result<()> {
     must_reject("replay checked different candidate bytes", bad)?;
 
     let mut bad = success.clone();
-    bad["promotion"]["checker_id"] = bad["promotion"]["replay_verifier_id"].clone();
+    let replay_identity = bad["promotion"]["replay_verifier_id"].clone();
+    bad["promotion"]["checker_id"] = replay_identity;
     must_reject("checker and replay identities are not independent", bad)?;
 
     let mut bad = success.clone();
@@ -580,7 +587,11 @@ fn run() -> Result<()> {
             let (_, ledger) = load(&path)?;
             validate(&ledger)?;
             println!(
-                "PITB_SPECULATIVE_BRANCH_LEDGER_PASS: branches={} started={} tokens={} model_calls={} lean_cpu_ms={} elapsed_wall_ms={} branch_wall_work_ms={} promotion={}",
+                concat!(
+                    "PITB_SPECULATIVE_BRANCH_LEDGER_PASS: branches={} started={} ",
+                    "tokens={} model_calls={} lean_cpu_ms={} elapsed_wall_ms={} ",
+                    "branch_wall_work_ms={} promotion={}"
+                ),
                 ledger.branches.len(),
                 ledger.actual.branches_started,
                 ledger.actual.tokens,
