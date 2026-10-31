@@ -67,6 +67,18 @@ pub enum StyleCoverageState {
     /// Independent perceptual or knowledgeable-practitioner qualification
     /// exists for the exact scoped claim.
     PerceptuallyOrExpertQualified,
+    /// A source/corpus lineage and scope has been independently verified.
+    /// Not emitted by the current collector until a source registry is bound.
+    SourceVerified,
+    /// A specific sample asset has been decoded and its content digest checked.
+    /// Not emitted by this collector; sample evidence belongs to #7464/#7554.
+    AssetDecoded,
+    /// An exact instrument × articulation × pitch × velocity × renderer cell
+    /// has passed a render check. Not emitted until render receipts are joined.
+    RenderCellVerified,
+    /// Perceptual identity or specialist review has qualified the stated scope.
+    /// Not emitted by code declaration or preference score alone.
+    PerceptuallyOrExpertQualified,
     /// No qualified per-style renderer / production recipe is present here.
     NotRendererQualified,
 }
@@ -607,6 +619,24 @@ mod tests {
                 };
                 assert_eq!(instruments.state, expected);
             }
+        }
+    }
+
+    #[test]
+    fn advanced_qualification_states_are_not_inferred_from_source_declarations() {
+        let report = collect_style_coverage();
+        for style in &report.styles {
+            assert!(
+                !style.axes.iter().any(|axis| matches!(
+                    axis.state,
+                    StyleCoverageState::SourceVerified
+                        | StyleCoverageState::AssetDecoded
+                        | StyleCoverageState::RenderCellVerified
+                        | StyleCoverageState::PerceptuallyOrExpertQualified
+                )),
+                "style {} was promoted without joined evidence",
+                style.canonical_name
+            );
         }
     }
 
