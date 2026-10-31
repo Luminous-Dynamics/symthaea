@@ -450,7 +450,7 @@ fn choose_with_pod_meta_router(
                 }
             });
             let selected_index = case.operations.iter()
-                .position(|operation| operation.public.id == operation_id);
+                .position(|operation| operation.public.id == operation_id.as_str());
             (selected_index, selected_mask, rejection_count)
         }
         PodSelection::Stop(_) => (None, 0, rejection_count),
@@ -815,6 +815,7 @@ mod tests {
         assert!(!Policy::OracleMinimumCost.promotion_candidate());
         assert!(!Policy::UnverifiedConfidence.promotion_candidate());
         assert!(Policy::MaskCoverageGreedy.promotion_candidate());
+        assert!(Policy::PodMetaRouter.promotion_candidate());
     }
 
     #[test]
