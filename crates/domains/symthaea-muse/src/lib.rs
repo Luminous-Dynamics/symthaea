@@ -32,6 +32,13 @@
 
 #![deny(unsafe_code)]
 
+// These two modules are consumed only by Muse Studio's authenticated local workflows.
+// Keep them behind `studio` so default/theory-only consumers do not inherit Studio surfaces.
+#[cfg(feature = "studio")]
+pub mod symbolic_import;
+#[cfg(feature = "studio")]
+pub mod teaching_corpus;
+
 #[cfg(feature = "theory")]
 pub mod adaptive_experiment;
 #[cfg(feature = "theory")]
