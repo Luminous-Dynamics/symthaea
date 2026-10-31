@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT source-epoch seal v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "suite_id",
+    "source_id",
+    "epoch_id",
+    "partition_id",
+    "observer_binary_digest",
+    "observer_configuration_digest",
+    "first_attempted_sequence",
+    "last_attempted_sequence",
+    "published_event_count",
+    "published_event_chain_root",
+    "classified_range_count",
+    "classified_range_chain_root",
+    "close_fence_digest",
+    "producer_quiescence_evidence_digest",
+    "producer_quiesced_at_monotonic_ns",
+    "consumer_drain_evidence_digest",
+    "consumer_drained_at_monotonic_ns",
+    "generation",
+    "previous_seal_digest",
+    "ledger_digest",
+    "commitment_digest"
+  ],
+  "properties": {
+    "format_version": {
+      "const": 1
+    },
+    "suite_id": {
+      "const": "basalt-source-epoch-seal-v1"
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "epoch_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "partition_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "observer_binary_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "observer_configuration_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "first_attempted_sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "last_attempted_sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "published_event_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "published_event_chain_root": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "classified_range_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "classified_range_chain_root": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "close_fence_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "producer_quiescence_evidence_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "producer_quiesced_at_monotonic_ns": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "consumer_drain_evidence_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "consumer_drained_at_monotonic_ns": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "previous_seal_digest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "ledger_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "commitment_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "generation": {
+            "const": 1
+          }
+        },
+        "required": [
+          "generation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "previous_seal_digest": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "generation": {
+            "minimum": 2
+          }
+        },
+        "required": [
+          "generation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "previous_seal_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  ]
+}
