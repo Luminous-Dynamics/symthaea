@@ -28,7 +28,7 @@ The following were checked on the default branch while preparing this protocol:
 | Sampled instrument path | `vcsl.rs` indexes VCSL and VSCO2-CE, with lazy decode/cache, velocity-layer selection and deterministic round-robin; `synth.rs` tries sampled playback before synthesis fallback | Current source maps 19 enum variants to sustain banks (Piano/PianoPP share one bank) and nine variants to short-articulation banks; activation is optional and installed file/pitch/velocity coverage is not yet proven by a runtime receipt |
 | Ensemble selection | Seeded, style-specific pools in `theory_realize.rs::instruments_for` | Deterministic variety exists, but it is not yet a complete score-conditioned orchestration decision |
 | Style vocabulary | 29 currently composer-backed `Style` variants | These are the actual engine routes to qualify first |
-| Style catalog | 152 target entries, 19 constellations; 29 composer-backed and 123 research-only according to the catalog document | Research-only entries must remain unavailable for composition until implemented and qualified |
+| Style catalog | 160 current catalog entries across 20 constellations; 29 direct composer routes and 131 research-only/unrouted entries in the source-bound roadmap snapshot | Research-only/unrouted entries must remain unavailable for composition until implemented and qualified |
 | MIDI output | Multi-track export, per-voice CC7/CC10, and style-gated channel-10 percussion already exist | Do not redo basic balance/panning/percussion; investigate expression and articulation beyond them |
 | Performance dialects | Existing ClassicalRubato, DanceLocked, ProcessExact, FolkLift and JazzLaidBack mechanisms | Audit coverage and style assignment; do not replace existing distinctions with a single new generic humanizer |
 
@@ -318,7 +318,7 @@ MEL-MR-STYLE-001 consumes their verified evidence where relevant and does not we
 
 ## 12. Claim boundary
 
-This protocol does not claim that the 42 instrument variants are sample-realistic, the 29 engine-backed styles are already distinguishable, the 152-style catalog is implemented, or any controller/technique works across all SoundFonts. It is a preregistered plan to generate that evidence. CI, compilation, benchmark execution and listener validation remain separate gates.
+This protocol does not claim that the 42 instrument variants are sample-realistic, the 29 engine-backed styles are already distinguishable, the 160-entry current style catalog is implemented, or any controller/technique works across all SoundFonts. It is a preregistered plan to generate that evidence. CI, compilation, benchmark execution and listener validation remain separate gates.
 
 
 ## 9. Competitive frontier and human-preference protocol (2026-10-31)
