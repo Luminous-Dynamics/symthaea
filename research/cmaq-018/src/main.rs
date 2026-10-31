@@ -321,7 +321,12 @@ fn predicted_effect(
     Some(left_prediction.utility - right_prediction.utility)
 }
 
-fn rank_tau_b(concordant: usize, discordant: usize, true_ties: usize, predicted_ties: usize) -> Option<f64> {
+fn rank_tau_b(
+    concordant: usize,
+    discordant: usize,
+    true_ties: usize,
+    predicted_ties: usize,
+) -> Option<f64> {
     let numerator = concordant as f64 - discordant as f64;
     let left = (concordant + discordant + true_ties) as f64;
     let right = (concordant + discordant + predicted_ties) as f64;
@@ -352,7 +357,10 @@ fn evaluate_episode(
         .collect();
 
     let predictions = branch_predictions(model, scenario, case, &canonical);
-    let branch_prediction_evaluations = predictions.iter().filter(|prediction| prediction.is_some()).count();
+    let branch_prediction_evaluations = predictions
+        .iter()
+        .filter(|prediction| prediction.is_some())
+        .count();
     let oracle_branch_evaluations = if model == Model::Oracle { ACTION_COUNT } else { 0 };
     let pair_effect_evaluations = if model == Model::ExplicitEffectHead { PAIR_COUNT } else { 0 };
 
@@ -372,7 +380,8 @@ fn evaluate_episode(
         for right_index in (left_index + 1)..canonical.len() {
             let left_action = canonical[left_index];
             let right_action = canonical[right_index];
-            let true_delta = branches[left_index].outcome.utility - branches[right_index].outcome.utility;
+            let true_delta = branches[left_index].outcome.utility
+                - branches[right_index].outcome.utility;
 
             if let Some(predicted_delta) = predicted_effect(
                 model,
@@ -473,7 +482,11 @@ fn evaluate_episode(
     // These assertions make same-history identity and action identity evaluator-owned invariants.
     debug_assert!(branches.iter().all(|branch| branch.history_id == case.history.id));
     debug_assert_eq!(
-        branches.iter().map(|branch| branch.action_id).collect::<std::collections::BTreeSet<_>>().len(),
+        branches
+            .iter()
+            .map(|branch| branch.action_id)
+            .collect::<std::collections::BTreeSet<_>>()
+            .len(),
         canonical.len()
     );
 
@@ -709,9 +722,19 @@ mod tests {
             history: ObservedHistory { x: 0.2, ..case.history },
             ..case
         };
-        let negative_delta = true_outcome(negative, Scenario::StateDependentReversal, ACTIONS[3]).utility
+        let negative_delta = true_outcome(
+            negative,
+            Scenario::StateDependentReversal,
+            ACTIONS[3],
+        )
+        .utility
             - true_outcome(negative, Scenario::StateDependentReversal, ACTIONS[0]).utility;
-        let positive_delta = true_outcome(positive, Scenario::StateDependentReversal, ACTIONS[3]).utility
+        let positive_delta = true_outcome(
+            positive,
+            Scenario::StateDependentReversal,
+            ACTIONS[3],
+        )
+        .utility
             - true_outcome(positive, Scenario::StateDependentReversal, ACTIONS[0]).utility;
         assert!(negative_delta > 0.0);
         assert!(positive_delta < 0.0);
@@ -771,11 +794,24 @@ mod tests {
     #[test]
     fn branch_list_permutation_does_not_change_pairwise_effect_metrics() {
         let case = make_episode_case(BASE_SEED);
-        let forward = evaluate_episode(Scenario::StateDependentReversal, Model::PointOutcome, case, &ACTIONS);
+        let forward = evaluate_episode(
+            Scenario::StateDependentReversal,
+            Model::PointOutcome,
+            case,
+            &ACTIONS,
+        );
         let reversed: Vec<_> = ACTIONS.iter().rev().copied().collect();
-        let backward = evaluate_episode(Scenario::StateDependentReversal, Model::PointOutcome, case, &reversed);
+        let backward = evaluate_episode(
+            Scenario::StateDependentReversal,
+            Model::PointOutcome,
+            case,
+            &reversed,
+        );
         assert_eq!(forward.pair_coverage.to_bits(), backward.pair_coverage.to_bits());
-        assert_eq!(forward.effect_magnitude_mae.unwrap().to_bits(), backward.effect_magnitude_mae.unwrap().to_bits());
+        assert_eq!(
+            forward.effect_magnitude_mae.unwrap().to_bits(),
+            backward.effect_magnitude_mae.unwrap().to_bits()
+        );
         assert_eq!(forward.top1_regret.unwrap().to_bits(), backward.top1_regret.unwrap().to_bits());
     }
 
@@ -785,17 +821,34 @@ mod tests {
         let mut other = case;
         other.history.x += 0.15;
         other.history.v -= 0.12;
-        let prediction_first = branch_predictions(Model::PointOutcome, Scenario::Monotone, case, &ACTIONS);
-        let prediction_second = branch_predictions(Model::PointOutcome, Scenario::Monotone, other, &ACTIONS);
-        let first = predicted_effect(Model::PointOutcome, case, ACTIONS[4], ACTIONS[1], &prediction_first).unwrap();
-        let second = predicted_effect(Model::PointOutcome, other, ACTIONS[4], ACTIONS[1], &prediction_second).unwrap();
+        let prediction_first =
+            branch_predictions(Model::PointOutcome, Scenario::Monotone, case, &ACTIONS);
+        let prediction_second =
+            branch_predictions(Model::PointOutcome, Scenario::Monotone, other, &ACTIONS);
+        let first = predicted_effect(
+            Model::PointOutcome,
+            case,
+            ACTIONS[4],
+            ACTIONS[1],
+            &prediction_first,
+        )
+        .unwrap();
+        let second = predicted_effect(
+            Model::PointOutcome,
+            other,
+            ACTIONS[4],
+            ACTIONS[1],
+            &prediction_second,
+        )
+        .unwrap();
         assert!((first - second).abs() < SIGN_EPSILON);
     }
 
     #[test]
     fn support_aware_model_abstains_on_unsupported_interventions() {
         let case = make_episode_case(BASE_SEED);
-        let predictions = branch_predictions(Model::SupportAwarePoint, Scenario::Monotone, case, &ACTIONS);
+        let predictions =
+            branch_predictions(Model::SupportAwarePoint, Scenario::Monotone, case, &ACTIONS);
         assert!(predictions[0].is_some());
         assert!(predictions[3].is_some());
         assert!(predictions[4].is_none());
