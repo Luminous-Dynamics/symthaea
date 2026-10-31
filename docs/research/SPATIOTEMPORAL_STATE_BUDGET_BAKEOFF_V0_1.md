@@ -10,7 +10,7 @@ Can a fixed training-state and memory budget be allocated across spatial learnin
 
 The candidate mechanisms are complementary in principle:
 - **STDL:** spatial partitioning with local auxiliary subnetworks, selecting downstream context under an auxiliary-memory constraint, and temporal detachment;
-- **BrainTrace:** online eligibility traces for long-horizon credit assignment;
+- **BrainTrace:** online eligibility traces for long-horizon credit assignment. The paper notes that pp-prop approximation quality depends on firing statistics and network depth, so a single tuned point is not a fair baseline;
 - **Symthaea HDC-LTC:** compressed relational summaries and fast/slow state for temporal context and cross-boundary memory.
 
 The experiment must establish whether these mechanisms are complementary, redundant, or harmful when combined. Stacking methods is not assumed to help.
@@ -33,7 +33,9 @@ These are experiment strata, not promised operating points. If a method cannot f
 
 ## 3. Stage 0 — exact small-model dependency and gradient oracle
 
-Before using large vision models, build a deterministic two- and four-module recurrent model with:
+A first scalar two-module control is now implemented in `research/temporal-bench/src/gradient_oracle.rs`. It computes the exact reverse-mode BPTT gradient, checks it against centered finite differences and a pinned known-answer vector, and measures the effect of hidden/downstream temporal detachment and a local auxiliary-head objective. Nine Rust tests are authored but unrun.
+
+Before using large vision models, extend this into a deterministic two- and four-module recurrent model with:
 - controllable cross-module dependencies;
 - 2–3 temporal scales;
 - known delayed targets;
@@ -46,7 +48,8 @@ Compare:
 3. Spatial local auxiliary losses with minimal local heads.
 4. Spatial local auxiliary losses with selected downstream-layer context (STDL-style).
 5. BrainTrace D-RTRL.
-6. BrainTrace pp-prop / ES-D-RTRL with rank/decay explicit.
+6. BrainTrace pp-prop / ES-D-RTRL with available trace/filter/decay configuration explicit.
+13. BrainTrace pp-prop sensitivity sweep across controlled firing-statistics strata and network depths [2, 4, 8].
 7. HDC fast-only cross-boundary summary.
 8. HDC slow-only summary.
 9. HDC fast+slow summary with fixed cadence.
@@ -61,7 +64,7 @@ Do not label local STDL losses as exact global gradients. For each method, repor
 - task-quality effect at equal update budget;
 - memory/compute cost of omitted or approximated dependencies.
 
-For pp-prop, explicitly report approximation/rank/decay settings; it is not relabelled as exact D-RTRL or BPTT.
+For pp-prop, explicitly report approximation/filter/decay settings and its firing-rate/depth operating point; it is not relabelled as exact D-RTRL or BPTT. Do not assume a rank control exists unless it is exposed by the pinned API.
 
 ## 4. Stage 1 — controlled event-vision parity
 
@@ -153,7 +156,8 @@ These thresholds are aspirational qualification gates. A method may fail; the be
 
 - STDL's public code snapshot predates the 2026 journal issue; exact paper-runner correspondence is unverified.
 - The public STDL test-as-validation pattern must be corrected in confirmatory replication.
-- BrainTrace pp-prop is factorized/approximated; it is not treated as exact D-RTRL/BPTT.
+- BrainTrace pp-prop is factorized/approximated; its approximation quality can depend on firing statistics and network depth, so sensitivity to both must be measured rather than represented by one tuned point. It is not treated as exact D-RTRL/BPTT.
+- The BrainTrace paper reports pp-prop trace memory (O(BN)), D-RTRL (O(BP)), and a paper-specific LIF-Gesture result of 0.5 GB vs 17.5 GB / ~10x speed vs D-RTRL. These are literature-only reference numbers, not Symthaea measurements.
 - A synthetic scalar or toy dependency oracle is not a substitute for event-vision evidence.
 - A simulator's sparse operation count or GPU memory reduction is not an energy measurement.
 - All task and oracle outputs must be handled through #9437's isolated evaluator/receipt boundary before making confirmatory claims.
