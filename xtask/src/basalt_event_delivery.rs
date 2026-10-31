@@ -360,17 +360,25 @@ pub fn audit_bytes(bytes: &[u8]) -> DeliveryAuditReport {
             sequence_ok = false;
         }
 
-        for (total, increment, label) in [
-            (&mut report.counts.published_sequences, events.len() as u64, "published"),
-            (&mut report.counts.lost_sequences, lost_count, "lost"),
-            (&mut report.counts.required_discards, required_discard_count, "required-discard"),
-            (&mut report.counts.excluded_discards, excluded_discard_count, "excluded-discard"),
-        ] {
-            if !checked_accumulate(total, increment) {
-                push_error(&mut report, "E_AGGREGATE_COUNT_OVERFLOW", "$.source_epochs", &format!("aggregate {label} count overflows u64"));
-                sequence_ok = false;
-                counters_ok = false;
-            }
+        if !checked_accumulate(&mut report.counts.published_sequences, events.len() as u64) {
+            push_error(&mut report, "E_AGGREGATE_COUNT_OVERFLOW", "$.source_epochs", "aggregate published count overflows u64");
+            sequence_ok = false;
+            counters_ok = false;
+        }
+        if !checked_accumulate(&mut report.counts.lost_sequences, lost_count) {
+            push_error(&mut report, "E_AGGREGATE_COUNT_OVERFLOW", "$.source_epochs", "aggregate lost count overflows u64");
+            sequence_ok = false;
+            counters_ok = false;
+        }
+        if !checked_accumulate(&mut report.counts.required_discards, required_discard_count) {
+            push_error(&mut report, "E_AGGREGATE_COUNT_OVERFLOW", "$.source_epochs", "aggregate required-discard count overflows u64");
+            sequence_ok = false;
+            counters_ok = false;
+        }
+        if !checked_accumulate(&mut report.counts.excluded_discards, excluded_discard_count) {
+            push_error(&mut report, "E_AGGREGATE_COUNT_OVERFLOW", "$.source_epochs", "aggregate excluded-discard count overflows u64");
+            sequence_ok = false;
+            counters_ok = false;
         }
 
         spans.sort_by_key(|span| (span.first, span.last));
