@@ -58,6 +58,9 @@ jobs:
       - name: Exercise exact cutset conditioning under a bounded factor budget
         run: cargo run --release --locked -p symthaea-iit --example cutset_conditioning_sweep -- --repeats 2
 
+      - name: Rank exact cutset separator candidates before inference
+        run: cargo run --release --locked -p symthaea-iit --example cutset_frontier_sweep
+
       - name: Benchmark proper-system Eq4 with sparse external backgrounds
         run: cargo run --locked -p symthaea-iit --example eq4_sparse_background_sweep
 
