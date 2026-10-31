@@ -347,7 +347,12 @@ mod tests {
         }
     }
 
-    fn observation(lower: f64, upper: f64, nominal_coverage: f64, realized: f64) -> IntervalObservation {
+    fn observation(
+        lower: f64,
+        upper: f64,
+        nominal_coverage: f64,
+        realized: f64,
+    ) -> IntervalObservation {
         IntervalObservation {
             interval: interval(lower, upper, nominal_coverage),
             realized,
