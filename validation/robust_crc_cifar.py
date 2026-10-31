@@ -384,6 +384,138 @@ def run_comparison(
     }
 
 
+def make_composition_grid_scenarios(
+    population_total: int = 10000,
+    min_count_per_type: int = 500,
+    step: int = 500,
+) -> dict[str, tuple[int, int, int]]:
+    """All 3-type integer mixtures on a regular finite population grid."""
+    if population_total <= 0 or min_count_per_type <= 0 or step <= 0:
+        raise ValueError("population total, minimum count and step must be positive")
+    remaining = population_total - 3 * min_count_per_type
+    if remaining < 0 or remaining % step != 0:
+        raise ValueError("grid parameters must tile the population total exactly")
+    units = remaining // step
+    scenarios = {}
+    for x in range(units + 1):
+        for y in range(units - x + 1):
+            z = units - x - y
+            counts = (
+                min_count_per_type + step * x,
+                min_count_per_type + step * y,
+                min_count_per_type + step * z,
+            )
+            name = f"mix_{counts[0]}_{counts[1]}_{counts[2]}"
+            scenarios[name] = counts
+    return scenarios
+
+
+def run_grid_robustness_stress(
+    n: int = 50,
+    alpha: float = 0.10,
+    population_total: int = 10000,
+    min_count_per_type: int = 500,
+    step: int = 500,
+    nominal_pool: tuple[int, int, int] = (7300, 969, 1731),
+    equal_share_rounds: int = 500,
+) -> dict:
+    """Compare robust, nominal-oracle and equal-share policies on a dense pool grid."""
+    scenarios = make_composition_grid_scenarios(
+        population_total, min_count_per_type, step
+    )
+    robust = DistributionallyRobustRandomizedCRC(n, alpha, scenarios)
+    solved = robust.solve()
+    robust_P = np.asarray(solved["probabilities"], dtype=np.float64)
+
+    nominal = RandomizedCommonDepthCRC(n, alpha, nominal_pool).solve()
+    nominal_P = np.asarray(nominal["probabilities"], dtype=np.float64)
+
+    equal_engine = CommonDepthCIFARCRC(n, alpha)
+    envelope = equal_engine.baseline("envelope")
+    equal_share, equal_history = equal_engine.recertify(
+        envelope, rounds=equal_share_rounds
+    )
+    equal_validity = equal_engine.validity_report(equal_share)
+
+    rows = {}
+    for name in robust.names:
+        rows[name] = {
+            "robust": robust.evaluate_scenario(robust_P, name),
+            "nominal_oracle": robust.evaluate_scenario(nominal_P, name),
+            "equal_share": evaluate_equal_share_for_scenario(
+                robust, equal_share, name
+            ),
+        }
+
+    def worst(method: str, metric: str = "correct_specificity"):
+        return min(
+            ((values[method][metric], name) for name, values in rows.items()),
+            key=lambda x: x[0],
+        )
+
+    def maximum(method: str, metric: str):
+        return max(values[method][metric] for values in rows.values())
+
+    robust_worst = worst("robust")
+    nominal_worst = worst("nominal_oracle")
+    equal_worst = worst("equal_share")
+
+    return {
+        "schema": "symthaea-distributionally-robust-crc-grid-v1",
+        "status": "FINITE_GRID_MAXIMIN_REPLAY_NOT_CONTINUOUS_DISTRIBUTION_ROBUSTNESS",
+        "protocol": {
+            "n_calibration": n,
+            "alpha": alpha,
+            "population_total": population_total,
+            "minimum_count_per_type": min_count_per_type,
+            "step": step,
+            "scenario_count": len(scenarios),
+            "scenario_set": {k: list(v) for k, v in scenarios.items()},
+            "scenario_grid_covers": (
+                f"all integer 3-type mixtures with each type >= {min_count_per_type} "
+                f"and counts on a {step}-example lattice"
+            ),
+            "action_support": robust.actions.tolist(),
+            "objective": "maximize worst-case expected correct specificity over the scenario grid",
+            "risk_constraints": "all augmented count-vector constraints, independent of scenario weights",
+        },
+        "state_counts": {
+            "calibration": len(robust.states),
+            "augmented": len(robust.augmented),
+        },
+        "worst_case": {
+            "robust_specificity": robust_worst[0],
+            "robust_scenario": robust_worst[1],
+            "nominal_oracle_specificity": nominal_worst[0],
+            "nominal_oracle_scenario": nominal_worst[1],
+            "equal_share_specificity": equal_worst[0],
+            "equal_share_scenario": equal_worst[1],
+            "robust_gain_vs_equal_share_pp": 100.0 * (robust_worst[0] - equal_worst[0]),
+            "robust_minus_nominal_oracle_pp": 100.0 * (robust_worst[0] - nominal_worst[0]),
+        },
+        "maximum_expected_risk_over_grid": {
+            "robust": maximum("robust", "risk"),
+            "nominal_oracle": maximum("nominal_oracle", "risk"),
+            "equal_share": maximum("equal_share", "risk"),
+        },
+        "scenario_results": rows,
+        "equal_share_verification": {
+            "valid": equal_validity["valid"],
+            "max_budget_excess": equal_validity["max_budget_excess"],
+            "rounds_executed": len(equal_history) - 1,
+        },
+        "robust_verification": solved["verification"],
+        "solver": solved["solver"],
+        "limitations": [
+            "finite lattice only; no guarantee for continuous mixtures between or outside grid points",
+            "expected utility is robust only over the listed finite set",
+            "finite-exchangeability expected-risk validity remains universal over all augmented count states",
+            "scenario set must be frozen independently of the evaluated test outcomes",
+            "common-depth three-type family only; confidence-adaptive family is separate",
+        ],
+    }
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True)
