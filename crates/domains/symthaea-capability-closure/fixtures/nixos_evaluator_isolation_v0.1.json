@@ -137,7 +137,10 @@
       "ProtectProc=invisible",
       "ProcSubset=pid",
       "SystemCallArchitectures=native",
-      "SystemCallFilter=@system-service,openat2,flock,fsync,fdatasync"
+      "SystemCallFilter=@system-service,openat2,flock,fsync,fdatasync",
+      "ProtectKernelLogs=true",
+      "StandardOutput=null_for_taskgen_and_candidate",
+      "explicit_syscall_allowlist_openat2_flock_fsync_fdatasync"
     ],
     "optional_host_sockets_hidden": [
       "/run/dbus/system_bus_socket",
@@ -164,7 +167,8 @@
       "no_run_scoped_subdirectories",
       "no_working_generator_candidate_evaluator_binaries_wired",
       "no_host_adversarial_tests"
-    ]
+    ],
+    "state_root_mode": "0711"
   },
   "artifact_intake": {
     "path": "research/evaluator-isolation/src/lib.rs",
@@ -245,7 +249,11 @@
         "fsync_counter_and_directory"
       ],
       "backup_rollback_protection": "not yet; requires protected monotonic storage or independent reconciliation",
-      "distributed": false
+      "distributed": false,
+      "directory_owner": "evaluator_uid",
+      "directory_permissions_enforced": true,
+      "counter_file_owner": "evaluator_uid",
+      "counter_file_mode": "0600"
     },
     "tests_authored": 12,
     "tests_executed": false,
@@ -257,7 +265,7 @@
     "local_systemd_analyze_version": "257.9",
     "synthetic_equivalent_unit_verify": "passed",
     "actual_nixos_unit_generation_verify": false,
-    "systemd_analyze_security": "not_run_container_not_booted_with_systemd_pid1",
+    "systemd_analyze_security": "not_run_no_systemd_pid1_bus",
     "nix_evaluation": false,
     "cargo_build": false,
     "rustfmt": false,
@@ -268,7 +276,11 @@
     "procfs_attacks": false,
     "unix_socket_attacks": false,
     "symlink_hardlink_toctou_attacks": false,
-    "signed_receipt_replay_campaign": false
+    "signed_receipt_replay_campaign": false,
+    "systemd_analyze_verify_synthetic_equivalent_units": "passed_systemd_257_9",
+    "nix_module_evaluation": false,
+    "source_authored_tests": 17,
+    "openat2_syscall_local": "passed_linux_6_18_57"
   },
   "claim_ceiling": "Source prototype plus synthetic systemd unit syntax and local openat2 availability checks only. No verified sandbox, security claim, working end-to-end evaluator, signing pipeline or replay-qualified production system."
 }
