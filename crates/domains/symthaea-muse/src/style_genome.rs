@@ -340,6 +340,10 @@ pub struct GenomeGeneEffectAudit {
     pub catalog_id: u16,
     pub layer: GeneEffectLayer,
     pub status: GeneEffectStatus,
+    /// Deterministic ID of the exact one-gene-ablated genotype, when created.
+    pub counterfactual_genome_id: Option<String>,
+    /// Digest of the exact compiled spec consumed by every paired seed.
+    pub counterfactual_compiled_spec_sha256: Option<String>,
     pub seed_count: usize,
     pub changed_seed_count: usize,
     pub reason: Option<String>,
@@ -1061,6 +1065,8 @@ fn audit_gene_effects(
                 catalog_id,
                 layer,
                 status: GeneEffectStatus::RendererPending,
+                counterfactual_genome_id: None,
+                counterfactual_compiled_spec_sha256: None,
                 seed_count: trials.len(),
                 changed_seed_count: 0,
                 reason: Some(reason),
@@ -1082,6 +1088,8 @@ fn audit_gene_effects(
                     catalog_id,
                     layer,
                     status: GeneEffectStatus::CounterfactualUnavailable,
+                    counterfactual_genome_id: None,
+                    counterfactual_compiled_spec_sha256: None,
                     seed_count: trials.len(),
                     changed_seed_count: 0,
                     reason: Some(reason),
@@ -1108,6 +1116,8 @@ fn audit_gene_effects(
                     catalog_id,
                     layer,
                     status: GeneEffectStatus::CounterfactualUnavailable,
+                    counterfactual_genome_id: Some(counterfactual_genome.genome_id.clone()),
+                    counterfactual_compiled_spec_sha256: None,
                     seed_count: trials.len(),
                     changed_seed_count: 0,
                     reason: Some(reason),
@@ -1228,6 +1238,10 @@ fn audit_gene_effects(
             catalog_id,
             layer,
             status,
+            counterfactual_genome_id: Some(counterfactual_genome.genome_id.clone()),
+            counterfactual_compiled_spec_sha256: Some(
+                counterfactual_compiled.provenance.compiled_spec_sha256.clone()
+            ),
             seed_count: trials.len(),
             changed_seed_count,
             reason,
