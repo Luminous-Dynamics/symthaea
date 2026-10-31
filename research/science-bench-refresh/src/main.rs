@@ -9,6 +9,10 @@ use science_bench_refresh_validator::evidence_behavior_contracts::{
 use science_bench_refresh_validator::evidence_outcomes::{
     compute_evidence_outcome_report_commitment, verify_evidence_outcome_report,
 };
+use science_bench_refresh_validator::execution_custody::{
+    analyze_execution_custody, compute_execution_custody_plan_commitment,
+    verify_execution_custody_plan, verify_execution_custody_report,
+};
 use science_bench_refresh_validator::exact_protected_matcher::{
     ProtectedSearchArtifactIndexCommitmentInput, compute_protected_index_commitment,
     match_search_exposure_exact, verify_search_exposure_exact_match_report,
@@ -70,6 +74,10 @@ fn usage(program: &str) {
             "  {program} verify-mutation-validity-plan PLAN.json\n",
             "  {program} analyze-mutation-validity PLAN.json RECEIPT.json\n",
             "  {program} verify-mutation-validity-report REPORT.json\n",
+            "  {program} commit-execution-custody-plan PLAN_FIELDS.json\n",
+            "  {program} verify-execution-custody-plan PLAN.json\n",
+            "  {program} analyze-execution-custody PLAN.json RECEIPT.json\n",
+            "  {program} verify-execution-custody-report REPORT.json\n",
             "  {program} commit-reference-assurance-package-fields PACKAGE_FIELDS.json\n",
             "  {program} verify-reference-assurance-package PACKAGE.json\n",
             "  {program} analyze-paired-evidence-outcomes PLAN.json OUTCOME_REPORT.json ANALYSIS_PLAN.json\n",
@@ -102,6 +110,119 @@ fn run(args: &[String]) -> ExitCode {
     }
 
     match args[0].as_str() {
+        "commit-execution-custody-plan" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let fields_bytes = match read(&args[1], "execution custody plan fields") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match compute_execution_custody_plan_commitment(&fields_bytes) {
+                Ok(commitment) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_execution_custody_plan_commitment.v1",
+                            "plan_commitment_sha256": commitment
+                        }))
+                        .expect("execution custody plan commitment serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "verify-execution-custody-plan" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "execution custody plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match verify_execution_custody_plan(&plan_bytes) {
+                Ok((plan, plan_sha256)) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_execution_custody_plan_verification.v1",
+                            "valid": true,
+                            "plan_sha256": plan_sha256,
+                            "plan_commitment_sha256": plan.plan_commitment_sha256,
+                            "analyzer_source_revision": plan.analyzer_source_revision,
+                            "run_id": plan.run_id,
+                            "planned_condition_count": plan.conditions.len(),
+                            "scoring_eligible": false,
+                            "external_anchor_required": true
+                        }))
+                        .expect("execution custody plan verification serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "analyze-execution-custody" => {
+            if args.len() != 3 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "execution custody plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let receipt_bytes = match read(&args[2], "execution custody receipt") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match analyze_execution_custody(&plan_bytes, &receipt_bytes) {
+                Ok(report) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&report)
+                            .expect("execution custody report serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "verify-execution-custody-report" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let report_bytes = match read(&args[1], "execution custody report") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match verify_execution_custody_report(&report_bytes) {
+                Ok(report) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&report)
+                            .expect("execution custody report verification serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
         "commit-judge-factorial-plan" => {
             if args.len() != 2 {
                 usage("science-bench-refresh-validator");
