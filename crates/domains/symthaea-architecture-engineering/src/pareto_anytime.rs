@@ -41,6 +41,8 @@ impl fmt::Display for AnytimeError {
 }
 impl Error for AnytimeError {}
 
+/// Evidence level asserted by the event producer. This module validates the assertion's
+/// chain/digest structure, not the referenced artifact bytes or verifier authenticity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EvidenceLevel {
@@ -592,7 +594,8 @@ impl AnytimeHistory {
             if event.ordinal != expected_ordinal {
                 return Err(AnytimeError::new(format!("{path}.ordinal"), "ordinals must be contiguous and one-based"));
             }
-            if event.started_elapsed_millis < previous_completion
+            if (index == 0 && event.started_elapsed_millis != 0)
+                || event.started_elapsed_millis < previous_completion
                 || event.completed_elapsed_millis < event.started_elapsed_millis
             {
                 return Err(AnytimeError::new(format!("{path}.time"), "v0.1 sequential events must be monotonic and non-overlapping"));
@@ -1308,6 +1311,20 @@ mod tests {
         assert_eq!(receipt.total_resources.host_cpu_millis, Some(12));
         assert_eq!(receipt.total_resources.energy_millijoules, None);
         assert!(!receipt.required_resource_meters_satisfied);
+    }
+
+    #[test]
+    fn target_plan_reference_front_order_is_canonical() {
+        let targets = vec![AnytimeTarget {
+            target_id: "hv".to_owned(),
+            metric: AnytimeTargetMetric::Hypervolume,
+            threshold: 0.1,
+            minimum_evidence_level: EvidenceLevel::Recorded,
+        }];
+        let left = AnytimeTargetPlan::new(targets.clone(), vec![vec![1.0, 0.0], vec![0.0, 1.0]]).unwrap();
+        let right = AnytimeTargetPlan::new(targets, vec![vec![0.0, 1.0], vec![1.0, 0.0]]).unwrap();
+        assert_eq!(left, right);
+        assert_eq!(left.plan_sha256().unwrap(), right.plan_sha256().unwrap());
     }
 
     #[test]
