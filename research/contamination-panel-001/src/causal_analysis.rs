@@ -1116,6 +1116,18 @@ mod tests {
         let study = study_fixture();
         let report = analyze_replicated_causal_study(&study).unwrap();
         assert_eq!(report.independent_model_pair_replicate_count, 2);
+        let study_bytes = serde_json::to_vec(&study).unwrap();
+        assert_eq!(
+            report.study_sha256,
+            hash_domain(b"replicated-contamination-causal-study.v1", &study_bytes)
+        );
+        assert_eq!(
+            report.randomization_test_seed_commitment_sha256,
+            hash_domain(
+                b"causal-randomization-test-seed.v1",
+                &decode_seed_hex(&study.randomization_test_seed_hex, "seed").unwrap()
+            )
+        );
         assert!(!report.replicate_count_meets_minimum);
         assert!(report.every_replicate_has_consistent_training_receipt);
         assert!(!report.training_receipts_independently_verified);
