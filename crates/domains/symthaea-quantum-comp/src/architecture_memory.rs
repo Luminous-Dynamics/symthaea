@@ -1063,6 +1063,22 @@ mod tests {
     }
 
     #[test]
+    fn accepts_read_and_write_edges_for_same_full_duplex_boundary() {
+        let mut topology = base_topology();
+        topology.transfer_edges.push(MemoryTransferEdge {
+            edge_id: "scratch-to-dram".to_owned(),
+            source_region_id: "scratch".to_owned(),
+            destination_region_id: "dram".to_owned(),
+            direction: MemoryTransferDirection::Write,
+            fabric: MemoryTransferFabric::Pcie,
+            communication_boundary_id: "boundary-dram-scratch".to_owned(),
+            conversion_latency_seconds: None,
+            conversion_energy_joules_per_bit: None,
+        });
+        assert_eq!(validate_memory_topology(&topology), Ok(()));
+    }
+
+    #[test]
     fn rejects_duplicate_boundary_accounting() {
         let mut topology = base_topology();
         let mut edge = topology.transfer_edges[0].clone();
@@ -1134,6 +1150,28 @@ mod tests {
         assert_eq!(
             validate_memory_topology(&topology),
             Err(MemoryTopologyError::UnknownCapacityForGuaranteedPlacement)
+        );
+    }
+
+    #[test]
+    fn rejects_guaranteed_placement_when_other_occupancy_is_unknown() {
+        let mut topology = base_topology();
+        topology.memory_regions[1].occupancy_bytes = None;
+        assert_eq!(
+            validate_memory_topology(&topology),
+            Err(MemoryTopologyError::UnknownOccupancyForGuaranteedPlacement)
+        );
+    }
+
+    #[test]
+    fn includes_other_occupancy_when_proving_capacity_fit() {
+        let mut topology = base_topology();
+        topology.memory_regions[1].capacity_bytes = Some(bytes(300, 400));
+        topology.memory_regions[1].occupancy_bytes = Some(bytes(64, 128));
+        topology.state_placements[0].live_bytes = Some(bytes(200, 250));
+        assert_eq!(
+            validate_memory_topology(&topology),
+            Err(MemoryTopologyError::PlacementCapacityNotProven)
         );
     }
 
