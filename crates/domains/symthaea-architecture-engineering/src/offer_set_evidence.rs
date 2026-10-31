@@ -352,6 +352,57 @@ struct EvidenceSetDigest<'a> {
     policy_bundles: Vec<(&'a str, &'a str)>,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OfferSetEvidenceBoundPlan {
+    pub paired_inference_plan: PairedInferencePlan,
+    /// Exact sorted digest of all per-policy evidence bundles used by this analysis.
+    pub offer_set_evidence_set_sha256: String,
+}
+
+impl OfferSetEvidenceBoundPlan {
+    /// Bind a paired-inference plan to the exact retained source-state bundles for a campaign.
+    /// The caller should freeze and retain this plan before examining confirmatory outcomes.
+    pub fn new(
+        paired_inference_plan: PairedInferencePlan,
+        tapes: &[EventTape],
+        bundles: &[OfferSetEvidenceBundle],
+    ) -> Result<Self, OfferSetEvidenceError> {
+        validate_evidence_for_tapes(tapes, bundles)?;
+        let offer_set_evidence_set_sha256 = evidence_set_digest(bundles)?;
+        Ok(Self { paired_inference_plan, offer_set_evidence_set_sha256 })
+    }
+
+    pub fn validate(&self) -> Result<(), OfferSetEvidenceError> {
+        validate_sha256(&self.offer_set_evidence_set_sha256, "offer_set_evidence_set_sha256")
+    }
+}
+
+/// Compute the order-independent digest of a policy evidence-bundle set.
+/// For execution-qualified use, call this through OfferSetEvidenceBoundPlan::new or
+/// verify_matched_offer_set_evidence so every bundle is first validated against its tape.
+pub fn offer_set_evidence_set_sha256(
+    bundles: &[OfferSetEvidenceBundle],
+) -> Result<String, OfferSetEvidenceError> {
+    if bundles.len() < 2 {
+        return Err(OfferSetEvidenceError::new(
+            "bundles",
+            "at least two policy evidence bundles are required",
+        ));
+    }
+    let mut policy_ids = BTreeSet::new();
+    for (index, bundle) in bundles.iter().enumerate() {
+        if !policy_ids.insert(bundle.manifest.policy_id.as_str()) {
+            return Err(OfferSetEvidenceError::new(
+                format!("bundles[{index}].policy_id"),
+                "duplicate policy evidence bundle",
+            ));
+        }
+        validate_sha256(&bundle.bundle_sha256, &format!("bundles[{index}].bundle_sha256"))?;
+    }
+    evidence_set_digest(bundles)
+}
+
 /// Verify all retained source artifacts, then compare their reconstructed offer manifests.
 pub fn verify_matched_offer_set_evidence(
     tapes: &[EventTape],
@@ -368,13 +419,21 @@ pub fn verify_matched_offer_set_evidence(
 /// Strongest current paired-analysis entry point: retained evaluator state is verified before
 /// matched execution qualification and preregistered paired inference.
 pub fn analyze_qualified_paired_metric_with_state_evidence(
-    plan: &PairedInferencePlan,
+    plan: &OfferSetEvidenceBoundPlan,
     observations: &[PairedMetricObservation],
     tapes: &[EventTape],
     bundles: &[OfferSetEvidenceBundle],
 ) -> Result<QualifiedEvidencePairedInference, OfferSetEvidenceError> {
+    plan.validate()?;
     let (offer_sets, manifests, retained_state_artifact_count) = validate_evidence_for_tapes(tapes, bundles)?;
-    let paired_inference = analyze_qualified_paired_metric(plan, observations, tapes, &manifests)
+    let actual_evidence_digest = evidence_set_digest(bundles)?;
+    if actual_evidence_digest != plan.offer_set_evidence_set_sha256 {
+        return Err(OfferSetEvidenceError::new(
+            "offer_set_evidence_set_sha256",
+            "analysis plan is not bound to the exact supplied source-state evidence bundle set",
+        ));
+    }
+    let paired_inference = analyze_qualified_paired_metric(&plan.paired_inference_plan, observations, tapes, &manifests)
         .map_err(|error: PairedInferenceError| OfferSetEvidenceError::new("paired_inference", error.to_string()))?;
     Ok(QualifiedEvidencePairedInference {
         offer_sets: OfferSetEvidenceMatchSummary {
