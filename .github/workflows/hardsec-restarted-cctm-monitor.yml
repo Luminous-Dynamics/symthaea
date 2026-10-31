@@ -99,6 +99,7 @@ jobs:
           assert guarantee["null_stream_iid_assumption_status"] == "assumption_not_verified"
           assert guarantee["reference_sample_iid_assumption_status"] == "assumption_not_verified"
           assert guarantee["context_assignment_exogeneity_status"] == "assumption_not_verified"
+          assert guarantee["accepted_observation_selection_status"] == "assumption_not_verified"
           assert guarantee["theorem_guarantee_status"] == "not_established_from_input_receipts"
           assert guarantee["effective_sample_size_estimate"] is None
           assert receipt["context_assignment"]["truth_labels_in_runtime_mapping"] is False
@@ -107,6 +108,15 @@ jobs:
           assert rows[16]["abstention_reason"] == "invalid_sensor_state"
           assert rows[17]["abstention_reason"] == "context_assignment_not_accepted"
           assert rows[18]["abstention_reason"] == "invalid_sensor_state"
+          for row in rows:
+              restarted = row.get("restarted")
+              if restarted is not None:
+                  assert restarted["live_state_count_after_expiry"] <= 256
+                  for candidate in restarted["candidate_starts"]:
+                      assert candidate["status"] in {"active", "zero_wealth_killed", "expires_after_current_update"}
+                      assert candidate["weight"] > 0
+                      assert candidate["age"] >= 1
+                      assert candidate["local_log_wealth"] is None or isinstance(candidate["local_log_wealth"], (int, float))
           starts = rows[0]["restarted"]["candidate_starts"]
           assert len(starts) == 1
           assert starts[0]["start_index"] == 1
@@ -137,6 +147,7 @@ jobs:
           assert plan["claim_rules"]["pfa_and_arl_not_conflated"] is True
           assert plan["claim_rules"]["finite_restart_lifetime_requires_predictable_kill"] is True
           assert plan["claim_rules"]["iid_or_conditional_superuniformity_required_for_sequential_guarantees"] is True
+          assert any(item["id"] == "bhattacharyya_ramdas_restarted_conformal_martingales_paper" for item in plan["reference_implementations"])
           reference = plan["reference_calibration_design"]
           assert abs(reference["total_alpha_budget"] + reference["total_dkw_delta_budget"] - 0.05) < 1e-12
           assert reference["windows_do_not_establish_reference_independence"] is True
