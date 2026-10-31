@@ -42,8 +42,10 @@ jobs:
           set -euo pipefail
           cargo run --release --locked > /tmp/cmaq-018-report.json
           python3 - <<'PY'
+          import hashlib
           import json
           import math
+          import struct
           from pathlib import Path
           from jsonschema import Draft202012Validator, ValidationError, validate
 
@@ -55,52 +57,51 @@ jobs:
               Path("uncertainty-contract.v0.1.schema.json").read_text()
           )
           Draft202012Validator.check_schema(uncertainty_schema)
-          joint_action_schema = json.loads(
-              Path("joint-action-bank.v0.1.schema.json").read_text()
-          )
-          Draft202012Validator.check_schema(joint_action_schema)
-          joint_action_bank = json.loads(
-              Path("fixtures/joint-action-bank.example.json").read_text()
-          )
-          validate(instance=joint_action_bank, schema=joint_action_schema)
-          assert joint_action_bank["schema_version"] == "cmaq-018-joint-action-bank-v0.1"
-          assert len(joint_action_bank["action_ids"]) == 3
-          assert len(joint_action_bank["joint_draw_ids"]) == 5
-          assert len(joint_action_bank["outcome_samples"]) == len(joint_action_bank["action_ids"])
-          assert all(
-              len(row) == len(joint_action_bank["joint_draw_ids"])
-              for row in joint_action_bank["outcome_samples"]
-          )
-          hostile_bank = json.loads(json.dumps(joint_action_bank))
-          hostile_bank["action_ids"][1] = hostile_bank["action_ids"][0]
-          try:
-              validate(instance=hostile_bank, schema=joint_action_schema)
-          except ValidationError:
-              pass
-          else:
-              raise AssertionError("joint action-bank schema admitted duplicate action IDs")
-          hostile_bank = json.loads(json.dumps(joint_action_bank))
-          hostile_bank["joint_draw_ids"][1] = hostile_bank["joint_draw_ids"][0]
-          try:
-              validate(instance=hostile_bank, schema=joint_action_schema)
-          except ValidationError:
-              pass
-          else:
-              raise AssertionError("joint action-bank schema admitted duplicate joint draw IDs")
-          hostile_bank = json.loads(json.dumps(joint_action_bank))
-          hostile_bank["outcome_samples"][1].pop()
-          assert any(
-              len(row) != len(hostile_bank["joint_draw_ids"])
-              for row in hostile_bank["outcome_samples"]
-          ), "hostile bank should expose unequal paired sample cardinality"
+
           joint_bank_schema = json.loads(Path("joint-action-bank.v0.1.schema.json").read_text())
           Draft202012Validator.check_schema(joint_bank_schema)
           joint_bank = json.loads(Path("fixtures/joint-action-bank.example.json").read_text())
           validate(instance=joint_bank, schema=joint_bank_schema)
+          assert joint_bank["schema_version"] == "cmaq-018-joint-action-bank-v0.1"
           assert len(joint_bank["action_ids"]) == 3
           assert len(joint_bank["joint_draw_ids"]) == 5
-          assert len(joint_bank["outcome_samples"]) == 3
-          assert all(len(row) == 5 for row in joint_bank["outcome_samples"])
+          assert len(joint_bank["outcome_samples"]) == len(joint_bank["action_ids"])
+          assert all(len(row) == len(joint_bank["joint_draw_ids"])
+                     for row in joint_bank["outcome_samples"])
+
+          def canonical_joint_draw_bank_digest(bank):
+              payload = bytearray(b"cmaq-018-joint-action-bank-v0.1\\0")
+
+              def append_text(value):
+                  encoded = value.encode("utf-8")
+                  payload.extend(struct.pack("<Q", len(encoded)))
+                  payload.extend(encoded)
+
+              def append_ids(values):
+                  payload.extend(struct.pack("<Q", len(values)))
+                  for value in values:
+                      payload.extend(struct.pack("<Q", value))
+
+              append_text(bank["history_sha256"])
+              payload.extend(struct.pack("<Q", bank["horizon_steps"]))
+              append_text(bank["action_manifest_sha256"])
+              append_text(bank["outcome_channel"])
+              append_ids(bank["action_ids"])
+              append_ids(bank["joint_draw_ids"])
+              payload.append({
+                  "shared_posterior_and_world_noise": 0,
+                  "paired_exogenous_disturbance": 1,
+                  "deterministic_shared_latent": 2,
+              }[bank["coupling"]])
+              payload.extend(struct.pack("<Q", len(bank["outcome_samples"])))
+              for row in bank["outcome_samples"]:
+                  payload.extend(struct.pack("<Q", len(row)))
+                  for value in row:
+                      payload.extend(struct.pack("<d", value))
+              return hashlib.sha256(payload).hexdigest()
+
+          assert canonical_joint_draw_bank_digest(joint_bank) == joint_bank["joint_draw_bank_sha256"]
+
           hostile_bank = json.loads(json.dumps(joint_bank))
           hostile_bank["action_ids"][1] = hostile_bank["action_ids"][0]
           try:
@@ -109,6 +110,7 @@ jobs:
               pass
           else:
               raise AssertionError("joint action-bank contract admitted duplicate action IDs")
+
           hostile_bank = json.loads(json.dumps(joint_bank))
           hostile_bank["joint_draw_ids"][1] = hostile_bank["joint_draw_ids"][0]
           try:
@@ -117,10 +119,15 @@ jobs:
               pass
           else:
               raise AssertionError("joint action-bank contract admitted duplicate draw IDs")
+
           hostile_bank = json.loads(json.dumps(joint_bank))
           hostile_bank["outcome_samples"][1].pop()
           assert any(len(row) != len(hostile_bank["joint_draw_ids"])
                      for row in hostile_bank["outcome_samples"])
+
+          hostile_bank = json.loads(json.dumps(joint_bank))
+          hostile_bank["outcome_samples"][0][0] += 0.25
+          assert canonical_joint_draw_bank_digest(hostile_bank) != joint_bank["joint_draw_bank_sha256"]
 
           uncertainty_sample = {
               "schema_version": "cmaq-018-uncertainty-contract-v0.1",
