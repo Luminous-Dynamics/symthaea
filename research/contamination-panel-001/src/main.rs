@@ -259,7 +259,7 @@ fn audit_intervention_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
 }
 
 fn generate_fresh_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
-    if args.len() != 7 {
+    if args.len() != 6 {
         return Err(
             "usage: contamination-panel-bench generate-fresh <config.json> <seed-hex> <public-packet.json> <sealed-oracle.json> <manifest.json>"
                 .into(),
@@ -283,7 +283,7 @@ fn generate_fresh_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
 }
 
 fn audit_fresh_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
-    if args.len() != 8 {
+    if args.len() != 7 {
         return Err(
             "usage: contamination-panel-bench audit-fresh <config.json> <seed-hex> <public-packet.json> <sealed-oracle.json> <manifest.json> <audit.json>"
                 .into(),
