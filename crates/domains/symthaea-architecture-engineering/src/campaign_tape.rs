@@ -392,10 +392,10 @@ impl CampaignTape {
                 ));
             }
             let visibility_cutoff = round[0].policy_visible_through_sequence;
-            if visibility_cutoff >= round[0].sequence_number {
+            if visibility_cutoff != round[0].sequence_number - 1 {
                 return Err(CampaignTapeError::new(
                     format!("events[{round_start}].policy_visible_through_sequence"),
-                    "a round cannot observe its own or a future event",
+                    "a round must observe all completed prior actions and none from its own batch",
                 ));
             }
             let mut worker_ids = BTreeSet::new();
@@ -1081,6 +1081,18 @@ mod tests {
         let mut tape = tape("claims");
         tape.append(evaluation_event("e1", 1, "w1", 0, "A")).unwrap();
         tape.append(evaluation_event("e2", 1, "w2", 0, "A")).unwrap();
+        assert!(tape.seal().is_err());
+    }
+
+    #[test]
+    fn resource_sum_overflow_is_rejected_not_downgraded_to_unknown() {
+        let mut tape = tape("overflow");
+        let mut first = evaluation_event("o1", 1, "w1", 0, "A");
+        first.resource_usage.wall_millis = Some(u64::MAX);
+        tape.append(first).unwrap();
+        let mut second = evaluation_event("o2", 2, "w1", 1, "B");
+        second.resource_usage.wall_millis = Some(1);
+        tape.append(second).unwrap();
         assert!(tape.seal().is_err());
     }
 
