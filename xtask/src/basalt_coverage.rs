@@ -878,6 +878,42 @@ mod tests {
     }
 
     #[test]
+    fn rejects_complete_claim_when_a_root_class_is_missing() {
+        let (profile, receipt) = encoded_pair("complete_within_profile");
+        let mut value: Value = serde_json::from_slice(&receipt).unwrap();
+        value["capture"]["root_scopes"].as_array_mut().unwrap().pop();
+        let report = audit_bytes(&profile, &serde_json::to_vec(&value).unwrap());
+        assert!(!report.receipt_well_formed);
+        assert!(report.overstated_claim);
+        assert!(!report.coverage_complete_within_profile);
+    }
+
+    #[test]
+    fn rejects_duplicate_root_class_assessment() {
+        let (profile, receipt) = encoded_pair("complete_within_profile");
+        let mut value: Value = serde_json::from_slice(&receipt).unwrap();
+        let first = value["capture"]["root_scopes"][0].clone();
+        value["capture"]["root_scopes"].as_array_mut().unwrap().push(first);
+        let report = audit_bytes(&profile, &serde_json::to_vec(&value).unwrap());
+        assert!(!report.receipt_well_formed);
+        assert!(!report.coverage_complete_within_profile);
+    }
+
+    #[test]
+    fn accepts_unresolved_root_scope_only_as_an_incomplete_claim() {
+        let (profile, receipt) = encoded_pair("incomplete");
+        let mut value: Value = serde_json::from_slice(&receipt).unwrap();
+        value["capture"]["root_scopes"][0]["status"] = json!("unresolved");
+        value["capture"]["root_scopes"][0]["paths"] = json!([]);
+        value["capture"]["root_scopes"][0]["manifest_digest"] = Value::Null;
+        value["capture"]["root_scopes"][0]["reason"] = json!("procfs observation not supported");
+        let report = audit_bytes(&profile, &serde_json::to_vec(&value).unwrap());
+        assert!(report.receipt_well_formed);
+        assert!(report.coverage_claim_consistent);
+        assert!(!report.coverage_complete_within_profile);
+    }
+
+    #[test]
     fn rejects_complete_claim_with_an_unrecognized_extra_channel() {
         let (profile, receipt) = encoded_pair("complete_within_profile");
         let mut value: Value = serde_json::from_slice(&receipt).unwrap();
