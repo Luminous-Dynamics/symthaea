@@ -143,3 +143,10 @@ The history writer now maintains a private in-memory validation state. A newly c
 The validation cache is excluded from serialization. When a retained history is deserialized, the next append first reconstructs the cache by replaying the complete chain, then resumes incrementally. The public history/header/event fields are exposed through immutable accessors so callers cannot mutate the prefix behind the cache. Full \`validate()\` and analysis still replay every event independently.
 
 Expected complexity: incremental appends are O(log n) for indexed identity checks plus event hashing; a full audit is O(n log n). An authored regression test serializes and resumes a history, then requires the resumed and uninterrupted streams and receipts to match exactly. No runtime benchmark or measured throughput claim is yet available.
+
+
+### Prefix-analysis complexity boundary
+
+The writer now appends incrementally, and the analyzer avoids recomputing target metrics for failed/invalid/timed-out attempts, verifier rejections, and auxiliary events that do not change evidence-level eligibility. It still performs batch Pareto analysis when an eligible candidate/promotion changes a target archive. Repeated full batch extraction at every successful candidate can become expensive for large runs.
+
+Issue #9610 tracks incremental evidence-level nondominated archives and prefix metrics. The existing batch Pareto evaluator must remain the independent oracle; randomized prefix-equivalence tests are required before using the incremental path for benchmark claims. No measured analysis speedup is claimed.
