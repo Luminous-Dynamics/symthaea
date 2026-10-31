@@ -190,7 +190,11 @@ impl InstrumentalArenaPromptBank {
                     id: card.id.clone(),
                 });
             }
-            if card.prompt.trim().is_empty() || !prompt_texts.insert(card.prompt.clone()) {
+            if card.prompt.trim().is_empty() {
+                issues.push(PromptBankIssue::EmptyField {
+                    field: format!("card.{}.prompt", card.id),
+                });
+            } else if !prompt_texts.insert(card.prompt.clone()) {
                 issues.push(PromptBankIssue::DuplicatePrompt {
                     id: card.id.clone(),
                 });
@@ -229,7 +233,7 @@ impl InstrumentalArenaPromptBank {
                 }
             }
             for required in REQUIRED_CONTENT {
-                if !card.required_content.iter().any(|found| found == required) {
+                if !card.required_content.iter().any(|found| found.as_str() == required) {
                     issues.push(PromptBankIssue::MissingRequiredContent {
                         id: card.id.clone(),
                         requirement: required.into(),
