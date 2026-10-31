@@ -1,0 +1,147 @@
+{
+  "schema_version": "hardsec-telemetry-trace-lineage-v1",
+  "dataset_id": "hs014-synthetic-known-answer-v1",
+  "source_corpus_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "sampling_policy": {
+    "offset_unit": "committed_instructions",
+    "window_size": 10000,
+    "stride": 10000
+  },
+  "holdout_axes": [
+    "program",
+    "execution",
+    "attack_family",
+    "adaptation_family"
+  ],
+  "traces": [
+    {
+      "trace_id": "trace-train-original",
+      "source_trace_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "program_id": "program-train",
+      "binary_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "execution_id": "execution-train",
+      "device_config_id": "device-c910-sim",
+      "attack_family_id": "family-train",
+      "adaptation_family_id": "none",
+      "split": "train",
+      "origin": "original",
+      "parent_trace_id": null,
+      "iteration_id": 0,
+      "windows": [
+        {
+          "window_id": "window-train-0",
+          "sample_index": 0,
+          "start_offset": 0,
+          "end_offset": 10000,
+          "window_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        {
+          "window_id": "window-train-1",
+          "sample_index": 1,
+          "start_offset": 10000,
+          "end_offset": 20000,
+          "window_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      ]
+    },
+    {
+      "trace_id": "trace-train-repeat-1",
+      "source_trace_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "program_id": "program-train",
+      "binary_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "execution_id": "execution-train",
+      "device_config_id": "device-c910-sim",
+      "attack_family_id": "family-train",
+      "adaptation_family_id": "none",
+      "split": "train",
+      "origin": "repeated_iteration",
+      "parent_trace_id": "trace-train-original",
+      "iteration_id": 1,
+      "windows": [
+        {
+          "window_id": "window-train-repeat-0",
+          "sample_index": 0,
+          "start_offset": 0,
+          "end_offset": 10000,
+          "window_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        {
+          "window_id": "window-train-repeat-1",
+          "sample_index": 1,
+          "start_offset": 10000,
+          "end_offset": 20000,
+          "window_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      ]
+    },
+    {
+      "trace_id": "trace-validation",
+      "source_trace_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "program_id": "program-validation",
+      "binary_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "execution_id": "execution-validation",
+      "device_config_id": "device-c910-sim",
+      "attack_family_id": "family-validation",
+      "adaptation_family_id": "none",
+      "split": "validation",
+      "origin": "original",
+      "parent_trace_id": null,
+      "iteration_id": 0,
+      "windows": [
+        {
+          "window_id": "window-validation-0",
+          "sample_index": 0,
+          "start_offset": 0,
+          "end_offset": 10000,
+          "window_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+        }
+      ]
+    },
+    {
+      "trace_id": "trace-test-attack",
+      "source_trace_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "program_id": "program-test",
+      "binary_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "execution_id": "execution-test",
+      "device_config_id": "device-c910-sim",
+      "attack_family_id": "family-test",
+      "adaptation_family_id": "timing",
+      "split": "test",
+      "origin": "original",
+      "parent_trace_id": null,
+      "iteration_id": 0,
+      "windows": [
+        {
+          "window_id": "window-test-attack-0",
+          "sample_index": 0,
+          "start_offset": 0,
+          "end_offset": 10000,
+          "window_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+        }
+      ]
+    },
+    {
+      "trace_id": "trace-test-benign",
+      "source_trace_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "program_id": "program-benign",
+      "binary_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "execution_id": "execution-benign",
+      "device_config_id": "device-c910-sim",
+      "attack_family_id": "none",
+      "adaptation_family_id": "none",
+      "split": "test",
+      "origin": "original",
+      "parent_trace_id": null,
+      "iteration_id": 0,
+      "windows": [
+        {
+          "window_id": "window-test-benign-0",
+          "sample_index": 0,
+          "start_offset": 0,
+          "end_offset": 10000,
+          "window_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+        }
+      ]
+    }
+  ]
+}
