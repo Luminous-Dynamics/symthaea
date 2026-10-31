@@ -197,6 +197,27 @@ def _validate_receipt(manifest: dict, manifest_digest: str, receipt: dict) -> No
                 raise CertificateError("exact CRC receipt cannot pass with positive budget excess")
             if not isinstance(checks.get("worst_augmented_count"), list):
                 raise CertificateError("exact CRC receipt needs a worst augmented state witness")
+            n = manifest["scope"]["n_calibration"]
+            augmented_count = manifest["scope"]["augmented_state_count"]
+            if checks["augmented_state_count"] != augmented_count:
+                raise CertificateError("receipt augmented-state count differs from certificate scope")
+            if not isinstance(checks.get("table_validation_passes"), int) or checks["table_validation_passes"] < 1:
+                raise CertificateError("exact CRC receipt needs a positive table-validation count")
+            if checks.get("exact_inequality_checks") != checks["table_validation_passes"] * augmented_count:
+                raise CertificateError("exact inequality count does not reconcile with table passes")
+            budget = parse_exact_fraction(checks.get("budget"), "checks.budget")
+            target_budget = parse_exact_fraction(
+                manifest["risk_target"]["level"], "risk_target.level"
+            ) * (n + 1)
+            if budget != target_budget:
+                raise CertificateError("receipt risk budget does not match (n+1)*alpha")
+            worst_total = parse_exact_fraction(checks.get("worst_total"), "checks.worst_total")
+            if excess != worst_total - budget:
+                raise CertificateError("reported exact excess does not match worst total minus budget")
+            worst_state = checks["worst_augmented_count"]
+            if (len(worst_state) != 3 or any(not isinstance(x, int) or x < 0 for x in worst_state)
+                    or sum(worst_state) != n + 1):
+                raise CertificateError("worst augmented count vector has an invalid shape or total")
     elif lane == "theorem_backed_eprocess":
         if receipt["status"] == "pass" and not (
             isinstance(checks.get("theorem_reference"), str)
