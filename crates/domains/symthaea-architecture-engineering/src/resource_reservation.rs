@@ -272,6 +272,7 @@ impl ResourceReservationLedger {
             if existing.action_id != proof.preflight_receipt.action_id
                 || existing.preflight_receipt_sha256 != proof.preflight_receipt.receipt_sha256
                 || existing.resource_cost != proof.resource_cost
+                || existing.expires_at_epoch != expires_at_epoch
             {
                 return Err(ResourceReservationError::new(
                     "idempotency_key",
@@ -1207,6 +1208,12 @@ mod tests {
             .unwrap();
         assert_eq!(first.reservation_id, retry.reservation_id);
         assert_eq!(first.receipt_sha256, retry.receipt_sha256);
+        assert_eq!(ledger.events().len(), events_before);
+        let (_, _, cost_changed_lease) = fixture();
+        let conflicting_retry = proof(&ledger, "measure-001", &scope, cost_changed_lease, 'e');
+        assert!(ledger
+            .reserve_measurement(&head, conflicting_retry, 6)
+            .is_err());
         assert_eq!(ledger.events().len(), events_before);
     }
 
