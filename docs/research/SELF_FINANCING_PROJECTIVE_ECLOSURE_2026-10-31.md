@@ -28,17 +28,17 @@ Choose nonnegative predictable shares \(p_{i,t}\), zero for inactive coordinates
 \sum_{i\in I_t}p_{i,t}\leq1.
 \]
 
-The current implementation uses a frozen nonnegative priority score \(s_i\) and normalizes only over the hypotheses active before the update:
+The implementation compares several predictable share policies. Static priority uses a frozen nonnegative score \(s_i\) and normalizes only over hypotheses active before the update. Equal-active uses \(s_i=1\). AWAIRE-style policies use each coordinate's past wealth \(M_{i,t-1}=\prod_{u<t}X_{i,u}\), its square, or only the largest past wealth coordinate(s). In every case the shares are determined before the current increments are observed and normalized over the active universe, not separately for each intersection.
 
 \[
-p_{i,t}=
-\begin{cases}
-s_i/\sum_{j\in I_t}s_j,&i\in I_t,\ \sum_{j\in I_t}s_j>0,\\
-0,&\text{otherwise}.
-\end{cases}
+p_{i,t}=\frac{s_{i,t}}{\sum_{j\in I_t}s_{j,t}}
+\quad (i\in I_t),
+\qquad p_{i,t}=0\quad(i\notin I_t),
 \]
 
-Equal scores yield symmetric allocation across the current active set. If all scores are zero, the portfolio holds cash.
+with all-zero scores interpreted as holding cash.
+
+**Prior art:** Ek, Stark, Stuckey and Vukcevic's AWAIRE (2023) already constructs intersection test supermartingales by multiplying predictable convex combinations of component test-supermartingale factors, and studies linear, quadratic and largest-past-wealth weighting. Thus this PR does not claim to invent adaptive self-financing mixtures. The narrower question is whether a single global, intersection-independent predictable portfolio schedule, combined with neutral dormant padding, yields a projective family across an expanding horizon and can support dynamic e-closure plus capacity-aware selection. AWAIRE must be an explicit comparator.
 
 For every finite intersection \(S\), define the self-financing wealth process
 
@@ -183,6 +183,8 @@ The committed test suite has not been executed in this environment. Remote CI is
 ## Benchmarks
 
 Compare against:
+- AWAIRE-style predictable mixtures (linear past wealth, quadratic past wealth, largest past wealth), including versions normalized within each intersection;
+- static global-weight projective mergers;
 - fixed global-weight projective mergers from dynamic e-closure;
 - self-financing equal-share portfolios (this prototype);
 - fixed priority-share portfolios;
