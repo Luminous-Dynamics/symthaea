@@ -19,13 +19,17 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
-use symthaea_muse_protocol::catalog::HybridStyleSpec;
+use symthaea_muse_protocol::{
+    EvidenceBasis, EvidenceStatus, HybridStyleSpec, ListenCompositionBundle,
+    MeterPoint, MotifDefinition, MusicalTime, SymbolicNoteEvent, TempoPoint,
+};
 use symthaea_music_theory::{
     GrammarPlanEvidence, GrammarStructuralTrace, MusicalIntent,
     Score, ScoreValidationConfig, fingerprint, compose_with_grammar_plan,
     score_validation::{ValidationSeverity, is_universal_invariant, validate_score},
 };
 
+use crate::analyst::{composer_trace_from_theory, verify_composer_trace};
 use crate::style_mixer::compile_hybrid_style;
 
 pub const STYLE_GENOME_SCHEMA: &str = "muse-style-genome-v1";
@@ -249,6 +253,13 @@ impl TraceIntegrity {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GenomeTraceIssue {
+    pub code: String,
+    pub record_id: String,
+    pub message: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GenomeTrial {
     pub seed: u64,
@@ -262,6 +273,9 @@ pub struct GenomeTrial {
     pub style_dependent_fatal_count: usize,
     pub warning_count: usize,
     pub trace_integrity: TraceIntegrity,
+    pub semantic_trace_verified: bool,
+    pub semantic_trace_checked_records: usize,
+    pub semantic_trace_issues: Vec<GenomeTraceIssue>,
     pub grammar_plan_kind: String,
     pub grammar_plan_well_formed: bool,
     pub form_signature: Option<String>,
@@ -598,6 +612,47 @@ pub fn evaluate_genome(
             .count();
         let warning_count = report.warning_count();
         let trace_integrity = audit_trace(&realization.score, &realization.trace);
+        let source_motif = compiled.spec.motif(intent.arousal, intent.seed);
+        let source_motif = if compiled.spec.texture.hook_cell {
+            symthaea_music_theory::hook::graft_hook(
+                &source_motif,
+                &symthaea_music_theory::hook::HookCell::generate_with(
+                    &compiled.spec.melody,
+                    intent.seed,
+                    compiled.spec.meter as f64,
+                ),
+                compiled.spec.meter as f64,
+            )
+        } else {
+            source_motif
+        };
+        let semantic_bundle = listen_bundle_for_score(
+            &realization.score,
+            &source_motif,
+            &realization.plan,
+        );
+        let composer_trace = composer_trace_from_theory(
+            &realization.trace,
+            &score_sha256_for_trace_placeholder(&realization.score),
+            0,
+            Some(("motif-primary", 1)),
+        );
+        let semantic_verification = verify_composer_trace(
+            &composer_trace,
+            &semantic_bundle,
+            &score_sha256_for_trace_placeholder(&realization.score),
+            0,
+        );
+        let semantic_trace_issues = semantic_verification.issues.iter()
+            .map(|issue| GenomeTraceIssue {
+                code: issue.code.clone(),
+                record_id: issue.record_id.clone(),
+                message: issue.message.clone(),
+            })
+            .collect::<Vec<_>>();
+        let semantic_trace_verified = semantic_verification.issues.is_empty()
+            && semantic_verification.checked_records == semantic_verification.verified_records
+            && semantic_verification.checked_records > 0;
         let grammar_plan_well_formed = period_plan_well_formed(&realization.plan);
         let structural_fingerprint = fingerprint::structural_fingerprint(
             &realization.score,
@@ -642,6 +697,9 @@ pub fn evaluate_genome(
             style_dependent_fatal_count,
             warning_count,
             trace_integrity,
+            semantic_trace_verified,
+            semantic_trace_checked_records: semantic_verification.checked_records,
+            semantic_trace_issues,
             grammar_plan_kind: grammar_plan_name(&realization.plan),
             grammar_plan_well_formed,
             form_signature,
@@ -655,6 +713,7 @@ pub fn evaluate_genome(
         && trials.iter().all(|trial| {
             trial.universal_invariant_passed
                 && trial.trace_integrity.is_complete()
+                && trial.semantic_trace_verified
                 && trial.grammar_plan_well_formed
                 && trial.structural_fingerprint.iter().all(|value| value.is_finite())
         });
@@ -669,6 +728,12 @@ pub fn evaluate_genome(
             issues.push(GenomeIssue::new(
                 "structural_trace_incomplete",
                 "one or more seeded trials emitted an empty, malformed or dangling structural trace",
+            ));
+        }
+        if trials.iter().any(|trial| !trial.semantic_trace_verified) {
+            issues.push(GenomeIssue::new(
+                "independent_trace_verification_failed",
+                "one or more seeded trials failed Muse Analyst's independent structural-trace verifier",
             ));
         }
         if trials.iter().any(|trial| !trial.grammar_plan_well_formed) {
@@ -729,6 +794,99 @@ pub fn evaluate_genome(
     };
     evaluation.evaluation_sha256 = evaluation_digest(&evaluation)?;
     Ok(evaluation)
+}
+
+fn score_sha256_for_trace_placeholder(score: &Score) -> String {
+    let bytes = serde_json::to_vec(score).unwrap_or_default();
+    domain_sha256(b"symthaea:muse-style-genome-score:v1\n", &bytes)
+}
+
+fn listen_bundle_for_score(
+    score: &Score,
+    motif: &symthaea_music_theory::Motif,
+    plan: &GrammarPlanEvidence,
+) -> ListenCompositionBundle {
+    const TICKS_PER_BEAT: f64 = 480.0;
+    let seconds_per_beat = 60.0 / score.tempo_bpm as f64;
+    let time = |beats: f64| MusicalTime {
+        tick: (beats * TICKS_PER_BEAT).round().max(0.0) as u64,
+        beats,
+        seconds: beats * seconds_per_beat,
+    };
+    let mut notes = Vec::with_capacity(score.notes.len());
+    for role in [
+        symthaea_music_theory::VoiceRole::Melody,
+        symthaea_music_theory::VoiceRole::Harmony,
+        symthaea_music_theory::VoiceRole::Bass,
+        symthaea_music_theory::VoiceRole::CounterMelody,
+    ] {
+        let role_name = format!("{role:?}");
+        let id_role = match role {
+            symthaea_music_theory::VoiceRole::Melody => "melody",
+            symthaea_music_theory::VoiceRole::Harmony => "harmony",
+            symthaea_music_theory::VoiceRole::Bass => "bass",
+            symthaea_music_theory::VoiceRole::CounterMelody => "counter",
+        };
+        for (index, note) in score.voice(role).into_iter().enumerate() {
+            let onset = note.onset.beats();
+            let duration = note.duration.beats();
+            notes.push(SymbolicNoteEvent {
+                id: format!("score-{id_role}-{index}"),
+                midi: note.pitch.midi(),
+                pitch_name: format!("MIDI{}", note.pitch.midi()),
+                onset: time(onset),
+                duration_ticks: (duration * TICKS_PER_BEAT).round().max(0.0) as u64,
+                duration_beats: duration,
+                duration_seconds: duration * seconds_per_beat,
+                velocity: note.velocity,
+                voice_role: role_name.clone(),
+                emphasis: format!("{:?}", note.emphasis).to_ascii_lowercase(),
+                section_intensity: note.section_intensity,
+            });
+        }
+    }
+    notes.sort_by(|left, right| left.onset.beats.total_cmp(&right.onset.beats));
+    let motif_notes: Vec<_> = motif.notes.iter()
+        .filter_map(|note| note.degree.map(|degree| (degree, note.duration.beats())))
+        .collect();
+    ListenCompositionBundle {
+        ticks_per_beat: TICKS_PER_BEAT as u32,
+        duration_ticks: (score.total_beats.beats() * TICKS_PER_BEAT).round().max(0.0) as u64,
+        duration_beats: score.total_beats.beats(),
+        duration_seconds: score.seconds(),
+        form_kind: format!("{plan:?}"),
+        tempo_map: vec![TempoPoint {
+            at: time(0.0),
+            bpm: score.tempo_bpm,
+        }],
+        meter_map: vec![MeterPoint {
+            at: time(0.0),
+            numerator: score.meter,
+            denominator: 4,
+        }],
+        sections: Vec::new(),
+        phrases: Vec::new(),
+        notes,
+        motif_definitions: vec![MotifDefinition {
+            id: "motif-primary".into(),
+            label: "recipe-source-motif".into(),
+            degrees: motif_notes.iter().map(|(degree, _)| *degree).collect(),
+            durations_beats: motif_notes.iter().map(|(_, duration)| *duration).collect(),
+            basis: EvidenceBasis {
+                status: EvidenceStatus::Reconstructed,
+                source_method: "style-genome-recipe-motif-v1".into(),
+                confidence: None,
+                limitations: vec![
+                    "This is the exact recipe-selected motif used by the grammar planner; motif occurrences remain composer assertions until Analyst verification.".into(),
+                ],
+            },
+        }],
+        motif_occurrences: Vec::new(),
+        cadences: Vec::new(),
+        sonorities: Vec::new(),
+        orchestration: Vec::new(),
+        resonance: None,
+    }
 }
 
 fn audit_trace(score: &Score, trace: &GrammarStructuralTrace) -> TraceIntegrity {
@@ -1091,6 +1249,7 @@ mod tests {
         };
         let evaluation = evaluate_genome(&genome, &MusicalIntent::default(), &config, &[]).unwrap();
         assert!(evaluation.trials.iter().all(|trial| trial.trace_integrity.is_complete()));
+        assert!(evaluation.trials.iter().all(|trial| trial.semantic_trace_verified), "{:?}", evaluation.trials.iter().map(|trial| &trial.semantic_trace_issues).collect::<Vec<_>>());
         assert!(evaluation.trials.iter().all(|trial| trial.universal_invariant_passed));
         // The archive gate does not incorrectly treat a classical-rule
         // warning/failure as a universal structural defect in another style.
