@@ -968,23 +968,24 @@ fn calibration_cluster_bootstrap(
                 }
             }
         }
-        if let (Some(e), Some(m), Some(a), Some(r), Some(sharpness), Some(b)) = (
+        if let (Some(e), Some(m), Some(a), Some(r), Some(b)) = (
             metrics.expected_calibration_error,
             metrics.maximum_calibration_error,
             metrics.adaptive_confidence_expected_calibration_error,
             metrics.reliability_curve_expected_calibration_error,
-            metrics.normalized_sharpness,
             metrics.brier_score,
         ) {
-            if e.is_finite() && m.is_finite() && a.is_finite() && r.is_finite()
-                && sharpness.is_finite() && b.is_finite()
-            {
+            if e.is_finite() && m.is_finite() && a.is_finite() && r.is_finite() && b.is_finite() {
                 ece.push(e);
                 mce.push(m);
                 adaptive_ece.push(a);
                 reliability_ece.push(r);
-                normalized_sharpness.push(sharpness);
                 brier.push(b);
+            }
+        }
+        if let Some(sharpness) = metrics.normalized_sharpness {
+            if sharpness.is_finite() {
+                normalized_sharpness.push(sharpness);
             }
         }
     }
@@ -2398,6 +2399,31 @@ mod tests {
         assert_eq!(first.brier_score_95, Some(Interval { lower: 0.04, upper: 0.04 }));
         assert_eq!(first.adaptive_confidence_ece_15_95, Some(Interval { lower: 0.2, upper: 0.2 }));
         assert_eq!(first.reliability_curve_ece_12_95, Some(Interval { lower: 0.2, upper: 0.2 }));
+    }
+
+    #[test]
+    fn undefined_sharpness_does_not_suppress_calibration_bootstrap_metrics() {
+        let mut rows = Vec::new();
+        for cluster in 0..6 {
+            let mut item = row(
+                &format!("zero-prob-{cluster}"),
+                false,
+                0.0,
+                0.5,
+                1.0,
+                1.0,
+                "merge",
+            );
+            item.cluster_id = format!("zero-prob-psu-{cluster}");
+            rows.push(item);
+        }
+        let refs = rows.iter().collect::<Vec<_>>();
+        let diagnostics = calibration_diagnostics(&refs);
+        assert_eq!(diagnostics.normalized_sharpness, None);
+        let bootstrap = calibration_cluster_bootstrap(&refs, 200, "undefined-sharpness");
+        assert_eq!(bootstrap.valid_replicates, 200);
+        assert_eq!(bootstrap.brier_score_95, Some(Interval { lower: 0.0, upper: 0.0 }));
+        assert_eq!(bootstrap.normalized_sharpness_95, None);
     }
 
     #[test]
