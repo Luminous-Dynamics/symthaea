@@ -93,6 +93,35 @@ jobs:
               len(row) != len(hostile_bank["joint_draw_ids"])
               for row in hostile_bank["outcome_samples"]
           ), "hostile bank should expose unequal paired sample cardinality"
+          joint_bank_schema = json.loads(Path("joint-action-bank.v0.1.schema.json").read_text())
+          Draft202012Validator.check_schema(joint_bank_schema)
+          joint_bank = json.loads(Path("fixtures/joint-action-bank.example.json").read_text())
+          validate(instance=joint_bank, schema=joint_bank_schema)
+          assert len(joint_bank["action_ids"]) == 3
+          assert len(joint_bank["joint_draw_ids"]) == 5
+          assert len(joint_bank["outcome_samples"]) == 3
+          assert all(len(row) == 5 for row in joint_bank["outcome_samples"])
+          hostile_bank = json.loads(json.dumps(joint_bank))
+          hostile_bank["action_ids"][1] = hostile_bank["action_ids"][0]
+          try:
+              validate(instance=hostile_bank, schema=joint_bank_schema)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError("joint action-bank contract admitted duplicate action IDs")
+          hostile_bank = json.loads(json.dumps(joint_bank))
+          hostile_bank["joint_draw_ids"][1] = hostile_bank["joint_draw_ids"][0]
+          try:
+              validate(instance=hostile_bank, schema=joint_bank_schema)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError("joint action-bank contract admitted duplicate draw IDs")
+          hostile_bank = json.loads(json.dumps(joint_bank))
+          hostile_bank["outcome_samples"][1].pop()
+          assert any(len(row) != len(hostile_bank["joint_draw_ids"])
+                     for row in hostile_bank["outcome_samples"])
+
           uncertainty_sample = {
               "schema_version": "cmaq-018-uncertainty-contract-v0.1",
               "claim_ceiling": "design_contract_only_no_model_calibration_result",
