@@ -33,7 +33,7 @@ The input history is an observed/remembered belief snapshot with explicit eviden
 - action_ids: stable semantic identities, not array positions;
 - outcome_channel: the scalar quantity predicted by this bank (for example task utility, tracked-object x-coordinate, contact score or terminal-risk score);
 - joint_draw_ids: unique sample IDs whose columns are aligned across every action;
-- joint_draw_bank_sha256: digest of the retained draw specification and sample artifact;
+- joint_draw_bank_sha256: recomputed SHA-256 over a canonical byte encoding of the history digest, horizon, action-manifest digest, outcome channel, ordered action IDs, ordered joint-draw IDs, coupling tag, matrix dimensions and exact little-endian f64 sample bits;
 - coupling: the declared common source of variation;
 - outcome_samples[action][draw]: one finite outcome per action and shared draw.
 
@@ -51,7 +51,7 @@ The coupling field has three allowed values:
 
 The adapter must not label independently sampled branches as paired merely because their rows have equal lengths. If the environment cannot support a valid coupling, it must return an explicit unsupported/unpaired result and must not compute a paired-effect interval.
 
-The action manifest digest binds action identity to the exact canonical action payload. Reordering action IDs and corresponding sample rows must not change the effect interval for a named pair. Changing action parameters without changing the manifest digest is an adapter-integrity failure.
+The action manifest digest binds action identity to the exact canonical action payload. Reordering action IDs and corresponding sample rows must not change the effect interval for a named pair, but it changes the canonical bank bytes; recompute the draw-bank digest after the permutation. Changing action parameters without changing the manifest digest is an adapter-integrity failure. The Rust API exposes compute_joint_draw_bank_sha256 and rejects a bank whose declared digest does not match its contents.
 
 ## Metric use
 
@@ -108,3 +108,10 @@ These are targets for a future actual adapter, not current results:
 ## Claim ceiling
 
 The joint action-bank code proves only that the supplied payload is structurally valid and that paired effects are computed from its aligned columns. It does not prove that the draw coupling is truthful, that the predictor is calibrated, that coverage survives adaptive selection or distribution shift, that the current CfC vision path predicts visual futures, or that any action is physically safe.
+
+
+## Canonical draw-bank bytes
+
+The canonical digest uses the domain tag `cmaq-018-joint-action-bank-v0.1\0`, followed by length-prefixed UTF-8 strings for history digest, action-manifest digest and outcome channel; little-endian u64 horizon, action count and action IDs; little-endian u64 draw count and draw IDs; one coupling byte (0/1/2 for the three enum variants); then the matrix row count, each row length and every f64 sample's exact IEEE-754 bit pattern in little-endian order.
+
+The Rust test pins the synthetic bank digest to a known answer, and the focused workflow recomputes the same encoding independently in Python. This proves content integrity for the encoded bank, not that the producer honestly generated the declared coupling or that the samples are calibrated.
