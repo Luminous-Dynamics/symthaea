@@ -1,6 +1,6 @@
 # HDC-LTC Multi-timescale Temporal Competence Benchmark (v0.1)
 
-**Status:** preregistered protocol with nine prototype Rust task generators; benchmark not built or executed  
+**Status:** preregistered protocol with ten prototype Rust task generators; benchmark not built or executed  
 **Tracking:** NEURO-SILICON-007 / issue #9394  
 **Parent research:** #9369 / #9370 (fast/slow memory), #9371 / #9372 (input trajectories), #9373 (Fourier/RK4 semantics), #7749 (HDC-LTC architecture)  
 **Version:** 0.1.0
@@ -114,6 +114,26 @@ These generators reproduce task *semantics and parameterization*, not the exact 
 
 The public DMS script uses NumPy global randomness and its inspected entry point hardcodes the I/O-factorized trainer despite README examples for other methods. The evidence-accumulation path seeds BrainState from an explicit argument but its inspected trainer uses an infinite training generator and stops on a training-accuracy threshold; it does not show a separate held-out test path. Our reproduction must supply the missing reproducibility and confirmatory split contract rather than treating those scripts' training curves as test performance.
 
+### T10 — Bitemporal continual-knowledge stream
+
+A new structured task is implemented in `research/temporal-bench/src/knowledge_stream.rs`. It maintains an append-only fact history with separate valid time and transaction/observation time. The candidate sees an initial assertion, high-similarity distractor facts, a correction that arrives after its valid-time boundary, a later retraction, and five queries with explicit `(valid_at, known_at)` coordinates.
+
+The required behavior is not simply “remember the newest value.” It must preserve both:
+- what the system had learned by a historical knowledge cutoff; and
+- what it currently believes applied at an earlier valid time after a late correction.
+
+The query suite includes same-valid-time queries before and after correction arrival, same-valid-time queries before and after retraction arrival, and an earlier-valid-time query after both updates. This distinguishes a proper bitemporal ledger from recency decay, a current-state key/value cache, and overwrite-on-update memory.
+
+This task is an executable synthetic adapter to the existing bitemporal source-event and proof-DAG work (#9075, #9149, #9427), not a replacement for those runtime/persistence implementations. It adds no production ledger or proof-DAG code.
+
+### OAKS continual-knowledge benchmark alignment
+
+Kim et al., ACL 2026, introduce OAKS with OAKS-BABI and OAKS-Novel, evaluating answers at each context interval as facts evolve. The paper reports state-tracking delays and distraction susceptibility across 14 evaluated models. The official code repository is `kaistAI/OAKS` and the dataset repository is `adobe-research/OAKS`; pinned repository snapshots, README blob hashes, and the data-license digest are recorded in the machine-readable fixture.
+
+OAKS is an external natural-language benchmark, not identical to T10's structured bitemporal oracle. Use both: T10 to test valid-time/known-time correctness under an exact oracle; OAKS to measure language-level tracking and distraction at every chunk. Do not combine their scores.
+
+The Adobe dataset repository's license restricts use to noncommercial research and teaching, excluding commercial product development or other commercial-gain activities. OAKS data must therefore remain in a noncommercial research lane unless a separate license is obtained. The OAKS evaluation-code README reports 435 OAKS-Novel questions while the dataset README reports 870; reconcile the precise data-file manifest and question-count convention before attempting a paper-score reproduction. No OAKS dataset has been downloaded or evaluated in this PR.
+
 ## 6. Baseline registry
 
 Required baseline families, where semantics are appropriate:
@@ -148,7 +168,10 @@ For every baseline pin repository, exact commit/release, framework, configuratio
 - cumulative regret and prior-regime retention;
 - phase error and forecast horizon;
 - calibration/robustness under jitter, gaps, and missingness;
-- worst-family and worst-delay performance.
+- worst-family and worst-delay performance;
+- exact-match accuracy at each `(valid_at, known_at)` bitemporal coordinate;
+- future-knowledge leakage rate, obsolete-claim use after retraction, correction propagation latency, and preservation of historical as-known answers;
+- OAKS per-chunk accuracy trajectory, answer-change precision/recall, and delay-to-correct-answer (reported separately from T10).
 
 ### Temporal integrity
 
@@ -191,9 +214,11 @@ These are targets, not measured results:
 
 1. Zero future-sample leakage on exhaustive synthetic controls.
 2. Zero silent acceptance of invalid time inputs; errors are explicit and deterministic.
-3. Scalar analytical controls converge to tolerance under integration step refinement.
-4. Delay-conditioned recall and interference curves are published for every preregistered delay.
-5. Online adaptation reports detection, recovery, regret, false alarms, and old-regime retention.
+3. Zero transaction-time leakage on exhaustive bitemporal fixtures: a late correction must not change any answer whose `known_at` precedes the correction's observed time.
+4. Exact agreement with an independent symbolic bitemporal oracle at all preregistered `(valid_at, known_at)` coordinates; historical as-known answers survive later corrections and retractions.
+5. Scalar analytical controls converge to tolerance under integration step refinement.
+6. Delay-conditioned recall and interference curves are published for every preregistered delay.
+7. Online adaptation reports detection, recovery, regret, false alarms, and old-regime retention.
 6. Any memory reduction includes persistent and peak bytes, all intermediate buffers, and read/write traffic.
 7. Energy claims use calibrated hardware measurement and disclose the full boundary; simulator estimates are not hardware measurements.
 8. Improvement claims are supported on held-out source families and state all Pareto gains and regressions.
@@ -233,10 +258,11 @@ The repository contains a standalone Rust research crate under research/temporal
 - a selective-retention/invalidation generator with before/after query semantics and stale-memory abstention;
 - an always-on sparse-event generator with rare target motifs, controlled distractor similarity, a quiet-idle control, event-level scoring, and false-trigger exposure accounting;
 - a phase-sensitive prediction generator with fixed-point oscillator phase, hidden phase/frequency shifts, exact next-crossing targets, and circular phase/timing scoring;
-- seed-bound deterministic stream regeneration for multiscale forecasting/change-point, DMS and evidence accumulation;
+- a bitemporal continual-knowledge stream with retroactive correction, delayed retraction, distractor facts, and explicit `(valid_at, known_at)` query coordinates;
+- seed-bound deterministic stream regeneration and replay verification for delayed cue, multiscale forecasting/change-point, DMS, evidence accumulation, irregular/missingness, retention/invalidation, fast-event detection, phase prediction, and bitemporal knowledge stream;
 - canonical SHA-256 digests for public streams and oracle records, with mutation negative controls.
 
-The three seed-bound checks regenerate the expected task and oracle from evaluator-held seed/config metadata and reject recommitted but inconsistent event streams. The other generator verifiers enforce their current task semantics and digest integrity but do not all yet perform a full seed replay. These checks improve reproducibility; they are not a cryptographic security boundary.
+Seed-bound replay checks regenerate expected tasks and oracles from evaluator-held seed/configuration and reject recommitted but seed-inconsistent event streams. The seed/configuration remains evaluator-owned and is not given to the candidate. These checks improve reproducibility; they are not a cryptographic security boundary.
 
 The public task and oracle are still returned together in one process. The confirmatory oracle is **not yet sealed by process or permission isolation**; there is no candidate sandbox, evaluator-owned signature, replay-resistant receipt, or secure taskgen/evaluator runner. **144 Rust unit tests are authored but unrun** in this environment; cargo, rustc, and rustfmt are unavailable here.
 
