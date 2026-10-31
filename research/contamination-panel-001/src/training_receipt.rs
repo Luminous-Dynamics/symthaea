@@ -124,6 +124,7 @@ pub struct PairedTrainingExecutionAuditV1 {
     pub placebo_run_id: String,
     pub treatment_checkpoint_sha256: String,
     pub placebo_checkpoint_sha256: String,
+    pub training_rng_seed_commitment_sha256: String,
     pub treatment_observed_tokens: u64,
     pub placebo_observed_tokens: u64,
     pub treatment_observed_steps: u64,
@@ -518,6 +519,7 @@ pub fn validate_paired_training_execution_receipt(
         placebo_run_id: receipt.placebo.run_id.clone(),
         treatment_checkpoint_sha256: receipt.treatment.output_checkpoint_sha256.clone(),
         placebo_checkpoint_sha256: receipt.placebo.output_checkpoint_sha256.clone(),
+        training_rng_seed_commitment_sha256: receipt.treatment.training_rng_seed_commitment_sha256.clone(),
         treatment_observed_tokens: receipt.treatment.observed_total_training_token_count,
         placebo_observed_tokens: receipt.placebo.observed_total_training_token_count,
         treatment_observed_steps: receipt.treatment.observed_training_steps,
@@ -804,6 +806,10 @@ mod tests {
         assert_eq!(
             report.design_sha256,
             expected_design_sha256(&design()).unwrap()
+        );
+        assert_eq!(
+            report.training_rng_seed_commitment_sha256,
+            design().training_rng_seed_commitment_sha256
         );
         assert!(report.execution_consistent);
         assert!(report.treatment_completed && report.placebo_completed);
