@@ -482,6 +482,17 @@ mod tests {
     }
 
     #[test]
+    fn verifier_rejects_sample_delay_window_mismatch() {
+        let config = DmsConfig::braintrace_reference(93);
+        let (mut task, oracle) = generate_dms_task(config).unwrap();
+        task.sample_end_step = task.sample_end_step.saturating_add(1);
+        assert_eq!(
+            verify_dms_trace(&task, &oracle),
+            Err(DmsVerificationError::InvalidDecisionWindow)
+        );
+    }
+
+    #[test]
     fn verifier_rejects_wrong_direction_relation() {
         let config = DmsConfig::braintrace_reference(93);
         let (task, mut oracle) = generate_dms_task(config).unwrap();
