@@ -257,7 +257,7 @@ The module src/ftd_calibration.rs runs deterministic Monte Carlo comparisons ove
 - shared per-feature reference banks reused across all test items;
 - independent per-hypothesis reference banks;
 - block-correlated items (common latent scores within task/source clusters);
-- correlated detector features;
+- positively or negatively dependent detector features;
 - deliberately shifted reference distributions;
 - upper- and lower-tail score directions;
 - paper normalized-rejection weights versus official softmax-sharpened weights.
@@ -279,11 +279,14 @@ Additional fixtures:
 - fixtures/ftd-calibration-shifted-reference.json: intentionally misspecified low-shifted reference plus block and feature dependence.
 - fixtures/ftd-calibration-shared-reference.json: mixed clean/contaminated population with a common finite reference bank.
 
+The simulator also compares ordinary Benjamini–Hochberg with Benjamini–Yekutieli final selection. BY is more conservative and is included as a dependence-robust multiple-testing comparator, conditional on valid input p-values. It does not repair a misspecified contaminated-reference distribution.
+
 The report separately estimates:
 - mean false-discovery proportion across runs (the Monte Carlo analogue of FDR);
 - frequency of individual runs whose FDP exceeds the target alpha;
 - clean-sample retention power;
 - selected fraction and counts;
+- fixed-grid null p-value ECDF excess, Kolmogorov–Smirnov and Cramér–von Mises descriptive statistics per detector and after fusion;
 - 95% Hoeffding intervals for bounded Monte Carlo mean outcomes, plus empirical Monte Carlo standard errors.
 
 The run-level exceedance rate is **not** the FDR definition. A high exceedance rate is a useful instability diagnostic; the mean FDP is the Monte Carlo estimate of expected FDP. All intervals describe Monte Carlo uncertainty over the simulator repetitions, not statistical uncertainty about real-world model contamination.
