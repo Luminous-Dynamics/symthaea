@@ -628,6 +628,40 @@ mod tests {
     }
 
     #[test]
+    fn submission_and_score_report_schemas_match_rust_serialization() {
+        let submission_schema: Value = serde_json::from_str(include_str!(
+            "../schema/fresh-answer-submission.schema.json"
+        )).unwrap();
+        let report_schema: Value = serde_json::from_str(include_str!(
+            "../schema/fresh-instance-score-report.schema.json"
+        )).unwrap();
+        let bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
+        let submission = build_submission(&bundle, exact_responses(&bundle));
+        let report = score_fresh_submission(
+            &bundle,
+            &serde_json::to_vec(&submission).unwrap(),
+        ).unwrap();
+        for (schema, value, version) in [
+            (&submission_schema, serde_json::to_value(&submission).unwrap(), FRESH_SUBMISSION_SCHEMA),
+            (&report_schema, serde_json::to_value(&report).unwrap(), FRESH_SCORE_REPORT_SCHEMA),
+        ] {
+            assert_eq!(schema["properties"]["schema"]["const"].as_str(), Some(version));
+            let required: BTreeSet<String> = schema["required"].as_array().unwrap()
+                .iter().map(|item| item.as_str().unwrap().to_owned()).collect();
+            let properties: BTreeSet<String> = schema["properties"].as_object().unwrap()
+                .keys().cloned().collect();
+            let actual: BTreeSet<String> = value.as_object().unwrap().keys().cloned().collect();
+            assert_eq!(required, properties);
+            assert_eq!(actual, properties);
+        }
+        let public_report = serde_json::to_string(&report).unwrap();
+        assert!(!public_report.contains("\"solution\""));
+        assert!(!public_report.contains("\"parameters\""));
+        assert!(!public_report.contains(&bundle.sealed_oracle_packet.generation_seed_hex));
+        assert!(!report.independently_verified);
+    }
+
+    #[test]
     fn perfect_answers_score_full_accuracy_and_coverage() {
         let bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
         let report = score(&bundle, exact_responses(&bundle));
@@ -671,6 +705,7 @@ mod tests {
             r#"{"x":1,"y":2,"explanation":"guess"}"#,
             r#"{"x":1.0,"y":2}"#,
             r#"{"x":1,"y":2} trailing"#,
+            r#"{"x":1,"x":2,"y":2}"#,
         ];
         for case in cases {
             let mut responses = exact_responses(&bundle);
