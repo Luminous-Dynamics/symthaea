@@ -517,7 +517,7 @@ fn ev(
     valid: (u64, Option<u64>), known: (u64, Option<u64>), scope: &str, authority: &str,
 ) -> EvidenceRevision {
     EvidenceRevision {
-        id: id.into(), source_id: format!("src-{}-{family}-{id}", split.label()),
+        id: id.into(), source_id: format!("src-{}-{}-{family}-{id}", split.label(), valid.0),
         source_family_id: format!("{}-family-{family}", split.label()),
         independence_group_id: group.into(), subject_claim_id: claim.into(),
         asserted_polarity: polarity, valid_from: valid.0, valid_until: valid.1,
@@ -605,13 +605,18 @@ pub fn generate_poar_graph_suite(seed: u64, split: DatasetSplit) -> GraphSuite {
     }
 
     // Transitive retraction: a root conclusion depends on a retractable leaf source.
-    add(&mut suite,seed,split,"retraction-dependency",q(t+5,t+5),&["root"],vec![
+    add(&mut suite,seed,split,"retraction-dependency",q(t+5,t+5),&["root","unaffected"],vec![
         claim("base",vec![alt("base-path",Polarity::Supports,vec![ProofRequirement::Evidence("e-base".into())],1)]),
         claim("root",vec![alt("root-via-base",Polarity::Supports,vec![
             ProofRequirement::Claim{claim_id:"base".into(),polarity:Polarity::Supports},
         ],0)]),
-    ],vec![ev(split,"retraction","e-base","base",Polarity::Supports,"g-base",(t,None),(t,None),"scope-a","authority-a")],
-    &[("e-base",HiddenTruth::SupportsAssertion)]);
+        claim("unaffected",vec![alt("unaffected-path",Polarity::Supports,vec![
+            ProofRequirement::Evidence("e-unaffected".into()),
+        ],1)]),
+    ],vec![
+        ev(split,"retraction","e-base","base",Polarity::Supports,"g-base",(t,None),(t,None),"scope-a","authority-a"),
+        ev(split,"retraction-independent","e-unaffected","unaffected",Polarity::Supports,"g-unaffected",(t,None),(t,None),"scope-a","authority-a"),
+    ],&[("e-base",HiddenTruth::SupportsAssertion),("e-unaffected",HiddenTruth::SupportsAssertion)]);
 
     // Scope mismatch and authority mismatch are distinct fixtures.
     add(&mut suite,seed,split,"scope-mismatch",q(t+5,t+5),&["claim"],vec![
@@ -647,9 +652,13 @@ pub fn generate_poar_graph_suite(seed: u64, split: DatasetSplit) -> GraphSuite {
     ],vec![ev(split,"future","e-future","claim",Polarity::Supports,"g-future",(t,None),(t+20,None),"scope-a","authority-a")],
     &[("e-future",HiddenTruth::SupportsAssertion)]);
 
-    // A genuinely deep dependency chain (not merely a list of targets).
+    // Difficulty is structurally stratified: dev=8, calibration=32, held-out test=64.
     {
-        let depth = 64usize;
+        let depth = match split {
+            DatasetSplit::Development => 8usize,
+            DatasetSplit::Calibration => 32usize,
+            DatasetSplit::Test => 64usize,
+        };
         let mut claims = Vec::with_capacity(depth);
         for index in 0..depth {
             let id = format!("chain-{index:03}");
@@ -666,7 +675,8 @@ pub fn generate_poar_graph_suite(seed: u64, split: DatasetSplit) -> GraphSuite {
             claims.push(ClaimNode { id, alternatives: vec![alternative] });
         }
         let leaf = format!("chain-{:03}", depth - 1);
-        add(&mut suite, seed, split, "long-chain-64", q(t+5,t+5), &["chain-000"], claims,
+        let suffix = format!("long-chain-{depth}");
+        add(&mut suite, seed, split, &suffix, q(t+5,t+5), &["chain-000"], claims,
             vec![ev(split,"long-chain","e-chain-leaf",&leaf,Polarity::Supports,"g-chain-leaf",
                 (t,None),(t,None),"scope-a","authority-a")],
             &[("e-chain-leaf",HiddenTruth::SupportsAssertion)]);
@@ -717,6 +727,20 @@ mod tests {
             retrieval_ranking: citations.iter().map(|id| (*id).into()).collect(),
             cited_evidence_ids: citations.iter().map(|id| (*id).into()).collect(),
         }
+    }
+
+    #[test]
+    fn split_graph_depths_are_held_out_in_difficulty_order() {
+        fn chain_depth(suite: &GraphSuite) -> usize {
+            let case = find(suite, "long-chain-");
+            case.claims.iter().filter(|c| c.id.starts_with("chain-")).count()
+        }
+        let dev = generate_poar_graph_suite(41,DatasetSplit::Development);
+        let cal = generate_poar_graph_suite(41,DatasetSplit::Calibration);
+        let test = generate_poar_graph_suite(41,DatasetSplit::Test);
+        assert_eq!(chain_depth(&dev),8);
+        assert_eq!(chain_depth(&cal),32);
+        assert_eq!(chain_depth(&test),64);
     }
 
     #[test]
