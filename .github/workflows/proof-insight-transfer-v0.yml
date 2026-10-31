@@ -17,6 +17,8 @@ on:
       - "docs/research/pitb-missingness-bounds-2026-10-29.md"
       - "scripts/research/pitb_support_antichain_v0.py"
       - "docs/research/pitb-support-antichain-2026-10-30.md"
+      - "scripts/research/pitb_typed_repair_trajectory_v0.py"
+      - "docs/research/pitb-typed-proof-repair-2026-10-31.md"
       - "docs/research/pitb-eligible-target-component-feasibility-2026-10-29.md"
       - ".github/workflows/proof-insight-transfer-v0.yml"
   workflow_dispatch:
@@ -3838,6 +3840,57 @@ jobs:
           script="$GITHUB_WORKSPACE/scripts/research/pitb_support_antichain_v0.py"
           python3 -m py_compile "$script"
           python3 "$script" --self-test
+      - name: Validate typed proof-repair trajectory and operation schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="$GITHUB_WORKSPACE/scripts/research/pitb_typed_repair_trajectory_v0.py"
+          schema="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/typed-proof-repair-operation.schema.json"
+          python3 -m py_compile "$script"
+          python3 "$script" --self-test
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$schema" <<'PY'
+          import copy
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path(sys.argv[1]).read_text())
+          Draft202012Validator.check_schema(schema)
+          good = {
+              "schema_version": "pitb.typed-proof-repair-operation.v0",
+              "episode_id": "schema-control",
+              "operation_id": "op-0",
+              "sequence_index": 0,
+              "target_theorem_id": "target",
+              "target_statement_sha256_before": "a" * 64,
+              "target_statement_sha256_after": "a" * 64,
+              "blueprint_sha256_before": "b" * 64,
+              "blueprint_sha256_after": "c" * 64,
+              "operation": {"kind": "add_dependency", "node_id": "lemma"},
+              "pre_state_node_ids": ["lemma", "target"],
+              "post_state_node_ids": ["lemma", "target"],
+              "affected_node_ids": ["lemma"],
+              "declared_support": ["lemma"],
+              "decision": "applied",
+              "lean_check": "passed",
+              "operation_receipt_sha256": "d" * 64,
+              "run_receipt_sha256": "e" * 64
+          }
+          validator = Draft202012Validator(schema)
+          errors = list(validator.iter_errors(good))
+          if errors:
+              raise SystemExit(f"valid operation fixture rejected: {errors[0].message}")
+          missing = copy.deepcopy(good)
+          del missing["pre_state_node_ids"]
+          if not list(validator.iter_errors(missing)):
+              raise SystemExit("schema accepted operation without pre-state node inventory")
+          bad_apply = copy.deepcopy(good)
+          bad_apply["lean_check"] = "failed"
+          if not list(validator.iter_errors(bad_apply)):
+              raise SystemExit("schema accepted applied operation without Lean success")
+          print("PITB_TYPED_REPAIR_SCHEMA_PASS: Draft2020-12 schema, valid fixture, missing-state and failed-Lean controls")
+          PY
       - name: Upload exact-source index and receipts
         uses: actions/upload-artifact@v4
         with:
