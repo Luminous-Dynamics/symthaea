@@ -328,6 +328,11 @@ pub struct AnytimeHistoryHeader {
     pub run_id: String,
     pub algorithm_id: String,
     pub algorithm_build_sha256: String,
+    pub evaluator_id: String,
+    pub evaluator_build_sha256: String,
+    pub verifier_id: String,
+    pub verifier_build_sha256: String,
+    pub execution_environment_sha256: String,
     pub problem_id: String,
     pub seed: u64,
     pub objective_specs: Vec<ParetoObjectiveSpec>,
@@ -345,6 +350,11 @@ impl AnytimeHistoryHeader {
         run_id: impl Into<String>,
         algorithm_id: impl Into<String>,
         algorithm_build_sha256: impl Into<String>,
+        evaluator_id: impl Into<String>,
+        evaluator_build_sha256: impl Into<String>,
+        verifier_id: impl Into<String>,
+        verifier_build_sha256: impl Into<String>,
+        execution_environment_sha256: impl Into<String>,
         problem_id: impl Into<String>,
         seed: u64,
         objective_specs: Vec<ParetoObjectiveSpec>,
@@ -361,6 +371,11 @@ impl AnytimeHistoryHeader {
             run_id: run_id.into(),
             algorithm_id: algorithm_id.into(),
             algorithm_build_sha256: algorithm_build_sha256.into(),
+            evaluator_id: evaluator_id.into(),
+            evaluator_build_sha256: evaluator_build_sha256.into(),
+            verifier_id: verifier_id.into(),
+            verifier_build_sha256: verifier_build_sha256.into(),
+            execution_environment_sha256: execution_environment_sha256.into(),
             problem_id: problem_id.into(),
             seed,
             objective_specs,
@@ -382,6 +397,8 @@ impl AnytimeHistoryHeader {
         for (path, value) in [
             ("run_id", self.run_id.as_str()),
             ("algorithm_id", self.algorithm_id.as_str()),
+            ("evaluator_id", self.evaluator_id.as_str()),
+            ("verifier_id", self.verifier_id.as_str()),
             ("problem_id", self.problem_id.as_str()),
             ("cost_model_id", self.cost_model_id.as_str()),
         ] {
@@ -390,6 +407,9 @@ impl AnytimeHistoryHeader {
             }
         }
         validate_sha256(&self.algorithm_build_sha256, "header.algorithm_build_sha256")?;
+        validate_sha256(&self.evaluator_build_sha256, "header.evaluator_build_sha256")?;
+        validate_sha256(&self.verifier_build_sha256, "header.verifier_build_sha256")?;
+        validate_sha256(&self.execution_environment_sha256, "header.execution_environment_sha256")?;
         validate_sha256(&self.cost_model_sha256, "header.cost_model_sha256")?;
         let dimensions = self.objective_specs.len();
         if !(2..=4).contains(&dimensions) {
@@ -456,6 +476,12 @@ pub enum AnytimeAction {
         evidence_sha256: String,
         level: EvidenceLevel,
         verifier_receipt_sha256: String,
+    },
+    CandidateVerificationRejected {
+        candidate_id: String,
+        evidence_sha256: String,
+        verifier_receipt_sha256: String,
+        rejection_reason: String,
     },
     AuxiliaryAction {
         action_id: String,
@@ -676,6 +702,17 @@ impl AnytimeHistory {
                         return Err(AnytimeError::new(format!("{path}.level"), "verification level must strictly advance"));
                     }
                     state.evidence_level = *level;
+                }
+                AnytimeAction::CandidateVerificationRejected { candidate_id, evidence_sha256, verifier_receipt_sha256, rejection_reason } => {
+                    validate_sha256(evidence_sha256, &format!("{path}.evidence_sha256"))?;
+                    validate_sha256(verifier_receipt_sha256, &format!("{path}.verifier_receipt_sha256"))?;
+                    if rejection_reason.trim().is_empty() {
+                        return Err(AnytimeError::new(format!("{path}.rejection_reason"), "verifier rejection requires a reason"));
+                    }
+                    let state = successful.get(candidate_id).ok_or_else(|| AnytimeError::new(format!("{path}.candidate_id"), "rejection must follow successful candidate evaluation"))?;
+                    if &state.candidate.evidence_sha256 != evidence_sha256 {
+                        return Err(AnytimeError::new(format!("{path}.evidence_sha256"), "rejection receipt refers to different evidence digest"));
+                    }
                 }
                 AnytimeAction::AuxiliaryAction { action_id, action_kind } => {
                     if action_id.trim().is_empty() || !auxiliary_ids.insert(action_id.as_str()) {
@@ -1120,7 +1157,9 @@ mod tests {
             },
         ], vec![vec![1.0, 0.0], vec![0.0, 1.0]]).unwrap();
         AnytimeHistoryHeader::new(
-            "test-run", "test-optimizer", H1, "zdt1", 7,
+            "test-run", "test-optimizer", H1,
+            "fixed-evaluator", H2, "independent-verifier", H3, H4,
+            "zdt1", 7,
             vec![
                 ParetoObjectiveSpec {
                     objective_id: "f1".to_owned(),
