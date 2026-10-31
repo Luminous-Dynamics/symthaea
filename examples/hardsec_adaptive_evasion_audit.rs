@@ -393,6 +393,89 @@ fn group_bootstrap_interval(
     })
 }
 
+fn binomial_lower_tail(k: usize, n: usize, probability: f64) -> f64 {
+    if k >= n {
+        return 1.0;
+    }
+    if k == 0 {
+        return (1.0 - probability).powf(n as f64);
+    }
+    let mut log_choose = 0.0f64;
+    for i in 1..=k {
+        log_choose += ((n - k + i) as f64).ln() - (i as f64).ln();
+    }
+    let log_mass = log_choose
+        + (k as f64) * probability.ln()
+        + ((n - k) as f64) * (-probability).ln_1p();
+    let mut term = log_mass.exp();
+    let mut total = term;
+    for i in (1..=k).rev() {
+        term *= (i as f64 / (n - i + 1) as f64) * ((1.0 - probability) / probability);
+        total += term;
+        if term <= total * 1e-16 {
+            break;
+        }
+    }
+    total.min(1.0)
+}
+
+/// Exact one-sided Clopper-Pearson upper endpoint, obtained by inverting
+/// P[X <= observed_failures] = alpha for X ~ Binomial(n, p).
+fn clopper_pearson_upper(observed_failures: usize, groups: usize, alpha: f64) -> Option<f64> {
+    if groups == 0 || observed_failures > groups || !(0.0 < alpha && alpha < 1.0) {
+        return None;
+    }
+    if observed_failures == groups {
+        return Some(1.0);
+    }
+    if observed_failures == 0 {
+        return Some(1.0 - alpha.powf(1.0 / groups as f64));
+    }
+    let mut lower = observed_failures as f64 / groups as f64;
+    let mut upper = 1.0f64;
+    for _ in 0..80 {
+        let midpoint = (lower + upper) * 0.5;
+        if binomial_lower_tail(observed_failures, groups, midpoint) > alpha {
+            lower = midpoint;
+        } else {
+            upper = midpoint;
+        }
+    }
+    Some(upper)
+}
+
+fn group_failure_bound(
+    groups: &BTreeMap<String, RecallCounts>,
+    endpoint: &str,
+    failure_semantics: &str,
+) -> Value {
+    let group_count = groups.len();
+    let failures = groups.values().filter(|stats| match failure_semantics {
+        "any_attack_miss" => stats.cleared + stats.abstained > 0,
+        "any_benign_false_alert" => stats.detected > 0,
+        _ => unreachable!("group failure semantics fixed by caller"),
+    }).count();
+    let familywise_alpha = 0.05f64;
+    let adjusted_alpha = familywise_alpha / 6.0;
+    let upper_bound = clopper_pearson_upper(failures, group_count, adjusted_alpha);
+    json!({
+        "endpoint": endpoint,
+        "failure_semantics": failure_semantics,
+        "status": if upper_bound.is_some() { "available_conditional_group_bound" } else { "unavailable_no_independent_groups" },
+        "groups_with_any_failure": failures,
+        "independent_group_count": group_count,
+        "observed_group_failure_fraction": if group_count == 0 { None } else { Some(failures as f64 / group_count as f64) },
+        "upper_confidence_bound": upper_bound,
+        "confidence_level_per_bound": 1.0 - adjusted_alpha,
+        "familywise_alpha": familywise_alpha,
+        "bonferroni_endpoint_count": 6,
+        "adjusted_alpha_per_endpoint": adjusted_alpha,
+        "bernoulli_unit": "caller_declared_independent_group",
+        "assumption": "groups are independent and exchangeable for this endpoint",
+        "interpretation": "Bound concerns the probability a new group contains at least one defined failure; it is not a per-case FNR/FPR and does not authenticate group independence."
+    })
+}
+
 fn percentile(sorted: &[u64], q: f64) -> Option<u64> {
     if sorted.is_empty() {
         return None;
@@ -817,7 +900,15 @@ fn audit_values(
             "adaptation_family_macro_recall": group_bootstrap_interval(&adaptation_family_groups, &prediction_campaign, "adaptation_family"),
             "program_macro_recall": group_bootstrap_interval(&program_groups, &prediction_campaign, "program"),
             "execution_macro_recall": group_bootstrap_interval(&execution_groups, &prediction_campaign, "execution"),
-            "benign_program_macro_false_alert_rate": group_bootstrap_interval(&benign_by_program, &prediction_campaign, "benign_program")
+            "benign_program_macro_false_alert_rate": group_bootstrap_interval(&benign_by_program, &prediction_campaign, "benign_program"),
+            "group_failure_bounds": {
+                "attack_family": group_failure_bound(&attack_family_groups, "attack_family", "any_attack_miss"),
+                "adaptation_family_level": group_failure_bound(&adaptation_groups, "adaptation_family_level", "any_attack_miss"),
+                "adaptation_family": group_failure_bound(&adaptation_family_groups, "adaptation_family", "any_attack_miss"),
+                "program": group_failure_bound(&program_groups, "program", "any_attack_miss"),
+                "execution": group_failure_bound(&execution_groups, "execution", "any_attack_miss"),
+                "benign_program": group_failure_bound(&benign_by_program, "benign_program", "any_benign_false_alert")
+            }
         },
         "calibration": calibration,
         "sensor_integrity": {
@@ -1210,6 +1301,44 @@ mod tests {
         assert_eq!(first["seed_sha256"], "007ff034591a1d49060b43c806029957ad4fe125dcd33c3cf96e4b6fe65a1b7e");
         assert_eq!(first["bootstrap_replicates"], GROUP_BOOTSTRAP_REPLICATES);
         assert_eq!(first["resampling_unit"], "caller_declared_independent_group");
+    }
+
+    #[test]
+    fn exact_group_failure_upper_bound_matches_zero_event_anchor() {
+        let upper = clopper_pearson_upper(0, 5, 0.05 / 6.0).unwrap();
+        assert!((upper - 0.6161480503626225).abs() < 1e-12);
+    }
+
+    #[test]
+    fn exact_group_failure_upper_bound_matches_mixed_event_anchor() {
+        let upper = clopper_pearson_upper(1, 4, 0.05 / 6.0).unwrap();
+        assert!((upper - 0.8677566049821364).abs() < 1e-12);
+    }
+
+    #[test]
+    fn exact_group_failure_upper_bound_is_monotone_in_observed_failures() {
+        let zero = clopper_pearson_upper(0, 10, 0.05 / 6.0).unwrap();
+        let one = clopper_pearson_upper(1, 10, 0.05 / 6.0).unwrap();
+        let two = clopper_pearson_upper(2, 10, 0.05 / 6.0).unwrap();
+        assert!(zero < one && one < two);
+        assert_eq!(clopper_pearson_upper(10, 10, 0.05 / 6.0), Some(1.0));
+        assert_eq!(clopper_pearson_upper(0, 0, 0.05 / 6.0), None);
+    }
+
+    #[test]
+    fn known_answer_group_bounds_use_group_not_case_denominators() {
+        let (p,m,t,pb,mb,tb) = fixture_values();
+        let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
+        let bounds = &receipt["statistical_support"]["group_failure_bounds"];
+        assert_eq!(bounds["attack_family"]["groups_with_any_failure"], 1);
+        assert_eq!(bounds["attack_family"]["independent_group_count"], 1);
+        assert_eq!(bounds["attack_family"]["upper_confidence_bound"], 1.0);
+        assert_eq!(bounds["adaptation_family_level"]["groups_with_any_failure"], 2);
+        assert_eq!(bounds["adaptation_family_level"]["independent_group_count"], 3);
+        assert_eq!(bounds["program"]["independent_group_count"], 3);
+        assert_eq!(bounds["benign_program"]["groups_with_any_failure"], 1);
+        assert_eq!(bounds["benign_program"]["independent_group_count"], 4);
+        assert_eq!(bounds["benign_program"]["bernoulli_unit"], "caller_declared_independent_group");
     }
 
     #[test]
