@@ -148,15 +148,19 @@ struct Summary {
     model: &'static str,
     mean_pair_coverage: f64,
     mean_effect_sign_accuracy: Option<f64>,
+    effect_sign_accuracy_episode_count: usize,
     effect_sign_accuracy_ci95_lower: Option<f64>,
     effect_sign_accuracy_ci95_upper: Option<f64>,
     mean_effect_magnitude_mae: Option<f64>,
+    effect_magnitude_mae_episode_count: usize,
     effect_magnitude_mae_ci95_lower: Option<f64>,
     effect_magnitude_mae_ci95_upper: Option<f64>,
     mean_rank_tau_b: Option<f64>,
+    rank_tau_b_episode_count: usize,
     rank_tau_b_ci95_lower: Option<f64>,
     rank_tau_b_ci95_upper: Option<f64>,
     mean_top1_regret: Option<f64>,
+    top1_regret_episode_count: usize,
     top1_regret_ci95_lower: Option<f64>,
     top1_regret_ci95_upper: Option<f64>,
     mean_null_false_effect_rate: Option<f64>,
@@ -164,6 +168,7 @@ struct Summary {
     mean_branch_outcome_mae: Option<f64>,
     mean_branch_state_mae: Option<f64>,
     mean_terminal_false_safe_rate: Option<f64>,
+    terminal_false_safe_rate_episode_count: usize,
     terminal_false_safe_rate_ci95_lower: Option<f64>,
     terminal_false_safe_rate_ci95_upper: Option<f64>,
     mean_branch_prediction_evaluations: f64,
@@ -548,6 +553,10 @@ fn mean_optional(values: &[Option<f64>]) -> Option<f64> {
 }
 
 
+fn optional_sample_count(values: &[Option<f64>]) -> usize {
+    values.iter().filter(|value| value.is_some()).count()
+}
+
 fn bootstrap_mean_ci(values: &[Option<f64>], seed: u64) -> Option<(f64, f64)> {
     const RESAMPLES: usize = 2000;
     let observed: Vec<f64> = values.iter().filter_map(|value| *value).collect();
@@ -622,9 +631,15 @@ fn summarize(scenario: Scenario, model: Model) -> Summary {
         mean_effect_sign_accuracy: mean_optional(
             &rows.iter().map(|row| row.sign_accuracy).collect::<Vec<_>>(),
         ),
+        effect_sign_accuracy_episode_count: optional_sample_count(
+            &rows.iter().map(|row| row.sign_accuracy).collect::<Vec<_>>(),
+        ),
         effect_sign_accuracy_ci95_lower: sign_ci.map(|interval| interval.0),
         effect_sign_accuracy_ci95_upper: sign_ci.map(|interval| interval.1),
         mean_effect_magnitude_mae: mean_optional(
+            &rows.iter().map(|row| row.effect_magnitude_mae).collect::<Vec<_>>(),
+        ),
+        effect_magnitude_mae_episode_count: optional_sample_count(
             &rows.iter().map(|row| row.effect_magnitude_mae).collect::<Vec<_>>(),
         ),
         effect_magnitude_mae_ci95_lower: magnitude_ci.map(|interval| interval.0),
@@ -632,9 +647,15 @@ fn summarize(scenario: Scenario, model: Model) -> Summary {
         mean_rank_tau_b: mean_optional(
             &rows.iter().map(|row| row.rank_tau_b).collect::<Vec<_>>(),
         ),
+        rank_tau_b_episode_count: optional_sample_count(
+            &rows.iter().map(|row| row.rank_tau_b).collect::<Vec<_>>(),
+        ),
         rank_tau_b_ci95_lower: tau_ci.map(|interval| interval.0),
         rank_tau_b_ci95_upper: tau_ci.map(|interval| interval.1),
         mean_top1_regret: mean_optional(
+            &rows.iter().map(|row| row.top1_regret).collect::<Vec<_>>(),
+        ),
+        top1_regret_episode_count: optional_sample_count(
             &rows.iter().map(|row| row.top1_regret).collect::<Vec<_>>(),
         ),
         top1_regret_ci95_lower: regret_ci.map(|interval| interval.0),
@@ -650,6 +671,9 @@ fn summarize(scenario: Scenario, model: Model) -> Summary {
             &rows.iter().map(|row| row.branch_state_mae).collect::<Vec<_>>(),
         ),
         mean_terminal_false_safe_rate: mean_optional(
+            &rows.iter().map(|row| row.terminal_false_safe_rate).collect::<Vec<_>>(),
+        ),
+        terminal_false_safe_rate_episode_count: optional_sample_count(
             &rows.iter().map(|row| row.terminal_false_safe_rate).collect::<Vec<_>>(),
         ),
         terminal_false_safe_rate_ci95_lower: false_safe_ci.map(|interval| interval.0),
@@ -730,24 +754,48 @@ fn render_report() -> String {
 
             output.push_str("\"mean_effect_sign_accuracy\":");
             write_optional(&mut output, row.mean_effect_sign_accuracy);
+            write!(
+                &mut output,
+                ",\"effect_sign_accuracy_episode_count\":{}",
+                row.effect_sign_accuracy_episode_count
+            )
+            .expect("writing to String cannot fail");
             output.push_str(",\"effect_sign_accuracy_ci95_lower\":");
             write_optional(&mut output, row.effect_sign_accuracy_ci95_lower);
             output.push_str(",\"effect_sign_accuracy_ci95_upper\":");
             write_optional(&mut output, row.effect_sign_accuracy_ci95_upper);
             output.push_str(",\"mean_effect_magnitude_mae\":");
             write_optional(&mut output, row.mean_effect_magnitude_mae);
+            write!(
+                &mut output,
+                ",\"effect_magnitude_mae_episode_count\":{}",
+                row.effect_magnitude_mae_episode_count
+            )
+            .expect("writing to String cannot fail");
             output.push_str(",\"effect_magnitude_mae_ci95_lower\":");
             write_optional(&mut output, row.effect_magnitude_mae_ci95_lower);
             output.push_str(",\"effect_magnitude_mae_ci95_upper\":");
             write_optional(&mut output, row.effect_magnitude_mae_ci95_upper);
             output.push_str(",\"mean_rank_tau_b\":");
             write_optional(&mut output, row.mean_rank_tau_b);
+            write!(
+                &mut output,
+                ",\"rank_tau_b_episode_count\":{}",
+                row.rank_tau_b_episode_count
+            )
+            .expect("writing to String cannot fail");
             output.push_str(",\"rank_tau_b_ci95_lower\":");
             write_optional(&mut output, row.rank_tau_b_ci95_lower);
             output.push_str(",\"rank_tau_b_ci95_upper\":");
             write_optional(&mut output, row.rank_tau_b_ci95_upper);
             output.push_str(",\"mean_top1_regret\":");
             write_optional(&mut output, row.mean_top1_regret);
+            write!(
+                &mut output,
+                ",\"top1_regret_episode_count\":{}",
+                row.top1_regret_episode_count
+            )
+            .expect("writing to String cannot fail");
             output.push_str(",\"top1_regret_ci95_lower\":");
             write_optional(&mut output, row.top1_regret_ci95_lower);
             output.push_str(",\"top1_regret_ci95_upper\":");
@@ -765,6 +813,12 @@ fn render_report() -> String {
             write_optional(&mut output, row.mean_branch_state_mae);
             output.push_str(",\"mean_terminal_false_safe_rate\":");
             write_optional(&mut output, row.mean_terminal_false_safe_rate);
+            write!(
+                &mut output,
+                ",\"terminal_false_safe_rate_episode_count\":{}",
+                row.terminal_false_safe_rate_episode_count
+            )
+            .expect("writing to String cannot fail");
             output.push_str(",\"terminal_false_safe_rate_ci95_lower\":");
             write_optional(&mut output, row.terminal_false_safe_rate_ci95_lower);
             output.push_str(",\"terminal_false_safe_rate_ci95_upper\":");
