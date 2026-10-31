@@ -34,8 +34,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  beverage-target:
+    name: Beverage runner source-target preflight
+    runs-on: ubuntu-latest
+    outputs:
+      present: ${{ steps.target.outputs.present }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - id: target
+        name: Check every runner referenced by the standalone harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            "crates/domains/symthaea-culinary/src/bin/beverage_benchmark_receipt.rs"
+            "crates/domains/symthaea-culinary/src/bin/wine_quality_source_audit.rs"
+            "crates/domains/symthaea-culinary/src/bin/fermentation_time_series_audit.rs"
+            "tools/beverage-benchmark-harness/src/bin/schema_contract_audit.rs"
+          )
+          missing=()
+          for path in "${required[@]}"; do
+            [[ -f "$path" ]] || missing+=("$path")
+          done
+          if (( ${#missing[@]} == 0 )); then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "BEVERAGE_TARGETS_PRESENT: all four runner sources exist"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            printf '::notice::BEVERAGE_NOT_APPLICABLE: missing runner source: %s\n' "${missing[@]}"
+          fi
+
   synthetic-contract:
-    name: Synthetic Corpus Contract
+    name: Synthetic Corpus Contract (only when all runner sources exist)
+    needs: beverage-target
+    if: ${{ needs.beverage-target.outputs.present == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
