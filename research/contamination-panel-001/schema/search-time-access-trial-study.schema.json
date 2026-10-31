@@ -15,6 +15,9 @@
     "prompt_and_decoding_sha256",
     "metric_definition_sha256",
     "enforcement_build_sha256",
+    "network_disabled_policy_sha256",
+    "allowlisted_policy_sha256",
+    "unrestricted_policy_sha256",
     "minimum_confirmatory_blocks",
     "run_order_seed_hex",
     "budget",
@@ -238,6 +241,18 @@
           }
         }
       }
+    },
+    "network_disabled_policy_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "allowlisted_policy_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "unrestricted_policy_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     }
   },
   "$defs": {
