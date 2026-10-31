@@ -518,8 +518,7 @@ impl GenomeArchive {
                 "genome ID already exists in the archive",
             );
         }
-        let candidate = mean_fingerprint_array(&evaluation.mean_structural_fingerprint);
-        let Some(candidate) = candidate else {
+        let Some(candidate) = mean_fingerprint_array(&evaluation.mean_structural_fingerprint) else {
             return receipt(
                 ArchiveInsertDisposition::RejectedIneligible,
                 &genome_id,
@@ -546,27 +545,28 @@ impl GenomeArchive {
             );
         }
 
-        let mut removed = Vec::new();
-        for entry in &self.entries {
-            if objective_dominates(&entry.objectives, &evaluation.objectives) {
-                return receipt(
-                    ArchiveInsertDisposition::RejectedDominated,
-                    &genome_id,
-                    Vec::new(),
-                    format!("candidate is Pareto-dominated by {}", entry.genome_id),
-                );
-            }
+        if let Some(entry) = self.entries.iter()
+            .find(|entry| objective_dominates(&entry.objectives, &evaluation.objectives))
+        {
+            return receipt(
+                ArchiveInsertDisposition::RejectedDominated,
+                &genome_id,
+                Vec::new(),
+                format!("candidate is Pareto-dominated by {}", entry.genome_id),
+            );
         }
 
-        for entry in &self.entries {
-            if objective_dominates(&evaluation.objectives, &entry.objectives) {
-                removed.push(entry.genome_id.clone());
-            }
-        }
-        self.entries.retain(|entry| !removed.contains(&entry.genome_id));
+        let removed: Vec<String> = self.entries.iter()
+            .filter(|entry| objective_dominates(&evaluation.objectives, &entry.objectives))
+            .map(|entry| entry.genome_id.clone())
+            .collect();
+        let mut next_entries: Vec<GenomeArchiveEntry> = self.entries.iter()
+            .filter(|entry| !removed.contains(&entry.genome_id))
+            .cloned()
+            .collect();
 
         if removed.is_empty() && self.config.near_clone_threshold.is_some_and(|threshold| {
-            self.entries.iter().any(|entry| {
+            next_entries.iter().any(|entry| {
                 mean_fingerprint_array(&entry.mean_structural_fingerprint)
                     .is_some_and(|existing| normalized_distance(&candidate, &existing) <= threshold)
             })
@@ -578,7 +578,7 @@ impl GenomeArchive {
                 "candidate is structurally near-identical to an archived genome and does not Pareto-dominate it",
             );
         }
-        if self.entries.len() >= self.config.max_entries {
+        if next_entries.len() >= self.config.max_entries {
             return receipt(
                 ArchiveInsertDisposition::RejectedCapacity,
                 &genome_id,
@@ -587,31 +587,51 @@ impl GenomeArchive {
             );
         }
 
-        let entry = GenomeArchiveEntry {
+        next_entries.push(GenomeArchiveEntry {
             genome_id: genome_id.clone(),
             evaluation_sha256: evaluation.evaluation_sha256.clone(),
             mean_structural_fingerprint: evaluation.mean_structural_fingerprint.clone(),
             objectives: evaluation.objectives.clone(),
             evaluation,
+        });
+        next_entries.sort_by(|left, right| left.genome_id.cmp(&right.genome_id));
+
+        // Build and hash a complete candidate snapshot before mutating self.
+        // Any serialization or invariant failure leaves the original archive
+        // byte-for-byte unchanged.
+        let mut next_archive = Self {
+            schema: self.schema.clone(),
+            config: self.config.clone(),
+            reference_population_sha256: self.reference_population_sha256.clone()
+                .or_else(|| next_entries.first().and_then(|entry| {
+                    entry.evaluation.reference_population_sha256.clone()
+                })),
+            reference_population_bound: self.reference_population_bound || !next_entries.is_empty(),
+            entries: next_entries,
+            archive_sha256: String::new(),
         };
-        if !self.reference_population_bound {
-            self.reference_population_sha256 = entry.evaluation.reference_population_sha256.clone();
-            self.reference_population_bound = true;
-        }
-        self.entries.push(entry);
-        self.entries.sort_by(|left, right| left.genome_id.cmp(&right.genome_id));
-        match self.compute_digest() {
-            Ok(digest) => self.archive_sha256 = digest,
+        let digest = match next_archive.compute_digest() {
+            Ok(digest) => digest,
             Err(error) => {
-                self.entries.retain(|entry| entry.genome_id != genome_id);
                 return receipt(
                     ArchiveInsertDisposition::RejectedIneligible,
                     &genome_id,
-                    removed,
+                    Vec::new(),
                     format!("archive digest could not be recomputed: {}", error.message),
                 );
             }
+        };
+        next_archive.archive_sha256 = digest;
+        if !next_archive.verify_digest() {
+            return receipt(
+                ArchiveInsertDisposition::RejectedIneligible,
+                &genome_id,
+                Vec::new(),
+                "candidate archive snapshot failed its own integrity/non-dominance checks",
+            );
         }
+        *self = next_archive;
+
         receipt(
             if removed.is_empty() {
                 ArchiveInsertDisposition::Accepted
