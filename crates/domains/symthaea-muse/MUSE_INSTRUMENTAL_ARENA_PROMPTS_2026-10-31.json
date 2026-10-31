@@ -16,11 +16,11 @@
     "cards_per_style": 15,
     "cards_per_density": 50,
     "target_duration_seconds": 90,
-    "duration_policy": "Request approximately 90 seconds. Record actual duration. Do not time-stretch. Retain original provider artifact and use a common, preregistered listening window if durations differ.",
+    "duration_policy": "Pilot target is approximately 90 seconds. This differs from the roughly 3-minute output length used in the current Artificial Analysis instrumental leaderboard, so this pilot is not directly Elo-comparable to that public leaderboard. Record actual duration and keep provider outputs unwarped. A confirmatory industry-comparison track must preregister a duration-matched prompt set or a common comparison window and must be reported as its own study.",
     "generation_policy": "Use fixed seed 42 where the provider exposes a seed and record whether the value was accepted. Keep fixed-seed and native/best-of-N generation as separate tracks. Never cherry-pick after hearing the result.",
     "prompt_policy": "Send identical prompt text to each system. System-specific parameter settings, model identity, exact prompt bytes and output SHA-256 must be recorded.",
     "review_policy": "AfroCuban, BossaNova and Flamenco prompts are candidate evaluation instructions only. A knowledgeable practitioner review is required before authenticity claims or any culture-specific promotion.",
-    "exclusions": "This prompt bank does not itself establish a frozen randomization schedule, consent process, audio artifact bundle, sample availability, provider access, or confirmatory preregistration."
+    "exclusions": "This prompt bank does not itself establish a frozen randomization schedule, consent process, audio artifact bundle, sample availability, provider access, or confirmatory preregistration. The 90-second pilot is not a direct reproduction of Artificial Analysis's roughly three-minute instrumental arena and must not be claimed as a direct leaderboard comparison."
   },
   "balance": {
     "cards_per_style": {
