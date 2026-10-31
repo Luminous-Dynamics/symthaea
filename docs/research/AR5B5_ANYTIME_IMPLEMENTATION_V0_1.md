@@ -134,3 +134,12 @@ All tests remain authored and unexecuted; no byte-verification or science-validi
 ### Terminal verifier rejection
 
 A candidate-verification rejection is now terminal for that candidate identity within the run. A later attempt to promote the same candidate is rejected by history validation. A contradictory verifier outcome after a prior promotion invalidates the history rather than allowing an already-qualified candidate to be silently reclassified. Use a new candidate/run/replication identity for changed bytes or an independent re-evaluation. A regression test covers rejection followed by attempted held-out promotion.
+
+
+### Incremental append and restart behavior
+
+The history writer now maintains a private in-memory validation state. A newly constructed history validates its frozen header once; each subsequent append verifies only the new event transition, updates bounded hash/index state, and appends the event. It no longer replays the entire prefix twice per action.
+
+The validation cache is excluded from serialization. When a retained history is deserialized, the next append first reconstructs the cache by replaying the complete chain, then resumes incrementally. The public history/header/event fields are exposed through immutable accessors so callers cannot mutate the prefix behind the cache. Full \`validate()\` and analysis still replay every event independently.
+
+Expected complexity: incremental appends are O(log n) for indexed identity checks plus event hashing; a full audit is O(n log n). An authored regression test serializes and resumes a history, then requires the resumed and uninterrupted streams and receipts to match exactly. No runtime benchmark or measured throughput claim is yet available.
