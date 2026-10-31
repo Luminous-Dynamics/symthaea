@@ -85,11 +85,25 @@ jobs:
               path: json.loads(Path(path).read_text())
               for path in lock_paths
           }
-          for path, lock in locks.items():
+          catalog = locks["control-baselines.lock.json"]
+          assert catalog["schema_version"] == "cmaq-011-baseline-catalog-v0.1"
+          assert catalog["baselines"]
+
+          external_lock_paths = [
+              "mrsq-baseline.lock.json",
+              "wbench-baseline.lock.json",
+              "wimle-baseline.lock.json",
+              "worldoracle-baseline.lock.json",
+              "worldsimprobe-baseline.lock.json",
+          ]
+          for path in external_lock_paths:
+              lock = locks[path]
               assert lock.get("schema_version") == "cmaq-011-external-baseline-lock-v0.1", path
               assert lock.get("baseline_id"), path
+              assert len(lock.get("source_commit", "")) == 40, path
 
           assert locks["mrsq-baseline.lock.json"]["license"] == "CC BY-NC 4.0"
+          assert locks["wbench-baseline.lock.json"]["source_license"] == "MIT"
           assert locks["wimle-baseline.lock.json"]["license"] == "MIT"
 
           worldoracle = locks["worldoracle-baseline.lock.json"]
