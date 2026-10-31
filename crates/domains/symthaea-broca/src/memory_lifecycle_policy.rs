@@ -987,6 +987,8 @@ mod tests {
                 minimum_independent_families: 2,
                 minimum_distinct_sessions: 2,
                 minimum_user_authored_evidence: 1,
+                required_complete_evidence_ids: BTreeSet::new(),
+                enumeration_receipt_sha256: None,
                 selection_overhead_tokens: 1,
             }],
         }
