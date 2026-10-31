@@ -6,7 +6,7 @@ const ACTIONS: usize = 3;
 const CONTEXTS: usize = 4;
 const DEFAULT_PROBE_BUDGET: usize = 2;
 const DEFAULT_DECISION_HORIZON: usize = 1;
-const REPORT_SCHEMA: &str = "cmaq-002-evoi-report-v0.2";
+const REPORT_SCHEMA: &str = "cmaq-002-evoi-report-v0.3";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Family {
@@ -242,19 +242,26 @@ fn posterior_decision_value(worlds: &[Mechanism], posterior: &[usize]) -> f64 {
     total / CONTEXTS as f64
 }
 
+fn actual_context_utility(world: &Mechanism, context: usize, action: Option<usize>) -> (f64, bool) {
+    let Some(action) = action else {
+        return (0.0, false);
+    };
+    let outcome = world.observe(Query { context, action });
+    if outcome.safe {
+        (f64::from(outcome.reward), false)
+    } else {
+        (-100.0, true)
+    }
+}
+
 fn actual_decision_value(world: &Mechanism, worlds: &[Mechanism], posterior: &[usize]) -> (f64, usize) {
     let mut total = 0.0;
     let mut unsafe_actions = 0usize;
     for context in 0..CONTEXTS {
-        if let Some(action) = candidate_action(worlds, posterior, context) {
-            let outcome = world.observe(Query { context, action });
-            if outcome.safe {
-                total += f64::from(outcome.reward);
-            } else {
-                unsafe_actions += 1;
-                total -= 100.0;
-            }
-        }
+        let action = candidate_action(worlds, posterior, context);
+        let (utility, unsafe_action) = actual_context_utility(world, context, action);
+        total += utility;
+        unsafe_actions += usize::from(unsafe_action);
     }
     (total / CONTEXTS as f64, unsafe_actions)
 }
@@ -341,6 +348,38 @@ impl SplitMix64 {
     }
 }
 
+fn robustly_safe_probe(worlds: &[Mechanism], posterior: &[usize], query: Query) -> bool {
+    !posterior.is_empty()
+        && posterior.iter().all(|index| worlds[*index].sense(query).safe)
+}
+
+fn available_probe_queries(
+    worlds: &[Mechanism],
+    posterior: &[usize],
+    used: &BTreeSet<Query>,
+) -> (Vec<Query>, usize) {
+    let unused: Vec<Query> = all_queries()
+        .into_iter()
+        .filter(|query| !used.contains(query))
+        .collect();
+    let safe: Vec<Query> = unused.iter().copied()
+        .filter(|query| robustly_safe_probe(worlds, posterior, *query))
+        .collect();
+    let blocked = unused.len().saturating_sub(safe.len());
+    (safe, blocked)
+}
+
+fn allocator_score_evaluations(strategy: Strategy, safe_candidate_count: usize) -> usize {
+    if safe_candidate_count == 0 {
+        return 0;
+    }
+    match strategy {
+        Strategy::Evoi | Strategy::MaxInformation => safe_candidate_count,
+        Strategy::Fixed | Strategy::Random => 1,
+        Strategy::NoProbe | Strategy::Oracle => 0,
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 enum Strategy {
     NoProbe,
@@ -383,11 +422,9 @@ fn select_probe(
     rng: &mut SplitMix64,
     decision_horizon: usize,
     probe_cost: f64,
+    allocator_cost_per_evaluation: f64,
 ) -> Option<Query> {
-    let available: Vec<Query> = all_queries()
-        .into_iter()
-        .filter(|query| !used.contains(query))
-        .collect();
+    let (available, _) = available_probe_queries(worlds, posterior, used);
     if available.is_empty() || posterior.len() <= 1 {
         return None;
     }
@@ -422,7 +459,12 @@ fn select_probe(
                     .then_with(|| right.cmp(left))
             })?;
             let gain = expected_value_of_probe(worlds, posterior, best);
-            if gain * decision_horizon as f64 > probe_cost { Some(best) } else { None }
+            let allocator_cost = available.len() as f64 * allocator_cost_per_evaluation;
+            if gain * decision_horizon as f64 > probe_cost + allocator_cost {
+                Some(best)
+            } else {
+                None
+            }
         }
     }
 }
@@ -484,7 +526,15 @@ struct Summary {
     mean_net_utility: f64,
     mean_regret: f64,
     mean_net_regret: f64,
+    mean_decision_gain_vs_no_probe: f64,
+    mean_decision_flip_fraction: f64,
+    beneficial_flip_fraction: f64,
+    harmful_flip_fraction: f64,
+    mean_allocator_score_evaluations: f64,
+    mean_allocator_cost: f64,
+    mean_safety_blocked_candidates: f64,
     unsafe_actions: usize,
+    unsafe_probes: usize,
     contradictions: usize,
 }
 
