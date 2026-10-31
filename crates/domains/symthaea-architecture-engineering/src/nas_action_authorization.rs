@@ -1593,13 +1593,18 @@ mod tests {
             .unwrap();
         assert_eq!(reservation.state, crate::resource_reservation::ReservationState::Committed);
         reservation_ledger.verify_integrity().unwrap();
-        let receipt = verify_measurement_preflight(&preflight_request).unwrap();
-        assert_eq!(receipt.action_kind, NasActionKind::AcquireMeasurement);
-        assert_eq!(
-            receipt.disposition,
-            "PREFLIGHT_ELIGIBLE_NO_RESERVATION_NO_EXECUTION"
-        );
-        verify_action_preflight_receipt_digest(&receipt).unwrap();
+        // A second preflight made against the old reservation-ledger head cannot reserve
+        // again after the prior action has changed the ledger revision.
+        let stale_capability =
+            prepare_measurement_reservation(&preflight_request).unwrap();
+        assert!(reservation_ledger
+            .reserve_measurement(
+                &scope.reservation_ledger_head_sha256,
+                stale_capability,
+                30,
+            )
+            .is_err());
+        assert_eq!(reservation.state, crate::resource_reservation::ReservationState::Committed);
 
         let mut changed_manifest_scope = scope.clone();
         changed_manifest_scope.confidence_family_manifest_sha256 = sha('0');
