@@ -48,6 +48,8 @@ This is a NAS-oriented extension inspired by cost-aware best-arm identification,
 - **DormantReactivation:** spend resource to revisit a previously dormant candidate.
 - **SentinelAudit:** acquire an aggregate pruning-audit disposition. Only aggregate outcomes are allowed; candidate IDs and raw sentinel scores must stay in the evaluator.
 
+Every action names a rung in the frozen ordered fidelity ladder and declares its last completed rung. The planner checks the ID/index mapping and verifies incremental cost against the manifest's ResumablePrefix or IndependentRuns cost model. An action cannot silently relabel a rung or understate a restart cost.
+
 The model is one-step and replanning-based: execute at most the selected action, update the posterior from the actual observation, reconcile actual cost, then call the planner again. It does not assume multiple future actions can be executed using a stale posterior.
 
 ## 4. Provenance and calibration contract
@@ -87,7 +89,7 @@ An action may spend its own reserve but cannot consume resources protected for o
 
 ## 6. Authored test coverage
 
-Sixteen Rust test declarations cover:
+Nineteen Rust test declarations cover:
 - the discrete-posterior value-of-information example (current regret 0.5, expected post-action regret 0.1, VOI 0.4);
 - no-information actions and explicit stopping;
 - top-K objective and lower-is-better metric semantics;
@@ -95,6 +97,7 @@ Sixteen Rust test declarations cover:
 - hard budget exhaustion;
 - calibration-task leakage and unqualified model rejection;
 - provenance mismatch and non-normalized likelihood rejection;
+- fidelity-name/index mismatch and fidelity-cost-model reconciliation for resumable prefixes versus independent restarts;
 - aggregate-only sentinel outcomes;
 - deterministic action tie-breaking;
 - canonical posterior/action-model digests;
