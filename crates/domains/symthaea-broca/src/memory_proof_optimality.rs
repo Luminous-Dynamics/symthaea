@@ -259,6 +259,9 @@ impl Enumeration<'_> {
                 || families.len() < minimum_independent_families as usize
                 || sessions.len() < minimum_distinct_sessions as usize
                 || user_authored_evidence.len() < minimum_user_authored_evidence as usize
+                || obligation.required_complete_evidence_ids
+                    .iter()
+                    .any(|required_id| !alternative.evidence_dependencies.contains(required_id))
             {
                 continue;
             }
@@ -457,6 +460,8 @@ mod tests {
                 minimum_independent_families: 1,
                 minimum_distinct_sessions: 0,
                 minimum_user_authored_evidence: 0,
+                required_complete_evidence_ids: BTreeSet::new(),
+                enumeration_receipt_sha256: None,
                 selection_overhead_tokens: 2,
             }],
         }
