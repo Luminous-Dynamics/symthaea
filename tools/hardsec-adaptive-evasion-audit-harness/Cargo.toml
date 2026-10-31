@@ -19,6 +19,7 @@ hardsec-context-sequential-monitor = []
 hardsec-context-cctm-monitor = []
 hardsec-context-assignment-audit = []
 hardsec-episode-restarted-monitor = []
+hardsec-trace-lineage-audit = []
 
 [dependencies]
 serde_json = "=1.0.150"
@@ -58,3 +59,8 @@ required-features = ["hardsec-context-assignment-audit"]
 name = "hardsec_episode_restarted_monitor"
 path = "../../examples/hardsec_episode_restarted_monitor.rs"
 required-features = ["hardsec-episode-restarted-monitor"]
+
+[[example]]
+name = "hardsec_trace_lineage_audit"
+path = "../../examples/hardsec_trace_lineage_audit.rs"
+required-features = ["hardsec-trace-lineage-audit"]
