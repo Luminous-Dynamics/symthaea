@@ -870,6 +870,167 @@ pub fn analyze_replicated_causal_study(
 mod tests {
     use super::*;
 
+    fn digest(label: &str) -> String {
+        hash_domain(b"causal-analysis-test", label.as_bytes())
+    }
+
+    fn hex(bytes: &[u8]) -> String {
+        bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+
+    fn make_replicate(index: u8) -> CausalReplicateInputV1 {
+        let mut clusters = Vec::new();
+        for family in ["math", "code", "science", "logic"] {
+            for cluster_index in 0..4 {
+                let cluster_id = format!("{family}-cluster-{cluster_index}");
+                clusters.push(crate::intervention::SourceClusterV1 {
+                    cluster_id: cluster_id.clone(),
+                    task_family: family.to_owned(),
+                    source_family_sha256: digest(&format!("source-{cluster_id}")),
+                    item_ids: vec![
+                        format!("{cluster_id}-item-1"),
+                        format!("{cluster_id}-item-2"),
+                    ],
+                    exposure_variant_sha256: digest(&format!("variant-{cluster_id}")),
+                    exposure_token_count: 500,
+                    matched_placebo_record_sha256: digest(&format!("placebo-{cluster_id}")),
+                    matched_placebo_token_count: 500,
+                });
+            }
+        }
+        let suffix = format!("replicate-{index:03}");
+        let mut design = RandomizedInterventionDesignV1 {
+            schema: crate::intervention::INTERVENTION_DESIGN_SCHEMA.to_owned(),
+            experiment_id: "causal-study-test".to_owned(),
+            replicate_id: suffix.clone(),
+            benchmark_id: "causal-panel".to_owned(),
+            benchmark_version: "v1".to_owned(),
+            benchmark_task_set_sha256: digest("task-set"),
+            model_base_checkpoint_sha256: digest("base-checkpoint"),
+            training_stage: crate::intervention::TrainingStageV1::InstructionSft,
+            exposure_mechanism: crate::intervention::ExposureMechanismV1::SemanticVariant,
+            target_exposure_fraction_permille: 500,
+            shared_training_corpus_sha256: digest("shared-corpus"),
+            shared_training_token_count: 96_000,
+            total_training_token_budget: 100_000,
+            training_steps: 1_000,
+            training_code_sha256: digest("training-code"),
+            runtime_image_sha256: digest("runtime"),
+            tokenization_pipeline_sha256: digest("tokenizer"),
+            training_hyperparameters_sha256: digest("hyperparameters"),
+            optimizer_schedule_sha256: digest("optimizer"),
+            treatment_training_corpus_sha256: digest(&format!("treatment-corpus-{index}")),
+            placebo_training_corpus_sha256: digest(&format!("placebo-corpus-{index}")),
+            clusters,
+        };
+        design.replicate_id = suffix.clone();
+        let seed = vec![index; 32];
+        let manifest = randomize_intervention(&design, &seed).unwrap();
+        let treatment_checkpoint = digest(&format!("treatment-checkpoint-{index}"));
+        let placebo_checkpoint = digest(&format!("placebo-checkpoint-{index}"));
+        let training_audit = PairedTrainingExecutionAuditV1 {
+            schema: crate::training_receipt::TRAINING_RECEIPT_REPORT_SCHEMA.to_owned(),
+            valid: true,
+            execution_consistent: true,
+            treatment_completed: true,
+            placebo_completed: true,
+            paired_checkpoints_distinct: true,
+            base_checkpoint_matched: true,
+            training_configuration_matched: true,
+            corpus_identities_matched_to_design: true,
+            intervention_payloads_matched_to_assignment: true,
+            treatment_token_budget_conserved: true,
+            placebo_token_budget_conserved: true,
+            observed_token_budgets_complete: true,
+            observed_step_budgets_complete: true,
+            runner_attestation_digests_present: true,
+            checkpoint_custody_digests_present: true,
+            external_attestation_verification: "digest_present_signature_not_verified".to_owned(),
+            independently_verified: false,
+            ready_for_independent_attestation_verification: true,
+            experiment_id: design.experiment_id.clone(),
+            replicate_id: suffix.clone(),
+            design_sha256: manifest.design_sha256.clone(),
+            manifest_sha256: manifest.manifest_sha256.clone(),
+            seed_commitment_sha256: manifest.randomization_seed_commitment_sha256.clone(),
+            treatment_run_id: format!("treatment-run-{index}"),
+            placebo_run_id: format!("placebo-run-{index}"),
+            treatment_checkpoint_sha256: treatment_checkpoint.clone(),
+            placebo_checkpoint_sha256: placebo_checkpoint.clone(),
+            treatment_observed_tokens: design.total_training_token_budget,
+            placebo_observed_tokens: design.total_training_token_budget,
+            treatment_observed_steps: design.training_steps,
+            placebo_observed_steps: design.training_steps,
+            claim_boundary: "synthetic-consistency-fixture".to_owned(),
+            issues: Vec::new(),
+        };
+        let audit_bytes = serde_json::to_vec(&training_audit).unwrap();
+        let training_receipt_audit_sha256 =
+            hash_domain(b"paired-training-execution-audit.v1", &audit_bytes);
+        let evidence = EvaluationEvidenceV1 {
+            base_checkpoint_sha256: design.model_base_checkpoint_sha256.clone(),
+            treatment_checkpoint_sha256: treatment_checkpoint,
+            placebo_checkpoint_sha256: placebo_checkpoint,
+            base_evaluation_receipt_sha256: digest(&format!("base-eval-{index}")),
+            treatment_evaluation_receipt_sha256: digest(&format!("treatment-eval-{index}")),
+            placebo_evaluation_receipt_sha256: digest(&format!("placebo-eval-{index}")),
+            metric_definition_sha256: digest("metric-definition"),
+            oracle_or_adjudication_sha256: digest("oracle"),
+            evaluation_harness_sha256: digest("eval-harness"),
+            prompt_and_decoding_sha256: digest("prompt-decoding"),
+        };
+        let assignment_map: BTreeMap<String, bool> = manifest.assignments.iter()
+            .map(|assignment| (assignment.cluster_id.clone(), assignment.assigned_to_exposure))
+            .collect();
+        let mut outcomes = Vec::new();
+        for cluster in &design.clusters {
+            let mut sorted_ids = cluster.item_ids.clone();
+            sorted_ids.sort();
+            let item_digest = hash_domain(
+                b"causal-evaluation-item-set.v1",
+                &serde_json::to_vec(&sorted_ids).unwrap(),
+            );
+            let exposed = assignment_map[&cluster.cluster_id];
+            outcomes.push(ClusterOutcomeV1 {
+                cluster_id: cluster.cluster_id.clone(),
+                task_family: cluster.task_family.clone(),
+                assigned_to_exposure: exposed,
+                item_count: 2,
+                evaluation_item_set_sha256: item_digest,
+                base: ScoreCountV1 { success_count: 1, observed_count: 2 },
+                treatment: ScoreCountV1 {
+                    success_count: if exposed { 2 } else { 1 },
+                    observed_count: 2,
+                },
+                placebo: ScoreCountV1 { success_count: 1, observed_count: 2 },
+            });
+        }
+        CausalReplicateInputV1 {
+            design,
+            manifest,
+            randomization_seed_hex: hex(&seed),
+            training_receipt_audit: training_audit,
+            training_receipt_audit_sha256,
+            evaluation_evidence: evidence,
+            cluster_outcomes: outcomes,
+        }
+    }
+
+    fn study_fixture() -> ReplicatedCausalStudyV1 {
+        ReplicatedCausalStudyV1 {
+            schema: CAUSAL_STUDY_SCHEMA.to_owned(),
+            study_id: "causal-study-fixture".to_owned(),
+            benchmark_id: "causal-panel".to_owned(),
+            benchmark_version: "v1".to_owned(),
+            primary_metric_id: "exact-correctness".to_owned(),
+            primary_metric_definition_sha256: digest("metric-definition"),
+            minimum_confirmatory_replicates: CAUSAL_MIN_CONFIRMATORY_REPLICATES as u32,
+            randomization_test_draws: CAUSAL_MIN_RANDOMIZATION_DRAWS,
+            randomization_test_seed_hex: hex(&vec![0xA7; 32]),
+            replicates: vec![make_replicate(1), make_replicate(2)],
+        }
+    }
+
     #[test]
     fn score_rates_reject_invalid_denominators_and_success_counts() {
         assert!(rate_permille(&ScoreCountV1 { success_count: 2, observed_count: 0 }, "x").is_err());
@@ -886,6 +1047,50 @@ mod tests {
         assert_eq!(t_critical_975(31), 2.042);
         assert_eq!(t_critical_975(50), 2.021);
         assert_eq!(t_critical_975(200), 1.98);
+    }
+
+    #[test]
+    fn end_to_end_analysis_uses_model_pairs_and_stays_exploratory_without_trust_roots() {
+        let study = study_fixture();
+        let report = analyze_replicated_causal_study(&study).unwrap();
+        assert_eq!(report.independent_model_pair_replicate_count, 2);
+        assert!(!report.replicate_count_meets_minimum);
+        assert!(report.every_replicate_has_consistent_training_receipt);
+        assert!(!report.training_receipts_independently_verified);
+        assert!(report.execution_evidence_ready_for_external_verification);
+        assert!(!report.confirmatory_eligible);
+        assert_eq!(
+            report.analysis_status,
+            "exploratory_insufficient_independent_model_pair_replicates"
+        );
+        assert!(report.primary_cluster_weighted_effect_permille.mean > 0.0);
+        assert!(report.primary_cluster_weighted_effect_permille.lower_95
+            <= report.primary_cluster_weighted_effect_permille.upper_95);
+        assert!(report.localization_randomization_p_value > 0.0
+            && report.localization_randomization_p_value <= 1.0);
+        assert_eq!(report.family_effects.len(), 4);
+        assert!(report.claim_boundary.contains("global_interference"));
+    }
+
+    #[test]
+    fn one_model_pair_is_not_misrepresented_as_many_training_replicates() {
+        let mut study = study_fixture();
+        study.replicates.truncate(1);
+        assert!(analyze_replicated_causal_study(&study)
+            .unwrap_err()
+            .contains("at least two independent model-pair replicates"));
+    }
+
+    #[test]
+    fn a_self_asserted_independent_verification_flag_is_rejected() {
+        let mut study = study_fixture();
+        study.replicates[0].training_receipt_audit.independently_verified = true;
+        let audit_bytes = serde_json::to_vec(&study.replicates[0].training_receipt_audit).unwrap();
+        study.replicates[0].training_receipt_audit_sha256 =
+            hash_domain(b"paired-training-execution-audit.v1", &audit_bytes);
+        assert!(analyze_replicated_causal_study(&study)
+            .unwrap_err()
+            .contains("self-asserted independent verification"));
     }
 
     #[test]
