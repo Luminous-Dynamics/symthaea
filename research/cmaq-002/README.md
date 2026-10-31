@@ -136,3 +136,10 @@ Important reproducibility boundaries:
 - The simulator runtime requires Linux/Python 3.10, CUDA/Vulkan/NVIDIA GPU, and its own Python/PyTorch/SAPIEN/CuRobo/PyTorch3D stack. This must remain an isolated external runtime, not production Symthaea code.
 
 The focused workflow schema-validates this lock and asserts that the dataset, asset archives and policy weights remain un-downloaded until the outstanding version/license/checksum gates are resolved. Paper-reported ID/OOD scores are comparison targets only; they are not Symthaea measurements.
+
+
+## ActiveArena observation custody hardening
+
+The ActiveArena bridge now includes a metadata-only adapter contract in [activearena-adapter-contract.schema.json](activearena-adapter-contract.schema.json) and [fixtures/activearena-adapter-contract.example.json](fixtures/activearena-adapter-contract.example.json). The focused workflow validates the fixture and rejects side-camera candidate access, evaluator-label leakage, predicted futures inserted as observations, forecast-to-observation-memory promotion, and qualification claims made before dataset/checkpoint/license gates are resolved.
+
+The custody schema is intentionally separate from the finite-mechanism CMAQ-002 probe schema. It makes actual acquired head-camera observations distinct from model forecasts and sealed evaluator-only side/front views and success labels. The fixture is metadata-only with synthetic digests; no dataset, simulator assets or policy weights have been downloaded.
