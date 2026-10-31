@@ -90,6 +90,8 @@ pub struct ParetoValueOfInformation {
     pub current: ParetoDecisionValue,
     pub expected_posterior_regret: f64,
     pub expected_hypervolume_regret_reduction: f64,
+    pub incremental_cost_units: u64,
+    pub expected_hypervolume_regret_reduction_per_cost_unit: f64,
     pub expected_observation_probabilities: Vec<(String, f64)>,
 }
 
@@ -253,7 +255,7 @@ pub fn evaluate_pareto_decision(
         }
 
         let indices: Vec<usize> = (0..candidate_count)
-            .filter(|index| (mask & (1u64 << index)) != 0)
+            .filter(|index| (mask & (1u64 << *index)) != 0)
             .collect();
         let better = expected_hv > best_expected_hv + VALUE_TOLERANCE;
         let tied = (expected_hv - best_expected_hv).abs() <= VALUE_TOLERANCE;
@@ -315,7 +317,7 @@ pub fn expected_pareto_value_of_information(
         expected_observation_probabilities
             .push((outcome.outcome_id.clone(), outcome_probability));
 
-        if outcome_probability <= PROBABILITY_TOLERANCE {
+        if outcome_probability <= 0.0 {
             continue;
         }
 
@@ -345,10 +347,14 @@ pub fn expected_pareto_value_of_information(
         ));
     }
 
+    let expected_hypervolume_regret_reduction = raw_reduction.max(0.0);
     Ok(ParetoValueOfInformation {
         current,
         expected_posterior_regret,
-        expected_hypervolume_regret_reduction: raw_reduction.max(0.0),
+        expected_hypervolume_regret_reduction,
+        incremental_cost_units: action.incremental_cost_units,
+        expected_hypervolume_regret_reduction_per_cost_unit:
+            expected_hypervolume_regret_reduction / action.incremental_cost_units as f64,
         expected_observation_probabilities,
     })
 }
@@ -646,12 +652,12 @@ mod tests {
             ParetoPosteriorParticle {
                 particle_id: "p1".into(),
                 probability: 0.5,
-                objective_values: vec![[0.9, 0.2], [0.2, 0.9], [0.45, 0.45]],
+                objective_values: vec![[0.95, 0.5], [0.3, 0.4], [0.5, 0.4]],
             },
             ParetoPosteriorParticle {
                 particle_id: "p2".into(),
                 probability: 0.5,
-                objective_values: vec![[0.2, 0.9], [0.9, 0.2], [0.45, 0.45]],
+                objective_values: vec![[0.3, 0.4], [0.95, 0.5], [0.5, 0.4]],
             },
         ]);
         let action = ParetoMeasurementAction {
@@ -673,6 +679,9 @@ mod tests {
         assert!(result.current.expected_hypervolume_regret > 0.0);
         assert!(result.expected_hypervolume_regret_reduction > 0.0);
         assert!(result.expected_posterior_regret.abs() < 1e-10);
+        assert_eq!(result.incremental_cost_units, 2);
+        assert!((result.expected_hypervolume_regret_reduction_per_cost_unit
+            - result.expected_hypervolume_regret_reduction / 2.0).abs() < 1e-12);
         assert_eq!(
             result
                 .expected_observation_probabilities
@@ -723,6 +732,6 @@ mod tests {
         };
         let error = evaluate_pareto_decision(&posterior, reference(), 2)
             .expect_err("large cohort requires an explicit approximate solver");
-        assert!(error.to_string().contains("limited to 16 candidates"));
+        assert!(error.to_string().contains("requires 2..=16 candidates"));
     }
 }
