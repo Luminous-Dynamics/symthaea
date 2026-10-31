@@ -115,5 +115,14 @@
         "snapshot_manifest_commitment"
       ]
     }
+  ],
+  "root_classes": [
+    "workspace",
+    "toolchain_and_sysroot",
+    "build_output_and_cache",
+    "temporary_filesystems",
+    "home_and_user_config",
+    "procfs_sysfs",
+    "devices_and_mounts"
   ]
 }
