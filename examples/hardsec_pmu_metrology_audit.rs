@@ -439,7 +439,7 @@ fn validate_blocks(trials: &[Trial], plan: &Plan) -> Result<BTreeMap<String, BTr
             if singleton_by_event.insert(event_id.clone(), (**trial).clone()).is_some() {
                 return Err(format!("block {block_id} has duplicate singleton observation for event {event_id}"));
             }
-            if trial.events[0].running_ns as f64 / trial.events[0].enabled_ns as f64 < plan.minimum_singleton_running_fraction {
+            if (trial.events[0].running_ns as f64 / trial.events[0].enabled_ns as f64) < plan.minimum_singleton_running_fraction {
                 return Err(format!("block {block_id} singleton event {event_id} falls below minimum running fraction"));
             }
         }
@@ -454,7 +454,7 @@ fn validate_blocks(trials: &[Trial], plan: &Plan) -> Result<BTreeMap<String, BTr
         if co_ids != expected_co {
             return Err(format!("block {block_id} co-scheduled event set differs from plan"));
         }
-        if co_trial.events.iter().any(|event| event.running_ns as f64 / event.enabled_ns as f64 < plan.minimum_co_running_fraction) {
+        if co_trial.events.iter().any(|event| (event.running_ns as f64 / event.enabled_ns as f64) < plan.minimum_co_running_fraction) {
             return Err(format!("block {block_id} co-scheduled event falls below minimum running fraction; it is not a simultaneous observation"));
         }
 
