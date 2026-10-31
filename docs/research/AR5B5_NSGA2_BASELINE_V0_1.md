@@ -108,3 +108,5 @@ cargo clippy -p symthaea-architecture-engineering --all-targets -- -D warnings
 - The test configuration is a smoke test, not a performance-tuned baseline.
 
 No claim that this NSGA-II implementation beats SOTA is made. Its purpose is to create a reproducible, auditable baseline for fair evaluation.
+
+The implementation limits population size to 2,048 because its fast nondominated sorting retains pairwise domination relationships. This is an explicit memory guard for the current reference implementation, not a theoretical NSGA-II limit.
