@@ -49,6 +49,9 @@ on:
       - "docs/neuroscience/examples/CONNECTOME_CORRECTION_PORTFOLIO.example.json"
       - "docs/neuroscience/examples/CONNECTOME_COLINEAR_PROFILE_INPUT.example.json"
       - "docs/neuroscience/examples/CONNECTOME_COLINEAR_BOUNDARY_TRUTH.example.json"
+      - "docs/neuroscience/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT_INPUT.schema.json"
+      - "docs/neuroscience/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT_PROTOCOL_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT.example.jsonl"
       - "docs/neuroscience/examples/CONNECTOME_SPATIAL_FRAME_ELIGIBILITY_MASK.hex"
       - ".github/workflows/connectomics-intake-audit.yml"
   push:
@@ -100,6 +103,9 @@ on:
       - "docs/neuroscience/examples/CONNECTOME_CORRECTION_PORTFOLIO.example.json"
       - "docs/neuroscience/examples/CONNECTOME_COLINEAR_PROFILE_INPUT.example.json"
       - "docs/neuroscience/examples/CONNECTOME_COLINEAR_BOUNDARY_TRUTH.example.json"
+      - "docs/neuroscience/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT_INPUT.schema.json"
+      - "docs/neuroscience/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT_PROTOCOL_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT.example.jsonl"
       - "docs/neuroscience/examples/CONNECTOME_SPATIAL_FRAME_ELIGIBILITY_MASK.hex"
       - ".github/workflows/connectomics-intake-audit.yml"
   workflow_dispatch:
