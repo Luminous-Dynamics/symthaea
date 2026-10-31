@@ -334,27 +334,39 @@ mod tests {
     }
 
     #[test]
-    fn sampling_aware_cse_differs_from_observed_time_mse_when_error_is_clustered() {
+    fn sampling_aware_cse_downweights_errors_in_densely_sampled_regions() {
         let mut config = IrregularConfig::reference(0xC5E_2027);
         config.slots = 512;
         config.missing_per_mille = 0;
-        config.jitter_per_mille = 0;
+        config.jitter_per_mille = 900;
         let (task, oracle) = generate_irregular_task(config).unwrap();
         let mut predictions = oracle_predictions(&task, &oracle);
-        // Add larger error only in the fast, densely sampled part of the period.
-        for (index, prediction) in predictions.iter_mut().enumerate() {
-            if index < 64 {
-                prediction.fast += 100.0;
-            }
+
+        let timestamps = task.observations.iter()
+            .map(|observation| observation.time_us as f64)
+            .collect::<Vec<_>>();
+        let inverse_density_logs =
+            leave_one_out_inverse_density_logs(&timestamps, 10_000.0).unwrap();
+        let mut density_order = inverse_density_logs.iter()
+            .enumerate()
+            .map(|(index, log_weight)| (*log_weight, index))
+            .collect::<Vec<_>>();
+        density_order.sort_by(|left, right| left.0.total_cmp(&right.0));
+        // Lower inverse-density log weight means locally higher observation density.
+        for (_, index) in density_order.into_iter().take(64) {
+            predictions[index].fast += 100.0;
         }
+
         let scores = score_irregular_forecasts(
             &task,
             &oracle,
             &predictions,
-            CseKernelConfig { bandwidth_us: 30_000 },
+            CseKernelConfig { bandwidth_us: 10_000 },
         )
         .unwrap();
-        assert_ne!(scores.fast.mse, scores.fast.cse);
+        assert!(scores.fast.mse > 0.0);
+        assert!(scores.fast.cse < scores.fast.mse);
+        assert!(scores.effective_sample_size > 0.0);
     }
 
     #[test]
