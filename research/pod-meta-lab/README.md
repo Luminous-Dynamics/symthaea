@@ -10,10 +10,11 @@ This lab is intentionally outside the root Cargo workspace and has zero third-pa
 cargo test --manifest-path research/pod-meta-lab/Cargo.toml
 cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin pod-meta-demo
 cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-v1
-cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-artifact-eval -- /tmp/poar-export/planner.poar /tmp/poar-export/oracle.poar.sealed /tmp/poar-export/predictions.poar <evaluator-revision> /tmp/poar-export/evaluation-receipt.tsv
 mkdir -p /tmp/poar-export
 cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-graph-export -- 1729 test /tmp/poar-export/planner.poar /tmp/poar-export/oracle.poar.sealed "$(git rev-parse HEAD)"
-sha256sum /tmp/poar-export/planner.poar /tmp/poar-export/oracle.poar.sealed
+planner_sha256="$(sha256sum /tmp/poar-export/planner.poar | awk '{print $1}')"
+cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-prediction-demo -- 1729 test "$planner_sha256" /tmp/poar-export/predictions.poar
+cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-graph-eval -- /tmp/poar-export/planner.poar /tmp/poar-export/oracle.poar.sealed /tmp/poar-export/predictions.poar "$(git rev-parse HEAD)" /tmp/poar-export/evaluation-receipt.tsv
 ```
 
 The oracle artifact contains hidden labels and gold proof paths; do not give it to the planner or publish it as an ordinary public artifact.
@@ -38,8 +39,8 @@ The oracle artifact contains hidden labels and gold proof paths; do not give it 
 - A POAR Contamination Transparency Card discloses public-template exposure, unknown third-party model training provenance, T1-T4 audit gaps, and release restrictions.
 - Validated `GraphGenerationConfig` supports controlled chain-depth sweeps (1–256); default split profiles remain 8/32/64.
 - `poar-graph-export` writes canonical planner-only and oracle TSV artifacts; the oracle header binds the planner's raw SHA-256 digest.
-- `encode_prediction_artifact_v1` and `poar-artifact-eval` support frozen prediction records, strict canonical parsing, exact-byte SHA-256 binding, target/disposition completeness, contiguous retrieval ranks, duplicate/dangling reference rejection, and oracle self-consistency checks. The evaluator runs after inference and emits a machine-readable per-run receipt with individual metrics.
-- The focused workflow smoke-tests export, prediction encoding, evaluator parsing/scoring, and receipt identity in runner temporary storage; it deletes the oracle rather than uploading it.
+- `encode_prediction_artifact_v1`, `poar-prediction-demo`, and `poar-graph-eval` support frozen prediction records, strict canonical parsing, exact-byte SHA-256 binding, target/disposition completeness, contiguous retrieval ranks, duplicate/dangling reference rejection, and oracle self-consistency checks. The evaluator runs after inference and emits a machine-readable per-run receipt with individual metrics.
+- The focused workflow smoke-tests export, an explicit all-abstain prediction artifact, evaluator parsing/scoring, and receipt identity in runner temporary storage; it deletes the oracle rather than uploading it. The abstain artifact verifies format/scoring execution only and is not a model or quality baseline.
 - 53 authored unit tests: 24 scheduler/receipt tests, one POAR routing-suite test, 22 graph/oracle tests, and 6 frozen-artifact evaluator tests.
 - Graph benchmarks report disposition correctness, false support/refutation, unsupported proof paths, citation completeness, temporal/scope/authority/integrity violations, retracted citations, correlated-source violations, plus ranked temporal evidence coverage@3 and precision@3; retrieval ranking is separate from final proof citations, and there is no composite score.
 
