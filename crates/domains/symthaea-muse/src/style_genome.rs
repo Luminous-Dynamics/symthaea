@@ -1119,12 +1119,17 @@ fn grammar_plan_well_formed(plan: &GrammarPlanEvidence) -> bool {
                 && plan.total_cycles > 0
                 && !plan.sections.is_empty()
                 && plan.sections.first().is_some_and(|section| section.start_cycle == 0)
-                && plan.sections.iter().all(|section| section.cycles > 0)
+                && plan.sections.iter().all(|section| {
+                    section.cycles > 0
+                        && section.energy.is_finite()
+                        && (0.0..=1.0).contains(&section.energy)
+                })
                 && plan.sections.windows(2).all(|pair| {
-                    pair[0].start_cycle + pair[0].cycles == pair[1].start_cycle
+                    pair[0].start_cycle.checked_add(pair[0].cycles)
+                        == Some(pair[1].start_cycle)
                 })
                 && plan.sections.last().is_some_and(|section| {
-                    section.start_cycle + section.cycles == plan.total_cycles
+                    section.start_cycle.checked_add(section.cycles) == Some(plan.total_cycles)
                 })
                 && plan.phrase_boundary_cycles.iter().all(|cycle| *cycle < plan.total_cycles)
                 && plan.phrase_boundary_cycles.windows(2).all(|pair| pair[0] < pair[1])
@@ -1155,7 +1160,7 @@ fn grammar_plan_well_formed(plan: &GrammarPlanEvidence) -> bool {
             plan.requested_bars > 0
                 && plan.choruses > 0
                 && plan.bars_per_chorus == 12
-                && plan.realized_bars == plan.choruses * plan.bars_per_chorus
+                && plan.choruses.checked_mul(plan.bars_per_chorus) == Some(plan.realized_bars)
                 && plan.realized_bars >= plan.requested_bars
                 && plan.trajectory.len() == plan.choruses
                 && plan.trajectory.first().is_some_and(|role| {
@@ -1168,7 +1173,7 @@ fn grammar_plan_well_formed(plan: &GrammarPlanEvidence) -> bool {
             plan.requested_bars > 0
                 && plan.choruses > 0
                 && plan.bars_per_chorus == 8
-                && plan.realized_bars == plan.choruses * plan.bars_per_chorus
+                && plan.choruses.checked_mul(plan.bars_per_chorus) == Some(plan.realized_bars)
                 && plan.realized_bars >= plan.requested_bars
                 && plan.trajectory.len() == plan.choruses
                 && plan.trajectory.first().is_some_and(|role| {
