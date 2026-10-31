@@ -1,0 +1,114 @@
+name: CMAQ-011 decision-centric benchmark contract
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/cmaq-011/**"
+      - ".github/workflows/cmaq-011.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/cmaq-011/**"
+      - ".github/workflows/cmaq-011.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check "jsonschema==4.25.1"
+      - name: Validate task manifest and qualification integrity policy
+        working-directory: research/cmaq-011
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from copy import deepcopy
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, validate
+
+          schema = json.loads(Path("task-manifest.schema.json").read_text())
+          manifest = json.loads(Path("task-manifest.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validate(instance=manifest, schema=schema)
+
+          def assert_qualification_safe(candidate):
+              integrity = candidate["integrity"]
+              assert integrity["network_access"] == "disabled"
+              assert integrity["allowed_network_domains"] == []
+              assert integrity["agent_can_access_hidden_targets"] is False
+              assert integrity["agent_can_write_scoring_artifacts"] is False
+              assert integrity["outcome_verification"] == "environment_side"
+
+          assert_qualification_safe(manifest)
+
+          hostile_mutations = [
+              ("hidden_target_access", lambda value: value["integrity"].__setitem__(
+                  "agent_can_access_hidden_targets", True
+              )),
+              ("scoring_artifact_write", lambda value: value["integrity"].__setitem__(
+                  "agent_can_write_scoring_artifacts", True
+              )),
+              ("unrestricted_network", lambda value: value["integrity"].__setitem__(
+                  "network_access", "unrestricted"
+              )),
+              ("self_reported_outcome", lambda value: value["integrity"].__setitem__(
+                  "outcome_verification", "self_reported"
+              )),
+          ]
+          for name, mutate in hostile_mutations:
+              candidate = deepcopy(manifest)
+              mutate(candidate)
+              try:
+                  assert_qualification_safe(candidate)
+              except AssertionError:
+                  pass
+              else:
+                  raise AssertionError(f"qualification policy admitted hostile mutation: {name}")
+
+          lock_paths = [
+              "control-baselines.lock.json",
+              "mrsq-baseline.lock.json",
+              "wbench-baseline.lock.json",
+              "wimle-baseline.lock.json",
+              "worldoracle-baseline.lock.json",
+              "worldsimprobe-baseline.lock.json",
+          ]
+          locks = {
+              path: json.loads(Path(path).read_text())
+              for path in lock_paths
+          }
+          for path, lock in locks.items():
+              assert lock.get("schema_version") == "cmaq-011-external-baseline-lock-v0.1", path
+              assert lock.get("baseline_id"), path
+
+          assert locks["mrsq-baseline.lock.json"]["license"] == "CC BY-NC 4.0"
+          assert locks["wimle-baseline.lock.json"]["license"] == "MIT"
+
+          worldoracle = locks["worldoracle-baseline.lock.json"]
+          access = worldoracle["release"]["validation_dataset_access"]
+          assert worldoracle["source_license"] == "Apache-2.0"
+          assert worldoracle["release"]["validation_dataset_license"] == "CC-BY-NC-SA-4.0"
+          assert access["status"] == "access_unresolved_do_not_download"
+          assert "Do not download" in access["policy"]
+          assert worldoracle["release"]["test_input_access"]["status"] == "private"
+          assert worldoracle["reproduction_status"] != "reproduced"
+
+          worldsimprobe = locks["worldsimprobe-baseline.lock.json"]
+          assert (
+              worldsimprobe["hidden_official_scoring_references"]["status"]
+              == "evaluator_side_not_public"
+          )
+
+          print(
+              "CMAQ-011 manifest schema, 4 hostile qualification mutations, "
+              "6 pinned baseline locks and WorldOracle access gates validated."
+          )
+          PY
