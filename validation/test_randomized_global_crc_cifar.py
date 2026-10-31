@@ -83,6 +83,27 @@ class RandomizedGlobalCommonDepthTests(unittest.TestCase):
         self.assertTrue(engine.verify(np.asarray(result["probabilities"]))["valid"])
         self.assertEqual(result["verification"]["augmented_states_checked"],len(engine.augmented))
 
+
+    def test_global_lp_returns_a_primal_dual_optimality_receipt(self):
+        engine=RandomizedCommonDepthCRC(5,.2,(70,20,10))
+        result=engine.solve()
+        receipt=result["solver"]["dual_certificate"]
+        keys=[
+            "primal_max_inequality_violation",
+            "primal_max_equality_residual",
+            "primal_max_bound_violation",
+            "dual_inequality_sign_violation",
+            "dual_lower_sign_violation",
+            "dual_upper_sign_violation",
+            "stationarity_max_abs",
+            "complementarity_max_abs",
+            "duality_gap_abs",
+        ]
+        for key in keys:
+            self.assertLessEqual(receipt[key],1e-7,(key,receipt[key]))
+        self.assertAlmostEqual(receipt["primal_objective_min"],
+                               receipt["dual_objective_min"],places=7)
+
     def test_invalid_population_and_action_grid_fail_closed(self):
         with self.assertRaises(ValueError):
             RandomizedCommonDepthCRC(50,.1,(10,10,10))
