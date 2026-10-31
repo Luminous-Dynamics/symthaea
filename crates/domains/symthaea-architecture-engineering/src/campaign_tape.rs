@@ -1342,13 +1342,21 @@ mod tests {
 
     #[test]
     fn duplicate_novel_candidate_counts_toward_the_existing_direction_claim_cap() {
-        let mut tape = tape("novel-duplicate-cap");
-        tape.append(evaluation_event("e1", 1, "w1", 0, "A")).unwrap();
+        let mut campaign_config = config();
+        campaign_config.worker_count = 3;
+        let mut tape = CampaignTape::new(
+            "tape-novel-duplicate-cap",
+            "novel_duplicate_cap",
+            A,
+            campaign_config,
+        ).unwrap();
+        tape.append(evaluation_event("e1", 1, "bootstrap", 0, "A")).unwrap();
         tape.append(evaluation_event("e2", 2, "w1", 1, "A")).unwrap();
+        tape.append(evaluation_event("e3", 2, "w2", 1, "A")).unwrap();
         tape.append(novel_candidate_event(
-            "n3",
+            "n4",
             2,
-            "w2",
+            "w3",
             1,
             DirectionProposalDisposition::Duplicate {
                 existing_direction_id: "A".to_owned(),
