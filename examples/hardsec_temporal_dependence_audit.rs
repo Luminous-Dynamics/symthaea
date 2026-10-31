@@ -268,6 +268,11 @@ fn parse_model(value: &Value) -> Result<Model, String> {
     }
     let causal = value.get("causal_innovation_model")
         .ok_or("model.causal_innovation_model missing")?;
+    let model_type = string_field(causal, "model_type", "model.causal_innovation_model")?;
+    if !matches!(model_type, "causal_innovation_recursion" | "gaussian_linear_process" | "other_declared_causal_model") {
+        return Err(format!("unsupported causal innovation model_type {model_type}"));
+    }
+    let innovation_distribution = string_field(causal, "innovation_distribution", "model.causal_innovation_model")?;
     let model_sha = string_field(causal, "model_artifact_sha256", "model.causal_innovation_model")?;
     valid_sha(model_sha, "model.causal_innovation_model.model_artifact_sha256")?;
     for key in ["iid_innovations_status", "stationarity_status", "causal_representation_status"] {
@@ -595,7 +600,23 @@ fn audit_values(
         "block_diagnostic":{
             "method":"non_overlapping_calibration_indicator_batch_means",
             "primary_block_length":model.primary_block_length,
-            "primary_block_report":report_values.iter().find(|report| report["block_length"]==model.primary_block_length).cloned(),
+            "primary_block_report":{
+                "block_length":primary.block_length,
+                "block_count":primary.block_count,
+                "complete_calibration_count":primary.complete_calibration_count,
+                "discarded_calibration_count":primary.discarded_calibration_count,
+                "calibration_block_mean":primary.calibration_block_mean,
+                "sigma_hat_covariance_sum":primary.sigma_hat_covariance_sum,
+                "iid_standard_error":primary.iid_standard_error,
+                "block_standard_error":primary.block_standard_error,
+                "realized_evaluation_coverage":primary.realized_evaluation_coverage,
+                "standardized_coverage_deviation":primary.standardized_coverage_deviation,
+                "null_realized_coverage_interval_lower":primary.normal_interval_lower,
+                "null_realized_coverage_interval_upper":primary.normal_interval_upper,
+                "observed_coverage_inside_null_interval":primary.realized_evaluation_coverage >= primary.normal_interval_lower
+                    && primary.realized_evaluation_coverage <= primary.normal_interval_upper,
+                "diagnostic_status":primary.diagnostic_status
+            },
             "block_length_sensitivity":report_values,
             "normal_approximation_status":"posthoc_asymptotic_diagnostic_only_assumptions_unverified",
             "student_t_small_block_diagnostic_status":"not_implemented_v1",
@@ -729,6 +750,33 @@ mod tests {
         assert_eq!(receipt["block_diagnostic"]["block_length_sensitivity"].as_array().unwrap().len(),3);
         assert_eq!(receipt["block_diagnostic"]["not_anytime_valid"],true);
         assert_eq!(receipt["functional_dependence"]["fdm_contract"]["marginal_coverage_bound_from_zhai_theorem_1"]["status"],"numeric_condition_satisfied_assumptions_unverified");
+    }
+
+
+    #[test]
+    fn rejects_zero_geometric_decay_ratio() {
+        let (mut model,data,_,_)=fixture();
+        model["dependence_bound"]["rho"]=json!(0.0);
+        assert!(audit(&model,&data).unwrap_err().contains("rho in (0,1)"));
+    }
+
+    #[test]
+    fn rejects_unsupported_innovation_model_type() {
+        let (mut model,data,_,_)=fixture();
+        model["causal_innovation_model"]["model_type"]=json!("empirical_acf_only");
+        assert!(audit(&model,&data).unwrap_err().contains("unsupported causal innovation model_type"));
+    }
+
+    #[test]
+    fn exposes_primary_block_report_and_keeps_assumptions_unverified() {
+        let (model,data,_,_)=fixture();
+        let receipt=audit(&model,&data).unwrap();
+        let primary=&receipt["block_diagnostic"]["primary_block_report"];
+        assert_eq!(primary["block_length"],50);
+        assert!(primary["block_standard_error"].as_f64().unwrap()>0.0);
+        assert_eq!(receipt["block_diagnostic"]["primary_block_report"]["diagnostic_status"],
+            "asymptotic_normal_diagnostic_only_assumptions_unverified");
+        assert_eq!(receipt["functional_dependence"]["iid_innovations_status"],"assumption_not_verified");
     }
 
     #[test]
