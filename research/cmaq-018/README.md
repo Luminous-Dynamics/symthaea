@@ -150,3 +150,8 @@ The action-bank digest is no longer a digest-shaped declaration: Rust recomputes
 CMAQ-018 now evaluates the decision event that follows interval prediction. The new `SelectionEpisode` / `evaluate_selected_action_sets` API reports episode-level realized regret, conditional regret-bound coverage, full action-set simultaneous coverage, and false interval-dominance certificates. A false certificate is counted when the chosen action's lower bound exceeds every competitor's upper bound but the evaluator's realized outcomes still show positive regret.
 
 The synthetic known-answer fixture has mean realized regret 1.25, mean bound 1.25, 75% bound coverage, 75% simultaneous coverage, two dominance certificates and one false certificate. It exists to test accounting and hostile behavior; it is not model calibration. The schema and fixture are `selected-action-evaluation.v0.1.schema.json` and `fixtures/selected-action-evaluation.example.json`.
+
+
+### Fail-closed selection and industry benchmark matrix
+
+CMAQ-018 now has a fail-closed interval-dominant action selector: it returns an action only when exactly one action's lower bound clears all competing upper bounds; otherwise it abstains. This is conditional on simultaneous interval coverage and is not actuator authority. The new frontier benchmark matrix in `INDUSTRY_BENCHMARK_MATRIX_2026-11-01.md` defines P0–P6 evaluation, matched D0/D1/W1/W2/W3 baselines, selection-aware calibration and explicit SOTA comparison rules.
