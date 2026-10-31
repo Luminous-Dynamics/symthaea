@@ -447,9 +447,7 @@ pub fn verify_matched_offer_sets(
     policy_ids.sort_unstable();
     let snapshots = first_snapshots.unwrap_or_default();
     let shared_decision_boundaries = snapshots.len();
-    let mut digest_items: Vec<_> = snapshots.into_iter().collect();
-    digest_items.sort_by(|left, right| left.0.cmp(&right.0));
-    let offer_set_manifest_sha256 = digest_serializable(&digest_items)?;
+    let offer_set_manifest_sha256 = digest_serializable(&snapshots)?;
 
     Ok(OfferSetMatchSummary {
         campaign_id: campaign_id.unwrap_or_default(),
@@ -491,7 +489,8 @@ mod tests {
     use super::*;
     use crate::event_tape::{
         ActionEvent, ActionOutcome, CandidateDisposition, ComparisonMode, EventTapeHeader,
-        ExecutionContract, ExecutionMode, MeterValue, PolicySnapshot, ResourceReceipt,
+        ExecutionContract, ExecutionMode, MeterValue, PolicySnapshot, ProposalDisposition,
+        ResourceReceipt,
     };
     use serde_json::json;
 
@@ -639,6 +638,57 @@ mod tests {
         let snapshot = OfferSetSnapshot::new(1, None, 0, vec!["B".to_owned()], true, H3)
             .unwrap();
         assert!(OfferSetManifest::new(&tape, vec![snapshot]).is_err());
+    }
+
+    #[test]
+    fn new_direction_proposal_requires_explicit_new_offer() {
+        let base = tape("board", json!({"alpha": 0.5}));
+        let mut proposal_tape = EventTape::new(base.header().clone()).unwrap();
+        let measured = |value| MeterValue::Measured { value };
+        proposal_tape
+            .append(ActionEvent {
+                event_id: "proposal-event".to_owned(),
+                policy_id: "board".to_owned(),
+                worker_id: 0,
+                round_id: 1,
+                batch_id: None,
+                observed_through_sequence: 0,
+                visible_history_sha256: String::new(),
+                retry_of_event_id: None,
+                intent: ActionIntent::ProposeDirection {
+                    descriptor_sha256: H5.to_owned(),
+                    parent_direction_id: Some("A".to_owned()),
+                    semantic_delta_sha256: H3.to_owned(),
+                },
+                outcome: ActionOutcome::DirectionVerification {
+                    task_recipe_sha256: H3.to_owned(),
+                    comparison_profile_sha256: H4.to_owned(),
+                    verifier_sha256: H1.to_owned(),
+                    verifier_receipt_sha256: H2.to_owned(),
+                    disposition: ProposalDisposition::Rejected,
+                },
+                resources: ResourceReceipt {
+                    host_cpu_millis: measured(1),
+                    wall_millis: measured(1),
+                    accelerator_millis: measured(0),
+                    peak_memory_bytes: measured(1),
+                    accelerator_peak_memory_bytes: measured(0),
+                    energy_millijoules: measured(0),
+                    input_tokens: measured(0),
+                    output_tokens: measured(0),
+                    tool_calls: measured(0),
+                    evaluator_calls: measured(0),
+                    verifier_calls: measured(1),
+                    charged_budget_microunits: measured(1),
+                },
+            })
+            .unwrap();
+        let snapshot =
+            OfferSetSnapshot::new(1, None, 0, vec!["A".to_owned()], false, H3).unwrap();
+        assert!(
+            OfferSetManifest::new(&proposal_tape, vec![snapshot]).is_err(),
+            "NEW must not be used unless the offer set allows it"
+        );
     }
 
     #[test]
