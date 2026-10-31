@@ -14,7 +14,8 @@ use symthaea_muse_protocol::catalog::{
     CanonicalStyle, HybridStyleSpec, StyleStatus, catalog_entry,
 };
 use symthaea_music_theory::{
-    Accompaniment, CompositionSpec, FormKind, GrammarFamily, MusicalIntent, Score, Style,
+    Accompaniment, CompositionSpec, FormKind, GrammarFamily, GrammarPlanEvidence,
+    GrammarStructuralTrace, MusicalIntent, Score, Style,
     MUSIC_THEORY_ENGINE_VERSION, compose_with_grammar_plan,
 };
 
@@ -86,6 +87,10 @@ pub struct HybridComposition {
     pub score: Score,
     /// Domain-separated digest of the exact generated symbolic Score.
     pub score_sha256: String,
+    /// The exact family plan that generated this score, retained for audit.
+    pub grammar_plan: GrammarPlanEvidence,
+    /// Event references and structural assertions for independent checking.
+    pub grammar_trace: GrammarStructuralTrace,
     pub compiled: CompiledHybridStyle,
 }
 
@@ -371,13 +376,12 @@ pub fn compose_hybrid_style(
     // Keep the structural owner's grammar-family dispatch. In particular,
     // dedicated engines must not be bypassed merely because the recipe is a
     // hybrid CompositionSpec.
-    let score = compose_with_grammar_plan(
+    let realization = compose_with_grammar_plan(
         compiled.structural_style.grammar_profile(),
         intent,
         &compiled.spec,
-    )
-    .score;
-    let score_bytes = serde_json::to_vec(&score).map_err(|error| {
+    );
+    let score_bytes = serde_json::to_vec(&realization.score).map_err(|error| {
         vec![StyleMixIssue {
             code: "generated_score_serialization_failed".into(),
             layer: Some(StyleMixLayer::Structure),
@@ -390,8 +394,10 @@ pub fn compose_hybrid_style(
         &score_bytes,
     );
     Ok(HybridComposition {
-        score,
+        score: realization.score,
         score_sha256,
+        grammar_plan: realization.plan,
+        grammar_trace: realization.trace,
         compiled,
     })
 }
@@ -619,6 +625,14 @@ mod tests {
                 .expect("GrooveCycle adapter must not panic for any seed");
             assert!(!candidate.score.notes.is_empty());
             assert_ne!(baseline, candidate.score, "rhythm donor was not consumed for seed {seed}");
+            match &candidate.grammar_plan {
+                GrammarPlanEvidence::GrooveCycle(plan) => {
+                    assert!(plan.phase_continuous, "cycle phase failed for seed {seed}");
+                    assert!(plan.obligations.iter().all(|item| item.fulfilled));
+                }
+                other => panic!("wrong grammar plan for GrooveCycle: {other:?}"),
+            }
+            assert!(!candidate.grammar_trace.structures.is_empty());
         }
     }
 
