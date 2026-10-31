@@ -38,8 +38,8 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "head_sha=\${GITHUB_SHA}"
-            echo "event_name=\${GITHUB_EVENT_NAME}"
+            echo "head_sha=$GITHUB_SHA"
+            echo "event_name=$GITHUB_EVENT_NAME"
             echo "rust_toolchain=1.96.0"
             echo "manifest=research/pod-meta-lab/Cargo.toml"
           } | tee pod-meta-qualification-receipt.txt
