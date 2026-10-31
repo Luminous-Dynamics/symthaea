@@ -123,10 +123,6 @@ macro_rules! descriptor {
 /// numbers. Additions require an explicit schema/count update and a coverage
 /// test change; do not silently infer descriptors from Rust variant names.
 pub fn instrument_descriptors() -> [InstrumentDescriptor; CURRENT_INSTRUMENT_VARIANT_COUNT] {
-    use InstrumentEntityKind as K;
-    use InstrumentFamily as F;
-    use PartialTableEvidence as P;
-
     [
         descriptor!(Piano, "piano", PhysicalInstrument, Keyboard, Measured),
         descriptor!(PianoPP, "piano.pp", TimbreVariant, Keyboard, Measured),
