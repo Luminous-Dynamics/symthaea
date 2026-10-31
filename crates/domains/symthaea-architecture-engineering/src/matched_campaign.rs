@@ -71,10 +71,13 @@ pub struct MatchedCampaignSummary {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResourceTotals {
     pub host_cpu_millis: Option<u64>,
-    pub wall_millis: Option<u64>,
+    /// Sum of action wall durations (worker-time); not elapsed campaign latency.
+    pub sum_action_wall_millis: Option<u64>,
     pub accelerator_millis: Option<u64>,
-    pub peak_memory_bytes: Option<u64>,
-    pub accelerator_peak_memory_bytes: Option<u64>,
+    /// Maximum per-action host peak; not concurrent campaign-wide memory.
+    pub max_action_peak_memory_bytes: Option<u64>,
+    /// Maximum per-action accelerator peak; not concurrent campaign-wide memory.
+    pub max_action_accelerator_peak_memory_bytes: Option<u64>,
     pub energy_millijoules: Option<u64>,
     pub input_tokens: Option<u64>,
     pub output_tokens: Option<u64>,
@@ -88,10 +91,10 @@ impl Default for ResourceTotals {
     fn default() -> Self {
         Self {
             host_cpu_millis: Some(0),
-            wall_millis: Some(0),
+            sum_action_wall_millis: Some(0),
             accelerator_millis: Some(0),
-            peak_memory_bytes: Some(0),
-            accelerator_peak_memory_bytes: Some(0),
+            max_action_peak_memory_bytes: Some(0),
+            max_action_accelerator_peak_memory_bytes: Some(0),
             energy_millijoules: Some(0),
             input_tokens: Some(0),
             output_tokens: Some(0),
@@ -110,10 +113,10 @@ impl ResourceTotals {
         path: &str,
     ) -> Result<(), MatchedCampaignError> {
         add_meter(&mut self.host_cpu_millis, &receipt.host_cpu_millis, &format!("{path}.host_cpu_millis"))?;
-        add_meter(&mut self.wall_millis, &receipt.wall_millis, &format!("{path}.wall_millis"))?;
+        add_meter(&mut self.sum_action_wall_millis, &receipt.wall_millis, &format!("{path}.wall_millis"))?;
         add_meter(&mut self.accelerator_millis, &receipt.accelerator_millis, &format!("{path}.accelerator_millis"))?;
-        add_meter(&mut self.peak_memory_bytes, &receipt.peak_memory_bytes, &format!("{path}.peak_memory_bytes"))?;
-        add_meter(&mut self.accelerator_peak_memory_bytes, &receipt.accelerator_peak_memory_bytes, &format!("{path}.accelerator_peak_memory_bytes"))?;
+        add_max_meter(&mut self.max_action_peak_memory_bytes, &receipt.peak_memory_bytes, &format!("{path}.peak_memory_bytes"))?;
+        add_max_meter(&mut self.max_action_accelerator_peak_memory_bytes, &receipt.accelerator_peak_memory_bytes, &format!("{path}.accelerator_peak_memory_bytes"))?;
         add_meter(&mut self.energy_millijoules, &receipt.energy_millijoules, &format!("{path}.energy_millijoules"))?;
         add_meter(&mut self.input_tokens, &receipt.input_tokens, &format!("{path}.input_tokens"))?;
         add_meter(&mut self.output_tokens, &receipt.output_tokens, &format!("{path}.output_tokens"))?;
@@ -123,6 +126,22 @@ impl ResourceTotals {
         add_meter(&mut self.charged_budget_microunits, &receipt.charged_budget_microunits, &format!("{path}.charged_budget_microunits"))?;
         Ok(())
     }
+}
+
+fn add_max_meter(
+    total: &mut Option<u64>,
+    value: &MeterValue,
+    path: &str,
+) -> Result<(), MatchedCampaignError> {
+    match value {
+        MeterValue::Unknown { .. } => *total = None,
+        MeterValue::Measured { value } => {
+            if let Some(current) = total {
+                *current = (*current).max(*value);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn add_meter(
@@ -656,6 +675,16 @@ mod tests {
             summary.resource_totals_by_policy["board"].host_cpu_millis,
             Some(12)
         );
+        assert_eq!(
+            summary.resource_totals_by_policy["board"].max_action_peak_memory_bytes,
+            Some(1024),
+            "peak memory is a max, never a sum of action peaks"
+        );
+        assert_eq!(
+            summary.resource_totals_by_policy["board"].sum_action_wall_millis,
+            Some(5),
+            "summed wall durations are worker-time, not campaign latency"
+        );
         assert!(summary.all_execution_schedules_complete);
     }
 
@@ -677,7 +706,7 @@ mod tests {
             summary.charged_budget_by_policy_microunits.get("board"),
             Some(&Some(100))
         );
-        assert_eq!(summary.resource_totals_by_policy["board"].wall_millis, None);
+        assert_eq!(summary.resource_totals_by_policy["board"].sum_action_wall_millis, None);
     }
 
     #[test]
