@@ -448,7 +448,7 @@ fn valid_metric(interval: Option<MetricInterval>, allow_zero: bool) -> bool {
     interval.is_none_or(|value| {
         value.lower.is_finite()
             && value.upper.is_finite()
-            && if allow_zero { value.lower >= 0.0 } else { value.lower > 0.0 }
+            && (if allow_zero { value.lower >= 0.0 } else { value.lower > 0.0 })
             && value.lower <= value.upper
     })
 }
@@ -621,7 +621,7 @@ pub fn validate_memory_topology(
             let Some(edge) = edge_by_id.get(edge_id.as_str()) else {
                 return Err(MemoryTopologyError::UnknownTransferEdge);
             };
-            if edge.source_region_id != current_region {
+            if edge.source_region_id.as_str() != current_region {
                 return Err(MemoryTopologyError::DisconnectedMemoryRoute);
             }
             current_region = edge.destination_region_id.as_str();
@@ -629,7 +629,7 @@ pub fn validate_memory_topology(
                 return Err(MemoryTopologyError::MemoryRouteCycle);
             }
         }
-        if current_region != route.destination_region_id {
+        if current_region != route.destination_region_id.as_str() {
             return Err(MemoryTopologyError::RouteEndpointMismatch);
         }
     }
@@ -1016,7 +1016,8 @@ mod tests {
         let mut topology = base_topology();
         let mut edge = topology.transfer_edges[0].clone();
         edge.edge_id = "second-edge".to_owned();
-        edge.communication_boundary_id = topology.transfer_edges[0].communication_boundary_id.clone();
+        edge.communication_boundary_id =
+            topology.transfer_edges[0].communication_boundary_id.clone();
         topology.transfer_edges.push(edge);
         assert_eq!(
             validate_memory_topology(&topology),
