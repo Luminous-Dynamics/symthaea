@@ -107,7 +107,7 @@ jobs:
                   assert row["mean_model_head_evaluations"] == 0.0
                   assert row["mean_oracle_transition_evaluations"] == 0.0
                   assert row["mean_predicted_minus_realized_block_return"] is None
-              elif row["policy"] == "compute_matched_direct_search":
+              elif row["policy"] == "direct_search_control":
                   assert row["mean_candidate_sequence_queries"] > 0.0
                   assert row["mean_model_head_evaluations"] == 0.0
                   assert row["mean_oracle_transition_evaluations"] == 0.0
