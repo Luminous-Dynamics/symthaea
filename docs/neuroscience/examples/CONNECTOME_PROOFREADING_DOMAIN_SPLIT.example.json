@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "manifest_id": "connectomebench2-v2-domain-transfer-synthetic-example-v1",
+  "dataset_revision_commit_sha": "1111111111111111111111111111111111111111",
+  "shift_axis": "species",
+  "seen_domain_ids": [
+    "mouse-cortex",
+    "fly-brain"
+  ],
+  "held_out_domain_ids": [
+    "zebrafish",
+    "human-cortex"
+  ],
+  "entries": [
+    {
+      "sample_id": "train-mouse-001",
+      "cluster_id": "mouse-train-psu-001",
+      "domain_id": "mouse-cortex",
+      "partition": "train"
+    },
+    {
+      "sample_id": "calibration-mouse-001",
+      "cluster_id": "mouse-calibration-psu-001",
+      "domain_id": "mouse-cortex",
+      "partition": "calibration"
+    },
+    {
+      "sample_id": "train-fly-001",
+      "cluster_id": "fly-train-psu-001",
+      "domain_id": "fly-brain",
+      "partition": "train"
+    },
+    {
+      "sample_id": "calibration-fly-001",
+      "cluster_id": "fly-calibration-psu-001",
+      "domain_id": "fly-brain",
+      "partition": "calibration"
+    },
+    {
+      "sample_id": "mouse-01",
+      "cluster_id": "mouse-psu-1",
+      "domain_id": "mouse-cortex",
+      "partition": "development"
+    },
+    {
+      "sample_id": "mouse-02",
+      "cluster_id": "mouse-psu-1",
+      "domain_id": "mouse-cortex",
+      "partition": "development"
+    },
+    {
+      "sample_id": "mouse-03",
+      "cluster_id": "mouse-psu-2",
+      "domain_id": "mouse-cortex",
+      "partition": "development"
+    },
+    {
+      "sample_id": "mouse-04",
+      "cluster_id": "mouse-psu-2",
+      "domain_id": "mouse-cortex",
+      "partition": "development"
+    },
+    {
+      "sample_id": "fly-01",
+      "cluster_id": "fly-psu-1",
+      "domain_id": "fly-brain",
+      "partition": "development"
+    },
+    {
+      "sample_id": "fly-02",
+      "cluster_id": "fly-psu-1",
+      "domain_id": "fly-brain",
+      "partition": "development"
+    },
+    {
+      "sample_id": "fly-03",
+      "cluster_id": "fly-psu-2",
+      "domain_id": "fly-brain",
+      "partition": "development"
+    },
+    {
+      "sample_id": "fly-04",
+      "cluster_id": "fly-psu-2",
+      "domain_id": "fly-brain",
+      "partition": "development"
+    },
+    {
+      "sample_id": "zfish-01",
+      "cluster_id": "zfish-psu-1",
+      "domain_id": "zebrafish",
+      "partition": "development"
+    },
+    {
+      "sample_id": "zfish-02",
+      "cluster_id": "zfish-psu-1",
+      "domain_id": "zebrafish",
+      "partition": "development"
+    },
+    {
+      "sample_id": "zfish-03",
+      "cluster_id": "zfish-psu-2",
+      "domain_id": "zebrafish",
+      "partition": "development"
+    },
+    {
+      "sample_id": "zfish-04",
+      "cluster_id": "zfish-psu-2",
+      "domain_id": "zebrafish",
+      "partition": "development"
+    },
+    {
+      "sample_id": "human-01",
+      "cluster_id": "human-psu-1",
+      "domain_id": "human-cortex",
+      "partition": "development"
+    },
+    {
+      "sample_id": "human-02",
+      "cluster_id": "human-psu-1",
+      "domain_id": "human-cortex",
+      "partition": "development"
+    },
+    {
+      "sample_id": "human-03",
+      "cluster_id": "human-psu-2",
+      "domain_id": "human-cortex",
+      "partition": "development"
+    },
+    {
+      "sample_id": "human-04",
+      "cluster_id": "human-psu-2",
+      "domain_id": "human-cortex",
+      "partition": "development"
+    }
+  ]
+}
