@@ -1,0 +1,454 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/intervention-target-delta-report.schema.json",
+  "title": "Symthaea Intervention Target Delta Verification Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "study_id",
+    "analyzer_source_revision",
+    "quality_plan_sha256",
+    "quality_receipt_sha256",
+    "target_plan_sha256",
+    "target_receipt_sha256",
+    "candidate_count",
+    "adjudicated_candidate_count",
+    "global_relation_valid_count",
+    "global_relation_invalid_count",
+    "global_relation_ambiguous_count",
+    "target_delta_valid_count",
+    "target_delta_invalid_count",
+    "target_delta_ambiguous_count",
+    "final_valid_count",
+    "final_invalid_count",
+    "final_ambiguous_count",
+    "accepted_valid_count",
+    "accepted_invalid_count",
+    "accepted_ambiguous_count",
+    "rejected_valid_count",
+    "rejected_invalid_count",
+    "rejected_ambiguous_count",
+    "abstained_valid_count",
+    "abstained_invalid_count",
+    "abstained_ambiguous_count",
+    "exact_changed_scope_match_count",
+    "collateral_material_change_count",
+    "reviewer_pairwise_agreement_ppm",
+    "reviewer_pairwise_comparison_count",
+    "reviewer_target_transition_agreement_ppm",
+    "reviewer_target_transition_comparison_count",
+    "generation_tokens",
+    "generation_cost_micro_usd",
+    "generation_wall_clock_ms",
+    "final_valid_accepted_unique_per_1000_tokens",
+    "final_valid_accepted_unique_per_usd",
+    "family_metrics",
+    "candidate_results",
+    "reviewer_independence_proven",
+    "reviewer_competence_proven",
+    "semantic_truth_proven",
+    "raw_artifact_custody_proven",
+    "execution_authenticity_proven",
+    "external_anchor_required",
+    "scoring_eligible_declared",
+    "claim_boundary",
+    "report_commitment_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_intervention_target_delta_report.v1"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "analyzer_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "quality_plan_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "quality_receipt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "target_plan_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "target_receipt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "candidate_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "adjudicated_candidate_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "global_relation_valid_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "global_relation_invalid_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "global_relation_ambiguous_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "target_delta_valid_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "target_delta_invalid_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "target_delta_ambiguous_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "final_valid_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "final_invalid_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "final_ambiguous_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "accepted_valid_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "accepted_invalid_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "accepted_ambiguous_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "rejected_valid_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "rejected_invalid_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "rejected_ambiguous_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "abstained_valid_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "abstained_invalid_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "abstained_ambiguous_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "exact_changed_scope_match_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "collateral_material_change_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "reviewer_pairwise_agreement_ppm": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "reviewer_pairwise_comparison_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "reviewer_target_transition_agreement_ppm": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "reviewer_target_transition_comparison_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "generation_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "generation_cost_micro_usd": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "generation_wall_clock_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "final_valid_accepted_unique_per_1000_tokens": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "final_valid_accepted_unique_per_usd": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "family_metrics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/family"
+      }
+    },
+    "candidate_results": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/candidate_result"
+      }
+    },
+    "reviewer_independence_proven": {
+      "const": false
+    },
+    "reviewer_competence_proven": {
+      "const": false
+    },
+    "semantic_truth_proven": {
+      "const": false
+    },
+    "raw_artifact_custody_proven": {
+      "const": false
+    },
+    "execution_authenticity_proven": {
+      "const": false
+    },
+    "external_anchor_required": {
+      "const": true
+    },
+    "scoring_eligible_declared": {
+      "const": false
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "report_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "validity": {
+      "enum": [
+        "valid",
+        "invalid",
+        "ambiguous"
+      ]
+    },
+    "disposition": {
+      "enum": [
+        "accepted",
+        "rejected",
+        "abstained"
+      ]
+    },
+    "relation": {
+      "enum": [
+        "semantic_invariant",
+        "semantic_change"
+      ]
+    },
+    "change": {
+      "enum": [
+        "unchanged",
+        "support_increased",
+        "support_decreased",
+        "contradiction_introduced",
+        "scope_changed",
+        "temporal_validity_changed",
+        "unit_changed",
+        "identity_changed",
+        "source_withdrawn",
+        "source_superseded",
+        "other_declared_change"
+      ]
+    },
+    "collateral": {
+      "enum": [
+        "none_observed",
+        "material_change_outside_allowed_scope",
+        "ambiguous"
+      ]
+    },
+    "family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transformation_family",
+        "candidate_count",
+        "valid_count",
+        "invalid_count",
+        "ambiguous_count",
+        "accepted_valid_count",
+        "accepted_invalid_count",
+        "accepted_ambiguous_count"
+      ],
+      "properties": {
+        "transformation_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "invalid_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ambiguous_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "accepted_valid_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "accepted_invalid_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "accepted_ambiguous_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "candidate_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "transformation_family",
+        "target_failure_mode",
+        "pipeline_disposition",
+        "intended_relation",
+        "expected_target_change",
+        "observed_target_change",
+        "expected_changed_claim_count",
+        "observed_changed_claim_count",
+        "exact_changed_scope_match",
+        "collateral_change",
+        "global_relation_validity",
+        "target_delta_validity",
+        "final_validity",
+        "reviewer_consensus_ppm",
+        "reviewer_count"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "transformation_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_failure_mode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pipeline_disposition": {
+          "$ref": "#/$defs/disposition"
+        },
+        "intended_relation": {
+          "$ref": "#/$defs/relation"
+        },
+        "expected_target_change": {
+          "$ref": "#/$defs/change"
+        },
+        "observed_target_change": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/change"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expected_changed_claim_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observed_changed_claim_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exact_changed_scope_match": {
+          "type": "boolean"
+        },
+        "collateral_change": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/collateral"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "global_relation_validity": {
+          "$ref": "#/$defs/validity"
+        },
+        "target_delta_validity": {
+          "$ref": "#/$defs/validity"
+        },
+        "final_validity": {
+          "$ref": "#/$defs/validity"
+        },
+        "reviewer_consensus_ppm": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "reviewer_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
