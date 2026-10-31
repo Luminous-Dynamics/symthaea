@@ -1,7 +1,7 @@
 # Finite-state conformal risk recertification
 
 **Date:** 2026-10-31  
-**Status:** exact two-type mathematical reproduction in a local reference prototype; committed implementation is a finite-state research engine. Not a CIFAR-100 replication and not a new theorem.
+**Status:** exact two-type mathematical reproduction in a local reference prototype; 5/5 finite-grid prototype tests passed. The committed linear-engine test file has 10 tests but has not yet been executed against the exact fetched commit bytes. No remote CI pass is claimed. Not a CIFAR-100 replication and not a new theorem.
 
 ## Research pivot
 
@@ -30,11 +30,13 @@ The research implementation uses count-vector multisets:
 - augmented states: all count vectors of total \(n+1\);
 - held-out total: \(T_A(S)=\sum_z S_z\,\ell(z,A(S-e_z))\).
 
-This avoids enumerating \((n+1)!\) permutations and counts duplicate observations with their multiplicity. The current engine supports multiple risks and a shared action for losses linear in a conservativeness parameter:
+This avoids enumerating \((n+1)!\) permutations and counts duplicate observations with their multiplicity. The first engine supports multiple risks and a shared action for losses linear in a conservativeness parameter:
 \[
 \ell_r(z,\lambda)=g_{r,z}(1-\lambda),\quad \lambda\in[0,1].
 \]
 Envelope CRC and standard CRC are included. Equal-share and fixed-order coordinate-sweep updates use exact linear inversions. Every update verifies all augmented states and fails closed on negative slack or invalid output.
+
+A second engine, `validation/finite_grid_crc_recertification.py`, removes the linear/convex restriction for finite action grids. It accepts any finite nonnegative loss table that is nonincreasing along the ordered conservativeness actions, supports multiple risks with one shared action, and enumerates all finite augmented multisets after every update. There is no interpolation between action values. Its five-test local prototype suite passed on step-like/nonconvex losses, multi-risk tables, invalid monotonicity, and coordinate-sweep validity. The test run used an executable local copy, not a checkout of the committed Git blob.
 
 ## Exact two-type reproduction
 
@@ -95,5 +97,7 @@ References:
 6. Port the finite-state count-vector engine to Rust after the Python reference and exact-state tests stabilize.
 
 Reproduction:
-    PYTHONPATH=validation python -m unittest -v test_finite_state_crc_recertification.py
+    PYTHONPATH=validation python -m unittest -v test_finite_state_crc_recertification.py test_finite_grid_crc_recertification.py
     PYTHONPATH=validation python validation/finite_state_crc_recertification.py --output /tmp/finite-state-crc.json
+
+The committed linear-engine suite has been authored (10 tests) but still needs exact-blob local execution; no CI or merge gate has passed in this research session.
