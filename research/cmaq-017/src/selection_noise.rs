@@ -116,7 +116,7 @@ pub fn evaluate_selection_noise(
     let selection_optimism_gap = naive_selection_gain - held_out_selection_gain;
 
     let (candidate_variance_share, continuation_variance_share, interaction_share) =
-        variance_component_shares(outcomes, &candidate_means);
+        variance_component_shares(outcomes, &candidate_means)?;
     let derived = [
         best_candidate_mean,
         baseline_mean,
@@ -161,7 +161,7 @@ fn mean(values: &[f64]) -> f64 {
 fn variance_component_shares(
     outcomes: &[Vec<f64>],
     candidate_means: &[f64],
-) -> (f64, f64, f64) {
+) -> Result<(f64, f64, f64), SelectionNoiseError> {
     let candidate_count = outcomes.len();
     let continuation_count = outcomes[0].len();
     let grand_mean = candidate_means.iter().sum::<f64>() / candidate_count as f64;
@@ -195,14 +195,21 @@ fn variance_component_shares(
     }
 
     let total_ss = candidate_ss + continuation_ss + interaction_ss;
-    if total_ss <= 0.0 || !total_ss.is_finite() {
-        return (0.0, 0.0, 0.0);
+    if !candidate_ss.is_finite()
+        || !continuation_ss.is_finite()
+        || !interaction_ss.is_finite()
+        || !total_ss.is_finite()
+    {
+        return Err(SelectionNoiseError::NonFiniteDerivedMetric);
     }
-    (
+    if total_ss <= 0.0 {
+        return Ok((0.0, 0.0, 0.0));
+    }
+    Ok((
         candidate_ss / total_ss,
         continuation_ss / total_ss,
         interaction_ss / total_ss,
-    )
+    ))
 }
 
 #[cfg(test)]
@@ -272,7 +279,11 @@ mod tests {
         assert_eq!(candidate_metrics.continuation_variance_share, 0.0);
         assert_eq!(candidate_metrics.candidate_continuation_interaction_share, 0.0);
 
-        let interaction_only = vec![vec![0.0, 1.0], vec![1.0, 0.0], vec![0.0, 1.0]];
+        let interaction_only = vec![
+            vec![0.0, 1.0, -1.0],
+            vec![1.0, -1.0, 0.0],
+            vec![-1.0, 0.0, 1.0],
+        ];
         let interaction_metrics = evaluate_selection_noise(&interaction_only).unwrap().unwrap();
         assert!((interaction_metrics.candidate_continuation_interaction_share - 1.0).abs() < 1e-12);
     }
