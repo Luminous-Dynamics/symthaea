@@ -915,6 +915,57 @@ mod tests {
     }
 
     #[test]
+    fn paired_matrix_uses_identical_seed_sets_and_rejects_missing_pairs() {
+        let seeds = [11, 22, 33];
+        let runs = run_four_seat_campaign_matrix(
+            &[DirectionLandscapeFamily::DelayedBreakthrough],
+            &POLICIES,
+            4,
+            &seeds,
+        )
+        .unwrap();
+        let comparisons = compare_four_seat_campaign_runs(
+            &runs,
+            RoundSchedulerPolicy::DirectionBoardFixedSet,
+        )
+        .unwrap();
+        assert_eq!(comparisons.len(), POLICIES.len() - 1);
+        assert!(comparisons.iter().all(|item| item.pair_count == seeds.len()));
+
+        assert!(compare_four_seat_campaign_runs(
+            &runs[..runs.len() - 1],
+            RoundSchedulerPolicy::DirectionBoardFixedSet,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn bootstrap_work_item_digests_are_policy_independent() {
+        let board = run_four_seat_campaign(
+            DirectionLandscapeFamily::DelayedBreakthrough,
+            RoundSchedulerPolicy::DirectionBoardFixedSet,
+            2,
+            0xabc,
+        )
+        .unwrap();
+        let coral = run_four_seat_campaign(
+            DirectionLandscapeFamily::DelayedBreakthrough,
+            RoundSchedulerPolicy::CoralDirectionOnly,
+            2,
+            0xabc,
+        )
+        .unwrap();
+        let board_seats = &board.executions[0].plan.seats;
+        let coral_seats = &coral.executions[0].plan.seats;
+        assert_eq!(board_seats.len(), coral_seats.len());
+        for (left, right) in board_seats.iter().zip(coral_seats) {
+            assert_eq!(left.action, right.action);
+            assert_eq!(left.action_id, right.action_id);
+            assert_eq!(left.work_item_sha256, right.work_item_sha256);
+        }
+    }
+
+    #[test]
     fn no_new_direction_null_remains_a_null_for_both_direction_ablations() {
         for policy in [
             RoundSchedulerPolicy::DirectionBoardFixedSet,
