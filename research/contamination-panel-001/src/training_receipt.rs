@@ -70,8 +70,8 @@ pub struct TrainingArmExecutionReceiptV1 {
     pub corpus_shard_manifest_sha256: String,
     pub post_tokenization_manifest_sha256: String,
     pub trainer_job_execution_receipt_sha256: String,
-    pub checkpoint_custody_receipt_sha256: String,
-    pub runner_attestation_sha256: String,
+    pub checkpoint_custody_receipt_sha256: Option<String>,
+    pub runner_attestation_sha256: Option<String>,
     pub started_at_utc: String,
     pub completed_at_utc: String,
     pub wall_clock_millis: u64,
@@ -270,10 +270,14 @@ fn validate_arm_common(
         (&arm.corpus_shard_manifest_sha256, "corpus_shard_manifest_sha256"),
         (&arm.post_tokenization_manifest_sha256, "post_tokenization_manifest_sha256"),
         (&arm.trainer_job_execution_receipt_sha256, "trainer_job_execution_receipt_sha256"),
-        (&arm.checkpoint_custody_receipt_sha256, "checkpoint_custody_receipt_sha256"),
-        (&arm.runner_attestation_sha256, "runner_attestation_sha256"),
     ] {
         validate_digest(value, label)?;
+    }
+    if let Some(value) = &arm.checkpoint_custody_receipt_sha256 {
+        validate_digest(value, "checkpoint_custody_receipt_sha256")?;
+    }
+    if let Some(value) = &arm.runner_attestation_sha256 {
+        validate_digest(value, "runner_attestation_sha256")?;
     }
     validate_utc_timestamp(&arm.started_at_utc, "started_at_utc")?;
     validate_utc_timestamp(&arm.completed_at_utc, "completed_at_utc")?;
@@ -464,11 +468,11 @@ pub fn validate_paired_training_execution_receipt(
         && receipt.treatment.observed_training_steps == design.training_steps
         && receipt.placebo.observed_training_steps == design.training_steps;
     let runner_attestation_digests_present =
-        valid_digest(&receipt.treatment.runner_attestation_sha256)
-        && valid_digest(&receipt.placebo.runner_attestation_sha256);
+        receipt.treatment.runner_attestation_sha256.as_deref().is_some_and(valid_digest)
+        && receipt.placebo.runner_attestation_sha256.as_deref().is_some_and(valid_digest);
     let checkpoint_custody_digests_present =
-        valid_digest(&receipt.treatment.checkpoint_custody_receipt_sha256)
-        && valid_digest(&receipt.placebo.checkpoint_custody_receipt_sha256);
+        receipt.treatment.checkpoint_custody_receipt_sha256.as_deref().is_some_and(valid_digest)
+        && receipt.placebo.checkpoint_custody_receipt_sha256.as_deref().is_some_and(valid_digest);
     let paired_checkpoints_distinct =
         receipt.treatment.output_checkpoint_sha256 != receipt.placebo.output_checkpoint_sha256;
 
@@ -626,8 +630,8 @@ mod tests {
             corpus_shard_manifest_sha256: digest(&format!("shards-{suffix}")),
             post_tokenization_manifest_sha256: digest(&format!("tokens-{suffix}")),
             trainer_job_execution_receipt_sha256: digest(&format!("job-{suffix}")),
-            checkpoint_custody_receipt_sha256: digest(&format!("custody-{suffix}")),
-            runner_attestation_sha256: digest(&format!("attestation-{suffix}")),
+            checkpoint_custody_receipt_sha256: Some(digest(&format!("custody-{suffix}"))),
+            runner_attestation_sha256: Some(digest(&format!("attestation-{suffix}")),
             started_at_utc: "2026-10-31T00:00:00Z".to_owned(),
             completed_at_utc: "2026-10-31T01:00:00Z".to_owned(),
             wall_clock_millis: 3_600_000,
@@ -921,14 +925,18 @@ mod tests {
         ).unwrap_err().contains("YYYY-MM-DDTHH:MM:SSZ"));
 
         let mut receipt = paired_receipt(&design, &manifest);
-        receipt.placebo.runner_attestation_sha256 = "missing".to_owned();
+        receipt.placebo.runner_attestation_sha256 = None;
         receipt.pair_receipt_sha256.clear();
         let bytes0 = serde_json::to_vec(&receipt).unwrap();
         receipt.pair_receipt_sha256 =
             hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
-        assert!(validate_paired_training_execution_receipt(
+        let report = validate_paired_training_execution_receipt(
             &design, &manifest, &seed(), &serde_json::to_vec(&receipt).unwrap()
-        ).unwrap_err().contains("runner_attestation_sha256"));
+        ).unwrap();
+        assert!(report.execution_consistent);
+        assert!(!report.runner_attestation_digests_present);
+        assert!(!report.ready_for_independent_attestation_verification);
+        assert!(!report.independently_verified);
     }
 
     #[test]
