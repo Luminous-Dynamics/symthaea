@@ -126,6 +126,14 @@ impl CounterfactualSupportAdapterReport {
             && self.events.iter().enumerate().all(|(index, event)| {
                 event.source_event_index == index
                     && event.support.source_event_index == index
+                    && event.raw_measured_support.iter().all(|interval| {
+                        interval.start_frame < interval.end_frame
+                            && interval.end_frame <= event.output_frame_count
+                    })
+                    && event.support.acoustic_support.iter().all(|interval| {
+                        interval.start_frame < interval.end_frame
+                            && interval.end_frame <= event.output_frame_count
+                    })
                     && event.support.support_evidence_sha256.as_deref()
                         == Some(event.evidence_sha256.as_str())
                     && is_sha256(&event.evidence_sha256)
