@@ -1,0 +1,14 @@
+{
+  "schema_version": "cmaq-018-net-decision-value-v0.1",
+  "claim_ceiling": "synthetic_known_answer_fixture_only_no_real_policy_advantage_claim",
+  "episode_count": 3,
+  "mean_gross_advantage_vs_d0": 2.3333333333333335,
+  "mean_net_advantage_vs_d0": 0.3333333333333333,
+  "net_win_rate_vs_d0": 0.6666666666666666,
+  "mean_gross_advantage_vs_d1": 1.5,
+  "mean_net_advantage_vs_d1": 0.16666666666666666,
+  "net_win_rate_vs_d1": 0.3333333333333333,
+  "mean_world_model_net_utility": 8.333333333333334,
+  "mean_d0_net_utility": 8,
+  "mean_d1_net_utility": 8.166666666666666
+}
