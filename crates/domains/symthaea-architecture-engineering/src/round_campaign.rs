@@ -1004,6 +1004,7 @@ mod tests {
         assert_eq!(summary.admitted_directions, 1);
         assert_eq!(ledger.total_action_count, 4);
         assert_eq!(ledger.total_charged_budget_units, 4);
+        ledger.validate_integrity().unwrap();
 
         let parent = ledger.last_close_sha256.clone().unwrap();
         let next = RoundPlan::new(
@@ -1061,6 +1062,11 @@ mod tests {
         };
         ledger.append(&next, &next_close).unwrap();
         assert_eq!(ledger.next_round_index, 2);
+        assert_eq!(ledger.entries.len(), 2);
+        ledger.validate_integrity().unwrap();
+        let mut altered_totals = ledger.clone();
+        altered_totals.total_action_count += 1;
+        assert!(altered_totals.validate_integrity().is_err());
         assert!(ledger.append(&next, &next_close).is_err());
     }
 
