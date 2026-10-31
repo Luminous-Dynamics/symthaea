@@ -2729,10 +2729,7 @@ impl BinaryCausalModel {
             request_sha256,
             algorithm_id: IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID,
             search_config: config,
-            certified_upper_bound: certified_iit4_2023_system_phi_upper_bound(
-                candidate_system.len(),
-                config.include_total_cut,
-            ),
+            certified_upper_bound,
             status,
             phi_s,
             selected_state_pair_index,
