@@ -199,7 +199,7 @@ fn sha1_hex(input: &[u8]) -> String {
 }
 
 fn git_blob_sha1(raw: &[u8]) -> String {
-    let header = format!("blob {}\\0", raw.len());
+    let header = format!("blob {}\0", raw.len());
     let mut object = Vec::with_capacity(header.len() + raw.len());
     object.extend_from_slice(header.as_bytes());
     object.extend_from_slice(raw);
