@@ -38,9 +38,7 @@ use crate::pareto_portfolio_voc::{
     evaluate_portfolio_measurement_voc, CandidatePortfolio, ParetoPortfolioConfig,
     ParetoPortfolioPosterior, PortfolioMeasurementAction, PortfolioParetoVoC,
 };
-use crate::run_wide_pruning_risk::{
-    PruningRiskEventReceipt, RunWidePruningRiskLedger,
-};
+use crate::run_wide_pruning_risk::RunWidePruningRiskLedger;
 
 const SCOPE_DOMAIN: &[u8] = b"symthaea.nas.action-preflight-scope.v0.1";
 const RECEIPT_DOMAIN: &[u8] = b"symthaea.nas.action-preflight-receipt.v0.1";
@@ -365,7 +363,32 @@ pub fn verify_measurement_preflight(
     .map_err(|error| NasAuthorizationError::new("portfolio_voc", error.to_string()))?;
     validate_portfolio_decision_scope(&voc, scope)?;
 
-    let resource_cost_sha256 = digest_serde(b"symthaea.nas.resource-cost-vector.v0.1", &action_cost_vector(request)?)?;
+    if objective.measurement_cost_unit != voc.resource_unit
+        || objective.measurement_cost_unit != action.resource_unit
+        || action.incremental_cost_units != voc.incremental_cost_units
+    {
+        return Err(NasAuthorizationError::new(
+            "measurement_cost",
+            "objective acquisition-cost unit or units do not match the recomputed portfolio measurement action",
+        ));
+    }
+    let cost_vector = action_cost_vector(request)?;
+    let matching_cost_dimensions = cost_vector
+        .resources
+        .iter()
+        .filter(|quantity| {
+            quantity.unit == objective.measurement_cost_unit
+                && quantity.units == voc.incremental_cost_units
+        })
+        .count();
+    if matching_cost_dimensions != 1 {
+        return Err(NasAuthorizationError::new(
+            "resource_cost",
+            "exactly one resource dimension must reconcile to the objective acquisition cost and unit",
+        ));
+    }
+
+    let resource_cost_sha256 = digest_serde(b"symthaea.nas.resource-cost-vector.v0.1", cost_vector)?;
     if resource_cost_sha256 != scope.resource_cost_sha256 {
         return Err(NasAuthorizationError::new(
             "resource_cost_sha256",
@@ -780,6 +803,22 @@ fn compute_objective_order_sha256(ids: &[String]) -> Result<String, NasAuthoriza
     digest_serde(OBJECTIVE_ORDER_DOMAIN, ids)
 }
 
+/// Check the integrity digest of a preflight receipt. This does not re-verify its source evidence
+/// or turn a preflight receipt into an execution capability.
+pub fn verify_action_preflight_receipt_digest(
+    receipt: &NasActionPreflightReceipt,
+) -> Result<(), NasAuthorizationError> {
+    if !is_sha256(&receipt.receipt_sha256)
+        || compute_preflight_receipt_sha256(receipt)? != receipt.receipt_sha256
+    {
+        return Err(NasAuthorizationError::new(
+            "receipt_sha256",
+            "preflight receipt digest does not match its canonical fields",
+        ));
+    }
+    Ok(())
+}
+
 fn compute_preflight_receipt_sha256(
     receipt: &NasActionPreflightReceipt,
 ) -> Result<String, NasAuthorizationError> {
@@ -954,6 +993,10 @@ mod tests {
             "PREFLIGHT_ELIGIBLE_NO_RESERVATION_NO_EXECUTION"
         );
         assert!(receipt.pruning_risk_receipt_sha256.is_some());
+        verify_action_preflight_receipt_digest(&receipt).unwrap();
+        let mut tampered = receipt.clone();
+        tampered.candidate_id = "other-candidate".into();
+        assert!(verify_action_preflight_receipt_digest(&tampered).is_err());
         assert_eq!(
             receipt.receipt_sha256,
             compute_preflight_receipt_sha256(&receipt).unwrap()
