@@ -114,7 +114,14 @@ For each qualification attempt, capture:
 - Run Nix evaluation and systemd unit verification on actual target NixOS.
 - Run adversarial isolation tests before any confirmatory temporal benchmark.
 
-## 8. Security claim ceiling
+## 8. Validation performed in the authoring environment
+
+- Kernel: Linux 6.18.57 x86_64. A direct `openat2` syscall successfully opened a temporary directory using `RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS`.
+- systemd: `systemd-analyze verify` passed for three synthetic unit files that mirror the current module's security directives, ordering, optional inaccessible socket paths and encrypted credential syntax, using systemd 257.9. This does not verify NixOS-generated units.
+- `systemd-analyze security` could not run because the container is not booted with systemd as PID 1 and cannot connect to the system bus.
+- Nix, nix-instantiate, Cargo, rustc and rustfmt are not installed in the authoring environment. There was no Nix evaluation, Cargo build, rustfmt, Clippy or Rust test execution.
+
+## 9. Security claim ceiling
 
 The module, openat2 intake, canonical Ed25519 receipt and replay-ledger sources are authored, not security-qualified. Their tests have not been executed. Even a future passing test only supports the declared NixOS/kernel/systemd/filesystem and threat model. It does not establish resistance to kernel compromise, root, privileged operator, hypervisor or hardware side-channel attacks.
 
