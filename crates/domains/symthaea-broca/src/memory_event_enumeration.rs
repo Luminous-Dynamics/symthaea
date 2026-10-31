@@ -23,8 +23,7 @@
 //! unanswerable rather than silently treating assistant advice as user evidence.
 
 use crate::memory_evidence::{
-    EvidenceInventorySnapshot, EvidenceRecord, EvidencePayload, EvidenceIndexSnapshotReceipt,
-    EVIDENCE_SCHEMA_VERSION,
+    EvidenceInventorySnapshot, EvidenceRecord, EVIDENCE_SCHEMA_VERSION,
 };
 use crate::memory_proof_admission::ProofCandidateAdmission;
 use serde::{Deserialize, Serialize};
@@ -380,12 +379,50 @@ impl EventEnumerationResult {
         if computed != self.receipt.receipt_sha256 {
             return Err("event enumeration receipt digest mismatch".into());
         }
+        let mut event_ids = BTreeSet::new();
+        let mut sessions = BTreeSet::new();
+        let mut families = BTreeSet::new();
+        for item in &self.matching_events {
+            require_non_empty(&item.source_evidence_id, "source_evidence_id")?;
+            require_non_empty(&item.source_family_id, "source_family_id")?;
+            require_non_empty(&item.source_session_id, "source_session_id")?;
+            item.event.validate()?;
+            if !event_ids.insert(item.event.event_id.as_str()) {
+                return Err(format!("duplicate result event ID {:?}", item.event.event_id));
+            }
+            sessions.insert(item.source_session_id.as_str());
+            families.insert(item.source_family_id.as_str());
+        }
+        if sessions.len() != self.receipt.distinct_session_count
+            || families.len() != self.receipt.distinct_source_family_count
+        {
+            return Err("enumeration diversity counts do not match returned events".into());
+        }
         if self.receipt.answer_is_permitted
             && (!self.receipt.inventory_complete
                 || !self.receipt.extraction_complete
                 || !self.receipt.speaker_attribution_complete)
         {
             return Err("answer permission exceeds enumeration coverage".into());
+        }
+        Ok(())
+    }
+
+    /// Re-run the closed-world derivation against the original immutable
+    /// inventory, admission envelopes, extraction batch and query. A digest
+    /// alone is not a signature: this independent recomputation is the
+    /// authoritative check before a count is used for an answer.
+    pub fn verify_against(
+        &self,
+        inventory: &EvidenceInventorySnapshot,
+        batch: &EventExtractionBatch,
+        admissions: &[ProofCandidateAdmission],
+        query: &EventEnumerationQuery,
+    ) -> Result<(), String> {
+        self.verify_internal_consistency()?;
+        let recomputed = enumerate_events_closed_world(inventory, batch, admissions, query)?;
+        if &recomputed != self {
+            return Err("event enumeration result does not match independent recomputation".into());
         }
         Ok(())
     }
@@ -770,6 +807,27 @@ mod tests {
         assert!(enumerate_events_closed_world(
             &inventory, &batch(&inventory), &admissions, &query()
         ).unwrap_err().contains("different EvidenceIndex snapshot"));
+    }
+
+    #[test]
+    fn authoritative_verification_recomputes_all_answer_gates() {
+        let (inventory, admissions) = inventory_and_admissions();
+        let extraction = batch(&inventory);
+        let query = query();
+        let result = enumerate_events_closed_world(
+            &inventory, &extraction, &admissions, &query
+        ).unwrap();
+        result.verify_against(&inventory, &extraction, &admissions, &query).unwrap();
+
+        let mut tampered = result.clone();
+        tampered.receipt.unattributed_relevant_event_count = 0;
+        tampered.receipt.speaker_attribution_complete = false;
+        tampered.receipt.answer_is_permitted = false;
+        tampered.receipt.receipt_sha256 = event_receipt_digest(&tampered.receipt).unwrap();
+        assert!(tampered
+            .verify_against(&inventory, &extraction, &admissions, &query)
+            .unwrap_err()
+            .contains("independent recomputation"));
     }
 
     #[test]
