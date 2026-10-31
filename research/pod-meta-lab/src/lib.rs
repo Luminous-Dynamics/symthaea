@@ -4,6 +4,7 @@
 //! It is deliberately independent of the production COG-META ABI and is not
 //! a production scheduler or a formal/legal proof checker.
 
+pub mod graph;
 pub mod poar;
 
 use std::collections::{BTreeMap, BTreeSet};
