@@ -1,0 +1,170 @@
+{
+  "schema_version": "cmaq-002-activearena-baseline-lock-v0.1",
+  "baseline_id": "activearena",
+  "title": "ActiveArena: Benchmarking and Understanding Active Perception in Robotic Manipulation",
+  "paper_url": "https://arxiv.org/abs/2609.24124",
+  "source": {
+    "repository": "https://github.com/leeibo/ActiveArena",
+    "default_branch": "main",
+    "pinned_commit": "1bf2c77b8d3ab978fc5b4599a69d017f593edbe8",
+    "repository_license": "MIT",
+    "source_file_blobs": {
+      "README.md": "cd1fc13e844426f2b990bdbc07b1acc83f762b05",
+      "LICENSE": "5f0a83b75f7b8fa2828766c65dea5ee8d4eedb1f",
+      "environment.yml": "b6fe6a15b63c024b295b1e21b5ddab8b616ed7c8",
+      "script/requirements.txt": "0546fcaf513fea7b697ac219b9848838a7b5b6d6",
+      "docs/UPSTREAM_SNAPSHOTS.md": "43f4ca96b3df07925dfb906b5f1e413da79e9c54",
+      "task_config/eval_seed_task_whitelist.yml": "4a14b27544ce782de110ee8ceb744de198eb0c5a",
+      "script/download_activearena_assets.py": "7f6e6257f3c875cd48ece551669c087bbdc36363",
+      "script/eval_policy.py": "6f98fe08413c45c743e047754cec9ba21ec38a98",
+      "docs/task_categories.md": "db689c14ffb81c7debef5a9131a52e119903c13d",
+      "task_config/info_gathering_demo.yml": "97058edba7aee041c0b901e49134fd2495aa5a3b",
+      "task_config/info_gathering_randomized.yml": "974fe56b3dfd9d377cdc34ffadc9a4c701a1343f"
+    }
+  },
+  "benchmark": {
+    "task_count": 35,
+    "task_families": 2,
+    "categories": [
+      "SS_single_object_search",
+      "SL_single_object_loop",
+      "ML_multi_object_loop",
+      "MD_multi_object_decision",
+      "IA_interactive_information_acquisition"
+    ],
+    "action_dimension": 18,
+    "candidate_visible_camera": "head",
+    "other_camera_views": "visualization_only_not_candidate_observations",
+    "id_configuration": "info_gathering_demo",
+    "ood_configuration": "info_gathering_randomized",
+    "seed_entries_per_task_per_setting": 100,
+    "evaluated_entries_per_task_per_setting": 50,
+    "evaluation_seed_policy": "first_50_ordered_unique_entries",
+    "unsuccessful_episode_policy": "count_as_failure",
+    "training_demonstrations_per_task": 100,
+    "training_frames_approx": 581200,
+    "training_hours_approx": 10.76,
+    "published_reference_scores": {
+      "metric": "task_macro_success_rate_percent",
+      "activearena_oft": {
+        "id": 62.97,
+        "ood": 47.6
+      },
+      "activearena_plan": {
+        "id": 60.97,
+        "ood": 45.54
+      },
+      "source": "official project page and paper; not Symthaea measurements"
+    }
+  },
+  "dataset": {
+    "repository": "https://huggingface.co/datasets/leeibo/ActiveArena-Data",
+    "observed_status": "publicly_listed",
+    "observed_license": "Apache-2.0",
+    "observed_format": "LeRobot/Parquet",
+    "observed_rows_approx": 581000,
+    "visible_fields": [
+      "observation.state",
+      "action",
+      "observation.images.camera_head",
+      "subtask_index",
+      "subtask_instruction_index",
+      "stage",
+      "subtask_keyframe",
+      "motion_keyframe",
+      "timestamp",
+      "frame_index",
+      "episode_index",
+      "task_index"
+    ],
+    "immutable_revision": null,
+    "revision_status": "unpinned_metadata_only",
+    "checksum_manifest_status": "not_yet_pinned",
+    "download_status": "not_downloaded",
+    "policy": "Do not use for a reproducibility claim until immutable dataset revision, file manifest, exact checksums and split/task mapping are frozen. Preserve the Apache-2.0 dataset license and separately verify licenses for simulator assets and model weights."
+  },
+  "assets": {
+    "base_simulator_source": {
+      "repository": "RoboTwin_Astribot",
+      "pinned_revision": "53e5fc8",
+      "role": "vendored simulator/task source"
+    },
+    "base_asset_dataset": {
+      "repository": "TianxingChen/RoboTwin2.0",
+      "pinned_revision": "981c92aa34d8f94d4cff47e0d5bc2f7d4e0af042",
+      "license_status": "not_independently_verified_in_this_lock"
+    },
+    "activearena_asset_dataset": {
+      "repository": "leeibo/ActiveArena-Assets",
+      "pinned_revision": "819632dfd545b569657e195cc47aae3af7fce5f1",
+      "downloader_blob": "7f6e6257f3c875cd48ece551669c087bbdc36363",
+      "upstream_downloader_checks_sha256": true,
+      "license_status": "not_independently_verified_in_this_lock"
+    },
+    "download_status": "not_downloaded",
+    "policy": "Do not assume the simulator source MIT license covers third-party or dataset assets. Review each asset license and verify hashes before reproduction."
+  },
+  "runtime": {
+    "os": "Linux",
+    "python": "3.10",
+    "gpu": "NVIDIA GPU required by upstream installation instructions",
+    "torch": "2.4.1",
+    "torchvision": "0.19.1",
+    "sapien": "3.0.0b1",
+    "requirements_blob": "0546fcaf513fea7b697ac219b9848838a7b5b6d6",
+    "cuda": "toolkit with nvcc",
+    "rendering": "Vulkan",
+    "video": "ffmpeg",
+    "curobo_revision": "d64c4b005459db10c5dd867d8b30a87d5bda9bdb",
+    "pytorch3d_revision": "89653419d0973396f3eff1a381ba09a07fffc2ed",
+    "resolved_environment_lock": "not_exported"
+  },
+  "policy_baseline": {
+    "repository": "https://github.com/leeibo/ActiveArena-VLA",
+    "pinned_commit": "abaea42b223d40f7b763cd879ce926c8c0c906a1",
+    "repository_license": "MIT_with_StarVLA_attribution_requirements",
+    "source_file_blobs": {
+      "README.md": "af4e993aa6f5b442d94091b9fda5c26cc5e85f32",
+      "LICENSE": "c636f73528f042c33c1e9a502a0f685316e44a11",
+      "MODEL_SNAPSHOT.md": "8ab640f1cef7bb6d2f68c3082b49a68527c10cb3",
+      "requirements.txt": "733686169b8b32d860567d77eafbfb800fae2360"
+    },
+    "released_oft_configurations": [
+      "oft_instruction_action_12_ws",
+      "oft_subtask_action_12_wos",
+      "oft_subtask_action_12_ws"
+    ],
+    "action_chunk": {
+      "predicted_steps": 16,
+      "action_dimension": 18
+    },
+    "base_vlm": {
+      "repository": "Qwen/Qwen3-VL-2B-Instruct",
+      "pinned_revision": "89644892e4d85e24eaac8bacfd4f463576704203",
+      "weights_download_status": "not_downloaded",
+      "license_status": "requires_independent_terms_review"
+    },
+    "checkpoint_bundle": {
+      "repository": "leeibo/ActiveArena-VLA-weights",
+      "immutable_revision": null,
+      "manifest_sha256": null,
+      "status": "unpinned_not_downloaded"
+    },
+    "claim_ceiling": "official published reference configurations only; no Symthaea reproduction or matched comparison"
+  },
+  "adapter_readiness": {
+    "status": "protocol_and_source_pins_only",
+    "required_before_reproduction": [
+      "pin immutable ActiveArena dataset revision and per-file checksums",
+      "verify base and ActiveArena asset dataset licenses and hashes",
+      "pin ActiveArena-VLA checkpoint bundle revision and manifest",
+      "review Qwen3-VL base-model terms and record exact weight digest",
+      "export resolved Python/CUDA dependency lock and GPU/runtime profile",
+      "run official one-episode smoke using policy-visible head camera only",
+      "reproduce all 35 tasks with first 50 frozen ID/OOD seeds per task",
+      "retain per-task raw receipts and report task-macro means separately"
+    ]
+  },
+  "reproduction_status": "source_and_evaluation_protocol_pinned_dataset_assets_and_checkpoints_not_frozen",
+  "claim_ceiling": "source and paper references only; no ActiveArena evaluation, Symthaea score, matched baseline or SOTA claim"
+}
