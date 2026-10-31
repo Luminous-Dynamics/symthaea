@@ -115,3 +115,22 @@ The joint action-bank code proves only that the supplied payload is structurally
 The canonical digest uses the domain tag `cmaq-018-joint-action-bank-v0.1\0`, followed by length-prefixed UTF-8 strings for history digest, action-manifest digest and outcome channel; little-endian u64 horizon, action count and action IDs; little-endian u64 draw count and draw IDs; one coupling byte (0/1/2 for the three enum variants); then the matrix row count, each row length and every f64 sample's exact IEEE-754 bit pattern in little-endian order.
 
 The Rust test pins the synthetic bank digest to a known answer, and the focused workflow recomputes the same encoding independently in Python. This proves content integrity for the encoded bank, not that the producer honestly generated the declared coupling or that the samples are calibrated.
+
+
+## Selected-action regret and false-dominance evaluation
+
+The action-set intervals are useful only if their guarantees survive the actual selection step. The metric module now includes `SelectionEpisode` and `evaluate_selected_action_sets`. Each held-out episode supplies the complete candidate interval set, evaluator-realized outcome for every action and the action selected by the policy.
+
+The evaluator reports:
+- mean realized regret of the selected action versus the best realized action in that frozen set;
+- mean conditional regret upper bound from the selected interval versus competitor upper bounds;
+- episode-level coverage of the regret bound;
+- simultaneous coverage of the complete action interval set;
+- number of interval-dominance certificates and the false-dominance count/rate;
+- mean width of the selected action's interval.
+
+A *false-dominance certificate* occurs when the selected interval's lower endpoint is at least every competitor's upper endpoint (so the interval method says zero regret) but evaluator truth shows positive regret. This metric exposes a particularly dangerous failure mode: an apparently decisive selected action whose intervals are wrong precisely where the planner used them.
+
+The episode—not an action, pair or draw—is the sampling unit. The known-answer synthetic fixture reports 4 episodes, 2 actions, mean regret 1.25, mean bound 1.25, 75% bound coverage, 75% simultaneous interval coverage, 2 dominance certificates and 1 false certificate (50% false-dominance rate). This is a hostile fixture, not a performance or calibration result. The focused workflow validates its schema and rejects impossible false-certificate counts.
+
+The bound is conditional on all intervals covering the true outcomes. It is not a safety proof. A future producer should abstain or request more evidence when action-set coverage is unsupported or the selected action is not robustly dominant; the decision must still be checked against an independent authority gate.
