@@ -42,9 +42,10 @@ mod factor_graph;
 pub use factor_graph::{
     min_fill_log_sum_product, min_fill_log_sum_product_with_cutset,
     min_fill_log_sum_product_with_cutset_plan, min_fill_sum_product,
-    plan_min_fill_cutset_elimination, plan_min_fill_elimination, BinaryFactor, BinaryLogFactor,
-    CutsetFactorEliminationPlan, CutsetLogFactorEliminationReport, FactorEliminationPlan,
-    FactorEliminationReport, FactorGraphError, LogFactorEliminationReport,
+    plan_min_fill_cutset_elimination, plan_min_fill_cutset_frontier, plan_min_fill_elimination,
+    BinaryFactor, BinaryLogFactor, CutsetFactorEliminationPlan, CutsetFrontierCandidate,
+    CutsetFrontierRejection, CutsetLogFactorEliminationReport, CutsetPlanFrontierReport,
+    FactorEliminationPlan, FactorEliminationReport, FactorGraphError, LogFactorEliminationReport,
 };
 
 mod sparse_causal;
