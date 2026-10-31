@@ -314,7 +314,7 @@ where
         assign_rank_and_crowding(&mut population)?;
         let parent_left = binary_tournament(&population, &mut rng);
         let parent_right = binary_tournament(&population, &mut rng);
-        let (mut child_left, mut child_right) = simulated_binary_crossover(
+        let (child_left, child_right) = simulated_binary_crossover(
             &population[parent_left].decision,
             &population[parent_right].decision,
             config.crossover_probability,
