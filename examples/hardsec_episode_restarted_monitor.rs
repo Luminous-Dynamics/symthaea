@@ -1150,6 +1150,21 @@ mod tests {
         assert!(audit(&p,&e,&c).unwrap_err().contains("training, selection and evaluation execution groups overlap"));
     }
 
+
+    #[test]
+    fn rejects_truth_labels_in_the_runtime_context_mapping() {
+        let (p,e,mut c,_,_,_)=fixture();
+        c["runtime_mapping"]["assignments"][0]["true_context_id"]=json!("compute");
+        assert!(audit(&p,&e,&c).unwrap_err().contains("exactly the five declared fields"));
+    }
+
+    #[test]
+    fn rejects_non_contiguous_context_assignment_source_sequence() {
+        let (p,e,mut c,_,_,_)=fixture();
+        c["runtime_mapping"]["assignments"][1]["sequence_index"]=json!(9);
+        assert!(audit(&p,&e,&c).unwrap_err().contains("sequence_index must be contiguous from one"));
+    }
+
     #[test]
     fn rejects_missing_assignment_window() {
         let (p,e,mut c,_,_,_)=fixture();
