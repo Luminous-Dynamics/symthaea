@@ -63,7 +63,7 @@
     {
       "metric_id": "errno_classification_accuracy",
       "phase": "safety",
-      "definition": "Fraction of controlled ENOSYS, EOPNOTSUPP, EPERM/EACCES and EINVAL outcomes assigned to distinct not-supported, disabled, permission-denied and invalid-request classes.",
+      "definition": "Fraction of controlled ENOSYS, EOPNOTSUPP, EPERM/EACCES and EINVAL outcomes assigned to distinct not-supported, operation-not-supported, permission-denied and invalid-request classes.",
       "target": {
         "operator": "=",
         "value": 1
@@ -134,7 +134,7 @@
   "gates": {
     "safety": [
       "operational_status_precision",
-      "unsupported_disabled_denied_classification_accuracy",
+      "errno_classification_accuracy",
       "descriptor_cleanup_confirmation",
       "unintended_side_effect_count",
       "false_capture_or_qualification_claim_rate",
@@ -162,7 +162,7 @@
     "controls": [
       "known_supported_api",
       "kernel_or_syscall_unavailable",
-      "kernel_feature_disabled",
+      "operation_not_supported",
       "permission_denied",
       "malformed_or_unsupported_flag",
       "descriptor_close_failure_injected_in_harness"
