@@ -45,7 +45,7 @@ class DynamicEclosureCapacityTests(unittest.TestCase):
         )
         collection = verify_dynamic_collection(adjusted, self.active_masks)
         self.assertTrue(collection["valid"], collection)
-        self.assertEqual(collection["future_extension_checks"], 7)
+        self.assertEqual(collection["future_extension_checks"], 8)
         self.assertGreater(collection["projective_equalities"], 0)
         self.assertEqual(spec["integral_budget"], Fraction(15, 16))
 
@@ -99,6 +99,18 @@ class DynamicEclosureCapacityTests(unittest.TestCase):
                 for failure in result["failures"]
             )
         )
+
+    def test_coordinate_eprocess_initial_values_cannot_exceed_one(self):
+        bad_paths = [
+            [2, 8, 8],
+            [1, 1, 16],
+        ]
+        with self.assertRaises(ValueError):
+            select_dynamic_capacity_actions(
+                bad_paths, self.weights, self.active_masks, self.alpha,
+                self.values, self.costs, self.capacity,
+                thresholds=self.thresholds, increments=self.increments,
+            )
 
     def test_dormant_coordinate_must_be_neutral_one(self):
         bad_paths = [
