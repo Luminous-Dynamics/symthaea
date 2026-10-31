@@ -11,7 +11,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use symthaea_muse_protocol::catalog::{
-    CanonicalStyle, HybridStyleSpec, PromotionBlocker, StyleStatus, catalog_entry,
+    CanonicalStyle, HybridStyleSpec, StyleStatus, catalog_entry,
 };
 use symthaea_music_theory::{
     CompositionSpec, MusicalIntent, Score, Style, MUSIC_THEORY_ENGINE_VERSION,
@@ -123,7 +123,7 @@ pub fn compile_hybrid_style(
 
     let production = hybrid.production_style_id.and_then(|id| {
         match catalog_entry(id) {
-            Some(entry) => Some((entry, None)),
+            Some(entry) => Some(entry),
             None => {
                 issues.push(unknown_style_issue(id, StyleMixLayer::Production));
                 None
@@ -229,7 +229,7 @@ pub fn compile_hybrid_style(
     }
 
     let mut unapplied_layers = Vec::new();
-    if let Some((entry, _)) = production {
+    if let Some(entry) = production {
         // CompositionSpec has no production/renderer field. Preserve the
         // declared environmental source as provenance, but never claim it
         // changed the sound. A qualified renderer adapter is a later stage.
@@ -356,22 +356,18 @@ fn source_record(entry: &CanonicalStyle, layer: StyleMixLayer) -> StyleMixSource
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_muse_protocol::catalog::CATALOG;
+    use symthaea_muse_protocol::catalog::catalog_entry;
 
     fn id_for_composer_style(name: &str) -> u16 {
-        CATALOG
-            .iter()
-            .find(|entry| entry.composer_style == Some(name))
+        (1..=152)
+            .find(|id| catalog_entry(*id).is_some_and(|entry| entry.composer_style == Some(name)))
             .unwrap_or_else(|| panic!("missing composer style {name}"))
-            .id
     }
 
     fn first_unimplemented_id() -> u16 {
-        CATALOG
-            .iter()
-            .find(|entry| entry.composer_style.is_none())
+        (1..=152)
+            .find(|id| catalog_entry(*id).is_some_and(|entry| entry.composer_style.is_none()))
             .expect("catalogue should keep research-only entries")
-            .id
     }
 
     #[test]
