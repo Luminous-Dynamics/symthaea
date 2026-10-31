@@ -2,6 +2,12 @@
 
 **Status (2026-10-31):** executable interval-metric primitives and an additive interface design contract. The current v0.1 CandidateBranchPredictor still returns a point forecast or abstention. No production uncertainty adapter, calibrated Symthaea model, calibration result, or performance gain is claimed by this increment.
 
+## Programme alignment
+
+CMAQ-013 issue [#9127](https://github.com/Luminous-Dynamics/symthaea/issues/9127) owns the full selected-action calibration benchmark: behavior-policy versus selected-policy coverage, split and selection-conditioned conformal methods, adaptive/rolling quantile baselines, search-width/horizon/shift sweeps, false-safe behavior and feedback cost. This CMAQ-018 increment supplies reusable interval, paired-effect and simultaneous-action-set metric primitives for that programme. It does **not** implement those calibration methods or replace the CMAQ-013 experiment. CMAQ-018 remains responsible for sealed same-history branch outcomes and action-effect truth.
+
+CMAQ-013 issue [#9289](https://github.com/Luminous-Dynamics/symthaea/issues/9289) separately owns the causal advantage-of-prediction finite-state experiment; CMAQ-012 issue [#9122](https://github.com/Luminous-Dynamics/symthaea/issues/9122) owns independent paired D0/D1/W1/W2/W3 result auditing. Keep these as separate claim layers.
+
 ## Why this is the next gap
 
 CMAQ-018 now asks whether a model ranks alternative interventions correctly from the same observed history. Its current candidate API returns point values for utility, next state and termination, or abstains. That is enough to test effect sign, effect magnitude, ranking, regret and coverage of predictions. It is not enough to establish whether uncertainty is calibrated for the action and horizon that a planner will actually select.
