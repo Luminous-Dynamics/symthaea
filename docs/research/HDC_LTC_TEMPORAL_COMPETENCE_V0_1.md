@@ -92,6 +92,8 @@ A fixed-point phase workload is implemented in `research/temporal-bench/src/phas
 
 The v0.1 generator uses a piecewise-linear triangle oscillator to keep the oracle deterministic with integer arithmetic. It is a phase/timing control, not a sinusoidal Fourier benchmark or a reproduction of an external dataset. A sinusoidal/frequency-sweep variant and explicit burst-cluster controls remain extensions. When Fourier features are used as continuous-time forcing, evaluate at correct integration stage times. An interval-held snapshot is a distinct approximation and must be named as such.
 
+**Affine time-dilation metamorphic qualification is now implemented.** The evaluator can transform a complete phase trace by an exact rational factor: sample times, oscillator periods, phase offsets, phase jumps, and crossing deadlines all scale together, while normalized phase and observed samples remain unchanged. The transform fails closed if any microsecond value cannot be represented exactly. Phase scoring also reports expected points, missing predictions, and prediction coverage in parts per million against the entire stream; sparse predictions can no longer appear as a complete result by reporting error only on a selected subset.
+
 ## 5. Data and split discipline
 
 Keep two strata separate:
