@@ -504,20 +504,26 @@ pub fn validate_artifact_record(record: &CorpusArtifactRecord) -> Vec<Eligibilit
         IngestStage::RightsEvidenceChecked | IngestStage::ArtifactDigestVerified
     ) {
         for layer in required_rights_layers(record.modality) {
-            match record.rights.iter().find(|grant| grant.layer == layer) {
-                None => issues.push(issue(
+            let layer_grants: Vec<_> = record
+                .rights
+                .iter()
+                .filter(|grant| grant.layer == layer)
+                .collect();
+            if layer_grants.is_empty() {
+                issues.push(issue(
                     "rights_stage_missing_layer",
                     Some(layer),
                     "rights evidence stage requires a grant record for every modality layer".into(),
-                )),
-                Some(grant) if grant.disposition == RightsDisposition::Unknown => {
-                    issues.push(issue(
-                        "rights_stage_unresolved_layer",
-                        Some(layer),
-                        "rights evidence stage cannot be reached while a required layer is Unknown".into(),
-                    ));
-                }
-                Some(_) => {}
+                ));
+            } else if layer_grants
+                .iter()
+                .any(|grant| grant.disposition == RightsDisposition::Unknown)
+            {
+                issues.push(issue(
+                    "rights_stage_unresolved_layer",
+                    Some(layer),
+                    "rights evidence stage cannot be reached while any jurisdiction grant for a required layer is Unknown".into(),
+                ));
             }
         }
     }
@@ -993,6 +999,27 @@ mod tests {
         assert!(issues.iter().any(|issue| {
             issue.code == "rights_stage_unresolved_layer"
                 && issue.layer == Some(RightsLayer::Performance)
+        }));
+    }
+
+    #[test]
+    fn rights_stage_checks_every_jurisdiction_grant_for_unknown_status() {
+        let mut record = audio_record();
+        let mut unknown_za = grant(
+            RightsLayer::UnderlyingComposition,
+            vec![IntendedUse::NonCommercialResearch],
+        );
+        unknown_za.jurisdictions = vec!["ZA".into()];
+        unknown_za.disposition = RightsDisposition::Unknown;
+        unknown_za.evidence_uri = None;
+        unknown_za.reviewer = None;
+        unknown_za.verified_at_utc = None;
+        record.rights.push(unknown_za);
+        record.ingest_stage = IngestStage::RightsEvidenceChecked;
+        let issues = validate_artifact_record(&record);
+        assert!(issues.iter().any(|issue| {
+            issue.code == "rights_stage_unresolved_layer"
+                && issue.layer == Some(RightsLayer::UnderlyingComposition)
         }));
     }
 
