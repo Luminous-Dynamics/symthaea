@@ -12,6 +12,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use super::pareto_benchmarks::{dtlz2_three_objectives, zdt1_objectives};
+use super::pareto_objectives::{
+    analyze_pareto, ObjectiveDirection, ParetoAnalysisPlan, ParetoAnalysisSummary,
+    ParetoCandidate, ParetoError, ParetoObjectiveSpec,
+};
 
 const SCHEMA: &str = "symthaea.architecture-engineering.pareto-nsga2";
 const VERSION: &str = "0.1.0";
@@ -179,12 +183,6 @@ impl DeterministicRng {
         (self.next_u64() % upper_exclusive as u64) as usize
     }
 
-    fn shuffle<T>(&mut self, values: &mut [T]) {
-        for index in (1..values.len()).rev() {
-            let swap_index = self.index(index + 1);
-            values.swap(index, swap_index);
-        }
-    }
 }
 
 pub fn run_nsga2_zdt1(
@@ -364,6 +362,88 @@ where
         nondominated_front,
         report_sha256,
     })
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Nsga2ParetoAnalysis {
+    pub plan: ParetoAnalysisPlan,
+    pub analysis: ParetoAnalysisSummary,
+}
+
+/// Deterministically replay an NSGA-II report from its frozen problem ID, config and seed.
+/// This verifies the full candidate archive and run receipt rather than trusting the stored SHA.
+pub fn verify_nsga2_report(
+    report: &Nsga2RunReport,
+    config: &Nsga2Config,
+) -> Result<(), Nsga2Error> {
+    let recomputed = match report.problem_id.as_str() {
+        "zdt1" => run_nsga2_zdt1(config, report.decision_dimensions)?,
+        "dtlz2-3obj" => run_nsga2_dtlz2(config, report.decision_dimensions)?,
+        other => {
+            return Err(Nsga2Error::new(
+                "report.problem_id",
+                format!("unsupported NSGA-II problem ID {other:?}"),
+            ));
+        }
+    };
+    if &recomputed != report {
+        return Err(Nsga2Error::new(
+            "report",
+            "stored NSGA-II report differs from deterministic replay",
+        ));
+    }
+    Ok(())
+}
+
+/// Convert a replay-verified NSGA-II archive into the same Pareto analysis used by Symthaea.
+/// The benchmark functions return minimization objectives, so every supplied spec must agree.
+pub fn analyze_nsga2_report(
+    report: &Nsga2RunReport,
+    config: &Nsga2Config,
+    objective_specs: Vec<ParetoObjectiveSpec>,
+    reference_point_utility: Vec<f64>,
+) -> Result<Nsga2ParetoAnalysis, Nsga2Error> {
+    verify_nsga2_report(report, config)?;
+    if objective_specs.len() != report.objective_dimensions {
+        return Err(Nsga2Error::new(
+            "objective_specs",
+            "objective specification count differs from the benchmark result",
+        ));
+    }
+    if objective_specs.iter().any(|objective| objective.direction != ObjectiveDirection::Minimize) {
+        return Err(Nsga2Error::new(
+            "objective_specs.direction",
+            "ZDT1 and DTLZ2 reference problems use native minimization objectives",
+        ));
+    }
+    let candidates = report.nondominated_front.iter()
+        .map(|candidate| ParetoCandidate {
+            candidate_id: candidate.candidate_id.clone(),
+            objective_values: candidate.objective_values.clone(),
+            feasible: true,
+            constraint_violations: Vec::new(),
+            evidence_sha256: candidate.candidate_id.clone(),
+        })
+        .collect::<Vec<_>>();
+    if candidates.is_empty() {
+        return Err(Nsga2Error::new(
+            "report.nondominated_front",
+            "cannot compute Pareto indicators for an empty archive",
+        ));
+    }
+    let plan = ParetoAnalysisPlan::new(
+        format!("{}-{}", report.problem_id, report.config_sha256),
+        objective_specs,
+        reference_point_utility,
+        candidates,
+    ).map_err(map_pareto_error)?;
+    let analysis = analyze_pareto(&plan).map_err(map_pareto_error)?;
+    Ok(Nsga2ParetoAnalysis { plan, analysis })
+}
+
+fn map_pareto_error(error: ParetoError) -> Nsga2Error {
+    Nsga2Error::new(error.path, error.message)
 }
 
 fn evaluate_checked<F>(
@@ -623,14 +703,14 @@ fn assign_crowding_for_front(
         });
         let first = order[0];
         let last = order[order.len() - 1];
-        population[first].crowding_distance = f64::INFINITY;
-        population[last].crowding_distance = f64::INFINITY;
         let minimum = population[first].objectives[objective];
         let maximum = population[last].objectives[objective];
         let range = maximum - minimum;
         if range <= f64::EPSILON {
             continue;
         }
+        population[first].crowding_distance = f64::INFINITY;
+        population[last].crowding_distance = f64::INFINITY;
         for position in 1..(order.len() - 1) {
             let index = order[position];
             if population[index].crowding_distance.is_infinite() {
@@ -726,6 +806,51 @@ mod tests {
         assert!(run_nsga2_zdt1(&bad, 10).is_err());
         assert!(run_nsga2_zdt1(&config(1), 1).is_err());
         assert!(run_nsga2_dtlz2(&config(1), 2).is_err());
+    }
+
+    #[test]
+    fn report_replay_and_common_pareto_indicators_are_bound_to_the_archive() {
+        let cfg = config(99);
+        let report = run_nsga2_zdt1(&cfg, 10).unwrap();
+        verify_nsga2_report(&report, &cfg).unwrap();
+
+        let analysis = analyze_nsga2_report(
+            &report,
+            &cfg,
+            vec![
+                ParetoObjectiveSpec {
+                    objective_id: "f1".to_owned(),
+                    direction: ObjectiveDirection::Minimize,
+                    scale_lower: 0.0,
+                    scale_upper: 1.0,
+                },
+                ParetoObjectiveSpec {
+                    objective_id: "f2".to_owned(),
+                    direction: ObjectiveDirection::Minimize,
+                    scale_lower: 0.0,
+                    scale_upper: 1.0,
+                },
+            ],
+            vec![0.0, 0.0],
+        ).unwrap();
+        assert!(!analysis.analysis.nondominated_candidate_ids.is_empty());
+
+        let mut tampered = report.clone();
+        tampered.final_population[0].objective_values[0] += 0.01;
+        assert!(verify_nsga2_report(&tampered, &cfg).is_err());
+    }
+
+    #[test]
+    fn crowding_distance_does_not_arbitrarily_mark_constant_objectives_as_extremes() {
+        let mut population = (0..4).map(|ordinal| Individual {
+            decision: vec![ordinal as f64 / 4.0],
+            objectives: vec![0.5, 0.5],
+            rank: 0,
+            crowding_distance: 0.0,
+            ordinal,
+        }).collect::<Vec<_>>();
+        assign_crowding_for_front(&mut population, &[0, 1, 2, 3]).unwrap();
+        assert!(population.iter().all(|individual| individual.crowding_distance == 0.0));
     }
 
     #[test]
