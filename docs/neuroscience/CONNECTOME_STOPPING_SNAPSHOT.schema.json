@@ -1,0 +1,336 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_STOPPING_SNAPSHOT.schema.json",
+  "title": "Connectome proofreading stopping snapshot",
+  "description": "One immutable, versioned observation for evaluating query-specific proofreading convergence. This input schema does not declare a connectome complete or authorize stopping. Optional synaptic_completeness evidence records the independent numerator/denominator for synapses whose pre- and postsynaptic locations both belong to fully proofread cells; it is never inferred from graph invariants.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset",
+    "snapshot",
+    "edits",
+    "graph",
+    "query_evidence",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "dataset_revision",
+        "dataset_revision_commit_sha",
+        "source_volume_id"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_revision_commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "source_volume_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "species": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "region": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot_id",
+        "sequence_index",
+        "captured_at",
+        "graph_sha256",
+        "previous_graph_sha256"
+      ],
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "captured_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "graph_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "previous_graph_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "edits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cumulative_committed",
+        "by_operation_class",
+        "edits_since_previous_snapshot"
+      ],
+      "properties": {
+        "cumulative_committed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "by_operation_class": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "edits_since_previous_snapshot": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "directed",
+        "node_count",
+        "edge_count",
+        "invariants"
+      ],
+      "properties": {
+        "directed": {
+          "type": "boolean"
+        },
+        "node_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "edge_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "invariants": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "query_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "query_definition_sha256",
+        "metrics"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_definition_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "metrics": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "value",
+              "unit"
+            ],
+            "properties": {
+              "value": {
+                "type": "number"
+              },
+              "unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "lower": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "upper": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "graph_computation_profile_sha256",
+        "edit_log_sha256",
+        "query_evaluation_profile_sha256"
+      ],
+      "properties": {
+        "graph_computation_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "edit_log_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "query_evaluation_profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "synaptic_completeness": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Optional independent completeness observation. Denominator is every synapse in the declared population; numerator requires both pre- and postsynaptic locations to belong to fully proofread cells.",
+      "additionalProperties": false,
+      "required": [
+        "population_id",
+        "population_definition_sha256",
+        "synapse_population_sha256",
+        "fully_proofread_cell_set_sha256",
+        "total_synapse_count",
+        "synapses_with_both_partners_in_fully_proofread_cells"
+      ],
+      "properties": {
+        "population_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "population_definition_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "synapse_population_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "fully_proofread_cell_set_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "total_synapse_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "synapses_with_both_partners_in_fully_proofread_cells": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "snapshot": {
+            "properties": {
+              "sequence_index": {
+                "const": 0
+              }
+            },
+            "required": [
+              "sequence_index"
+            ]
+          }
+        },
+        "required": [
+          "snapshot"
+        ]
+      },
+      "then": {
+        "properties": {
+          "snapshot": {
+            "properties": {
+              "previous_graph_sha256": {
+                "type": "null"
+              }
+            }
+          },
+          "edits": {
+            "properties": {
+              "edits_since_previous_snapshot": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "snapshot": {
+            "properties": {
+              "previous_graph_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          },
+          "edits": {
+            "properties": {
+              "edits_since_previous_snapshot": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
