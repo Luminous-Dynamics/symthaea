@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "crates/bridges/symthaea-proof-insights/src/bin/import_sorrydb_snapshot.rs"
+      - "crates/bridges/symthaea-proof-insights/src/bin/analyze_sorrydb_branch_ledger.rs"
       - "data/benchmarks/proof-insight-transfer-v0/sorrydb-track/**"
       - "docs/research/pitb-sorrydb-evaluation-2026-10-31.md"
       - ".github/workflows/pitb-sorrydb-contract.yml"
@@ -485,6 +486,8 @@ jobs:
           set -euo pipefail
           cd "$(dirname "$PITB_MANIFEST")"
           cargo run --locked --bin import_sorrydb_snapshot -- --self-test
+          cargo run --locked --bin analyze_sorrydb_branch_ledger -- --self-test \
+            "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/fixtures/speculative-branch-ledger.synthetic.json"
           input="$GITHUB_WORKSPACE/_pitb-sorrydb/data/SorryDB_2601/SorryDB_2601_1000_evaluation_split.json"
           cargo run --locked --bin import_sorrydb_snapshot -- --input "$input" --output "$RUNNER_TEMP/sorrydb-manifest-a.json"
           cargo run --locked --bin import_sorrydb_snapshot -- --input "$input" --output "$RUNNER_TEMP/sorrydb-manifest-b.json"
