@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luminousdynamics.io/schemas/cmaq-012-profiling-receipt-v0.1.json",
   "title": "CMAQ-012 per-run profiling receipt",
-  "description": "Per-arm measured resource receipt. The current CLI binds receipt SHA-256 values but does not yet ingest or independently verify receipt bytes.",
+  "description": "Per-arm/episode measured resource receipt. The TSV ledger carries SHA-256 of the exact serialized receipt bytes; the receipt does not contain its own digest. The current CLI binds and deduplicates those digests but does not yet ingest or independently verify receipt bytes.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -13,7 +13,6 @@
     "split",
     "seed",
     "arm",
-    "profiling_receipt_sha256",
     "measurement_method",
     "latency_ms",
     "compute_work_units",
@@ -60,10 +59,6 @@
         "W2",
         "W3"
       ]
-    },
-    "profiling_receipt_sha256": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
     },
     "measurement_method": {
       "enum": [
