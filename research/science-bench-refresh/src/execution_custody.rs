@@ -848,3 +848,344 @@ pub fn verify_execution_custody_report(
     }
     Ok(report)
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn digest(label: &str) -> String {
+        sha256_hex(label.as_bytes())
+    }
+
+    fn push_event(
+        events: &mut Vec<ExecutionEventV1>,
+        timestamp: u64,
+        payload: ExecutionEventPayloadV1,
+    ) {
+        let sequence = events.len() as u64;
+        let previous = events.last().map(|event| event.event_sha256.clone())
+            .unwrap_or_else(|| ZERO_DIGEST.to_owned());
+        let fields = ExecutionEventFieldsV1 {
+            sequence,
+            timestamp_unix_milliseconds: timestamp,
+            previous_event_sha256: previous.clone(),
+            payload: payload.clone(),
+        };
+        let hash = event_hash(&fields).unwrap();
+        events.push(ExecutionEventV1 {
+            sequence,
+            timestamp_unix_milliseconds: timestamp,
+            previous_event_sha256: previous,
+            payload,
+            event_sha256: hash,
+        });
+    }
+
+    fn make_plan() -> (ExecutionCustodyPlanV1, Vec<u8>) {
+        let fields = ExecutionCustodyPlanFieldsV1 {
+            schema: CUSTODY_PLAN_SCHEMA.to_owned(),
+            analyzer_source_revision: crate::BUILT_GENERATOR_SOURCE_REVISION.to_owned(),
+            purpose: CustodyPurposeV1::ExampleOnly,
+            run_id: "custody-run-001".to_owned(),
+            run_nonce_sha256: digest("run nonce"),
+            evaluator_source_revision: "b".repeat(40),
+            evaluator_prompt_sha256: digest("evaluator prompt"),
+            rubric_sha256: digest("rubric"),
+            task_set_sha256: digest("task set"),
+            environment_sha256: digest("execution environment"),
+            max_parallelism: 1,
+            conditions: vec![CustodyConditionPlanV1 {
+                condition_id: "condition-001".to_owned(),
+                planned_ordinal: 0,
+                input_sha256: digest("rendered input"),
+                expected_input_bytes: 13,
+            }],
+        };
+        let commitment = plan_commitment(&fields).unwrap();
+        let plan = ExecutionCustodyPlanV1 {
+            schema: fields.schema.clone(),
+            analyzer_source_revision: fields.analyzer_source_revision.clone(),
+            purpose: fields.purpose,
+            run_id: fields.run_id.clone(),
+            run_nonce_sha256: fields.run_nonce_sha256.clone(),
+            evaluator_source_revision: fields.evaluator_source_revision.clone(),
+            evaluator_prompt_sha256: fields.evaluator_prompt_sha256.clone(),
+            rubric_sha256: fields.rubric_sha256.clone(),
+            task_set_sha256: fields.task_set_sha256.clone(),
+            environment_sha256: fields.environment_sha256.clone(),
+            max_parallelism: fields.max_parallelism,
+            conditions: fields.conditions.clone(),
+            plan_commitment_sha256: commitment,
+        };
+        let bytes = serde_json::to_vec_pretty(&plan).unwrap();
+        (plan, bytes)
+    }
+
+    fn make_receipt(with_anchor: bool) -> (Vec<u8>, Vec<u8>) {
+        let (plan, plan_bytes) = make_plan();
+        let plan_sha = sha256_hex(&plan_bytes);
+        let condition = &plan.conditions[0];
+        let mut events = Vec::new();
+        push_event(
+            &mut events,
+            1_000,
+            ExecutionEventPayloadV1::RunStarted {
+                run_id: plan.run_id.clone(),
+                plan_sha256: plan_sha.clone(),
+                runner_id_sha256: digest("runner identity"),
+                environment_sha256: plan.environment_sha256.clone(),
+            },
+        );
+        push_event(
+            &mut events,
+            1_001,
+            ExecutionEventPayloadV1::InputRendered {
+                condition_id: condition.condition_id.clone(),
+                planned_ordinal: condition.planned_ordinal,
+                input_sha256: condition.input_sha256.clone(),
+                input_bytes: condition.expected_input_bytes,
+            },
+        );
+        push_event(
+            &mut events,
+            1_002,
+            ExecutionEventPayloadV1::EvaluationStarted {
+                condition_id: condition.condition_id.clone(),
+                planned_ordinal: condition.planned_ordinal,
+                evaluator_source_revision: plan.evaluator_source_revision.clone(),
+                evaluator_prompt_sha256: plan.evaluator_prompt_sha256.clone(),
+            },
+        );
+        push_event(
+            &mut events,
+            1_003,
+            ExecutionEventPayloadV1::ToolCall {
+                condition_id: condition.condition_id.clone(),
+                tool_name_sha256: digest("tool"),
+                request_sha256: digest("tool request"),
+                request_bytes: 20,
+                response_sha256: Some(digest("tool response")),
+                response_bytes: 30,
+            },
+        );
+        push_event(
+            &mut events,
+            1_004,
+            ExecutionEventPayloadV1::EvaluationFinished {
+                condition_id: condition.condition_id.clone(),
+                planned_ordinal: condition.planned_ordinal,
+                status: CustodyTerminalStatusV1::Completed,
+                output_sha256: Some(digest("evaluator output")),
+                output_bytes: 44,
+                evaluator_call_count: 1,
+                evaluator_token_count: 123,
+            },
+        );
+        push_event(
+            &mut events,
+            1_005,
+            ExecutionEventPayloadV1::RunFinished {
+                run_id: plan.run_id.clone(),
+                planned_condition_count: 1,
+                completed_condition_count: 1,
+                terminal_condition_count: 1,
+                run_status: "completed".to_owned(),
+            },
+        );
+
+        let event_hashes: Vec<String> = events.iter().map(|event| event.event_sha256.clone()).collect();
+        let event_root = compute_execution_merkle_root(&event_hashes).unwrap();
+        let bundle_payload = serde_json::to_vec(&(
+            &plan_sha,
+            &plan.plan_commitment_sha256,
+            &event_root,
+            events.len() as u64,
+            &plan.run_id,
+        )).unwrap();
+        let bundle = digest_domain(BUNDLE_DOMAIN, &bundle_payload).unwrap();
+        let anchor = if with_anchor {
+            let proof = compute_merkle_inclusion_proof(&[bundle.clone()], 0).unwrap();
+            let root = compute_execution_merkle_root(&[bundle.clone()]).unwrap();
+            Some(ExternalCheckpointStatementV1 {
+                provider: "synthetic-local-transparency-log".to_owned(),
+                log_id: "synthetic-log-001".to_owned(),
+                record_id: "entry-001".to_owned(),
+                bundle_sha256: bundle,
+                checkpoint_root_sha256: root,
+                tree_size: 1,
+                anchored_at_unix_milliseconds: 2_000,
+                inclusion_proof: proof,
+            })
+        } else {
+            None
+        };
+        let receipt = ExecutionCustodyReceiptV1 {
+            schema: CUSTODY_RECEIPT_SCHEMA.to_owned(),
+            analyzer_source_revision: plan.analyzer_source_revision.clone(),
+            purpose: plan.purpose,
+            run_id: plan.run_id.clone(),
+            plan_sha256: plan_sha,
+            plan_commitment_sha256: plan.plan_commitment_sha256.clone(),
+            evaluator_source_revision: plan.evaluator_source_revision.clone(),
+            evaluator_prompt_sha256: plan.evaluator_prompt_sha256.clone(),
+            rubric_sha256: plan.rubric_sha256.clone(),
+            environment_sha256: plan.environment_sha256.clone(),
+            events,
+            external_checkpoint: anchor,
+        };
+        let receipt_bytes = serde_json::to_vec_pretty(&receipt).unwrap();
+        (plan_bytes, receipt_bytes)
+    }
+
+    #[test]
+    fn verifies_complete_event_chain_and_local_merkle_anchor() {
+        let (plan, receipt) = make_receipt(true);
+        let report = analyze_execution_custody(&plan, &receipt).unwrap();
+        assert_eq!(report.fields.event_count, 6);
+        assert!(report.fields.event_chain_valid);
+        assert!(report.fields.event_sequence_contiguous);
+        assert!(report.fields.timestamps_monotonic);
+        assert_eq!(report.fields.planned_condition_count, 1);
+        assert_eq!(report.fields.observed_condition_count, 1);
+        assert_eq!(report.fields.completed_condition_count, 1);
+        assert_eq!(report.fields.total_tool_call_count, 1);
+        assert_eq!(report.fields.total_evaluator_call_count, 1);
+        assert_eq!(report.fields.total_evaluator_token_count, 123);
+        assert_eq!(report.fields.total_rendered_input_bytes, 13);
+        assert_eq!(report.fields.total_output_bytes, 44);
+        assert!(report.fields.external_checkpoint_present);
+        assert!(report.fields.external_checkpoint_matches_bundle);
+        assert!(report.fields.external_inclusion_proof_valid);
+        assert!(!report.fields.external_checkpoint_authenticity_proven);
+        assert!(!report.fields.runner_identity_authenticated);
+        assert!(!report.fields.raw_prompt_custody_proven);
+        assert!(!report.fields.evaluator_execution_proven);
+        assert!(!report.fields.wall_clock_authenticity_proven);
+        assert!(report.fields.external_anchor_required);
+        assert!(!report.fields.scoring_eligible_declared);
+    }
+
+    #[test]
+    fn report_commitment_verifies_and_detects_tampering() {
+        let (plan, receipt) = make_receipt(false);
+        let report = analyze_execution_custody(&plan, &receipt).unwrap();
+        let bytes = serde_json::to_vec(&report).unwrap();
+        let verified = verify_execution_custody_report(&bytes).unwrap();
+        assert_eq!(verified.report_commitment_sha256, report.report_commitment_sha256);
+        let mut tampered: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        tampered["fields"]["completed_condition_count"] = serde_json::json!(999);
+        let altered = serde_json::to_vec(&tampered).unwrap();
+        assert!(verify_execution_custody_report(&altered).unwrap_err().contains("commitment mismatch"));
+    }
+
+    #[test]
+    fn rejects_broken_previous_hash_and_event_hash() {
+        let (plan, receipt) = make_receipt(false);
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["events"][2]["previous_event_sha256"] = serde_json::json!(digest("wrong predecessor"));
+        assert!(analyze_execution_custody(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("previous hash"));
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["events"][2]["event_sha256"] = serde_json::json!(digest("tampered event"));
+        assert!(analyze_execution_custody(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("event hash mismatch"));
+    }
+
+    #[test]
+    fn rejects_sequence_gap_reorder_and_non_monotonic_time() {
+        let (plan, receipt) = make_receipt(false);
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["events"][2]["sequence"] = serde_json::json!(20);
+        assert!(analyze_execution_custody(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("sequence gap"));
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["events"][3]["timestamp_unix_milliseconds"] = serde_json::json!(999);
+        assert!(analyze_execution_custody(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("timestamps are not monotonic"));
+    }
+
+    #[test]
+    fn rejects_rendered_input_and_schedule_drift() {
+        let (plan, receipt) = make_receipt(false);
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["events"][1]["payload"]["input_sha256"] = serde_json::json!(digest("different input"));
+        assert!(analyze_execution_custody(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("rendered input differs"));
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["events"][1]["payload"]["planned_ordinal"] = serde_json::json!(8);
+        assert!(analyze_execution_custody(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("committed serial schedule"));
+    }
+
+    #[test]
+    fn rejects_tool_calls_outside_an_active_evaluation() {
+        let (plan, receipt) = make_receipt(false);
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["events"][2]["payload"]["event_type"] = serde_json::json!("tool_call");
+        let altered = serde_json::to_vec(&value).unwrap();
+        assert!(analyze_execution_custody(&plan, &altered).is_err());
+    }
+
+    #[test]
+    fn rejects_missing_terminal_event_and_run_finished_count_mismatch() {
+        let (plan, receipt) = make_receipt(false);
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["events"].as_array_mut().unwrap().remove(4);
+        assert!(analyze_execution_custody(&plan, &serde_json::to_vec(&value).unwrap()).is_err());
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["events"][5]["payload"]["completed_condition_count"] = serde_json::json!(0);
+        assert!(analyze_execution_custody(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("completed count"));
+    }
+
+    #[test]
+    fn rejects_external_checkpoint_root_and_tree_size_mismatch() {
+        let (plan, receipt) = make_receipt(true);
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["external_checkpoint"]["checkpoint_root_sha256"] = serde_json::json!(digest("wrong root"));
+        assert!(analyze_execution_custody(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("inclusion proof"));
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["external_checkpoint"]["tree_size"] = serde_json::json!(2);
+        assert!(analyze_execution_custody(&plan, &serde_json::to_vec(&value).unwrap())
+            .unwrap_err().contains("tree size"));
+    }
+
+    #[test]
+    fn merkle_inclusion_proofs_work_for_odd_tree_sizes() {
+        let leaves = vec![digest("a"), digest("b"), digest("c")];
+        let root = compute_execution_merkle_root(&leaves).unwrap();
+        for index in 0..leaves.len() {
+            let proof = compute_merkle_inclusion_proof(&leaves, index).unwrap();
+            assert!(verify_merkle_inclusion_proof(&leaves[index], &proof, &root).unwrap());
+        }
+        let mut proof = compute_merkle_inclusion_proof(&leaves, 2).unwrap();
+        proof.sibling_sha256[0] = digest("wrong sibling");
+        assert!(!verify_merkle_inclusion_proof(&leaves[2], &proof, &root).unwrap());
+    }
+
+    #[test]
+    fn rejects_parallel_execution_and_empty_schedule() {
+        let (plan, _) = make_plan();
+        let mut fields = plan.fields();
+        fields.max_parallelism = 2;
+        assert!(validate_execution_custody_plan_fields(&fields).unwrap_err()
+            .iter().any(|issue| issue.contains("serial max_parallelism")));
+        fields.max_parallelism = 1;
+        fields.conditions.clear();
+        assert!(validate_execution_custody_plan_fields(&fields).unwrap_err()
+            .iter().any(|issue| issue.contains("conditions must contain")));
+    }
+
+    #[test]
+    fn plan_commitment_rejects_changed_environment_and_revision() {
+        let (plan, _) = make_plan();
+        let mut fields = plan.fields();
+        fields.environment_sha256 = digest("changed env");
+        assert!(validate_execution_custody_plan_fields(&fields).is_ok());
+        fields.analyzer_source_revision = "c".repeat(40);
+        assert!(validate_execution_custody_plan_fields(&fields).unwrap_err()
+            .iter().any(|issue| issue.contains("exact compiled validator revision")));
+    }
+}
