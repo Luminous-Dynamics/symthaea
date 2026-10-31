@@ -1,0 +1,37 @@
+{
+  "schema":"symthaea-risk-certificate-v1",
+  "manifest":{
+    "schema":"symthaea-risk-certificate-v1",
+    "risk_target":{"kind":"expected_risk","metric":"hierarchical_classification_error","level":"1/10","time_uniform":false},
+    "method":{"name":"common_depth_envelope_crc_equal_share_recursion","version":"research-2026-10-31",
+      "source_path":"validation/exact_rational_common_depth_crc.py",
+      "source_git_blob_sha1":"4246b82635d20ff7b8aa4f83024d11b3671fc37b"},
+    "assumptions":{"sampling":"finite_exchangeability","model_frozen":true,"loss_frozen":true,"filtration":"none"},
+    "scope":{"n_calibration":50,"controller_entries":1326,"augmented_state_count":1378,
+      "universe":"all_augmented_count_vectors","time_uniform":false,"rounds":500},
+    "proof_lane":"exact_finite_exchangeability",
+    "evidence":{
+      "controller_table_sha256":"b987c413fb029fb06348605945498a44a95b84004db5ad35fc1f74c9263b8ecc",
+      "loss_spec_sha256":"f7ceab7c677e408ef689d7fa3501756b6fa8efb7de2c3610bbd7c4cfcb0b0626",
+      "state_space_sha256":"62709b1a19edb0786f6626c1f52b1c6875a2287f48245656c969c6ebc694d9c2",
+      "pool_type_histogram_sha256":"490aa4e715c5d30e6677f8b4c0d5c05b32333bcc8d390c8e75ab50189e438359"
+    }
+  },
+  "manifest_sha256":"33116ade91b9c26e87db744774b0146d72b997151c33a265c07078ee676a37c5",
+  "receipt":{
+    "status":"pass","proof_lane":"exact_finite_exchangeability",
+    "evidence_digests":{
+      "controller_table_sha256":"b987c413fb029fb06348605945498a44a95b84004db5ad35fc1f74c9263b8ecc",
+      "loss_spec_sha256":"f7ceab7c677e408ef689d7fa3501756b6fa8efb7de2c3610bbd7c4cfcb0b0626",
+      "state_space_sha256":"62709b1a19edb0786f6626c1f52b1c6875a2287f48245656c969c6ebc694d9c2",
+      "pool_type_histogram_sha256":"490aa4e715c5d30e6677f8b4c0d5c05b32333bcc8d390c8e75ab50189e438359"
+    },
+    "verifier":{"name":"symthaea-exact-rational-common-depth-crc","version":"v1"},
+    "checks":{
+      "arithmetic":"rational_exact","augmented_state_count":1378,"table_validation_passes":1009,
+      "exact_inequality_checks":1390402,"worst_augmented_count":[0,0,51],
+      "worst_total":"51/10","budget":"51/10","max_excess":"0/1"
+    },
+    "manifest_sha256":"33116ade91b9c26e87db744774b0146d72b997151c33a265c07078ee676a37c5"
+  }
+}

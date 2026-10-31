@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/symthaea-risk-certificate-v1.json",
+  "title": "Symthaea proof-carrying risk certificate v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "manifest",
+    "manifest_sha256",
+    "receipt"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea-risk-certificate-v1"
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "schema",
+        "risk_target",
+        "method",
+        "assumptions",
+        "scope",
+        "proof_lane",
+        "evidence"
+      ],
+      "properties": {
+        "schema": {
+          "const": "symthaea-risk-certificate-v1"
+        },
+        "risk_target": {
+          "type": "object",
+          "required": [
+            "kind",
+            "metric",
+            "level",
+            "time_uniform"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "expected_risk",
+                "high_probability_risk",
+                "fdr",
+                "supfdr",
+                "fwer"
+              ]
+            },
+            "metric": {
+              "type": "string",
+              "minLength": 1
+            },
+            "level": {
+              "type": "string",
+              "pattern": "^[0-9]+(/[1-9][0-9]*)?$"
+            },
+            "time_uniform": {
+              "type": "boolean"
+            },
+            "confidence_level": {
+              "type": "string",
+              "pattern": "^[0-9]+(/[1-9][0-9]*)?$"
+            }
+          },
+          "additionalProperties": true
+        },
+        "method": {
+          "type": "object",
+          "required": [
+            "name",
+            "version"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "assumptions": {
+          "type": "object"
+        },
+        "scope": {
+          "type": "object"
+        },
+        "proof_lane": {
+          "enum": [
+            "exact_finite_exchangeability",
+            "analytical_fdr_theorem",
+            "exact_intersection_closure",
+            "theorem_backed_eprocess",
+            "high_probability_bound",
+            "simulation_only"
+          ]
+        },
+        "evidence": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "status",
+        "proof_lane",
+        "evidence_digests",
+        "verifier",
+        "checks",
+        "manifest_sha256"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "inconclusive"
+          ]
+        },
+        "proof_lane": {
+          "type": "string"
+        },
+        "evidence_digests": {
+          "type": "object"
+        },
+        "verifier": {
+          "type": "object",
+          "required": [
+            "name"
+          ]
+        },
+        "checks": {
+          "type": "object"
+        },
+        "manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}
