@@ -117,7 +117,20 @@ struct Expected {
     commit: &'static str,
     lean: &'static str,
     checkout: &'static str,
+    branch: &'static str,
     role: &'static str,
+    path: &'static str,
+    start_line: usize,
+    start_column: usize,
+    end_line: usize,
+    end_column: usize,
+    source_blob: &'static str,
+    toolchain_blob: &'static str,
+    lakefile_blob: &'static str,
+    lake_manifest_blob: &'static str,
+    mathlib_revision: &'static str,
+    target_hint: &'static str,
+    context_signal: &'static str,
 }
 const TASKS: [Expected; 3] = [
     Expected {
@@ -126,7 +139,20 @@ const TASKS: [Expected; 3] = [
         commit: "cd0f32f5b07311e08a9e89733a1375f54eb790c0",
         lean: "v4.24.0",
         checkout: "lean-course25",
+        branch: "master",
         role: "stable_toolchain_baseline",
+        path: "LeanCourse25/Assignments/Assignment11.lean",
+        start_line: 39,
+        start_column: 78,
+        end_line: 39,
+        end_column: 83,
+        source_blob: "d553bc3bda3d14af1bc90373b7d0c5fc81bfba0a",
+        toolchain_blob: "c00a53503cc3cc776c290056ed21ce7e5d80b083",
+        lakefile_blob: "fcaf0ab48e8cd8ed6a1af0acf355e0430ed11bfd",
+        lake_manifest_blob: "6dce7dda77492aaef6d63db207f10f364e1bae4b",
+        mathlib_revision: "f897ebcf72cd16f89ab4577d0c826cd14afaafc7",
+        target_hint: "nullmeasurable_measurable_null",
+        context_signal: "ordinary proposition/measure-theory context; not an authoritative reconstructed proof state",
     },
     Expected {
         id: "7956fe8e4946a9ddf7098ee84c69669db5bc902715dad6e7cdf0db121aa5bfce",
@@ -134,7 +160,20 @@ const TASKS: [Expected; 3] = [
         commit: "ddcb6542f2b62883c8642d3db4ecc115afcce33e",
         lean: "v4.26.0",
         checkout: "prime-number-theorem",
+        branch: "More-FKS",
         role: "stable_toolchain_and_dependency_context",
+        path: "PrimeNumberTheoremAnd/FioriKadiriSwidinsky.lean",
+        start_line: 44,
+        start_column: 137,
+        end_line: 44,
+        end_column: 142,
+        source_blob: "6214f90ce5f8c61aca4a4d696ff5687d872dfc0e",
+        toolchain_blob: "2654c20bb16bfd3a12f77a6cdeb73d48bf3b8359",
+        lakefile_blob: "17c674bdc92fe6e333c839adc27ff7b8948be42c",
+        lake_manifest_blob: "c0405e3c9643b00b1ce6a8120516ca482e6fe4ec",
+        mathlib_revision: "2df2f0150c275ad53cb3c90f7c98ec15a56a1a67",
+        target_hint: "table_1_prop",
+        context_signal: "numerical prime-number-theorem estimate; no instance-registry signal inferred from debug goal",
     },
     Expected {
         id: "19f8c8d2aa81dccb1ea0da25a7f9271c9330e18eb3ec4aa453917a3c5d29cbed",
@@ -142,7 +181,20 @@ const TASKS: [Expected; 3] = [
         commit: "326f55435f91295d95a6166b060cace7ef92e6e4",
         lean: "v4.26.0-rc2",
         checkout: "clap-lean",
+        branch: "assert_range2",
         role: "explicit_local_instance_registry_challenge",
+        path: "Clap/Compilation.lean",
+        start_line: 278,
+        start_column: 2,
+        end_line: 278,
+        end_column: 7,
+        source_blob: "ec8e38968c481b479cd6588756feaeebd2164286",
+        toolchain_blob: "7035713c5522d1113de6e26251f8791eba689308",
+        lakefile_blob: "0ca8d438bf079e52a9fff208ba57dfb4bd7e266e",
+        lake_manifest_blob: "001d03474b6ea317800a505fe646c39da0acddaf",
+        mathlib_revision: "d5c9558e75342a10d6321e6a8c798a14f68ae23c",
+        target_hint: "fail₁",
+        context_signal: "inst✝ : Fact (Nat.Prime p); selection hint only, actual LocalInstances registry must be captured from Lean",
     },
 ];
 const TOOLCHAINS: [(&str, usize); 14] = [
@@ -241,11 +293,24 @@ fn validate_task(task: &Task, root: &Path, index: usize) -> Result<()> {
     let expected = TASKS.get(index).context("too many tasks in smoke cohort")?;
     if task.ordinal != index || task.task_id != expected.id
         || task.repository.remote != expected.remote || task.repository.commit != expected.commit
+        || task.repository.branch != expected.branch
         || task.repository.lean_version != expected.lean
         || task.checkout_directory != expected.checkout
         || task.selection_role != expected.role
+        || task.location.path != expected.path
+        || task.location.start_line != expected.start_line
+        || task.location.start_column != expected.start_column
+        || task.location.end_line != expected.end_line
+        || task.location.end_column != expected.end_column
+        || task.location.source_file_git_blob_sha1 != expected.source_blob
+        || task.project_pins.lean_toolchain_file_git_blob_sha1 != expected.toolchain_blob
+        || task.project_pins.lakefile_toml_git_blob_sha1 != expected.lakefile_blob
+        || task.project_pins.lake_manifest_json_git_blob_sha1 != expected.lake_manifest_blob
+        || task.project_pins.mathlib_revision != expected.mathlib_revision
+        || task.target_hint != expected.target_hint
+        || task.debug_context_signal != expected.context_signal
     {
-        bail!("task {index} differs from its fixed smoke-cohort identity");
+        bail!("task {index} differs from its fixed SorryDB identity, source span, or project pins");
     }
     if task.repository.branch.is_empty() || task.target_hint.is_empty()
         || !task.source_inspected || task.environment_reconstructed
@@ -280,8 +345,8 @@ fn validate_task(task: &Task, root: &Path, index: usize) -> Result<()> {
             task.repository.remote
         );
     }
-    if !git(&checkout, &["status", "--porcelain", "--untracked-files=no"])?.is_empty() {
-        bail!("task {index} checkout has tracked modifications");
+    if !git(&checkout, &["status", "--porcelain", "--untracked-files=all"])?.is_empty() {
+        bail!("task {index} checkout has tracked modifications or untracked files");
     }
 
     let pins = [
@@ -290,15 +355,26 @@ fn validate_task(task: &Task, root: &Path, index: usize) -> Result<()> {
         ("lake-manifest.json", task.project_pins.lake_manifest_json_git_blob_sha1.as_str()),
         (task.location.path.as_str(), task.location.source_file_git_blob_sha1.as_str()),
     ];
-    for (path, expected_sha) in pins {
-        validate_relative_path(path)?;
+    for (pin_path, expected_sha) in pins {
+        validate_relative_path(pin_path)?;
         if !valid_hex(expected_sha, 40) {
-            bail!("task {index} has invalid blob digest for {path}");
+            bail!("task {index} has invalid blob digest for {pin_path}");
         }
-        let actual = blob_sha1(&checkout, path)?;
+        let file_path = checkout.join(pin_path);
+        let metadata = fs::symlink_metadata(&file_path)
+            .with_context(|| format!("inspect pinned file {pin_path}"))?;
+        if !metadata.is_file() || metadata.file_type().is_symlink() {
+            bail!("task {index} pinned path {pin_path} is not a regular file");
+        }
+        let canonical_file = file_path.canonicalize()
+            .with_context(|| format!("canonicalize pinned file {pin_path}"))?;
+        if !canonical_file.starts_with(&checkout) {
+            bail!("task {index} pinned file {pin_path} escapes the checkout");
+        }
+        let actual = blob_sha1(&checkout, pin_path)?;
         if actual != expected_sha {
             bail!(
-                "task {index} blob mismatch for {path}: expected {expected_sha}, received {actual}"
+                "task {index} blob mismatch for {pin_path}: expected {expected_sha}, received {actual}"
             );
         }
     }
@@ -313,7 +389,12 @@ fn validate_task(task: &Task, root: &Path, index: usize) -> Result<()> {
     }
     validate_mathlib_revision(&checkout, &task.project_pins.mathlib_revision)?;
 
-    let source = fs::read_to_string(checkout.join(&task.location.path))?;
+    let source_path = checkout.join(&task.location.path);
+    let source_metadata = fs::symlink_metadata(&source_path)?;
+    if !source_metadata.is_file() || source_metadata.file_type().is_symlink() {
+        bail!("task {index} sorry source is not a regular file");
+    }
+    let source = fs::read_to_string(&source_path)?;
     let selected = extract_span(&source, task.location.start_line, task.location.start_column,
         task.location.end_line, task.location.end_column)?;
     if selected != "sorry" {
