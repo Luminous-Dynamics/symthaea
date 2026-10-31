@@ -26,11 +26,14 @@ Pou et al. (2026) report 99% detection precision for benign and malicious sample
 
 Source: [Pou et al., Cybersecurity 9, 222 (2026)](https://doi.org/10.1186/s42400-026-00662-8).
 
-### HARPY-V-GEM5
+### HARPY-V-GEM5 and HARPY-V-GEM5-100c
 
 Pujol et al. (2026) report known-workload detection above 99.5% with HPC features and 99.0% with instruction features on a 32-program GEM5 corpus. Their leave-one-program-out analysis is much more informative for generalization: HPC-based random forest is reported at 90.08% aggregate LOPO accuracy, with 25–36% standard deviations across programs and near-zero results for several held-out variants. The authors also report a 21.6 percentage-point gap between HPC-RF training accuracy (99.55%) and a separate LOPO mean figure (77.95% in their overfitting analysis); those metrics arise from different tables/analyses and must not be conflated. Some instruction-only and HPC-only failures are complementary, suggesting a hybrid detection cascade. Each LOPO test fold contains one held-out program and therefore only one class; ordinary per-fold precision/F1/MCC are not valid mixed-class measures. GhostWrite's natural trace was extended by repeated iterations; those repeated windows remain the same lineage, not additional independent programs.
 
 Sources: [Pujol et al., Neural Computing and Applications (published 27 Oct 2026)](https://doi.org/10.1007/s00521-026-12467-4), especially the [LOPO protocol and results](https://link.springer.com/article/10.1007/s00521-026-12467-4).
+
+
+A separate 2026 catalogue record identifies **HARPY-V-GEM5-100c** (DOI [10.34810/DATA3542](https://doi.org/10.34810/DATA3542)): 24 side-channel attack implementations and 23 benign workloads, simulated on a single-core RISC-V gem5 O3 CPU with two cache configurations and 4-/8-wide pipeline variants. It is a separate corpus/configuration family, not an extra fold of DATA2711. The B2FIND metadata lists CC0/open-access rights, but archive bytes, exact file inventory, and checksums have not been materialized or independently verified here. Treat this as a newly catalogued simulator input candidate until those artifacts are obtained and hashed. [B2FIND record](https://b2find.eudat.eu/dataset/c210e2d9-edd3-5062-8ad9-7cecf9a0b820).
 
 ### Evasive Spectre / interleaving baselines
 
