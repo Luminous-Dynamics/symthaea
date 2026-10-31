@@ -212,7 +212,7 @@ pub fn resolve_capability(
         return CapabilityDecision::InvalidEvidence { reason };
     }
 
-    let mut exact = cells.iter().filter(|cell| cell.request == *request);
+    let mut exact = cells.iter().filter(|cell| &cell.request == request);
     let Some(cell) = exact.next() else {
         return CapabilityDecision::Unknown {
             reason: "no evidence cell matches the complete instrument/setup/technique/articulation/pitch/velocity/realization/renderer-build request".into(),
@@ -357,6 +357,18 @@ mod tests {
         variants.push(changed);
 
         let mut changed = original.clone();
+        changed.setup_id = "scordatura".into();
+        variants.push(changed);
+
+        let mut changed = original.clone();
+        changed.realization = CapabilityRealization::ProceduralSynthesis;
+        variants.push(changed);
+
+        let mut changed = original.clone();
+        changed.renderer_id = "another-renderer".into();
+        variants.push(changed);
+
+        let mut changed = original.clone();
         changed.renderer_build_sha256 = digest('f');
         variants.push(changed);
 
@@ -369,6 +381,24 @@ mod tests {
                 "neighbouring request inherited support: {changed:?}"
             );
         }
+    }
+
+    #[test]
+    fn procedural_capability_does_not_require_a_sample_asset_digest() {
+        let mut request = request();
+        request.realization = CapabilityRealization::ProceduralSynthesis;
+        let mut proof = proof(&request);
+        proof.asset_sha256 = None;
+        let cell = CapabilityEvidenceCell {
+            request: request.clone(),
+            outcome: CapabilityEvidenceOutcome::Qualified,
+            reason: None,
+            proof: Some(proof),
+        };
+        assert!(matches!(
+            resolve_capability(&request, &[cell]),
+            CapabilityDecision::Supported { .. }
+        ));
     }
 
     #[test]
