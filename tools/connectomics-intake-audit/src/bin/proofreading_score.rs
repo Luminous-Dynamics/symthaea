@@ -2644,7 +2644,8 @@ mod tests {
         ];
         let bytes = synthetic_domain_manifest(&rows, EvaluationPartition::Development);
         let mut manifest: DomainSplitManifest = serde_json::from_slice(&bytes).unwrap();
-        manifest.entries.push(manifest.entries[0].clone());
+        let duplicate_entry = manifest.entries[0].clone();
+        manifest.entries.push(duplicate_entry);
         let duplicate_bytes = serde_json::to_vec(&manifest).unwrap();
         assert!(validate_domain_split_provenance(
             &rows, Some(&duplicate_bytes), &"c".repeat(40), EvaluationPartition::Development
