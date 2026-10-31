@@ -1347,6 +1347,13 @@ mod tests {
             .unwrap_err().contains("non-blinded"));
 
         let mut receipt = parse_receipt(&target_receipt);
+        receipt["adjudications"][0]["reviewers"][0]["baseline_artifact_sha256"] =
+            json!(digest("wrong reviewed baseline"));
+        let altered = serde_json::to_vec(&receipt).unwrap();
+        assert!(analyze_intervention_target_delta(&quality_plan,&quality_receipt,&target_plan,&altered)
+            .unwrap_err().contains("reviewer target/artifact binding differs"));
+
+        let mut receipt = parse_receipt(&target_receipt);
         receipt["adjudications"].as_array_mut().unwrap().pop();
         let altered = serde_json::to_vec(&receipt).unwrap();
         assert!(analyze_intervention_target_delta(&quality_plan,&quality_receipt,&target_plan,&altered)
