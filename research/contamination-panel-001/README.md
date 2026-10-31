@@ -611,3 +611,23 @@ The score report contains per-item status and response digest but never matrix p
 
 A valid exact-match score is evidence that the supplied text outputs matched the supplied sealed oracle. It does not validate task difficulty, representativeness, recipe novelty or absence from model training. The run execution receipt digest is self-reported; the report therefore always sets independently_verified=false until a separate trusted signature verifier is implemented.
 
+
+
+## Fresh-instance exact scoring and report verification
+
+The module src/fresh_scoring.rs accepts a public task packet, sealed oracle, manifest and one strict model answer submission. It verifies packet/oracle/manifest content digests, cross-artifact identities, exact item-set coverage, seed commitment, hidden parameter/answer hashes and the linear-system arithmetic before scoring.
+
+The score-fresh CLI writes a portable score report. A report has:
+- correct, incorrect, invalid-format and abstained item counts;
+- accuracy across all released items;
+- response coverage;
+- accuracy among nonblank answers;
+- accuracy among validly formatted answers;
+- per-item response digest and status;
+- model calls, token counts, wall time, tools, human assistance and declared compute cost;
+- input artifact/submission digests and report digest.
+
+The independent verifier verify_fresh_score_report_integrity recomputes the report digest and re-derives all summary counts and rates from the item-status records. It rejects a report whose outer hash has been recomputed after falsifying its summary fields.
+
+A valid score report always sets independently_verified=false because the execution receipt digest is self-reported. It proves exact oracle agreement with the supplied outputs, not that a trusted model runner actually produced them.
+
