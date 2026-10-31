@@ -1,0 +1,194 @@
+{
+  "format_version": 1,
+  "suite_id": "basalt-linux-capability-inventory-benchmark-v1",
+  "unit_of_analysis": "host_kernel_boot_namespace",
+  "scoring_policy": {
+    "composite_score": "prohibited",
+    "safety_before_efficiency": true,
+    "promote_only_when_all_safety_gates_pass": true,
+    "independent_sample_unit": "host_kernel_boot_namespace",
+    "repeated_reads_on_one_host_are_not_independent_samples": true
+  },
+  "comparison_arms": [
+    {
+      "arm_id": "kernel_config_only",
+      "role": "baseline",
+      "description": "Parse the matching kernel build config where available; missing config remains unknown."
+    },
+    {
+      "arm_id": "sysfs_procfs_mount_inventory",
+      "role": "baseline",
+      "description": "Inventory active LSMs, BTF, mounts, tracepoint IDs, and current cgroup membership."
+    },
+    {
+      "arm_id": "bpftool_feature_probe",
+      "role": "baseline",
+      "description": "Separately run bpftool feature probe kernel and bind its exact tool/kernel output; this is not run by the read-only BASALT probe."
+    },
+    {
+      "arm_id": "runtime_capability_smoke_tests",
+      "role": "reference",
+      "description": "Separately exercise selected syscalls, permission paths, and BPF attach/load/unload with explicit privilege and teardown checks."
+    },
+    {
+      "arm_id": "basalt_read_only_inventory",
+      "role": "candidate",
+      "description": "Combine kernel config, active interfaces, BTF, mounts, tool identity and uncertainty without modifying the host."
+    }
+  ],
+  "metrics": [
+    {
+      "metric_id": "capability_status_accuracy",
+      "phase": "safety",
+      "definition": "Fraction of non-unknown capability findings that agree with an independently established host capability state.",
+      "numerator": "correct non-unknown capability findings",
+      "denominator": "all non-unknown capability findings",
+      "target": {
+        "operator": ">=",
+        "value": 0.99
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "unknown_false_promotion_rate",
+      "phase": "safety",
+      "definition": "Fraction of capabilities with insufficient/inaccessible supporting evidence incorrectly reported candidate_available or not_available.",
+      "numerator": "unsupported inferences promoted to a definite status",
+      "denominator": "capability findings with incomplete evidence",
+      "target": {
+        "operator": "=",
+        "value": 0
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "report_schema_conformance",
+      "phase": "safety",
+      "definition": "Fraction of generated reports accepted by the strict JSON Schema and cross-field semantic checks.",
+      "numerator": "schema-valid and semantically valid reports",
+      "denominator": "all generated reports",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "host_identity_binding",
+      "phase": "safety",
+      "definition": "Fraction of required identity fields bound to source bytes or a stable kernel interface value.",
+      "numerator": "identity fields with source path and digest/value evidence",
+      "denominator": "required identity fields",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "non_interference_side_effects",
+      "phase": "safety",
+      "definition": "Count of unintended BPF attachments, mount changes, cgroup changes, namespace creation, policy writes, sysctl writes, or workload executions caused by preflight.",
+      "numerator": "observed unintended side effects",
+      "denominator": "probe executions",
+      "target": {
+        "operator": "=",
+        "value": 0
+      },
+      "unit": "scenario_count"
+    },
+    {
+      "metric_id": "stable_field_reproducibility",
+      "phase": "selectivity",
+      "definition": "Fraction of stable report fields that match across repeated probes on the same boot and mount namespace, excluding probe ID and observation timestamp.",
+      "numerator": "matching stable fields",
+      "denominator": "all stable fields",
+      "target": {
+        "operator": ">=",
+        "value": 0.999
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "p95_preflight_latency_ms",
+      "phase": "efficiency",
+      "definition": "95th percentile wall time for a read-only preflight on a warm host, with no external tool execution.",
+      "numerator": "p95 elapsed milliseconds",
+      "denominator": "one probe execution",
+      "target": {
+        "operator": "<=",
+        "value": 250
+      },
+      "unit": "milliseconds"
+    },
+    {
+      "metric_id": "p95_report_size_bytes",
+      "phase": "efficiency",
+      "definition": "95th percentile serialized report size.",
+      "numerator": "p95 report bytes",
+      "denominator": "one probe execution",
+      "target": {
+        "operator": "<=",
+        "value": 65536
+      },
+      "unit": "bytes"
+    }
+  ],
+  "gates": {
+    "safety": [
+      "capability_status_accuracy",
+      "unknown_false_promotion_rate",
+      "report_schema_conformance",
+      "host_identity_binding",
+      "non_interference_side_effects"
+    ],
+    "selectivity": [
+      "stable_field_reproducibility"
+    ],
+    "efficiency": [
+      "p95_preflight_latency_ms",
+      "p95_report_size_bytes"
+    ],
+    "promotion_rule": "All safety gates are mandatory and non-compensatory. Selectivity and efficiency are evaluated only after safety gates pass. Candidate availability never implies runtime attachment, event coverage, or observer qualification."
+  },
+  "statistical_protocol": {
+    "confidence_level": 0.95,
+    "independence_unit": "host_kernel_boot_namespace",
+    "clustering": "Repeated probes, repeated interface reads, and multiple capability checks within one boot and namespace are clustered observations, not independent hosts.",
+    "split": "Use development hosts, qualification hosts, and untouched confirmation hosts. Stratify by kernel build, architecture, LSM order, container/host namespace, and privilege profile.",
+    "stopping": "Preregister hosts, kernels, architectures, missing-evidence handling, smoke-test reference, exclusions, and stopping rules before qualification."
+  },
+  "reporting": {
+    "required_strata": [
+      "kernel_release",
+      "kernel_build_id",
+      "architecture",
+      "active_lsm_order",
+      "btf_digest",
+      "mount_namespace_profile",
+      "privilege_profile",
+      "config_source"
+    ],
+    "required_costs": [
+      "wall_time_ms",
+      "cpu_time_ms",
+      "bytes_read",
+      "report_bytes"
+    ],
+    "required_disclosures": [
+      "unknown_capabilities",
+      "inaccessible_sources",
+      "kernel_config_source",
+      "bpftool_not_executed",
+      "runtime_smoke_tests_not_performed",
+      "host_side_effect_audit"
+    ],
+    "forbidden_claims": [
+      "candidate_available_means_attached",
+      "configuration_presence_proves_runtime_permissions",
+      "unknown_means_disabled",
+      "preflight_qualifies_observer",
+      "probe_report_proves_event_capture"
+    ]
+  }
+}
