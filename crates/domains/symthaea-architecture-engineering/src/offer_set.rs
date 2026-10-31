@@ -488,9 +488,9 @@ fn digest_serializable<T: Serialize>(value: &T) -> Result<String, OfferSetError>
 mod tests {
     use super::*;
     use crate::event_tape::{
-        ActionEvent, ActionOutcome, CandidateDisposition, ComparisonMode, EventTapeHeader,
-        ExecutionContract, ExecutionMode, MeterValue, PolicySnapshot, ProposalDisposition,
-        ResourceReceipt,
+        ActionEvent, ActionOutcome, BudgetModel, CandidateDisposition, ComparisonMode,
+        EventTapeHeader, ExecutionContract, ExecutionMode, MeterValue, PolicySnapshot,
+        ProposalDisposition, ResourceCostWeights, ResourceReceipt,
     };
     use serde_json::json;
 
@@ -508,6 +508,21 @@ mod tests {
 
     fn tape(policy_id: &str, config: serde_json::Value) -> EventTape {
         let measured = |value| MeterValue::Measured { value };
+        let budget_model = BudgetModel::WeightedResources {
+            weights: ResourceCostWeights {
+                host_cpu_millis: 1,
+                wall_millis: 0,
+                accelerator_millis: 0,
+                host_memory_byte_millis: 0,
+                accelerator_memory_byte_millis: 0,
+                energy_millijoules: 0,
+                input_tokens: 0,
+                output_tokens: 0,
+                tool_calls: 0,
+                evaluator_calls: 0,
+                verifier_calls: 0,
+            },
+        };
         let header = EventTapeHeader {
             schema: "symthaea.ar5b4.event-tape".to_owned(),
             version: "0.1.0".to_owned(),
@@ -522,7 +537,8 @@ mod tests {
             evaluator_sha256: H5.to_owned(),
             verifier_sha256: H1.to_owned(),
             budget_model_id: "offer-set-budget-v1".to_owned(),
-            budget_model_sha256: H2.to_owned(),
+            budget_model_sha256: digest(&budget_model),
+            budget_model,
             budget_limit_microunits: 100,
             initial_direction_ids: vec!["A".to_owned()],
             execution: ExecutionContract {
