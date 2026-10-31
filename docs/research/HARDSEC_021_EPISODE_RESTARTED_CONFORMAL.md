@@ -144,7 +144,8 @@ Compare at matched PFA levels, and report ARL as a separate operating regime:
 6. Weighted-restarted maximum with near-harmonic weights (next ablation).
 7. Pinned official conformal implementation.
 8. T-SMADE and other published HPC attack detectors.
-9. Intel VTune/perf top-down PMU metrics as an industry profiling/control baseline.
+9. T-SMADE (2024), a two-stage workload-aware HPC attack detector, and Mandal et al. (2024) counter-interleaving detection.
+10. Intel VTune/perf top-down PMU metrics as industry profiling/control baselines. VTune is a profiler, not a security detector.
 
 Intel VTune's Top-down Microarchitecture Analysis Method uses PMU events such as cache misses and branch mispredictions to characterize frontend, backend, bad-speculation and retiring behavior. HARDSEC is not a replacement for VTune or a generic profiler. Its distinct target is an auditable security-evidence chain: qualified acquisition, execution-level evidence units, source/context receipts, sequential false-alarm policy and fail-closed handling.
 
@@ -159,6 +160,12 @@ Primary measures:
 - worst-context and worst-attack-family recall;
 - source-window overlap and execution reuse;
 - CPU time, peak memory and aggregation overhead.
+
+### Dependent-time-series research boundary
+
+Barber and Pananjady (2026) analyze split-conformal prediction under stationary beta-mixing time series and bound coverage loss through a switch coefficient. That is a useful reference for quantifying dependence sensitivity, but it is **not** a sequential PFA theorem for this restarted detector. We will add a beta-mixing dependence qualification track, but we must not transplant a split-conformal coverage bound into an online change-detection guarantee. [PMLR 313 (2026)](https://proceedings.mlr.press/v313/barber26a.html).
+
+The 2026 restarted-conformal paper also distinguishes PFA from ARL control: they are different operating objectives and cannot both be nontrivially guaranteed at once. HARDSEC-021 v1 is PFA-controlled; report ARL only as a separate experiment, never as another name for PFA. [Bhattacharyya & Ramdas (2026)](https://arxiv.org/abs/2609.27179).
 
 ### Aspirational targets (not achieved results)
 
