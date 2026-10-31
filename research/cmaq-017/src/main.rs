@@ -399,7 +399,7 @@ fn evaluate_candidate(
 ) -> CandidateScore {
     if policy == Policy::DirectSearchControl {
         return CandidateScore {
-            // Candidate-count matched control only: not hardware/FLOP/latency matched to model rollout.
+            // Candidate-count only; not hardware, FLOP, or latency matched.
             ranking_score: direct_sequence_score(state, actions),
             predicted_prefix_return: None,
             model_transition_evaluations: 0,
@@ -742,7 +742,8 @@ fn append_row(
         sorted_returns[..lower_tail_count].iter().sum::<f64>() / lower_tail_count as f64;
     let worst_episode_return = sorted_returns[0];
     let (direct_delta, direct_low, direct_high) = mean_and_ci(&paired_direct);
-    let (search_control_delta, search_control_low, search_control_high) = mean_and_ci(&paired_search_control);
+    let (search_control_delta, search_control_low, search_control_high) =
+        mean_and_ci(&paired_search_control);
     let (shuffled_delta, shuffled_low, shuffled_high) = mean_and_ci(&paired_shuffled);
     let (oracle_gap, oracle_low, oracle_high) = mean_and_ci(&paired_oracle_gap);
 
