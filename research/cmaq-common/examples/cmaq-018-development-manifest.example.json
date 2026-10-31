@@ -78,7 +78,7 @@
   },
   "sample": {
     "episode_count": 64,
-    "episode_seed_commitment_sha256": "4c62e04413640e6463a64c0a29dffcc35918f5cff7c2d1dc0bb8d34db67682cb",
+    "episode_seed_commitment_sha256": "5bc559963289ce80429bea306a0187ba271c40a38b1e15bb18f15f585e8a587d",
     "seed_derivation": "base=0xC0A9001820261031; episode_seed(i)=base XOR (i*0x9E3779B97F4A7C15), i=0..63; candidate does not receive seed or evaluator history ID",
     "unit_of_analysis": "episode_history",
     "paired_seed_design": true,
