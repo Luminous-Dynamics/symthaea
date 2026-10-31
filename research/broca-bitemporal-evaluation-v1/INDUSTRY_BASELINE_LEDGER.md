@@ -17,6 +17,10 @@ The machine-readable registry is \`industry-baseline-ledger-v1.json\`.
 | Mem0 Platform | LoCoMo | 92.5% | Vendor result / third-party method audit | 1,425/1,540; reported GPT-5 reader and judge |
 | Mem0 Platform | LongMemEval | 94.4% | Vendor result / third-party method audit | 472/500; original LongMemEval, not LongMemEval-V2 |
 | AgentRunbook-C | LongMemEval-V2 | 74.9% Small / 70.1% Medium | Benchmark reference | Separate V2 protocol, latency 108.3s / 139.9s |
+| TSHMem | LongMemEval S* | 66.3% (+18.6 pp vs paper's strongest baseline) | Peer-reviewed EMNLP 2026 | Paper-specific S* variant; do not pool with original or V2 LongMemEval without matching protocol |
+| TimlMemBench | Governed memory use | 208 reviewed samples / 1,715 questions / 1,821 governance cases | Peer-reviewed Findings benchmark | Distinguishes canonical-pool QA from raw-native ingestion; not a system accuracy score |
+| UTILMEM | Evidence utilization | 1,717 instances across 5 domains | Peer-reviewed EMNLP 2026 benchmark | Tests distributed evidence synthesis and distractor resistance; not a system leaderboard score |
+| LOCOMO-CONV | In-situ conversational memory | Dialog / implicit / counterfactual / composed | Peer-reviewed Findings benchmark | LoCoMo-derived; QA-only recall misses implicit and composed usage failures |
 | MemDerive | Derived-state tasks | 30.41–48.30% evaluated memory systems | Primary paper | 10 scenarios, 4,692 events, 1,503 queries; BM25 58.28%, oracle support 96.01% |
 | SciValidityBench | Decision-use validity | +9.2 to +18.8 pp vs generic event graph | Primary paper | 64 TaskSpecs, 5 validity modules, 6 scientific domains |
 | Vera-Life | Vera-Life-Eval | 62.3% LifeEM (1,500 subset); 61.1% full | Peer-reviewed workshop paper | Qwen3-8B; action-conditioned lifecycle decisions; 8,500 questions / 41,203 evidence pieces |
