@@ -183,9 +183,26 @@ Do not create a parallel action-authority kernel or another generic scorecard. T
 - Machine-readable trajectory receipts and independent evaluator.
 - Rust-first, dependency-light simulator/protocol core.
 
-## 10. Claim boundary
+## 10. Executable MACE-001 v0.1 evaluator
 
-This is a research specification. It does not establish that current Broca learns causal effects from its own actions, that observational logs identify causality, that a causal graph guarantees policy transfer, or that Broca beats AMA-Agent or MemoryArena baselines. SOTA claims require matched official evaluation and independently reproduced outcomes.
+The branch now contains a dependency-free Rust evaluator package at `research/mace-001`:
+
+- Rust 1.96.0 is pinned and the package has an isolated Cargo workspace with no third-party dependencies.
+- Agent-visible task/payload TSV and evaluator-only oracle TSV are separate inputs.
+- `audit` enforces one-to-one case coverage, opaque IDs, evaluator-label leakage sentinels, one anchor plus one irrelevant control per pair, identical paired prompts, and identical core expected decisions.
+- `score` separately reports causal-status, transfer, action and completion agreement; it also counts false causal claims, unsafe transition reuse, unsupported completion claims, pair-invariance failures and missing pre-action prediction records.
+- The output receipt binds the exact input/oracle/candidate bytes with SHA-256.
+- Non-compensatory gates cannot be passed by a high average on the other dimensions.
+- A synthetic perfect-control trace validates the scorer's positive path; it is not a Broca output or a benchmark result.
+- A path-filtered GitHub Actions workflow runs unit tests, audit and the synthetic score control.
+
+The Rust unit suite includes mutation tests for false causal claims, invalid transfer, outcome overclaim, anchor/control inconsistency, missing/duplicate/unknown rows, label leakage, prompt mismatch, malformed candidate data and SHA-256 standard test vectors.
+
+**Verification boundary:** code, workflow and tests are committed, but the Rust suite has not been compiled or executed in this session. The GitHub Actions workflow is an exact-head validation path; until a completed non-skipped run is observed, no Rust test pass is claimed. The v0.1 parser validates the compact TSV/payload contract but does not run a general JSON Schema validator. The candidate's prediction-before-action flag and record ID are assertions; they are not authenticated timestamps or signed receipts.
+
+## 11. Claim boundary
+
+This is a research specification plus a first executable conformance evaluator. It does not establish that current Broca learns causal effects from its own actions, that observational logs identify causality, that a causal graph guarantees policy transfer, or that Broca beats AMA-Agent or MemoryArena baselines. SOTA claims require matched official evaluation and independently reproduced outcomes.
 
 ## References
 
