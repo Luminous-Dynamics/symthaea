@@ -49,6 +49,10 @@ struct TraceMeta {
     adaptation_family: String,
     split: String,
     origin: String,
+    source_sha: String,
+    binary_sha: String,
+    parent_trace_id: Option<String>,
+    iteration_id: u64,
     windows: BTreeMap<String, WindowMeta>,
 }
 
@@ -262,6 +266,15 @@ fn parse_traces(value: &Value) -> Result<(String, String, BTreeMap<String, Trace
             adaptation_family: adaptation_family.clone(),
             split: split.clone(),
             origin: origin.clone(),
+            source_sha: source_sha.to_owned(),
+            binary_sha: binary_sha.to_owned(),
+            parent_trace_id: match item.get("parent_trace_id") {
+                Some(Value::Null) => None,
+                Some(Value::String(value)) => Some(value.clone()),
+                _ => return Err(format!("{context}.parent_trace_id must be a string or null")),
+            },
+            iteration_id: item.get("iteration_id").and_then(Value::as_u64)
+                .ok_or_else(|| format!("{context}.iteration_id must be a non-negative integer"))?,
             windows: trace_windows,
         }).is_some() {
             return Err(format!("duplicate trace_id {trace_id}"));
@@ -275,6 +288,9 @@ fn parse_traces(value: &Value) -> Result<(String, String, BTreeMap<String, Trace
         program_splits.insert((program, split));
         *summary.origin_trace_counts.entry(origin).or_default() += 1;
     }
+
+    validate_trace_parentage(&traces)?;
+    validate_trace_holdouts(&traces, &axes)?;
 
     for (hash, count) in &all_window_hashes {
         if *count > 1 {
@@ -294,6 +310,85 @@ fn parse_traces(value: &Value) -> Result<(String, String, BTreeMap<String, Trace
 
     let _ = axes;
     Ok((dataset_id, corpus_sha, traces, summary))
+}
+
+fn validate_trace_parentage(traces: &BTreeMap<String, TraceMeta>) -> Result<(), String> {
+    let mut parent_iterations = BTreeSet::new();
+    for (trace_id, trace) in traces {
+        match trace.origin.as_str() {
+            "original" => {
+                if trace.parent_trace_id.is_some() || trace.iteration_id != 0 {
+                    return Err(format!("original trace {trace_id} must have null parent and iteration_id=0"));
+                }
+            }
+            "repeated_iteration" | "replayed" => {
+                if trace.iteration_id == 0 {
+                    return Err(format!("{} trace {trace_id} must have iteration_id > 0", trace.origin));
+                }
+                let parent_id = trace.parent_trace_id.as_deref()
+                    .ok_or_else(|| format!("{} trace {trace_id} requires parent_trace_id", trace.origin))?;
+                let parent = traces.get(parent_id)
+                    .ok_or_else(|| format!("trace {trace_id} references missing parent {parent_id}"))?;
+                if parent.origin != "original" {
+                    return Err(format!("trace {trace_id} parent must be original"));
+                }
+                if parent.program != trace.program
+                    || parent.binary_sha != trace.binary_sha
+                    || parent.device != trace.device
+                    || parent.attack_family != trace.attack_family
+                    || parent.adaptation_family != trace.adaptation_family
+                    || parent.split != trace.split
+                {
+                    return Err(format!("trace {trace_id} does not match its parent workload lineage"));
+                }
+                if trace.origin == "repeated_iteration" {
+                    if parent.execution != trace.execution || parent.source_sha != trace.source_sha {
+                        return Err(format!("repeated iteration {trace_id} must preserve source trace and execution identity"));
+                    }
+                } else if parent.execution == trace.execution {
+                    return Err(format!("replayed trace {trace_id} must have a distinct execution_id"));
+                }
+                if !parent_iterations.insert((parent_id.to_owned(), trace.iteration_id)) {
+                    return Err(format!("duplicate iteration_id {} for parent {}", trace.iteration_id, parent_id));
+                }
+            }
+            "unknown" => {
+                if trace.parent_trace_id.is_some() || trace.iteration_id != 0 {
+                    return Err(format!("unknown-origin trace {trace_id} must not claim parent or iteration"));
+                }
+            }
+            other => return Err(format!("trace {trace_id} has unsupported origin {other}")),
+        }
+    }
+    Ok(())
+}
+
+fn validate_trace_holdouts(
+    traces: &BTreeMap<String, TraceMeta>,
+    axes: &BTreeSet<String>,
+) -> Result<(), String> {
+    for axis in axes {
+        let mut groups: BTreeMap<String, String> = BTreeMap::new();
+        for (trace_id, trace) in traces {
+            let group = match axis.as_str() {
+                "program" => trace.program.as_str(),
+                "execution" => trace.execution.as_str(),
+                "device_config" => trace.device.as_str(),
+                "attack_family" => trace.attack_family.as_str(),
+                "adaptation_family" => trace.adaptation_family.as_str(),
+                _ => return Err(format!("unsupported holdout axis {axis}")),
+            };
+            if matches!(axis.as_str(), "attack_family" | "adaptation_family") && group == "none" {
+                continue;
+            }
+            if let Some(previous) = groups.insert(group.to_owned(), trace.split.clone()) {
+                if previous != trace.split {
+                    return Err(format!("{axis} holdout group {group} crosses {previous} and {} (trace {trace_id})", trace.split));
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn reconcile_trace_receipt(
@@ -746,6 +841,26 @@ mod tests {
         refresh_trace_receipt(&t,&tb,&mut r);
         rb=json_bytes(&r);
         assert!(run_fixture(&a,&t,&r,&l,&ab,&tb,&rb,&lb).unwrap_err().contains("unknown origin"));
+    }
+
+    #[test]
+    fn rejects_holdout_family_crossing_splits() {
+        let (a,mut t,mut r,l,ab,mut tb,mut rb,lb)=fixture();
+        t["traces"][2]["attack_family_id"]=json!("spectre-baseline-train");
+        tb=json_bytes(&t);
+        refresh_trace_receipt(&t,&tb,&mut r);
+        rb=json_bytes(&r);
+        assert!(run_fixture(&a,&t,&r,&l,&ab,&tb,&rb,&lb).unwrap_err().contains("attack_family holdout group"));
+    }
+
+    #[test]
+    fn rejects_repeated_trace_without_parent() {
+        let (a,mut t,mut r,l,ab,mut tb,mut rb,lb)=fixture();
+        t["traces"][11]["parent_trace_id"]=Value::Null;
+        tb=json_bytes(&t);
+        refresh_trace_receipt(&t,&tb,&mut r);
+        rb=json_bytes(&r);
+        assert!(run_fixture(&a,&t,&r,&l,&ab,&tb,&rb,&lb).unwrap_err().contains("requires parent_trace_id"));
     }
 
     #[test]
