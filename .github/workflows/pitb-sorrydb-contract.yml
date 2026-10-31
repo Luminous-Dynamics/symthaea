@@ -155,6 +155,73 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Validate speculative branch ledger contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-jsonschema/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+          root = Path.cwd()
+          schema = json.loads((root / "data/benchmarks/proof-insight-transfer-v0/sorrydb-track/speculative-branch-ledger.schema.json").read_text())
+          fixture = json.loads((root / "data/benchmarks/proof-insight-transfer-v0/sorrydb-track/fixtures/speculative-branch-ledger.synthetic.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          validator.validate(fixture)
+          if fixture["evidence_class"] != "synthetic_contract_fixture" or fixture["actual"]["branches_started"] != 0:
+              raise SystemExit("branch ledger fixture must remain synthetic and not executed")
+          if any(branch["status"] != "planned" for branch in fixture["branches"]) or fixture["promotion"]["status"] != "not_attempted":
+              raise SystemExit("synthetic branch ledger cannot claim branch execution or promotion")
+          def errors(value):
+              result=[]; branches=value["branches"]
+              ids=[b["branch_id"] for b in branches]; workspaces=[b["workspace_id"] for b in branches]
+              if len(ids)!=len(set(ids)): result.append("duplicate branch IDs")
+              if len(workspaces)!=len(set(workspaces)): result.append("shared mutable workspace")
+              by_id={b["branch_id"]:b for b in branches}; roots=[b for b in branches if b["parent_branch_id"] is None]
+              if len(roots)!=1 or roots[0]["kind"]!="root": result.append("branch graph must have one root")
+              for b in branches:
+                  p=b["parent_branch_id"]
+                  if p is not None and (p not in by_id or p==b["branch_id"]): result.append("orphan or self parent")
+                  if b["base_commit"]!=value["task"]["repository_commit"]: result.append("source commit drift")
+                  if b["proof_state_sha256"]!=value["task"]["proof_state_sha256"]: result.append("proof-state drift")
+              for b in branches:
+                  seen=set(); current=b["branch_id"]
+                  while current is not None and current in by_id:
+                      if current in seen: result.append("branch cycle"); break
+                      seen.add(current); current=by_id[current]["parent_branch_id"]
+              budget=value["budget"]; actual=value["actual"]
+              if len(branches)>budget["max_branches"]: result.append("branch-count budget exceeded")
+              if actual["peak_active_branches"]>budget["max_active_branches"]: result.append("active-branch cap exceeded")
+              if actual["peak_lean_queries"]>budget["max_lean_queries"]: result.append("Lean-query cap exceeded")
+              caps={"tokens":"max_tokens","model_calls":"max_model_calls","lean_cpu_ms":"max_lean_cpu_ms","wall_ms":"max_wall_ms","cost_microusd":"max_cost_microusd"}
+              for field,cap in caps.items():
+                  if actual[field]>budget[cap]: result.append(field+" budget exceeded")
+                  if sum(b["resources"][field] for b in branches)!=actual[field]: result.append(field+" branch totals mismatch")
+              p=value["promotion"]
+              if p["status"]=="verified_success":
+                  if p["branch_id"] not in by_id: result.append("promoted branch missing")
+                  if p["target_type_before_sha256"]!=p["target_type_after_sha256"]: result.append("promoted theorem type changed")
+                  if p["patch_scope"]!="sorry-span-only": result.append("promotion escaped sorry span")
+                  if p["kernel_check"]!="passed" or p["contains_sorry_ax"]: result.append("promotion kernel/sorryAx gate failed")
+                  if p["new_axiom_names"] or not p["checker_receipt_sha256"] or not p["replay_receipt_sha256"]: result.append("promotion missing independent evidence")
+              return result
+          if errors(fixture): raise SystemExit("synthetic branch fixture semantic failure: "+repr(errors(fixture)))
+          print("PITB_SPECULATIVE_BRANCH_FIXTURE_PASS: private planned workspaces; no execution or promotion")
+          def must_reject(label, value):
+              try: validator.validate(value)
+              except ValidationError: print("PITB_SPECULATIVE_BRANCH_SCHEMA_NEGATIVE_PASS: "+label); return
+              if errors(value): print("PITB_SPECULATIVE_BRANCH_SEMANTIC_NEGATIVE_PASS: "+label); return
+              raise SystemExit("branch ledger accepted invalid case: "+label)
+          bad=copy.deepcopy(fixture); bad["branches"][1]["workspace_id"]=bad["branches"][0]["workspace_id"]; must_reject("shared workspace",bad)
+          bad=copy.deepcopy(fixture); bad["branches"][1]["parent_branch_id"]="missing"; must_reject("orphan parent",bad)
+          bad=copy.deepcopy(fixture); bad["branches"][1]["proof_state_sha256"]="f"*64; must_reject("proof-state drift",bad)
+          bad=copy.deepcopy(fixture); bad["branches"][1]["parent_branch_id"]="delegated-1"; must_reject("branch cycle",bad)
+          bad=copy.deepcopy(fixture); bad["actual"]["peak_active_branches"]=3
+          if not errors(bad): raise SystemExit("active-branch cap negative control did not fail")
+          print("PITB_SPECULATIVE_BRANCH_NEGATIVE_CONTROLS_PASS: workspace, DAG, state, and concurrency")
+          PY
       - name: Checkout exact SorryDB source snapshot
         uses: actions/checkout@v4
         with:

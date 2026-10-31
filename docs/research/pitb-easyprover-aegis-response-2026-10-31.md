@@ -64,3 +64,10 @@ The paradigm shift to test is whether **evidence-aware, isolated, asynchronous s
 ## Source
 
 Ganguly et al., *Scaling Lean Theorem Proving for Real-World Code Verification*, arXiv:2610.38174 (28 October 2026): https://arxiv.org/abs/2610.38174
+
+
+## Branch execution receipt
+
+The versioned speculative-branch ledger is beside an explicitly synthetic, not-executed fixture. Each branch binds to the exact task commit and proof-state digest, while carrying a private-workspace ID and resource counters. Parent-child edges form a branch DAG. Context and instance projection digests remain branch-local; branch resource use must reconcile with the total run budget and concurrency caps.
+
+A branch can return a proof candidate, partial lemma, counterexample, retrieval route or repair plan. It cannot declare a proof verified. A separate promotion record requires an independently checked candidate, unchanged theorem type, sorry-span-only patch, kernel acceptance, no sorryAx, and clean replay receipts. This complements the proof-progress trace: the trace records tactic/obligation transitions, while the branch ledger records workspace isolation and branch-level resource accounting. The fixture contains planned branches only and no experiment results.

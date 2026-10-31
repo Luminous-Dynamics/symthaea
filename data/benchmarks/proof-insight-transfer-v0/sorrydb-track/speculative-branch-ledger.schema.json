@@ -1,0 +1,408 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PITB SorryDB speculative branch ledger v0",
+  "description": "Records branch/workspace isolation and resource use. A branch candidate is not a verified proof; promotion is a separate independent check.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "task",
+    "arm_id",
+    "budget",
+    "actual",
+    "branches",
+    "promotion"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb.speculative-branch-ledger.v0"
+    },
+    "evidence_class": {
+      "enum": [
+        "synthetic_contract_fixture",
+        "measured_run"
+      ]
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "repository_commit",
+        "target_type_sha256",
+        "proof_state_sha256"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "repository_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "target_type_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "proof_state_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "arm_id": {
+      "enum": [
+        "R0",
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+      ]
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_branches",
+        "max_active_branches",
+        "max_lean_queries",
+        "max_tokens",
+        "max_model_calls",
+        "max_lean_cpu_ms",
+        "max_wall_ms",
+        "max_cost_microusd"
+      ],
+      "properties": {
+        "max_branches": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_active_branches": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_lean_queries": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_model_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_lean_cpu_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_wall_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_cost_microusd": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "actual": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "branches_started",
+        "peak_active_branches",
+        "peak_lean_queries",
+        "tokens",
+        "model_calls",
+        "lean_cpu_ms",
+        "wall_ms",
+        "cost_microusd"
+      ],
+      "properties": {
+        "branches_started": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "peak_active_branches": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "peak_lean_queries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "model_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lean_cpu_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wall_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cost_microusd": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "branches": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "branch_id",
+          "parent_branch_id",
+          "kind",
+          "workspace_id",
+          "workspace_isolation",
+          "base_commit",
+          "proof_state_sha256",
+          "status",
+          "result_type",
+          "resources"
+        ],
+        "properties": {
+          "branch_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          },
+          "parent_branch_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "root",
+              "delegated_agent",
+              "tactic_probe",
+              "retrieval",
+              "support_projection",
+              "typed_repair"
+            ]
+          },
+          "workspace_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "workspace_isolation": {
+            "const": "private_worktree"
+          },
+          "base_commit": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "proof_state_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "status": {
+            "enum": [
+              "planned",
+              "running",
+              "candidate_available",
+              "partial_result",
+              "failed",
+              "refuted",
+              "cancelled",
+              "budget_exhausted"
+            ]
+          },
+          "result_type": {
+            "enum": [
+              "none",
+              "proof_candidate",
+              "partial_lemma",
+              "counterexample",
+              "retrieval_route",
+              "repair_plan"
+            ]
+          },
+          "resources": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "tokens",
+              "model_calls",
+              "lean_cpu_ms",
+              "wall_ms",
+              "cost_microusd"
+            ],
+            "properties": {
+              "tokens": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "model_calls": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "lean_cpu_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "wall_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "cost_microusd": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "promotion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "branch_id",
+        "target_type_before_sha256",
+        "target_type_after_sha256",
+        "patch_scope",
+        "checker_receipt_sha256",
+        "replay_receipt_sha256",
+        "kernel_check",
+        "contains_sorry_ax",
+        "new_axiom_names"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_attempted",
+            "rejected",
+            "verified_failure",
+            "verified_success"
+          ]
+        },
+        "branch_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target_type_before_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "target_type_after_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "patch_scope": {
+          "enum": [
+            "sorry-span-only",
+            "outside-target-span",
+            "unknown",
+            null
+          ]
+        },
+        "checker_receipt_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "replay_receipt_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "kernel_check": {
+          "enum": [
+            "not_run",
+            "passed",
+            "failed"
+          ]
+        },
+        "contains_sorry_ax": {
+          "type": "boolean"
+        },
+        "new_axiom_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "verified_success"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "branch_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "target_type_before_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "target_type_after_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "patch_scope": {
+                "const": "sorry-span-only"
+              },
+              "checker_receipt_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "replay_receipt_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "kernel_check": {
+                "const": "passed"
+              },
+              "contains_sorry_ax": {
+                "const": false
+              },
+              "new_axiom_names": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

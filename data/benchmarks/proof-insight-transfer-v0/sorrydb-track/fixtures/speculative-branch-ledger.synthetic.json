@@ -1,0 +1,81 @@
+{
+  "schema_version": "pitb.sorrydb.speculative-branch-ledger.v0",
+  "evidence_class": "synthetic_contract_fixture",
+  "task": {
+    "task_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "repository_commit": "1111111111111111111111111111111111111111",
+    "target_type_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "proof_state_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "arm_id": "R4",
+  "budget": {
+    "max_branches": 2,
+    "max_active_branches": 2,
+    "max_lean_queries": 1,
+    "max_tokens": 10000,
+    "max_model_calls": 100,
+    "max_lean_cpu_ms": 60000,
+    "max_wall_ms": 120000,
+    "max_cost_microusd": 10000
+  },
+  "actual": {
+    "branches_started": 0,
+    "peak_active_branches": 0,
+    "peak_lean_queries": 0,
+    "tokens": 0,
+    "model_calls": 0,
+    "lean_cpu_ms": 0,
+    "wall_ms": 0,
+    "cost_microusd": 0
+  },
+  "branches": [
+    {
+      "branch_id": "root",
+      "parent_branch_id": null,
+      "kind": "root",
+      "workspace_id": "workspace-root",
+      "workspace_isolation": "private_worktree",
+      "base_commit": "1111111111111111111111111111111111111111",
+      "proof_state_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "status": "planned",
+      "result_type": "none",
+      "resources": {
+        "tokens": 0,
+        "model_calls": 0,
+        "lean_cpu_ms": 0,
+        "wall_ms": 0,
+        "cost_microusd": 0
+      }
+    },
+    {
+      "branch_id": "delegated-1",
+      "parent_branch_id": "root",
+      "kind": "delegated_agent",
+      "workspace_id": "workspace-child",
+      "workspace_isolation": "private_worktree",
+      "base_commit": "1111111111111111111111111111111111111111",
+      "proof_state_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "status": "planned",
+      "result_type": "none",
+      "resources": {
+        "tokens": 0,
+        "model_calls": 0,
+        "lean_cpu_ms": 0,
+        "wall_ms": 0,
+        "cost_microusd": 0
+      }
+    }
+  ],
+  "promotion": {
+    "status": "not_attempted",
+    "branch_id": null,
+    "target_type_before_sha256": null,
+    "target_type_after_sha256": null,
+    "patch_scope": null,
+    "checker_receipt_sha256": null,
+    "replay_receipt_sha256": null,
+    "kernel_check": "not_run",
+    "contains_sorry_ax": false,
+    "new_axiom_names": []
+  }
+}
