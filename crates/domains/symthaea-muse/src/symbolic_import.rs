@@ -24,6 +24,92 @@ struct RawNote {
     velocity: u8,
 }
 
+/// Convert a written time signature to the legacy Score representation.
+///
+/// Score::meter stores an integer number of quarter-note beats per bar. The
+/// importer therefore accepts only signatures whose exact bar length is an
+/// integer number of quarter notes. It preserves bar length for 6/8 (3 beats),
+/// but cannot preserve its compound grouping; fractional/additive signatures
+/// are rejected rather than silently reinterpreted.
+fn quarter_note_meter(numerator: u8, denominator: u32, source: &str) -> Result<u8, String> {
+    if numerator == 0 || denominator == 0 || !denominator.is_power_of_two() {
+        return Err(format!(
+            "{source} time signature has an invalid numerator/denominator: {numerator}/{denominator}"
+        ));
+    }
+    let quarter_note_units = u32::from(numerator) * 4;
+    if quarter_note_units % denominator != 0 {
+        return Err(format!(
+            "{source} time signature {numerator}/{denominator} has a fractional quarter-note bar length; the legacy Score meter cannot represent it"
+        ));
+    }
+    let beats = quarter_note_units / denominator;
+    u8::try_from(beats)
+        .ok()
+        .filter(|beats| *beats > 0)
+        .ok_or_else(|| {
+            format!(
+                "{source} time signature {numerator}/{denominator} exceeds the legacy Score meter range"
+            )
+        })
+}
+
+fn midi_time_signature_meter(numerator: u8, denominator_exponent: u8) -> Result<u8, String> {
+    let denominator = 1_u32
+        .checked_shl(u32::from(denominator_exponent))
+        .ok_or_else(|| {
+            format!(
+                "MIDI time-signature denominator exponent {denominator_exponent} is out of range"
+            )
+        })?;
+    quarter_note_meter(numerator, denominator, "MIDI")
+}
+
+fn musicxml_time_signature_meter(
+    document: &roxmltree::Document<'_>,
+) -> Result<u8, String> {
+    let mut signatures = BTreeSet::<(u8, u8)>::new();
+    for time in document.descendants().filter(|node| node.has_tag_name("time")) {
+        let beats: Vec<_> = time.children().filter(|node| node.has_tag_name("beats")).collect();
+        let beat_types: Vec<_> = time
+            .children()
+            .filter(|node| node.has_tag_name("beat-type"))
+            .collect();
+        if beats.len() != 1 || beat_types.len() != 1 {
+            return Err(
+                "MusicXML composite, additive, senza-misura, or incomplete time signatures are not representable by the legacy Score meter"
+                    .into(),
+            );
+        }
+        let numerator = beats[0]
+            .text()
+            .and_then(|value| value.trim().parse::<u8>().ok())
+            .ok_or_else(|| {
+                "MusicXML time-signature numerator must be a single integer".to_string()
+            })?;
+        let denominator = beat_types[0]
+            .text()
+            .and_then(|value| value.trim().parse::<u8>().ok())
+            .ok_or_else(|| {
+                "MusicXML time-signature denominator must be a single integer".to_string()
+            })?;
+        signatures.insert((numerator, denominator));
+    }
+
+    if signatures.len() > 1 {
+        return Err(
+            "MusicXML time-signature changes are not representable by the legacy Score meter"
+                .into(),
+        );
+    }
+    match signatures.into_iter().next() {
+        Some((numerator, denominator)) => {
+            quarter_note_meter(numerator, u32::from(denominator), "MusicXML")
+        }
+        None => Ok(4),
+    }
+}
+
 pub fn parse_symbolic(bytes: &[u8], format: SymbolicImportFormat) -> Result<Score, String> {
     match format {
         SymbolicImportFormat::Midi => parse_midi(bytes),
@@ -46,6 +132,7 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
     }
     let mut tempo_bpm = 120.0_f32;
     let mut meter = 4_u8;
+    let mut midi_time_signature = None::<(u8, u8)>;
     let mut fifths = 0_i8;
     let mut minor = false;
     let mut notes = Vec::new();
@@ -68,8 +155,21 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                         return Err("MIDI tempo event does not encode a finite positive tempo".into());
                     }
                 }
-                TrackEventKind::Meta(MetaMessage::TimeSignature(numerator, _, _, _)) => {
-                    meter = numerator.max(1);
+                TrackEventKind::Meta(MetaMessage::TimeSignature(
+                    numerator,
+                    denominator_exponent,
+                    _,
+                    _,
+                )) => {
+                    let signature = (numerator, denominator_exponent);
+                    if midi_time_signature.is_some_and(|previous| previous != signature) {
+                        return Err(
+                            "MIDI time-signature changes are not representable by the legacy Score meter"
+                                .into(),
+                        );
+                    }
+                    midi_time_signature = Some(signature);
+                    meter = midi_time_signature_meter(numerator, denominator_exponent)?;
                 }
                 TrackEventKind::Meta(MetaMessage::KeySignature(sf, is_minor)) => {
                     fifths = sf;
@@ -212,7 +312,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
     let mut divisions = 1_i64;
     let mut fifths = 0_i32;
     let mut minor = false;
-    let mut meter = 4_u8;
+    let meter = musicxml_time_signature_meter(&document)?;
     let mut tempo = 120.0_f32;
     let mut raw = Vec::<(usize, u8, i64, i64)>::new();
 
@@ -226,8 +326,6 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 fifths = node_i64(child).unwrap_or(i64::from(fifths)) as i32;
             } else if child.has_tag_name("mode") {
                 minor = child.text().is_some_and(|value| value.trim() == "minor");
-            } else if child.has_tag_name("beats") {
-                meter = node_i64(child).unwrap_or(i64::from(meter)).clamp(1, 16) as u8;
             } else if child.has_tag_name("sound") {
                 if let Some(value) = child.attribute("tempo").and_then(|v| v.parse().ok()) {
                     tempo = value;
@@ -472,6 +570,68 @@ mod tests {
             parse_midi(&midi).is_err(),
             "zero microseconds per beat must be rejected"
         );
+    }
+
+    #[test]
+    fn converts_compound_meters_to_exact_quarter_note_bar_length() {
+        assert_eq!(midi_time_signature_meter(6, 3).unwrap(), 3);
+        assert_eq!(quarter_note_meter(2, 2, "test").unwrap(), 4);
+        assert_eq!(quarter_note_meter(3, 4, "test").unwrap(), 3);
+    }
+
+    #[test]
+    fn rejects_time_signatures_the_legacy_score_cannot_represent() {
+        assert!(midi_time_signature_meter(7, 3).is_err(), "7/8 is 3.5 quarter notes");
+        assert!(midi_time_signature_meter(0, 2).is_err());
+        assert!(quarter_note_meter(4, 3, "test").is_err());
+    }
+
+    #[test]
+    fn midi_6_8_uses_three_quarter_note_beats_per_bar() {
+        let midi = [
+            0x4d, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06,
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x60,
+            0x4d, 0x54, 0x72, 0x6b, 0x00, 0x00, 0x00, 0x14,
+            0x00, 0xff, 0x58, 0x04, 0x06, 0x03, 0x24, 0x08,
+            0x00, 0x90, 0x3c, 0x64,
+            0x60, 0x80, 0x3c, 0x00,
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let score = parse_midi(&midi).expect("valid 6/8 MIDI");
+        assert_eq!(score.meter, 3);
+    }
+
+    #[test]
+    fn midi_7_8_is_rejected_instead_of_becoming_seven_quarter_beats() {
+        let midi = [
+            0x4d, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06,
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x60,
+            0x4d, 0x54, 0x72, 0x6b, 0x00, 0x00, 0x00, 0x14,
+            0x00, 0xff, 0x58, 0x04, 0x07, 0x03, 0x21, 0x08,
+            0x00, 0x90, 0x3c, 0x64,
+            0x60, 0x80, 0x3c, 0x00,
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        assert!(parse_midi(&midi).is_err());
+    }
+
+    #[test]
+    fn musicxml_6_8_uses_three_quarter_note_beats_per_bar() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions><time><beats>6</beats><beat-type>8</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let score = parse_musicxml(xml).unwrap();
+        assert_eq!(score.meter, 3);
+    }
+
+    #[test]
+    fn musicxml_7_8_is_rejected_instead_of_becoming_seven_quarter_beats() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions><time><beats>7</beats><beat-type>8</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        assert!(parse_musicxml(xml).is_err());
     }
 
     #[test]
