@@ -8,6 +8,8 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
+use digest::CanonicalHasher;
+
 pub mod digest;
 pub mod dms;
 pub mod evidence;
@@ -53,6 +55,48 @@ pub struct PublicTask {
     pub distractor_count: usize,
     pub similarity: DistractorSimilarity,
     pub events: Vec<TimedEvent>,
+    /// SHA-256 over the versioned canonical public-task encoding.
+    pub content_sha256: [u8; 32],
+}
+
+/// Compute the domain-separated SHA-256 digest of a delayed-cue public task.
+///
+/// The digest covers all public task fields and ordered events, but not the
+/// digest field itself. The 64-bit stream_id is included as a pairing key only.
+pub fn delayed_cue_content_digest(task: &PublicTask) -> [u8; 32] {
+    let mut hash = CanonicalHasher::new(b"symthaea.temporal.delayed-cue.public.v1");
+    hash.u64(task.stream_id);
+    hash.u64(task.delay_steps);
+    hash.usize(task.distractor_count);
+    hash.u8(match task.similarity {
+        DistractorSimilarity::High => 0,
+        DistractorSimilarity::Low => 1,
+    });
+    hash.usize(task.events.len());
+    for event in &task.events {
+        hash.u64(event.step);
+        hash.u64(event.ordinal);
+        match &event.kind {
+            EventKind::Associate { key, value } => {
+                hash.u8(0);
+                hash.u64(*key);
+                hash.u64(*value);
+            }
+            EventKind::Probe { key } => {
+                hash.u8(1);
+                hash.u64(*key);
+            }
+        }
+    }
+    hash.finish()
+}
+
+/// Check whether a delayed-cue task still matches its canonical content digest.
+/// This detects accidental or post-commitment mutation when the digest itself
+/// is bound into a separately protected receipt; it does not authenticate who
+/// created the task or protect an oracle held by the same process.
+pub fn delayed_cue_digest_valid(task: &PublicTask) -> bool {
+    task.content_sha256 == delayed_cue_content_digest(task)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -145,14 +189,18 @@ pub fn generate_delayed_cue(
         kind: EventKind::Probe { key: target_key },
     });
 
+    let mut public_task = PublicTask {
+        stream_id,
+        delay_steps: config.delay_steps,
+        distractor_count: config.distractor_count,
+        similarity: config.similarity,
+        events,
+        content_sha256: [0; 32],
+    };
+    public_task.content_sha256 = delayed_cue_content_digest(&public_task);
+
     Ok((
-        PublicTask {
-            stream_id,
-            delay_steps: config.delay_steps,
-            distractor_count: config.distractor_count,
-            similarity: config.similarity,
-            events,
-        },
+        public_task,
         OracleRecord {
             stream_id,
             target_key,
@@ -278,6 +326,23 @@ mod tests {
         let first = generate_delayed_cue(config(DistractorSimilarity::High)).unwrap();
         let second = generate_delayed_cue(config(DistractorSimilarity::High)).unwrap();
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn public_task_has_a_stable_sha256_digest() {
+        let (task, _) = generate_delayed_cue(config(DistractorSimilarity::High)).unwrap();
+        assert!(delayed_cue_digest_valid(&task));
+        assert_eq!(
+            task.content_sha256,
+            delayed_cue_content_digest(&task)
+        );
+    }
+
+    #[test]
+    fn public_task_digest_detects_event_mutation() {
+        let (mut task, _) = generate_delayed_cue(config(DistractorSimilarity::High)).unwrap();
+        task.events[0].ordinal ^= 1;
+        assert!(!delayed_cue_digest_valid(&task));
     }
 
     #[test]
