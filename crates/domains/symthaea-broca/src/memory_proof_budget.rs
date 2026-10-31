@@ -22,6 +22,7 @@
 //!   binds it but does not re-tokenize source content.
 //! - A packet digest is an integrity commitment, not a digital signature.
 
+use crate::memory_evidence::EvidenceSpeakerRole;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -74,6 +75,9 @@ pub struct ProofEvidenceCandidate {
     /// Required for any obligation with minimum_distinct_sessions > 0.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_session_id: Option<String>,
+    /// Speaker role derived from the immutable source step identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_speaker: Option<EvidenceSpeakerRole>,
     pub scope_id: String,
     pub payload_sha256: String,
     pub source_span_sha256: String,
@@ -216,6 +220,10 @@ pub struct ProofObligation {
     /// Defaults to zero when deserializing legacy proof requests.
     #[serde(default, skip_serializing_if = "is_zero_u32")]
     pub minimum_distinct_sessions: u32,
+    /// Minimum number of distinct evidence dependencies that must be
+    /// attributable to the user. Assistant/unknown sources never count.
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub minimum_user_authored_evidence: u32,
     /// Token cost of this selected proof's conclusion/dependency envelope.
     pub selection_overhead_tokens: u32,
 }
@@ -319,6 +327,14 @@ impl ProofBudgetRequest {
                     obligation.conclusion_id
                 ));
             }
+            if obligation.minimum_user_authored_evidence > 0
+                && obligation.minimum_user_authored_evidence as usize > self.candidates.len()
+            {
+                return Err(format!(
+                    "minimum_user_authored_evidence for {:?} exceeds candidate count",
+                    obligation.conclusion_id
+                ));
+            }
             if obligation.alternatives.is_empty() {
                 return Err(format!(
                     "proof obligation {:?} must have at least one alternative",
@@ -375,6 +391,7 @@ pub enum JustificationRejectionReason {
     IndependentFamilyCountInsufficient,
     SessionProvenanceMissing,
     DistinctSessionCountInsufficient,
+    UserEvidenceCountInsufficient,
     ContradictoryEvidence,
 }
 
@@ -415,6 +432,8 @@ pub struct ProofPacketEvidenceRef {
     pub source_family_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_session_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_speaker: Option<EvidenceSpeakerRole>,
     pub payload_sha256: String,
     pub source_span_sha256: String,
     pub authorization_receipt_sha256: String,
@@ -577,6 +596,8 @@ impl<'a> ExactSearch<'a> {
             self.request.obligations[obligation_index].minimum_independent_families;
         let minimum_distinct_sessions =
             self.request.obligations[obligation_index].minimum_distinct_sessions;
+        let minimum_user_authored_evidence =
+            self.request.obligations[obligation_index].minimum_user_authored_evidence;
         let alternatives = self.request.obligations[obligation_index].alternatives.clone();
         for alternative in &alternatives {
             if self.search_limit_reached {
@@ -588,6 +609,7 @@ impl<'a> ExactSearch<'a> {
             let mut missing_session_provenance = false;
             let mut families = BTreeSet::<String>::new();
             let mut sessions = BTreeSet::<String>::new();
+            let mut user_authored_evidence = BTreeSet::<String>::new();
             for evidence_id in &alternative.evidence_dependencies {
                 let Some(candidate) = self.candidate_by_id.get(evidence_id.as_str()) else {
                     missing = true;
@@ -604,6 +626,9 @@ impl<'a> ExactSearch<'a> {
                     } else {
                         missing_session_provenance = true;
                     }
+                }
+                if candidate.source_speaker == Some(EvidenceSpeakerRole::User) {
+                    user_authored_evidence.insert(candidate.evidence_id.clone());
                 }
             }
 
@@ -640,6 +665,14 @@ impl<'a> ExactSearch<'a> {
                     conclusion_id: conclusion_id.clone(),
                     justification_id: alternative.justification_id.clone(),
                     reason: JustificationRejectionReason::DistinctSessionCountInsufficient,
+                });
+                continue;
+            }
+            if user_authored_evidence.len() < minimum_user_authored_evidence as usize {
+                self.justification_rejections.insert(JustificationRejection {
+                    conclusion_id: conclusion_id.clone(),
+                    justification_id: alternative.justification_id.clone(),
+                    reason: JustificationRejectionReason::UserEvidenceCountInsufficient,
                 });
                 continue;
             }
@@ -733,6 +766,7 @@ impl<'a> ExactSearch<'a> {
             for alternative in &obligation.alternatives {
                 let mut families = BTreeSet::new();
                 let mut sessions = BTreeSet::new();
+                let mut user_authored_evidence = BTreeSet::new();
                 let mut admissible = true;
                 for evidence_id in &alternative.evidence_dependencies {
                     let Some(candidate) = self.candidate_by_id.get(evidence_id.as_str()) else {
@@ -752,10 +786,14 @@ impl<'a> ExactSearch<'a> {
                             break;
                         }
                     }
+                    if candidate.source_speaker == Some(EvidenceSpeakerRole::User) {
+                        user_authored_evidence.insert(candidate.evidence_id.as_str());
+                    }
                 }
                 if !admissible
                     || families.len() < obligation.minimum_independent_families as usize
                     || sessions.len() < obligation.minimum_distinct_sessions as usize
+                    || user_authored_evidence.len() < obligation.minimum_user_authored_evidence as usize
                 {
                     continue;
                 }
@@ -932,6 +970,7 @@ pub fn solve_proof_budget(
                 source_span_end: candidate.source_span_end,
                 source_family_id: candidate.source_family_id.clone(),
                 source_session_id: candidate.source_session_id.clone(),
+                source_speaker: candidate.source_speaker,
                 payload_sha256: candidate.payload_sha256.clone(),
                 source_span_sha256: candidate.source_span_sha256.clone(),
                 authorization_receipt_sha256: candidate.authorization_receipt_sha256.clone(),
@@ -1038,6 +1077,7 @@ pub fn verify_proof_packet(
 
         let mut independent_families = BTreeSet::new();
         let mut distinct_sessions = BTreeSet::new();
+        let mut user_authored_evidence = BTreeSet::new();
         for evidence_id in &justification.evidence_dependencies {
             let candidate = candidate_by_id
                 .get(evidence_id.as_str())
@@ -1055,6 +1095,9 @@ pub fn verify_proof_packet(
                 })?;
                 distinct_sessions.insert(session_id);
             }
+            if candidate.source_speaker == Some(EvidenceSpeakerRole::User) {
+                user_authored_evidence.insert(candidate.evidence_id.as_str());
+            }
             selected_evidence_ids.insert(evidence_id.clone());
         }
         if independent_families.len() < obligation.minimum_independent_families as usize {
@@ -1066,6 +1109,12 @@ pub fn verify_proof_packet(
         if distinct_sessions.len() < obligation.minimum_distinct_sessions as usize {
             return Err(format!(
                 "selected proof {:?} does not meet the distinct-session threshold",
+                selected.justification_id
+            ));
+        }
+        if user_authored_evidence.len() < obligation.minimum_user_authored_evidence as usize {
+            return Err(format!(
+                "selected proof {:?} does not meet the user-authored evidence threshold",
                 selected.justification_id
             ));
         }
@@ -1101,6 +1150,7 @@ pub fn verify_proof_packet(
             source_span_end: candidate.source_span_end,
             source_family_id: candidate.source_family_id.clone(),
             source_session_id: candidate.source_session_id.clone(),
+            source_speaker: candidate.source_speaker,
             payload_sha256: candidate.payload_sha256.clone(),
             source_span_sha256: candidate.source_span_sha256.clone(),
             authorization_receipt_sha256: candidate.authorization_receipt_sha256.clone(),
@@ -1184,6 +1234,7 @@ mod tests {
             source_span_end: 10,
             source_family_id: family.into(),
             source_session_id: Some(format!("session-{id}")),
+            source_speaker: Some(EvidenceSpeakerRole::User),
             scope_id: "scope-1".into(),
             payload_sha256: digest('a'),
             source_span_sha256: sha256_hex(b"0123456789"),
@@ -1214,6 +1265,7 @@ mod tests {
             alternatives,
             minimum_independent_families: 1,
             minimum_distinct_sessions: 0,
+            minimum_user_authored_evidence: 0,
             selection_overhead_tokens: 0,
         }
     }
@@ -1974,6 +2026,7 @@ mod tests {
             source_span_end: candidate.source_span_end,
             source_family_id: candidate.source_family_id.clone(),
             source_session_id: candidate.source_session_id.clone(),
+            source_speaker: candidate.source_speaker,
             payload_sha256: candidate.payload_sha256.clone(),
             source_span_sha256: candidate.source_span_sha256.clone(),
             authorization_receipt_sha256: candidate.authorization_receipt_sha256.clone(),
