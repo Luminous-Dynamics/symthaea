@@ -10,8 +10,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const MUTATION_PLAN_SCHEMA: &str =
-    "symthaea.science_bench_refresh_mutation_validity_plan.v1";
+pub const MUTATION_PLAN_SCHEMA: &str = "symthaea.science_bench_refresh_mutation_validity_plan.v1";
 pub const MUTATION_RECEIPT_SCHEMA: &str =
     "symthaea.science_bench_refresh_mutation_validity_receipt.v1";
 pub const MUTATION_REPORT_SCHEMA: &str =
@@ -324,13 +323,17 @@ fn digest_domain(domain: &[u8], payload: &[u8]) -> Result<String, String> {
 
 fn valid_digest(value: &str, allow_zero: bool) -> bool {
     value.len() == 64
-        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
         && (allow_zero || value.bytes().any(|byte| byte != b'0'))
 }
 
 fn valid_revision(value: &str) -> bool {
     value.len() == 40
-        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
         && value.bytes().any(|byte| byte != b'0')
 }
 
@@ -339,7 +342,8 @@ fn nonempty(value: &str, max: usize) -> bool {
 }
 
 fn checked_add(total: &mut u64, value: u64, label: &str) -> Result<(), String> {
-    *total = total.checked_add(value)
+    *total = total
+        .checked_add(value)
         .ok_or_else(|| format!("{label} counter overflow"))?;
     Ok(())
 }
@@ -358,18 +362,26 @@ fn validate_artifacts(
 ) -> Vec<String> {
     let mut issues = Vec::new();
     if artifacts.is_empty() || artifacts.len() > MAX_ARTIFACTS {
-        issues.push(format!("{mutation_id} {label} must contain 1..={MAX_ARTIFACTS} artifact commitments"));
+        issues.push(format!(
+            "{mutation_id} {label} must contain 1..={MAX_ARTIFACTS} artifact commitments"
+        ));
     }
     let mut ids = BTreeSet::new();
     for artifact in artifacts {
         if !nonempty(&artifact.artifact_id, 128) || !ids.insert(artifact.artifact_id.as_str()) {
-            issues.push(format!("{mutation_id} {label} contains an empty or duplicate artifact ID"));
+            issues.push(format!(
+                "{mutation_id} {label} contains an empty or duplicate artifact ID"
+            ));
         }
         if !valid_digest(&artifact.content_sha256, allow_zero) {
-            issues.push(format!("{mutation_id} {label} contains an invalid artifact content digest"));
+            issues.push(format!(
+                "{mutation_id} {label} contains an invalid artifact content digest"
+            ));
         }
         if artifact.byte_length == 0 {
-            issues.push(format!("{mutation_id} {label} contains a zero-byte artifact"));
+            issues.push(format!(
+                "{mutation_id} {label} contains a zero-byte artifact"
+            ));
         }
     }
     issues
@@ -387,20 +399,31 @@ pub fn validate_mutation_validity_plan_fields(
     if !valid_revision(&fields.analyzer_source_revision)
         || fields.analyzer_source_revision != crate::BUILT_GENERATOR_SOURCE_REVISION
     {
-        issues.push("analyzer_source_revision must match the exact compiled validator revision".to_owned());
+        issues.push(
+            "analyzer_source_revision must match the exact compiled validator revision".to_owned(),
+        );
     }
     if fields.purpose.qualified() && crate::BUILT_GENERATOR_WORKTREE_CLEAN != "true" {
-        issues.push("qualified mutation validity plans require a clean analyzer worktree".to_owned());
+        issues
+            .push("qualified mutation validity plans require a clean analyzer worktree".to_owned());
     }
     if !nonempty(&fields.study_id, 128) {
         issues.push("study_id must be non-empty and at most 128 bytes".to_owned());
     }
     for (label, value) in [
-        ("generator_source_revision", &fields.generator_source_revision),
-        ("evaluator_source_revision", &fields.evaluator_source_revision),
+        (
+            "generator_source_revision",
+            &fields.generator_source_revision,
+        ),
+        (
+            "evaluator_source_revision",
+            &fields.evaluator_source_revision,
+        ),
     ] {
         if !valid_revision(value) {
-            issues.push(format!("{label} must be a full nonzero lowercase Git revision"));
+            issues.push(format!(
+                "{label} must be a full nonzero lowercase Git revision"
+            ));
         }
     }
     for (label, value) in [
@@ -416,7 +439,9 @@ pub fn validate_mutation_validity_plan_fields(
         }
     }
     if !(2..=MAX_REVIEWERS as u32).contains(&fields.reviewers_per_mutation) {
-        issues.push(format!("reviewers_per_mutation must be in 2..={MAX_REVIEWERS}"));
+        issues.push(format!(
+            "reviewers_per_mutation must be in 2..={MAX_REVIEWERS}"
+        ));
     }
     if fields.variants.is_empty() || fields.variants.len() > MAX_VARIANTS {
         issues.push(format!("variants must contain 1..={MAX_VARIANTS} entries"));
@@ -425,42 +450,77 @@ pub fn validate_mutation_validity_plan_fields(
     let mut mutation_ids = BTreeSet::new();
     let mut pair_ids = BTreeSet::new();
     for variant in &fields.variants {
-        if !nonempty(&variant.mutation_id, 128) || !mutation_ids.insert(variant.mutation_id.as_str()) {
+        if !nonempty(&variant.mutation_id, 128)
+            || !mutation_ids.insert(variant.mutation_id.as_str())
+        {
             issues.push("mutation IDs must be non-empty and unique".to_owned());
         }
-        if !nonempty(&variant.metamorphic_pair_id, 128) || !pair_ids.insert(variant.metamorphic_pair_id.as_str()) {
-            issues.push(format!("{} has an empty or duplicate metamorphic_pair_id", variant.mutation_id));
+        if !nonempty(&variant.metamorphic_pair_id, 128)
+            || !pair_ids.insert(variant.metamorphic_pair_id.as_str())
+        {
+            issues.push(format!(
+                "{} has an empty or duplicate metamorphic_pair_id",
+                variant.mutation_id
+            ));
         }
         if !valid_digest(&variant.baseline_input_sha256, allow_zero)
             || !valid_digest(&variant.variant_input_sha256, allow_zero)
         {
-            issues.push(format!("{} has an invalid baseline/variant input digest", variant.mutation_id));
+            issues.push(format!(
+                "{} has an invalid baseline/variant input digest",
+                variant.mutation_id
+            ));
         }
         if variant.baseline_input_sha256 == variant.variant_input_sha256 {
-            issues.push(format!("{} baseline and variant input digests must differ", variant.mutation_id));
+            issues.push(format!(
+                "{} baseline and variant input digests must differ",
+                variant.mutation_id
+            ));
         }
         if variant.intended_relation == MutationSemanticRelationV1::Changing
-            && !variant.target_dimension.as_deref().is_some_and(|value| nonempty(value, 128))
+            && !variant
+                .target_dimension
+                .as_deref()
+                .is_some_and(|value| nonempty(value, 128))
         {
-            issues.push(format!("{} meaning-changing mutation requires a target_dimension", variant.mutation_id));
+            issues.push(format!(
+                "{} meaning-changing mutation requires a target_dimension",
+                variant.mutation_id
+            ));
         }
         if variant.intended_relation == MutationSemanticRelationV1::Preserving
             && variant.target_dimension.is_some()
         {
-            issues.push(format!("{} semantics-preserving mutation must not declare a changed target_dimension", variant.mutation_id));
+            issues.push(format!(
+                "{} semantics-preserving mutation must not declare a changed target_dimension",
+                variant.mutation_id
+            ));
         }
-        issues.extend(validate_artifacts(&variant.mutation_id, "baseline_artifacts", &variant.baseline_artifacts, allow_zero));
-        issues.extend(validate_artifacts(&variant.mutation_id, "variant_artifacts", &variant.variant_artifacts, allow_zero));
+        issues.extend(validate_artifacts(
+            &variant.mutation_id,
+            "baseline_artifacts",
+            &variant.baseline_artifacts,
+            allow_zero,
+        ));
+        issues.extend(validate_artifacts(
+            &variant.mutation_id,
+            "variant_artifacts",
+            &variant.variant_artifacts,
+            allow_zero,
+        ));
     }
 
-    if issues.is_empty() { Ok(()) } else { Err(issues) }
+    if issues.is_empty() {
+        Ok(())
+    } else {
+        Err(issues)
+    }
 }
 
 pub fn compute_mutation_validity_plan_commitment(fields_bytes: &[u8]) -> Result<String, String> {
     let fields: MutationValidityPlanFieldsV1 = serde_json::from_slice(fields_bytes)
         .map_err(|error| format!("mutation validity plan fields invalid: {error}"))?;
-    validate_mutation_validity_plan_fields(&fields)
-        .map_err(|issues| issues.join("; "))?;
+    validate_mutation_validity_plan_fields(&fields).map_err(|issues| issues.join("; "))?;
     plan_commitment(&fields)
 }
 
@@ -470,8 +530,7 @@ pub fn verify_mutation_validity_plan(
     let plan: MutationValidityPlanV1 = serde_json::from_slice(plan_bytes)
         .map_err(|error| format!("mutation validity plan invalid: {error}"))?;
     let fields = plan.fields();
-    validate_mutation_validity_plan_fields(&fields)
-        .map_err(|issues| issues.join("; "))?;
+    validate_mutation_validity_plan_fields(&fields).map_err(|issues| issues.join("; "))?;
     let expected = plan_commitment(&fields)?;
     if !valid_digest(&plan.plan_commitment_sha256, !plan.purpose.qualified())
         || plan.plan_commitment_sha256 != expected
@@ -488,7 +547,9 @@ pub fn verify_mutation_validity_report(
         .map_err(|error| format!("mutation validity report invalid: {error}"))?;
     let supplied = report.report_commitment_sha256.clone();
     if !valid_digest(&supplied, false) {
-        return Err("mutation validity report commitment must be a nonzero SHA-256 digest".to_owned());
+        return Err(
+            "mutation validity report commitment must be a nonzero SHA-256 digest".to_owned(),
+        );
     }
     report.report_commitment_sha256.clear();
     let payload = serde_json::to_vec(&report)
@@ -576,7 +637,10 @@ pub fn analyze_mutation_validity(
     if receipt.analyzer_source_revision != plan.analyzer_source_revision
         || receipt.analyzer_source_revision != crate::BUILT_GENERATOR_SOURCE_REVISION
     {
-        return Err("receipt analyzer revision differs from the exact compiled validator revision".to_owned());
+        return Err(
+            "receipt analyzer revision differs from the exact compiled validator revision"
+                .to_owned(),
+        );
     }
     if receipt.purpose != plan.purpose {
         return Err("receipt purpose differs from the plan".to_owned());
@@ -584,7 +648,10 @@ pub fn analyze_mutation_validity(
     if !nonempty(&receipt.run_id, 128) {
         return Err("run_id must be non-empty and at most 128 bytes".to_owned());
     }
-    if !valid_digest(&receipt.metamorphic_receipt_sha256, !plan.purpose.qualified()) {
+    if !valid_digest(
+        &receipt.metamorphic_receipt_sha256,
+        !plan.purpose.qualified(),
+    ) {
         return Err("metamorphic_receipt_sha256 must be a valid digest".to_owned());
     }
     if receipt.plan_sha256 != plan_sha256
@@ -597,72 +664,133 @@ pub fn analyze_mutation_validity(
         || receipt.evaluator_prompt_sha256 != plan.evaluator_prompt_sha256
         || receipt.rubric_sha256 != plan.rubric_sha256
     {
-        return Err("receipt generator/evaluator/prompt/rubric differs from frozen plan".to_owned());
+        return Err(
+            "receipt generator/evaluator/prompt/rubric differs from frozen plan".to_owned(),
+        );
     }
 
-    let planned: BTreeMap<&str, &MutationVariantPlanV1> = plan.variants.iter()
+    let planned: BTreeMap<&str, &MutationVariantPlanV1> = plan
+        .variants
+        .iter()
         .map(|variant| (variant.mutation_id.as_str(), variant))
         .collect();
     let mut observed = BTreeMap::new();
     for observation in &receipt.observations {
-        if observed.insert(observation.mutation_id.as_str(), observation).is_some() {
-            return Err(format!("duplicate mutation observation {}", observation.mutation_id));
+        if observed
+            .insert(observation.mutation_id.as_str(), observation)
+            .is_some()
+        {
+            return Err(format!(
+                "duplicate mutation observation {}",
+                observation.mutation_id
+            ));
         }
-        let variant = planned.get(observation.mutation_id.as_str())
-            .ok_or_else(|| format!("unexpected mutation observation {}", observation.mutation_id))?;
+        let variant = planned
+            .get(observation.mutation_id.as_str())
+            .ok_or_else(|| {
+                format!(
+                    "unexpected mutation observation {}",
+                    observation.mutation_id
+                )
+            })?;
         if observation.baseline_input_sha256 != variant.baseline_input_sha256
             || observation.variant_input_sha256 != variant.variant_input_sha256
         {
-            return Err(format!("mutation {} input digest differs from committed plan", observation.mutation_id));
+            return Err(format!(
+                "mutation {} input digest differs from committed plan",
+                observation.mutation_id
+            ));
         }
         if observation.adjudications.len() > plan.reviewers_per_mutation as usize {
-            return Err(format!("mutation {} has more adjudications than planned reviewer slots", observation.mutation_id));
+            return Err(format!(
+                "mutation {} has more adjudications than planned reviewer slots",
+                observation.mutation_id
+            ));
         }
         let mut reviewer_ids = BTreeSet::new();
         let mut independence_groups = BTreeSet::new();
         for adjudication in &observation.adjudications {
             for (label, digest) in [
                 ("adjudicator_id_sha256", &adjudication.adjudicator_id_sha256),
-                ("independence_group_sha256", &adjudication.independence_group_sha256),
+                (
+                    "independence_group_sha256",
+                    &adjudication.independence_group_sha256,
+                ),
                 ("rationale_sha256", &adjudication.rationale_sha256),
             ] {
                 if !valid_digest(digest, false) {
-                    return Err(format!("mutation {} has invalid {label}", observation.mutation_id));
+                    return Err(format!(
+                        "mutation {} has invalid {label}",
+                        observation.mutation_id
+                    ));
                 }
             }
             if !reviewer_ids.insert(adjudication.adjudicator_id_sha256.as_str()) {
-                return Err(format!("mutation {} reuses an adjudicator identity", observation.mutation_id));
+                return Err(format!(
+                    "mutation {} reuses an adjudicator identity",
+                    observation.mutation_id
+                ));
             }
             if !independence_groups.insert(adjudication.independence_group_sha256.as_str()) {
-                return Err(format!("mutation {} reuses an adjudicator independence group", observation.mutation_id));
+                return Err(format!(
+                    "mutation {} reuses an adjudicator independence group",
+                    observation.mutation_id
+                ));
             }
             if adjudication.confidence_millionths > 1_000_000 {
-                return Err(format!("mutation {} has out-of-range adjudicator confidence", observation.mutation_id));
+                return Err(format!(
+                    "mutation {} has out-of-range adjudicator confidence",
+                    observation.mutation_id
+                ));
             }
         }
         match observation.evaluation_status {
             MutationEvaluationStatusV1::Completed => {
-                let passed = observation.evaluator_relation_pass
-                    .ok_or_else(|| format!("completed mutation {} requires evaluator_relation_pass", observation.mutation_id))?;
+                let passed = observation.evaluator_relation_pass.ok_or_else(|| {
+                    format!(
+                        "completed mutation {} requires evaluator_relation_pass",
+                        observation.mutation_id
+                    )
+                })?;
                 match (passed, observation.failure_fingerprint_sha256.as_deref()) {
                     (true, None) => {}
                     (false, Some(digest)) if valid_digest(digest, false) => {}
-                    (false, _) => return Err(format!("failed mutation {} requires a valid failure fingerprint", observation.mutation_id)),
-                    (true, Some(_)) => return Err(format!("passing mutation {} must not carry a failure fingerprint", observation.mutation_id)),
+                    (false, _) => {
+                        return Err(format!(
+                            "failed mutation {} requires a valid failure fingerprint",
+                            observation.mutation_id
+                        ));
+                    }
+                    (true, Some(_)) => {
+                        return Err(format!(
+                            "passing mutation {} must not carry a failure fingerprint",
+                            observation.mutation_id
+                        ));
+                    }
                 }
             }
             _ => {
                 if observation.evaluator_relation_pass.is_some()
                     || observation.failure_fingerprint_sha256.is_some()
                 {
-                    return Err(format!("ineligible mutation {} must not carry an evaluator outcome", observation.mutation_id));
+                    return Err(format!(
+                        "ineligible mutation {} must not carry an evaluator outcome",
+                        observation.mutation_id
+                    ));
                 }
             }
         }
     }
-    let missing: Vec<&str> = planned.keys().filter(|id| !observed.contains_key(**id)).copied().collect();
+    let missing: Vec<&str> = planned
+        .keys()
+        .filter(|id| !observed.contains_key(**id))
+        .copied()
+        .collect();
     if !missing.is_empty() {
-        return Err(format!("receipt is missing {} planned mutation observations", missing.len()));
+        return Err(format!(
+            "receipt is missing {} planned mutation observations",
+            missing.len()
+        ));
     }
 
     let mut totals = BTreeMap::new();
@@ -693,7 +821,11 @@ pub fn analyze_mutation_validity(
             &observation.adjudications,
             plan.reviewers_per_mutation,
         );
-        checked_add(&mut observed_adjudications, observation.adjudications.len() as u64, "observed adjudication")?;
+        checked_add(
+            &mut observed_adjudications,
+            observation.adjudications.len() as u64,
+            "observed adjudication",
+        )?;
         let pair_count = (observation.adjudications.len() as u64)
             .checked_mul(observation.adjudications.len().saturating_sub(1) as u64)
             .map(|value| value / 2)
@@ -702,7 +834,9 @@ pub fn analyze_mutation_validity(
         let mut disagreements = 0_u64;
         for left in 0..observation.adjudications.len() {
             for right in (left + 1)..observation.adjudications.len() {
-                if observation.adjudications[left].decision == observation.adjudications[right].decision {
+                if observation.adjudications[left].decision
+                    == observation.adjudications[right].decision
+                {
                     agreements += 1;
                 } else {
                     disagreements += 1;
@@ -710,8 +844,16 @@ pub fn analyze_mutation_validity(
             }
         }
         debug_assert_eq!(agreements + disagreements, pair_count);
-        checked_add(&mut pairwise_agreements, agreements, "pairwise review agreement")?;
-        checked_add(&mut pairwise_disagreements, disagreements, "pairwise review disagreement")?;
+        checked_add(
+            &mut pairwise_agreements,
+            agreements,
+            "pairwise review agreement",
+        )?;
+        checked_add(
+            &mut pairwise_disagreements,
+            disagreements,
+            "pairwise review disagreement",
+        )?;
 
         match status {
             DerivedReviewStatus::ConfirmedValidPreserving => confirmed_valid_preserving += 1,
@@ -724,7 +866,8 @@ pub fn analyze_mutation_validity(
         }
         let valid_mutation = matches!(
             status,
-            DerivedReviewStatus::ConfirmedValidPreserving | DerivedReviewStatus::ConfirmedValidChanging
+            DerivedReviewStatus::ConfirmedValidPreserving
+                | DerivedReviewStatus::ConfirmedValidChanging
         );
         let is_invalid = status == DerivedReviewStatus::ConfirmedInvalid;
         let mut failure_counted = false;
@@ -763,15 +906,25 @@ pub fn analyze_mutation_validity(
             evaluator_relation_pass: observation.evaluator_relation_pass,
             failure_counted_as_verified: failure_counted,
             failure_exclusion_reason: exclusion_reason,
-            failure_fingerprint_sha256: if failure_counted { observation.failure_fingerprint_sha256.clone() } else { None },
+            failure_fingerprint_sha256: if failure_counted {
+                observation.failure_fingerprint_sha256.clone()
+            } else {
+                None
+            },
         };
         summaries.push(summary);
 
         for (key, value) in [
             ("generator_calls", observation.generator_call_count),
             ("generator_tokens", observation.generator_token_count),
-            ("semantic_assistance_calls", observation.semantic_assistance_call_count),
-            ("semantic_assistance_tokens", observation.semantic_assistance_token_count),
+            (
+                "semantic_assistance_calls",
+                observation.semantic_assistance_call_count,
+            ),
+            (
+                "semantic_assistance_tokens",
+                observation.semantic_assistance_token_count,
+            ),
             ("evaluator_calls", observation.evaluator_call_count),
             ("evaluator_tokens", observation.evaluator_token_count),
             ("human_review_seconds", observation.human_review_seconds),
@@ -782,7 +935,8 @@ pub fn analyze_mutation_validity(
     }
 
     let planned_count = plan.variants.len() as u64;
-    let planned_slots = planned_count.checked_mul(u64::from(plan.reviewers_per_mutation))
+    let planned_slots = planned_count
+        .checked_mul(u64::from(plan.reviewers_per_mutation))
         .ok_or_else(|| "planned adjudication slot count overflow".to_owned())?;
     let missing_slots = planned_slots.saturating_sub(observed_adjudications);
     let adjudicable = confirmed_valid_preserving + confirmed_valid_changing + confirmed_invalid;
@@ -793,8 +947,16 @@ pub fn analyze_mutation_validity(
         Some(confirmed_valid as f64 / adjudicable as f64 * 1_000_000.0)
     };
     let valid_yield = Some(confirmed_valid as f64 / planned_count as f64 * 1_000_000.0);
-    let total_tokens = totals.get("generator_tokens").copied().unwrap_or(0)
-        .checked_add(totals.get("semantic_assistance_tokens").copied().unwrap_or(0))
+    let total_tokens = totals
+        .get("generator_tokens")
+        .copied()
+        .unwrap_or(0)
+        .checked_add(
+            totals
+                .get("semantic_assistance_tokens")
+                .copied()
+                .unwrap_or(0),
+        )
         .and_then(|value| value.checked_add(totals.get("evaluator_tokens").copied().unwrap_or(0)))
         .ok_or_else(|| "total token count overflow".to_owned())?;
     let unique_verified = verified_fingerprints.len() as u64;
@@ -866,7 +1028,6 @@ pub fn analyze_mutation_validity(
     Ok(report)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -884,10 +1045,7 @@ mod tests {
         }
     }
 
-    fn variant(
-        id: &str,
-        relation: MutationSemanticRelationV1,
-    ) -> MutationVariantPlanV1 {
+    fn variant(id: &str, relation: MutationSemanticRelationV1) -> MutationVariantPlanV1 {
         MutationVariantPlanV1 {
             mutation_id: id.to_owned(),
             metamorphic_pair_id: format!("pair-{id}"),
@@ -905,7 +1063,11 @@ mod tests {
         }
     }
 
-    fn rating(id: &str, index: usize, decision: SemanticReviewDecisionV1) -> SemanticAdjudicationV1 {
+    fn rating(
+        id: &str,
+        index: usize,
+        decision: SemanticReviewDecisionV1,
+    ) -> SemanticAdjudicationV1 {
         SemanticAdjudicationV1 {
             adjudicator_id_sha256: digest(&format!("{id}:reviewer:{index}")),
             independence_group_sha256: digest(&format!("{id}:group:{index}")),
@@ -927,7 +1089,9 @@ mod tests {
             mutation_id: variant.mutation_id.clone(),
             baseline_input_sha256: variant.baseline_input_sha256.clone(),
             variant_input_sha256: variant.variant_input_sha256.clone(),
-            adjudications: decisions.iter().enumerate()
+            adjudications: decisions
+                .iter()
+                .enumerate()
                 .map(|(index, decision)| rating(&variant.mutation_id, index, *decision))
                 .collect(),
             evaluation_status: status,
@@ -956,7 +1120,10 @@ mod tests {
             variant("preserve-disputed", MutationSemanticRelationV1::Preserving),
             variant("change-unreviewed", MutationSemanticRelationV1::Changing),
             variant("preserve-abstained", MutationSemanticRelationV1::Preserving),
-            variant("preserve-valid-duplicate", MutationSemanticRelationV1::Preserving),
+            variant(
+                "preserve-valid-duplicate",
+                MutationSemanticRelationV1::Preserving,
+            ),
         ];
         let fields = MutationValidityPlanFieldsV1 {
             schema: MUTATION_PLAN_SCHEMA.to_owned(),
@@ -1083,8 +1250,14 @@ mod tests {
         assert_eq!(report.abstained_count, 1);
         assert_eq!(report.unreviewed_count, 1);
         assert_eq!(report.adjudicable_confirmed_count, 4);
-        assert_eq!(report.adjudicable_panel_concordance_millionths, Some(750_000.0));
-        assert_eq!(report.confirmed_valid_yield_over_planned_millionths, Some(3.0 / 7.0 * 1_000_000.0));
+        assert_eq!(
+            report.adjudicable_panel_concordance_millionths,
+            Some(750_000.0)
+        );
+        assert_eq!(
+            report.confirmed_valid_yield_over_planned_millionths,
+            Some(3.0 / 7.0 * 1_000_000.0)
+        );
         assert_eq!(report.pairwise_review_agreement_count, 15);
         assert_eq!(report.pairwise_review_disagreement_count, 3);
         assert_eq!(report.evaluator_failure_observation_count, 4);
@@ -1114,19 +1287,27 @@ mod tests {
         let report = analyze_mutation_validity(&plan, &receipt).unwrap();
         let bytes = serde_json::to_vec(&report).unwrap();
         let verified = verify_mutation_validity_report(&bytes).unwrap();
-        assert_eq!(verified.report_commitment_sha256, report.report_commitment_sha256);
+        assert_eq!(
+            verified.report_commitment_sha256,
+            report.report_commitment_sha256
+        );
         let mut tampered: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         tampered["confirmed_valid_preserving_count"] = serde_json::json!(99);
         let tampered_bytes = serde_json::to_vec(&tampered).unwrap();
-        assert!(verify_mutation_validity_report(&tampered_bytes).unwrap_err()
-            .contains("commitment mismatch"));
+        assert!(
+            verify_mutation_validity_report(&tampered_bytes)
+                .unwrap_err()
+                .contains("commitment mismatch")
+        );
     }
 
     #[test]
     fn deterministic_for_exact_plan_and_receipt_bytes() {
         let (plan, receipt) = make_plan_and_receipt();
-        let first = serde_json::to_vec(&analyze_mutation_validity(&plan, &receipt).unwrap()).unwrap();
-        let second = serde_json::to_vec(&analyze_mutation_validity(&plan, &receipt).unwrap()).unwrap();
+        let first =
+            serde_json::to_vec(&analyze_mutation_validity(&plan, &receipt).unwrap()).unwrap();
+        let second =
+            serde_json::to_vec(&analyze_mutation_validity(&plan, &receipt).unwrap()).unwrap();
         assert_eq!(first, second);
     }
 
@@ -1135,13 +1316,19 @@ mod tests {
         let (plan, receipt) = make_plan_and_receipt();
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         value["observations"].as_array_mut().unwrap().pop();
-        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
-            .unwrap_err().contains("missing"));
+        assert!(
+            analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+                .unwrap_err()
+                .contains("missing")
+        );
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         let first = value["observations"][0].clone();
         value["observations"].as_array_mut().unwrap().push(first);
-        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
-            .unwrap_err().contains("duplicate"));
+        assert!(
+            analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+                .unwrap_err()
+                .contains("duplicate")
+        );
     }
 
     #[test]
@@ -1149,12 +1336,18 @@ mod tests {
         let (plan, receipt) = make_plan_and_receipt();
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         value["observations"][0]["variant_input_sha256"] = serde_json::json!(digest("wrong"));
-        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
-            .unwrap_err().contains("input digest differs"));
+        assert!(
+            analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+                .unwrap_err()
+                .contains("input digest differs")
+        );
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         value["evaluator_source_revision"] = serde_json::json!("d".repeat(40));
-        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
-            .unwrap_err().contains("differs from frozen plan"));
+        assert!(
+            analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+                .unwrap_err()
+                .contains("differs from frozen plan")
+        );
     }
 
     #[test]
@@ -1163,24 +1356,37 @@ mod tests {
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         value["observations"][0]["adjudications"][1]["adjudicator_id_sha256"] =
             value["observations"][0]["adjudications"][0]["adjudicator_id_sha256"].clone();
-        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
-            .unwrap_err().contains("reuses an adjudicator identity"));
+        assert!(
+            analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+                .unwrap_err()
+                .contains("reuses an adjudicator identity")
+        );
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         value["observations"][0]["adjudications"][1]["independence_group_sha256"] =
             value["observations"][0]["adjudications"][0]["independence_group_sha256"].clone();
-        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
-            .unwrap_err().contains("reuses an adjudicator independence group"));
+        assert!(
+            analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+                .unwrap_err()
+                .contains("reuses an adjudicator independence group")
+        );
     }
 
     #[test]
     fn rejects_semantics_changing_plan_without_target_dimension() {
         let (plan, _) = make_plan_and_receipt();
         let mut value: serde_json::Value = serde_json::from_slice(&plan).unwrap();
-        value.as_object_mut().unwrap().remove("plan_commitment_sha256");
+        value
+            .as_object_mut()
+            .unwrap()
+            .remove("plan_commitment_sha256");
         let mut fields: MutationValidityPlanFieldsV1 = serde_json::from_value(value).unwrap();
         fields.variants[1].target_dimension = None;
         let issues = validate_mutation_validity_plan_fields(&fields).unwrap_err();
-        assert!(issues.iter().any(|issue| issue.contains("requires a target_dimension")));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.contains("requires a target_dimension"))
+        );
     }
 
     #[test]
@@ -1188,12 +1394,19 @@ mod tests {
         let (plan, receipt) = make_plan_and_receipt();
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         value["observations"][0]["failure_fingerprint_sha256"] = serde_json::Value::Null;
-        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
-            .unwrap_err().contains("requires a valid failure fingerprint"));
+        assert!(
+            analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+                .unwrap_err()
+                .contains("requires a valid failure fingerprint")
+        );
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
-        value["observations"][1]["failure_fingerprint_sha256"] = serde_json::json!(digest("unexpected"));
-        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
-            .unwrap_err().contains("must not carry a failure fingerprint"));
+        value["observations"][1]["failure_fingerprint_sha256"] =
+            serde_json::json!(digest("unexpected"));
+        assert!(
+            analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+                .unwrap_err()
+                .contains("must not carry a failure fingerprint")
+        );
     }
 
     #[test]
@@ -1201,8 +1414,11 @@ mod tests {
         let (plan, receipt) = make_plan_and_receipt();
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         value["observations"][4]["evaluator_relation_pass"] = serde_json::json!(false);
-        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
-            .unwrap_err().contains("must not carry an evaluator outcome"));
+        assert!(
+            analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+                .unwrap_err()
+                .contains("must not carry an evaluator outcome")
+        );
     }
 
     #[test]
@@ -1210,8 +1426,11 @@ mod tests {
         let (plan, receipt) = make_plan_and_receipt();
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         value["observations"][0]["generator_token_count"] = serde_json::json!(u64::MAX);
-        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
-            .unwrap_err().contains("counter overflow"));
+        assert!(
+            analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+                .unwrap_err()
+                .contains("counter overflow")
+        );
     }
 
     #[test]
@@ -1219,9 +1438,14 @@ mod tests {
         let (plan, receipt) = make_plan_and_receipt();
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         let first_rating = value["observations"][0]["adjudications"][0].clone();
-        value["observations"][0]["adjudications"].as_array_mut().unwrap()
+        value["observations"][0]["adjudications"]
+            .as_array_mut()
+            .unwrap()
             .push(first_rating);
-        assert!(analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
-            .unwrap_err().contains("more adjudications than planned"));
+        assert!(
+            analyze_mutation_validity(&plan, &serde_json::to_vec(&value).unwrap())
+                .unwrap_err()
+                .contains("more adjudications than planned")
+        );
     }
 }
