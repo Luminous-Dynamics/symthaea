@@ -33,6 +33,8 @@ jobs:
       - name: Clippy
         working-directory: research/cmaq-017
         run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Install JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema
       - name: Generate and validate deterministic report
         working-directory: research/cmaq-017
         shell: bash
@@ -42,8 +44,11 @@ jobs:
           python3 - <<'PY'
           import json
           from pathlib import Path
+          from jsonschema import validate
 
           report = json.loads(Path("/tmp/cmaq-017-report.json").read_text())
+          schema = json.loads(Path("report.schema.json").read_text())
+          validate(instance=report, schema=schema)
           assert report["schema_version"] == "cmaq-017-multistep-exploitability-v0.1"
           assert report["episode_count"] == 16
           assert report["environment_steps"] == 12
@@ -117,3 +122,47 @@ jobs:
           assert len(condition_counts) == 75
           assert set(condition_counts.values()) == {8}
           PY
+
+      - name: Create run receipt
+        working-directory: research/cmaq-017
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import platform
+          import subprocess
+          from pathlib import Path
+
+          report_path = Path("/tmp/cmaq-017-report.json")
+          receipt = {
+              "schema_version": "cmaq-017-run-receipt-v0.1",
+              "source_commit": subprocess.check_output(
+                  ["git", "rev-parse", "HEAD"], text=True
+              ).strip(),
+              "report_sha256": hashlib.sha256(report_path.read_bytes()).hexdigest(),
+              "report_bytes": report_path.stat().st_size,
+              "rustc_version": subprocess.check_output(
+                  ["rustc", "--version"], text=True
+              ).strip(),
+              "cargo_version": subprocess.check_output(
+                  ["cargo", "--version"], text=True
+              ).strip(),
+              "runner_platform": platform.platform(),
+              "workflow_run_id": os.environ.get("GITHUB_RUN_ID"),
+              "workflow_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+          }
+          Path("/tmp/cmaq-017-run-receipt.json").write_text(
+              json.dumps(receipt, sort_keys=True, indent=2) + "\\n"
+          )
+          PY
+          sha256sum /tmp/cmaq-017-report.json /tmp/cmaq-017-run-receipt.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-017-report-and-run-receipt
+          path: |
+            /tmp/cmaq-017-report.json
+            /tmp/cmaq-017-run-receipt.json
+          retention-days: 30
