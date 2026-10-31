@@ -1,0 +1,89 @@
+{
+  "schema_version": "hardsec-temporal-dependence-model-v1",
+  "dependence_model_id": "hs022-causal-fdm-geometric-fixture-v1",
+  "evidence_domain": "synthetic_fixture",
+  "stream_id": "pmu-score-stream-fdm-demo",
+  "calibration_execution_group_id": "calibration-execution-01",
+  "evaluation_execution_group_id": "evaluation-execution-02",
+  "calibration_device_boot_group_id": "device-boot-calibration-01",
+  "evaluation_device_boot_group_id": "device-boot-evaluation-02",
+  "context_id": "compute",
+  "scoring_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "anomaly_score_direction": "higher_is_more_anomalous",
+  "target_miscoverage_alpha": 0.1,
+  "predictor_fixed_status": "assumption_not_verified",
+  "score_marginal_continuity_status": "assumption_not_verified",
+  "causal_innovation_model": {
+    "model_type": "causal_innovation_recursion",
+    "model_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "innovation_distribution": "iid_innovations_claimed",
+    "iid_innovations_status": "assumption_not_verified",
+    "stationarity_status": "assumption_not_verified",
+    "causal_representation_status": "assumption_not_verified"
+  },
+  "dependence_bound": {
+    "status": "summable_geometric_claimed",
+    "envelope_type": "geometric",
+    "amplitude": 0.05,
+    "rho": 0.8,
+    "lag_upper_bounds": [
+      {
+        "lag": 0,
+        "theta_upper_bound": 0.05
+      },
+      {
+        "lag": 1,
+        "theta_upper_bound": 0.04000000000000001
+      },
+      {
+        "lag": 2,
+        "theta_upper_bound": 0.03200000000000001
+      },
+      {
+        "lag": 3,
+        "theta_upper_bound": 0.025600000000000008
+      },
+      {
+        "lag": 4,
+        "theta_upper_bound": 0.020480000000000005
+      },
+      {
+        "lag": 5,
+        "theta_upper_bound": 0.016384000000000006
+      },
+      {
+        "lag": 6,
+        "theta_upper_bound": 0.013107200000000006
+      },
+      {
+        "lag": 7,
+        "theta_upper_bound": 0.010485760000000004
+      },
+      {
+        "lag": 8,
+        "theta_upper_bound": 0.008388608000000004
+      },
+      {
+        "lag": 9,
+        "theta_upper_bound": 0.006710886400000004
+      },
+      {
+        "lag": 10,
+        "theta_upper_bound": 0.005368709120000003
+      }
+    ],
+    "proof_artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "proof_reference": "synthetic fixture only; no physical PMU coupling proof supplied",
+    "per_lag_bound_proof_status": "assumption_not_verified"
+  },
+  "block_diagnostic": {
+    "block_lengths": [
+      25,
+      50,
+      100
+    ],
+    "primary_block_length": 50,
+    "nominal_two_sided_level": 0.05,
+    "block_inference_assumption_status": "assumption_not_verified"
+  }
+}
