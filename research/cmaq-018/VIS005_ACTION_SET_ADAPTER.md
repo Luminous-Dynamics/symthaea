@@ -150,3 +150,8 @@ The current benchmark plan is in [INDUSTRY_BENCHMARK_MATRIX_2026-11-01.md](INDUS
 The new `evaluate_net_decision_value` primitive accepts a costed realized outcome for the world-model arm, D0 and D1 on every matched episode. Each arm's net utility subtracts inference, acquisition and failure/recovery costs, all already normalized to the preregistered common utility scale. It reports paired gross/net advantages and net win rates. It rejects negative costs and non-finite outcomes.
 
 A synthetic 3-episode known-answer fixture checks the arithmetic: +2.333 gross but only +0.333 net versus D0; +1.5 gross and +0.167 net versus D1. These are deliberately just test values, not a real benchmark result. The production result must include episode-level confidence intervals and an equal-compute comparison.
+
+
+## Existing architecture gap and future-observation target
+
+The source-backed audit in [VIS005_ACTION_CONDITIONED_GAP_AUDIT_2026-11-01.md](VIS005_ACTION_CONDITIONED_GAP_AUDIT_2026-11-01.md) documents the current vision manifold delayed-horizon evaluator, cross-manifold mapper and JEPA target semantics. The joint action bank is a future adapter/evaluator seam, not proof that the current CfC/JEPA path is action-conditioned on real future visual observations. The future adapter must predict from a frozen history plus hypothetical action, and the evaluator must score against later observations from exact cloned branches without exposing hidden outcomes to the predictor.
