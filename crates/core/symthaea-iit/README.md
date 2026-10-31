@@ -435,11 +435,20 @@ includes `TotalCut`. The caller's work budget applies to canonical representativ
 actually materialized, while the report records the raw equivalent labelings and
 how many were pruned. Budget exhaustion returns an error rather than a partial list.
 
-This remains a candidate generator only. It does not yet apply repertoires to each
-cut, score a minimum-information partition, or compute system \(\phi_s\). The
-next gate is full-matrix parity and post-cut TPM parity with pinned PyPhi inputs,
-then the formalism-specific minimum search. Different partition schemes must not
-be represented as a speed-only option when they alter the calculated quantity.
+The enumerator itself remains a candidate generator; the crate's separate
+bounded IIT 4.0 (2023) system-search API applies repertoire and GID scores,
+selects the MIP, and returns phi_s when its specified-state tie cascade is
+fully resolvable. The search API's current differential qualification is limited
+to the named published Fig. 1A anchors and the embedded-system fixtures described
+above; it is not general PyPhi parity. Different partition schemes must not be
+represented as a speed-only option when they alter the calculated quantity.
+
+Before materializing cuts, callers can use
+`estimate_iit4_system_partition_work(candidate, unit_count, include_total_cut)`.
+It computes exact raw labeling, canonical cut, pruned labeling, and TotalCut
+counts from Stirling numbers with O(n) counter storage. The enumerator uses the
+same estimate to reject an insufficient canonical-work budget before building
+partition objects. Arithmetic overflow is an explicit error, not a wrapped estimate.
 
 
 ## Partition application
@@ -482,6 +491,21 @@ measurements. The independent brute-force reference still generates the original
 3^k labeling family, constructs its matrices, and compares the complete result
 set against the canonical generator through six units.
 
+
+## Preflight cost admission
+
+The public work estimator is the cheap preflight analogue of PyPhi's
+`estimate_analysis()` at the directed-partition layer. It is not a runtime
+estimate and does not predict Eq. 3/Eq. 4 contraction cost; it reports exact
+combinatorial counts with checked integer arithmetic. Use it before choosing
+a budget or attempting to materialize cuts. A future full-analysis estimator
+must additionally include tied specified-state pairs, factor-graph induced-width
+forecasts, partition-score evaluations, and relation/Composition work when
+those stages are implemented.
+
+Estimator regressions pin both raw and canonical counts for 1–6 candidate units
+and compare predictions against materialized reports. A budget one below the
+exact canonical count must fail before recursive enumeration.
 
 ## Reproducible partition microbenchmark
 
