@@ -185,6 +185,61 @@ mod tests {
     }
 
     #[test]
+    fn zdt1_reference_front_flows_through_pareto_analysis_and_receipt() {
+        use crate::pareto_objectives::{
+            analyze_pareto, analyze_reference_front_indicators, ObjectiveDirection,
+            ParetoAnalysisPlan, ParetoCandidate, ParetoObjectiveSpec,
+        };
+
+        let evidence = [
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        ];
+        let decisions = [0.0, 0.5, 1.0];
+        let candidates = decisions.iter().enumerate().map(|(index, first)| {
+            let objectives = zdt1_objectives(&[*first, 0.0]).unwrap();
+            ParetoCandidate {
+                candidate_id: format!("zdt1-{index}"),
+                objective_values: objectives.to_vec(),
+                feasible: true,
+                constraint_violations: Vec::new(),
+                evidence_sha256: evidence[index].to_owned(),
+            }
+        }).collect();
+
+        let plan = ParetoAnalysisPlan::new(
+            "zdt1-integration",
+            vec![
+                ParetoObjectiveSpec {
+                    objective_id: "f1".to_owned(),
+                    direction: ObjectiveDirection::Minimize,
+                    scale_lower: 0.0,
+                    scale_upper: 1.0,
+                },
+                ParetoObjectiveSpec {
+                    objective_id: "f2".to_owned(),
+                    direction: ObjectiveDirection::Minimize,
+                    scale_lower: 0.0,
+                    scale_upper: 1.0,
+                },
+            ],
+            vec![0.0, 0.0],
+            candidates,
+        ).unwrap();
+
+        let summary = analyze_pareto(&plan).unwrap();
+        assert_eq!(summary.nondominated_candidate_ids.len(), 3);
+        let reference = zdt1_reference_front(3).unwrap()
+            .into_iter()
+            .map(|point| point.into_iter().map(|value| 1.0 - value).collect())
+            .collect::<Vec<Vec<f64>>>();
+        let indicators = analyze_reference_front_indicators(&plan, &reference).unwrap();
+        assert!(indicators.igd_plus.abs() < 1e-12);
+        assert!(indicators.additive_epsilon.abs() < 1e-12);
+    }
+
+    #[test]
     fn invalid_decisions_and_reference_grid_sizes_are_rejected() {
         assert!(zdt1_objectives(&[0.5]).is_err());
         assert!(zdt1_objectives(&[0.5, 1.1]).is_err());
