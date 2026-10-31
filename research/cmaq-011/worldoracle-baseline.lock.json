@@ -27,8 +27,8 @@
     "submission_portal": "https://worldoracle-benchmark.github.io/submission/",
     "validation_dataset_revision": "0ada1ba08b905de0801b7ffd6bdfb4dc4da761ef",
     "validation_dataset_access": {
-      "status": "publicly_accessible_as_of_2026-10-31",
-      "source": "Current Hugging Face dataset card identifies this as a public validation dataset and provides the manifest, checksums and episode archives.",
+      "status": "access_unresolved_do_not_download",
+      "source": "As of 2026-10-31, the official GitHub README announces a validation release but the current Hugging Face validation card labels the dataset private. The observed access discrepancy is unresolved; no dataset access is authorized by this lock.",
       "observed_hf_commit_short": "0ada1ba",
       "episode_count_total": 67,
       "platforms": {
@@ -40,7 +40,9 @@
       "total_file_size_bytes_approx": 60600000000,
       "validation_manifest": "validation_manifest.json",
       "sha256_inventory": "SHA256SUMS",
-      "policy": "Access only after reviewing CC BY-NC-SA 4.0 terms. Do not infer commercial use or model-training rights from the Apache-2.0 source-code license."
+      "policy": "Do not download, use, mirror or train on the validation data until explicit authorized access reconciles the GitHub README and Hugging Face card. CC BY-NC-SA 4.0 restricts data use to its non-commercial/share-alike terms; the Apache-2.0 code license does not grant data rights.",
+      "authorized_download": false,
+      "authorized_use": false
     },
     "test_input_access": {
       "status": "private_as_of_2026-10-31",
@@ -106,14 +108,14 @@
     }
   ],
   "reproduction_constraints": {
-    "validation_claim_ceiling": "Official public-validation reference, smaller and less diverse than the hidden test set; expect high variance.",
-    "data_use": "CC BY-NC-SA 4.0 is non-commercial/share-alike. Do not infer commercial training rights from the Apache-2.0 source-code license.",
-    "resource_requirements": "Linux/Python 3.10; CUDA recommended for V-JEPA2, LPIPS and DINOv3. Public AgiBot G2 validation GT is approximately 18.6 GiB, excluding inference files, predictions and checkpoints.",
+    "validation_claim_ceiling": "Pinned official reference only. Dataset access remains unresolved/restricted; no download or evaluation is authorized until the GitHub README and Hugging Face visibility discrepancy is explicitly resolved.",
+    "data_use": "Do not download or use the dataset while access is unresolved. If explicit permission is granted, CC BY-NC-SA 4.0 remains non-commercial/share-alike; the Apache-2.0 source license does not confer data-use or commercial training rights.",
+    "resource_requirements": "Record published source-reported resource requirements only; no local dataset download or validation evaluation is authorized by this lock.",
     "physical_judge_cost": "Evaluation uses an OpenAI-compatible VLM endpoint. Pin endpoint/model version and account for inference cost.",
     "no_test_leakage": "Do not use withheld test ground truth; use the official portal for test evaluation.",
-    "source_and_data_pinning": "Before a run, pin exact source, dataset commit, validation manifest, SHA-256 archives, evaluator checkpoints, VLM version, Python/CUDA dependency lock and local configuration."
+    "source_and_data_pinning": "Source revision is pinned. Dataset revision/checksum inventory is reference metadata only and must not be retrieved or consumed until explicit authorized access resolves the public/private discrepancy."
   },
-  "reproduction_status": "pinned_official_reference_not_reproduced",
-  "claim_ceiling": "Published validation scores are reference targets, not our measurements. No Symthaea result, matched comparison or SOTA claim exists yet.",
+  "reproduction_status": "source_pinned_dataset_access_unresolved_do_not_download",
+  "claim_ceiling": "Published validation scores are reference targets only. Dataset access is unresolved/restricted; no download, local evaluation, Symthaea measurement, matched comparison or SOTA claim is authorized.",
   "published_validation_scores_note": "The official validation results file is indicative only; the authors warn that the validation set is substantially smaller and less diverse than the test set. It reports scores for selected platforms/tracks, not a complete table over all 67 validation episodes."
 }
