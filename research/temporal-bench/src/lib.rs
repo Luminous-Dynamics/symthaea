@@ -684,3 +684,108 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod integration_smoke_tests {
+    use super::*;
+
+    #[test]
+    fn all_ten_task_families_generate_and_verify() {
+        let delayed_config = DelayedCueConfig {
+            seed: 0xA11C_E001,
+            delay_steps: 64,
+            distractor_count: 16,
+            similarity: DistractorSimilarity::High,
+        };
+        let (delayed_task, delayed_oracle) = generate_delayed_cue(delayed_config).unwrap();
+        assert_eq!(
+            verify_delayed_cue_trace_seeded(&delayed_task, &delayed_oracle, delayed_config),
+            Ok(())
+        );
+
+        let multiscale_config = temporal::MultiTimescaleConfig {
+            seed: 0xA11C_E002,
+            steps: 256,
+            forecast_horizon: 7,
+            feedback_delay: 3,
+            regime_shift: true,
+        };
+        let (multiscale_task, multiscale_oracle) =
+            temporal::generate_multiscale_task(multiscale_config).unwrap();
+        assert_eq!(
+            temporal::verify_multiscale_trace(&multiscale_task, &multiscale_oracle),
+            Ok(())
+        );
+
+        let dms_config = dms::DmsConfig::braintrace_reference(0xA11C_E003);
+        let (dms_task, dms_oracle) = dms::generate_dms_task(dms_config).unwrap();
+        assert_eq!(dms::verify_dms_trace(&dms_task, &dms_oracle), Ok(()));
+
+        let evidence_config = evidence::EvidenceConfig::braintrace_reference(0xA11C_E004);
+        let (evidence_task, evidence_oracle) =
+            evidence::generate_evidence_task(evidence_config).unwrap();
+        assert_eq!(
+            evidence::verify_evidence_trace(&evidence_task, &evidence_oracle),
+            Ok(())
+        );
+
+        let irregular_config = irregular::IrregularConfig::reference(0xA11C_E005);
+        let (irregular_task, irregular_oracle) =
+            irregular::generate_irregular_task(irregular_config).unwrap();
+        assert_eq!(
+            irregular::verify_irregular_trace_seeded(
+                &irregular_task,
+                &irregular_oracle,
+                irregular_config
+            ),
+            Ok(())
+        );
+
+        let retention_config = retention::RetentionConfig::reference(0xA11C_E006);
+        let (retention_task, retention_oracle) =
+            retention::generate_retention_task(retention_config).unwrap();
+        assert_eq!(
+            retention::verify_retention_trace_seeded(
+                &retention_task,
+                &retention_oracle,
+                retention_config
+            ),
+            Ok(())
+        );
+
+        let fast_config = fast_event::FastEventConfig::reference(0xA11C_E007);
+        let (fast_task, fast_oracle) =
+            fast_event::generate_fast_event_task(fast_config).unwrap();
+        assert_eq!(
+            fast_event::verify_fast_event_trace_seeded(
+                &fast_task,
+                &fast_oracle,
+                fast_config
+            ),
+            Ok(())
+        );
+
+        let phase_config = phase::PhaseConfig::reference(
+            0xA11C_E008,
+            phase::PhaseMode::Mixed
+        );
+        let (phase_task, phase_oracle) =
+            phase::generate_phase_task(phase_config).unwrap();
+        assert_eq!(
+            phase::verify_phase_trace_seeded(&phase_task, &phase_oracle, phase_config),
+            Ok(())
+        );
+
+        let knowledge_config = knowledge_stream::KnowledgeStreamConfig::reference(0xA11C_E009);
+        let (knowledge_task, knowledge_oracle) =
+            knowledge_stream::generate_knowledge_stream(knowledge_config).unwrap();
+        assert_eq!(
+            knowledge_stream::verify_knowledge_stream_seeded(
+                &knowledge_task,
+                &knowledge_oracle,
+                knowledge_config
+            ),
+            Ok(())
+        );
+    }
+}
