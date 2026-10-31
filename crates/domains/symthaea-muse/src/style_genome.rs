@@ -1539,8 +1539,9 @@ fn objective_dominates(left: &GenomeObjectives, right: &GenomeObjectives) -> boo
                 strictly_better |= a > b;
             }
             (None, None) => {}
-            // Candidates evaluated against different/missing reference
-            // populations are incomparable on novelty, not silently equated.
+            // Incomparable applicability (including missing reference
+            // populations and family-specific metrics) is not silently
+            // equated or scored as zero.
             _ => return false,
         }
     }
