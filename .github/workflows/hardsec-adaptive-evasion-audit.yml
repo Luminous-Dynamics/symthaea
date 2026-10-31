@@ -24,7 +24,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout exact pull request revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
@@ -40,6 +42,7 @@ jobs:
           out_dir="$(mktemp -d)"
           cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-adaptive-evasion-audit --example hardsec_adaptive_evasion_audit -- \
             --predictions tests/fixtures/hardsec/adaptive-evasion-v1/predictions.json \
+            --baseline-predictions tests/fixtures/hardsec/adaptive-evasion-v1/baseline-predictions.json \
             --manifest tests/fixtures/hardsec/adaptive-evasion-v1/case-manifest.json \
             --truth tests/fixtures/hardsec/adaptive-evasion-v1/evaluator-truth.json \
             --receipt "$out_dir/receipt.json"
@@ -82,4 +85,17 @@ jobs:
           assert bounds["benign_program"]["independent_group_count"] == 4
           assert math.isclose(bounds["benign_program"]["upper_confidence_bound"], 0.8677566049821364, rel_tol=0.0, abs_tol=1e-12)
           assert bounds["benign_program"]["bonferroni_endpoint_count"] == 6
+          paired = receipt["paired_baseline_comparison"]
+          assert paired["result"] == "paired"
+          assert paired["baseline_model_id"] == "fixture-baseline-detector"
+          paired_groups = paired["group_metrics"]
+          program = paired_groups["program_group_level"]
+          assert program["independent_group_count"] == 3
+          assert math.isclose(program["improvement_point_estimate"], 1.0 / 3.0, rel_tol=0.0, abs_tol=1e-12)
+          assert program["status"] == "unavailable_insufficient_independent_groups"
+          benign = paired_groups["benign_false_alert_by_program"]
+          assert benign["independent_group_count"] == 4
+          assert math.isclose(benign["candidate_macro_estimate"], 0.25, rel_tol=0.0, abs_tol=1e-12)
+          assert math.isclose(benign["baseline_macro_estimate"], 0.5, rel_tol=0.0, abs_tol=1e-12)
+          assert math.isclose(benign["improvement_point_estimate"], 0.25, rel_tol=0.0, abs_tol=1e-12)
           PY
