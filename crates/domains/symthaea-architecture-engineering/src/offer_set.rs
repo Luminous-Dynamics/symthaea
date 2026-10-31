@@ -221,6 +221,26 @@ impl OfferSetManifest {
 
     /// Verify provenance, exact decision-boundary coverage, and every action's eligibility.
     pub fn validate_for_tape(&self, tape: &EventTape) -> Result<(), OfferSetError> {
+        tape.validate_integrity()
+            .map_err(|error| OfferSetError::new("event_tape.integrity", error.to_string()))?;
+        if tape.events().is_empty() {
+            return Err(OfferSetError::new(
+                "event_tape.events",
+                "offer-set manifests cannot qualify an empty campaign",
+            ));
+        }
+        if self.snapshots.is_empty() {
+            return Err(OfferSetError::new(
+                "snapshots",
+                "at least one decision-boundary snapshot is required",
+            ));
+        }
+        if tape.header().comparison_mode != super::event_tape::ComparisonMode::MechanismMatched {
+            return Err(OfferSetError::new(
+                "event_tape.header.comparison_mode",
+                "offer-set verification requires a mechanism-matched tape",
+            ));
+        }
         if self.schema != SCHEMA || self.version != VERSION {
             return Err(OfferSetError::new(
                 "schema",
@@ -354,6 +374,12 @@ pub fn verify_matched_offer_sets(
 
     for (tape_index, tape) in tapes.iter().enumerate() {
         let header = tape.header();
+        if header.comparison_mode != super::event_tape::ComparisonMode::MechanismMatched {
+            return Err(OfferSetError::new(
+                format!("tapes[{tape_index}].comparison_mode"),
+                "best-practical-system tapes cannot be reconciled as a mechanism-matched offer-set",
+            ));
+        }
         let policy_id = header.policy.policy_id.clone();
         let manifest = manifests_by_policy.get(policy_id.as_str()).ok_or_else(|| {
             OfferSetError::new(
