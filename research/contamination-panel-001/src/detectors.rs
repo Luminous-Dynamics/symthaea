@@ -5,8 +5,9 @@
 //! planted controls; uncertainty and generalization require separate analysis.
 
 use crate::{
-    ExposureMechanismV1, PUBLIC_PACKET_SCHEMA, PublicChallengePacketV1, SealedChallengeKeyV1,
-    SEALED_KEY_SCHEMA, TierV1, hash_domain, validate_pair_packet,
+    ChallengeManifestV1, ExposureMechanismV1, GENERATOR_VERSION, MANIFEST_SCHEMA,
+    PUBLIC_PACKET_SCHEMA, PublicChallengePacketV1, SealedChallengeKeyV1, SEALED_KEY_SCHEMA,
+    TierV1, hash_domain, validate_pair_packet,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -84,6 +85,7 @@ pub struct DetectorEvaluationReportV1 {
     pub generation_id: String,
     pub public_packet_sha256: String,
     pub sealed_key_sha256: String,
+    pub manifest_sha256: String,
     pub detector_id: String,
     pub detector_version: String,
     pub detector_kind: DetectorKindV1,
@@ -254,25 +256,64 @@ fn balanced_accuracy_permille(
 pub fn evaluate_detector_run(
     packet: &PublicChallengePacketV1,
     sealed_key: &SealedChallengeKeyV1,
+    manifest: &ChallengeManifestV1,
     run: &DetectorRunV1,
 ) -> Result<DetectorEvaluationReportV1, String> {
     validate_pair_packet(packet)?;
     if sealed_key.schema != SEALED_KEY_SCHEMA {
         return Err(format!("sealed key schema must be {SEALED_KEY_SCHEMA}"));
     }
+    if manifest.schema != MANIFEST_SCHEMA
+        || manifest.generator_version != GENERATOR_VERSION
+    {
+        return Err("challenge manifest schema or generator version is unsupported".to_owned());
+    }
+    if manifest.pairs_per_tier == 0 || manifest.pairs_per_tier > crate::MAX_PAIRS_PER_TIER {
+        return Err("manifest pairs_per_tier is outside the supported range".to_owned());
+    }
+    let expected_pair_count = u64::from(manifest.pairs_per_tier)
+        .checked_mul(8)
+        .ok_or_else(|| "manifest pair count overflows u64".to_owned())?;
+    if manifest.pair_count != expected_pair_count
+        || u64::try_from(packet.pairs.len()).ok() != Some(expected_pair_count)
+    {
+        return Err("manifest pair count does not match the declared generator design".to_owned());
+    }
+    if !crate::valid_digest(&manifest.generator_config_sha256)
+        || !crate::valid_digest(&manifest.public_packet_sha256)
+        || !crate::valid_digest(&manifest.sealed_key_sha256)
+        || !crate::valid_digest(&manifest.seed_commitment_sha256)
+    {
+        return Err("manifest contains an invalid digest".to_owned());
+    }
+    if manifest.generation_id != packet.generation_id {
+        return Err("manifest generation ID does not match the public packet".to_owned());
+    }
     if sealed_key.generation_id != packet.generation_id
         || run.generation_id != packet.generation_id
     {
         return Err("packet, sealed key and detector run generation IDs must match".to_owned());
     }
+    if sealed_key.seed_commitment_sha256 != manifest.seed_commitment_sha256 {
+        return Err("sealed key seed commitment does not match the manifest".to_owned());
+    }
     if run.schema != DETECTOR_RUN_SCHEMA {
         return Err(format!("detector run schema must be {DETECTOR_RUN_SCHEMA}"));
     }
-    if run.public_packet_sha256 != packet_digest(packet)? {
-        return Err("detector run does not bind the exact public packet".to_owned());
+    let expected_public_packet_sha256 = packet_digest(packet)?;
+    if run.public_packet_sha256 != expected_public_packet_sha256
+        || manifest.public_packet_sha256 != expected_public_packet_sha256
+    {
+        return Err("detector run or manifest does not bind the exact public packet".to_owned());
     }
     if sealed_key.public_packet_sha256 != run.public_packet_sha256 {
         return Err("sealed key does not bind the detector run public packet".to_owned());
+    }
+    let sealed_key_bytes = serde_json::to_vec_pretty(sealed_key)
+        .map_err(|error| format!("cannot serialize sealed key: {error}"))?;
+    let expected_sealed_key_sha256 = hash_domain(b"sealed-key.v1", &sealed_key_bytes);
+    if manifest.sealed_key_sha256 != expected_sealed_key_sha256 {
+        return Err("sealed key bytes do not match the manifest commitment".to_owned());
     }
     if run.detector_id.trim().is_empty()
         || run.detector_version.trim().is_empty()
@@ -493,13 +534,14 @@ pub fn evaluate_detector_run(
         });
     }
 
-    let sealed_key_bytes = serde_json::to_vec_pretty(sealed_key)
-        .map_err(|error| format!("cannot serialize sealed key: {error}"))?;
+    let manifest_bytes = serde_json::to_vec_pretty(manifest)
+        .map_err(|error| format!("cannot serialize challenge manifest: {error}"))?;
     Ok(DetectorEvaluationReportV1 {
         schema: DETECTOR_REPORT_SCHEMA.to_owned(),
         generation_id: packet.generation_id.clone(),
         public_packet_sha256: run.public_packet_sha256.clone(),
-        sealed_key_sha256: hash_domain(b"sealed-key.v1", &sealed_key_bytes),
+        sealed_key_sha256: expected_sealed_key_sha256,
+        manifest_sha256: hash_domain(b"manifest.v1", &manifest_bytes),
         detector_id: run.detector_id.clone(),
         detector_version: run.detector_version.clone(),
         detector_kind: run.kind,
@@ -529,7 +571,7 @@ mod tests {
     };
     use serde_json::json;
 
-    fn fixture() -> (PublicChallengePacketV1, SealedChallengeKeyV1) {
+    fn fixture() -> (PublicChallengePacketV1, SealedChallengeKeyV1, ChallengeManifestV1) {
         let bundle = generate_challenge_bundle(
             &GeneratorConfigV1 {
                 generation_id: "detector-fixture".to_owned(),
@@ -542,7 +584,9 @@ mod tests {
             serde_json::from_slice(&bundle.public_packet_bytes).unwrap();
         let key: SealedChallengeKeyV1 =
             serde_json::from_slice(&bundle.sealed_key_bytes).unwrap();
-        (packet, key)
+        let manifest: ChallengeManifestV1 =
+            serde_json::from_slice(&bundle.manifest_bytes).unwrap();
+        (packet, key, manifest)
     }
 
     fn spec(kind: DetectorKindV1, threshold: u16, ngram: u8) -> DetectorSpecV1 {
@@ -558,13 +602,13 @@ mod tests {
 
     #[test]
     fn exact_text_baseline_separates_exact_positive_and_negative_controls() {
-        let (packet, key) = fixture();
+        let (packet, key, manifest) = fixture();
         let detector_run = score_public_packet(
             &packet,
             &spec(DetectorKindV1::ExactTextEquality, 1_000, 0),
         )
         .unwrap();
-        let report = evaluate_detector_run(&packet, &key, &detector_run).unwrap();
+        let report = evaluate_detector_run(&packet, &key, &manifest, &detector_run).unwrap();
         let t1 = report
             .metrics_by_tier
             .iter()
@@ -600,7 +644,7 @@ mod tests {
 
     #[test]
     fn ngram_similarity_is_deterministic_and_bounded() {
-        let (packet, _) = fixture();
+        let (packet, _, _) = fixture();
         let detector_spec = spec(DetectorKindV1::TokenNgramJaccard, 500, 3);
         let first = score_public_packet(&packet, &detector_spec).unwrap();
         let second = score_public_packet(&packet, &detector_spec).unwrap();
@@ -620,7 +664,7 @@ mod tests {
         )
         .unwrap();
         run.scores.pop();
-        assert!(evaluate_detector_run(&packet, &key, &run)
+        assert!(evaluate_detector_run(&packet, &key, &manifest, &run)
             .unwrap_err()
             .contains("score every pair exactly once"));
     }
@@ -660,13 +704,13 @@ mod tests {
 
         let mut wrong_key = key.clone();
         wrong_key.public_packet_sha256 = "0".repeat(64);
-        assert!(evaluate_detector_run(&packet, &wrong_key, &run)
+        assert!(evaluate_detector_run(&packet, &wrong_key, &manifest, &run)
             .unwrap_err()
             .contains("does not bind"));
 
         let mut wrong_run = run;
         wrong_run.public_packet_sha256 = "1".repeat(64);
-        assert!(evaluate_detector_run(&packet, &key, &wrong_run)
+        assert!(evaluate_detector_run(&packet, &key, &manifest, &wrong_run)
             .unwrap_err()
             .contains("does not bind the exact public packet"));
     }
