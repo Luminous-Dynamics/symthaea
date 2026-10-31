@@ -10,6 +10,7 @@ This lab is intentionally outside the root Cargo workspace and has zero third-pa
 cargo test --manifest-path research/pod-meta-lab/Cargo.toml
 cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin pod-meta-demo
 cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-v1
+cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-artifact-eval -- /tmp/poar-export/planner.poar /tmp/poar-export/oracle.poar.sealed /tmp/poar-export/predictions.poar <evaluator-revision> /tmp/poar-export/evaluation-receipt.tsv
 mkdir -p /tmp/poar-export
 cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-graph-export -- 1729 test /tmp/poar-export/planner.poar /tmp/poar-export/oracle.poar.sealed "$(git rev-parse HEAD)"
 sha256sum /tmp/poar-export/planner.poar /tmp/poar-export/oracle.poar.sealed
@@ -36,8 +37,10 @@ The oracle artifact contains hidden labels and gold proof paths; do not give it 
 - Controlled mutations for retraction, asserted-polarity flip, known/valid-time shifts, scope/authority changes, integrity downgrade, and independence-group merging; hidden source-truth labels remain unchanged. Retraction controls assert that dependent claims invalidate while unrelated independently supported claims remain stable.
 - A POAR Contamination Transparency Card discloses public-template exposure, unknown third-party model training provenance, T1-T4 audit gaps, and release restrictions.
 - Validated `GraphGenerationConfig` supports controlled chain-depth sweeps (1–256); default split profiles remain 8/32/64.
-- `poar-graph-export` writes canonical planner-only and oracle TSV artifacts; the oracle header binds the planner's raw SHA-256 digest. The focused workflow smoke-tests this separation in runner temp storage and deletes the oracle instead of uploading it.
-- 47 authored unit tests: 24 scheduler/receipt tests, one POAR routing-suite test, and 22 graph/oracle tests.
+- `poar-graph-export` writes canonical planner-only and oracle TSV artifacts; the oracle header binds the planner's raw SHA-256 digest.
+- `encode_prediction_artifact_v1` and `poar-artifact-eval` support frozen prediction records, strict canonical parsing, exact-byte SHA-256 binding, target/disposition completeness, contiguous retrieval ranks, duplicate/dangling reference rejection, and oracle self-consistency checks. The evaluator runs after inference and emits a machine-readable per-run receipt with individual metrics.
+- The focused workflow smoke-tests export, prediction encoding, evaluator parsing/scoring, and receipt identity in runner temporary storage; it deletes the oracle rather than uploading it.
+- 53 authored unit tests: 24 scheduler/receipt tests, one POAR routing-suite test, 22 graph/oracle tests, and 6 frozen-artifact evaluator tests.
 - Graph benchmarks report disposition correctness, false support/refutation, unsupported proof paths, citation completeness, temporal/scope/authority/integrity violations, retracted citations, correlated-source violations, plus ranked temporal evidence coverage@3 and precision@3; retrieval ranking is separate from final proof citations, and there is no composite score.
 
 ## Research contracts
@@ -47,7 +50,7 @@ The oracle artifact contains hidden labels and gold proof paths; do not give it 
 
 ## Deliberate limits
 
-This is a scheduler-mechanics prototype, not a production proof engine. The verifier receipt is supplied by the test fixture; the crate does not verify signatures, source authenticity, legal correctness, or whether a verifier is truly independent. The state SupportedUnderProfile is only a synthetic transition after an accepted, exactly-bound fixture receipt. Evidence admissibility is given by the fixture; it is not source authentication. The verifier/proposer distinction is only checked by declared IDs and does not establish true organizational or implementation independence.
+This is a scheduler-mechanics prototype, not a production proof engine. The verifier receipt is supplied by the test fixture; the crate does not verify signatures, source authenticity, legal correctness, or whether a verifier is truly independent. The artifact evaluator validates the canonical format and digest links but is not a hardware-backed sandbox, signed evaluator, protected oracle store, or organizationally independent verifier. The state SupportedUnderProfile is only a synthetic transition after an accepted, exactly-bound fixture receipt. Evidence admissibility is given by the fixture; it is not source authentication. The verifier/proposer distinction is only checked by declared IDs and does not establish true organizational or implementation independence.
 
 The lab does not yet compute obligations from Symthaea's production ProofGraph because the #5469 inventory and #5470 typed-contract ownership sequence remains open. It also does not estimate learned value-of-computation. The first version uses a deterministic baseline so scheduler mechanics can be checked before adding a predictor.
 
