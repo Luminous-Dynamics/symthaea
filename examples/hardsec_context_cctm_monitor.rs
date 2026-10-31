@@ -369,13 +369,7 @@ fn parse_context_assignment_receipt(
         ("assignment_artifact_sha256", plan.context_assignment_artifact_sha256.as_str()),
         ("anomaly_score_artifact_sha256", plan.scoring_artifact_sha256.as_str()),
     ] {
-        if field == "anomaly_score_artifact_sha256" {
-            // Older/compatible receipts may omit this optional cross-link;
-            // if present it must match the anomaly scorer pinned in the plan.
-            if value.get(field).and_then(Value::as_str).is_some_and(|actual| actual != expected) {
-                return Err("context assignment receipt anomaly_score_artifact_sha256 mismatch".to_owned());
-            }
-        } else if string_field(value, field, "context_receipt")? != expected {
+        if string_field(value, field, "context_receipt")? != expected {
             return Err(format!("context assignment receipt {field} does not match CCTM plan/stream"));
         }
     }
