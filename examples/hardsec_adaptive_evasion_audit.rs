@@ -67,6 +67,7 @@ struct RecallCounts {
 #[derive(Debug, Clone)]
 struct Args {
     predictions: PathBuf,
+    baseline_predictions: Option<PathBuf>,
     manifest: PathBuf,
     truth: PathBuf,
     receipt: PathBuf,
@@ -1186,7 +1187,7 @@ fn parse_args() -> Result<Args, String> {
     let mut values = BTreeMap::new();
     let mut args = env::args().skip(1);
     while let Some(flag) = args.next() {
-        if !matches!(flag.as_str(), "--predictions" | "--manifest" | "--truth" | "--receipt") {
+        if !matches!(flag.as_str(), "--predictions" | "--baseline-predictions" | "--manifest" | "--truth" | "--receipt") {
             return Err(format!("unknown argument {flag}"));
         }
         let path = args.next().ok_or_else(|| format!("{flag} requires a path"))?;
@@ -1197,6 +1198,7 @@ fn parse_args() -> Result<Args, String> {
     let take = |key: &str| values.get(key).cloned().ok_or_else(|| format!("missing required argument {key}"));
     Ok(Args {
         predictions: take("--predictions")?,
+        baseline_predictions: values.get("--baseline-predictions").cloned(),
         manifest: take("--manifest")?,
         truth: take("--truth")?,
         receipt: take("--receipt")?,
@@ -1228,11 +1230,38 @@ fn run() -> Result<(), String> {
     let (predictions_bytes, predictions) = read_input(&args.predictions, "predictions")?;
     let (manifest_bytes, manifest) = read_input(&args.manifest, "manifest")?;
     let (truth_bytes, truth) = read_input(&args.truth, "truth")?;
-    validate_receipt_location(&args.receipt, &[&args.predictions, &args.manifest, &args.truth])?;
-    let receipt = audit_values(
+    let mut input_paths = vec![args.predictions.as_path(), args.manifest.as_path(), args.truth.as_path()];
+    if let Some(baseline_path) = args.baseline_predictions.as_ref() {
+        input_paths.push(baseline_path.as_path());
+    }
+    validate_receipt_location(&args.receipt, &input_paths)?;
+    let mut receipt = audit_values(
         &predictions, &manifest, &truth,
         &predictions_bytes, &manifest_bytes, &truth_bytes,
     )?;
+    if let Some(baseline_path) = args.baseline_predictions.as_ref() {
+        let (baseline_bytes, baseline_predictions) = read_input(baseline_path, "baseline predictions")?;
+        let baseline_campaign_id = prediction_campaign_id(&baseline_predictions)?;
+        let candidate_campaign_id = prediction_campaign_id(&predictions)?;
+        if baseline_campaign_id != candidate_campaign_id {
+            return Err("candidate and baseline prediction campaign IDs must match".to_owned());
+        }
+        let baseline_receipt = audit_values(
+            &baseline_predictions,
+            &manifest,
+            &truth,
+            &baseline_bytes,
+            &manifest_bytes,
+            &truth_bytes,
+        )?;
+        let comparison = paired_model_comparison(
+            &receipt,
+            &baseline_receipt,
+            candidate_campaign_id,
+            &sha256(&baseline_bytes),
+        )?;
+        receipt["paired_baseline_comparison"] = comparison;
+    }
     let encoded = serde_json::to_vec_pretty(&receipt).map_err(|e| format!("cannot encode receipt: {e}"))?;
     let mut file = OpenOptions::new().write(true).create_new(true).open(&args.receipt)
         .map_err(|e| format!("cannot create receipt without overwrite: {e}"))?;
