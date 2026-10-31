@@ -56,6 +56,8 @@ jobs:
           assert receipt["measurement_semantics"]["multiplex_scaled_values_are_estimates"] is True
           assert receipt["measurement_semantics"]["multiplex_scaled_values_confirmatory"] is False
           assert receipt["observer_effect"]["overall_status"] == "within_declared_thresholds"
+          assert all(e["sampling"]["status"] == "within_declared_loss_threshold" for e in receipt["event_qualification"])
+          assert all(c["status"] == "within_declared_throughput_and_read_overhead_thresholds" for c in receipt["observer_effect"]["condition_reports"])
           assert len(receipt["event_qualification"]) == 4
           assert receipt["event_qualification"][0]["co_scheduled"]["status"] == "confirmatory_eligible_under_declared_thresholds"
           assert receipt["event_qualification"][3]["co_scheduled"]["status"] == "not_in_co_scheduled_group_not_tested"
