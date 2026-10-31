@@ -58,7 +58,7 @@ If an objective's mean passes while its worst target fails, the fleet result is 
 
 ## 6. Tests
 
-Eleven Rust unit tests are authored for:
+Twelve Rust unit tests are authored for:
 - worst-target aggregation overriding a passing fleet mean;
 - hard-floor violation on one target;
 - incomplete required-target coverage;
