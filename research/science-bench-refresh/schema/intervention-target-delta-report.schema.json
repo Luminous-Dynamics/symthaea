@@ -311,6 +311,7 @@
       "required": [
         "transformation_family",
         "candidate_count",
+        "unique_semantic_cluster_count",
         "valid_count",
         "invalid_count",
         "ambiguous_count",
@@ -348,6 +349,10 @@
           "minimum": 0
         },
         "accepted_ambiguous_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unique_semantic_cluster_count": {
           "type": "integer",
           "minimum": 0
         }
