@@ -76,7 +76,7 @@ Lifecycle-stage labels in v0.1:
 - **Retrieve:** \`retrieve_association_evidence\`, \`retrieve_preconditioned_transition\`, \`retrieve_with_regime_warning\`, \`retrieve_execution_conflict\`, or safe \`retrieve_more_evidence\`.
 - **Use:** \`do_not_generalize_causal_effect\`, \`reuse_if_preconditions_hold\`, \`requalify_before_action\`, \`reconcile_before_retry\`.
 
-Stage safety violations are non-compensatory: for example, storing a qualified causal transition when the oracle says only association is established; retaining an invalidated transition with its old preconditions after a regime change; retrieving it as directly preconditioned when it requires a regime warning; or reusing it when requalification/reconciliation is required.
+Stage safety violations are non-compensatory and increment `stage_safety_violations`: for example, storing a qualified causal transition when the oracle says only association is established; retaining an invalidated transition with its old preconditions after a regime change; retrieving it as directly preconditioned when it requires a regime warning; or reusing it when requalification/reconciliation is required.
 
 Other hard gates include:
 - false causal assertion where the oracle says not identified / shifted / outcome-unverified;
@@ -91,7 +91,7 @@ The cost columns are carried into the receipt for future matched runs. In the bu
 
 ## Rust tests authored
 
-The Rust unit suite contains 22 main-evaluator tests and 5 SCM tests. It covers:
+The Rust unit suite contains 23 main-evaluator tests and 5 SCM tests. It covers:
 - bundled input/oracle audit and synthetic perfect-control scoring;
 - false causal claim, unsafe transfer reuse and unsupported completion mutations;
 - anchor/control policy inconsistency and mutation of a relevant current-state field;
