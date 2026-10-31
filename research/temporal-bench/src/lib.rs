@@ -8,6 +8,8 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
+pub mod temporal;
+
 const MAX_DISTRACTORS: usize = 10_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
