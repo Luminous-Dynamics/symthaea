@@ -1,6 +1,6 @@
 {
   "schema_version": "cmaq-012-profiling-receipt-v0.1",
-  "resource_profile_sha256": "7fface57b733540bbe96458325b739a529d2669cbb31209c93690abba1b45f9d",
+  "resource_profile_sha256": "387121ab0b8792f166c5acf3efce961f90c9edea48d2c2387cd0ccd0fd318d47",
   "task": "halfcheetah",
   "capability": "control",
   "split": "qualification",
