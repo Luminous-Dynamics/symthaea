@@ -707,6 +707,109 @@ mod tests {
     }
 
     #[test]
+    fn exhaustive_enumeration_is_materialized_admitted_and_bound_to_complete_proof() {
+        let mut index = EvidenceIndex::new();
+        let make_record = |hdc_id: u64, evidence_id: &str, session: &str, step: &str, text: &str| {
+            let source_bytes = serde_json::to_vec(&serde_json::json!({
+                "messages": [{"content": text}]
+            })).unwrap();
+            let record = EvidenceRecord {
+                schema_version: crate::memory_evidence::EVIDENCE_SCHEMA_VERSION.to_string(),
+                evidence_id: evidence_id.into(),
+                hdc_id,
+                scope_id: "scope-1".into(),
+                source: EvidenceSource {
+                    trajectory_id: session.into(),
+                    step_id: Some(step.into()),
+                    step_index: step.rsplit('-').next().and_then(|value| value.parse().ok()),
+                    source_sha256: digest_bytes(&source_bytes),
+                    source_pointer: "/messages/0/content".into(),
+                },
+                payload: EvidencePayload::Text { value: text.into() },
+                content_sha256: digest(text),
+                lifecycle: EvidenceLifecycle::Active,
+                occurred_at_unix_ms: Some(100),
+                valid_from_unix_ms: Some(50),
+                valid_until_unix_ms: Some(500),
+                superseded_by: None,
+            };
+            (record, source_bytes)
+        };
+        for (hdc, id, session, step, text) in [
+            (1, "A", "session-1", "user-0", "invoice paid in March"),
+            (2, "B", "session-2", "assistant-1", "invoice paid follow-up"),
+            (3, "C", "session-3", "user-2", "credit issued in May"),
+        ] {
+            let (record, bytes) = make_record(hdc, id, session, step, text);
+            index.insert(record, &bytes).unwrap();
+        }
+
+        let enumeration = index.enumerate_exact_lexical_all_terms_at_snapshot(
+            "invoice paid", "scope-1", 250, 200, None,
+        ).unwrap();
+        assert_eq!(enumeration.receipt.matching_record_count, 2);
+        let hits = index.materialize_exact_lexical_enumeration_hits(
+            &enumeration,
+            Path::new("."),
+        ).unwrap();
+        assert_eq!(hits.len(), 2);
+
+        let snapshot = hits[0].snapshot_receipt.clone().unwrap();
+        let mut admissions = Vec::new();
+        for hit in &hits {
+            let mut trusted = admission(&hit.evidence_id);
+            trusted.source_revision_id = format!("revision-{}", hit.evidence_id);
+            trusted.source_trajectory_id = hit.source.trajectory_id.clone();
+            trusted.source_step_id = hit.source.step_id.clone();
+            trusted.source_step_index = hit.source.step_index;
+            trusted.source_sha256 = hit.source.source_sha256.clone();
+            trusted.source_pointer = hit.source.source_pointer.clone();
+            trusted.source_family_id = format!("family-{}", hit.evidence_id);
+            trusted.index_state_sha256 = snapshot.index_state_sha256.clone();
+            admissions.push(trusted);
+        }
+
+        let mut proof_request = request();
+        proof_request.obligations[0].minimum_independent_families = 2;
+        proof_request.obligations[0].minimum_distinct_sessions = 2;
+        proof_request.obligations[0].minimum_user_authored_evidence = 1;
+
+        let admitted = admit_complete_enumeration_for_proof_budget(
+            proof_request,
+            &index,
+            &enumeration,
+            &admissions,
+            Path::new("."),
+            "claim-1",
+            "all-invoice-events",
+        ).unwrap();
+        assert_eq!(admitted.candidates.len(), 2);
+        assert_eq!(
+            admitted.obligations[0].required_complete_evidence_ids,
+            BTreeSet::from(["A".into(), "B".into()])
+        );
+        assert_eq!(admitted.obligations[0].enumeration_receipt_sha256.as_deref(),
+            Some(enumeration.receipt.receipt_sha256.as_str()));
+        let result = solve_proof_budget(admitted.clone()).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        assert_eq!(result.evidence.len(), 2);
+        crate::memory_proof_budget::verify_proof_budget_result(&admitted, &result).unwrap();
+
+        // A missing admission envelope for just one enumerated result is a hard
+        // failure; the adapter never silently falls back to a smaller top-k.
+        let error = admit_complete_enumeration_for_proof_budget(
+            request(),
+            &index,
+            &enumeration,
+            &admissions[..1],
+            Path::new("."),
+            "claim-1",
+            "all-invoice-events",
+        ).unwrap_err();
+        assert!(error.contains("missing admission envelope"));
+    }
+
+    #[test]
     fn refuses_snapshot_known_at_mismatch() {
         let error = admit_lexical_hits_for_proof_budget(
             request(),
