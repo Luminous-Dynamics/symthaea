@@ -1,6 +1,6 @@
 # CMAQ-012: Paired Advantage-of-Prediction Result Auditor
 
-**Status:** executable Rust auditor v0.1; draft  
+**Status:** executable Rust auditor v0.2; draft  
 **Tracking issue:** [#9122](https://github.com/Luminous-Dynamics/symthaea/issues/9122)  
 **Claim ceiling:** result-ledger validation and paired estimand calculation only; no real environment result, competitive claim or SOTA claim
 
@@ -35,7 +35,8 @@ The dependency-free Rust CLI consumes strict UTF-8 TSV. It rejects:
 - malformed SHA-256 digests, identifiers, numbers or statuses;
 - duplicate rows, missing arms or unpaired seeds;
 - mismatched initial-state, proposer, candidate-set, environment-config or adapter digests;
-- unequal candidate counts, rollout horizons or declared planner-compute budgets.
+- unequal candidate counts, rollout horizons, declared planner-compute budgets or resource-profile identities;
+- reused per-run profiling receipt digests or measurement methods that do not match within an episode.
 
 The exact header is:
 
@@ -76,3 +77,16 @@ The checked-in fixture contains four paired episodes and is intentionally labell
 5. Independently reproduce the baseline and candidate, preserving raw episode ledgers and all failed runs.
 
 A parser pass is not a benchmark pass. A smoke fixture is not an environment result. An AoP claim requires matched real-environment runs and independent artifact verification.
+
+
+## v0.2 measured resource-vector qualification
+
+The v0.1 opaque `planner_compute_budget_units` remains as a declared cap, but equality of that number alone is no longer sufficient to report a compute match. Each row now also carries a resource-profile digest, unique profiling-receipt digest, measurement method, normalized `compute_work_units`, peak memory, optional energy, direct-value/world-model/oracle/environment call counts, and optimizer iterations.
+
+The auditor accepts `operator_trace` and `hardware_counter` as measurement methods for matching. `static_estimate` and `unavailable` remain visible but yield `resource_unmeasured`. Matching requires D1/W1 and W1/W2 agreement for compute-work p50/p95 (5%), latency p50/p95 (5%) and peak-memory p95 (10%). If energy is measured for all three arms, its mean must also agree within 10%.
+
+**Role checks:** D1 must have direct-value calls and zero learned-model calls; W1/W2 must have learned-model forward and transition calls; W3 must have oracle transition calls and zero learned-model calls; W2 must preserve W1's direct/model calls and optimizer iterations.
+
+Report group eligibility now distinguishes `budget_unmatched`, `resource_unmeasured` and `budget_match_unverified`. The latter is intentional: the current CLI verifies receipt digest syntax and uniqueness but does not yet ingest the receipt bytes. Therefore a resource vector that passes its declared tolerances is not yet authenticated hardware evidence and is not a qualification candidate. See [COMPUTE_MATCHING.md](COMPUTE_MATCHING.md), [resource-profile.schema.json](resource-profile.schema.json) and [profiling-receipt.schema.json](profiling-receipt.schema.json).
+
+No static FLOP estimate, latency-derived energy estimate or dummy work is accepted as proof of compute parity. The normalized work-unit definition, hardware/runtime, profiler and measurement scope must be bound by the content-addressed resource profile. Failed and timed-out runs remain in the resource denominator.
