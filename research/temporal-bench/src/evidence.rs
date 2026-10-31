@@ -331,11 +331,21 @@ impl fmt::Display for EvidenceVerificationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::StreamIdMismatch => write!(f, "evidence task and oracle stream IDs differ"),
-            Self::ContentDigestMismatch => write!(f, "evidence public task SHA-256 digest does not match its contents"),
-            Self::OracleDigestMismatch => write!(f, "evidence oracle SHA-256 digest does not match its contents"),
-            Self::ReproducibilityMismatch => write!(f, "evidence public stream/oracle does not match the seeded generator"),
-            Self::InvalidTaskWindow => write!(f, "evidence task timing or input dimensions are invalid"),
-            Self::InvalidOracle => write!(f, "evidence oracle assignments or majority label are invalid"),
+            Self::ContentDigestMismatch => {
+                write!(f, "evidence public task SHA-256 digest does not match its contents")
+            }
+            Self::OracleDigestMismatch => {
+                write!(f, "evidence oracle SHA-256 digest does not match its contents")
+            }
+            Self::ReproducibilityMismatch => {
+                write!(f, "evidence public stream/oracle does not match the seeded generator")
+            }
+            Self::InvalidTaskWindow => {
+                write!(f, "evidence task timing or input dimensions are invalid")
+            }
+            Self::InvalidOracle => {
+                write!(f, "evidence oracle assignments or majority label are invalid")
+            }
             Self::InvalidObservation { expected_step } => {
                 write!(f, "evidence observation is missing or reordered at step {expected_step}")
             }
@@ -346,10 +356,16 @@ impl fmt::Display for EvidenceVerificationError {
                 write!(f, "evidence active channels are duplicated or unordered at step {step}")
             }
             Self::CueChannelOutsideAssignedWindow { step, channel } => {
-                write!(f, "cue channel {channel} is active outside its assigned cue window at step {step}")
+                write!(
+                    f,
+                    "cue channel {channel} is active outside its assigned cue window at step {step}"
+                )
             }
             Self::RecallChannelOutsideRecallWindow { step, channel } => {
-                write!(f, "recall channel {channel} is active outside the recall window at step {step}")
+                write!(
+                    f,
+                    "recall channel {channel} is active outside the recall window at step {step}"
+                )
             }
         }
     }
@@ -467,7 +483,8 @@ pub fn verify_evidence_trace(
         noise_rate_hz: f64::from_bits(task.noise_rate_hz_bits),
     };
     let (expected_task, expected_oracle) =
-        generate_evidence_task(config).map_err(|_| EvidenceVerificationError::ReproducibilityMismatch)?;
+    let (expected_task, expected_oracle) = generate_evidence_task(config)
+        .map_err(|_| EvidenceVerificationError::ReproducibilityMismatch)?;
     if expected_task != *task || expected_oracle != *oracle {
         return Err(EvidenceVerificationError::ReproducibilityMismatch);
     }
