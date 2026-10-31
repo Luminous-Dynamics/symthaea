@@ -274,13 +274,8 @@ pub fn analyze_paired_metric(
                     "paired metric difference overflowed or is non-finite",
                 ));
             }
-            sum_delta += advantage;
-            if !sum_delta.is_finite() {
-                return Err(PairedInferenceError::new(
-                    format!("landscapes[{landscape_id}].delta"),
-                    "landscape paired-delta accumulation overflowed",
-                ));
-            }
+            let count = (seed_index + 1) as f64;
+            landscape_mean = landscape_mean * ((count - 1.0) / count) + advantage / count;
             paired_seed_count += 1;
             match compare_with_tolerance(advantage) {
                 std::cmp::Ordering::Greater => paired_seed_win_count += 1,
@@ -292,7 +287,7 @@ pub fn analyze_paired_metric(
         landscape_deltas.push(LandscapePairedDelta {
             landscape_id: landscape_id.clone(),
             paired_seed_count: seed_cells.len(),
-            challenger_advantage: sum_delta / seed_cells.len() as f64,
+            challenger_advantage: landscape_mean,
         });
     }
 
@@ -558,18 +553,17 @@ fn paired_sign_flip_p_value(
         let combinations = 1u64 << n;
         let extreme = (0..combinations)
             .filter(|mask| {
-                let sum = values
-                    .iter()
-                    .enumerate()
-                    .map(|(index, value)| {
-                        if (mask & (1u64 << index)) == 0 {
-                            -*value
-                        } else {
-                            *value
-                        }
-                    })
-                    .sum::<f64>();
-                let randomized_mean = sum / n as f64;
+            let mut randomized_mean = 0.0;
+            for (index, value) in values.iter().enumerate() {
+                let count = (index + 1) as f64;
+                let signed = if (mask & (1u64 << index)) == 0 {
+                    -*value
+                } else {
+                    *value
+                };
+                randomized_mean =
+                    randomized_mean * ((count - 1.0) / count) + signed / count;
+            }
                 randomized_mean.abs() + 1e-15 >= observed_mean.abs()
             })
             .count();
@@ -578,11 +572,14 @@ fn paired_sign_flip_p_value(
         let mut rng = DeterministicRng::new(seed);
         let mut extreme = 0usize;
         for _ in 0..monte_carlo_replicates {
-            let sum = values
-                .iter()
-                .map(|value| if rng.next_u64() & 1 == 0 { -*value } else { *value })
-                .sum::<f64>();
-            if (sum / n as f64).abs() + 1e-15 >= observed_mean.abs() {
+            let mut randomized_mean = 0.0;
+            for (index, value) in values.iter().enumerate() {
+                let count = (index + 1) as f64;
+                let signed = if rng.next_u64() & 1 == 0 { -*value } else { *value };
+                randomized_mean =
+                    randomized_mean * ((count - 1.0) / count) + signed / count;
+            }
+            if randomized_mean.abs() + 1e-15 >= observed_mean.abs() {
                 extreme += 1;
             }
         }
