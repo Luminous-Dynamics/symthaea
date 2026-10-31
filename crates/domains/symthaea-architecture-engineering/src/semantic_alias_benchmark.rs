@@ -113,6 +113,22 @@ struct AliasAdjudicationPayload<'a> {
 }
 
 impl AliasAdjudicationKey {
+    /// Construct an evaluator-only key for a frozen policy-visible challenge.
+    /// Keep this value in the evaluator process; do not pass it to the policy under test.
+    pub fn new(
+        challenge: &PolicyVisibleAliasChallenge,
+        truth_identity_by_proposal: BTreeMap<String, String>,
+        utility_by_identity: BTreeMap<String, f64>,
+    ) -> Result<Self, SemanticAliasError> {
+        let key = Self {
+            challenge_sha256: challenge.challenge_sha256()?,
+            truth_identity_by_proposal,
+            utility_by_identity,
+        };
+        key.validate_for(challenge)?;
+        Ok(key)
+    }
+
     fn adjudication_sha256(&self) -> Result<String, SemanticAliasError> {
         digest_serializable(&AliasAdjudicationPayload {
             challenge_sha256: &self.challenge_sha256,
@@ -637,12 +653,11 @@ pub fn canonical_alias_fixture(
         ("identity-b".to_owned(), 0.80),
         ("identity-c".to_owned(), 0.70),
     ]);
-    let adjudication = AliasAdjudicationKey {
-        challenge_sha256: challenge.challenge_sha256()?,
+    let adjudication = AliasAdjudicationKey::new(
+        &challenge,
         truth_identity_by_proposal,
         utility_by_identity,
-    };
-    adjudication.validate_for(&challenge)?;
+    )?;
     Ok((challenge, adjudication))
 }
 
