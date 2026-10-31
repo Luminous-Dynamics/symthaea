@@ -515,6 +515,17 @@ mod tests {
     }
 
     #[test]
+    fn verifier_rejects_recall_duration_mismatch() {
+        let config = EvidenceConfig::braintrace_reference(321);
+        let (mut task, oracle) = generate_evidence_task(config).unwrap();
+        task.recall_steps = task.recall_steps.saturating_add(1);
+        assert_eq!(
+            verify_evidence_trace(&task, &oracle),
+            Err(EvidenceVerificationError::InvalidTaskWindow)
+        );
+    }
+
+    #[test]
     fn verifier_rejects_mutated_majority_label() {
         let config = EvidenceConfig::braintrace_reference(321);
         let (task, mut oracle) = generate_evidence_task(config).unwrap();
