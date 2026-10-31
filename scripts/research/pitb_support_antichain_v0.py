@@ -32,7 +32,7 @@ OUTCOME_KEYS = set(IDENTITY) | set(RECEIPTS) | {
 PREDICTION_KEYS = {
     "schema_version", "group_id", "model_id", "model_version", "abstained",
     "claimed_necessary_declarations", "proposed_sufficient_route",
-    "confidence", "run_receipt_sha256",
+    "route_sufficiency_probability", "run_receipt_sha256",
 }
 
 
@@ -209,12 +209,12 @@ def score_predictions(predictions, groups):
         if type(p["abstained"]) is not bool:
             raise ContractError(f"prediction {n}.abstained must be boolean")
         necessary = strings(p["claimed_necessary_declarations"], f"prediction {n}.claimed_necessary")
-        confidence = p["confidence"]
-        if confidence is not None and (
-            isinstance(confidence, bool) or not isinstance(confidence, (int, float))
-            or not math.isfinite(confidence) or not 0 <= confidence <= 1
+        route_probability = p["route_sufficiency_probability"]
+        if route_probability is not None and (
+            isinstance(route_probability, bool) or not isinstance(route_probability, (int, float))
+            or not math.isfinite(route_probability) or not 0 <= route_probability <= 1
         ):
-            raise ContractError(f"prediction {n}.confidence must be null or lie in [0,1]")
+            raise ContractError(f"prediction {n}.route_sufficiency_probability must be null or lie in [0,1]")
         route = p["proposed_sufficient_route"]
         if p["abstained"]:
             if necessary or route is not None:
@@ -225,6 +225,9 @@ def score_predictions(predictions, groups):
             if not set(necessary) <= universe or not set(route) <= universe:
                 raise ContractError("prediction contains declarations outside the lattice")
         pred_by_id[gid] = p
+    model_versions = {(p["model_id"], p["model_version"]) for p in pred_by_id.values()}
+    if len(model_versions) > 1:
+        raise ContractError("one prediction ledger must contain exactly one model_id/model_version pair; analyze models separately")
     if set(pred_by_id) != set(by_id):
         missing = sorted(set(by_id) - set(pred_by_id))
         raise ContractError(f"prediction ledger must cover every analyzed group exactly once; missing={missing[:8]}")
@@ -249,12 +252,14 @@ def score_predictions(predictions, groups):
         is_exact = any(r == route for r in routes)
         valid += int(is_valid)
         exact += int(is_exact)
-        if p["confidence"] is not None:
-            brier_values.append((float(p["confidence"]) - float(is_valid)) ** 2)
+        if p["route_sufficiency_probability"] is not None:
+            brier_values.append((float(p["route_sufficiency_probability"]) - float(is_valid)) ** 2)
     precision = tp / (tp + fp) if tp + fp else None
     recall = tp / (tp + fn) if tp + fn else None
     f1 = 2 * precision * recall / (precision + recall) if precision is not None and recall is not None and precision + recall else None
     return {
+        "model_id": next(iter(pred_by_id.values()))["model_id"] if pred_by_id else None,
+        "model_version": next(iter(pred_by_id.values()))["model_version"] if pred_by_id else None,
         "prediction_count": len(predictions), "evaluated_prediction_count": evaluated,
         "prediction_coverage": evaluated / len(predictions) if predictions else 0.0,
         "necessary_declaration_confusion": {"true_positive": tp, "false_positive": fp, "false_negative": fn, "true_negative": tn},
@@ -338,7 +343,7 @@ def self_test():
             "abstained": False,
             "claimed_necessary_declarations": required,
             "proposed_sufficient_route": route,
-            "confidence": 0.8,
+            "route_sufficiency_probability": 0.8,
             "run_receipt_sha256": hashlib.sha256(target.encode()).hexdigest(),
         })
     scored = score_predictions(predictions, groups)
