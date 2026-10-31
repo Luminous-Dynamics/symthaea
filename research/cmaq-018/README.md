@@ -74,7 +74,6 @@ Reported independently for each scenario/model pair:
 - Null-effect false-positive rate: predicted nonzero effects when all true effects are zero.
 - Pair-coverage and branch-prediction coverage, so abstention is not hidden.
 - Absolute branch-utility MAE and next-state MAE where the model emits branch predictions.
-- Terminal false-safe rate where actual terminal branches have predictions.
 - Branch prediction evaluations, direct pair-effect evaluations, and oracle branch evaluations, reported separately.
 
 Intervals resample the 64 independent episode histories as clusters (2,000 deterministic percentile-bootstrap replicates). The 21 action pairs inside one episode are never treated as independent samples. Each metric's per-episode value is computed first, then episodes are resampled. Each metric reports its own defined-episode count. Undefined metrics have denominator zero and JSON `null`; percentile bounds are also null when fewer than two episode histories define the metric.
