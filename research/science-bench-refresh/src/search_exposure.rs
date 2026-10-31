@@ -9,14 +9,12 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
-pub const SEARCH_RECEIPT_SCHEMA: &str =
-    "symthaea.science_bench_refresh_search_exposure_receipt.v1";
+pub const SEARCH_RECEIPT_SCHEMA: &str = "symthaea.science_bench_refresh_search_exposure_receipt.v1";
 pub const SEARCH_RECEIPT_REPORT_SCHEMA: &str =
     "symthaea.science_bench_refresh_search_exposure_report.v1";
 
 const HASH_PREFIX: &[u8] = b"symthaea.science_bench_refresh.search_receipt.v1\0";
-const ZERO_DIGEST: &str =
-    "0000000000000000000000000000000000000000000000000000000000000000";
+const ZERO_DIGEST: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 const MAX_EVENTS: usize = 250_000;
 const NETWORK_POLICIES: &[&str] = &["isolated", "audited_open_web", "controlled_allowlist"];
 const EVENT_KINDS: &[&str] = &[
@@ -104,10 +102,10 @@ pub struct SearchExposureReceiptReportV1 {
 }
 
 fn digest_domain_framed(domain: &[u8], payload: &[u8]) -> Result<String, String> {
-    let domain_len = u64::try_from(domain.len())
-        .map_err(|_| "hash domain exceeds u64 length".to_owned())?;
-    let payload_len = u64::try_from(payload.len())
-        .map_err(|_| "hash payload exceeds u64 length".to_owned())?;
+    let domain_len =
+        u64::try_from(domain.len()).map_err(|_| "hash domain exceeds u64 length".to_owned())?;
+    let payload_len =
+        u64::try_from(payload.len()).map_err(|_| "hash payload exceeds u64 length".to_owned())?;
     let mut hasher = Sha256::new();
     hasher.update(HASH_PREFIX);
     hasher.update(domain_len.to_be_bytes());
@@ -181,13 +179,20 @@ fn validate_receipt_shape(receipt: &SearchExposureReceiptV1) -> Result<(), Strin
         return Err("task_ref_sha256 must be 64 lowercase hex characters".to_owned());
     }
     if !NETWORK_POLICIES.contains(&receipt.network_policy.as_str()) {
-        return Err(format!("unsupported network_policy: {}", receipt.network_policy));
+        return Err(format!(
+            "unsupported network_policy: {}",
+            receipt.network_policy
+        ));
     }
     if receipt.events.len() > MAX_EVENTS {
-        return Err(format!("receipt exceeds safety limit of {MAX_EVENTS} events"));
+        return Err(format!(
+            "receipt exceeds safety limit of {MAX_EVENTS} events"
+        ));
     }
     if receipt.expected_event_count > MAX_EVENTS as u64 {
-        return Err(format!("expected_event_count exceeds safety limit of {MAX_EVENTS}"));
+        return Err(format!(
+            "expected_event_count exceeds safety limit of {MAX_EVENTS}"
+        ));
     }
     if !valid_digest(&receipt.final_event_sha256) {
         return Err("final_event_sha256 must be 64 lowercase hex characters".to_owned());
@@ -229,7 +234,9 @@ fn validate_receipt_shape(receipt: &SearchExposureReceiptV1) -> Result<(), Strin
             return Err(format!("events[{index}] has unsupported decision"));
         }
         if !valid_digest(&event.request_sha256) {
-            return Err(format!("events[{index}].request_sha256 must be a lowercase SHA-256 digest"));
+            return Err(format!(
+                "events[{index}].request_sha256 must be a lowercase SHA-256 digest"
+            ));
         }
         validate_host(&event.host, &format!("events[{index}].host"))?;
         if !valid_digest(&event.previous_event_sha256) || !valid_digest(&event.event_sha256) {
@@ -238,14 +245,20 @@ fn validate_receipt_shape(receipt: &SearchExposureReceiptV1) -> Result<(), Strin
         if let Some(response) = &event.response_sha256
             && !valid_digest(response)
         {
-            return Err(format!("events[{index}].response_sha256 must be a lowercase SHA-256 digest"));
+            return Err(format!(
+                "events[{index}].response_sha256 must be a lowercase SHA-256 digest"
+            ));
         }
         match (event.decision.as_str(), event.response_sha256.is_some()) {
             ("allow", false) => {
-                return Err(format!("events[{index}] allowed event must include a response digest"));
+                return Err(format!(
+                    "events[{index}] allowed event must include a response digest"
+                ));
             }
             ("block", true) => {
-                return Err(format!("events[{index}] blocked event must not include a response digest"));
+                return Err(format!(
+                    "events[{index}] blocked event must not include a response digest"
+                ));
             }
             _ => {}
         }
@@ -288,7 +301,9 @@ pub(crate) fn receipt_hash(receipt: &SearchExposureReceiptV1) -> Result<String, 
 /// Verify a receipt's chain, declared final event, run commitment, and declared
 /// network policy. Only digests and hostnames are accepted; raw queries/URLs and
 /// response bodies must be kept out of the receipt.
-pub fn verify_search_exposure_receipt(bytes: &[u8]) -> Result<SearchExposureReceiptReportV1, String> {
+pub fn verify_search_exposure_receipt(
+    bytes: &[u8],
+) -> Result<SearchExposureReceiptReportV1, String> {
     let receipt: SearchExposureReceiptV1 = serde_json::from_slice(bytes)
         .map_err(|error| format!("receipt does not match strict v1 JSON shape: {error}"))?;
     validate_receipt_shape(&receipt)?;
@@ -313,15 +328,21 @@ pub fn verify_search_exposure_receipt(bytes: &[u8]) -> Result<SearchExposureRece
         }
         if event.previous_event_sha256 != expected_previous {
             event_chain_valid = false;
-            violations.push(format!("events[{index}] previous-event digest does not match"));
+            violations.push(format!(
+                "events[{index}] previous-event digest does not match"
+            ));
         }
         let recomputed_event = event_hash(event)?;
         if recomputed_event != event.event_sha256 {
             event_chain_valid = false;
-            violations.push(format!("events[{index}] event digest does not match its contents"));
+            violations.push(format!(
+                "events[{index}] event digest does not match its contents"
+            ));
         }
         expected_previous = recomputed_event;
-        let count = event_kind_counts.entry(event.event_kind.clone()).or_default();
+        let count = event_kind_counts
+            .entry(event.event_kind.clone())
+            .or_default();
         *count = count
             .checked_add(1)
             .ok_or_else(|| "event-kind counter overflows u64".to_owned())?;
@@ -370,8 +391,10 @@ pub fn verify_search_exposure_receipt(bytes: &[u8]) -> Result<SearchExposureRece
         violations.push("receipt commitment does not match the declared run context".to_owned());
     }
 
-    let integrity_valid =
-        event_count_matches && event_chain_valid && final_event_matches && receipt_commitment_matches;
+    let integrity_valid = event_count_matches
+        && event_chain_valid
+        && final_event_matches
+        && receipt_commitment_matches;
     let policy_compliant = !violations.iter().any(|violation| {
         violation.contains("violates isolated policy")
             || violation.contains("outside controlled allowlist")
@@ -416,7 +439,12 @@ mod tests {
             SearchExposureEventV1 {
                 sequence: 0,
                 event_kind: "search_query".to_owned(),
-                decision: if network_policy == "isolated" { "block" } else { "allow" }.to_owned(),
+                decision: if network_policy == "isolated" {
+                    "block"
+                } else {
+                    "allow"
+                }
+                .to_owned(),
                 request_sha256: sha256_hex(b"query-not-stored"),
                 host: "search.example.org".to_owned(),
                 response_sha256: if network_policy == "isolated" {
@@ -430,7 +458,12 @@ mod tests {
             SearchExposureEventV1 {
                 sequence: 1,
                 event_kind: "fetch".to_owned(),
-                decision: if network_policy == "isolated" { "block" } else { "allow" }.to_owned(),
+                decision: if network_policy == "isolated" {
+                    "block"
+                } else {
+                    "allow"
+                }
+                .to_owned(),
                 request_sha256: sha256_hex(b"https://docs.example.org/resource"),
                 host: "docs.example.org".to_owned(),
                 response_sha256: if network_policy == "isolated" {
@@ -472,7 +505,10 @@ mod tests {
         let report = verify_search_exposure_receipt(&bytes).unwrap();
         assert!(report.integrity_valid);
         assert!(report.policy_compliant);
-        assert_eq!(report.admission, "receipt_integrity_and_declared_policy_pass_external_anchor_required");
+        assert_eq!(
+            report.admission,
+            "receipt_integrity_and_declared_policy_pass_external_anchor_required"
+        );
     }
 
     #[test]
@@ -514,12 +550,14 @@ mod tests {
         let receipt = valid_receipt("audited_open_web", vec![]);
         let mut reordered = receipt.clone();
         reordered.events.swap(0, 1);
-        let report = verify_search_exposure_receipt(&serde_json::to_vec(&reordered).unwrap()).unwrap();
+        let report =
+            verify_search_exposure_receipt(&serde_json::to_vec(&reordered).unwrap()).unwrap();
         assert!(!report.integrity_valid);
 
         let mut missing = receipt;
         missing.events.pop();
-        let report = verify_search_exposure_receipt(&serde_json::to_vec(&missing).unwrap()).unwrap();
+        let report =
+            verify_search_exposure_receipt(&serde_json::to_vec(&missing).unwrap()).unwrap();
         assert!(!report.event_count_matches);
         assert!(!report.integrity_valid);
     }
@@ -527,7 +565,8 @@ mod tests {
     #[test]
     fn controlled_allowlist_blocks_an_allowed_unlisted_host() {
         let receipt = valid_receipt("controlled_allowlist", vec!["docs.example.org".to_owned()]);
-        let report = verify_search_exposure_receipt(&serde_json::to_vec(&receipt).unwrap()).unwrap();
+        let report =
+            verify_search_exposure_receipt(&serde_json::to_vec(&receipt).unwrap()).unwrap();
         assert!(report.integrity_valid);
         assert!(!report.policy_compliant);
         assert_eq!(report.admission, "network_policy_violation");
