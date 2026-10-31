@@ -138,8 +138,6 @@ pub fn score_irregular_forecasts(
     }
 
     let mut timestamps = Vec::with_capacity(count);
-    let mut squared_errors = [[0.0_f64; 3]; 3];
-    let mut absolute_errors = [[0.0_f64; 3]; 3];
     let mut ordinary_squared_sums = [0.0_f64; 3];
     let mut ordinary_absolute_sums = [0.0_f64; 3];
 
@@ -170,8 +168,6 @@ pub fn score_irregular_forecasts(
             let error = predicted[channel] - truth[channel];
             let absolute = error.abs();
             let squared = error * error;
-            absolute_errors[channel][0] = absolute;
-            squared_errors[channel][0] = squared;
             ordinary_absolute_sums[channel] += absolute;
             ordinary_squared_sums[channel] += squared;
         }
