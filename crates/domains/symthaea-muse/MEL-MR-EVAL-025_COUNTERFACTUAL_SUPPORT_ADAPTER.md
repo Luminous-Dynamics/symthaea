@@ -1,6 +1,6 @@
 # MEL-MR-EVAL-025 — replay-verified FluidSynth support adapter
 
-**Status:** adapter and seven focused source tests authored; EVAL-035 adds separately replayable raw and temporally qualified support. No compile, test, real FluidSynth render or dataset run is claimed.
+**Status:** adapter and seven focused source tests authored; EVAL-035 upgrades the influence report to v0.2 and the adapter/evidence hash schemas to v2, with separately replayable raw and temporally qualified support. No compile, test, real FluidSynth render or dataset run is claimed.
 
 ## Objective
 
@@ -29,6 +29,13 @@ The adapter rebuilds and replay-verifies the EVAL-029 `FluidSynthEffectsGroupAss
 
 - `support.acoustic_support` is copied from `CounterfactualInfluenceReport.qualified_support_intervals`; planner input never consumes raw isolated threshold crossings.
 - `raw_measured_support` separately retains the raw `measured_influence_intervals` for audit and diagnosis.
+### Support interval and digest contract
+
+- EVAL-025 adapter version is now v2; event-evidence and aggregate-report hash domains are also v2.
+- The planner-facing acoustic support is derived from EVAL-017 qualified_support_intervals, not raw threshold-positive windows.
+- raw_measured_support separately retains raw measured intervals for audit. Both interval sets are validated against the exact output-frame horizon and committed by the per-event digest.
+- The v2 adapter does not authorize older v1 receipts as though they used the new support semantics.
+
 - Starts remain inclusive and ends exclusive.
 - All intervals use `report.total_frames`: the rendered PCM output frame count. It can include release/reverb tails beyond input MIDI duration.
 - EVAL-017 v0.2 stores the full ordered per-window/per-channel trace, enter and release thresholds, raw detection, release detection, qualified membership, and bridged-gap flags.
@@ -71,4 +78,4 @@ The existing `validate_intervention` currently admits only `EventIntervention::R
 
 ## Validation and claim boundary
 
-The adapter code and six focused tests are authored, but this environment has no `cargo`, `rustc`, `rustfmt`, FluidSynth binary, SoundFont or benchmark audio. CI status will be reported as skipped unless it actually executes. No real per-event support measurement, routing completeness, pruning gain, runtime improvement or SOTA result is claimed.
+The adapter code and seven focused tests are authored; EVAL-017 currently contains fifteen source tests including seven temporal support controls, but this environment has no `cargo`, `rustc`, `rustfmt`, FluidSynth binary, SoundFont or benchmark audio. CI status will be reported as skipped unless it actually executes. No real per-event support measurement, routing completeness, pruning gain, runtime improvement or SOTA result is claimed.
