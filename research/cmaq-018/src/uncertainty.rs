@@ -60,6 +60,18 @@ pub struct SelectionMetrics {
     pub mean_selected_interval_width: f64,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AbstainReason {
+    NoIntervalDominantAction,
+    AmbiguousDominantActions,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RobustActionDecision {
+    Certified { action_index: usize },
+    Abstain { reason: AbstainReason },
+}
+
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JointDrawCoupling {
@@ -560,6 +572,42 @@ pub fn evaluate_simultaneous_sets(
         mean_max_interval_width,
         absolute_coverage_error: (empirical_coverage - familywise_nominal_coverage).abs(),
     }))
+}
+
+/// Select only a uniquely interval-dominant action; otherwise abstain.
+///
+/// The returned certificate is conditional on valid simultaneous coverage
+/// for the complete candidate set. It is not a physical safety guarantee.
+pub fn select_interval_dominant_action(
+    intervals: &[PredictiveInterval],
+) -> Result<RobustActionDecision, IntervalError> {
+    if intervals.len() < 2 {
+        return Err(IntervalError::InsufficientActions);
+    }
+    let nominal = intervals[0].nominal_coverage;
+    for interval in intervals {
+        validate_interval(*interval)?;
+        if interval.nominal_coverage.to_bits() != nominal.to_bits() {
+            return Err(IntervalError::MixedNominalCoverage);
+        }
+    }
+    let mut dominant = None;
+    for index in 0..intervals.len() {
+        if is_interval_dominant(intervals, index)? {
+            if dominant.is_some() {
+                return Ok(RobustActionDecision::Abstain {
+                    reason: AbstainReason::AmbiguousDominantActions,
+                });
+            }
+            dominant = Some(index);
+        }
+    }
+    Ok(match dominant {
+        Some(action_index) => RobustActionDecision::Certified { action_index },
+        None => RobustActionDecision::Abstain {
+            reason: AbstainReason::NoIntervalDominantAction,
+        },
+    })
 }
 
 /// Evaluate whether uncertainty intervals support useful selected actions.
@@ -1111,6 +1159,53 @@ mod tests {
             selected_index: 0,
         }];
         assert_eq!(evaluate_selected_action_sets(&bad_truth), Err(IntervalError::NonFiniteRealization));
+    }
+
+
+    #[test]
+    fn robust_action_selection_certifies_only_a_unique_interval_dominant_action() {
+        let intervals = [
+            interval(3.0,4.0,0.9),
+            interval(0.0,2.0,0.9),
+            interval(1.0,2.5,0.9),
+        ];
+        assert_eq!(
+            select_interval_dominant_action(&intervals).unwrap(),
+            RobustActionDecision::Certified { action_index: 0 }
+        );
+
+        let overlapping = [
+            interval(1.0,3.0,0.9),
+            interval(2.0,4.0,0.9),
+        ];
+        assert_eq!(
+            select_interval_dominant_action(&overlapping).unwrap(),
+            RobustActionDecision::Abstain { reason: AbstainReason::NoIntervalDominantAction }
+        );
+
+        let boundary_tie = [
+            interval(2.0,3.0,0.9),
+            interval(1.0,2.0,0.9),
+        ];
+        assert_eq!(
+            select_interval_dominant_action(&boundary_tie).unwrap(),
+            RobustActionDecision::Abstain { reason: AbstainReason::AmbiguousDominantActions }
+        );
+    }
+
+    #[test]
+    fn robust_action_selection_rejects_mixed_levels_and_too_small_sets() {
+        assert_eq!(
+            select_interval_dominant_action(&[interval(0.0,1.0,0.9)]),
+            Err(IntervalError::InsufficientActions)
+        );
+        assert_eq!(
+            select_interval_dominant_action(&[
+                interval(2.0,3.0,0.9),
+                interval(0.0,1.0,0.8),
+            ]),
+            Err(IntervalError::MixedNominalCoverage)
+        );
     }
 
     #[test]
