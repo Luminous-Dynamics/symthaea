@@ -105,8 +105,15 @@ impl CoralBatchCampaignRun {
                 _ => None,
             })
             .max_by(f64::total_cmp);
-        if self.new_direction_opening_global_best != bootstrap_best
-            && self.new_direction_opening_global_best.is_some()
+        let verifier_admitted_new_direction = self.tape.events.iter().any(|event| matches!(
+            &event.payload,
+            CampaignEventPayload::NovelCandidateEvaluation {
+                disposition: DirectionProposalDisposition::Admitted { .. },
+                ..
+            }
+        ));
+        if verifier_admitted_new_direction != self.new_direction_opening_global_best.is_some()
+            || self.new_direction_opening_global_best != bootstrap_best.filter(|_| verifier_admitted_new_direction)
         {
             return Err("new-direction opening best differs from the pre-allocation bootstrap best".to_owned());
         }
@@ -703,6 +710,24 @@ mod tests {
         assert_eq!(run.coral_config.first_round_agents_per_direction, 1);
         assert_eq!(run.coral_config_sha256, config_digest(&config).unwrap());
         run.validate_integrity().unwrap();
+    }
+
+    #[test]
+    fn new_direction_opening_best_is_frozen_before_any_admitting_batch_result() {
+        let run = run_coral_batch_campaign(
+            DirectionLandscapeFamily::NewOperatorBreakthrough,
+            7,
+            11,
+        ).unwrap();
+        let bootstrap_best = run.tape.events.iter()
+            .take(3)
+            .filter_map(|event| match &event.payload {
+                CampaignEventPayload::CandidateEvaluation { score, .. } => *score,
+                _ => None,
+            })
+            .max_by(f64::total_cmp);
+        assert_eq!(run.new_direction_opening_global_best, bootstrap_best);
+        assert!(run.new_direction_opening_global_best.is_some());
     }
 
     #[test]
