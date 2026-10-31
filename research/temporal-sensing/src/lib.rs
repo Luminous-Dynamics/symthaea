@@ -497,6 +497,74 @@ mod tests {
     }
 
     #[test]
+    fn novelty_and_past_residual_thresholds_use_only_candidate_history() {
+        let mut current = features();
+        current.novelty_ppm = 950_000;
+        let novelty = decide_next_observation(
+            SensingPolicy::NoveltyThreshold { threshold_ppm: 900_000 },
+            context(20),
+            current,
+        ).unwrap();
+        assert!(matches!(novelty,
+            SensingDecision::ObserveNow { reason: TriggerReason::Novelty, .. }
+        ));
+
+        current.novelty_ppm = 0;
+        current.past_residual_ppm = 950_000;
+        let residual = decide_next_observation(
+            SensingPolicy::PastResidualThreshold { threshold_ppm: 900_000 },
+            context(20),
+            current,
+        ).unwrap();
+        assert!(matches!(residual,
+            SensingDecision::ObserveNow { reason: TriggerReason::PastResidual, .. }
+        ));
+    }
+
+    #[test]
+    fn multirate_policy_uses_slow_interval_below_activity_threshold() {
+        let decision = decide_next_observation(
+            SensingPolicy::MultiRate {
+                fast_interval_us: 20,
+                slow_interval_us: 80,
+                activity_threshold_ppm: 700_000,
+            },
+            context(5),
+            features(),
+        ).unwrap();
+        assert_eq!(decision, SensingDecision::Wait {
+            delay_us: 75,
+            due_at_us: 80,
+            reason: TriggerReason::SlowActivity,
+        });
+    }
+
+    #[test]
+    fn invalid_zero_intervals_and_timestamp_overflow_are_rejected() {
+        assert_eq!(
+            decide_next_observation(
+                SensingPolicy::FixedInterval { interval_us: 0 },
+                context(5),
+                features(),
+            ),
+            Err(SensingError::ZeroInterval)
+        );
+
+        let mut overflow = context(u64::MAX - 5);
+        overflow.last_observation_us = u64::MAX - 10;
+        overflow.maximum_gap_us = 20;
+        overflow.minimum_gap_us = 1;
+        assert_eq!(
+            decide_next_observation(
+                SensingPolicy::FixedInterval { interval_us: 1 },
+                overflow,
+                features(),
+            ),
+            Err(SensingError::TimestampOverflow)
+        );
+    }
+
+    #[test]
     fn irregular_schedule_clamps_policy_wait_to_maximum_gap() {
         let decision = decide_next_observation(
             SensingPolicy::FixedInterval { interval_us: 1_000 },
