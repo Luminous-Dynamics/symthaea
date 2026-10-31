@@ -867,6 +867,22 @@ mod tests {
     }
 
     #[test]
+    fn external_fixture_binds_netlist_digest_separately_from_graph_document() {
+        let graph: Value = serde_json::from_str(include_str!("../tests/fixtures/hardsec/localization-audit-v1/source-graph.json")).unwrap();
+        let explanation: Value = serde_json::from_str(include_str!("../tests/fixtures/hardsec/localization-audit-v1/explanation.json")).unwrap();
+        let oracle: Value = serde_json::from_str(include_str!("../tests/fixtures/hardsec/localization-audit-v1/evaluator-oracle.json")).unwrap();
+        let source_sha = graph["source_artifact_sha256"].as_str().unwrap();
+        assert_eq!(explanation["source"]["source_sha256"].as_str().unwrap(), source_sha);
+        assert_eq!(oracle["source_sha256"].as_str().unwrap(), source_sha);
+        assert_eq!(explanation["paths"][0]["source_sha256"].as_str().unwrap(), source_sha);
+        let graph_bytes = include_bytes!("../tests/fixtures/hardsec/localization-audit-v1/source-graph.json");
+        assert_eq!(sha256(graph_bytes).len(), 64);
+        assert_ne!(sha256(graph_bytes), source_sha);
+        let schema: Value = serde_json::from_str(include_str!("../schemas/hardsec-source-graph-v1.schema.json")).unwrap();
+        assert!(schema["required"].as_array().unwrap().iter().any(|v| v == "source_artifact_sha256"));
+    }
+
+    #[test]
     fn empty_reference_path_set_does_not_divide_by_zero() {
         let (mut e,g,mut o,_,gb,_) = fixture_values();
         o["reference_paths"] = json!([]);
