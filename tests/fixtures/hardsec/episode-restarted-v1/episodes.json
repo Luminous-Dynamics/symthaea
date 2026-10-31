@@ -13,8 +13,8 @@
       "episode_id": "episode-0001",
       "execution_group_id": "eval-exec-0001",
       "source_trace_sha256": "0000000100000001000000010000000100000001000000010000000100000001",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.512683438137,
       "windows": [
         {
@@ -57,15 +57,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 2,
       "episode_id": "episode-0002",
       "execution_group_id": "eval-exec-0002",
       "source_trace_sha256": "0000000200000002000000020000000200000002000000020000000200000002",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.635933251819,
       "windows": [
         {
@@ -108,15 +109,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 3,
       "episode_id": "episode-0003",
       "execution_group_id": "eval-exec-0003",
       "source_trace_sha256": "0000000300000003000000030000000300000003000000030000000300000003",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.032051397953,
       "windows": [
         {
@@ -159,15 +161,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 4,
       "episode_id": "episode-0004",
       "execution_group_id": "eval-exec-0004",
       "source_trace_sha256": "0000000400000004000000040000000400000004000000040000000400000004",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.589245993877,
       "windows": [
         {
@@ -210,15 +213,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 5,
       "episode_id": "episode-0005",
       "execution_group_id": "eval-exec-0005",
       "source_trace_sha256": "0000000500000005000000050000000500000005000000050000000500000005",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.924025802873,
       "windows": [
         {
@@ -261,15 +265,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 6,
       "episode_id": "episode-0006",
       "execution_group_id": "eval-exec-0006",
       "source_trace_sha256": "0000000600000006000000060000000600000006000000060000000600000006",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.285595278023,
       "windows": [
         {
@@ -312,15 +317,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 7,
       "episode_id": "episode-0007",
       "execution_group_id": "eval-exec-0007",
       "source_trace_sha256": "0000000700000007000000070000000700000007000000070000000700000007",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.716218892019,
       "windows": [
         {
@@ -363,15 +369,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 8,
       "episode_id": "episode-0008",
       "execution_group_id": "eval-exec-0008",
       "source_trace_sha256": "0000000800000008000000080000000800000008000000080000000800000008",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.487306301715,
       "windows": [
         {
@@ -414,15 +421,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 9,
       "episode_id": "episode-0009",
       "execution_group_id": "eval-exec-0009",
       "source_trace_sha256": "0000000900000009000000090000000900000009000000090000000900000009",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.757929887623,
       "windows": [
         {
@@ -465,15 +473,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 10,
       "episode_id": "episode-0010",
       "execution_group_id": "eval-exec-0010",
       "source_trace_sha256": "0000000a0000000a0000000a0000000a0000000a0000000a0000000a0000000a",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.482262972509,
       "windows": [
         {
@@ -516,15 +525,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 11,
       "episode_id": "episode-0011",
       "execution_group_id": "eval-exec-0011",
       "source_trace_sha256": "0000000b0000000b0000000b0000000b0000000b0000000b0000000b0000000b",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.010384329129,
       "windows": [
         {
@@ -567,15 +577,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 12,
       "episode_id": "episode-0012",
       "execution_group_id": "eval-exec-0012",
       "source_trace_sha256": "0000000c0000000c0000000c0000000c0000000c0000000c0000000c0000000c",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.211511438945,
       "windows": [
         {
@@ -618,15 +629,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 13,
       "episode_id": "episode-0013",
       "execution_group_id": "eval-exec-0013",
       "source_trace_sha256": "0000000d0000000d0000000d0000000d0000000d0000000d0000000d0000000d",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.313978412189,
       "windows": [
         {
@@ -669,15 +681,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 14,
       "episode_id": "episode-0014",
       "execution_group_id": "eval-exec-0014",
       "source_trace_sha256": "0000000e0000000e0000000e0000000e0000000e0000000e0000000e0000000e",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.152616184903,
       "windows": [
         {
@@ -720,15 +733,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 15,
       "episode_id": "episode-0015",
       "execution_group_id": "eval-exec-0015",
       "source_trace_sha256": "0000000f0000000f0000000f0000000f0000000f0000000f0000000f0000000f",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.69124415284,
       "windows": [
         {
@@ -771,15 +785,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 16,
       "episode_id": "episode-0016",
       "execution_group_id": "eval-exec-0016",
       "source_trace_sha256": "0000001000000010000000100000001000000010000000100000001000000010",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.409574351506,
       "windows": [
         {
@@ -822,15 +837,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 17,
       "episode_id": "episode-0017",
       "execution_group_id": "eval-exec-0017",
       "source_trace_sha256": "0000001100000011000000110000001100000011000000110000001100000011",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.983509009704,
       "windows": [
         {
@@ -873,15 +889,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 18,
       "episode_id": "episode-0018",
       "execution_group_id": "eval-exec-0018",
       "source_trace_sha256": "0000001200000012000000120000001200000012000000120000001200000012",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.57044551312,
       "windows": [
         {
@@ -924,15 +941,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 19,
       "episode_id": "episode-0019",
       "execution_group_id": "eval-exec-0019",
       "source_trace_sha256": "0000001300000013000000130000001300000013000000130000001300000013",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.053793909494,
       "windows": [
         {
@@ -975,15 +993,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 20,
       "episode_id": "episode-0020",
       "execution_group_id": "eval-exec-0020",
       "source_trace_sha256": "0000001400000014000000140000001400000014000000140000001400000014",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.543268196518,
       "windows": [
         {
@@ -1026,15 +1045,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 21,
       "episode_id": "episode-0021",
       "execution_group_id": "eval-exec-0021",
       "source_trace_sha256": "0000001500000015000000150000001500000015000000150000001500000015",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.730876433663,
       "windows": [
         {
@@ -1077,15 +1097,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 22,
       "episode_id": "episode-0022",
       "execution_group_id": "eval-exec-0022",
       "source_trace_sha256": "0000001600000016000000160000001600000016000000160000001600000016",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.331810994772,
       "windows": [
         {
@@ -1128,15 +1149,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 23,
       "episode_id": "episode-0023",
       "execution_group_id": "eval-exec-0023",
       "source_trace_sha256": "0000001700000017000000170000001700000017000000170000001700000017",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.932141236495,
       "windows": [
         {
@@ -1179,15 +1201,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 24,
       "episode_id": "episode-0024",
       "execution_group_id": "eval-exec-0024",
       "source_trace_sha256": "0000001800000018000000180000001800000018000000180000001800000018",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.627745189937,
       "windows": [
         {
@@ -1230,15 +1253,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 25,
       "episode_id": "episode-0025",
       "execution_group_id": "eval-exec-0025",
       "source_trace_sha256": "0000001900000019000000190000001900000019000000190000001900000019",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.798347577453,
       "windows": [
         {
@@ -1281,15 +1305,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 26,
       "episode_id": "episode-0026",
       "execution_group_id": "eval-exec-0026",
       "source_trace_sha256": "0000001a0000001a0000001a0000001a0000001a0000001a0000001a0000001a",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.737427361077,
       "windows": [
         {
@@ -1332,15 +1357,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 27,
       "episode_id": "episode-0027",
       "execution_group_id": "eval-exec-0027",
       "source_trace_sha256": "0000001b0000001b0000001b0000001b0000001b0000001b0000001b0000001b",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.514264163096,
       "windows": [
         {
@@ -1383,15 +1409,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 28,
       "episode_id": "episode-0028",
       "execution_group_id": "eval-exec-0028",
       "source_trace_sha256": "0000001c0000001c0000001c0000001c0000001c0000001c0000001c0000001c",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.792144516716,
       "windows": [
         {
@@ -1434,15 +1461,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 29,
       "episode_id": "episode-0029",
       "execution_group_id": "eval-exec-0029",
       "source_trace_sha256": "0000001d0000001d0000001d0000001d0000001d0000001d0000001d0000001d",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.587754306383,
       "windows": [
         {
@@ -1485,15 +1513,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 30,
       "episode_id": "episode-0030",
       "execution_group_id": "eval-exec-0030",
       "source_trace_sha256": "0000001e0000001e0000001e0000001e0000001e0000001e0000001e0000001e",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.972900853259,
       "windows": [
         {
@@ -1536,15 +1565,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 31,
       "episode_id": "episode-0031",
       "execution_group_id": "eval-exec-0031",
       "source_trace_sha256": "0000001f0000001f0000001f0000001f0000001f0000001f0000001f0000001f",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.028839723673,
       "windows": [
         {
@@ -1587,15 +1617,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 32,
       "episode_id": "episode-0032",
       "execution_group_id": "eval-exec-0032",
       "source_trace_sha256": "0000002000000020000000200000002000000020000000200000002000000020",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.677114303457,
       "windows": [
         {
@@ -1638,15 +1669,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 33,
       "episode_id": "episode-0033",
       "execution_group_id": "eval-exec-0033",
       "source_trace_sha256": "0000002100000021000000210000002100000021000000210000002100000021",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.922029102221,
       "windows": [
         {
@@ -1689,15 +1721,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 34,
       "episode_id": "episode-0034",
       "execution_group_id": "eval-exec-0034",
       "source_trace_sha256": "0000002200000022000000220000002200000022000000220000002200000022",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.727442601463,
       "windows": [
         {
@@ -1740,15 +1773,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 35,
       "episode_id": "episode-0035",
       "execution_group_id": "eval-exec-0035",
       "source_trace_sha256": "0000002300000023000000230000002300000023000000230000002300000023",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.632267883513,
       "windows": [
         {
@@ -1791,15 +1825,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 36,
       "episode_id": "episode-0036",
       "execution_group_id": "eval-exec-0036",
       "source_trace_sha256": "0000002400000024000000240000002400000024000000240000002400000024",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.934872653568,
       "windows": [
         {
@@ -1842,15 +1877,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 37,
       "episode_id": "episode-0037",
       "execution_group_id": "eval-exec-0037",
       "source_trace_sha256": "0000002500000025000000250000002500000025000000250000002500000025",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.139748520218,
       "windows": [
         {
@@ -1893,15 +1929,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 38,
       "episode_id": "episode-0038",
       "execution_group_id": "eval-exec-0038",
       "source_trace_sha256": "0000002600000026000000260000002600000026000000260000002600000026",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.141683566151,
       "windows": [
         {
@@ -1944,15 +1981,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 39,
       "episode_id": "episode-0039",
       "execution_group_id": "eval-exec-0039",
       "source_trace_sha256": "0000002700000027000000270000002700000027000000270000002700000027",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.074015777092,
       "windows": [
         {
@@ -1995,15 +2033,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 40,
       "episode_id": "episode-0040",
       "execution_group_id": "eval-exec-0040",
       "source_trace_sha256": "0000002800000028000000280000002800000028000000280000002800000028",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.347432744922,
       "windows": [
         {
@@ -2046,15 +2085,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 41,
       "episode_id": "episode-0041",
       "execution_group_id": "eval-exec-0041",
       "source_trace_sha256": "0000002900000029000000290000002900000029000000290000002900000029",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.725809458643,
       "windows": [
         {
@@ -2097,15 +2137,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 42,
       "episode_id": "episode-0042",
       "execution_group_id": "eval-exec-0042",
       "source_trace_sha256": "0000002a0000002a0000002a0000002a0000002a0000002a0000002a0000002a",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.225216042018,
       "windows": [
         {
@@ -2148,15 +2189,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 43,
       "episode_id": "episode-0043",
       "execution_group_id": "eval-exec-0043",
       "source_trace_sha256": "0000002b0000002b0000002b0000002b0000002b0000002b0000002b0000002b",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.968407258857,
       "windows": [
         {
@@ -2199,15 +2241,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 44,
       "episode_id": "episode-0044",
       "execution_group_id": "eval-exec-0044",
       "source_trace_sha256": "0000002c0000002c0000002c0000002c0000002c0000002c0000002c0000002c",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.328616990009,
       "windows": [
         {
@@ -2250,15 +2293,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 45,
       "episode_id": "episode-0045",
       "execution_group_id": "eval-exec-0045",
       "source_trace_sha256": "0000002d0000002d0000002d0000002d0000002d0000002d0000002d0000002d",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.431363240816,
       "windows": [
         {
@@ -2301,15 +2345,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 46,
       "episode_id": "episode-0046",
       "execution_group_id": "eval-exec-0046",
       "source_trace_sha256": "0000002e0000002e0000002e0000002e0000002e0000002e0000002e0000002e",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.13448672439,
       "windows": [
         {
@@ -2352,15 +2397,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 47,
       "episode_id": "episode-0047",
       "execution_group_id": "eval-exec-0047",
       "source_trace_sha256": "0000002f0000002f0000002f0000002f0000002f0000002f0000002f0000002f",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.750982766505,
       "windows": [
         {
@@ -2403,15 +2449,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 48,
       "episode_id": "episode-0048",
       "execution_group_id": "eval-exec-0048",
       "source_trace_sha256": "0000003000000030000000300000003000000030000000300000003000000030",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.825485258596,
       "windows": [
         {
@@ -2454,15 +2501,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 49,
       "episode_id": "episode-0049",
       "execution_group_id": "eval-exec-0049",
       "source_trace_sha256": "0000003100000031000000310000003100000031000000310000003100000031",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.086132509634,
       "windows": [
         {
@@ -2505,15 +2553,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 50,
       "episode_id": "episode-0050",
       "execution_group_id": "eval-exec-0050",
       "source_trace_sha256": "0000003200000032000000320000003200000032000000320000003200000032",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.951666338136,
       "windows": [
         {
@@ -2556,15 +2605,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 51,
       "episode_id": "episode-0051",
       "execution_group_id": "eval-exec-0051",
       "source_trace_sha256": "0000003300000033000000330000003300000033000000330000003300000033",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.647554496769,
       "windows": [
         {
@@ -2607,15 +2657,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 52,
       "episode_id": "episode-0052",
       "execution_group_id": "eval-exec-0052",
       "source_trace_sha256": "0000003400000034000000340000003400000034000000340000003400000034",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.88480216288,
       "windows": [
         {
@@ -2658,15 +2709,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 53,
       "episode_id": "episode-0053",
       "execution_group_id": "eval-exec-0053",
       "source_trace_sha256": "0000003500000035000000350000003500000035000000350000003500000035",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.556235934608,
       "windows": [
         {
@@ -2709,15 +2761,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 54,
       "episode_id": "episode-0054",
       "execution_group_id": "eval-exec-0054",
       "source_trace_sha256": "0000003600000036000000360000003600000036000000360000003600000036",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.855120829074,
       "windows": [
         {
@@ -2760,15 +2813,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 55,
       "episode_id": "episode-0055",
       "execution_group_id": "eval-exec-0055",
       "source_trace_sha256": "0000003700000037000000370000003700000037000000370000003700000037",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.234081893694,
       "windows": [
         {
@@ -2811,15 +2865,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 56,
       "episode_id": "episode-0056",
       "execution_group_id": "eval-exec-0056",
       "source_trace_sha256": "0000003800000038000000380000003800000038000000380000003800000038",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.400168405147,
       "windows": [
         {
@@ -2862,15 +2917,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 57,
       "episode_id": "episode-0057",
       "execution_group_id": "eval-exec-0057",
       "source_trace_sha256": "0000003900000039000000390000003900000039000000390000003900000039",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.55064573139,
       "windows": [
         {
@@ -2913,15 +2969,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 58,
       "episode_id": "episode-0058",
       "execution_group_id": "eval-exec-0058",
       "source_trace_sha256": "0000003a0000003a0000003a0000003a0000003a0000003a0000003a0000003a",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.822109117871,
       "windows": [
         {
@@ -2964,15 +3021,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 59,
       "episode_id": "episode-0059",
       "execution_group_id": "eval-exec-0059",
       "source_trace_sha256": "0000003b0000003b0000003b0000003b0000003b0000003b0000003b0000003b",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.415492449421,
       "windows": [
         {
@@ -3015,15 +3073,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 60,
       "episode_id": "episode-0060",
       "execution_group_id": "eval-exec-0060",
       "source_trace_sha256": "0000003c0000003c0000003c0000003c0000003c0000003c0000003c0000003c",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.805441187927,
       "windows": [
         {
@@ -3066,15 +3125,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 61,
       "episode_id": "episode-0061",
       "execution_group_id": "eval-exec-0061",
       "source_trace_sha256": "0000003d0000003d0000003d0000003d0000003d0000003d0000003d0000003d",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.229402993806,
       "windows": [
         {
@@ -3117,15 +3177,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 62,
       "episode_id": "episode-0062",
       "execution_group_id": "eval-exec-0062",
       "source_trace_sha256": "0000003e0000003e0000003e0000003e0000003e0000003e0000003e0000003e",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.254332416458,
       "windows": [
         {
@@ -3168,15 +3229,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 63,
       "episode_id": "episode-0063",
       "execution_group_id": "eval-exec-0063",
       "source_trace_sha256": "0000003f0000003f0000003f0000003f0000003f0000003f0000003f0000003f",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.901572817471,
       "windows": [
         {
@@ -3219,15 +3281,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 64,
       "episode_id": "episode-0064",
       "execution_group_id": "eval-exec-0064",
       "source_trace_sha256": "0000004000000040000000400000004000000040000000400000004000000040",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.730068686651,
       "windows": [
         {
@@ -3270,15 +3333,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 65,
       "episode_id": "episode-0065",
       "execution_group_id": "eval-exec-0065",
       "source_trace_sha256": "0000004100000041000000410000004100000041000000410000004100000041",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.816715838388,
       "windows": [
         {
@@ -3321,15 +3385,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 66,
       "episode_id": "episode-0066",
       "execution_group_id": "eval-exec-0066",
       "source_trace_sha256": "0000004200000042000000420000004200000042000000420000004200000042",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.16696010693,
       "windows": [
         {
@@ -3372,15 +3437,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 67,
       "episode_id": "episode-0067",
       "execution_group_id": "eval-exec-0067",
       "source_trace_sha256": "0000004300000043000000430000004300000043000000430000004300000043",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.508055238519,
       "windows": [
         {
@@ -3423,15 +3489,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 68,
       "episode_id": "episode-0068",
       "execution_group_id": "eval-exec-0068",
       "source_trace_sha256": "0000004400000044000000440000004400000044000000440000004400000044",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.881963584805,
       "windows": [
         {
@@ -3474,15 +3541,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 69,
       "episode_id": "episode-0069",
       "execution_group_id": "eval-exec-0069",
       "source_trace_sha256": "0000004500000045000000450000004500000045000000450000004500000045",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.672065361403,
       "windows": [
         {
@@ -3525,15 +3593,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 70,
       "episode_id": "episode-0070",
       "execution_group_id": "eval-exec-0070",
       "source_trace_sha256": "0000004600000046000000460000004600000046000000460000004600000046",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.831757182954,
       "windows": [
         {
@@ -3576,15 +3645,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 71,
       "episode_id": "episode-0071",
       "execution_group_id": "eval-exec-0071",
       "source_trace_sha256": "0000004700000047000000470000004700000047000000470000004700000047",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.861024278682,
       "windows": [
         {
@@ -3627,15 +3697,16 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 72,
       "episode_id": "episode-0072",
       "execution_group_id": "eval-exec-0072",
       "source_trace_sha256": "0000004800000048000000480000004800000048000000480000004800000048",
-      "program_binary_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "device_config_id": "synthetic-device-config-01",
+      "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.673540671589,
       "windows": [
         {
@@ -3678,7 +3749,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 73,
@@ -3686,7 +3758,7 @@
       "execution_group_id": "eval-exec-0073",
       "source_trace_sha256": "0000004900000049000000490000004900000049000000490000004900000049",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.522444408387,
       "windows": [
         {
@@ -3729,7 +3801,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 74,
@@ -3737,7 +3810,7 @@
       "execution_group_id": "eval-exec-0074",
       "source_trace_sha256": "0000004a0000004a0000004a0000004a0000004a0000004a0000004a0000004a",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.014938253677,
       "windows": [
         {
@@ -3780,7 +3853,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 75,
@@ -3788,7 +3862,7 @@
       "execution_group_id": "eval-exec-0075",
       "source_trace_sha256": "0000004b0000004b0000004b0000004b0000004b0000004b0000004b0000004b",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.332768880296,
       "windows": [
         {
@@ -3831,7 +3905,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 76,
@@ -3839,7 +3914,7 @@
       "execution_group_id": "eval-exec-0076",
       "source_trace_sha256": "0000004c0000004c0000004c0000004c0000004c0000004c0000004c0000004c",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.356543502072,
       "windows": [
         {
@@ -3882,7 +3957,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 77,
@@ -3890,7 +3966,7 @@
       "execution_group_id": "eval-exec-0077",
       "source_trace_sha256": "0000004d0000004d0000004d0000004d0000004d0000004d0000004d0000004d",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.808854156174,
       "windows": [
         {
@@ -3933,7 +4009,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 78,
@@ -3941,7 +4018,7 @@
       "execution_group_id": "eval-exec-0078",
       "source_trace_sha256": "0000004e0000004e0000004e0000004e0000004e0000004e0000004e0000004e",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.200373110129,
       "windows": [
         {
@@ -3984,7 +4061,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 79,
@@ -3992,7 +4070,7 @@
       "execution_group_id": "eval-exec-0079",
       "source_trace_sha256": "0000004f0000004f0000004f0000004f0000004f0000004f0000004f0000004f",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.287204725202,
       "windows": [
         {
@@ -4035,7 +4113,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 80,
@@ -4043,7 +4122,7 @@
       "execution_group_id": "eval-exec-0080",
       "source_trace_sha256": "0000005000000050000000500000005000000050000000500000005000000050",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.681285119848,
       "windows": [
         {
@@ -4086,7 +4165,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 81,
@@ -4094,7 +4174,7 @@
       "execution_group_id": "eval-exec-0081",
       "source_trace_sha256": "0000005100000051000000510000005100000051000000510000005100000051",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.350183507428,
       "windows": [
         {
@@ -4137,7 +4217,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 82,
@@ -4145,7 +4226,7 @@
       "execution_group_id": "eval-exec-0082",
       "source_trace_sha256": "0000005200000052000000520000005200000052000000520000005200000052",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.438768854132,
       "windows": [
         {
@@ -4188,7 +4269,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 83,
@@ -4196,7 +4278,7 @@
       "execution_group_id": "eval-exec-0083",
       "source_trace_sha256": "0000005300000053000000530000005300000053000000530000005300000053",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.962991910521,
       "windows": [
         {
@@ -4239,7 +4321,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 84,
@@ -4247,7 +4330,7 @@
       "execution_group_id": "eval-exec-0084",
       "source_trace_sha256": "0000005400000054000000540000005400000054000000540000005400000054",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.345927842194,
       "windows": [
         {
@@ -4290,7 +4373,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 85,
@@ -4298,7 +4382,7 @@
       "execution_group_id": "eval-exec-0085",
       "source_trace_sha256": "0000005500000055000000550000005500000055000000550000005500000055",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.777596297674,
       "windows": [
         {
@@ -4341,7 +4425,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 86,
@@ -4349,7 +4434,7 @@
       "execution_group_id": "eval-exec-0086",
       "source_trace_sha256": "0000005600000056000000560000005600000056000000560000005600000056",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.713453589706,
       "windows": [
         {
@@ -4392,7 +4477,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 87,
@@ -4400,7 +4486,7 @@
       "execution_group_id": "eval-exec-0087",
       "source_trace_sha256": "0000005700000057000000570000005700000057000000570000005700000057",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.572472936939,
       "windows": [
         {
@@ -4443,7 +4529,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 88,
@@ -4451,7 +4538,7 @@
       "execution_group_id": "eval-exec-0088",
       "source_trace_sha256": "0000005800000058000000580000005800000058000000580000005800000058",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.751427107723,
       "windows": [
         {
@@ -4494,7 +4581,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 89,
@@ -4502,7 +4590,7 @@
       "execution_group_id": "eval-exec-0089",
       "source_trace_sha256": "0000005900000059000000590000005900000059000000590000005900000059",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.442551314831,
       "windows": [
         {
@@ -4545,7 +4633,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 90,
@@ -4553,7 +4642,7 @@
       "execution_group_id": "eval-exec-0090",
       "source_trace_sha256": "0000005a0000005a0000005a0000005a0000005a0000005a0000005a0000005a",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.963386676973,
       "windows": [
         {
@@ -4596,7 +4685,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 91,
@@ -4604,7 +4694,7 @@
       "execution_group_id": "eval-exec-0091",
       "source_trace_sha256": "0000005b0000005b0000005b0000005b0000005b0000005b0000005b0000005b",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.44455600949,
       "windows": [
         {
@@ -4647,7 +4737,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 92,
@@ -4655,7 +4746,7 @@
       "execution_group_id": "eval-exec-0092",
       "source_trace_sha256": "0000005c0000005c0000005c0000005c0000005c0000005c0000005c0000005c",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.827764386544,
       "windows": [
         {
@@ -4698,7 +4789,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 93,
@@ -4706,7 +4798,7 @@
       "execution_group_id": "eval-exec-0093",
       "source_trace_sha256": "0000005d0000005d0000005d0000005d0000005d0000005d0000005d0000005d",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.75158013124,
       "windows": [
         {
@@ -4749,7 +4841,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 94,
@@ -4757,7 +4850,7 @@
       "execution_group_id": "eval-exec-0094",
       "source_trace_sha256": "0000005e0000005e0000005e0000005e0000005e0000005e0000005e0000005e",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.154020548565,
       "windows": [
         {
@@ -4800,7 +4893,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 95,
@@ -4808,7 +4902,7 @@
       "execution_group_id": "eval-exec-0095",
       "source_trace_sha256": "0000005f0000005f0000005f0000005f0000005f0000005f0000005f0000005f",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.289668650832,
       "windows": [
         {
@@ -4851,7 +4945,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 96,
@@ -4859,7 +4954,7 @@
       "execution_group_id": "eval-exec-0096",
       "source_trace_sha256": "0000006000000060000000600000006000000060000000600000006000000060",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.947094152914,
       "windows": [
         {
@@ -4902,7 +4997,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 97,
@@ -4910,7 +5006,7 @@
       "execution_group_id": "eval-exec-0097",
       "source_trace_sha256": "0000006100000061000000610000006100000061000000610000006100000061",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.130947748199,
       "windows": [
         {
@@ -4953,7 +5049,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 98,
@@ -4961,7 +5058,7 @@
       "execution_group_id": "eval-exec-0098",
       "source_trace_sha256": "0000006200000062000000620000006200000062000000620000006200000062",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.036639088532,
       "windows": [
         {
@@ -5004,7 +5101,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 99,
@@ -5012,7 +5110,7 @@
       "execution_group_id": "eval-exec-0099",
       "source_trace_sha256": "0000006300000063000000630000006300000063000000630000006300000063",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.914906627033,
       "windows": [
         {
@@ -5055,7 +5153,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 100,
@@ -5063,7 +5162,7 @@
       "execution_group_id": "eval-exec-0100",
       "source_trace_sha256": "0000006400000064000000640000006400000064000000640000006400000064",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.1894299204,
       "windows": [
         {
@@ -5106,7 +5205,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 101,
@@ -5114,7 +5214,7 @@
       "execution_group_id": "eval-exec-0101",
       "source_trace_sha256": "0000006500000065000000650000006500000065000000650000006500000065",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.074321052991,
       "windows": [
         {
@@ -5157,7 +5257,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 102,
@@ -5165,7 +5266,7 @@
       "execution_group_id": "eval-exec-0102",
       "source_trace_sha256": "0000006600000066000000660000006600000066000000660000006600000066",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.486797573743,
       "windows": [
         {
@@ -5208,7 +5309,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 103,
@@ -5216,7 +5318,7 @@
       "execution_group_id": "eval-exec-0103",
       "source_trace_sha256": "0000006700000067000000670000006700000067000000670000006700000067",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.96750318585,
       "windows": [
         {
@@ -5259,7 +5361,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 104,
@@ -5267,7 +5370,7 @@
       "execution_group_id": "eval-exec-0104",
       "source_trace_sha256": "0000006800000068000000680000006800000068000000680000006800000068",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.476494339528,
       "windows": [
         {
@@ -5310,7 +5413,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 105,
@@ -5318,7 +5422,7 @@
       "execution_group_id": "eval-exec-0105",
       "source_trace_sha256": "0000006900000069000000690000006900000069000000690000006900000069",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.976570088416,
       "windows": [
         {
@@ -5361,7 +5465,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 106,
@@ -5369,7 +5474,7 @@
       "execution_group_id": "eval-exec-0106",
       "source_trace_sha256": "0000006a0000006a0000006a0000006a0000006a0000006a0000006a0000006a",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.562489177799,
       "windows": [
         {
@@ -5412,7 +5517,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 107,
@@ -5420,7 +5526,7 @@
       "execution_group_id": "eval-exec-0107",
       "source_trace_sha256": "0000006b0000006b0000006b0000006b0000006b0000006b0000006b0000006b",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.53474360751,
       "windows": [
         {
@@ -5463,7 +5569,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 108,
@@ -5471,7 +5578,7 @@
       "execution_group_id": "eval-exec-0108",
       "source_trace_sha256": "0000006c0000006c0000006c0000006c0000006c0000006c0000006c0000006c",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.339358357945,
       "windows": [
         {
@@ -5514,7 +5621,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 109,
@@ -5522,7 +5630,7 @@
       "execution_group_id": "eval-exec-0109",
       "source_trace_sha256": "0000006d0000006d0000006d0000006d0000006d0000006d0000006d0000006d",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.706827134825,
       "windows": [
         {
@@ -5565,7 +5673,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 110,
@@ -5573,7 +5682,7 @@
       "execution_group_id": "eval-exec-0110",
       "source_trace_sha256": "0000006e0000006e0000006e0000006e0000006e0000006e0000006e0000006e",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.672663037432,
       "windows": [
         {
@@ -5616,7 +5725,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 111,
@@ -5624,7 +5734,7 @@
       "execution_group_id": "eval-exec-0111",
       "source_trace_sha256": "0000006f0000006f0000006f0000006f0000006f0000006f0000006f0000006f",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.678450067993,
       "windows": [
         {
@@ -5667,7 +5777,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 112,
@@ -5675,7 +5786,7 @@
       "execution_group_id": "eval-exec-0112",
       "source_trace_sha256": "0000007000000070000000700000007000000070000000700000007000000070",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.335494443076,
       "windows": [
         {
@@ -5718,7 +5829,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 113,
@@ -5726,7 +5838,7 @@
       "execution_group_id": "eval-exec-0113",
       "source_trace_sha256": "0000007100000071000000710000007100000071000000710000007100000071",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.123928604648,
       "windows": [
         {
@@ -5769,7 +5881,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 114,
@@ -5777,7 +5890,7 @@
       "execution_group_id": "eval-exec-0114",
       "source_trace_sha256": "0000007200000072000000720000007200000072000000720000007200000072",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.496718881419,
       "windows": [
         {
@@ -5820,7 +5933,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 115,
@@ -5828,7 +5942,7 @@
       "execution_group_id": "eval-exec-0115",
       "source_trace_sha256": "0000007300000073000000730000007300000073000000730000007300000073",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.232161814813,
       "windows": [
         {
@@ -5871,7 +5985,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 116,
@@ -5879,7 +5994,7 @@
       "execution_group_id": "eval-exec-0116",
       "source_trace_sha256": "0000007400000074000000740000007400000074000000740000007400000074",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.380868867273,
       "windows": [
         {
@@ -5922,7 +6037,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 117,
@@ -5930,7 +6046,7 @@
       "execution_group_id": "eval-exec-0117",
       "source_trace_sha256": "0000007500000075000000750000007500000075000000750000007500000075",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.987364749424,
       "windows": [
         {
@@ -5973,7 +6089,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 118,
@@ -5981,7 +6098,7 @@
       "execution_group_id": "eval-exec-0118",
       "source_trace_sha256": "0000007600000076000000760000007600000076000000760000007600000076",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.545603221981,
       "windows": [
         {
@@ -6024,7 +6141,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 119,
@@ -6032,7 +6150,7 @@
       "execution_group_id": "eval-exec-0119",
       "source_trace_sha256": "0000007700000077000000770000007700000077000000770000007700000077",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.439135655295,
       "windows": [
         {
@@ -6075,7 +6193,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 120,
@@ -6083,7 +6202,7 @@
       "execution_group_id": "eval-exec-0120",
       "source_trace_sha256": "0000007800000078000000780000007800000078000000780000007800000078",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.512698055478,
       "windows": [
         {
@@ -6126,7 +6245,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 121,
@@ -6134,7 +6254,7 @@
       "execution_group_id": "eval-exec-0121",
       "source_trace_sha256": "0000007900000079000000790000007900000079000000790000007900000079",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.966862179339,
       "windows": [
         {
@@ -6177,7 +6297,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 122,
@@ -6185,7 +6306,7 @@
       "execution_group_id": "eval-exec-0122",
       "source_trace_sha256": "0000007a0000007a0000007a0000007a0000007a0000007a0000007a0000007a",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.505132108694,
       "windows": [
         {
@@ -6228,7 +6349,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 123,
@@ -6236,7 +6358,7 @@
       "execution_group_id": "eval-exec-0123",
       "source_trace_sha256": "0000007b0000007b0000007b0000007b0000007b0000007b0000007b0000007b",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.259291757364,
       "windows": [
         {
@@ -6279,7 +6401,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 124,
@@ -6287,7 +6410,7 @@
       "execution_group_id": "eval-exec-0124",
       "source_trace_sha256": "0000007c0000007c0000007c0000007c0000007c0000007c0000007c0000007c",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.848493995378,
       "windows": [
         {
@@ -6330,7 +6453,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 125,
@@ -6338,7 +6462,7 @@
       "execution_group_id": "eval-exec-0125",
       "source_trace_sha256": "0000007d0000007d0000007d0000007d0000007d0000007d0000007d0000007d",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.703724195249,
       "windows": [
         {
@@ -6381,7 +6505,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 126,
@@ -6389,7 +6514,7 @@
       "execution_group_id": "eval-exec-0126",
       "source_trace_sha256": "0000007e0000007e0000007e0000007e0000007e0000007e0000007e0000007e",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.752165444894,
       "windows": [
         {
@@ -6432,7 +6557,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 127,
@@ -6440,7 +6566,7 @@
       "execution_group_id": "eval-exec-0127",
       "source_trace_sha256": "0000007f0000007f0000007f0000007f0000007f0000007f0000007f0000007f",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.423229762819,
       "windows": [
         {
@@ -6483,7 +6609,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 128,
@@ -6491,7 +6618,7 @@
       "execution_group_id": "eval-exec-0128",
       "source_trace_sha256": "0000008000000080000000800000008000000080000000800000008000000080",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.757023710059,
       "windows": [
         {
@@ -6534,7 +6661,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 129,
@@ -6542,7 +6670,7 @@
       "execution_group_id": "eval-exec-0129",
       "source_trace_sha256": "0000008100000081000000810000008100000081000000810000008100000081",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.127053933218,
       "windows": [
         {
@@ -6585,7 +6713,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 130,
@@ -6593,7 +6722,7 @@
       "execution_group_id": "eval-exec-0130",
       "source_trace_sha256": "0000008200000082000000820000008200000082000000820000008200000082",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.684257866582,
       "windows": [
         {
@@ -6636,7 +6765,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 131,
@@ -6644,7 +6774,7 @@
       "execution_group_id": "eval-exec-0131",
       "source_trace_sha256": "0000008300000083000000830000008300000083000000830000008300000083",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.561440213118,
       "windows": [
         {
@@ -6687,7 +6817,8 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     },
     {
       "sequence_index": 132,
@@ -6695,7 +6826,7 @@
       "execution_group_id": "eval-exec-0132",
       "source_trace_sha256": "0000008400000084000000840000008400000084000000840000008400000084",
       "program_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "device_config_id": "synthetic-device-config-01",
+      "device_config_id": "riscv-sim-pmu-v1",
       "randomizer_u": 0.506807793165,
       "windows": [
         {
@@ -6738,7 +6869,18 @@
           "source_offset_start": 300,
           "source_offset_end": 400
         }
-      ]
+      ],
+      "pmu_acquisition_condition_id": "grouped_co_scheduled"
     }
+  ],
+  "pmu_metrology_protocol_id": "hs018-pmu-counterfactual-acquisition-v1",
+  "pmu_platform_id": "riscv-sim-pmu-v1",
+  "pmu_workload_id": "fixed-workload-v1",
+  "pmu_workload_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "pmu_acquisition_condition_id": "grouped_co_scheduled",
+  "pmu_event_ids": [
+    "instret",
+    "cycles",
+    "l1_miss"
   ]
 }
