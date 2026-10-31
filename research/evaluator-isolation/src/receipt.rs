@@ -18,6 +18,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::fd::{AsRawFd, FromRawFd};
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
+use zeroize::Zeroize;
 
 use super::{
     IntakeError, RESOLVE_BENEATH, RESOLVE_NO_MAGICLINKS, RESOLVE_NO_SYMLINKS,
@@ -351,7 +352,11 @@ pub fn load_signing_key_from_systemd_credential(
     // SAFETY: openat2 returned a new owned credential descriptor.
     let mut file = unsafe { File::from_raw_fd(fd) };
     let metadata = file.metadata().map_err(|_| ReceiptError::CredentialMalformed)?;
-    if !metadata.file_type().is_file() || metadata.len() != 32 || metadata.nlink() != 1 {
+    if !metadata.file_type().is_file()
+        || metadata.len() != 32
+        || metadata.nlink() != 1
+        || metadata.mode() & 0o077 != 0
+    {
         return Err(ReceiptError::CredentialMalformed);
     }
     let mut seed = [0_u8; 32];
@@ -364,7 +369,7 @@ pub fn load_signing_key_from_systemd_credential(
         Ok(())
     })();
     if read_result.is_err() {
-        seed.fill(0);
+        seed.zeroize();
         return Err(ReceiptError::CredentialMalformed);
     }
     let signing_key = SigningKey::from_bytes(&seed);
