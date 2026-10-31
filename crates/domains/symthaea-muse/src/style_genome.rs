@@ -618,6 +618,13 @@ pub fn evaluate_genome(
             .count();
         let warning_count = report.warning_count();
         let trace_integrity = audit_trace(&realization.score, &realization.trace);
+        let score_bytes = serde_json::to_vec(&realization.score).map_err(|error| {
+            vec![GenomeIssue::new("score_serialization_failed", error.to_string())]
+        })?;
+        let score_sha256 = domain_sha256(
+            b"symthaea:muse-style-genome-score:v1\n",
+            &score_bytes,
+        );
         let source_motif = compiled.spec.motif(intent.arousal, intent.seed);
         let source_motif = if compiled.spec.texture.hook_cell {
             symthaea_music_theory::hook::graft_hook(
@@ -670,13 +677,6 @@ pub fn evaluate_genome(
                 format!("seed {seed} produced a non-finite structural fingerprint"),
             ));
         }
-        let score_bytes = serde_json::to_vec(&realization.score).map_err(|error| {
-            vec![GenomeIssue::new("score_serialization_failed", error.to_string())]
-        })?;
-        let score_sha256 = domain_sha256(
-            b"symthaea:muse-style-genome-score:v1\n",
-            &score_bytes,
-        );
         // Form variation is topology variation, not arbitrary differences
         // in notes, key spelling or progression values. Hash only section
         // role order and meter so equivalent forms remain in the same cell.
