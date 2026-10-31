@@ -12,8 +12,9 @@
 //! this module does not force every tradition through common-practice tonal
 //! rules.
 //!
-//! This v1 uses the existing hybrid compiler, grammar planner, native trace,
-//! score validator and structural fingerprint. It does not duplicate them.
+//! This v2 uses the existing hybrid compiler, typed family-native grammar
+//! plans, native trace, score validator and structural fingerprint. It does
+//! not duplicate those mechanisms; it fingerprints their emitted evidence.
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -889,9 +890,6 @@ pub fn evaluate_genome(
     } else {
         None
     };
-    let grammar_topologies = trials.iter()
-        .filter_map(|trial| trial.grammar_plan_signature.as_ref())
-        .collect::<BTreeSet<_>>();
     let grammar_topology_variation = pairwise_signature_diversity(
         &trials
             .iter()
@@ -1219,6 +1217,13 @@ fn strip_seed_and_dynamic_fields(value: &mut serde_json::Value) {
             object.remove("seed");
             object.remove("energy");
             object.remove("section_intensity");
+            // Absolute transposition is a different musical realization,
+            // not a different formal topology. Relative key-context labels
+            // (e.g. Opera home/relative) remain in the typed plan.
+            object.remove("key");
+            object.remove("home_key");
+            object.remove("contrast_key");
+            object.remove("development_key");
             for child in object.values_mut() {
                 strip_seed_and_dynamic_fields(child);
             }
@@ -1700,6 +1705,89 @@ mod tests {
         assert_eq!(left.seed_count, 3);
         assert!(left.objectives.novelty_distance.is_none());
         assert!(left.evaluation_sha256.len() == 64);
+    }
+
+    #[test]
+    fn dedicated_grammar_plan_fingerprints_ignore_seed_but_bind_structure() {
+        use symthaea_music_theory::{GrammarPlanEvidence, Style};
+
+        let opera = Style::Opera;
+        let opera_spec = opera.spec();
+        let mut intent_a = MusicalIntent::default();
+        intent_a.seed = 3;
+        let mut intent_b = MusicalIntent::default();
+        intent_b.seed = 4;
+        let plan_a = compose_with_grammar_plan(
+            opera.grammar_profile(),
+            &intent_a,
+            &opera_spec,
+        ).plan;
+        let plan_b = compose_with_grammar_plan(
+            opera.grammar_profile(),
+            &intent_b,
+            &opera_spec,
+        ).plan;
+
+        assert!(grammar_plan_well_formed(&plan_a));
+        assert_eq!(grammar_plan_signature(&plan_a), grammar_plan_signature(&plan_b));
+        assert_eq!(grammar_transformations(&plan_a), grammar_transformations(&plan_b));
+
+        let mut changed = plan_a.clone();
+        match &mut changed {
+            GrammarPlanEvidence::Opera(evidence) => {
+                evidence.plan.sections[0].end_bar_exclusive += 1;
+            }
+            other => panic!("expected Opera plan, got {other:?}"),
+        }
+        assert_ne!(grammar_plan_signature(&plan_a), grammar_plan_signature(&changed));
+    }
+
+    #[test]
+    fn process_plan_fingerprint_tracks_trajectory_not_random_seed_field() {
+        use symthaea_music_theory::Style;
+
+        let style = Style::Minimalism;
+        let spec = style.spec();
+        let intent_a = MusicalIntent { seed: 0, ..Default::default() };
+        let intent_b = MusicalIntent { seed: 1, ..Default::default() };
+        let plan_a = compose_with_grammar_plan(style.grammar_profile(), &intent_a, &spec).plan;
+        let plan_b = compose_with_grammar_plan(style.grammar_profile(), &intent_b, &spec).plan;
+
+        assert!(grammar_plan_well_formed(&plan_a));
+        assert!(grammar_plan_well_formed(&plan_b));
+        assert_ne!(grammar_plan_signature(&plan_a), grammar_plan_signature(&plan_b));
+        assert_ne!(grammar_transformations(&plan_a), grammar_transformations(&plan_b));
+    }
+
+    #[test]
+    fn compatibility_plans_abstain_from_native_topology_fitness() {
+        let compatibility = GrammarPlanEvidence::Compatibility {
+            family: symthaea_music_theory::grammar::GrammarFamily::AmbientTextural,
+            form_available: true,
+        };
+        assert!(!grammar_plan_well_formed(&compatibility));
+        assert!(grammar_plan_signature(&compatibility).is_none());
+        assert!(grammar_transformations(&compatibility).is_empty());
+    }
+
+    #[test]
+    fn topology_and_operation_diversity_are_seed_count_stable() {
+        let identical = ["same", "same", "same", "same"];
+        let all_different = ["a", "b", "c", "d"];
+        let half = ["a", "a", "b", "b"];
+        assert_eq!(pairwise_signature_diversity(&identical), 0.0);
+        assert_eq!(pairwise_signature_diversity(&all_different), 1.0);
+        assert!((pairwise_signature_diversity(&half) - (4.0 / 6.0)).abs() < 1e-12);
+
+        assert_eq!(jaccard_distance(&[], &[]), 0.0);
+        assert_eq!(
+            jaccard_distance(&["inversion".into()], &["retrograde".into()]),
+            1.0
+        );
+        assert_eq!(
+            jaccard_distance(&["inversion".into()], &["inversion".into()]),
+            0.0
+        );
     }
 
     #[test]
