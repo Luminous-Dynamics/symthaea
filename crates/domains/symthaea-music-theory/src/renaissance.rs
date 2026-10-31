@@ -248,9 +248,9 @@ fn verify_renaissance_plan(score: &Score, plan: &RenaissancePlan) -> Renaissance
     let three_independent_voices_present = has_role(VoiceRole::Melody)
         && has_role(VoiceRole::CounterMelody)
         && has_role(VoiceRole::Bass)
-        && melody_parts == [SUPERIUS].into_iter().collect()
-        && alto_parts == [ALTUS].into_iter().collect()
-        && bass_parts == [BASSUS].into_iter().collect();
+        && melody_parts == std::collections::BTreeSet::from([SUPERIUS])
+        && alto_parts == std::collections::BTreeSet::from([ALTUS])
+        && bass_parts == std::collections::BTreeSet::from([BASSUS]);
 
     RenaissanceVerification {
         three_independent_voices_present,
