@@ -112,3 +112,11 @@ Do not create a lowest-common-denominator exporter that drops local instances or
 The first real LocalInstances test must come from Lean's actual metavariable declaration in clap-lean, not the SorryDB pretty-printed goal. The debug text only tells us which task is promising. It does not prove that the printed binder maps one-to-one to a registry entry.
 
 A failed build or unsupported API is a preflight/adapter-compatibility outcome. It is not a proof-search failure and must remain in the operational readiness report.
+
+## Lean API source audit and compatibility calibration
+
+I inspected the pinned Lean source tags directly for 4.24.0, 4.26.0, 4.26.0-rc2 and the existing 4.34.1 pilot. All four expose the critical shape used by ContextEvidenceV2: MetavarDecl carries LocalInstances; LocalInstance carries className and fvar; LocalInstances is an array; MVarId.getDecl returns the declaration; and LocalDecl exposes value?, binderInfo, isAuxDecl, isImplementationDetail and isNondep. This is static source/API inspection only, not a compiled cross-version result.
+
+A small standalone Lean calibration source now exercises the high-risk API path inside each selected project Lake environment. It obtains the current goal MetavarDecl, enumerates LocalInstances, resolves the registered FVarId back into the ordered LocalContext, checks that binder metadata is instImplicit, and verifies the class name is Decidable. It then runs inferInstance so Lean also typechecks a proof through the registered local instance. The workflow builds each untouched pinned project with leanprover/lean-action@v1 before running the calibration.
+
+The calibration emits a JSON line with a versioned schema marker and the local-instance rows. This establishes only API compatibility and registry capture for a controlled fixture. It does not yet prove that a real SorryDB target proof state was exported or that the complete v2 exporter compiles unchanged across all three versions.

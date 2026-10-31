@@ -356,3 +356,43 @@ jobs:
           cargo run --locked --bin verify_sorrydb_smoke_cohort -- \
             --manifest "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/smoke-cohort-candidates.v0.json" \
             --checkouts-root "$GITHUB_WORKSPACE/_pitb-smoke"
+      - name: Build LeanCourse25 at pinned Lean 4.24.0
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: _pitb-smoke/lean-course25
+          build: "true"
+          test: "false"
+          use-github-cache: "true"
+      - name: Build PrimeNumberTheoremAnd at pinned Lean 4.26.0
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: _pitb-smoke/prime-number-theorem
+          build: "true"
+          test: "false"
+          use-github-cache: "true"
+      - name: Build clap-lean at pinned Lean 4.26.0-rc2
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: _pitb-smoke/clap-lean
+          build: "true"
+          test: "false"
+          use-github-cache: "true"
+      - name: Compile LocalInstances compatibility calibration in all three Lean environments
+        shell: bash
+        run: |
+          set -euo pipefail
+          shim="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/LeanCaptureCompatibilityV0.lean"
+          for project in lean-course25 prime-number-theorem clap-lean; do
+            checkout="$GITHUB_WORKSPACE/_pitb-smoke/$project"
+            log="$RUNNER_TEMP/pitb-lean-capture-compat-$project.log"
+            olean="$RUNNER_TEMP/pitb-lean-capture-compat-$project.olean"
+            (cd "$checkout" && lake env lean "$shim" -o "$olean") 2>&1 | tee "$log"
+            grep -q "PITB_LOCAL_INSTANCE_COMPAT_PASS:" "$log"
+          done
+      - name: Retain Lean LocalInstances compatibility receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-lean-local-instance-compatibility
+          path: ${{ runner.temp }}/pitb-lean-capture-compat-*.log
+          if-no-files-found: warn
