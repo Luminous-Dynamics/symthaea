@@ -49,6 +49,7 @@ use crate::motif::Motif;
 use crate::rhythm::Duration;
 use crate::scale::Scale;
 use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
+use serde::{Deserialize, Serialize};
 
 /// Cantus events (absolute onsets) for a motif emitted at `start` in
 /// `octave` — the same bookkeeping [`crate::fugue`] does locally, needed
@@ -70,6 +71,171 @@ fn cantus_of(scale: Scale, m: &Motif, octave: i32, start: Duration) -> Vec<Cantu
     out
 }
 
+/// Auditable nine-bar plan for the current Renaissance motet-in-miniature.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RenaissancePlan {
+    pub meter: u8,
+    pub total_bars: u8,
+    pub point_one_start_bar: u8,
+    pub point_one_entry_order: Vec<String>,
+    pub bridge_start_bar: u8,
+    pub bridge_bars: u8,
+    pub point_two_start_bar: u8,
+    pub point_two_entry_order: Vec<String>,
+    pub cadence_start_bar: u8,
+    pub alto_suspension_degree: u8,
+    pub alto_resolution_degree: u8,
+    pub soprano_underthird_degrees: [u8; 3],
+    pub bass_final_degree: u8,
+}
+
+/// Score-side checks for the structural obligations of the Renaissance form.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RenaissanceVerification {
+    pub equal_voices_present: bool,
+    pub no_chordal_harmony_voice: bool,
+    pub point_one_entry_order_verified: bool,
+    pub point_two_entry_order_verified: bool,
+    pub alto_suspension_resolves_down_step: bool,
+    pub soprano_landini_underthird_verified: bool,
+    pub bass_closes_on_tonic: bool,
+}
+
+impl RenaissanceVerification {
+    pub fn all_verified(&self) -> bool {
+        self.equal_voices_present
+            && self.no_chordal_harmony_voice
+            && self.point_one_entry_order_verified
+            && self.point_two_entry_order_verified
+            && self.alto_suspension_resolves_down_step
+            && self.soprano_landini_underthird_verified
+            && self.bass_closes_on_tonic
+    }
+}
+
+/// A Renaissance score and the plan/evidence produced by the same engine pass.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RenaissanceRealization {
+    pub score: Score,
+    pub plan: RenaissancePlan,
+    pub verification: RenaissanceVerification,
+}
+
+fn renaissance_plan(meter: u8) -> RenaissancePlan {
+    RenaissancePlan {
+        meter,
+        total_bars: 9,
+        point_one_start_bar: 0,
+        point_one_entry_order: vec!["bassus".into(), "altus".into(), "superius".into()],
+        bridge_start_bar: 3,
+        bridge_bars: 1,
+        point_two_start_bar: 4,
+        point_two_entry_order: vec!["superius".into(), "bassus".into(), "altus".into()],
+        cadence_start_bar: 7,
+        alto_suspension_degree: 7,
+        alto_resolution_degree: 6,
+        soprano_underthird_degrees: [7, 6, 8],
+        bass_final_degree: 1,
+    }
+}
+
+fn first_event_in_bar<'a>(
+    score: &'a Score,
+    role: VoiceRole,
+    start_bar: u8,
+    end_bar: u8,
+) -> Option<&'a ScoreNote> {
+    let start = start_bar as f64 * score.meter as f64;
+    let end = end_bar as f64 * score.meter as f64;
+    score
+        .notes
+        .iter()
+        .filter(|note| note.role == role && note.onset.beats() >= start && note.onset.beats() < end)
+        .min_by(|left, right| left.onset.beats().total_cmp(&right.onset.beats()))
+}
+
+fn verify_renaissance_plan(score: &Score, plan: &RenaissancePlan) -> RenaissanceVerification {
+    let has_role = |role| score.notes.iter().any(|note| note.role == role);
+    let meter = score.meter as f64;
+    let role_at = |role, bar| {
+        first_event_in_bar(score, role, bar, bar.saturating_add(1))
+            .is_some_and(|note| (note.onset.beats() - bar as f64 * meter).abs() <= 1e-7)
+    };
+    let point_one_entry_order_verified =
+        plan.point_one_entry_order == ["bassus", "altus", "superius"]
+            && role_at(VoiceRole::Bass, plan.point_one_start_bar)
+            && role_at(VoiceRole::CounterMelody, plan.point_one_start_bar + 1)
+            && role_at(VoiceRole::Melody, plan.point_one_start_bar + 2);
+    let point_two_entry_order_verified =
+        plan.point_two_entry_order == ["superius", "bassus", "altus"]
+            && role_at(VoiceRole::Melody, plan.point_two_start_bar)
+            && role_at(VoiceRole::Bass, plan.point_two_start_bar + 1)
+            && role_at(VoiceRole::CounterMelody, plan.point_two_start_bar + 2);
+
+    let scale = score.key.scale();
+    let cadence_start = plan.cadence_start_bar as f64 * meter;
+    let cadence_end = plan.total_bars as f64 * meter;
+    let mut alto: Vec<_> = score
+        .notes
+        .iter()
+        .filter(|note| {
+            note.role == VoiceRole::CounterMelody
+                && note.onset.beats() >= cadence_start
+                && note.onset.beats() < cadence_end
+        })
+        .collect();
+    alto.sort_by(|left, right| left.onset.beats().total_cmp(&right.onset.beats()));
+    let alto_suspension_resolves_down_step = alto.len() >= 2
+        && alto[alto.len() - 2].pitch.midi()
+            == scale.degree_pitch(plan.alto_suspension_degree as i32, 4).midi()
+        && alto[alto.len() - 1].pitch.midi()
+            == scale.degree_pitch(plan.alto_resolution_degree as i32, 4).midi();
+
+    let mut soprano: Vec<_> = score
+        .notes
+        .iter()
+        .filter(|note| {
+            note.role == VoiceRole::Melody
+                && note.onset.beats() >= cadence_start
+                && note.onset.beats() < cadence_end
+        })
+        .collect();
+    soprano.sort_by(|left, right| left.onset.beats().total_cmp(&right.onset.beats()));
+    let expected_soprano: Vec<_> = plan
+        .soprano_underthird_degrees
+        .iter()
+        .map(|degree| scale.degree_pitch(*degree as i32, 5).midi())
+        .collect();
+    let actual_soprano: Vec<_> = soprano.iter().map(|note| note.pitch.midi()).collect();
+    let soprano_landini_underthird_verified = actual_soprano == expected_soprano;
+
+    let mut bass: Vec<_> = score
+        .notes
+        .iter()
+        .filter(|note| {
+            note.role == VoiceRole::Bass
+                && note.onset.beats() >= cadence_start
+                && note.onset.beats() < cadence_end
+        })
+        .collect();
+    bass.sort_by(|left, right| left.onset.beats().total_cmp(&right.onset.beats()));
+    let bass_closes_on_tonic = bass.last().is_some_and(|note| {
+        note.pitch.midi() == scale.degree_pitch(plan.bass_final_degree as i32, 3).midi()
+    });
+
+    RenaissanceVerification {
+        equal_voices_present: has_role(VoiceRole::Melody)
+            && has_role(VoiceRole::CounterMelody)
+            && has_role(VoiceRole::Bass),
+        no_chordal_harmony_voice: !has_role(VoiceRole::Harmony),
+        point_one_entry_order_verified,
+        point_two_entry_order_verified,
+        alto_suspension_resolves_down_step,
+        soprano_landini_underthird_verified,
+        bass_closes_on_tonic,
+    }
+}
+
 /// Compose the motet-in-miniature. `point1` arrives already hook-grafted
 /// (the piece's name). Fixed 9-bar shape:
 ///
@@ -86,6 +252,18 @@ pub(crate) fn realize_renaissance(
     point1: &Motif,
     seed: u64,
 ) -> Score {
+    realize_renaissance_with_plan(key, tempo_bpm, meter, point1, seed).score
+}
+
+/// Plan-preserving realization used by the grammar evidence boundary.
+pub(crate) fn realize_renaissance_with_plan(
+    key: Key,
+    tempo_bpm: f32,
+    meter: u8,
+    point1: &Motif,
+    seed: u64,
+) -> RenaissanceRealization {
+    let plan = renaissance_plan(meter);
     let mut score = Score::new(key, tempo_bpm, meter);
     let scale = key.scale();
     let s_beats = meter as i64;
@@ -308,7 +486,8 @@ pub(crate) fn realize_renaissance(
         Cadential,
     );
 
-    score
+    let verification = verify_renaissance_plan(&score, &plan);
+    RenaissanceRealization { score, plan, verification }
 }
 
 #[cfg(test)]
@@ -348,8 +527,13 @@ mod tests {
     #[test]
     fn realize_renaissance_composes_three_independent_voices() {
         let key = Key::modal(PitchClass::D, crate::scale::Mode::Dorian).unwrap();
-        let score = realize_renaissance(key, 92.0, 4, &point(), 7);
+        let realized = realize_renaissance_with_plan(key, 92.0, 4, &point(), 7);
+        let score = realized.score;
         assert!(!score.notes.is_empty(), "a real piece must come out");
+        assert!(realized.verification.all_verified(), "{:?}", realized.verification);
+        assert_eq!(realized.plan.total_bars, 9);
+        assert_eq!(realized.plan.point_one_entry_order, vec!["bassus", "altus", "superius"]);
+        assert_eq!(realized.plan.point_two_entry_order, vec!["superius", "bassus", "altus"]);
         let has_role = |r: VoiceRole| score.notes.iter().any(|n| n.role == r);
         assert!(has_role(VoiceRole::Melody), "soprano must sound");
         assert!(has_role(VoiceRole::CounterMelody), "alto must sound");
