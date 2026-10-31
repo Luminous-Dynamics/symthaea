@@ -13,6 +13,9 @@ cargo test --manifest-path research/pod-meta-efficiency-lab/Cargo.toml
 cargo run --manifest-path research/pod-meta-efficiency-lab/Cargo.toml --bin pod-meta-efficiency
 cargo fmt --manifest-path research/pod-meta-efficiency-lab/Cargo.toml -- --check
 cargo clippy --manifest-path research/pod-meta-efficiency-lab/Cargo.toml --all-targets -- -D warnings
+cargo fmt --manifest-path research/pod-meta-lab/Cargo.toml -- --check
+cargo test --manifest-path research/pod-meta-lab/Cargo.toml
+cargo clippy --manifest-path research/pod-meta-lab/Cargo.toml --all-targets -- -D warnings
 ~~~
 
 The runner prints 280 data rows: 8 task profiles × 5 resource budgets × 7 policy arms, plus a header. Each row binds seed 1729 and reports the native POD-Meta scheduler's candidate rejections. The full external benchmark mapping and comparability rules are recorded in EXTERNAL_BENCHMARK_MATRIX_V1.md.
