@@ -31,6 +31,47 @@ pub struct Network {
     pub edges: Vec<Edge>,
 }
 
+
+/// Context used by an explicitly state-conditioned synthetic circuit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CircuitState {
+    Resting,
+    Active,
+}
+
+/// Declares when a contextual edge is available. This is a model condition,
+/// not a claim that an anatomical synapse appears or disappears biologically.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EdgeScope {
+    Both,
+    RestingOnly,
+    ActiveOnly,
+}
+
+/// Node output nonlinearity for an exact synthetic fixture.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum NodeTransfer {
+    Identity,
+    Threshold { threshold: f64 },
+    Clamp { minimum: f64, maximum: f64 },
+}
+
+/// A delay-bearing edge with an explicit state applicability rule.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ContextualEdge {
+    pub edge: Edge,
+    pub scope: EdgeScope,
+}
+
+/// Contextual nonlinear network, kept separate from the linear reference
+/// network so that comparisons cannot silently change model semantics.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ContextualNetwork {
+    pub node_count: usize,
+    pub edges: Vec<ContextualEdge>,
+    pub transfers: Vec<NodeTransfer>,
+}
+
 /// A declared extrasynaptic/latent coupling kept separate from anatomical edges.
 ///
 /// This is a phenomenological model term. Its presence does not identify a
@@ -71,6 +112,8 @@ pub enum OracleError {
     ShapeMismatch,
     TargetOutOfRange { node: usize, node_count: usize },
     InvalidThreshold,
+    TransferCountMismatch { expected: usize, actual: usize },
+    InvalidTransferParameters,
 }
 
 impl fmt::Display for OracleError {
@@ -99,6 +142,12 @@ impl fmt::Display for OracleError {
             }
             Self::InvalidThreshold => {
                 write!(formatter, "detection threshold must be finite and non-negative")
+            }
+            Self::TransferCountMismatch { expected, actual } => {
+                write!(formatter, "expected {expected} node transfers, received {actual}")
+            }
+            Self::InvalidTransferParameters => {
+                write!(formatter, "node transfer parameters must be finite and ordered")
             }
         }
     }
@@ -196,6 +245,215 @@ pub fn simulate(
     }
 
     Ok(Trajectory { values })
+}
+
+
+fn apply_transfer(transfer: NodeTransfer, value: f64) -> Result<f64, OracleError> {
+    if !value.is_finite() {
+        return Err(OracleError::NonFiniteParameter);
+    }
+    let output = match transfer {
+        NodeTransfer::Identity => value,
+        NodeTransfer::Threshold { threshold } => {
+            if !threshold.is_finite() {
+                return Err(OracleError::InvalidTransferParameters);
+            }
+            if value >= threshold { 1.0 } else { 0.0 }
+        }
+        NodeTransfer::Clamp { minimum, maximum } => {
+            if !minimum.is_finite() || !maximum.is_finite() || minimum > maximum {
+                return Err(OracleError::InvalidTransferParameters);
+            }
+            value.clamp(minimum, maximum)
+        }
+    };
+    if !output.is_finite() {
+        return Err(OracleError::NonFiniteParameter);
+    }
+    Ok(output)
+}
+
+/// Simulate a nonlinear network under one frozen context/state.
+///
+/// All edges read only earlier epochs. The transfer function is applied to
+/// each node after its external input and incoming delayed signals are summed.
+pub fn simulate_contextual(
+    network: &ContextualNetwork,
+    state: CircuitState,
+    horizon: usize,
+    inputs: &[Injection],
+) -> Result<Trajectory, OracleError> {
+    if network.transfers.len() != network.node_count {
+        return Err(OracleError::TransferCountMismatch {
+            expected: network.node_count,
+            actual: network.transfers.len(),
+        });
+    }
+
+    let base = Network {
+        node_count: network.node_count,
+        edges: network.edges.iter().map(|item| item.edge).collect(),
+    };
+    validate(&base, horizon, inputs)?;
+
+    for transfer in &network.transfers {
+        match *transfer {
+            NodeTransfer::Identity => {}
+            NodeTransfer::Threshold { threshold } => {
+                if !threshold.is_finite() {
+                    return Err(OracleError::InvalidTransferParameters);
+                }
+            }
+            NodeTransfer::Clamp { minimum, maximum } => {
+                if !minimum.is_finite() || !maximum.is_finite() || minimum > maximum {
+                    return Err(OracleError::InvalidTransferParameters);
+                }
+            }
+        }
+    }
+
+    let mut values = vec![vec![0.0; network.node_count]; horizon];
+    for epoch in 0..horizon {
+        let mut summed = vec![0.0; network.node_count];
+        for input in inputs.iter().filter(|input| input.epoch == epoch) {
+            summed[input.node] += input.amplitude;
+        }
+
+        for contextual_edge in &network.edges {
+            let enabled = match contextual_edge.scope {
+                EdgeScope::Both => true,
+                EdgeScope::RestingOnly => state == CircuitState::Resting,
+                EdgeScope::ActiveOnly => state == CircuitState::Active,
+            };
+            let edge = contextual_edge.edge;
+            if enabled && epoch >= edge.delay {
+                summed[edge.target] += edge.weight * values[epoch - edge.delay][edge.source];
+            }
+        }
+
+        for node in 0..network.node_count {
+            values[epoch][node] = apply_transfer(network.transfers[node], summed[node])?;
+        }
+    }
+
+    Ok(Trajectory { values })
+}
+
+fn with_interventions(
+    baseline: &[Injection],
+    interventions: &[Injection],
+) -> Vec<Injection> {
+    let mut combined = baseline.to_vec();
+    combined.extend_from_slice(interventions);
+    combined
+}
+
+/// Time-resolved two-factor interaction: Y(AB) - Y(A) - Y(B) + Y(0).
+///
+/// A nonzero value identifies non-additivity in this synthetic model under the
+/// declared state and observation horizon. It does not identify a biological
+/// molecular mechanism.
+pub fn factorial_interaction_trace(
+    network: &ContextualNetwork,
+    state: CircuitState,
+    horizon: usize,
+    baseline_inputs: &[Injection],
+    intervention_a: Injection,
+    intervention_b: Injection,
+    target: usize,
+) -> Result<Vec<f64>, OracleError> {
+    if target >= network.node_count {
+        return Err(OracleError::TargetOutOfRange {
+            node: target,
+            node_count: network.node_count,
+        });
+    }
+    let baseline = simulate_contextual(network, state, horizon, baseline_inputs)?;
+    let only_a = simulate_contextual(
+        network,
+        state,
+        horizon,
+        &with_interventions(baseline_inputs, &[intervention_a]),
+    )?;
+    let only_b = simulate_contextual(
+        network,
+        state,
+        horizon,
+        &with_interventions(baseline_inputs, &[intervention_b]),
+    )?;
+    let both = simulate_contextual(
+        network,
+        state,
+        horizon,
+        &with_interventions(baseline_inputs, &[intervention_a, intervention_b]),
+    )?;
+
+    let mut interaction = Vec::with_capacity(horizon);
+    for epoch in 0..horizon {
+        let value = both.values[epoch][target]
+            - only_a.values[epoch][target]
+            - only_b.values[epoch][target]
+            + baseline.values[epoch][target];
+        if !value.is_finite() {
+            return Err(OracleError::NonFiniteParameter);
+        }
+        interaction.push(value);
+    }
+    Ok(interaction)
+}
+
+/// Time-resolved third-order finite difference over three simultaneous
+/// interventions, requiring all eight factorial arms.
+pub fn third_order_interaction_trace(
+    network: &ContextualNetwork,
+    state: CircuitState,
+    horizon: usize,
+    baseline_inputs: &[Injection],
+    intervention_a: Injection,
+    intervention_b: Injection,
+    intervention_c: Injection,
+    target: usize,
+) -> Result<Vec<f64>, OracleError> {
+    if target >= network.node_count {
+        return Err(OracleError::TargetOutOfRange {
+            node: target,
+            node_count: network.node_count,
+        });
+    }
+    let run = |items: &[Injection]| -> Result<Trajectory, OracleError> {
+        simulate_contextual(
+            network,
+            state,
+            horizon,
+            &with_interventions(baseline_inputs, items),
+        )
+    };
+
+    let baseline = run(&[])?;
+    let a = run(&[intervention_a])?;
+    let b = run(&[intervention_b])?;
+    let c = run(&[intervention_c])?;
+    let ab = run(&[intervention_a, intervention_b])?;
+    let ac = run(&[intervention_a, intervention_c])?;
+    let bc = run(&[intervention_b, intervention_c])?;
+    let abc = run(&[intervention_a, intervention_b, intervention_c])?;
+
+    let mut interaction = Vec::with_capacity(horizon);
+    for epoch in 0..horizon {
+        let value = abc.values[epoch][target]
+            - ab.values[epoch][target]
+            - ac.values[epoch][target]
+            - bc.values[epoch][target]
+            + a.values[epoch][target]
+            + b.values[epoch][target]
+            + c.values[epoch][target]
+            - baseline.values[epoch][target];
+        if !value.is_finite() {
+            return Err(OracleError::NonFiniteParameter);
+        }
+        interaction.push(value);
+    }
+    Ok(interaction)
 }
 
 fn combined_model_network(model: &CouplingModel) -> Result<Network, OracleError> {
@@ -977,6 +1235,162 @@ mod tests {
     fn json_report_matches_the_pinned_golden_fixture_byte_for_byte() {
         let expected = include_str!("../fixtures/reference-suite.expected.json");
         assert_eq!(reference_suite_json().unwrap(), expected);
+    }
+
+
+    #[test]
+    fn threshold_gate_exposes_pairwise_synergy_missed_by_single_target_trials() {
+        let network = ContextualNetwork {
+            node_count: 3,
+            edges: vec![
+                ContextualEdge {
+                    edge: Edge { source: 0, target: 2, weight: 0.5, delay: 1 },
+                    scope: EdgeScope::Both,
+                },
+                ContextualEdge {
+                    edge: Edge { source: 1, target: 2, weight: 0.5, delay: 1 },
+                    scope: EdgeScope::Both,
+                },
+            ],
+            transfers: vec![
+                NodeTransfer::Identity,
+                NodeTransfer::Identity,
+                NodeTransfer::Threshold { threshold: 1.0 },
+            ],
+        };
+        let a = Injection { node: 0, epoch: 0, amplitude: 1.0 };
+        let b = Injection { node: 1, epoch: 0, amplitude: 1.0 };
+        let interaction = factorial_interaction_trace(
+            &network, CircuitState::Resting, 3, &[], a, b, 2,
+        ).unwrap();
+        assert_eq!(interaction, trace(&[0.0, 1.0, 0.0]));
+    }
+
+    #[test]
+    fn additive_linear_network_has_zero_factorial_interaction() {
+        let network = ContextualNetwork {
+            node_count: 3,
+            edges: vec![
+                ContextualEdge {
+                    edge: Edge { source: 0, target: 2, weight: 0.5, delay: 1 },
+                    scope: EdgeScope::Both,
+                },
+                ContextualEdge {
+                    edge: Edge { source: 1, target: 2, weight: 0.5, delay: 1 },
+                    scope: EdgeScope::Both,
+                },
+            ],
+            transfers: vec![NodeTransfer::Identity; 3],
+        };
+        let a = Injection { node: 0, epoch: 0, amplitude: 1.0 };
+        let b = Injection { node: 1, epoch: 0, amplitude: 1.0 };
+        let interaction = factorial_interaction_trace(
+            &network, CircuitState::Resting, 3, &[], a, b, 2,
+        ).unwrap();
+        assert_eq!(interaction, trace(&[0.0, 0.0, 0.0]));
+    }
+
+    #[test]
+    fn saturation_produces_negative_pairwise_interaction() {
+        let network = ContextualNetwork {
+            node_count: 3,
+            edges: vec![
+                ContextualEdge {
+                    edge: Edge { source: 0, target: 2, weight: 1.0, delay: 1 },
+                    scope: EdgeScope::Both,
+                },
+                ContextualEdge {
+                    edge: Edge { source: 1, target: 2, weight: 1.0, delay: 1 },
+                    scope: EdgeScope::Both,
+                },
+            ],
+            transfers: vec![
+                NodeTransfer::Identity,
+                NodeTransfer::Identity,
+                NodeTransfer::Clamp { minimum: 0.0, maximum: 1.0 },
+            ],
+        };
+        let a = Injection { node: 0, epoch: 0, amplitude: 1.0 };
+        let b = Injection { node: 1, epoch: 0, amplitude: 1.0 };
+        let interaction = factorial_interaction_trace(
+            &network, CircuitState::Resting, 3, &[], a, b, 2,
+        ).unwrap();
+        assert_eq!(interaction, trace(&[0.0, -1.0, 0.0]));
+    }
+
+    #[test]
+    fn three_way_threshold_gate_has_nonzero_third_order_interaction() {
+        let network = ContextualNetwork {
+            node_count: 4,
+            edges: vec![
+                ContextualEdge {
+                    edge: Edge { source: 0, target: 3, weight: 0.5, delay: 1 },
+                    scope: EdgeScope::Both,
+                },
+                ContextualEdge {
+                    edge: Edge { source: 1, target: 3, weight: 0.5, delay: 1 },
+                    scope: EdgeScope::Both,
+                },
+                ContextualEdge {
+                    edge: Edge { source: 2, target: 3, weight: 0.5, delay: 1 },
+                    scope: EdgeScope::Both,
+                },
+            ],
+            transfers: vec![
+                NodeTransfer::Identity,
+                NodeTransfer::Identity,
+                NodeTransfer::Identity,
+                NodeTransfer::Threshold { threshold: 1.5 },
+            ],
+        };
+        let a = Injection { node: 0, epoch: 0, amplitude: 1.0 };
+        let b = Injection { node: 1, epoch: 0, amplitude: 1.0 };
+        let c = Injection { node: 2, epoch: 0, amplitude: 1.0 };
+        let interaction = third_order_interaction_trace(
+            &network, CircuitState::Active, 3, &[], a, b, c, 3,
+        ).unwrap();
+        assert_eq!(interaction, trace(&[0.0, 1.0, 0.0]));
+    }
+
+    #[test]
+    fn state_gated_edge_changes_response_without_changing_topology() {
+        let network = ContextualNetwork {
+            node_count: 2,
+            edges: vec![ContextualEdge {
+                edge: Edge { source: 0, target: 1, weight: 0.75, delay: 1 },
+                scope: EdgeScope::ActiveOnly,
+            }],
+            transfers: vec![NodeTransfer::Identity; 2],
+        };
+        let input = [Injection { node: 0, epoch: 0, amplitude: 1.0 }];
+        let resting = simulate_contextual(&network, CircuitState::Resting, 3, &input).unwrap();
+        let active = simulate_contextual(&network, CircuitState::Active, 3, &input).unwrap();
+        assert_eq!(resting.node_trace(1).unwrap(), trace(&[0.0, 0.0, 0.0]));
+        assert_eq!(active.node_trace(1).unwrap(), trace(&[0.0, 0.75, 0.0]));
+        assert_eq!(network.edges.len(), 1);
+    }
+
+    #[test]
+    fn contextual_network_rejects_transfer_count_and_bad_clamp() {
+        let mismatch = ContextualNetwork {
+            node_count: 2,
+            edges: vec![],
+            transfers: vec![NodeTransfer::Identity],
+        };
+        assert_eq!(
+            simulate_contextual(&mismatch, CircuitState::Resting, 2, &[]),
+            Err(OracleError::TransferCountMismatch { expected: 2, actual: 1 })
+        );
+
+        let bad_clamp = ContextualNetwork {
+            node_count: 1,
+            edges: vec![],
+            transfers: vec![NodeTransfer::Clamp { minimum: 2.0, maximum: 1.0 }],
+        };
+        assert_eq!(
+            simulate_contextual(&bad_clamp, CircuitState::Resting, 2, &[]),
+            Err(OracleError::InvalidTransferParameters)
+        );
     }
 
     #[test]
