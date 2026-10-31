@@ -241,7 +241,8 @@ fn validate_task(task: &Task, root: &Path, index: usize) -> Result<()> {
     let expected = TASKS.get(index).context("too many tasks in smoke cohort")?;
     if task.ordinal != index || task.task_id != expected.id
         || task.repository.remote != expected.remote || task.repository.commit != expected.commit
-        || task.repository.lean_version != expected.lean || task.checkout_directory != expected.checkout
+        || task.repository.lean_version != expected.lean
+        || task.checkout_directory != expected.checkout
         || task.selection_role != expected.role
     {
         bail!("task {index} differs from its fixed smoke-cohort identity");
@@ -274,7 +275,10 @@ fn validate_task(task: &Task, root: &Path, index: usize) -> Result<()> {
     }
     let remote = git(&checkout, &["remote", "get-url", "origin"])?;
     if normalize_remote(&remote) != normalize_remote(&task.repository.remote) {
-        bail!("task {index} remote mismatch: expected {}, received {remote}", task.repository.remote);
+        bail!(
+            "task {index} remote mismatch: expected {}, received {remote}",
+            task.repository.remote
+        );
     }
     if !git(&checkout, &["status", "--porcelain", "--untracked-files=no"])?.is_empty() {
         bail!("task {index} checkout has tracked modifications");
@@ -293,7 +297,9 @@ fn validate_task(task: &Task, root: &Path, index: usize) -> Result<()> {
         }
         let actual = blob_sha1(&checkout, path)?;
         if actual != expected_sha {
-            bail!("task {index} blob mismatch for {path}: expected {expected_sha}, received {actual}");
+            bail!(
+                "task {index} blob mismatch for {path}: expected {expected_sha}, received {actual}"
+            );
         }
     }
     let toolchain = fs::read_to_string(checkout.join("lean-toolchain"))?;
@@ -420,7 +426,12 @@ fn parse_args() -> Result<Mode> {
 fn run() -> Result<()> {
     match parse_args()? {
         Mode::Help => {
-            println!("Usage: verify_sorrydb_smoke_cohort --self-test | --manifest FILE --checkouts-root DIR");
+            println!(
+                concat!(
+                    "Usage: verify_sorrydb_smoke_cohort --self-test | ",
+                    "--manifest FILE --checkouts-root DIR"
+                )
+            );
             Ok(())
         }
         Mode::SelfTest => self_test(),
@@ -429,7 +440,12 @@ fn run() -> Result<()> {
                 .with_context(|| format!("read manifest {}", manifest.display()))?;
             let parsed: Manifest = serde_json::from_slice(&bytes)?;
             validate_manifest(&parsed, &root)?;
-            println!("PITB_SORRYDB_SMOKE_SOURCE_VALIDATION_PASS: tasks=3 projects=3 toolchains=3; no build/proof result");
+            println!(
+                concat!(
+                    "PITB_SORRYDB_SMOKE_SOURCE_VALIDATION_PASS: tasks=3 ",
+                    "projects=3 toolchains=3; no build/proof result"
+                )
+            );
             Ok(())
         }
     }
