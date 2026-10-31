@@ -22,14 +22,14 @@
         "observed_history.x",
         "observed_history.v",
         "left_action",
-        "right_action",
-        "forecast_kind"
+        "right_action"
       ],
       "output": [
         "predicted_pairwise_utility_delta",
-        "forecast_kind_provenance"
+        "counterfactual_pairwise_utility_delta"
       ],
-      "model": "history_sign_slope_plus_grip_delta"
+      "model": "history_sign_slope_plus_grip_delta",
+      "provenance": "counterfactual_by_definition"
     },
     {
       "id": "shuffled_action_labels",
