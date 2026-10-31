@@ -68,7 +68,7 @@ pub struct FleetDeploymentManifest {
     pub fleet_sha256: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FleetEvidenceDisposition {
     Measured,
@@ -975,8 +975,11 @@ mod tests {
 
     #[test]
     fn worst_device_utility_not_average_controls_fleet_feasibility() {
-        let (profiles, registries, manifest, config) = fixture();
-        // Mean accuracy is 0.90, but one target is below the 0.80 floor.
+        let (profiles, registries, mut manifest, config) = fixture();
+        // Mean latency utility is 0.725, but the worst target is 0.65 < 0.70.
+        manifest.objectives[1].minimum_utility = 0.70;
+        manifest.fleet_sha256 =
+            compute_fleet_deployment_manifest_sha256(&manifest).unwrap();
         let observations = complete_observations(
             &profiles,
             &registries,
@@ -986,11 +989,13 @@ mod tests {
         let result = evaluate_fleet_candidate(
             &manifest, &registries, "candidate-A", &config, &observations,
         ).unwrap();
-        assert_eq!(result.status, FleetCandidateStatus::FeasibleAllRequiredTargets);
+        assert_eq!(result.status, FleetCandidateStatus::InfeasibleAtLeastOneRequiredTarget);
         let latency = result.objective_envelopes.as_ref().unwrap().iter()
             .find(|item| item.objective_id == "latency").unwrap();
         assert!((latency.worst_utility - 0.65).abs() < 1e-12);
         assert!((latency.cross_target_spread - 0.15).abs() < 1e-12);
+        assert_eq!(result.constraint_violations.len(), 1);
+        assert_eq!(result.constraint_violations[0].target_id, "nrf5340");
     }
 
     #[test]
@@ -1137,8 +1142,11 @@ mod tests {
         ).unwrap();
         let mut changed = result.clone();
         changed.status = FleetCandidateStatus::FeasibleAllRequiredTargets;
-        changed.evaluation_sha256 = "0".repeat(64);
-        assert!(verify_fleet_candidate_evaluation_digest(&changed).is_err());
+        changed.evaluation_sha256 = compute_evaluation_sha256(&changed).unwrap();
+        verify_fleet_candidate_evaluation_digest(&changed).unwrap();
+        assert!(verify_fleet_candidate_evaluation(
+            &manifest, &registries, "candidate-A", &config, &observations, &changed,
+        ).is_err());
     }
 
     #[test]
