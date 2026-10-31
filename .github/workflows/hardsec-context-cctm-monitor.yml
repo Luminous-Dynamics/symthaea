@@ -66,5 +66,6 @@ jobs:
           assert guarantee["context_assignment_exogeneity_status"] == "assumption_not_verified"
           assert guarantee["theorem_guarantee_status"] == "not_established_from_input_receipts"
           assert guarantee["effective_sample_size_estimate"] is None
+          assert receipt["theoretical_contract"]["null_hypothesis"].find("i.i.d.") >= 0
           assert any(row["abstention_reason"] == "unseen_workload_context" for row in monitor["window_decisions"])
           PY
