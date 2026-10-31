@@ -47,6 +47,14 @@ pub enum DirectionLandscapeFamily {
     NewOperatorBreakthrough,
     /// The early score ranking reverses after a delayed intervention.
     RankReversal,
+    /// A high-scoring proxy collapses while a slower direction yields better final transfer.
+    DeceptiveProxy,
+    /// One direction has high payoff variance while another is stable but less flashy.
+    HeteroscedasticRewards,
+    /// Two initial directions share a strongly correlated payoff profile.
+    CorrelatedDirections,
+    /// Explicit no-breakthrough/no-new-opportunity null control.
+    NullNoBreakthrough,
 }
 
 /// Search policies compared under identical action budgets and payoff schedules.
@@ -1014,6 +1022,36 @@ fn schedule(
         (DirectionLandscapeFamily::RankReversal, "A") => &[0.92, 0.42, 0.25],
         (DirectionLandscapeFamily::RankReversal, "B") => &[0.18, 0.35, 0.95],
         (DirectionLandscapeFamily::RankReversal, "C") => &[0.58, 0.60, 0.61],
+        (DirectionLandscapeFamily::DeceptiveProxy, "A") => &[0.93, 0.92, 0.35, 0.25],
+        (DirectionLandscapeFamily::DeceptiveProxy, "B") => &[0.45, 0.55, 0.75, 0.96],
+        (DirectionLandscapeFamily::DeceptiveProxy, "C") => &[0.62, 0.63, 0.64, 0.65],
+        (DirectionLandscapeFamily::HeteroscedasticRewards, "A") => {
+            &[0.50, 0.92, 0.32, 0.88, 0.28, 0.95]
+        }
+        (DirectionLandscapeFamily::HeteroscedasticRewards, "B") => {
+            &[0.65, 0.66, 0.64, 0.66, 0.65, 0.66]
+        }
+        (DirectionLandscapeFamily::HeteroscedasticRewards, "C") => {
+            &[0.55, 0.57, 0.56, 0.59, 0.58, 0.60]
+        }
+        (DirectionLandscapeFamily::CorrelatedDirections, "A") => {
+            &[0.60, 0.66, 0.70, 0.73, 0.75]
+        }
+        (DirectionLandscapeFamily::CorrelatedDirections, "B") => {
+            &[0.61, 0.65, 0.71, 0.72, 0.74]
+        }
+        (DirectionLandscapeFamily::CorrelatedDirections, "C") => {
+            &[0.50, 0.52, 0.55, 0.57, 0.58]
+        }
+        (DirectionLandscapeFamily::NullNoBreakthrough, "A") => {
+            &[0.60, 0.60, 0.60, 0.60, 0.60]
+        }
+        (DirectionLandscapeFamily::NullNoBreakthrough, "B") => {
+            &[0.60, 0.60, 0.60, 0.60, 0.60]
+        }
+        (DirectionLandscapeFamily::NullNoBreakthrough, "C") => {
+            &[0.60, 0.60, 0.60, 0.60, 0.60]
+        }
         _ => &[],
     }
 }
@@ -1334,11 +1372,15 @@ mod tests {
         DirectionCampaignPolicy::OracleUpperBound,
     ];
 
-    const LANDSCAPES: [DirectionLandscapeFamily; 4] = [
+    const LANDSCAPES: [DirectionLandscapeFamily; 8] = [
         DirectionLandscapeFamily::DelayedBreakthrough,
         DirectionLandscapeFamily::NoNewDirection,
         DirectionLandscapeFamily::NewOperatorBreakthrough,
         DirectionLandscapeFamily::RankReversal,
+        DirectionLandscapeFamily::DeceptiveProxy,
+        DirectionLandscapeFamily::HeteroscedasticRewards,
+        DirectionLandscapeFamily::CorrelatedDirections,
+        DirectionLandscapeFamily::NullNoBreakthrough,
     ];
 
     #[test]
@@ -1544,6 +1586,59 @@ mod tests {
         assert_eq!(aggregate[0].mean_total_cost_units, 32.0);
         assert!(aggregate_direction_campaign_runs(&[run.clone(), run]).is_err());
     }
+
+    #[test]
+    fn deceptive_proxy_reverses_final_best_direction_after_an_early_proxy_lead() {
+        let early_proxy = payoff(DirectionLandscapeFamily::DeceptiveProxy, "A", 0);
+        let delayed_transfer = payoff(DirectionLandscapeFamily::DeceptiveProxy, "B", 3);
+        assert!(early_proxy > delayed_transfer * 0.9);
+        assert!(delayed_transfer > early_proxy);
+        assert_eq!(oracle_best_score(DirectionLandscapeFamily::DeceptiveProxy), 0.96);
+        assert!(!landscape_has_new_operator(DirectionLandscapeFamily::DeceptiveProxy));
+    }
+
+    #[test]
+    fn heteroscedastic_reward_control_has_distinct_arm_variances() {
+        let high_variance = schedule(
+            DirectionLandscapeFamily::HeteroscedasticRewards,
+            "A",
+        );
+        let low_variance = schedule(
+            DirectionLandscapeFamily::HeteroscedasticRewards,
+            "B",
+        );
+        let variance = |values: &[f64]| {
+            let mean = values.iter().sum::<f64>() / values.len() as f64;
+            values
+                .iter()
+                .map(|value| (value - mean).powi(2))
+                .sum::<f64>()
+                / values.len() as f64
+        };
+        assert!(variance(high_variance) > variance(low_variance) * 20.0);
+    }
+
+    #[test]
+    fn correlated_direction_control_uses_near_parallel_reward_profiles() {
+        let left = schedule(DirectionLandscapeFamily::CorrelatedDirections, "A");
+        let right = schedule(DirectionLandscapeFamily::CorrelatedDirections, "B");
+        assert_eq!(left.len(), right.len());
+        assert!(left.iter().zip(right).all(|(a, b)| (a - b).abs() <= 0.02));
+        assert!(!landscape_has_new_operator(DirectionLandscapeFamily::CorrelatedDirections));
+    }
+
+    #[test]
+    fn null_no_breakthrough_control_has_no_directional_or_new_operator_advantage() {
+        let a = schedule(DirectionLandscapeFamily::NullNoBreakthrough, "A");
+        let b = schedule(DirectionLandscapeFamily::NullNoBreakthrough, "B");
+        let c = schedule(DirectionLandscapeFamily::NullNoBreakthrough, "C");
+        assert!(a.iter().all(|value| *value == 0.60));
+        assert_eq!(a, b);
+        assert_eq!(b, c);
+        assert!(!landscape_has_new_operator(DirectionLandscapeFamily::NullNoBreakthrough));
+        assert_eq!(oracle_best_score(DirectionLandscapeFamily::NullNoBreakthrough), 0.60);
+    }
+
     #[test]
     fn synthetic_campaign_emits_integrity_checkable_but_unmetered_event_tape() {
         let run = run_direction_campaign(
