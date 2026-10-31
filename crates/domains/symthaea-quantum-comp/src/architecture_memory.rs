@@ -242,7 +242,8 @@ pub struct MemoryRegion {
     pub scope: MemoryScope,
     /// Usable capacity interval, if known.
     pub capacity_bytes: Option<MemoryInterval>,
-    /// Observed occupancy/high-water interval, if known.
+    /// Existing reserved/background occupancy, excluding the logical state placements
+    /// listed in this topology record. Required to prove guaranteed placement capacity.
     pub occupancy_bytes: Option<MemoryInterval>,
     /// Read access latency in seconds, if measured.
     pub read_latency_seconds: Option<MetricInterval>,
@@ -396,6 +397,8 @@ pub enum MemoryTopologyError {
     InvalidPositiveCount,
     /// A measured occupancy definitely exceeds declared capacity.
     MemoryCapacityExceeded,
+    /// Guaranteed residency has no known existing/background occupancy bound.
+    UnknownOccupancyForGuaranteedPlacement,
     /// Capacity intervals overlap so a guaranteed fit cannot be proven.
     MemoryCapacityNotProven,
     /// Guaranteed residency has no known capacity.
@@ -641,7 +644,9 @@ pub fn validate_memory_topology(
     }
 
     let mut placement_pairs = HashSet::new();
+    let mut placement_lower_by_region: HashMap<&str, u64> = HashMap::new();
     let mut placement_upper_by_region: HashMap<&str, u64> = HashMap::new();
+    let mut guaranteed_regions = HashSet::new();
     for placement in &topology.state_placements {
         if !non_empty(&placement.state_class_id)
             || !non_empty(&placement.region_id)
@@ -680,36 +685,52 @@ pub fn validate_memory_topology(
             if region.capacity_bytes.is_none() {
                 return Err(MemoryTopologyError::UnknownCapacityForGuaranteedPlacement);
             }
-            let Some(live_bytes) = placement.live_bytes else {
+            if region.occupancy_bytes.is_none() {
+                return Err(MemoryTopologyError::UnknownOccupancyForGuaranteedPlacement);
+            }
+            guaranteed_regions.insert(placement.region_id.as_str());
+            if placement.live_bytes.is_none() {
                 return Err(MemoryTopologyError::MissingLiveSetForGuaranteedPlacement);
-            };
-            let current = placement_upper_by_region
+            }
+        }
+        if let Some(live_bytes) = placement.live_bytes {
+            let lower_current = placement_lower_by_region
                 .get(placement.region_id.as_str())
                 .copied()
                 .unwrap_or(0);
-            let total = current
-                .checked_add(live_bytes.upper_bytes)
+            let lower_total = lower_current
+                .checked_add(live_bytes.lower_bytes)
                 .ok_or(MemoryTopologyError::PlacementCapacityExceeded)?;
-            placement_upper_by_region.insert(placement.region_id.as_str(), total);
-        } else if let Some(live_bytes) = placement.live_bytes {
-            let current = placement_upper_by_region
+            placement_lower_by_region.insert(placement.region_id.as_str(), lower_total);
+
+            let upper_current = placement_upper_by_region
                 .get(placement.region_id.as_str())
                 .copied()
                 .unwrap_or(0);
-            let total = current
+            let upper_total = upper_current
                 .checked_add(live_bytes.upper_bytes)
                 .ok_or(MemoryTopologyError::PlacementCapacityExceeded)?;
-            placement_upper_by_region.insert(placement.region_id.as_str(), total);
+            placement_upper_by_region.insert(placement.region_id.as_str(), upper_total);
         }
     }
 
     for (region_id, placement_upper) in placement_upper_by_region {
         let region = region_by_id[region_id];
-        if let Some(capacity) = region.capacity_bytes {
-            if placement_upper > capacity.upper_bytes {
+        if let (Some(capacity), Some(occupancy)) = (region.capacity_bytes, region.occupancy_bytes) {
+            let placement_lower = placement_lower_by_region[region_id];
+            let minimum_total = occupancy
+                .lower_bytes
+                .checked_add(placement_lower)
+                .ok_or(MemoryTopologyError::PlacementCapacityExceeded)?;
+            let maximum_total = occupancy
+                .upper_bytes
+                .checked_add(placement_upper)
+                .ok_or(MemoryTopologyError::PlacementCapacityExceeded)?;
+
+            if minimum_total > capacity.upper_bytes {
                 return Err(MemoryTopologyError::PlacementCapacityExceeded);
             }
-            if placement_upper > capacity.lower_bytes {
+            if guaranteed_regions.contains(region_id) && maximum_total > capacity.lower_bytes {
                 return Err(MemoryTopologyError::PlacementCapacityNotProven);
             }
         }
