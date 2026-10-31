@@ -15,11 +15,11 @@ cargo fmt --manifest-path research/pod-meta-efficiency-lab/Cargo.toml -- --check
 cargo clippy --manifest-path research/pod-meta-efficiency-lab/Cargo.toml --all-targets -- -D warnings
 ~~~
 
-The runner prints 240 data rows: 8 task profiles × 5 resource budgets × 6 policy arms, plus a header. The seed is frozen at 1729.
+The runner prints 240 data rows: 8 task profiles × 5 resource budgets × 6 policy arms, plus a header. Each row binds seed 1729. The full external benchmark mapping and comparability rules are recorded in EXTERNAL_BENCHMARK_MATRIX_V1.md.
 
 ## Policy arms
 
-- fixed_depth: executes operations in a fixed catalogue order under the budget.
+- fixed_order: executes operations in a fixed catalogue order under the budget (a fixed action sequence, not a recurrent-token-depth experiment).
 - generic_voc: ranks operations by generic predicted gain / abstract cost, without conditioning the ranking on the exact unresolved proof obligations.
 - budget_matched_random: seed-reproducible random selection from the same operation catalogue under the same total budget.
 - proof_obligation_guided: services mandatory verification first, reserves its cost, then selects operations by newly targetable unresolved obligations per abstract cost. An operation's asserted coverage never discharges an obligation by itself.
