@@ -232,6 +232,8 @@ pub enum TailProfileError {
     TailGuardWasClipped,
     EventCountMismatch,
     InvalidLineageAssignment,
+    SourceLineageMismatch,
+    UnsupportedOperationFamily,
     CrossSplitLineageLeakage,
     InsufficientCalibrationLineages,
     InsufficientQualificationLineages,
@@ -917,6 +919,22 @@ pub fn build_and_sign_tail_profile(
             DatasetSplit::Validation => TailProfileSplit::Qualification,
             DatasetSplit::Test => return Err(TailProfileError::InvalidLineageAssignment),
         };
+        let report = bundle.adapter_report.report();
+        if record.source_score_sha256.as_deref() != Some(report.source_score_sha256.as_str()) {
+            return Err(TailProfileError::SourceLineageMismatch);
+        }
+        let manifest_operation = record.operation_family.to_ascii_lowercase().replace('-', "_");
+        let observed_operation = operation_family_from_report(report)?;
+        let operation_matches = match observed_operation.as_str() {
+            "remove" => matches!(
+                manifest_operation.as_str(),
+                "remove" | "remove_event" | "remove_instrument"
+            ),
+            _ => false,
+        };
+        if !operation_matches {
+            return Err(TailProfileError::UnsupportedOperationFamily);
+        }
         let (bundle_context, mut bundle_observations) = observations_from_verified_report(
             bundle.adapter_report,
             topology,
