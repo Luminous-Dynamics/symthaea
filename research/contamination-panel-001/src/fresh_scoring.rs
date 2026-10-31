@@ -25,6 +25,7 @@ pub const FRESH_SCORE_REPORT_SCHEMA: &str = "symthaea.fresh_instance_score_repor
 pub const FRESH_EXACT_METRIC_ID: &str = "fresh-exact-integer-pair.v1";
 pub const FRESH_MAX_RESPONSE_BYTES: usize = 1_048_576;
 pub const FRESH_MAX_TOTAL_RESPONSE_BYTES: usize = 16 * 1024 * 1024;
+pub const FRESH_MAX_SUBMISSION_BYTES: usize = 32 * 1024 * 1024;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -412,6 +413,8 @@ pub fn verify_fresh_score_report_integrity(report: &FreshScoreReportV1) -> Resul
         || !rate_matches(report.accuracy_when_answered_permille, optional_rate(correct, answered))
         || !rate_matches(report.accuracy_when_valid_format_permille, optional_rate(correct, valid_format))
         || report.independently_verified
+        || report.execution_receipt_verification
+            != "digest_present_signature_not_cryptographically_verified"
     {
         return Err("fresh score report item statuses, summary counts/rates or trust boundary are inconsistent".to_owned());
     }
@@ -433,6 +436,9 @@ pub fn score_fresh_submission(
     submission_bytes: &[u8],
 ) -> Result<FreshScoreReportV1, String> {
     let answers = validate_bundle(bundle)?;
+    if submission_bytes.len() > FRESH_MAX_SUBMISSION_BYTES {
+        return Err("answer submission exceeds the 32 MiB safety bound".to_owned());
+    }
     let submission: FreshAnswerSubmissionV1 = serde_json::from_slice(submission_bytes)
         .map_err(|error| format!("answer submission does not match strict v1 JSON: {error}"))?;
     if submission.schema != FRESH_SUBMISSION_SCHEMA {
@@ -844,6 +850,14 @@ mod tests {
             &bundle,
             &serde_json::to_vec(&build_submission(&bundle, responses)).unwrap()
         ).unwrap_err().contains("unknown item ID"));
+    }
+
+    #[test]
+    fn oversized_submission_payload_fails_before_parsing() {
+        let oversized = vec![b' '; FRESH_MAX_SUBMISSION_BYTES + 1];
+        let bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
+        assert!(score_fresh_submission(&bundle, &oversized)
+            .unwrap_err().contains("32 MiB safety bound"));
     }
 
     #[test]
