@@ -21,7 +21,7 @@ The runner prints 240 data rows: 8 task profiles × 5 resource budgets × 6 poli
 
 - fixed_depth: executes operations in a fixed catalogue order under the budget.
 - generic_voc: ranks operations by generic predicted gain / abstract cost, without conditioning the ranking on the exact unresolved proof obligations.
-- cost_matched_random: seed-reproducible random selection from the same operation catalogue under the same total budget.
+- budget_matched_random: seed-reproducible random selection from the same operation catalogue under the same total budget.
 - proof_obligation_guided: services mandatory verification first, reserves its cost, then selects operations by newly targetable unresolved obligations per abstract cost. An operation's asserted coverage never discharges an obligation by itself.
 - unverified_confidence: diagnostic unsafe controller that trusts advertised claims without the independent verifier.
 - oracle_minimum_cost: evaluator-informed minimum-cost set-cover upper bound. It is impossible for a planner that cannot inspect evaluator-only outcomes and is never a promotion candidate.
@@ -44,7 +44,7 @@ An operation that produces no newly verified support is not automatically wastef
 
 - Eight fixed task profiles are structural fixtures, not a hidden or contamination-free leaderboard.
 - Abstract work units are not measured FLOPs, GPU time, energy, latency, or monetary cost.
-- The random baseline shares the same operation catalogue and budget, but is not a learned or cost-matched distribution over industry tool usage.
+- The random baseline shares the same operation catalogue and total budget, but is budget-matched rather than realized-cost-matched. It is not a learned distribution over industry tool usage.
 - Generic VOC uses deterministic supplied predictions, not a calibrated learned predictor.
 - The oracle is computed in the same process for diagnostics; it is not a deployable policy.
 - The benchmark does not yet model natural-language generation, multiple models, tool latency distributions, real evidence sources or production adapters.
