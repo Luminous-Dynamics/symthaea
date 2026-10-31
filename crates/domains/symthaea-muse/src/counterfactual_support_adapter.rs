@@ -27,6 +27,7 @@ use crate::fluid_render::{
     effects_group_for_midi_channel, verify_effects_group_assignment,
 };
 use crate::interaction_probe_plan::{AcousticSupportInterval, EventInteractionSupport};
+use crate::renderer_execution_receipt::DecodedSampleFormat;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -56,6 +57,9 @@ pub struct CounterfactualEventSupportEvidence {
     pub tail_guard_intervals: Vec<AcousticSupportInterval>,
     pub conservative_support_intervals: Vec<AcousticSupportInterval>,
     pub tail_guard_was_clipped: bool,
+    /// Last projected note-off frame for all MIDI descendants of this source event.
+    pub final_note_off_frame: u64,
+    pub segmentation_config_sha256: String,
     pub source_score_sha256: String,
     pub baseline_event_map_artifact_sha256: String,
     pub baseline_event_map_receipt_sha256: String,
@@ -67,7 +71,15 @@ pub struct CounterfactualEventSupportEvidence {
     pub repeatability_calibration_sha256: String,
     pub renderer_identity_sha256: String,
     pub renderer_config_sha256: String,
+    pub renderer_executable_sha256: String,
+    pub soundfont_sha256: String,
+    pub render_config_sha256: String,
+    pub output_bits_per_sample: u16,
+    pub output_sample_format: DecodedSampleFormat,
     pub effects_group_assignment: FluidSynthEffectsGroupAssignment,
+    /// Complete downstream route graph digest when independently attested.
+    /// None is the current state and blocks topology-specific tail profiles.
+    pub route_graph_sha256: Option<String>,
     pub sample_rate_hz: u32,
     pub channels: usize,
     pub output_frame_count: u64,
@@ -135,6 +147,7 @@ impl CounterfactualSupportAdapterReport {
                 event.source_event_index == index
                     && event.support.source_event_index == index
                     && event.support.acoustic_support == event.conservative_support_intervals
+                    && event.final_note_off_frame <= event.output_frame_count
                     && event.support.support_evidence_sha256.as_deref()
                         == Some(event.evidence_sha256.as_str())
                     && is_sha256(&event.evidence_sha256)
@@ -370,19 +383,26 @@ fn build_event_support(
         input.baseline_renderer_evidence,
         input.counterfactual_renderer_evidence,
     )?;
-    let baseline_channels: BTreeSet<u8> = input
+    let baseline_lineage: Vec<_> = input
         .baseline_renderer_evidence
         .performed_event_lineage()
         .iter()
         .filter(|lineage| lineage.source_event_id == input.source_event_id)
-        .map(|lineage| lineage.midi_channel)
         .collect();
-    if baseline_channels.is_empty() {
+    if baseline_lineage.is_empty() {
+        return Err(CounterfactualSupportAdapterError::InvalidEventIdentity);
+    }
+    let final_note_off_frame = baseline_lineage
+        .iter()
+        .map(|lineage| lineage.end_frame)
+        .max()
+        .ok_or(CounterfactualSupportAdapterError::InvalidEventIdentity)?;
+    if final_note_off_frame > output_frame_count {
         return Err(CounterfactualSupportAdapterError::InvalidEventIdentity);
     }
 
     let mut domains = BTreeSet::new();
-    for channel in baseline_channels {
+    for channel in baseline_lineage.iter().map(|lineage| lineage.midi_channel).collect::<BTreeSet<_>>() {
         let group = effects_group_for_midi_channel(
             channel,
             assignment.effects_group_count,
@@ -404,6 +424,8 @@ fn build_event_support(
         tail_guard_intervals,
         conservative_support_intervals: conservative_support_intervals.clone(),
         tail_guard_was_clipped: report.tail_guard_was_clipped,
+        final_note_off_frame,
+        segmentation_config_sha256: sha256_hex(&serde_json::to_vec(&report.segmentation).map_err(|_| CounterfactualSupportAdapterError::SerializationFailure)?),
         source_score_sha256: base.source_score_sha256.clone(),
         baseline_event_map_artifact_sha256: base.performed_event_map_sha256.clone(),
         baseline_event_map_receipt_sha256: base.performed_event_map_receipt_sha256.clone(),
@@ -415,6 +437,11 @@ fn build_event_support(
         repeatability_calibration_sha256: base.repeatability_calibration_sha256.clone(),
         renderer_identity_sha256: base.renderer_identity_sha256.clone(),
         renderer_config_sha256: base.renderer_config_sha256.clone(),
+        renderer_executable_sha256: input.baseline_renderer_evidence.renderer_executable_sha256().to_owned(),
+        soundfont_sha256: input.baseline_renderer_evidence.soundfont_sha256().to_owned(),
+        render_config_sha256: input.baseline_renderer_evidence.render_config_sha256().to_owned(),
+        output_bits_per_sample: input.baseline_renderer_evidence.output_bits_per_sample(),
+        output_sample_format: input.baseline_renderer_evidence.output_sample_format(),
         effects_group_assignment: assignment,
         sample_rate_hz: base.sample_rate_hz,
         channels: base.channels,
@@ -511,6 +538,12 @@ fn assemble_from_verified_events(
             || event.baseline_audio_sha256 != first.baseline_audio_sha256
             || event.renderer_identity_sha256 != first.renderer_identity_sha256
             || event.renderer_config_sha256 != first.renderer_config_sha256
+            || event.renderer_executable_sha256 != first.renderer_executable_sha256
+            || event.soundfont_sha256 != first.soundfont_sha256
+            || event.render_config_sha256 != first.render_config_sha256
+            || event.output_bits_per_sample != first.output_bits_per_sample
+            || event.output_sample_format != first.output_sample_format
+            || event.segmentation_config_sha256 != first.segmentation_config_sha256
             || event.effects_group_assignment != first.effects_group_assignment
             || event.sample_rate_hz != first.sample_rate_hz
             || event.channels != first.channels
@@ -530,7 +563,13 @@ fn assemble_from_verified_events(
         baseline_audio_sha256: first.baseline_audio_sha256.clone(),
         renderer_identity_sha256: first.renderer_identity_sha256.clone(),
         renderer_config_sha256: first.renderer_config_sha256.clone(),
+        renderer_executable_sha256: first.renderer_executable_sha256.clone(),
+        soundfont_sha256: first.soundfont_sha256.clone(),
+        render_config_sha256: first.render_config_sha256.clone(),
+        output_bits_per_sample: first.output_bits_per_sample,
+        output_sample_format: first.output_sample_format,
         effects_group_assignment: first.effects_group_assignment.clone(),
+        route_graph_sha256: None,
         sample_rate_hz: first.sample_rate_hz,
         channels: first.channels,
         output_frame_count: first.output_frame_count,
@@ -604,6 +643,8 @@ mod tests {
             tail_guard_intervals: Vec::new(),
             conservative_support_intervals: intervals.clone(),
             tail_guard_was_clipped: false,
+            final_note_off_frame: 45,
+            segmentation_config_sha256: digest("segmentation-config"),
             source_score_sha256: digest("score"),
             baseline_event_map_artifact_sha256: digest("baseline-map-bytes"),
             baseline_event_map_receipt_sha256: digest("baseline-map-receipt"),
@@ -615,6 +656,11 @@ mod tests {
             repeatability_calibration_sha256: digest("repeatability"),
             renderer_identity_sha256: digest("renderer"),
             renderer_config_sha256: digest("renderer-config-effects-groups-4"),
+            renderer_executable_sha256: digest("fluidsynth-executable"),
+            soundfont_sha256: digest("soundfont"),
+            render_config_sha256: digest("render-config"),
+            output_bits_per_sample: 32,
+            output_sample_format: DecodedSampleFormat::PcmFloat,
             effects_group_assignment: assignment.clone(),
             sample_rate_hz: 48_000,
             channels: 2,
