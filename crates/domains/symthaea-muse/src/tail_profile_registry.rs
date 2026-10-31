@@ -757,22 +757,77 @@ fn create_profile_unsigned(
 /// token and a separately signed topology declaration. The signature is made
 /// only after held-out qualification reports zero misses.
 pub fn build_and_sign_tail_profile(
-    verified_report: &VerifiedCounterfactualSupportAdapterReport,
+    source_bundles: &[TailProfileSourceBundle<'_>],
+    benchmark_manifest: &BenchmarkLineageManifest,
+    benchmark_audit: &BenchmarkLineageAudit,
     topology: &VerifiedRendererTopology,
-    lineage_assignments: &[TailProfileLineageAssignment],
     spec: &TailProfileBuildSpec,
     signer_key_id: &str,
     signing_key: &SigningKey,
 ) -> Result<TailProfile, TailProfileError> {
-    let (context, observations) =
-        observations_from_verified_report(verified_report, topology, lineage_assignments)?;
-    let mut profile = create_profile_unsigned(spec, context, &observations, signer_key_id)?;
+    if benchmark_manifest.dataset_revision != spec.dataset_revision
+        || !benchmark_audit.is_clean()
+        || !verify_benchmark_lineage_audit(benchmark_manifest, benchmark_audit)
+        || source_bundles.is_empty()
+    {
+        return Err(TailProfileError::InvalidLineageAssignment);
+    }
+
+    // The benchmark manifest is authoritative for source composition lineage
+    // and partition. Test samples are deliberately unavailable to profile fitting.
+    let mut records_by_sample = BTreeMap::new();
+    for record in &benchmark_manifest.records {
+        records_by_sample.insert(record.sample_id.as_str(), record);
+    }
+
+    let mut seen_samples = BTreeSet::new();
+    let mut context: Option<TailProfileContext> = None;
+    let mut observations = Vec::new();
+
+    for bundle in source_bundles {
+        if !seen_samples.insert(bundle.benchmark_sample_id.as_str()) {
+            return Err(TailProfileError::InvalidLineageAssignment);
+        }
+        let record = records_by_sample
+            .get(bundle.benchmark_sample_id.as_str())
+            .ok_or(TailProfileError::InvalidLineageAssignment)?;
+        let split = match record.split {
+            DatasetSplit::Train => TailProfileSplit::Calibration,
+            DatasetSplit::Validation => TailProfileSplit::Qualification,
+            DatasetSplit::Test => return Err(TailProfileError::InvalidLineageAssignment),
+        };
+        let (bundle_context, mut bundle_observations) = observations_from_verified_report(
+            bundle.adapter_report,
+            topology,
+            &record.composition_lineage_sha256,
+            split,
+        )?;
+        if let Some(expected) = &context {
+            if expected != &bundle_context {
+                return Err(TailProfileError::RendererContextMismatch);
+            }
+        } else {
+            context = Some(bundle_context);
+        }
+        observations.append(&mut bundle_observations);
+    }
+
+    let context = context.ok_or(TailProfileError::EventCountMismatch)?;
+    let mut profile = create_profile_unsigned(
+        spec,
+        context,
+        &observations,
+        &benchmark_audit.manifest_sha256,
+        &benchmark_audit.audit_sha256,
+        signer_key_id,
+    )?;
     if !profile.qualification.qualified {
         return Err(TailProfileError::QualificationTailMiss);
     }
     let digest = profile_digest(&profile)?;
     profile.profile_sha256 = digest.clone();
-    profile.signature_ed25519_hex = hex_encode(signing_key.sign(digest.as_bytes()).to_bytes().as_ref());
+    profile.signature_ed25519_hex =
+        hex_encode(signing_key.sign(digest.as_bytes()).to_bytes().as_ref());
     Ok(profile)
 }
 
