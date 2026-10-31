@@ -29,7 +29,12 @@
     "agent_input_sha256",
     "oracle_sha256",
     "candidate_sha256",
-    "performance_metrics_are_measurements"
+    "performance_metrics_are_measurements",
+    "write_stage_matches",
+    "maintenance_stage_matches",
+    "retrieval_stage_matches",
+    "use_stage_matches",
+    "stage_safety_violations"
   ],
   "properties": {
     "schema_version": {
@@ -125,6 +130,26 @@
     },
     "performance_metrics_are_measurements": {
       "const": false
+    },
+    "write_stage_matches": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "maintenance_stage_matches": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "retrieval_stage_matches": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "use_stage_matches": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "stage_safety_violations": {
+      "type": "integer",
+      "minimum": 0
     }
   }
 }
