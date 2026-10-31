@@ -473,6 +473,182 @@ mod tests {
             .collect()
     }
 
+
+    fn test_tape(
+        board: &CoralDirectionBoard,
+        round: &CoralSeatRound,
+        mismatch_first_arm: bool,
+    ) -> EventTape {
+        use crate::event_tape::{
+            ActionEvent, ActionOutcome, CandidateDisposition, EventTapeHeader, MeterValue,
+            PolicySnapshot, ProposalDisposition, ResourceReceipt,
+        };
+        use serde_json::Value;
+
+        const H1: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const H2: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        const H3: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+        const H4: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+        const H5: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+
+        let config = serde_json::to_value(&board.config).unwrap();
+        let header = EventTapeHeader {
+            schema: "symthaea.ar5b4.event-tape".to_owned(),
+            version: "0.1.0".to_owned(),
+            campaign_id: "coral-seat-test".to_owned(),
+            source_commit: "0123456789abcdef0123456789abcdef01234567".to_owned(),
+            execution_environment_sha256: H1.to_owned(),
+            comparison_mode: ComparisonMode::MechanismMatched,
+            proposal_source_id: "frozen-coral-proposals-v1".to_owned(),
+            proposal_stream_sha256: Some(H2.to_owned()),
+            task_recipe_sha256: H3.to_owned(),
+            comparison_profile_sha256: H4.to_owned(),
+            evaluator_sha256: H5.to_owned(),
+            verifier_sha256: H1.to_owned(),
+            budget_model_id: "coral-seat-test-budget-v1".to_owned(),
+            budget_model_sha256: H2.to_owned(),
+            budget_limit_microunits: 1000,
+            initial_direction_ids: vec![
+                "A".to_owned(),
+                "B".to_owned(),
+                "C".to_owned(),
+                "D".to_owned(),
+            ],
+            execution: coral_four_seat_execution_contract(),
+            policy: PolicySnapshot {
+                policy_id: "coral-reference".to_owned(),
+                algorithm_id: "coral-direction-board-v0.1".to_owned(),
+                config_sha256: digest_serializable(&config).unwrap(),
+                config,
+                has_hidden_oracle_access: false,
+            },
+        };
+        let mut tape = EventTape::new(header).unwrap();
+        let measured = |value| MeterValue::Measured { value };
+        for claim in &round.claims {
+            let arm = if mismatch_first_arm && claim.worker_id == 0 {
+                CoralArm::Direction("D".to_owned())
+            } else {
+                claim.arm.clone()
+            };
+            let (intent, outcome, evaluator_calls) = match arm {
+                CoralArm::Direction(direction_id) => (
+                    ActionIntent::EvaluateCandidate {
+                        candidate_sha256: digest_serializable(&(
+                            "candidate",
+                            round.round_id,
+                            claim.worker_id,
+                            &direction_id,
+                        ))
+                        .unwrap(),
+                        parent_candidate_sha256: None,
+                        semantic_delta_sha256: H3.to_owned(),
+                        direction_id,
+                    },
+                    ActionOutcome::CandidateEvaluation {
+                        task_recipe_sha256: H3.to_owned(),
+                        comparison_profile_sha256: H4.to_owned(),
+                        evaluator_sha256: H5.to_owned(),
+                        verifier_sha256: H1.to_owned(),
+                        verifier_receipt_sha256: H2.to_owned(),
+                        disposition: CandidateDisposition::Verified,
+                        score: Some(0.9),
+                        uncertainty: Some(0.0),
+                        evidence_sha256: Some(H3.to_owned()),
+                    },
+                    1,
+                ),
+                CoralArm::New => (
+                    ActionIntent::ProposeDirection {
+                        descriptor_sha256: digest_serializable(&(
+                            "proposal",
+                            round.round_id,
+                            claim.worker_id,
+                        ))
+                        .unwrap(),
+                        parent_direction_id: Some("A".to_owned()),
+                        semantic_delta_sha256: H4.to_owned(),
+                    },
+                    ActionOutcome::DirectionVerification {
+                        task_recipe_sha256: H3.to_owned(),
+                        comparison_profile_sha256: H4.to_owned(),
+                        verifier_sha256: H1.to_owned(),
+                        verifier_receipt_sha256: H5.to_owned(),
+                        disposition: ProposalDisposition::Rejected,
+                    },
+                    0,
+                ),
+            };
+            tape.append(ActionEvent {
+                event_id: claim.event_id.clone(),
+                policy_id: "coral-reference".to_owned(),
+                worker_id: claim.worker_id,
+                round_id: round.round_id,
+                batch_id: Some(round.batch_id.clone()),
+                observed_through_sequence: 0,
+                visible_history_sha256: String::new(),
+                retry_of_event_id: None,
+                intent,
+                outcome,
+                resources: ResourceReceipt {
+                    host_cpu_millis: measured(10),
+                    wall_millis: measured(5),
+                    accelerator_millis: measured(0),
+                    peak_memory_bytes: measured(1024),
+                    accelerator_peak_memory_bytes: measured(0),
+                    energy_millijoules: measured(1),
+                    input_tokens: measured(0),
+                    output_tokens: measured(0),
+                    tool_calls: measured(0),
+                    evaluator_calls: measured(evaluator_calls),
+                    verifier_calls: measured(1),
+                    charged_budget_microunits: measured(100),
+                },
+            })
+            .unwrap();
+        }
+        tape
+    }
+
+    #[test]
+    fn event_batch_must_match_frozen_four_seat_claims_and_config() {
+        let board = board();
+        let round = CoralSeatRound::new(
+            &board,
+            1,
+            "coral-round-1",
+            claims([
+                CoralArm::Direction("A".to_owned()),
+                CoralArm::Direction("B".to_owned()),
+                CoralArm::Direction("C".to_owned()),
+                CoralArm::New,
+            ]),
+        )
+        .unwrap();
+        let tape = test_tape(&board, &round, false);
+        tape.validate().unwrap();
+        round.validate_event_batch(&board, &tape).unwrap();
+    }
+
+    #[test]
+    fn event_batch_rejects_worker_action_that_differs_from_claimed_arm() {
+        let board = board();
+        let round = CoralSeatRound::new(
+            &board,
+            1,
+            "coral-round-1",
+            claims([
+                CoralArm::Direction("A".to_owned()),
+                CoralArm::Direction("B".to_owned()),
+                CoralArm::Direction("C".to_owned()),
+                CoralArm::New,
+            ]),
+        )
+        .unwrap();
+        let tape = test_tape(&board, &round, true);
+        assert!(round.validate_event_batch(&board, &tape).is_err());
+    }
+
     #[test]
     fn reference_execution_contract_is_exactly_four_sequential_seats_in_a_batch() {
         let contract = coral_four_seat_execution_contract();
