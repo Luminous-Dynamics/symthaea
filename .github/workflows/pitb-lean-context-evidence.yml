@@ -1,0 +1,115 @@
+name: PITB Lean Context Evidence Layers
+
+on:
+  pull_request:
+    paths:
+      - "data/benchmarks/proof-insight-transfer-v0/lean-pilot/**"
+      - ".github/workflows/pitb-lean-context-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  context-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact proposed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Build exact Lean 4.34.1 context-evidence module
+        uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1
+        with:
+          lake-package-directory: data/benchmarks/proof-insight-transfer-v0/lean-pilot
+          auto-config: false
+          build: true
+          test: false
+          lint: false
+          use-mathlib-cache: false
+          nanoda: true
+          nanoda-allow-sorry: false
+          axiom-audit: true
+          axiom-audit-root: PITBCounterfactualPilot
+
+      - name: Re-elaborate exporter and validate evidence layers
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd data/benchmarks/proof-insight-transfer-v0/lean-pilot
+          mkdir -p "$RUNNER_TEMP/pitb-context-evidence"
+          log="$RUNNER_TEMP/pitb-context-evidence/lean.log"
+          lake env lean PITBCounterfactualPilot/ContextEvidence.lean -o "$RUNNER_TEMP/pitb-context-evidence/ContextEvidence.olean" 2>&1 | tee "$log"
+          python -m venv "$RUNNER_TEMP/pitb-context-evidence/venv"
+          "$RUNNER_TEMP/pitb-context-evidence/venv/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
+          "$RUNNER_TEMP/pitb-context-evidence/venv/bin/python" - "$log" "local-context-evidence-v1.schema.json" "$RUNNER_TEMP/pitb-context-evidence" <<'PY'
+          import hashlib
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+
+          log_path, schema_path, output_dir = map(Path, sys.argv[1:])
+          matches = [
+              line.split("PITB_CONTEXT_EVIDENCE_JSON:", 1)[1]
+              for line in log_path.read_text().splitlines()
+              if "PITB_CONTEXT_EVIDENCE_JSON:" in line
+          ]
+          if len(matches) != 1:
+              raise SystemExit(f"expected exactly one evidence payload, found {len(matches)}")
+          try:
+              evidence = json.loads(matches[0])
+          except json.JSONDecodeError as exc:
+              raise SystemExit(f"Lean emitted malformed context evidence JSON: {exc}")
+          schema = json.loads(schema_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema, format_checker=FormatChecker()).validate(evidence)
+          if evidence["schema_version"] != "pitb.local-context-evidence.v1":
+              raise SystemExit("unsupported local-context evidence schema")
+          if evidence["label"] != "transparent-let-have-separation":
+              raise SystemExit("unexpected calibration label")
+          declarations = evidence["local_context"]["declarations"]
+          by_name = {row["user_name"]: row for row in declarations}
+          for required in ("h", "transparentValue", "opaqueValue"):
+              if required not in by_name:
+                  raise SystemExit(f"Lean context is missing expected declaration {required}")
+          h_id = by_name["h"]["fvar_id"]
+          transparent_id = by_name["transparentValue"]["fvar_id"]
+          opaque_id = by_name["opaqueValue"]["fvar_id"]
+          if not by_name["transparentValue"]["is_let_declaration"] or by_name["transparentValue"]["is_nondep"]:
+              raise SystemExit("ordinary let must be visible and non-nondep")
+          if h_id not in by_name["transparentValue"]["transparent_value_fvar_ids"]:
+              raise SystemExit("ordinary let value must retain its dependency on h")
+          if not by_name["opaqueValue"]["is_let_declaration"] or not by_name["opaqueValue"]["is_nondep"]:
+              raise SystemExit("have-bound declaration must be identified as nondependent")
+          if transparent_id not in by_name["opaqueValue"]["nondep_value_fvar_ids"]:
+              raise SystemExit("have-bound assigned-value provenance must identify transparentValue")
+          support = evidence["proof_support"]
+          typed_ids = set(support["typed_dependency_closure_ids"])
+          assigned_ids = set(support["assigned_value_provenance_closure_ids"])
+          if opaque_id not in typed_ids or transparent_id in typed_ids or h_id in typed_ids:
+              raise SystemExit("typed dependency closure incorrectly followed an opaque have-value")
+          if not {opaque_id, transparent_id, h_id}.issubset(assigned_ids):
+              raise SystemExit("assigned-value provenance closure did not follow the complete let/have value chain")
+          if not support["opaque_value_provenance"]:
+              raise SystemExit("opaque have-value provenance edge was not separately recorded")
+          if not set(support["direct_free_variable_ids"]).issubset(typed_ids):
+              raise SystemExit("typed dependency closure omitted a direct proof-term free variable")
+          encoded = json.dumps(evidence, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+          (output_dir / "context-evidence.json").write_bytes(encoded + b"\n")
+          (output_dir / "context-evidence.sha256").write_text(hashlib.sha256(encoded).hexdigest() + "  context-evidence.json\n")
+          print("PITB_CONTEXT_EVIDENCE_LAYERS_PASS: transparent-let-dependencies=typed opaque-have-values=provenance-only")
+          print(f"context_evidence_sha256={hashlib.sha256(encoded).hexdigest()}")
+          PY
+
+      - name: Upload exact-source context evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-context-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/pitb-context-evidence/lean.log
+            ${{ runner.temp }}/pitb-context-evidence/context-evidence.json
+            ${{ runner.temp }}/pitb-context-evidence/context-evidence.sha256
+          if-no-files-found: error
+          retention-days: 90
