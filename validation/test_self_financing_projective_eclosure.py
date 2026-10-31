@@ -54,6 +54,60 @@ class SelfFinancingProjectiveEclosureTests(unittest.TestCase):
         self.assertTrue(result["verification"]["optimality_verified"])
         json.dumps(result, sort_keys=True, separators=(",", ":"))
 
+    def test_past_wealth_weights_are_predictable_and_projective(self):
+        from self_financing_projective_eclosure import (
+            build_self_financing_intersection_paths,
+        )
+
+        raw, shares = build_self_financing_intersection_paths(
+            self.increments, self.active, self.scores,
+            share_policy="past_wealth",
+        )
+        self.assertEqual(shares[0], (Fraction(1), Fraction(0)))
+        self.assertEqual(shares[1], (Fraction(1, 2), Fraction(1, 2)))
+        self.assertEqual(shares[2], (Fraction(8, 9), Fraction(1, 9)))
+        self.assertEqual(
+            raw[0b01],
+            (Fraction(1), Fraction(9, 2), Fraction(9, 2)),
+        )
+        self.assertEqual(
+            raw[0b10],
+            (Fraction(1), Fraction(1), Fraction(8, 3)),
+        )
+        self.assertEqual(
+            raw[0b11],
+            (Fraction(1), Fraction(9, 2), Fraction(12)),
+        )
+
+        result = select_self_financing_capacity_actions(
+            self.increments, self.active, self.scores, self.alpha,
+            self.values, self.costs, self.capacity,
+            self.thresholds, self.adjuster_increments,
+            share_policy="past_wealth",
+        )
+        self.assertEqual(
+            [row["rejections"] for row in result["decisions"]],
+            [[], [1], [1, 2]],
+        )
+        self.assertTrue(result["verification"]["valid"])
+
+    def test_largest_past_wealth_policy_is_a_valid_adaptive_baseline(self):
+        result = select_self_financing_capacity_actions(
+            self.increments, self.active, self.scores, self.alpha,
+            self.values, self.costs, self.capacity,
+            self.thresholds, self.adjuster_increments,
+            share_policy="largest_past_wealth",
+        )
+        self.assertEqual(
+            result["decisions"][2]["shares"],
+            [[1, 1], [1, 2]],
+        )
+        self.assertEqual(
+            [row["rejections"] for row in result["decisions"]],
+            [[], [1], [1]],
+        )
+        self.assertTrue(result["verification"]["valid"])
+
     def test_future_priority_and_evidence_do_not_rewrite_past_receipts(self):
         # Coordinate 2 is not active until the final update, so its future
         # score and future evidence must not alter the first two decisions.
