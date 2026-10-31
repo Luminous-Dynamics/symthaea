@@ -241,19 +241,15 @@ fn score_candidate(
 
     let (rank_score, eligible) = match policy {
         RetentionPolicy::TemporalValuePerByteSecond => {
-            let mut weighted_value = u128::from(candidate.predicted_ted_reduction_us);
-            weighted_value = weighted_value
+            // Multiply before dividing so fixed-point truncation happens
+            // once rather than discarding fractional value at every factor.
+            // u64 * 1e18 remains within u128.
+            let weighted_product = u128::from(candidate.predicted_ted_reduction_us)
                 .checked_mul(u128::from(candidate.confidence_ppm))
-                .ok_or(RetentionError::ArithmeticOverflow)?
-                / PPM;
-            weighted_value = weighted_value
-                .checked_mul(u128::from(candidate.relevance_ppm))
-                .ok_or(RetentionError::ArithmeticOverflow)?
-                / PPM;
-            weighted_value = weighted_value
-                .checked_mul(u128::from(candidate.freshness_ppm))
-                .ok_or(RetentionError::ArithmeticOverflow)?
-                / PPM;
+                .and_then(|value| value.checked_mul(u128::from(candidate.relevance_ppm)))
+                .and_then(|value| value.checked_mul(u128::from(candidate.freshness_ppm)))
+                .ok_or(RetentionError::ArithmeticOverflow)?;
+            let weighted_value = weighted_product / (PPM * PPM * PPM);
 
             let denominator = u128::from(candidate.bytes)
                 .checked_mul(u128::from(effective_horizon))
@@ -495,6 +491,25 @@ mod tests {
             ),
             Err(RetentionError::ZeroTtl)
         );
+    }
+
+    #[test]
+    fn fixed_point_factors_are_multiplied_before_single_rounding() {
+        let mut candidate_a = candidate(1, 1, 15);
+        candidate_a.confidence_ppm = 900_000;
+        candidate_a.relevance_ppm = 900_000;
+        candidate_a.freshness_ppm = 900_000;
+        let candidate_b = candidate(2, 1, 10);
+        let plan = select_retained_items(
+            &[candidate_a, candidate_b],
+            1,
+            1_000_000,
+            RetentionPolicy::TemporalValuePerByteSecond,
+            [0; 32],
+        )
+        .unwrap();
+        // 15 * 0.9^3 = 10.935, which exceeds candidate B's value of 10.
+        assert_eq!(plan.selected_ids, vec![1]);
     }
 
     #[test]
