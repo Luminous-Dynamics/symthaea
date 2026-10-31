@@ -43,7 +43,7 @@ pub struct FtdCalibrationConfigV1 {
     pub reference_design: ReferenceDesignV1,
     pub item_cluster_size: u16,
     pub item_cluster_correlation_permille: u16,
-    pub feature_correlation_permille: u16,
+    pub feature_correlation_permille: i16,
     pub tail_direction: ReferenceTailV1,
     pub weight_policy: FtdWeightPolicyV1,
     pub softmax_temperature_milli: Option<u16>,
@@ -157,9 +157,9 @@ fn validate_config(config: &FtdCalibrationConfigV1, seed: &[u8]) -> Result<(), S
         return Err("item_cluster_size must be in [1, 1000]".to_owned());
     }
     if config.item_cluster_correlation_permille > 1_000
-        || config.feature_correlation_permille > 1_000
+        || !(-1_000..=1_000).contains(&config.feature_correlation_permille)
     {
-        return Err("correlation permille fields must be in [0, 1000]".to_owned());
+        return Err("item correlation must be in [0, 1000] and feature correlation in [-1000, 1000]".to_owned());
     }
     if !(1..=200).contains(&config.alpha_permille) {
         return Err("alpha_permille must be in [1, 200]".to_owned());
@@ -225,14 +225,19 @@ fn build_item_scores(
         let shared_cluster_value = rng.uniform_open();
 
         for item_index in cluster_start..cluster_end {
-            let share_features = rng.choose_permille(config.feature_correlation_permille);
+            let feature_correlation = config.feature_correlation_permille;
+            let share_features = rng.choose_permille(feature_correlation.unsigned_abs());
             let shared_item_feature_value = rng.uniform_open();
 
             for feature_index in 0..k {
                 let raw_score = if share_cluster {
                     shared_cluster_value
                 } else if share_features {
-                    shared_item_feature_value
+                    if feature_correlation < 0 && feature_index % 2 == 1 {
+                        1.0 - shared_item_feature_value
+                    } else {
+                        shared_item_feature_value
+                    }
                 } else {
                     rng.uniform_open()
                 };
@@ -720,6 +725,14 @@ mod tests {
         ).unwrap();
         assert!(by.iter().filter(|value| **value).count()
             <= bh.iter().filter(|value| **value).count());
+    }
+
+    #[test]
+    fn negative_feature_dependence_is_supported_as_a_separate_stress_setting() {
+        let mut cfg = config();
+        cfg.feature_correlation_permille = -1_000;
+        let report = run_ftd_calibration(&cfg, &[0x59; 32]).unwrap();
+        assert_eq!(report.config.feature_correlation_permille, -1_000);
     }
 
     #[test]
