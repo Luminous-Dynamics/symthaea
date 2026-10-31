@@ -496,10 +496,10 @@ mod tests {
             &manifest, "verifier", VERIFIER_BUILD, &bytes,
         ).is_err());
 
-        let mut bytes = resolved();
-        bytes.push(bytes[0].clone());
+        let original = resolved();
+        let duplicate = vec![original[0].clone(), original[0].clone()];
         assert!(verify_evidence_artifact_bytes(
-            &manifest, "verifier", VERIFIER_BUILD, &bytes,
+            &manifest, "verifier", VERIFIER_BUILD, &duplicate,
         ).is_err());
     }
 
