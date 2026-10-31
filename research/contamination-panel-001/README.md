@@ -638,3 +638,70 @@ cargo run --locked -- verify-fresh-score \
   /secure/evaluator/fresh-score-report.json
 ~~~
 
+
+
+## Fresh benchmark exact scoring
+
+The module src/fresh_scoring.rs scores one strict response submission against the evaluator-only sealed oracle. The score report contains item IDs, response hashes and statuses; it never contains oracle parameters, expected answers or the generation seed.
+
+### Submission contract
+
+Each run must bind:
+- run/model/provider/version/access mode;
+- checkpoint and public-packet digests;
+- inference harness, prompt/decoding and metric-definition digests;
+- a run-execution receipt digest;
+- model calls, input/output tokens, wall time, tool calls, human-assistance minutes and cost;
+- exactly one raw response record per public item, with response hash.
+
+A blank response is an explicit abstention. A nonblank response must parse as a strict JSON object with exactly integer fields x and y. Extra fields, floats, strings, duplicate JSON keys, trailing prose and code fences are invalid-format responses. A valid but incorrect integer pair is incorrect. Invalid outputs and abstentions count as not-correct in overall accuracy.
+
+### Reported metrics
+
+The report distinguishes:
+- overall accuracy over every released item (abstentions and invalid outputs count as not-correct);
+- coverage / answered fraction;
+- accuracy conditional on answering;
+- accuracy conditional on a valid-format answer;
+- invalid-format, incorrect and abstention counts;
+- response hashes and per-item status;
+- call/token/tool/time/human/cost budget counters.
+
+The scorer uses the sealed oracle to verify the mathematical solutions and now also checks that each public equation text is exactly the canonical rendering of the corresponding hidden matrix parameters. Rehashing a modified public task and manifest cannot make it scoreable against a different oracle. It recomputes every oracle parameter digest, answer digest and normalized determinant margin as well.
+
+The report has its own digest and an offline integrity verifier that recomputes the count partition and all summary rates. It always states independently_verified=false because the run-execution receipt remains self-reported until trusted signature verification is implemented.
+
+### CLI
+
+Score a submission using the public packet, sealed oracle and manifest (keep the oracle on a trusted evaluator host):
+
+~~~sh
+cargo run --locked -- score-fresh \
+  /secure/evaluator/fresh-public-packet.json \
+  /secure/evaluator/fresh-sealed-oracle.json \
+  /secure/evaluator/fresh-manifest.json \
+  /secure/evaluator/model-answer-submission.json \
+  /secure/evaluator/fresh-score-report.json
+~~~
+
+Check the score-report digest and internal rates separately:
+
+~~~sh
+cargo run --locked -- verify-fresh-score \
+  /secure/evaluator/fresh-score-report.json
+~~~
+
+Schemas:
+- schema/fresh-answer-submission.schema.json
+- schema/fresh-instance-score-report.schema.json
+
+### Numerical stability qualification
+
+The 2x2 generator requires both an absolute determinant floor and a normalized determinant margin:
+
+floor(1000 * |det(A)| / (row_1_norm * row_2_norm))
+
+The normalized threshold is computed with exact integer comparisons; it is not a floating-point approximation at the generation boundary. The sealed oracle records the measured margin, and both the generator audit and scorer recompute it from matrix parameters.
+
+This helps prevent near-singular systems from being accidentally mixed into the same task difficulty band. It does not yet make the problem generator psychometrically calibrated: difficulty also depends on coefficient/solution magnitudes, cancellation, representation, and model-specific skill. These factors need separate calibration experiments.
+
