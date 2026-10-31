@@ -26,7 +26,7 @@ Direction proposals bind a descriptor digest and semantic delta. Only the verifi
 
 ## Resource accounting
 
-Each action records host CPU milliseconds, wall milliseconds, accelerator milliseconds, peak memory bytes, energy millijoules, input/output tokens, tool calls, evaluator calls, verifier calls, and normalized budget charge in microunits.
+Each action records host CPU milliseconds, wall milliseconds, accelerator milliseconds, host peak memory bytes, accelerator peak memory bytes, energy millijoules, input/output tokens, tool calls, evaluator calls, verifier calls, and normalized budget charge in microunits.
 
 Normalized charges are meaningful only relative to the frozen budget-model identity and digest; the same microunit value under two different models is not automatically comparable. A reading is either `Measured(value)` or `Unknown(reason)`. Measured zero is valid; unknown is never converted to zero. `validate_integrity` preserves structurally valid but unmetered tapes for diagnosis. `validate` is the qualification gate and rejects any unknown measurement or unknown charge. Retries are separate events and consume separate charges. The running normalized charge may not exceed the header budget ceiling.
 
