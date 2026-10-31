@@ -315,12 +315,21 @@ def verify_decision_sequence(
     previous_mask = 0
     previous_cost = Fraction(0)
     checked = 0
+    feasible_candidates_checked = 0
+    certified_candidates_checked = 0
+    optimality_checked = 0
 
     if len(decisions) != len(e):
         failures.append("decision count does not match stream length")
 
     for index, decision in enumerate(decisions):
         t = index + 1
+        if t > len(e):
+            failures.append(("extra_decision", t))
+            continue
+        if not isinstance(decision, dict):
+            failures.append(("invalid_decision_record", t))
+            continue
         mask = decision.get("rejection_mask")
         if isinstance(mask, bool) or not isinstance(mask, int) or not 0 <= mask < (1 << t):
             failures.append(("invalid_rejection_mask", t))
@@ -356,15 +365,64 @@ def verify_decision_sequence(
             failures.append(("worst_intersection_receipt_mismatch", t))
         if decision.get("intersections_checked_for_selected_set") != closure["intersections_checked"]:
             failures.append(("intersection_count_receipt_mismatch", t))
+
+        # Independent exhaustive optimality check over every nested,
+        # cumulative-capacity-feasible action in the certified menu.
+        best_mask = None
+        best_value = None
+        best_cost = None
+        for candidate_mask in range(1 << t):
+            if (candidate_mask & previous_mask) != previous_mask:
+                continue
+            candidate_cost = sum(
+                (c[j] for j in range(t) if (candidate_mask >> j) & 1),
+                Fraction(0),
+            )
+            if candidate_cost > capacity[index]:
+                continue
+            feasible_candidates_checked += 1
+            candidate_check = verify_certified_set(candidate_mask, t, e, g, level)
+            if not candidate_check["certified"]:
+                continue
+            certified_candidates_checked += 1
+            candidate_value = sum(
+                (v[j] for j in range(t) if (candidate_mask >> j) & 1),
+                Fraction(0),
+            )
+            better = best_mask is None or candidate_value > best_value
+            if not better and candidate_value == best_value:
+                better = candidate_cost < best_cost
+                if not better and candidate_cost == best_cost:
+                    chosen_tuple = tuple(
+                        j for j in range(t) if (best_mask >> j) & 1
+                    )
+                    candidate_tuple = tuple(
+                        j for j in range(t) if (candidate_mask >> j) & 1
+                    )
+                    better = candidate_tuple < chosen_tuple
+            if better:
+                best_mask = candidate_mask
+                best_value = candidate_value
+                best_cost = candidate_cost
+        optimality_checked += 1
+        if best_mask != mask:
+            failures.append(("utility_optimality_failure", t, best_mask, mask))
         previous_mask = mask
         previous_cost = actual_cost
 
     return {
         "valid": not failures,
         "failures": failures,
-        "decisions_checked": len(decisions),
+        "decisions_checked": min(len(decisions), len(e)),
         "intersection_constraints_checked": checked,
-        "scope": "finite-prefix e-closure membership and cumulative capacity only",
+        "feasible_candidates_checked": feasible_candidates_checked,
+        "certified_candidates_checked": certified_candidates_checked,
+        "optimality_prefixes_checked": optimality_checked,
+        "optimality_verified": optimality_checked == len(e) and not any(
+            isinstance(failure, tuple) and failure and failure[0] == "utility_optimality_failure"
+            for failure in failures
+        ),
+        "scope": "finite-prefix e-closure membership, cumulative capacity and utility optimality",
     }
 
 
