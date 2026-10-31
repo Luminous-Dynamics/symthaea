@@ -3,7 +3,7 @@
 **Date:** 2026-10-31  
 **Status:** research and qualification programme; no new biological performance claim  
 **Primary implementation:** PR [#8883](https://github.com/Luminous-Dynamics/symthaea/pull/8883)  
-**Research tracks:** [#9241](https://github.com/Luminous-Dynamics/symthaea/issues/9241), [#9242](https://github.com/Luminous-Dynamics/symthaea/issues/9242), [#9248](https://github.com/Luminous-Dynamics/symthaea/issues/9248), [#9250](https://github.com/Luminous-Dynamics/symthaea/issues/9250), [#9255](https://github.com/Luminous-Dynamics/symthaea/issues/9255), [#9260](https://github.com/Luminous-Dynamics/symthaea/issues/9260), [#9265](https://github.com/Luminous-Dynamics/symthaea/issues/9265), [#9282](https://github.com/Luminous-Dynamics/symthaea/issues/9282), [#9322](https://github.com/Luminous-Dynamics/symthaea/issues/9322), [#9344](https://github.com/Luminous-Dynamics/symthaea/issues/9344).
+**Research tracks:** [#9241](https://github.com/Luminous-Dynamics/symthaea/issues/9241), [#9242](https://github.com/Luminous-Dynamics/symthaea/issues/9242), [#9248](https://github.com/Luminous-Dynamics/symthaea/issues/9248), [#9250](https://github.com/Luminous-Dynamics/symthaea/issues/9250), [#9255](https://github.com/Luminous-Dynamics/symthaea/issues/9255), [#9260](https://github.com/Luminous-Dynamics/symthaea/issues/9260), [#9265](https://github.com/Luminous-Dynamics/symthaea/issues/9265), [#9282](https://github.com/Luminous-Dynamics/symthaea/issues/9282), [#9322](https://github.com/Luminous-Dynamics/symthaea/issues/9322), [#9345](https://github.com/Luminous-Dynamics/symthaea/issues/9345), [#9344](https://github.com/Luminous-Dynamics/symthaea/issues/9344).
 
 ## 1. Strategic thesis
 
@@ -92,6 +92,8 @@ The public split uses 50 µm spatial cubes. That does not by itself establish in
 Dataset card: https://huggingface.co/datasets/jeffbbrown2/ConnectomeBench2  
 VLM benchmark: https://arxiv.org/abs/2609.36492  
 ConnectomeBench2 research: https://arxiv.org/abs/2606.21116
+
+The row-level intake auditor already checks `has_em` against the metadata `present_slots` field. It does not yet report stratified modality coverage or validate sidecar claims against the actual image/geometry bytes in Parquet shards. These are tracked in [#9345](https://github.com/Luminous-Dynamics/symthaea/issues/9345). Comparisons must use matched sample-ID intersections for pure modality ablations and separate full eligible-cohort outcomes. Do not infer population inclusion probabilities from missingness percentages.
 
 ### 3.2 Biological source artifacts are a separate qualification tier
 
