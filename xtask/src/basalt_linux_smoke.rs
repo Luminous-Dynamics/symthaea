@@ -298,7 +298,8 @@ impl LinuxSmokeSyscalls for SystemLinuxSmokeSyscalls {
         if result < 0 {
             Err(std::io::Error::last_os_error().raw_os_error().unwrap_or(libc::EIO))
         } else {
-            libc::c_int::try_from(result).map_err(|_| libc::EOVERFLOW)
+            // fanotify_init returns an int file descriptor even though syscall() exposes c_long.
+            Ok(result as libc::c_int)
         }
     }
 
@@ -540,7 +541,7 @@ mod tests {
     }
 
     #[test]
-    fn errno_mapping_distinguishes_unsupported_disabled_denied_and_invalid_request() {
+    fn errno_mapping_distinguishes_unsupported_operation_denied_and_invalid_request() {
         assert_eq!(classify_errno(libc::ENOSYS), ProbeStatus::NotSupported);
         assert_eq!(classify_errno(libc::EOPNOTSUPP), ProbeStatus::OperationNotSupported);
         assert_eq!(classify_errno(libc::EPERM), ProbeStatus::PermissionDenied);
@@ -767,6 +768,28 @@ mod tests {
             .map(|field| field.as_str().unwrap().to_string()).collect();
         actual.sort(); required.sort();
         assert_eq!(actual, required);
+    }
+    #[test]
+    fn probe_status_serde_values_match_the_report_schema() {
+        let statuses = [
+            ProbeStatus::Passed,
+            ProbeStatus::NotSupported,
+            ProbeStatus::OperationNotSupported,
+            ProbeStatus::PermissionDenied,
+            ProbeStatus::InvalidRequest,
+            ProbeStatus::NotAttempted,
+            ProbeStatus::Failed,
+        ];
+        let actual: std::collections::BTreeSet<String> = statuses.iter()
+            .map(|status| serde_json::to_value(status).unwrap().as_str().unwrap().to_string())
+            .collect();
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../benchmarks/basalt/schema/linux-runtime-smoke.v1.schema.json"
+        )).unwrap();
+        let expected: std::collections::BTreeSet<String> = schema["$defs"]["probeObservation"]
+            ["properties"]["status"]["enum"].as_array().unwrap().iter()
+            .map(|value| value.as_str().unwrap().to_string()).collect();
+        assert_eq!(actual, expected);
     }
     #[test]
     fn digest_is_domain_tagged_and_fixed_width() {
