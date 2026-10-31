@@ -13,8 +13,8 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use super::event_tape::{
-    ActionIntent, ActionOutcome, ComparisonMode, EventTape, EventTapeSummary, MeterValue,
-    ResourceReceipt,
+    ActionIntent, ActionOutcome, BudgetModel, ComparisonMode, EventTape, EventTapeSummary,
+    MeterValue, ResourceCostWeights, ResourceReceipt,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -175,6 +175,7 @@ struct CommonContract<'a> {
     evaluator_sha256: &'a str,
     verifier_sha256: &'a str,
     budget_model_id: &'a str,
+    budget_model: &'a BudgetModel,
     budget_model_sha256: &'a str,
     budget_limit_microunits: u64,
     initial_direction_ids: &'a [String],
@@ -306,6 +307,7 @@ pub fn reconcile_mechanism_matched_campaign(
             evaluator_sha256: &header.evaluator_sha256,
             verifier_sha256: &header.verifier_sha256,
             budget_model_id: &header.budget_model_id,
+            budget_model: &header.budget_model,
             budget_model_sha256: &header.budget_model_sha256,
             budget_limit_microunits: header.budget_limit_microunits,
             initial_direction_ids: &header.initial_direction_ids,
@@ -561,7 +563,7 @@ mod tests {
             config_value,
             score,
             unknown_wall_time,
-            H2,
+            1,
             100,
         )
     }
@@ -572,10 +574,25 @@ mod tests {
         config_value: serde_json::Value,
         score: f64,
         unknown_wall_time: bool,
-        budget_model_sha256: &str,
+        budget_model_weight: u64,
         charge: u64,
     ) -> EventTape {
         let config_sha256 = digest(&config_value);
+        let budget_model = BudgetModel::WeightedResources {
+            weights: ResourceCostWeights {
+                host_cpu_millis: budget_model_weight,
+                wall_millis: 0,
+                accelerator_millis: 0,
+                host_memory_byte_millis: 0,
+                accelerator_memory_byte_millis: 0,
+                energy_millijoules: 0,
+                input_tokens: 0,
+                output_tokens: 0,
+                tool_calls: 0,
+                evaluator_calls: 0,
+                verifier_calls: 0,
+            },
+        };
         let header = EventTapeHeader {
             schema: "symthaea.ar5b4.event-tape".to_owned(),
             version: "0.1.0".to_owned(),
@@ -590,7 +607,8 @@ mod tests {
             evaluator_sha256: H5.to_owned(),
             verifier_sha256: H1.to_owned(),
             budget_model_id: "microcost-v1".to_owned(),
-            budget_model_sha256: budget_model_sha256.to_owned(),
+            budget_model_sha256: digest(&budget_model),
+            budget_model,
             budget_limit_microunits: 1000,
             initial_direction_ids: vec!["A".to_owned()],
             execution: ExecutionContract {
@@ -613,7 +631,7 @@ mod tests {
             reason: reason.to_owned(),
         };
         let mut resources = ResourceReceipt {
-            host_cpu_millis: meter(12),
+            host_cpu_millis: meter(charge),
             wall_millis: meter(5),
             accelerator_millis: meter(0),
             peak_memory_bytes: meter(1024),
@@ -673,7 +691,7 @@ mod tests {
         assert!(summary.normalized_budget_spend_matched);
         assert_eq!(
             summary.resource_totals_by_policy["board"].host_cpu_millis,
-            Some(12)
+            Some(100)
         );
         assert_eq!(
             summary.resource_totals_by_policy["board"].max_action_peak_memory_bytes,
@@ -726,7 +744,7 @@ mod tests {
             json!({"prior": 1.0}),
             0.91,
             false,
-            H3,
+            2,
             100,
         );
         assert!(reconcile_mechanism_matched_campaign(&[left, right]).is_err());
