@@ -506,6 +506,54 @@
           }
         }
       }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "exec_image_identity_recall"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "exec_occurrence_order_integrity"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "clone_flag_semantic_integrity"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
     }
   ]
 }
