@@ -85,3 +85,30 @@ The Rust binary \`verify_sorrydb_smoke_cohort\` validates each materialized repo
 The focused workflow checks out each project at its recorded commit and invokes the verifier. Its result is only a source-integrity receipt: it does not establish that dependencies are available, the unchanged project builds, or Lean's actual metavariable state has been exported.
 
 The three sorry spans were rechecked against their exact source commits. Each source-file blob matches its manifest pin, and zero-based character slicing selects exactly \`sorry\` in all three files. This agrees with SorryDB's \`position_to_index\` implementation, which uses Unicode character columns; raw UTF-8 byte offsets would be incorrect for these Lean files.
+
+
+## Lean exporter compatibility is a separate blocker
+
+The current PITB v2 Lean pilot package is pinned to Lean 4.34.1, whereas the first three SorryDB candidates use Lean 4.24.0, 4.26.0, and 4.26.0-rc2. The v2 JSON evidence contract can be shared across versions, but a compiled Lean exporter cannot be assumed source-compatible across these toolchains. Do not run the current 4.34.1 exporter against older projects by swapping a version string.
+
+The next implementation should split the evidence pipeline into two layers:
+
+1. **Version-local Lean capture shim:** compile inside each task's own Lake environment. It emits only versioned primitive data: target expression, ordered local declarations, binder info, declaration type/value availability, auxiliary-declaration flags, local-instance registry class/type expressions, and direct elaborated proof-term support when a proof exists.
+2. **Version-neutral PITB canonicalizer/verifier:** validates the raw shim payload against a strict adapter schema, normalizes stable tags and expression serialization, computes content digests, derives role-aware dependency edges, and verifies that every retained instance reference resolves in the projected context.
+
+Each raw receipt must record Lean version/build identity, Mathlib/Lake dependency revisions, serializer ID, expression options, universe level representation, and source commit. A digest from one serializer/toolchain is not a cross-version theorem identity. The target must be captured and compared within the same pinned environment.
+
+Do not create a lowest-common-denominator exporter that drops local instances or declaration values. Version-specific shims may have different capture internals, but the canonical semantic fields must be complete. If an older Lean version cannot expose a field with the required fidelity, mark that evidence as unavailable and block the corresponding v2 qualification rather than silently defaulting it.
+
+### Compatibility matrix to qualify
+
+| Environment | Candidate role | Required qualification |
+|---|---|---|
+| Lean 4.24.0 | Stable baseline | Compile capture shim; local context/instance round-trip fixture; exact target digest |
+| Lean 4.26.0 | Project/dependency context | Same tests plus Lake/Mathlib manifest binding |
+| Lean 4.26.0-rc2 | Explicit instance challenge | Confirm registry membership for Fact (Nat.Prime p) and prove projection digest changes when removed |
+| Lean 4.34.1 | Existing PITB pilot | Keep as the development reference; do not treat it as compatibility evidence for older releases |
+
+The first real LocalInstances test must come from Lean's actual metavariable declaration in clap-lean, not the SorryDB pretty-printed goal. The debug text only tells us which task is promising. It does not prove that the printed binder maps one-to-one to a registry entry.
+
+A failed build or unsupported API is a preflight/adapter-compatibility outcome. It is not a proof-search failure and must remain in the operational readiness report.

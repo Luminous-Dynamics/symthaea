@@ -308,7 +308,7 @@ fn validate_task(task: &Task, root: &Path, index: usize) -> Result<()> {
         bail!("task {index} lean-toolchain does not match {}", task.repository.lean_version);
     }
     let lakefile = fs::read_to_string(checkout.join("lakefile.toml"))?;
-    if !lakefile.contains(&task.repository.lean_version) {
+    if !lakefile.contains(task.repository.lean_version.as_str()) {
         bail!("task {index} lakefile does not mention its Lean toolchain");
     }
     validate_mathlib_revision(&checkout, &task.project_pins.mathlib_revision)?;
