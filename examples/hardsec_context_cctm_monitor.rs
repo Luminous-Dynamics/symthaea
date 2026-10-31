@@ -883,26 +883,30 @@ mod tests {
     }
 
     #[test]
-    fn invalid_and_unseen_context_records_abstain_without_wealth_update() {
-        let (p, mut s, _, _) = fixture();
-        s["records"] = json!([
-            {"sequence_index":1,"window_id":"stale","context_id":"compute","anomaly_score":100.0,"sensor_state":"stale","pmu_qualification_result":QUALIFIED_PMU},
-            {"sequence_index":2,"window_id":"unseen","context_id":"other","anomaly_score":100.0,"sensor_state":"valid","pmu_qualification_result":QUALIFIED_PMU}
-        ]);
-        let r = audit(&p, &s).unwrap();
+    fn invalid_and_unseen_context_assignments_abstain_without_wealth_update() {
+        let (p, mut s, pb, sb) = fixture();
+        s["records"][0]["sensor_state"] = json!("stale");
+        s["records"][1]["context_id"] = json!("new-regime");
+        let bytes = include_bytes!("../tests/fixtures/hardsec/context-assignment-v1/runtime-receipt.json");
+        let mut assignment_receipt: Value = serde_json::from_slice(bytes).unwrap();
+        assignment_receipt["runtime_mapping"]["assignments"][1]["decision_status"] = json!("abstained");
+        assignment_receipt["runtime_mapping"]["assignments"][1]["decision_reason"] = json!("unknown_context");
+        assignment_receipt["runtime_mapping"]["assignments"][1]["selected_context_id"] = Value::Null;
+        let rb = encode(&assignment_receipt);
+        let r = audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
         assert_eq!(r["sequential_monitor"]["valid_observation_count"], 0);
+        assert_eq!(r["sequential_monitor"]["abstention_count"], 2);
+        assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["invalid_sensor_state"], 1);
+        assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["context_assignment_not_accepted"], 1);
         assert_eq!(r["reference_policy"]["contexts"][0]["final_log_wealth"], 0.0);
     }
 
     #[test]
     fn unqualified_pmu_observation_abstains() {
         let (p, mut s, _, _) = fixture();
-        s["records"] = json!([{
-            "sequence_index":1,"window_id":"no-metro","context_id":"compute","anomaly_score":100.0,
-            "sensor_state":"valid","pmu_qualification_result":"measurement_quality_gate_failed"
-        }]);
+        s["records"][0]["pmu_qualification_result"] = json!("measurement_quality_gate_failed");
         let r = audit(&p, &s).unwrap();
-        assert_eq!(r["sequential_monitor"]["valid_observation_count"], 0);
+        assert_eq!(r["sequential_monitor"]["valid_observation_count"], 15);
         assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["pmu_acquisition_not_qualified"], 1);
     }
 
