@@ -173,7 +173,7 @@ class RandomizedCommonDepthCRC:
             "proof_lane":"ExactFiniteExchangeabilityPlusLPOptimality",
             "risk_target":{
                 "metric":"expected_hierarchical_loss",
-                "level":self.alpha.tolist(),
+                "level":self.alpha,
                 "guarantee":"expected_risk",
             },
             "assumption_contract":{
@@ -285,7 +285,7 @@ class RandomizedCommonDepthCRC:
             return {"valid":False,"reason":"certificate type mismatch"}
         if certificate.get("scope",{}).get("n_calibration")!=self.n:
             return {"valid":False,"reason":"calibration scope mismatch"}
-        if certificate.get("risk_target",{}).get("level")!=self.alpha.tolist():
+        if certificate.get("risk_target",{}).get("level")!=self.alpha:
             return {"valid":False,"reason":"risk target mismatch"}
         verification=self.verify(probabilities)
         if not verification["valid"]:
