@@ -219,6 +219,42 @@
       "phase": "boot_lifecycle",
       "mutation": "Attempt generation reset after observer restart, kernel update or device restore",
       "expected": "reject_generation_reset"
+    },
+    {
+      "id": "TSTATE-037",
+      "phase": "rollback",
+      "mutation": "Remote anchor CAS commits the complete new source/log/receipt record, then the client crashes before local cache materialization",
+      "expected": "rebuild_local_cache_from_authoritative_anchor_record"
+    },
+    {
+      "id": "TSTATE-038",
+      "phase": "crash_recovery",
+      "mutation": "Remote anchor CAS commits but the response is lost; retry queries by exact receipt digest/idempotency key",
+      "expected": "already_committed_only_if_complete_anchor_record_matches"
+    },
+    {
+      "id": "TSTATE-039",
+      "phase": "offline",
+      "mutation": "Remote anchor is unavailable before candidate CAS",
+      "expected": "anti_rollback_unknown_no_trust_promotion"
+    },
+    {
+      "id": "TSTATE-040",
+      "phase": "rollback",
+      "mutation": "Local cache is ahead of authoritative remote anchor state",
+      "expected": "reject_or_unknown_no_trust_promotion"
+    },
+    {
+      "id": "TSTATE-041",
+      "phase": "concurrency",
+      "mutation": "Remote anchor backend reads a lagging replica and attempts CAS without linearizable compare semantics",
+      "expected": "backend_nonconformant_no_trust_promotion"
+    },
+    {
+      "id": "TSTATE-042",
+      "phase": "offline",
+      "mutation": "Witness quorum disagrees about the authoritative anchor head",
+      "expected": "witness_equivocation_no_advance"
     }
   ],
   "metrics": [
@@ -299,6 +335,24 @@
       "class": "efficiency",
       "unit": "milliseconds",
       "target": "measure separately from local durable commit"
+    },
+    {
+      "id": "anchor_cache_rebuild_failures",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "anchor_commit_response_loss_recovery_failures",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "remote_anchor_commit_p95",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": "measure separately; no local-store latency substitution"
     }
   ],
   "benchmark_policy": {
