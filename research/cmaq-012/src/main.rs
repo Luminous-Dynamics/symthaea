@@ -363,8 +363,8 @@ impl<'a> JsonParser<'a> {
         let start = self.position;
         if self.bytes.get(self.position) == Some(&b'-') { self.position += 1; }
         match self.bytes.get(self.position) {
-            Some(&b'0') => self.position += 1,
-            Some(&b'1'..=&b'9') => {
+            Some(byte) if **byte == b'0' => self.position += 1,
+            Some(byte) if (b'1'..=b'9').contains(*byte) => {
                 self.position += 1;
                 while self.bytes.get(self.position).is_some_and(|byte| byte.is_ascii_digit()) {
                     self.position += 1;
@@ -1163,6 +1163,21 @@ fn artifact_path(root: &Path, subdirectory: &str, digest_value: &str) -> PathBuf
     root.join(subdirectory).join(format!("{digest_value}.json"))
 }
 
+fn validate_artifact_directory(root: &Path, subdirectory: &str) -> Result<(), String> {
+    let root_metadata = fs::symlink_metadata(root)
+        .map_err(|error| format!("cannot inspect artifact root {}: {error}", root.display()))?;
+    if root_metadata.file_type().is_symlink() || !root_metadata.is_dir() {
+        return Err(format!("artifact root {} must be a real directory, not a symlink", root.display()));
+    }
+    let child = root.join(subdirectory);
+    let child_metadata = fs::symlink_metadata(&child)
+        .map_err(|error| format!("cannot inspect artifact directory {}: {error}", child.display()))?;
+    if child_metadata.file_type().is_symlink() || !child_metadata.is_dir() {
+        return Err(format!("artifact directory {} must be a real directory, not a symlink", child.display()));
+    }
+    Ok(())
+}
+
 fn read_verified_artifact(
     root: &Path,
     subdirectory: &str,
@@ -1354,6 +1369,8 @@ fn verify_artifacts(
     artifacts_dir: &Path,
     allow_fixtures: bool,
 ) -> Result<ArtifactVerification, String> {
+    validate_artifact_directory(artifacts_dir, "profiles")?;
+    validate_artifact_directory(artifacts_dir, "receipts")?;
     let mut verified_profiles = BTreeSet::new();
     let mut verified_receipts = BTreeSet::new();
     let mut fixture_mode: Option<bool> = None;
