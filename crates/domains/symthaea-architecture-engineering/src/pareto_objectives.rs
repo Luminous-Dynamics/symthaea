@@ -648,6 +648,114 @@ fn digest_serializable<T: Serialize>(value: &T) -> Result<String, ParetoError> {
     Ok(digest.iter().map(|byte| format!("{byte:02x}")).collect())
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ParetoIndicatorReceipt {
+    pub schema: String,
+    pub version: String,
+    pub campaign_id: String,
+    pub plan_sha256: String,
+    pub approximation_front_sha256: String,
+    pub reference_front_sha256: String,
+    pub igd_plus: f64,
+    pub additive_epsilon: f64,
+    pub receipt_sha256: String,
+}
+
+#[derive(Serialize)]
+struct ParetoIndicatorReceiptPayload<'a> {
+    schema: &'a str,
+    version: &'a str,
+    campaign_id: &'a str,
+    plan_sha256: &'a str,
+    approximation_front_sha256: &'a str,
+    reference_front_sha256: &'a str,
+    igd_plus: f64,
+    additive_epsilon: f64,
+}
+
+/// Compute IGD+ and additive epsilon against a retained reference front, binding both fronts
+/// and the source plan into one reproducible receipt. Reference points must be unique and
+/// mutually nondominated; input order does not affect the receipt.
+pub fn analyze_reference_front_indicators(
+    plan: &ParetoAnalysisPlan,
+    reference_front_utility: &[Vec<f64>],
+) -> Result<ParetoIndicatorReceipt, ParetoError> {
+    let analysis = analyze_pareto(plan)?;
+    let approximation_front = analysis.candidate_results.iter()
+        .filter(|candidate| candidate.on_pareto_front)
+        .map(|candidate| candidate.utility_vector.clone())
+        .collect::<Vec<_>>();
+    validate_indicator_fronts(&approximation_front, reference_front_utility)?;
+    validate_reference_front(reference_front_utility)?;
+
+    let approximation_front = canonicalize_front(&approximation_front);
+    let reference_front = canonicalize_front(reference_front_utility);
+    let igd_plus = inverted_generational_distance_plus(
+        &approximation_front,
+        &reference_front,
+    )?;
+    let additive_epsilon = additive_epsilon_indicator(
+        &approximation_front,
+        &reference_front,
+    )?;
+    let approximation_front_sha256 = digest_serializable(&approximation_front)?;
+    let reference_front_sha256 = digest_serializable(&reference_front)?;
+    let receipt_sha256 = digest_serializable(&ParetoIndicatorReceiptPayload {
+        schema: SCHEMA,
+        version: VERSION,
+        campaign_id: &plan.campaign_id,
+        plan_sha256: &analysis.plan_sha256,
+        approximation_front_sha256: &approximation_front_sha256,
+        reference_front_sha256: &reference_front_sha256,
+        igd_plus,
+        additive_epsilon,
+    })?;
+
+    Ok(ParetoIndicatorReceipt {
+        schema: SCHEMA.to_owned(),
+        version: VERSION.to_owned(),
+        campaign_id: plan.campaign_id.clone(),
+        plan_sha256: analysis.plan_sha256,
+        approximation_front_sha256,
+        reference_front_sha256,
+        igd_plus,
+        additive_epsilon,
+        receipt_sha256,
+    })
+}
+
+fn validate_reference_front(front: &[Vec<f64>]) -> Result<(), ParetoError> {
+    for (index, point) in front.iter().enumerate() {
+        if front.iter().enumerate().any(|(other_index, other)| {
+            if index == other_index {
+                return false;
+            }
+            same_vector(point, other) || dominates(other, point)
+        }) {
+            return Err(ParetoError::new(
+                format!("reference_front_utility[{index}]"),
+                "reference front must contain unique mutually nondominated points",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn canonicalize_front(front: &[Vec<f64>]) -> Vec<Vec<f64>> {
+    let mut canonical = front.to_vec();
+    canonical.sort_by(|left, right| {
+        for (left_value, right_value) in left.iter().zip(right) {
+            let ordering = left_value.total_cmp(right_value);
+            if ordering != Ordering::Equal {
+                return ordering;
+            }
+        }
+        left.len().cmp(&right.len())
+    });
+    canonical
+}
+
 /// Inverted generational distance plus in maximization-utility coordinates.
 ///
 /// For each reference point, this averages the nearest one-sided distance from the reference
@@ -992,6 +1100,45 @@ mod tests {
         let better = vec![vec![1.1, 0.1], vec![0.1, 1.1]];
         assert_eq!(inverted_generational_distance_plus(&better, &reference).unwrap(), 0.0);
         assert!((additive_epsilon_indicator(&better, &reference).unwrap() + 0.1).abs() < 1e-12);
+    }
+
+    #[test]
+    fn reference_front_indicator_receipt_binds_order_independent_fronts() {
+        let benchmark = plan(vec![
+            candidate("a", 0.8, 0.4, 80.0, true, vec![], H1),
+            candidate("b", 0.4, 0.8, 20.0, true, vec![], H2),
+        ]);
+        let left_reference = vec![
+            vec![1.0, 0.4, 0.2],
+            vec![0.4, 1.0, 0.8],
+        ];
+        let right_reference = vec![
+            vec![0.4, 1.0, 0.8],
+            vec![1.0, 0.4, 0.2],
+        ];
+        let left = analyze_reference_front_indicators(&benchmark, &left_reference).unwrap();
+        let right = analyze_reference_front_indicators(&benchmark, &right_reference).unwrap();
+        assert!((left.igd_plus - 0.2).abs() < 1e-12);
+        assert!((left.additive_epsilon - 0.2).abs() < 1e-12);
+        assert_eq!(left.reference_front_sha256, right.reference_front_sha256);
+        assert_eq!(left.receipt_sha256, right.receipt_sha256);
+    }
+
+    #[test]
+    fn reference_front_indicator_receipt_rejects_dominated_or_duplicate_reference_points() {
+        let benchmark = plan(vec![
+            candidate("a", 0.8, 0.4, 80.0, true, vec![], H1),
+        ]);
+        let dominated_reference = vec![
+            vec![1.0, 0.5, 0.5],
+            vec![0.5, 0.4, 0.4],
+        ];
+        assert!(analyze_reference_front_indicators(&benchmark, &dominated_reference).is_err());
+        let duplicate_reference = vec![
+            vec![1.0, 0.5, 0.5],
+            vec![1.0, 0.5, 0.5],
+        ];
+        assert!(analyze_reference_front_indicators(&benchmark, &duplicate_reference).is_err());
     }
 
     #[test]
