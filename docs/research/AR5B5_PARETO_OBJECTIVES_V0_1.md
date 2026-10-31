@@ -20,6 +20,7 @@ File: crates/domains/symthaea-architecture-engineering/src/pareto_objectives.rs
 - analyze_reference_sensitivity: computes hypervolume under the primary reference point and each explicitly supplied alternative; reports min/max/range and a digest-bound sensitivity receipt.
 - inverted_generational_distance_plus and additive_epsilon_indicator: companion set-quality metrics in the same maximization-utility coordinates.
 - analyze_reference_front_indicators: computes IGD+ and additive epsilon against a unique, mutually nondominated reference front and returns a receipt binding the plan, approximation front and canonical reference front.
+- ParetoIndicatorReceipt: retains digests for the plan, approximation front and reference front alongside the two companion metrics.
 
 ### Objective transformation
 
@@ -67,6 +68,7 @@ Reference sensitivity is a separate output. A single HV value is never presented
 - reference-clipped volume;
 - infeasible-candidate exclusion from the front and hypervolume;
 - reference-point sensitivity and receipt;
+- IGD+/additive-epsilon known cases and digest-bound reference-front receipts;
 - IGD+ and additive-epsilon known cases, including strictly dominating approximations;
 - reference-front receipt order invariance and rejection of duplicate/dominated reference points;
 - candidate-order invariance of plan and receipt digests;
