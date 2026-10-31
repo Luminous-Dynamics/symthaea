@@ -77,6 +77,10 @@ pub struct VoCQualificationManifest {
     pub fit_architecture_families: Vec<String>,
     pub calibration_architecture_families: Vec<String>,
     pub evaluation_architecture_families: Vec<String>,
+    /// Expected evaluation strata are declared before outcome inspection.
+    pub evaluation_rank_regimes: Vec<String>,
+    pub evaluation_curve_shapes: Vec<String>,
+    pub evaluation_noise_regimes: Vec<String>,
     pub fit_seed_ids: Vec<String>,
     pub calibration_seed_ids: Vec<String>,
     pub evaluation_seed_ids: Vec<String>,
@@ -574,6 +578,9 @@ fn validate_manifest(
             "evaluation_architecture_families",
             &manifest.evaluation_architecture_families,
         ),
+        ("evaluation_rank_regimes", &manifest.evaluation_rank_regimes),
+        ("evaluation_curve_shapes", &manifest.evaluation_curve_shapes),
+        ("evaluation_noise_regimes", &manifest.evaluation_noise_regimes),
         ("fit_seed_ids", &manifest.fit_seed_ids),
         ("calibration_seed_ids", &manifest.calibration_seed_ids),
         ("evaluation_seed_ids", &manifest.evaluation_seed_ids),
@@ -748,10 +755,18 @@ fn validate_episodes(
         .collect();
     let seed_ids: HashSet<&str> = manifest.evaluation_seed_ids.iter().map(String::as_str).collect();
     let fidelity_ids: HashSet<&str> = manifest.fidelity_ids.iter().map(String::as_str).collect();
+    let rank_regimes: HashSet<&str> = manifest.evaluation_rank_regimes.iter().map(String::as_str).collect();
+    let curve_shapes: HashSet<&str> = manifest.evaluation_curve_shapes.iter().map(String::as_str).collect();
+    let noise_regimes: HashSet<&str> = manifest.evaluation_noise_regimes.iter().map(String::as_str).collect();
     let candidate_count = manifest.candidate_ids.len();
     let particle_count = manifest.posterior_particle_weights.len();
     let mut episode_ids = HashSet::with_capacity(episodes.len());
     let mut covered_tasks = HashSet::new();
+    let mut covered_families = HashSet::new();
+    let mut covered_fidelities = HashSet::new();
+    let mut covered_rank_regimes = HashSet::new();
+    let mut covered_curve_shapes = HashSet::new();
+    let mut covered_noise_regimes = HashSet::new();
 
     for (index, episode) in episodes.iter().enumerate() {
         let field = format!("episodes[{index}]");
@@ -787,15 +802,15 @@ fn validate_episodes(
                 "fidelity is not in the frozen ordered ladder",
             ));
         }
-        for (name, value) in [
-            ("rank_regime", episode.rank_regime.as_str()),
-            ("curve_shape", episode.curve_shape.as_str()),
-            ("noise_regime", episode.noise_regime.as_str()),
+        for (name, value, declared) in [
+            ("rank_regime", episode.rank_regime.as_str(), &rank_regimes),
+            ("curve_shape", episode.curve_shape.as_str(), &curve_shapes),
+            ("noise_regime", episode.noise_regime.as_str(), &noise_regimes),
         ] {
-            if value.trim().is_empty() {
+            if value.trim().is_empty() || !declared.contains(value) {
                 return Err(QualificationError::new(
                     format!("{field}.{name}"),
-                    "stratum identity must be non-empty",
+                    "stratum identity must be non-empty and present in the frozen evaluation taxonomy",
                 ));
             }
         }
@@ -854,13 +869,27 @@ fn validate_episodes(
             }
         }
         covered_tasks.insert(episode.task_id.as_str());
+        covered_families.insert(episode.architecture_family.as_str());
+        covered_fidelities.insert(episode.fidelity_id.as_str());
+        covered_rank_regimes.insert(episode.rank_regime.as_str());
+        covered_curve_shapes.insert(episode.curve_shape.as_str());
+        covered_noise_regimes.insert(episode.noise_regime.as_str());
     }
 
-    if covered_tasks.len() != manifest.evaluation_task_ids.len() {
-        return Err(QualificationError::new(
-            "evaluation_task_ids",
-            "one or more declared evaluation tasks have no replay episodes",
-        ));
+    for (field, declared_count, covered_count) in [
+        ("evaluation_task_ids", manifest.evaluation_task_ids.len(), covered_tasks.len()),
+        ("evaluation_architecture_families", manifest.evaluation_architecture_families.len(), covered_families.len()),
+        ("fidelity_ids", manifest.fidelity_ids.len(), covered_fidelities.len()),
+        ("evaluation_rank_regimes", manifest.evaluation_rank_regimes.len(), covered_rank_regimes.len()),
+        ("evaluation_curve_shapes", manifest.evaluation_curve_shapes.len(), covered_curve_shapes.len()),
+        ("evaluation_noise_regimes", manifest.evaluation_noise_regimes.len(), covered_noise_regimes.len()),
+    ] {
+        if declared_count != covered_count {
+            return Err(QualificationError::new(
+                field,
+                "one or more declared evaluation strata have no replay episodes",
+            ));
+        }
     }
     for kind in QualificationActionKind::all() {
         let count = episodes
@@ -1414,6 +1443,9 @@ mod tests {
             fit_architecture_families: vec!["fit-family".into()],
             calibration_architecture_families: vec!["cal-family".into()],
             evaluation_architecture_families: vec!["eval-family".into()],
+            evaluation_rank_regimes: vec!["clear-winner".into()],
+            evaluation_curve_shapes: vec!["early-separating".into()],
+            evaluation_noise_regimes: vec!["low-noise".into()],
             fit_seed_ids: vec!["fit-seed".into()],
             calibration_seed_ids: vec!["cal-seed".into()],
             evaluation_seed_ids: vec!["eval-seed".into()],
