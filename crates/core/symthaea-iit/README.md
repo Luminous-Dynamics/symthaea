@@ -348,12 +348,19 @@ Use two clearly separated upstream baselines:
 | Heterogeneous multi-valued units | End-to-end support, including mixed alphabets and per-node factored TPMs | Binary-only; tracked in [#9596](https://github.com/Luminous-Dynamics/symthaea/issues/9596) |
 | Macro units and grain search | Coarse-graining, black-boxing, intrinsic-unit criteria, bounded grain search | Not implemented |
 | Actual causation | Dedicated pipeline | Not implemented |
-| Sparse exact inference | Factored TPM representation, caching and parallel execution | Sparse local-CPT model, log-domain min-fill, explicit cutset conditioning, factor-entry budgets, and posterior reuse |
+| Sparse exact inference | Factored TPM and sum-product contraction for cause-side Bayesian inversion, math-keyed caches, process/thread/Dask parallelism, and cluster campaigns | Sparse local-CPT model, log-domain min-fill, explicit cutset conditioning/planning, hard factor-entry budgets, work telemetry, and scoped posterior reuse |
 | Preflight/admission | Combinatorial `estimate_analysis()` | Exact partition-work estimate and factor/cutset planners; integrated full-search estimator tracked in [#9597](https://github.com/Luminous-Dynamics/symthaea/issues/9597) |
 
 The most defensible Symthaea differentiator today is **resource-bounded exact
-inference over sparse local-CPT substrates**: factor cost is governed by induced
-width and explicit table budgets, rather than allocating a global dense TPM.
+inference over sparse local-CPT substrates**: explicit local conditional tables,
+public min-fill/cutset planning, hard table-entry budgets, and auditable work
+receipts. Important qualification: PyPhi 2.0 also uses sum-product contraction
+over its factored TPM dependency structure for cause-side Bayesian inversion,
+plus math-keyed caching and parallel/distributed execution. Symthaea is not
+introducing sparse contraction to IIT; it is building an independently
+implemented Rust path with more explicit resource admission and observable
+factor-work contracts. Whether that is faster or more memory-efficient must be
+measured head-to-head after output parity.
 Current large-substrate examples evaluate a fixed four-unit candidate inside
 substrates up to 2,048 units. That is not a 2,048-unit integrated system, and
 must not be compared to PyPhi's 10–12-unit system-`phi_s` ceiling as though the
