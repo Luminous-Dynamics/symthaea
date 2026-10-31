@@ -1,0 +1,294 @@
+{
+  "schema_version": "hardsec-telemetry-trace-lineage-v1",
+  "dataset_id": "hs014-hs012-linked-synthetic-fixture-v1",
+  "source_corpus_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "sampling_policy": {
+    "offset_unit": "committed_instructions",
+    "window_size": 10000,
+    "stride": 10000
+  },
+  "holdout_axes": [
+    "program",
+    "execution",
+    "attack_family",
+    "adaptation_family"
+  ],
+  "traces": [
+    {
+      "trace_id": "trace-tr1",
+      "source_trace_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "program_id": "train-p",
+      "binary_sha256": "0000000000000000000000000000000000000000000000000000000000000101",
+      "execution_id": "train-e",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "spectre-baseline-train",
+      "adaptation_family_id": "none",
+      "split": "train",
+      "origin": "original",
+      "parent_trace_id": null,
+      "iteration_id": 0,
+      "windows": [
+        {
+          "window_id": "window-tr1-0",
+          "sample_index": 0,
+          "start_offset": 0,
+          "end_offset": 10000,
+          "window_sha256": "0000000000000000000000000000000000000000000000000000000000000201"
+        }
+      ]
+    },
+    {
+      "trace_id": "trace-va1",
+      "source_trace_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "program_id": "val-p",
+      "binary_sha256": "0000000000000000000000000000000000000000000000000000000000000102",
+      "execution_id": "val-e",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "spectre-baseline-validation",
+      "adaptation_family_id": "none",
+      "split": "validation",
+      "origin": "original",
+      "parent_trace_id": null,
+      "iteration_id": 0,
+      "windows": [
+        {
+          "window_id": "window-va1-0",
+          "sample_index": 0,
+          "start_offset": 0,
+          "end_offset": 10000,
+          "window_sha256": "0000000000000000000000000000000000000000000000000000000000000202"
+        }
+      ]
+    },
+    {
+      "trace_id": "trace-c1",
+      "source_trace_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+      "program_id": "p1",
+      "binary_sha256": "0000000000000000000000000000000000000000000000000000000000000103",
+      "execution_id": "e1",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "evasive-spectre",
+      "adaptation_family_id": "timing",
+      "split": "test",
+      "origin": "original",
+      "parent_trace_id": null,
+      "iteration_id": 0,
+      "windows": [
+        {
+          "window_id": "window-c1-0",
+          "sample_index": 0,
+          "start_offset": 0,
+          "end_offset": 10000,
+          "window_sha256": "0000000000000000000000000000000000000000000000000000000000000203"
+        }
+      ]
+    },
+    {
+      "trace_id": "trace-c2",
+      "source_trace_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+      "program_id": "p2",
+      "binary_sha256": "0000000000000000000000000000000000000000000000000000000000000104",
+      "execution_id": "e2",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "evasive-spectre",
+      "adaptation_family_id": "interleave",
+      "split": "test",
+      "origin": "original",
+      "parent_trace_id": null,
+      "iteration_id": 0,
+      "windows": [
+        {
+          "window_id": "window-c2-0",
+          "sample_index": 0,
+          "start_offset": 0,
+          "end_offset": 10000,
+          "window_sha256": "0000000000000000000000000000000000000000000000000000000000000204"
+        }
+      ]
+    },
+    {
+      "trace_id": "trace-c3",
+      "source_trace_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+      "program_id": "p3",
+      "binary_sha256": "0000000000000000000000000000000000000000000000000000000000000105",
+      "execution_id": "e3",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "evasive-spectre",
+      "adaptation_family_id": "timing",
+      "split": "test",
+      "origin": "original",
+      "parent_trace_id": null,
+      "iteration_id": 0,
+      "windows": [
+        {
+          "window_id": "window-c3-0",
+          "sample_index": 0,
+          "start_offset": 0,
+          "end_offset": 10000,
+          "window_sha256": "0000000000000000000000000000000000000000000000000000000000000205"
+        }
+      ]
+    },
+    {
+      "trace_id": "trace-c4",
+      "source_trace_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
+      "program_id": "p4",
+      "binary_sha256": "0000000000000000000000000000000000000000000000000000000000000106",
+      "execution_id": "e4",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "evasive-spectre",
+      "adaptation_family_id": "timing",
+      "split": "test",
+      "origin": "original",
+      "parent_trace_id": null,
+      "iteration_id": 0,
+      "windows": [
+        {
+          "window_id": "window-c4-0",
+          "sample_index": 0,
+          "start_offset": 0,
+          "end_offset": 10000,
+          "window_sha256": "0000000000000000000000000000000000000000000000000000000000000206"
+        }
+      ]
+    },
+    {
+      "trace_id": "trace-c5",
+      "source_trace_sha256": "0000000000000000000000000000000000000000000000000000000000000007",
+      "program_id": "p5",
+      "binary_sha256": "0000000000000000000000000000000000000000000000000000000000000107",
+      "execution_id": "e5",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "evasive-spectre",
+      "adaptation_family_id": "interleave",
+      "split": "test",
+      "origin": "original",
+      "parent_trace_id": null,
+      "iteration_id": 0,
+      "windows": [
+        {
+          "window_id": "window-c5-0",
+          "sample_index": 0,
+          "start_offset": 0,
+          "end_offset": 10000,
+          "window_sha256": "0000000000000000000000000000000000000000000000000000000000000207"
+        }
+      ]
+    },
+    {
+      "trace_id": "trace-c6",
+      "source_trace_sha256": "0000000000000000000000000000000000000000000000000000000000000008",
+      "program_id": "p6",
+      "binary_sha256": "0000000000000000000000000000000000000000000000000000000000000108",
+      "execution_id": "e6",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "none",
+      "adaptation_family_id": "none",
+      "split": "test",
+      "origin": "original",
+      "parent_trace_id": null,
+      "iteration_id": 0,
+      "windows": [
+        {
+          "window_id": "window-c6-0",
+          "sample_index": 0,
+          "start_offset": 0,
+          "end_offset": 10000,
+          "window_sha256": "0000000000000000000000000000000000000000000000000000000000000208"
+        }
+      ]
+    },
+    {
+      "trace_id": "trace-c7",
+      "source_trace_sha256": "0000000000000000000000000000000000000000000000000000000000000009",
+      "program_id": "p7",
+      "binary_sha256": "0000000000000000000000000000000000000000000000000000000000000109",
+      "execution_id": "e7",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "none",
+      "adaptation_family_id": "none",
+      "split": "test",
+      "origin": "original",
+      "parent_trace_id": null,
+      "iteration_id": 0,
+      "windows": [
+        {
+          "window_id": "window-c7-0",
+          "sample_index": 0,
+          "start_offset": 0,
+          "end_offset": 10000,
+          "window_sha256": "0000000000000000000000000000000000000000000000000000000000000209"
+        }
+      ]
+    },
+    {
+      "trace_id": "trace-c8",
+      "source_trace_sha256": "0000000000000000000000000000000000000000000000000000000000000010",
+      "program_id": "p8",
+      "binary_sha256": "0000000000000000000000000000000000000000000000000000000000000110",
+      "execution_id": "e8",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "none",
+      "adaptation_family_id": "none",
+      "split": "test",
+      "origin": "original",
+      "parent_trace_id": null,
+      "iteration_id": 0,
+      "windows": [
+        {
+          "window_id": "window-c8-0",
+          "sample_index": 0,
+          "start_offset": 0,
+          "end_offset": 10000,
+          "window_sha256": "0000000000000000000000000000000000000000000000000000000000000210"
+        }
+      ]
+    },
+    {
+      "trace_id": "trace-c9",
+      "source_trace_sha256": "0000000000000000000000000000000000000000000000000000000000000011",
+      "program_id": "p9",
+      "binary_sha256": "0000000000000000000000000000000000000000000000000000000000000111",
+      "execution_id": "e9",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "none",
+      "adaptation_family_id": "none",
+      "split": "test",
+      "origin": "original",
+      "parent_trace_id": null,
+      "iteration_id": 0,
+      "windows": [
+        {
+          "window_id": "window-c9-0",
+          "sample_index": 0,
+          "start_offset": 0,
+          "end_offset": 10000,
+          "window_sha256": "0000000000000000000000000000000000000000000000000000000000000211"
+        }
+      ]
+    },
+    {
+      "trace_id": "trace-c1-repeat",
+      "source_trace_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+      "program_id": "p1",
+      "binary_sha256": "0000000000000000000000000000000000000000000000000000000000000103",
+      "execution_id": "e1",
+      "device_config_id": "cpu-a",
+      "attack_family_id": "evasive-spectre",
+      "adaptation_family_id": "timing",
+      "split": "test",
+      "origin": "repeated_iteration",
+      "parent_trace_id": "trace-c1",
+      "iteration_id": 1,
+      "windows": [
+        {
+          "window_id": "window-c1-repeat-0",
+          "sample_index": 0,
+          "start_offset": 0,
+          "end_offset": 10000,
+          "window_sha256": "0000000000000000000000000000000000000000000000000000000000000203"
+        }
+      ]
+    }
+  ]
+}
