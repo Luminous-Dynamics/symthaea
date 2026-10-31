@@ -404,6 +404,9 @@ def verify_raw_projective_sequence(
     capacities: tuple[Fraction, ...],
 ) -> dict:
     """Independent replay with O(N) certificate checks and exhaustive optimality."""
+    paths, weights, active_masks, alpha, values, costs, capacities = _normalise_stream(
+        paths, weights, active_masks, alpha, values, costs, capacities
+    )
     n = len(paths)
     t_count = len(active_masks)
     failures = []
