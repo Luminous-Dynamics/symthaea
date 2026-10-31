@@ -16,7 +16,7 @@ This module adds an empirical gate over frozen held-out replay episodes. The gat
 
 The manifest binds:
 
-- benchmark and metric identity/direction;
+- benchmark and metric identity/direction plus the unit shared by all planned/measured action costs;
 - exact source-trajectory artifact SHA-256;
 - posterior-model and action-likelihood-model SHA-256;
 - ordered fidelity-ladder and fidelity-cost-model SHA-256;
@@ -29,7 +29,7 @@ All three split dimensions must be pairwise disjoint. Candidate IDs are strictly
 
 The evaluation episodes must belong only to declared evaluation task, architecture-family, seed and fidelity IDs. The manifest also predeclares the expected rank regimes, learning-curve shapes and noise regimes. Every declared evaluation task, architecture family, fidelity rung and declared regime must contribute evidence; an absent regime is a hard error rather than a silent omission. Raw model scores and realized scores are normalized to [0,1] before metric-direction transformation; minimization is converted to maximize-is-better utility inside the scorer.
 
-The split digest binds the complete manifest, including all model/artifact digests and posterior weights. The replay-evidence digest binds the exact held-out episodes, joint particle matrices, outcomes and costs. The receipt binds those digests, threshold digest, measured metrics and qualification decision.
+The split digest binds the complete manifest, including all model/artifact digests and posterior weights. The replay-evidence digest binds the exact held-out episodes, joint particle matrices, outcomes and costs. The receipt binds those digests, threshold digest, measured metrics, qualification decision and explicit resource unit.
 
 A digest proves byte identity, not that the artifact is truthful. A separate acquisition process must verify dataset origin, task identities, seed provenance, candidate mapping, no test leakage and complete trajectory lineage.
 
@@ -104,7 +104,7 @@ A benchmark harness should prove that the gate abstains under at least these con
 9. Omit late learners, high-noise cases, failed runs or dormant-candidate reactivations.
 10. Edit a replay episode, threshold or receipt field after scoring.
 
-The current eighteen Rust tests cover basic pass/replay, receipt tampering, split leakage, invalid categorical probabilities, likelihood misspecification, ESS degeneration, minimize-is-better semantics, order-invariant replay evidence, consistent action-category semantics, reordered equivalent outcomes, fidelity-order digest binding, rejection of undeclared evaluation strata, Brier skill behavior against the K/N baseline, and family/seed leakage, missing-family coverage, and degenerate K=N controls. They are test declarations only until compiled and run.
+The current twenty Rust tests cover basic pass/replay, receipt tampering, split leakage, invalid categorical probabilities, likelihood misspecification, ESS degeneration, minimize-is-better semantics, order-invariant replay evidence, consistent action-category semantics, reordered equivalent outcomes, fidelity-order digest binding, rejection of undeclared evaluation strata, Brier skill behavior against the K/N baseline, family/seed leakage, missing-family coverage, degenerate K=N controls, resource-unit digest binding and canonical taxonomy ordering. They are test declarations only until compiled and run.
 
 ## 7. Benchmark campaign and competitive baselines
 
