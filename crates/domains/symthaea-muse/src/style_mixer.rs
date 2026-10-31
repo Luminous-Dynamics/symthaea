@@ -85,9 +85,11 @@ pub struct HybridComposition {
 }
 
 /// Compile an explicit catalogue-layer recipe to the actual composer's
-/// declarative spec. Every applied layer is copied from an executable
-/// source style; unsupported meter transfers or unknown/unimplemented
-/// composer routes fail closed.
+/// declarative spec. V1 intentionally supports only PeriodSentence structural
+/// owners using Ternary/Rondo/Variations and rejects dedicated-engine owners
+/// until family-specific donor-consumption adapters exist. Every applied
+/// layer is copied from an executable source style; unsupported meter
+/// transfers or unknown/unimplemented composer routes fail closed.
 pub fn compile_hybrid_style(
     hybrid: &HybridStyleSpec,
 ) -> Result<CompiledHybridStyle, Vec<StyleMixIssue>> {
@@ -519,8 +521,8 @@ mod tests {
 
     #[test]
     fn melodic_donor_cannot_be_claimed_when_owner_disables_hook_cells() {
-        let mut hybrid = HybridStyleSpec {
-            structural_style_id: id_for_composer_style("Classical"),
+        let hybrid = HybridStyleSpec {
+            structural_style_id: id_for_composer_style("Ambient"),
             melodic_style_id: Some(id_for_composer_style("Blues")),
             rhythmic_style_id: None,
             harmonic_style_id: None,
@@ -529,26 +531,10 @@ mod tests {
             production_style_id: None,
             culturally_qualified_sources_acknowledged: false,
         };
-        // Classical currently has hook cells enabled; this test uses a
-        // focused helper-level contract by selecting a future no-hook owner
-        // through a synthetic spec is not possible through the public catalog.
-        // Instead assert that every preset with hook cells disabled is not
-        // falsely accepted as a melodic donor.
-        let candidate_ids = (1..=152).collect::<Vec<_>>();
-        let no_hook_name = candidate_ids.into_iter().find_map(|id| {
-            let entry = catalog_entry(id)?;
-            let style_name = entry.composer_style?;
-            let style = Style::ALL.into_iter()
-                .find(|style| format!("{style:?}") == style_name)?;
-            (!style.spec().texture.hook_cell).then_some(style_name)
-        });
-        if let Some(style_name) = no_hook_name {
-            hybrid.structural_style_id = id_for_composer_style(style_name);
-            let issues = compile_hybrid_style(&hybrid).unwrap_err();
-            assert!(issues.iter().any(|issue| {
-                issue.code == "melody_hook_adapter_required"
-            }));
-        }
+        let issues = compile_hybrid_style(&hybrid).unwrap_err();
+        assert!(issues.iter().any(|issue| {
+            issue.code == "melody_hook_adapter_required"
+        }));
     }
 
     #[test]
