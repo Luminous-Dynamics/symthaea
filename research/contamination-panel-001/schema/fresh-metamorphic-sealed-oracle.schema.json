@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/fresh-metamorphic-sealed-oracle-v1.json",
+  "title": "Fresh metamorphic evaluator-only sealed oracle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "batch_id",
+    "base_sealed_oracle_sha256",
+    "generation_seed_commitment_sha256",
+    "item_count",
+    "group_count",
+    "entries",
+    "sealed_oracle_sha256",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.fresh_metamorphic_sealed_oracle.v1"
+    },
+    "batch_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "base_sealed_oracle_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "generation_seed_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "item_count": {
+      "type": "integer",
+      "minimum": 5
+    },
+    "group_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 50000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "item_id",
+          "group_id",
+          "parent_item_id",
+          "form",
+          "parameters",
+          "solution",
+          "normalized_determinant_margin_permille",
+          "parent_answer_sha256",
+          "parameter_sha256",
+          "answer_sha256"
+        ],
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "group_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parent_item_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "form": {
+            "type": "string",
+            "enum": [
+              "base",
+              "swap_rows",
+              "scale_first_row_by_two",
+              "scale_second_row_by_negative_two",
+              "swap_and_scale_rows"
+            ]
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "a11",
+              "a12",
+              "a21",
+              "a22",
+              "b1",
+              "b2"
+            ],
+            "properties": {
+              "a11": {
+                "type": "integer"
+              },
+              "a12": {
+                "type": "integer"
+              },
+              "a21": {
+                "type": "integer"
+              },
+              "a22": {
+                "type": "integer"
+              },
+              "b1": {
+                "type": "integer"
+              },
+              "b2": {
+                "type": "integer"
+              }
+            }
+          },
+          "solution": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "type": "integer"
+              },
+              "y": {
+                "type": "integer"
+              }
+            }
+          },
+          "normalized_determinant_margin_permille": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "parent_answer_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "parameter_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "answer_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "sealed_oracle_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
