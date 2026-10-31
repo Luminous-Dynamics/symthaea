@@ -87,7 +87,8 @@
       "HDC_fast_slow_fixed_cadence",
       "HDC_fast_slow_novelty_refresh",
       "HDC_plus_STDL_local_auxiliary",
-      "HDC_plus_BrainTrace_online_trace"
+      "HDC_plus_BrainTrace_online_trace",
+      "BrainTrace_pp_prop_firing_rate_sensitivity"
     ],
     "implementation": {
       "path": "research/temporal-bench/src/gradient_oracle.rs",
@@ -110,6 +111,44 @@
         "double_detachment_keeps_only_final_step_input_credit",
         "local_auxiliary_objective_is_distinct_from_global_BPTT"
       ]
+    },
+    "sensitivity_factors": {
+      "braintrace_pp_prop": {
+        "network_depth": [
+          2,
+          4,
+          8
+        ],
+        "firing_statistics": [
+          "sparse",
+          "intermediate",
+          "dense"
+        ],
+        "trace_configuration": "Sweep only parameters exposed by pinned BrainTrace API and preregister exact values; do not invent rank controls.",
+        "report": [
+          "held_out_task_quality",
+          "gradient_cosine_vs_BPTT",
+          "relative_update_norm_error",
+          "trace_memory_bytes",
+          "update_throughput",
+          "time_to_target_quality"
+        ]
+      },
+      "rationale": {
+        "paper_memory_complexity": {
+          "pp_prop": "O(B*N)",
+          "d_rtrl": "O(B*P)"
+        },
+        "paper_lif_gesture_reference": {
+          "pp_prop_memory_gb": 0.5,
+          "d_rtrl_memory_gb": 17.5,
+          "reported_memory_ratio": 35,
+          "reported_speedup_vs_d_rtrl": 10,
+          "scope": "Published paper's specific LIF-Gesture setup; literature reference only, not Symthaea measurement."
+        },
+        "source": "Wang et al., Nature Communications 17, 1745 (2026-01-19), DOI 10.1038/s41467-026-68453-w.",
+        "limitations": "Paper states pp-prop approximation quality can depend on firing statistics and network depth."
+      }
     }
   },
   "stage1": {
@@ -169,7 +208,8 @@
     "gradient_oracle_tests_executed": false,
     "full_multimodule_oracle_implemented": false,
     "stdl_implemented": false,
-    "braintrace_implemented": false
+    "braintrace_implemented": false,
+    "braintrace_sensitivity_sweep_implemented": false
   },
   "caveats": [
     "STDL's public code snapshot predates journal publication; exact paper runner mapping unverified.",
