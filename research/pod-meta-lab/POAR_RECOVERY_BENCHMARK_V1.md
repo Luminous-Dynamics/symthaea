@@ -45,7 +45,7 @@ Aim for zero forbidden effects and zero false completion in the deterministic co
 
 ## External suites
 
-Use official evaluators independently: [Open Agent Leaderboard / Exgentic](https://huggingface.co/blog/ibm-research/open-agent-leaderboard) for full-system success and cost; [NOWAI-Bench](https://github.com/ServiceNow/NOWAI-Bench) for enterprise workflows and voice tasks; [OSWorld 2.0](https://osworld-v2.xlang.ai/) for long-horizon computer use; [AgentRx](https://aclanthology.org/2026.findings-emnlp.598/) for failure localization; [TEMPO](https://aclanthology.org/2026.emnlp-main.291/) for temporal retrieval; and [GRACE](https://aclanthology.org/2026.emnlp-main.614/) / [FaithCoT-Bench](https://proceedings.iclr.cc/paper_files/paper/2026/hash/6c7154e394e24c69409256ccf8bf0804-Abstract-Conference.html) for trace faithfulness. Do not average incompatible scores.
+Use official evaluators independently: [Open Agent Leaderboard / Exgentic](https://www.exgentic.ai/blog/open-leaderboard/) for full-system success and cost; [NOWAI-Bench](https://github.com/ServiceNow/NOWAI-Bench) for enterprise workflows and voice tasks; [OSWorld 2.0](https://osworld-v2.xlang.ai/) for long-horizon computer use; [AgentRx](https://aclanthology.org/2026.findings-emnlp.598/) for failure localization; [TEMPO](https://aclanthology.org/2026.emnlp-main.291/) for temporal retrieval; and [GRACE](https://aclanthology.org/2026.emnlp-main.1582/) / [FaithCoT-Bench](https://proceedings.iclr.cc/paper_files/paper/2026/hash/6c7154e394e24c69409256ccf8bf0804-Abstract-Conference.html) for trace faithfulness. Do not average incompatible scores.
 
 ## Symthaea hypothesis
 
