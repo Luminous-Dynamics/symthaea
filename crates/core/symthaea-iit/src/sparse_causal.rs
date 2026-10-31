@@ -2150,6 +2150,13 @@ mod tests {
             .analyze_iit4_2023_system_phi_s(&candidate, &current_state, config, 1 << 16)
             .unwrap();
         assert_eq!(sparse_result.formalism, dense_result.formalism);
+        assert_eq!(sparse_result.certified_upper_bound, dense_result.certified_upper_bound);
+        assert_eq!(sparse_result.certified_upper_bound, Some(CANDIDATE.len() * (CANDIDATE.len() - 1)));
+        assert_eq!(sparse_result.receipt_sha256().unwrap(), sparse
+            .analyze_iit4_2023_system_phi_s(&candidate, &current_state, config, 1 << 16)
+            .unwrap()
+            .receipt_sha256()
+            .unwrap());
         assert_eq!(sparse_result.status, dense_result.status);
         assert_eq!(sparse_result.selected_state_pair_index, dense_result.selected_state_pair_index);
         assert_eq!(sparse_result.tied_state_pair_indices, dense_result.tied_state_pair_indices);
