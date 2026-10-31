@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fmt::Write as _;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
 
 const SCHEMA: &str = "cmaq-012-paired-aop-report-v0.2";
@@ -184,6 +184,297 @@ impl Row {
             oracle_transition_calls, environment_transition_calls, optimizer_iterations,
         })
     }
+}
+
+
+#[derive(Clone, Debug, PartialEq)]
+enum JsonValue {
+    Null,
+    Bool(bool),
+    Number(String),
+    String(String),
+    Array(Vec<JsonValue>),
+    Object(BTreeMap<String, JsonValue>),
+}
+
+impl JsonValue {
+    fn get(&self, key: &str) -> Result<&JsonValue, String> {
+        match self {
+            Self::Object(values) => values.get(key).ok_or_else(|| format!("missing JSON field {key:?}")),
+            _ => Err("expected JSON object".into()),
+        }
+    }
+
+    fn as_str(&self, field: &str) -> Result<&str, String> {
+        match self {
+            Self::String(value) => Ok(value),
+            _ => Err(format!("JSON field {field:?} must be a string")),
+        }
+    }
+
+    fn as_bool(&self, field: &str) -> Result<bool, String> {
+        match self {
+            Self::Bool(value) => Ok(*value),
+            _ => Err(format!("JSON field {field:?} must be a boolean")),
+        }
+    }
+
+    fn as_u64(&self, field: &str) -> Result<u64, String> {
+        match self {
+            Self::Number(value) if !value.contains(['.', 'e', 'E', '-']) => value.parse::<u64>()
+                .map_err(|_| format!("JSON field {field:?} must be a non-negative integer")),
+            _ => Err(format!("JSON field {field:?} must be a non-negative integer")),
+        }
+    }
+
+    fn as_f64(&self, field: &str) -> Result<f64, String> {
+        match self {
+            Self::Number(value) => {
+                let parsed = value.parse::<f64>().map_err(|_| format!("JSON field {field:?} is not numeric"))?;
+                if parsed.is_finite() { Ok(parsed) } else { Err(format!("JSON field {field:?} is not finite")) }
+            }
+            _ => Err(format!("JSON field {field:?} must be numeric")),
+        }
+    }
+
+    fn optional_u64(&self, field: &str) -> Result<Option<u64>, String> {
+        match self {
+            Self::Null => Ok(None),
+            value => value.as_u64(field).map(Some),
+        }
+    }
+
+    fn optional_f64(&self, field: &str) -> Result<Option<f64>, String> {
+        match self {
+            Self::Null => Ok(None),
+            value => value.as_f64(field).map(Some),
+        }
+    }
+
+    fn is_null(&self) -> bool {
+        matches!(self, Self::Null)
+    }
+}
+
+struct JsonParser<'a> {
+    bytes: &'a [u8],
+    position: usize,
+}
+
+impl<'a> JsonParser<'a> {
+    fn new(input: &'a str) -> Self {
+        Self { bytes: input.as_bytes(), position: 0 }
+    }
+
+    fn whitespace(&mut self) {
+        while self.position < self.bytes.len()
+            && matches!(self.bytes[self.position], b' ' | b'\n' | b'\r' | b'\t')
+        {
+            self.position += 1;
+        }
+    }
+
+    fn consume(&mut self, expected: u8) -> Result<(), String> {
+        self.whitespace();
+        if self.bytes.get(self.position) == Some(&expected) {
+            self.position += 1;
+            Ok(())
+        } else {
+            Err(format!("expected {:?} at JSON byte {}", expected as char, self.position))
+        }
+    }
+
+    fn parse_string(&mut self) -> Result<String, String> {
+        self.consume(b'"')?;
+        let mut output = Vec::new();
+        while self.position < self.bytes.len() {
+            let byte = self.bytes[self.position];
+            self.position += 1;
+            match byte {
+                b'"' => {
+                    return String::from_utf8(output).map_err(|_| "JSON string is not valid UTF-8".into());
+                }
+                b'\\' => {
+                    let escaped = *self.bytes.get(self.position)
+                        .ok_or_else(|| "unterminated JSON escape".to_string())?;
+                    self.position += 1;
+                    match escaped {
+                        b'"' => output.push(b'"'),
+                        b'\\' => output.push(b'\\'),
+                        b'/' => output.push(b'/'),
+                        b'b' => output.push(0x08),
+                        b'f' => output.push(0x0c),
+                        b'n' => output.push(b'\n'),
+                        b'r' => output.push(b'\r'),
+                        b't' => output.push(b'\t'),
+                        b'u' => {
+                            let first = self.parse_hex_quad()?;
+                            let codepoint = if (0xD800..=0xDBFF).contains(&first) {
+                                if self.bytes.get(self.position..self.position + 2) != Some(b"\\u") {
+                                    return Err("high surrogate must be followed by a low surrogate".into());
+                                }
+                                self.position += 2;
+                                let second = self.parse_hex_quad()?;
+                                if !(0xDC00..=0xDFFF).contains(&second) {
+                                    return Err("invalid low surrogate in JSON string".into());
+                                }
+                                0x10000 + (((first - 0xD800) as u32) << 10) + (second - 0xDC00) as u32
+                            } else if (0xDC00..=0xDFFF).contains(&first) {
+                                return Err("unpaired low surrogate in JSON string".into());
+                            } else {
+                                first as u32
+                            };
+                            let character = char::from_u32(codepoint)
+                                .ok_or_else(|| "invalid Unicode scalar in JSON string".to_string())?;
+                            let mut buffer = [0u8; 4];
+                            output.extend_from_slice(character.encode_utf8(&mut buffer).as_bytes());
+                        }
+                        _ => return Err(format!("invalid JSON escape byte {escaped:?}")),
+                    }
+                }
+                0x00..=0x1f => return Err("unescaped control byte in JSON string".into()),
+                other => output.push(other),
+            }
+        }
+        Err("unterminated JSON string".into())
+    }
+
+    fn parse_hex_quad(&mut self) -> Result<u16, String> {
+        if self.position + 4 > self.bytes.len() {
+            return Err("truncated Unicode escape".into());
+        }
+        let mut value = 0u16;
+        for byte in &self.bytes[self.position..self.position + 4] {
+            value = value.checked_mul(16).ok_or_else(|| "Unicode escape overflow".to_string())?;
+            value += match byte {
+                b'0'..=b'9' => (byte - b'0') as u16,
+                b'a'..=b'f' => (byte - b'a' + 10) as u16,
+                b'A'..=b'F' => (byte - b'A' + 10) as u16,
+                _ => return Err("invalid hexadecimal digit in Unicode escape".into()),
+            };
+        }
+        self.position += 4;
+        Ok(value)
+    }
+
+    fn parse_number(&mut self) -> Result<JsonValue, String> {
+        let start = self.position;
+        if self.bytes.get(self.position) == Some(&b'-') { self.position += 1; }
+        match self.bytes.get(self.position) {
+            Some(b'0') => self.position += 1,
+            Some(b'1'..=b'9') => {
+                self.position += 1;
+                while self.bytes.get(self.position).is_some_and(u8::is_ascii_digit) {
+                    self.position += 1;
+                }
+            }
+            _ => return Err(format!("invalid JSON number at byte {start}")),
+        }
+        if self.bytes.get(self.position) == Some(&b'.') {
+            self.position += 1;
+            let fraction_start = self.position;
+            while self.bytes.get(self.position).is_some_and(u8::is_ascii_digit) {
+                self.position += 1;
+            }
+            if self.position == fraction_start {
+                return Err("JSON number has an empty fractional part".into());
+            }
+        }
+        if matches!(self.bytes.get(self.position), Some(b'e' | b'E')) {
+            self.position += 1;
+            if matches!(self.bytes.get(self.position), Some(b'+' | b'-')) { self.position += 1; }
+            let exponent_start = self.position;
+            while self.bytes.get(self.position).is_some_and(u8::is_ascii_digit) {
+                self.position += 1;
+            }
+            if self.position == exponent_start {
+                return Err("JSON number has an empty exponent".into());
+            }
+        }
+        let text = std::str::from_utf8(&self.bytes[start..self.position])
+            .map_err(|_| "invalid UTF-8 in JSON number".to_string())?;
+        let parsed = text.parse::<f64>().map_err(|_| format!("invalid JSON number {text:?}"))?;
+        if !parsed.is_finite() {
+            return Err("JSON number is outside finite f64 range".into());
+        }
+        Ok(JsonValue::Number(text.to_string()))
+    }
+
+    fn value(&mut self) -> Result<JsonValue, String> {
+        self.whitespace();
+        match self.bytes.get(self.position).copied() {
+            Some(b'"') => self.parse_string().map(JsonValue::String),
+            Some(b'{') => {
+                self.position += 1;
+                self.whitespace();
+                let mut values = BTreeMap::new();
+                if self.bytes.get(self.position) == Some(&b'}') {
+                    self.position += 1;
+                    return Ok(JsonValue::Object(values));
+                }
+                loop {
+                    self.whitespace();
+                    if self.bytes.get(self.position) != Some(&b'"') {
+                        return Err(format!("JSON object key must be a string at byte {}", self.position));
+                    }
+                    let key = self.parse_string()?;
+                    self.consume(b':')?;
+                    let value = self.value()?;
+                    if values.insert(key.clone(), value).is_some() {
+                        return Err(format!("duplicate JSON object key {key:?}"));
+                    }
+                    self.whitespace();
+                    match self.bytes.get(self.position) {
+                        Some(b',') => self.position += 1,
+                        Some(b'}') => { self.position += 1; break; }
+                        _ => return Err(format!("expected comma or closing brace at byte {}", self.position)),
+                    }
+                }
+                Ok(JsonValue::Object(values))
+            }
+            Some(b'[') => {
+                self.position += 1;
+                self.whitespace();
+                let mut values = Vec::new();
+                if self.bytes.get(self.position) == Some(&b']') {
+                    self.position += 1;
+                    return Ok(JsonValue::Array(values));
+                }
+                loop {
+                    values.push(self.value()?);
+                    self.whitespace();
+                    match self.bytes.get(self.position) {
+                        Some(b',') => self.position += 1,
+                        Some(b']') => { self.position += 1; break; }
+                        _ => return Err(format!("expected comma or closing bracket at byte {}", self.position)),
+                    }
+                }
+                Ok(JsonValue::Array(values))
+            }
+            Some(b't') if self.bytes.get(self.position..self.position + 4) == Some(b"true") => {
+                self.position += 4; Ok(JsonValue::Bool(true))
+            }
+            Some(b'f') if self.bytes.get(self.position..self.position + 5) == Some(b"false") => {
+                self.position += 5; Ok(JsonValue::Bool(false))
+            }
+            Some(b'n') if self.bytes.get(self.position..self.position + 4) == Some(b"null") => {
+                self.position += 4; Ok(JsonValue::Null)
+            }
+            Some(b'-' | b'0'..=b'9') => self.parse_number(),
+            Some(other) => Err(format!("unexpected JSON byte {other:?} at {}", self.position)),
+            None => Err("unexpected end of JSON input".into()),
+        }
+    }
+}
+
+fn parse_json(input: &str) -> Result<JsonValue, String> {
+    let mut parser = JsonParser::new(input);
+    let value = parser.value()?;
+    parser.whitespace();
+    if parser.position != parser.bytes.len() {
+        return Err(format!("trailing bytes after JSON value at {}", parser.position));
+    }
+    Ok(value)
 }
 
 fn identifier(value: &str) -> Result<String, String> {
