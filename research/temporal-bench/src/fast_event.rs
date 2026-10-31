@@ -149,9 +149,14 @@ impl fmt::Display for FastEventVerificationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::StreamIdMismatch => write!(f, "fast-event task and oracle stream IDs differ"),
-            Self::PublicDigestMismatch => write!(f, "fast-event public stream SHA-256 digest mismatch"),
+            Self::PublicDigestMismatch => {
+                write!(f, "fast-event public stream SHA-256 digest mismatch")
+            }
             Self::OracleDigestMismatch => write!(f, "fast-event oracle SHA-256 digest mismatch"),
-            Self::SeedReplayMismatch => write!(f, "fast-event task/oracle do not match the supplied seed and configuration"),
+            Self::SeedReplayMismatch => write!(
+                f,
+                "fast-event task/oracle do not match the supplied seed and configuration"
+            ),
             Self::InvalidTaskContract => write!(f, "fast-event timing or task metadata is invalid"),
             Self::InvalidEventCount => write!(f, "fast-event oracle event counts are inconsistent"),
             Self::InvalidEventSchedule { index } => {
@@ -213,7 +218,10 @@ pub fn generate_fast_event_task(
             unique_distractor_code(&mut rng, config.similarity, &mut used_codes)
         };
         let amplitude = MIN_AMPLITUDE
-            + i16::try_from(rng.next_u64() % u64::try_from(MAX_AMPLITUDE - MIN_AMPLITUDE + 1).unwrap_or(1))
+            + i16::try_from(
+                rng.next_u64()
+                    % u64::try_from(MAX_AMPLITUDE - MIN_AMPLITUDE + 1).unwrap_or(1)
+            )
                 .unwrap_or(0);
         events.push(FastEventTruth {
             start_step: u32::try_from(start).unwrap_or(u32::MAX),
@@ -752,7 +760,10 @@ mod tests {
         let (_, oracle) = generate_fast_event_task(config).unwrap();
         for pair in oracle.events.windows(2) {
             assert!(pair[1].start_step >= pair[0].end_step);
-            assert_ne!(pair[0].start_step / BLOCK_SIZE as u32, pair[1].start_step / BLOCK_SIZE as u32);
+            assert_ne!(
+                pair[0].start_step / BLOCK_SIZE as u32,
+                pair[1].start_step / BLOCK_SIZE as u32
+            );
         }
     }
 
@@ -826,7 +837,10 @@ mod tests {
         let score = score_fast_event_predictions(&task, &oracle, &predictions).unwrap();
         assert_eq!(score.false_positive_idle, 1);
         assert_eq!(score.true_positives, 0);
-        assert_eq!(score.idle_false_triggers_per_hour(), Some(1.0 * 3_600_000_000.0 / score.quiet_exposure_us as f64));
+        assert_eq!(
+            score.idle_false_triggers_per_hour(),
+            Some(1.0 * 3_600_000_000.0 / score.quiet_exposure_us as f64)
+        );
     }
 
     #[test]
