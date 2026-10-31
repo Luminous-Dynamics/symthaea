@@ -1,0 +1,251 @@
+name: CMAQ-004 world-model value-add smoke harness
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-004/**"
+      - ".github/workflows/cmaq-004.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "research/cmaq-004/**"
+      - ".github/workflows/cmaq-004.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  value-add:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-004
+        run: cargo test --locked
+      - name: Generate report and validate model value-add frontier
+        working-directory: research/cmaq-004
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked --bin cmaq-004-world-model-value-add > /tmp/cmaq-004-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-004-report.json").read_text())
+          assert report["schema_version"] == "cmaq-004-value-add-report-v0.3"
+          assert report["support_contexts"] == [0, 1, 2]
+          assert report["heldout_context"] == 3
+          assert report["support_samples_per_context_action"] == 1024
+          assert report["evaluation_episodes"] == 4096
+          cost_levels = [0.0, 0.02, 0.04, 0.08, 0.12, 0.16]
+          assert report["model_query_cost_levels"] == cost_levels
+          families = {item["world_family"]: item for item in report["families"]}
+          assert set(families) == {"additive_positive", "interaction_only", "additive_reversed"}
+          expected_strategies = {
+              "direct_nearest_context", "learned_additive_model", "shuffled_model_control",
+              "stale_model_control", "oracle_evaluator_only"
+          }
+
+          def rows_at_cost(family, cost):
+              rows = {
+                  row["strategy"]: row
+                  for row in families[family]["results"]
+                  if abs(row["model_query_cost_per_query"] - cost) < 1e-9
+              }
+              assert set(rows) == expected_strategies
+              return rows
+
+          for family_name in families:
+              assert len(families[family_name]["results"]) == len(cost_levels) * len(expected_strategies)
+              for cost in cost_levels:
+                  rows = rows_at_cost(family_name, cost)
+                  oracle = rows["oracle_evaluator_only"]["mean_net_utility"]
+                  assert oracle >= max(
+                      row["mean_net_utility"]
+                      for key, row in rows.items()
+                      if key != "oracle_evaluator_only"
+                  )
+
+          additive_free = rows_at_cost("additive_positive", 0.0)["learned_additive_model"]
+          additive_base = rows_at_cost("additive_positive", 0.04)["learned_additive_model"]
+          additive_expensive = rows_at_cost("additive_positive", 0.16)["learned_additive_model"]
+          assert additive_base["net_lift_vs_direct"] > 0.10
+          assert additive_base["net_lift_ci95_low"] > 0
+          assert additive_base["model_prediction_mae"] < 0.05
+          assert additive_free["net_lift_vs_direct"] > additive_base["net_lift_vs_direct"]
+          assert additive_expensive["net_lift_vs_direct"] < 0.0
+          assert additive_expensive["net_lift_ci95_high"] < 0
+
+          interaction = rows_at_cost("interaction_only", 0.04)["learned_additive_model"]
+          assert interaction["net_lift_vs_direct"] < -0.05
+          assert interaction["net_lift_ci95_high"] < 0
+          assert interaction["model_prediction_mae"] > 0.20
+
+          reversed_world = rows_at_cost("additive_reversed", 0.04)
+          assert reversed_world["stale_model_control"]["net_lift_vs_direct"] < -0.30
+          assert reversed_world["learned_additive_model"]["net_lift_vs_direct"] < 0.0
+
+          print("CMAQ-004 schema, held-out lift, misspecification, stale-model and query-cost frontier validated")
+          print(json.dumps({
+              family_name: {
+                  str(cost): {
+                      row["strategy"]: {
+                          "action": row["chosen_action"],
+                          "net_utility": row["mean_net_utility"],
+                          "net_lift": row["net_lift_vs_direct"],
+                          "net_lift_ci95": [row["net_lift_ci95_low"], row["net_lift_ci95_high"]],
+                          "prediction_mae": row["model_prediction_mae"],
+                      }
+                      for row in rows_at_cost(family_name, cost).values()
+                  }
+                  for cost in cost_levels
+              }
+              for family_name in families
+          }, sort_keys=True))
+          PY
+      - name: Run family-level held-out transfer panel
+        working-directory: research/cmaq-004
+        run: cargo run --quiet --locked --bin family_transfer > /tmp/cmaq-004-family-transfer.json
+      - name: Validate family-level transfer and lower-tail risk
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import math
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-004-family-transfer.json").read_text())
+          assert report["schema_version"] == "cmaq-004-family-transfer-v0.3"
+          assert report["family_count"] == 256
+          assert report["support_samples_per_context_action"] == 256
+          assert report["support_contexts"] == [0, 1, 2]
+          assert report["heldout_context"] == 3
+          assert report["query_cost_levels"] == [0.0, 0.02, 0.04, 0.08]
+          assert report["model_queries_per_decision"] == 2
+
+          rows = report["summary"]
+          assert len(rows) == 128
+          by_key = {
+              (row["lane"], row["strategy"], round(row["query_cost_per_query"], 4)): row
+              for row in rows
+          }
+          assert len(by_key) == len(rows)
+          strategies = {
+              "direct_nearest_context", "additive_model", "margin_gate_005",
+              "margin_gate_020", "margin_gate_050", "shuffled_model_control",
+              "stale_model_control", "oracle_evaluator_only",
+          }
+          lanes = {"all", "additive", "interaction", "holdout_shift"}
+          costs = report["query_cost_levels"]
+          assert {row["strategy"] for row in rows} == strategies
+          assert {row["lane"] for row in rows} == lanes
+
+          for lane in lanes:
+              for strategy in strategies:
+                  for cost in costs:
+                      row = by_key[(lane, strategy, round(cost, 4))]
+                      expected_count = {"all": 256, "additive": 86, "interaction": 85, "holdout_shift": 85}[lane]
+                      assert row["family_count"] == expected_count
+                      for key in (
+                          "mean_net_utility", "mean_gross_lift_vs_direct", "mean_break_even_query_cost",
+                          "beneficial_family_rate_before_cost", "mean_net_lift_vs_direct", "lift_ci95_low",
+                          "lift_ci95_high", "lower_cvar05_net_lift", "minimum_family_net_lift",
+                          "harmed_family_rate", "mean_additive_prediction_mae", "action_one_rate", "action_override_rate",
+                      ):
+                          assert math.isfinite(row[key]), (key, row)
+                      assert row["lift_ci95_low"] <= row["lift_ci95_high"]
+                      assert row["minimum_family_net_lift"] <= row["lower_cvar05_net_lift"] + 1e-8
+                      assert row["lower_cvar05_net_lift"] <= row["mean_net_lift_vs_direct"] + 1e-8
+                      assert 0.0 <= row["harmed_family_rate"] <= 1.0
+                      assert 0.0 <= row["beneficial_family_rate_before_cost"] <= 1.0
+                      assert 0.0 <= row["action_one_rate"] <= 1.0
+                      assert 0.0 <= row["action_override_rate"] <= 1.0
+
+          for lane in lanes:
+              for cost in costs:
+                  direct = by_key[(lane, "direct_nearest_context", round(cost, 4))]
+                  assert abs(direct["mean_net_lift_vs_direct"]) <= 1e-8
+                  assert abs(direct["lift_ci95_low"]) <= 1e-8
+                  assert abs(direct["lift_ci95_high"]) <= 1e-8
+                  oracle = by_key[(lane, "oracle_evaluator_only", round(cost, 4))]
+                  assert oracle["mean_net_utility"] >= max(
+                      by_key[(lane, strategy, round(cost, 4))]["mean_net_utility"]
+                      for strategy in strategies if strategy != "oracle_evaluator_only"
+                  ) - 1e-8
+
+          # Model choice is held fixed across query-cost levels: gross lift is invariant,
+          # break-even query price is gross lift / two queries, and net lift pays that cost.
+          for lane in lanes:
+              baseline = by_key[(lane, "additive_model", 0.0)]
+              free = baseline["mean_net_lift_vs_direct"]
+              gross = baseline["mean_gross_lift_vs_direct"]
+              assert abs(free - gross) < 1e-8
+              assert abs(baseline["mean_break_even_query_cost"] - gross / 2.0) < 1e-8
+              assert abs(baseline["beneficial_family_rate_before_cost"] - by_key[(lane, "additive_model", 0.08)]["beneficial_family_rate_before_cost"]) < 1e-8
+              for cost in costs:
+                  row = by_key[(lane, "additive_model", round(cost, 4))]
+                  assert abs(row["mean_gross_lift_vs_direct"] - gross) < 1e-8
+                  assert abs(row["mean_break_even_query_cost"] - gross / 2.0) < 1e-8
+                  assert abs(row["mean_net_lift_vs_direct"] - (gross - 2.0 * cost)) < 1e-8
+
+          # Every gated policy still pays inference cost because the margin is derived
+          # from model outputs. Cost must not quietly disappear when it falls back to direct.
+          gate_names = ["margin_gate_005", "margin_gate_020", "margin_gate_050"]
+          for lane in lanes:
+              for gate in gate_names:
+                  baseline = by_key[(lane, gate, 0.0)]
+                  gross = baseline["mean_gross_lift_vs_direct"]
+                  for cost in costs:
+                      row = by_key[(lane, gate, round(cost, 4))]
+                      assert abs(row["mean_gross_lift_vs_direct"] - gross) < 1e-8
+                      assert abs(row["mean_break_even_query_cost"] - gross / 2.0) < 1e-8
+                      assert abs(row["mean_net_lift_vs_direct"] - (gross - 2.0 * cost)) < 1e-8
+                      assert abs(row["action_override_rate"] - baseline["action_override_rate"]) < 1e-8
+              for cost in costs:
+                  loose = by_key[(lane, "margin_gate_005", round(cost, 4))]["action_override_rate"]
+                  medium = by_key[(lane, "margin_gate_020", round(cost, 4))]["action_override_rate"]
+                  strict = by_key[(lane, "margin_gate_050", round(cost, 4))]["action_override_rate"]
+                  assert loose + 1e-8 >= medium >= strict - 1e-8
+
+          assert by_key[("interaction", "additive_model", 0.04)]["harmed_family_rate"] > 0.0
+          assert by_key[("holdout_shift", "additive_model", 0.04)]["harmed_family_rate"] > 0.0
+          assert by_key[("all", "additive_model", 0.04)]["mean_additive_prediction_mae"] > 0.0
+          print("CMAQ-004 family transfer schema, family-level uncertainty, gross/net lift, break-even price, margin-gate takeover, tail-risk and cost controls validated")
+          print(json.dumps({
+              lane: {
+                  "family_count": by_key[(lane, "additive_model", 0.04)]["family_count"],
+                  "margin_gates_at_cost_0_04": {
+                      gate: {
+                          "action_override_rate": by_key[(lane, gate, 0.04)]["action_override_rate"],
+                          "mean_gross_lift": by_key[(lane, gate, 0.04)]["mean_gross_lift_vs_direct"],
+                          "mean_break_even_query_cost": by_key[(lane, gate, 0.04)]["mean_break_even_query_cost"],
+                          "mean_net_lift": by_key[(lane, gate, 0.04)]["mean_net_lift_vs_direct"],
+                          "harmed_family_rate": by_key[(lane, gate, 0.04)]["harmed_family_rate"],
+                          "lower_cvar05_lift": by_key[(lane, gate, 0.04)]["lower_cvar05_net_lift"],
+                      }
+                      for gate in gate_names
+                  },
+                  "cost_frontier": {
+                      str(cost): {
+                          "mean_gross_lift": by_key[(lane, "additive_model", round(cost, 4))]["mean_gross_lift_vs_direct"],
+                          "mean_break_even_query_cost": by_key[(lane, "additive_model", round(cost, 4))]["mean_break_even_query_cost"],
+                          "mean_net_lift": by_key[(lane, "additive_model", round(cost, 4))]["mean_net_lift_vs_direct"],
+                          "lift_ci95": [
+                              by_key[(lane, "additive_model", round(cost, 4))]["lift_ci95_low"],
+                              by_key[(lane, "additive_model", round(cost, 4))]["lift_ci95_high"],
+                          ],
+                          "lower_cvar05_lift": by_key[(lane, "additive_model", round(cost, 4))]["lower_cvar05_net_lift"],
+                          "harmed_family_rate": by_key[(lane, "additive_model", round(cost, 4))]["harmed_family_rate"],
+                          "beneficial_family_rate_before_cost": by_key[(lane, "additive_model", round(cost, 4))]["beneficial_family_rate_before_cost"],
+                      }
+                      for cost in costs
+                  },
+              }
+              for lane in sorted(lanes)
+          }, sort_keys=True))
+          PY
