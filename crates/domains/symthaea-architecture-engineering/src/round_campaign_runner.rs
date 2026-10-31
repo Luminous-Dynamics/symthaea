@@ -96,6 +96,93 @@ pub struct FourSeatPairedComparison {
     pub tie_rate: f64,
 }
 
+/// Versioned manifest and complete run set for one paired benchmark matrix.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FourSeatCampaignMatrix {
+    pub schema: String,
+    pub version: String,
+    pub landscapes: Vec<DirectionLandscapeFamily>,
+    pub policies: Vec<RoundSchedulerPolicy>,
+    pub round_count: usize,
+    pub seeds: Vec<u64>,
+    pub runs: Vec<FourSeatCampaignRun>,
+    pub matrix_sha256: String,
+}
+
+impl FourSeatCampaignMatrix {
+    fn compute_digest(&self) -> Result<String, String> {
+        let mut unsigned = self.clone();
+        unsigned.matrix_sha256.clear();
+        let bytes = serde_json::to_vec(&unsigned).map_err(|error| error.to_string())?;
+        Ok(digest_bytes(
+            b"symthaea.ar5b6.campaign-matrix.v0.1\0",
+            &bytes,
+        ))
+    }
+
+    /// Require the exact Cartesian product recorded by the manifest; no missing run is optional.
+    pub fn validate_integrity(&self) -> Result<(), String> {
+        if self.schema != RUN_SCHEMA || self.version != RUN_VERSION {
+            return Err("campaign matrix schema/version mismatch".to_owned());
+        }
+        if self.round_count == 0
+            || self.landscapes.is_empty()
+            || self.policies.is_empty()
+            || self.seeds.is_empty()
+        {
+            return Err("campaign matrix dimensions must be non-empty and positive".to_owned());
+        }
+        if self.landscapes.iter().copied().collect::<BTreeSet<_>>().len()
+            != self.landscapes.len()
+            || self.policies.iter().copied().collect::<BTreeSet<_>>().len()
+                != self.policies.len()
+            || self.seeds.iter().copied().collect::<BTreeSet<_>>().len() != self.seeds.len()
+        {
+            return Err("campaign matrix manifest contains duplicate dimensions".to_owned());
+        }
+        let expected_count = self
+            .landscapes
+            .len()
+            .checked_mul(self.policies.len())
+            .and_then(|value| value.checked_mul(self.seeds.len()))
+            .ok_or_else(|| "campaign matrix expected-run count overflow".to_owned())?;
+        if self.runs.len() != expected_count {
+            return Err(format!(
+                "campaign matrix has {} runs, manifest requires {expected_count}",
+                self.runs.len()
+            ));
+        }
+
+        let mut expected = BTreeSet::new();
+        for landscape in &self.landscapes {
+            for policy in &self.policies {
+                for seed in &self.seeds {
+                    expected.insert((*landscape, *policy, *seed));
+                }
+            }
+        }
+        let mut observed = BTreeSet::new();
+        for run in &self.runs {
+            if run.round_count != self.round_count
+                || run.action_count != self.round_count * SEATS_PER_ROUND
+            {
+                return Err("run budget differs from campaign matrix manifest".to_owned());
+            }
+            let key = (run.landscape, run.policy, run.seed);
+            if !expected.contains(&key) || !observed.insert(key) {
+                return Err("unexpected or duplicate campaign run in matrix".to_owned());
+            }
+        }
+        if observed != expected {
+            return Err("campaign matrix is missing one or more required landscape/policy/seed runs".to_owned());
+        }
+        if self.compute_digest()? != self.matrix_sha256 {
+            return Err("campaign matrix digest does not match its manifest and runs".to_owned());
+        }
+        Ok(())
+    }
+}
+
 /// Run every requested policy on the same deterministic landscape/seed matrix.
 pub fn run_four_seat_campaign_matrix(
     landscapes: &[DirectionLandscapeFamily],
