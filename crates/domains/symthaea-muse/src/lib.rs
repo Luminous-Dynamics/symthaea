@@ -32,6 +32,13 @@
 
 #![deny(unsafe_code)]
 
+// These library services are consumed by Muse Studio. `studio` implies `theory`,
+// while keeping the default Muse build free of the optional symbolic stack.
+#[cfg(feature = "theory")]
+pub mod symbolic_import;
+#[cfg(feature = "theory")]
+pub mod teaching_corpus;
+
 #[cfg(feature = "theory")]
 pub mod adaptive_experiment;
 #[cfg(feature = "theory")]
