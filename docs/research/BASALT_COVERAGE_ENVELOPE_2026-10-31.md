@@ -14,7 +14,7 @@ The coverage envelope adds a separate, run-level claim whose scope is bound to a
 - Auditor: `xtask/src/basalt_coverage.rs`
 - CLI: `basalt-coverage-envelope-audit --profile PROFILE.json --receipt ENVELOPE.json`
 
-The profile is explicitly `candidate_not_qualified`. It scopes Linux x86_64/aarch64 and names nine channels with 33 required event kinds: filesystem, process, environment, generated artifacts, toolchain, cache, network, observer integrity, and snapshot consistency. It lists ten controls required before any complete-within-profile statement can be accepted, including hook-attachment inventory, sandbox-policy binding, and snapshot-manifest binding.
+The profile is explicitly `candidate_not_qualified`. It scopes Linux x86_64/aarch64 and names nine channels with 33 required event kinds: filesystem, process, environment, generated artifacts, toolchain, cache, network, observer integrity, and snapshot consistency. It lists ten controls required before any complete-within-profile statement can be accepted, including hook-attachment inventory, sandbox-policy binding, and snapshot-manifest binding. It also defines seven required root classes: workspace, toolchain/sysroot, build output/cache, temporary filesystems, home/user configuration, procfs/sysfs, and devices/mounts.
 
 ## Coverage claim contract
 
@@ -26,7 +26,7 @@ Each required channel appears exactly once in the envelope. Each required event 
 
 Missing or duplicate channel records, missing or duplicate event classifications, unprofiled channels/event kinds, malformed digests, root-path traversal, and profile-byte mismatch make the envelope invalid or unbound.
 
-A `complete_within_profile` claim is consistent only when all required event kinds are observed, all required controls are active, platform constraints match, kernel build identity and BTF digest are present when required, observer configuration/hook-set/sandbox-policy/snapshot-manifest digests are present, the capture interval is increasing, the process tree is closed, the snapshot is stable, monitored roots are explicit, and all event-loss/overflow/restart/unmonitored-child/root-escape counters are zero.
+A `complete_within_profile` claim is consistent only when all required event kinds are observed, all required controls are active, platform constraints match, kernel build identity and BTF digest are present when required, observer configuration/hook-set/sandbox-policy/snapshot-manifest digests are present, the capture interval is increasing, the process tree is closed, the snapshot is stable, all seven root classes have explicit paths and per-class manifest digests, and all event-loss/overflow/restart/unmonitored-child/root-escape counters are zero.
 
 An honest `incomplete` or `unsupported` claim is reportable but never becomes complete. Unsupported platform claims remain explicit; they cannot satisfy the complete gate.
 
@@ -44,7 +44,7 @@ The auditor is a policy consistency check, not a kernel observer, cryptographic 
 
 ## Fail-closed tests
 
-The new module includes tests for: a self-consistent bounded complete claim; missing and duplicate event classifications; changed profile bytes with unchanged profile ID; event loss and ring-buffer overflow; observer restart; unmonitored children and root escape; unstable snapshots and open process trees; invalid capture intervals and path traversal; unknown channels; missing required controls; missing kernel BTF identity; and honest incomplete/unsupported downgrades.
+The new module includes tests for: a self-consistent bounded complete claim; missing and duplicate event classifications; changed profile bytes with unchanged profile ID; event loss and ring-buffer overflow; observer restart; unmonitored children and root escape; unstable snapshots and open process trees; invalid capture intervals and path traversal; unknown channels; missing required controls; missing kernel BTF or snapshot commitments; missing/duplicate root classes; invalid root paths; unresolved root-scope downgrades; and honest incomplete/unsupported claims.
 
 These are authored unit tests only. They have not been compiled or executed in this environment.
 
