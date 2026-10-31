@@ -1,0 +1,148 @@
+{
+  "suite_id": "basalt-source-epoch-seal-benchmark-v1",
+  "benchmark_version": 1,
+  "title": "BASALT source-epoch commitment and tamper qualification",
+  "claim_ceiling": "The verifier checks exact ledger-byte binding, source identity, ordered event/disposition chains, the seal commitment and supplied close-claim consistency. It does not verify a signature, signer authorization, anti-rollback state, coordinator qualification, or observer delivery qualification.",
+  "independent_unit": "One source-epoch from a pinned host boot, observer binary/configuration, kernel identity and task-lineage run. Events and individual mutations within one epoch are not independent statistical samples.",
+  "scenario_schema": "basalt-source-epoch-seal.v1",
+  "scenarios": [
+    {
+      "id": "SEAL-001",
+      "mutation": "Unmodified ledger and correctly computed seal",
+      "expected": "integrity_passed"
+    },
+    {
+      "id": "SEAL-002",
+      "mutation": "Append whitespace to ledger bytes without changing parsed JSON",
+      "expected": "reject_ledger_digest_mismatch"
+    },
+    {
+      "id": "SEAL-003",
+      "mutation": "Change one event digest, update ledger digest and outer commitment, but retain old event root",
+      "expected": "reject_event_chain_mismatch"
+    },
+    {
+      "id": "SEAL-004",
+      "mutation": "Change one classified range disposition, update ledger digest and outer commitment, but retain old range root",
+      "expected": "reject_range_chain_mismatch"
+    },
+    {
+      "id": "SEAL-005",
+      "mutation": "Change source, epoch or partition identity and recompute the outer commitment",
+      "expected": "reject_unknown_source_or_binding"
+    },
+    {
+      "id": "SEAL-006",
+      "mutation": "Change terminal high-water mark while retaining the original ledger binding",
+      "expected": "reject_ledger_binding_mismatch"
+    },
+    {
+      "id": "SEAL-007",
+      "mutation": "Change close-fence digest or observer identity",
+      "expected": "reject_ledger_binding_mismatch"
+    },
+    {
+      "id": "SEAL-008",
+      "mutation": "Set generation greater than one without a predecessor digest",
+      "expected": "reject_generation_link"
+    },
+    {
+      "id": "SEAL-009",
+      "mutation": "Set consumer-drain timestamp before producer quiescence",
+      "expected": "reject_close_order"
+    },
+    {
+      "id": "SEAL-010",
+      "mutation": "Mutate a seal field but retain its old commitment digest",
+      "expected": "reject_commitment_mismatch"
+    },
+    {
+      "id": "SEAL-011",
+      "mutation": "Supply an invalid signature or an unknown signer in the future DSSE adapter",
+      "expected": "not_implemented_in_v1"
+    },
+    {
+      "id": "SEAL-012",
+      "mutation": "Replay a prior valid generation against a newer external checkpoint",
+      "expected": "not_implemented_in_v1"
+    },
+    {
+      "id": "SEAL-013",
+      "mutation": "Omit the required previous_seal_digest field instead of supplying null for generation 1",
+      "expected": "reject_missing_required_field"
+    },
+    {
+      "id": "SEAL-014",
+      "mutation": "Create a self-consistent event chain with an event observation timestamp later than the declared consumer-drain acknowledgement",
+      "expected": "reject_event_after_drain"
+    },
+    {
+      "id": "SEAL-015",
+      "mutation": "Provide a fully reconciled ledger with a classified lost tail and a matching valid integrity seal",
+      "expected": "integrity_passed_with_ledger_loss_free_false"
+    }
+  ],
+  "metrics": [
+    {
+      "id": "exact_ledger_binding_recall",
+      "class": "safety",
+      "unit": "fraction",
+      "target": 1
+    },
+    {
+      "id": "event_chain_tamper_rejection",
+      "class": "safety",
+      "unit": "fraction",
+      "target": 1
+    },
+    {
+      "id": "range_chain_tamper_rejection",
+      "class": "safety",
+      "unit": "fraction",
+      "target": 1
+    },
+    {
+      "id": "invalid_close_order_rejection",
+      "class": "safety",
+      "unit": "fraction",
+      "target": 1
+    },
+    {
+      "id": "false_authentication_promotion",
+      "class": "safety",
+      "unit": "count",
+      "target": 0
+    },
+    {
+      "id": "false_qualification_promotion",
+      "class": "safety",
+      "unit": "count",
+      "target": 0
+    },
+    {
+      "id": "known_loss_not_promoted_as_loss_free",
+      "class": "safety",
+      "unit": "count",
+      "target": 0
+    },
+    {
+      "id": "verification_p95_100k_events",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": 250
+    },
+    {
+      "id": "peak_rss_100k_events",
+      "class": "efficiency",
+      "unit": "MiB",
+      "target": 128
+    }
+  ],
+  "benchmark_policy": {
+    "all_safety_gates_must_pass_before_efficiency_is_scored": true,
+    "report_every_mutation_and_invalid_run": true,
+    "no_event_level_pseudoreplication": true,
+    "efficiency_targets_are_research_targets_not_results": true,
+    "held_out_confirmatory_runs_required": true
+  }
+}
