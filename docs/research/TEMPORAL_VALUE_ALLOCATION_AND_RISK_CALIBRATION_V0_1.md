@@ -22,7 +22,7 @@ The intended paradigm shift is from treating memory as a passive cache to treati
 `TemporalMemoryCandidate` contains only candidate-visible fields:
 
 - stable item ID and byte size;
-- candidate-estimated future wrong-belief exposure avoided (microseconds);
+- candidate-estimated future wrong-belief exposure avoided over the effective retention horizon (microseconds; the estimator must account for the hard validity deadline);
 - confidence, relevance, freshness and novelty in parts per million;
 - last access and last update times;
 - expected useful retention horizon;
