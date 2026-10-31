@@ -989,7 +989,7 @@ mod tests {
         assert_eq!(inverted_generational_distance_plus(&exact, &reference).unwrap(), 0.0);
         assert_eq!(additive_epsilon_indicator(&exact, &reference).unwrap(), 0.0);
 
-        let better = vec![vec![1.1, 0.0], vec![0.0, 1.1]];
+        let better = vec![vec![1.1, 0.1], vec![0.1, 1.1]];
         assert_eq!(inverted_generational_distance_plus(&better, &reference).unwrap(), 0.0);
         assert!((additive_epsilon_indicator(&better, &reference).unwrap() + 0.1).abs() < 1e-12);
     }
