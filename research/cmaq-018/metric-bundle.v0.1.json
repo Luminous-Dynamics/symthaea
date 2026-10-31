@@ -1,0 +1,38 @@
+{
+  "schema_version": "cmaq-018-metric-bundle-v0.1",
+  "cross_track_pooling": false,
+  "per_scenario_model_rows": true,
+  "pair_metrics": {
+    "effect_sign_accuracy": "fraction of non-tied true pair deltas whose predicted delta has the same nonzero sign",
+    "effect_magnitude_mae": "mean absolute error in pairwise utility delta",
+    "kendall_tau_b": "Kendall tau-b: C and D are concordant/discordant pairs; T_true counts every pair tied under true effects; T_pred counts every pair tied under predicted effects; tau_b=(C-D)/sqrt((n-T_true)*(n-T_pred)), with n=covered pairs. Ties on both sides count in both T_true and T_pred.",
+    "top1_regret": "best true utility in the frozen action bank minus selected action true utility, floored at zero",
+    "null_false_effect_rate": "fraction of covered pairs predicted nonzero when true scenario effect is identically zero"
+  },
+  "thresholds": {
+    "sign_tie_epsilon_nano": 1,
+    "null_nonzero_effect_epsilon_nano": 1,
+    "tie_epsilon_representation": "integer_nanounits"
+  },
+  "coverage_metrics": [
+    "pair_coverage",
+    "branch_coverage"
+  ],
+  "branch_metrics": [
+    "branch_outcome_mae",
+    "branch_state_mae",
+    "terminal_false_safe_rate",
+    "branch_outcome_mae_episode_count",
+    "branch_state_mae_episode_count"
+  ],
+  "uncertainty": {
+    "method": "episode-history percentile bootstrap",
+    "resamples": 2000,
+    "confidence_level_percent": 95,
+    "minimum_episode_histories": 2,
+    "interval_order": "lower_lte_upper"
+  },
+  "sample_unit": "episode_history",
+  "pair_count_per_history": 21,
+  "denominator_policy": "emit per-metric defined episode count; null metric count=0; no confidence interval below two independent histories; report branch-outcome and branch-state defined episode counts separately; pairwise-effect-only predictor has no absolute branch-error denominator"
+}

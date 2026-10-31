@@ -1,0 +1,228 @@
+name: CMAQ-018 matched-history counterfactual branch fidelity
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/cmaq-018/**"
+      - ".github/workflows/cmaq-018.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/cmaq-018/**"
+      - ".github/workflows/cmaq-018.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  branch-fidelity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format
+        working-directory: research/cmaq-018
+        run: cargo fmt --all -- --check
+      - name: Unit tests
+        working-directory: research/cmaq-018
+        run: cargo test --locked
+      - name: Clippy
+        working-directory: research/cmaq-018
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Install JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check "jsonschema==4.25.1"
+      - name: Generate and validate branch report
+        working-directory: research/cmaq-018
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --release --locked > /tmp/cmaq-018-report.json
+          python3 - <<'PY'
+          import json
+          import math
+          from pathlib import Path
+          from jsonschema import validate
+
+          report = json.loads(Path("/tmp/cmaq-018-report.json").read_text())
+          schema = json.loads(Path("report.schema.json").read_text())
+          validate(instance=report, schema=schema)
+
+          assert report["schema_version"] == "cmaq-018-counterfactual-branch-fidelity-v0.1"
+          assert report["episode_count"] == 64
+          assert report["action_count"] == 7
+          assert report["pair_count_per_episode"] == 21
+          assert len(report["actions"]) == 7
+          assert len(report["summary"]) == 35
+
+          action_ids = [action["id"] for action in report["actions"]]
+          assert action_ids == list(range(7))
+          assert sum(action["training_supported"] for action in report["actions"]) == 4
+
+          rows = report["summary"]
+          keys = [(row["scenario"], row["model"]) for row in rows]
+          assert len(keys) == len(set(keys)) == 35
+          assert set(row["scenario"] for row in rows) == set(report["scenarios"])
+          assert set(row["model"] for row in rows) == set(report["models"])
+
+          def get(scenario, model):
+              matches = [row for row in rows
+                         if row["scenario"] == scenario and row["model"] == model]
+              assert len(matches) == 1
+              return matches[0]
+
+          for row in rows:
+              assert row["episode_count"] == 64
+              assert row["pair_count_per_episode"] == 21
+              assert 0.0 <= row["mean_pair_coverage"] <= 1.0
+              assert 0.0 <= row["mean_branch_coverage"] <= 1.0
+              for key in ("mean_effect_magnitude_mae", "mean_top1_regret",
+                          "mean_branch_outcome_mae", "mean_branch_state_mae"):
+                  value = row[key]
+                  assert value is None or (isinstance(value, (int, float)) and math.isfinite(value) and value >= 0.0)
+              for key in ("mean_effect_sign_accuracy", "mean_null_false_effect_rate",
+                          "mean_terminal_false_safe_rate"):
+                  value = row[key]
+                  assert value is None or (isinstance(value, (int, float)) and 0.0 <= value <= 1.0)
+              tau = row["mean_rank_tau_b"]
+              assert tau is None or -1.0 <= tau <= 1.0
+
+          interval_pairs = [
+              ("mean_effect_sign_accuracy", "effect_sign_accuracy_episode_count", "effect_sign_accuracy_ci95_lower", "effect_sign_accuracy_ci95_upper"),
+              ("mean_effect_magnitude_mae", "effect_magnitude_mae_episode_count", "effect_magnitude_mae_ci95_lower", "effect_magnitude_mae_ci95_upper"),
+              ("mean_null_false_effect_rate", "null_false_effect_episode_count", "null_false_effect_rate_ci95_lower", "null_false_effect_rate_ci95_upper"),
+              ("mean_rank_tau_b", "rank_tau_b_episode_count", "rank_tau_b_ci95_lower", "rank_tau_b_ci95_upper"),
+              ("mean_top1_regret", "top1_regret_episode_count", "top1_regret_ci95_lower", "top1_regret_ci95_upper"),
+              ("mean_terminal_false_safe_rate", "terminal_false_safe_rate_episode_count", "terminal_false_safe_rate_ci95_lower", "terminal_false_safe_rate_ci95_upper"),
+          ]
+          for row in rows:
+              for _, count_key, _, _ in interval_pairs:
+                  assert isinstance(row[count_key], int)
+                  assert 0 <= row[count_key] <= 64
+              for count_key in ("branch_outcome_mae_episode_count", "branch_state_mae_episode_count"):
+                  assert isinstance(row[count_key], int)
+                  assert 0 <= row[count_key] <= 64
+                  mean_key = count_key.removesuffix("_episode_count")
+                  mean_key = "mean_" + mean_key
+                  if row[mean_key] is None:
+                      assert row[count_key] == 0
+                  else:
+                      assert row[count_key] >= 1
+              for mean_key, count_key, lower_key, upper_key in interval_pairs:
+                  mean_value = row[mean_key]
+                  count = row[count_key]
+                  lower = row[lower_key]
+                  upper = row[upper_key]
+                  assert 0 <= count <= 64
+                  if mean_value is None:
+                      assert count == 0
+                      assert lower is None and upper is None
+                  else:
+                      assert count >= 1
+                      if count < 2:
+                          assert lower is None and upper is None
+                      else:
+                          assert lower is not None and upper is not None
+                          assert lower <= upper
+
+          # Null effects must not be mistaken for evidence of a nonzero action effect.
+          null_point = get("null_effect", "point_outcome")
+          assert null_point["mean_null_false_effect_rate"] == 1.0
+          assert null_point["null_false_effect_episode_count"] == 64
+          assert null_point["null_false_effect_rate_ci95_lower"] == 1.0
+          assert null_point["null_false_effect_rate_ci95_upper"] == 1.0
+          assert null_point["mean_effect_sign_accuracy"] is None
+          assert null_point["effect_sign_accuracy_episode_count"] == 0
+          assert null_point["mean_rank_tau_b"] is None
+          assert null_point["rank_tau_b_episode_count"] == 0
+          assert null_point["mean_null_false_effect_rate"] is not None
+          assert null_point["null_false_effect_episode_count"] == 64
+          assert null_point["mean_top1_regret"] is not None
+          assert null_point["top1_regret_episode_count"] == 64
+          assert null_point["mean_effect_magnitude_mae"] is not None
+          assert null_point["effect_magnitude_mae_episode_count"] == 64
+          assert null_point["effect_sign_accuracy_ci95_lower"] is None
+          assert null_point["rank_tau_b_ci95_upper"] is None
+
+          # Support-aware coverage must explicitly expose the unsupported action branches.
+          support = get("monotone", "support_aware_point")
+          assert abs(support["mean_branch_coverage"] - 4.0 / 7.0) < 1e-9
+          assert abs(support["mean_pair_coverage"] - 6.0 / 21.0) < 1e-9
+
+          # An explicit effect head makes pair calls rather than absolute branch predictions.
+          effect = get("monotone", "explicit_effect_head")
+          assert effect["mean_branch_prediction_evaluations"] == 0.0
+          assert effect["branch_outcome_mae_episode_count"] == 0
+          assert effect["branch_state_mae_episode_count"] == 0
+          assert effect["mean_branch_outcome_mae"] is None
+          assert effect["mean_branch_state_mae"] is None
+          assert effect["mean_pair_effect_evaluations"] == 21.0
+          assert effect["mean_branch_outcome_mae"] is None
+          assert effect["mean_branch_state_mae"] is None
+
+          # The evaluator-only oracle is exact on this deterministic branch generator.
+          for scenario in report["scenarios"]:
+              oracle = get(scenario, "oracle")
+              assert oracle["mean_pair_coverage"] == 1.0
+              assert oracle["mean_effect_magnitude_mae"] == 0.0
+              assert oracle["effect_magnitude_mae_episode_count"] == 64
+              assert oracle["effect_magnitude_mae_ci95_lower"] == 0.0
+              assert oracle["effect_magnitude_mae_ci95_upper"] == 0.0
+              assert oracle["mean_top1_regret"] == 0.0
+              assert oracle["mean_branch_outcome_mae"] == 0.0
+              assert oracle["branch_outcome_mae_episode_count"] == 64
+              assert oracle["mean_branch_state_mae"] == 0.0
+              assert oracle["branch_state_mae_episode_count"] == 64
+              assert oracle["mean_terminal_false_safe_rate"] in (0.0, None)
+              assert oracle["mean_oracle_branch_evaluations"] == 7.0
+
+          # Point outcome predictions understate the terminal failure in the seam lane.
+          seam = get("termination_seam", "point_outcome")
+          assert seam["mean_terminal_false_safe_rate"] == 1.0
+          assert seam["terminal_false_safe_rate_episode_count"] == 64
+          oracle_seam = get("termination_seam", "oracle")
+          assert oracle_seam["mean_terminal_false_safe_rate"] == 0.0
+          assert oracle_seam["terminal_false_safe_rate_episode_count"] == 64
+          PY
+      - name: Create run receipt
+        working-directory: research/cmaq-018
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import platform
+          import subprocess
+          from pathlib import Path
+
+          report_path = Path("/tmp/cmaq-018-report.json")
+          schema_path = Path("report.schema.json")
+          receipt = {
+              "schema_version": "cmaq-018-run-receipt-v0.1",
+              "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+              "report_sha256": hashlib.sha256(report_path.read_bytes()).hexdigest(),
+              "schema_sha256": hashlib.sha256(schema_path.read_bytes()).hexdigest(),
+              "report_bytes": report_path.stat().st_size,
+              "rustc_version": subprocess.check_output(["rustc", "--version"], text=True).strip(),
+              "cargo_version": subprocess.check_output(["cargo", "--version"], text=True).strip(),
+              "runner_platform": platform.platform(),
+              "workflow_run_id": os.environ.get("GITHUB_RUN_ID"),
+              "workflow_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+          }
+          Path("/tmp/cmaq-018-run-receipt.json").write_text(
+              json.dumps(receipt, sort_keys=True, indent=2) + "\n"
+          )
+          PY
+          sha256sum /tmp/cmaq-018-report.json /tmp/cmaq-018-run-receipt.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-018-report-and-run-receipt
+          path: |
+            /tmp/cmaq-018-report.json
+            /tmp/cmaq-018-run-receipt.json
+          retention-days: 30
