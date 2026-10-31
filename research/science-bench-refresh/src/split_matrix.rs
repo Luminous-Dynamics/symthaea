@@ -508,6 +508,36 @@ mod tests {
     }
 
     #[test]
+    fn reused_task_id_blocks_even_when_policy_inputs_differ() {
+        let mut fixtures = clean_fixtures();
+        fixtures[2] = fixture(
+            "refresh",
+            "a-1",
+            "A different instruction and different observations.",
+            91.0,
+            182.0,
+            "unique-refresh-world",
+            "never_exposed",
+        );
+        let refs: Vec<_> = fixtures.iter().map(Fixture::borrowed).collect();
+        let report = audit_required_split_matrix(&refs).unwrap();
+
+        assert_eq!(report.shared_task_id_occurrences, 1);
+        assert_eq!(report.hard_blocking_pair_count, 1);
+        let anchor_refresh = report
+            .pairs
+            .iter()
+            .find(|pair| {
+                pair.left_split_label.starts_with("anchor:")
+                    && pair.right_split_label.starts_with("refresh:")
+            })
+            .unwrap();
+        assert_eq!(anchor_refresh.policy_input.shared_task_id_count, 1);
+        assert_eq!(anchor_refresh.policy_input.exact_overlap_pair_count, 0);
+        assert!(anchor_refresh.hard_blocker);
+    }
+
+    #[test]
     fn numeric_near_duplicate_is_review_not_a_confirmed_block_or_clean_result() {
         let mut fixtures = clean_fixtures();
         fixtures[2].task_set = task_set(
