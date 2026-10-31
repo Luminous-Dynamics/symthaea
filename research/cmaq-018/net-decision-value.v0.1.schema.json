@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-018-net-decision-value-v0.1.json",
+  "title": "CMAQ-018 matched net decision-value evaluation",
+  "description": "Episode-paired comparison of world-model decisions with D0 and D1 after inference, acquisition and failure/recovery costs are converted to one preregistered utility scale.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "claim_ceiling",
+    "episode_count",
+    "mean_gross_advantage_vs_d0",
+    "mean_net_advantage_vs_d0",
+    "net_win_rate_vs_d0",
+    "mean_gross_advantage_vs_d1",
+    "mean_net_advantage_vs_d1",
+    "net_win_rate_vs_d1",
+    "mean_world_model_net_utility",
+    "mean_d0_net_utility",
+    "mean_d1_net_utility"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-018-net-decision-value-v0.1"
+    },
+    "claim_ceiling": {
+      "const": "synthetic_known_answer_fixture_only_no_real_policy_advantage_claim"
+    },
+    "episode_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "mean_gross_advantage_vs_d0": {
+      "type": "number"
+    },
+    "mean_net_advantage_vs_d0": {
+      "type": "number"
+    },
+    "net_win_rate_vs_d0": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "mean_gross_advantage_vs_d1": {
+      "type": "number"
+    },
+    "mean_net_advantage_vs_d1": {
+      "type": "number"
+    },
+    "net_win_rate_vs_d1": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "mean_world_model_net_utility": {
+      "type": "number"
+    },
+    "mean_d0_net_utility": {
+      "type": "number"
+    },
+    "mean_d1_net_utility": {
+      "type": "number"
+    }
+  }
+}
