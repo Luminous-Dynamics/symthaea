@@ -233,6 +233,7 @@ pub struct BenchmarkComponentAuditV1 {
     pub manifest_digest_matches: bool,
     pub all_four_components_present: bool,
     pub component_artifact_digests_valid: bool,
+    pub evaluation_check_bindings_valid: bool,
     pub all_required_interfaces_present: bool,
     pub required_capabilities_available: bool,
     pub prohibited_capabilities_absent: bool,
@@ -240,10 +241,12 @@ pub struct BenchmarkComponentAuditV1 {
     pub all_requirement_preconditions_covered: bool,
     pub no_orphan_evaluator_checks: bool,
     pub no_unknown_requirement_references: bool,
+    pub no_unknown_precondition_references: bool,
     pub ambiguous_requirement_count: u64,
     pub inferred_requirement_count: u64,
     pub uncovered_explicit_requirement_count: u64,
     pub uncovered_precondition_count: u64,
+    pub unknown_precondition_reference_count: u64,
     pub missing_capability_count: u64,
     pub exposed_prohibited_capability_count: u64,
     pub orphan_evaluator_check_count: u64,
@@ -391,7 +394,8 @@ pub fn audit_benchmark_components(
 
     let mut issues = Vec::new();
     let mut all_components_present = true;
-    let mut component_artifact_digests_valid = true;
+    let component_artifact_digests_valid = true;
+    let mut evaluation_check_bindings_valid = true;
     let mut all_interfaces_present = true;
     let mut required_capabilities_available = true;
     let mut prohibited_capabilities_absent = true;
@@ -399,6 +403,7 @@ pub fn audit_benchmark_components(
     let mut all_requirement_preconditions_covered = true;
     let mut no_orphan_checks = true;
     let mut no_unknown_requirement_refs = true;
+    let mut no_unknown_precondition_refs = true;
 
     let component_ids = [
         manifest.user_task.artifact_id.as_str(),
@@ -490,9 +495,10 @@ pub fn audit_benchmark_components(
     }
 
     let mut covered_requirements: BTreeSet<&str> = BTreeSet::new();
-    let mut covered_preconditions: BTreeSet<&str> = BTreeSet::new();
+    let mut covered_requirement_preconditions: BTreeSet<(&str, &str)> = BTreeSet::new();
     let mut check_ids = BTreeSet::new();
     let mut unknown_requirement_reference_count = 0_u64;
+    let mut unknown_precondition_reference_count = 0_u64;
     let mut orphan_check_count = 0_u64;
     for check in &manifest.evaluator_checks {
         validate_id(&check.check_id, "evaluator_check.check_id")?;
@@ -505,12 +511,14 @@ pub fn audit_benchmark_components(
             issues.push(format!("evaluator check {} has no requirement mapping", check.check_id));
         }
         let mut unique_requirements = BTreeSet::new();
+        let mut known_requirements_for_check = Vec::new();
         for requirement_id in &check.covered_requirement_ids {
             if !unique_requirements.insert(requirement_id.as_str()) {
                 return Err(format!("evaluator check {} duplicates a requirement mapping", check.check_id));
             }
-            if requirement_by_id.contains_key(requirement_id.as_str()) {
+            if let Some(requirement) = requirement_by_id.get(requirement_id.as_str()) {
                 covered_requirements.insert(requirement_id.as_str());
+                known_requirements_for_check.push(*requirement);
             } else {
                 no_unknown_requirement_refs = false;
                 unknown_requirement_reference_count += 1;
@@ -518,20 +526,32 @@ pub fn audit_benchmark_components(
             }
         }
         let mut unique_preconditions = BTreeSet::new();
+        let mut known_preconditions_for_check = Vec::new();
         for precondition_id in &check.covered_precondition_ids {
             if !unique_preconditions.insert(precondition_id.as_str()) {
                 return Err(format!("evaluator check {} duplicates a precondition mapping", check.check_id));
             }
             if environment_preconditions.contains(precondition_id.as_str()) {
-                covered_preconditions.insert(precondition_id.as_str());
+                known_preconditions_for_check.push(precondition_id.as_str());
             } else {
-                all_requirement_preconditions_covered = false;
+                no_unknown_precondition_refs = false;
+                unknown_precondition_reference_count += 1;
                 issues.push(format!("evaluator check {} references unknown environment precondition {}", check.check_id, precondition_id));
+            }
+        }
+        for requirement in known_requirements_for_check {
+            for precondition in &requirement.environment_precondition_ids {
+                if known_preconditions_for_check.contains(&precondition.as_str()) {
+                    covered_requirement_preconditions.insert((
+                        requirement.requirement_id.as_str(),
+                        precondition.as_str(),
+                    ));
+                }
             }
         }
     }
     if check_ids != manifest.evaluation.check_ids.iter().map(String::as_str).collect() {
-        component_artifact_digests_valid = false;
+        evaluation_check_bindings_valid = false;
         issues.push("evaluation component check_ids do not exactly match evaluator check records".to_owned());
     }
     let mut uncovered_explicit_count = 0_u64;
@@ -546,7 +566,10 @@ pub fn audit_benchmark_components(
         }
         for precondition in &requirement.environment_precondition_ids {
             if !environment_preconditions.contains(precondition.as_str())
-                || !covered_preconditions.contains(precondition.as_str())
+                || !covered_requirement_preconditions.contains(&(
+                    requirement.requirement_id.as_str(),
+                    precondition.as_str(),
+                ))
             {
                 all_requirement_preconditions_covered = false;
                 uncovered_precondition_count += 1;
@@ -584,6 +607,7 @@ pub fn audit_benchmark_components(
 
     let valid = all_components_present
         && component_artifact_digests_valid
+        && evaluation_check_bindings_valid
         && all_interfaces_present
         && required_capabilities_available
         && prohibited_capabilities_absent
@@ -591,6 +615,7 @@ pub fn audit_benchmark_components(
         && all_requirement_preconditions_covered
         && no_orphan_checks
         && no_unknown_requirement_refs
+        && no_unknown_precondition_refs
         && unresolved_blockers == 0;
     let mut report = BenchmarkComponentAuditV1 {
         schema: COMPONENT_AUDIT_SCHEMA.to_owned(),
@@ -598,6 +623,7 @@ pub fn audit_benchmark_components(
         manifest_digest_matches,
         all_four_components_present: all_components_present,
         component_artifact_digests_valid,
+        evaluation_check_bindings_valid,
         all_required_interfaces_present: all_interfaces_present,
         required_capabilities_available,
         prohibited_capabilities_absent,
@@ -605,10 +631,12 @@ pub fn audit_benchmark_components(
         all_requirement_preconditions_covered,
         no_orphan_evaluator_checks: no_orphan_checks,
         no_unknown_requirement_references: no_unknown_requirement_refs,
+        no_unknown_precondition_references: no_unknown_precondition_refs,
         ambiguous_requirement_count: ambiguous_count,
         inferred_requirement_count: inferred_count,
         uncovered_explicit_requirement_count: uncovered_explicit_count,
         uncovered_precondition_count,
+        unknown_precondition_reference_count,
         missing_capability_count: u64::try_from(missing_capabilities.len()).map_err(|_| "missing capability count exceeds u64")?,
         exposed_prohibited_capability_count: u64::try_from(exposed_prohibited.len()).map_err(|_| "prohibited capability count exceeds u64")?,
         orphan_evaluator_check_count: orphan_check_count,
@@ -648,6 +676,7 @@ pub fn verify_benchmark_component_audit_integrity(
     if report.valid
         != (report.all_four_components_present
             && report.component_artifact_digests_valid
+            && report.evaluation_check_bindings_valid
             && report.all_required_interfaces_present
             && report.required_capabilities_available
             && report.prohibited_capabilities_absent
@@ -655,6 +684,7 @@ pub fn verify_benchmark_component_audit_integrity(
             && report.all_requirement_preconditions_covered
             && report.no_orphan_evaluator_checks
             && report.no_unknown_requirement_references
+            && report.no_unknown_precondition_references
             && report.unresolved_blocker_count == 0)
     {
         return Err("benchmark component audit report validity does not match its checks".to_owned());
@@ -855,6 +885,17 @@ mod tests {
         assert!(!report.prohibited_capabilities_absent);
         assert_eq!(report.missing_capability_count, 1);
         assert_eq!(report.exposed_prohibited_capability_count, 1);
+    }
+
+    #[test]
+    fn requirement_precondition_must_be_covered_by_same_check() {
+        let mut manifest = manifest();
+        manifest.evaluator_checks[0].covered_precondition_ids.clear();
+        manifest.evaluator_checks[1].covered_precondition_ids = vec!["PRE-001".to_owned()];
+        manifest.manifest_sha256 = benchmark_component_manifest_digest(&manifest).unwrap();
+        let report = audit_benchmark_components(&manifest).unwrap();
+        assert!(!report.all_requirement_preconditions_covered);
+        assert_eq!(report.uncovered_precondition_count, 1);
     }
 
     #[test]
