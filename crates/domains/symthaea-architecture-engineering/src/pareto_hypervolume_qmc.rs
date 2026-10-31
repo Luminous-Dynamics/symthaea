@@ -114,6 +114,10 @@ impl HypervolumeQmcDesign {
     pub fn sampling_design_sha256(&self) -> &str {
         &self.sampling_design_sha256
     }
+
+    pub fn scramble_replicates(&self) -> usize {
+        self.scramble_shifts.len()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -174,6 +178,35 @@ pub fn estimate_hypervolume_qmc_with_design(
     points: &[Vec<f64>],
     design: &HypervolumeQmcDesign,
 ) -> Result<HypervolumeQmcEstimate, HypervolumeQmcError> {
+    let replicate_indices: Vec<usize> = (0..design.scramble_shifts.len()).collect();
+    estimate_hypervolume_qmc_with_replicates(points, design, &replicate_indices)
+}
+
+/// Estimate using a declared subset of the immutable design's independent scramble replicates.
+/// This supports selection/evaluation sample splitting and cross-fitting without changing the
+/// underlying reference, seed or generated shifts.
+pub fn estimate_hypervolume_qmc_with_replicates(
+    points: &[Vec<f64>],
+    design: &HypervolumeQmcDesign,
+    replicate_indices: &[usize],
+) -> Result<HypervolumeQmcEstimate, HypervolumeQmcError> {
+    if replicate_indices.len() < 2 {
+        return Err(HypervolumeQmcError::new(
+            "replicate_indices",
+            "at least two independent scrambles are required to estimate numerical error",
+        ));
+    }
+    let mut seen_replicates = std::collections::HashSet::with_capacity(replicate_indices.len());
+    for (position, replicate_index) in replicate_indices.iter().copied().enumerate() {
+        if replicate_index >= design.scramble_shifts.len()
+            || !seen_replicates.insert(replicate_index)
+        {
+            return Err(HypervolumeQmcError::new(
+                format!("replicate_indices[{position}]"),
+                "indices must be unique and within the frozen design",
+            ));
+        }
+    }
     let reference = &design.reference;
     let config = &design.config;
     let dimension = reference.len();
@@ -203,7 +236,8 @@ pub fn estimate_hypervolume_qmc_with_design(
     }
 
     let point_set_sha256 = compute_point_set_sha256(points, reference);
-    let sampling_design_sha256 = design.sampling_design_sha256.clone();
+    let sampling_design_sha256 =
+        compute_sampling_subset_sha256(&design.sampling_design_sha256, replicate_indices);
     let box_volume = design.box_volume;
 
     if eligible.is_empty() {
@@ -214,16 +248,17 @@ pub fn estimate_hypervolume_qmc_with_design(
             box_volume,
             dimension,
             sample_count_per_replicate: config.samples_per_replicate,
-            scramble_replicates: config.scramble_replicates,
-            hit_counts_per_replicate: vec![0; config.scramble_replicates],
+            scramble_replicates: replicate_indices.len(),
+            hit_counts_per_replicate: vec![0; replicate_indices.len()],
             point_set_sha256,
             sampling_design_sha256,
         });
     }
 
-    let mut replicate_estimates = Vec::with_capacity(config.scramble_replicates);
-    let mut hit_counts_per_replicate = Vec::with_capacity(config.scramble_replicates);
-    for shifts in &design.scramble_shifts {
+    let mut replicate_estimates = Vec::with_capacity(replicate_indices.len());
+    let mut hit_counts_per_replicate = Vec::with_capacity(replicate_indices.len());
+    for replicate_index in replicate_indices {
+        let shifts = &design.scramble_shifts[*replicate_index];
         let mut hits = 0usize;
         for sample_index in 0..config.samples_per_replicate {
             let sequence_index = sample_index as u64 + 1;
@@ -271,7 +306,7 @@ pub fn estimate_hypervolume_qmc_with_design(
         box_volume,
         dimension,
         sample_count_per_replicate: config.samples_per_replicate,
-        scramble_replicates: config.scramble_replicates,
+        scramble_replicates: replicate_indices.len(),
         hit_counts_per_replicate,
         point_set_sha256,
         sampling_design_sha256,
@@ -321,6 +356,16 @@ fn sample_standard_deviation(values: &[f64]) -> f64 {
     let mean = values.iter().sum::<f64>() / values.len() as f64;
     let sum_squared = values.iter().map(|value| (value - mean).powi(2)).sum::<f64>();
     (sum_squared / (values.len() - 1) as f64).sqrt()
+}
+
+fn compute_sampling_subset_sha256(base_digest: &str, replicate_indices: &[usize]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update((base_digest.len() as u64).to_be_bytes());
+    hasher.update(base_digest.as_bytes());
+    for index in replicate_indices {
+        hasher.update((*index as u64).to_be_bytes());
+    }
+    encode_sha256(hasher.finalize().as_slice())
 }
 
 fn compute_point_set_sha256(points: &[Vec<f64>], reference: &[f64]) -> String {
