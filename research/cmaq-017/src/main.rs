@@ -1064,6 +1064,7 @@ mod tests {
         );
         assert_eq!(plan.candidate_queries, 0);
         assert_eq!(plan.model_head_evaluations, 0);
+        assert_eq!(plan.model_transition_evaluations, 0);
         assert_eq!(plan.oracle_transition_evaluations, 0);
     }
 
@@ -1081,6 +1082,7 @@ mod tests {
         );
         assert_eq!(plan.candidate_queries, 32);
         assert_eq!(plan.model_head_evaluations, 0);
+        assert_eq!(plan.model_transition_evaluations, 0);
         assert_eq!(plan.oracle_transition_evaluations, 0);
         assert!(plan.predicted_prefix_return.is_none());
     }
@@ -1109,6 +1111,7 @@ mod tests {
             BASE_SEED,
         );
         assert_eq!(ensemble.model_head_evaluations, 32 * 3);
+        assert_eq!(ensemble.model_transition_evaluations, 32 * 3 * 4);
         assert_eq!(ensemble.oracle_transition_evaluations, 0);
         assert_eq!(oracle.model_head_evaluations, 0);
         assert_eq!(oracle.oracle_transition_evaluations, 32 * 4);
