@@ -16,7 +16,9 @@
     "minimum_reference_scores",
     "conditional_superuniformity_status",
     "betting_mixture",
-    "contexts"
+    "contexts",
+    "scoring_artifact_sha256",
+    "anomaly_score_direction"
   ],
   "properties": {
     "schema_version": {
@@ -122,6 +124,13 @@
           }
         }
       }
+    },
+    "scoring_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "anomaly_score_direction": {
+      "const": "higher_is_more_anomalous"
     }
   }
 }
