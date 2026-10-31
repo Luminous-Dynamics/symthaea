@@ -19,6 +19,8 @@ pub const SEARCH_FINDINGS_AUDIT_SCHEMA: &str = "symthaea.search_time_exposure_fi
 pub const SEARCH_TRACE_GENESIS: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
 pub const SEARCH_MAX_EVENTS: usize = 1_000_000;
+pub const SEARCH_MAX_TRACE_BYTES: usize = 256 * 1024 * 1024;
+pub const SEARCH_MAX_ALLOWLIST_DESTINATIONS: usize = 100_000;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -345,6 +347,7 @@ pub fn audit_search_time_trace(
     if instrumented.len() != trace.instrumented_channels.len()
         || unobserved.len() != trace.unobserved_channels.len()
         || allowlisted_destinations.len() != trace.allowlisted_destination_sha256s.len()
+        || trace.allowlisted_destination_sha256s.len() > SEARCH_MAX_ALLOWLIST_DESTINATIONS
         || !instrumented.is_disjoint(&unobserved)
     {
         return Err("instrumented/unobserved channels and allowlist destinations must be unique and disjoint".to_owned());
@@ -377,6 +380,7 @@ pub fn audit_search_time_trace(
     let mut channels_instrumented = true;
     let mut invocation_ids = BTreeSet::new();
     let mut sequence_complete = true;
+    let mut event_hashes_valid = true;
     let mut issues = Vec::new();
 
     for (index, event) in trace.events.iter().enumerate() {
@@ -455,12 +459,12 @@ pub fn audit_search_time_trace(
             issues.push(format!("event {} timestamp moves backwards", event.sequence));
         }
         if event.previous_event_sha256 != previous {
-            sequence_complete = false;
+            event_hashes_valid = false;
             issues.push(format!("event {} previous digest does not match chain", event.sequence));
         }
         let expected_event_digest = event_digest(event)?;
         if event.event_sha256 != expected_event_digest {
-            sequence_complete = false;
+            event_hashes_valid = false;
             issues.push(format!("event {} digest does not match contents", event.sequence));
         }
         previous = event.event_sha256.clone();
@@ -471,16 +475,7 @@ pub fn audit_search_time_trace(
     if !trace_root_matches {
         issues.push("trace root digest does not match trace contents".to_owned());
     }
-    let hash_chain_replayed = sequence_complete
-        && trace.events.iter().enumerate().all(|(index, event)| {
-            let expected_previous = if index == 0 {
-                SEARCH_TRACE_GENESIS
-            } else {
-                trace.events[index - 1].event_sha256.as_str()
-            };
-            event.previous_event_sha256 == expected_previous
-                && event.event_sha256 == event_digest(event).unwrap_or_default()
-        });
+    let hash_chain_replayed = sequence_complete && event_hashes_valid;
     if !hash_chain_replayed {
         issues.push("search event hash chain could not be replayed".to_owned());
     }
@@ -561,6 +556,9 @@ pub fn audit_search_time_findings(
     if !trace_audit.valid {
         return Err("search-time trace failed integrity audit".to_owned());
     }
+    if findings.findings.len() > SEARCH_MAX_EVENTS {
+        return Err(format!("search findings exceed {SEARCH_MAX_EVENTS}"));
+    }
     let event_by_sequence: BTreeMap<u64, &SearchTimeEventV1> =
         trace.events.iter().map(|event| (event.sequence, event)).collect();
     let mut seen = BTreeSet::new();
@@ -589,6 +587,9 @@ pub fn audit_search_time_findings(
         }
         if event.response_bytes == 0 || event.response_sha256.is_none() {
             return Err("exposure finding requires a received response body".to_owned());
+        }
+        if finding.matched_item_ids.len() > 100_000 {
+            return Err("finding has too many matched item IDs".to_owned());
         }
         if finding.confidence_permille > 1_000 {
             return Err("finding confidence must be in [0, 1000] permille".to_owned());
