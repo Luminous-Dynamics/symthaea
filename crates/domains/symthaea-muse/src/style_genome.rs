@@ -1124,7 +1124,7 @@ fn audit_gene_effects(
                     counterfactual_recipe_sha256: serde_json::to_vec(&counterfactual_genome.recipe)
                         .ok()
                         .map(|bytes| domain_sha256(
-                            b"symthaea:muse-style-genome-counterfactual-recipe:v1\\n",
+                            b"symthaea:muse-style-genome-counterfactual-recipe:v1\n",
                             &bytes,
                         )),
                     counterfactual_compiled_spec_sha256: None,
@@ -1252,7 +1252,7 @@ fn audit_gene_effects(
             counterfactual_recipe_sha256: serde_json::to_vec(&counterfactual_genome.recipe)
                 .ok()
                 .map(|bytes| domain_sha256(
-                    b"symthaea:muse-style-genome-counterfactual-recipe:v1\\n",
+                    b"symthaea:muse-style-genome-counterfactual-recipe:v1\n",
                     &bytes,
                 )),
             counterfactual_compiled_spec_sha256: Some(
@@ -1962,7 +1962,7 @@ fn gene_effect_audits_well_formed(
             .as_ref()
             .and_then(|counterfactual| serde_json::to_vec(&counterfactual.recipe).ok())
             .map(|bytes| domain_sha256(
-                b"symthaea:muse-style-genome-counterfactual-recipe:v1\\n",
+                b"symthaea:muse-style-genome-counterfactual-recipe:v1\n",
                 &bytes,
             ));
         let counterfactual_genome_valid = expected_counterfactual_genome.as_ref().is_some_and(|expected| {
