@@ -8,7 +8,7 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
-const MAX_DISTRACTORS: usize = 1_000_000;
+const MAX_DISTRACTORS: usize = 10_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DistractorSimilarity {
@@ -298,6 +298,10 @@ mod tests {
         assert_eq!(target.step, 0);
         assert_eq!(probe.step, task.delay_steps);
         assert_eq!(probe.step - target.step, task.delay_steps);
+        assert!(matches!(
+            &probe.kind,
+            EventKind::Probe { key } if *key == oracle.target_key
+        ));
     }
 
     #[test]
