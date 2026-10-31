@@ -1,3 +1,6 @@
+#[allow(dead_code)]
+mod selection_noise;
+
 use std::fmt::Write as _;
 
 const SCHEMA: &str = "cmaq-017-multistep-exploitability-v0.1";
