@@ -37,11 +37,11 @@ The five ensemble heads are explicitly synthetic with separated error-pocket cen
 For every scenario × candidate budget × policy, the report emits:
 
 - mean true selected return and regret from the known optimum;
-- mean model-predicted selected return;
+- mean reference-model selected return (the central point-predictor head);
 - selected-action optimism gap;
 - selected-action error;
 - fraction of episodes selecting the predeclared exploit pocket;
-- total candidate query budget and episode count.
+- total candidate query budget and mean queries per episode (zero for direct/oracle controls), plus episode count.
 
 The generator also records the scenario's uniform-grid prediction MSE as a descriptive diagnostic. It is not substituted for selected-action error or realized task utility.
 
