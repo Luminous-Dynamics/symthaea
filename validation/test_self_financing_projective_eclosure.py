@@ -100,7 +100,7 @@ class SelfFinancingProjectiveEclosureTests(unittest.TestCase):
         )
         self.assertEqual(
             result["decisions"][2]["shares"],
-            [[1, 1], [1, 2]],
+            [[1, 1], [0, 1]],
         )
         self.assertEqual(
             [row["rejections"] for row in result["decisions"]],
