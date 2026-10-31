@@ -23,7 +23,6 @@ pub const INTERVENTION_AUDIT_SCHEMA: &str =
     "symthaea.randomized_contamination_intervention_audit.v1";
 pub const INTERVENTION_MIN_SEED_BYTES: usize = 32;
 pub const MAX_INTERVENTION_CLUSTERS: usize = 100_000;
-pub const MAX_INTERVENTION_ARMS: usize = 1;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -737,11 +736,11 @@ mod tests {
 
     #[test]
     fn invalid_training_budget_or_fraction_fails_closed() {
-        let mut design = design();
-        design.total_training_token_budget = 0;
-        assert!(randomize_intervention(&design, &seed()).is_err());
-        design = design();
-        design.target_exposure_fraction_permille = 1_001;
-        assert!(randomize_intervention(&design, &seed()).is_err());
+        let mut invalid_design = design();
+        invalid_design.total_training_token_budget = 0;
+        assert!(randomize_intervention(&invalid_design, &seed()).is_err());
+        let mut invalid_design = design();
+        invalid_design.target_exposure_fraction_permille = 1_001;
+        assert!(randomize_intervention(&invalid_design, &seed()).is_err());
     }
 }
