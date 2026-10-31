@@ -142,3 +142,10 @@ Use Symtropy for controlled hidden truth, WorldOracle-style paired real executio
 ## 9. Claim ceiling
 
 This document is a research protocol. It does not assert that Symthaea currently outperforms any published model, has calibrated action-conditioned visual forecasts, or is safe for physical action. The new Rust action-bank API validates payload structure and content digest; the selected-action evaluator measures decision-relevant metrics on supplied intervals/outcomes. Real predictor quality, calibration, coupling authenticity, domain transfer and downstream advantage remain empirical questions.
+
+
+### Executable net-decision-value evaluator
+
+The current Rust API now includes `CostedDecisionOutcome`, `DecisionValueEpisode` and `evaluate_net_decision_value`. For each matched episode, the evaluator subtracts inference, acquisition and failure/recovery costs from realized utility for the world-model arm, D0 and D1. It then reports paired mean gross and net advantages and net win rates versus both direct baselines. Negative costs and non-finite values are rejected.
+
+The synthetic known-answer fixture illustrates why gross reward is not enough: mean gross advantage is +2.333 versus D0, but after costs the advantage is only +0.333; versus D1 the net advantage is +0.167. These values only test arithmetic and do not represent a measured policy. A real advantage claim still requires enough independent episodes, paired uncertainty intervals and equal-budget accounting.
