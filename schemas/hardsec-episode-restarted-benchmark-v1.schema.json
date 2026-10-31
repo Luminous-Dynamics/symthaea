@@ -114,7 +114,10 @@
         "randomizer_independence_is_assumption_not_proven",
         "correlated_windows_collapsed_before_testing",
         "delay_units_are_episodes",
-        "synthetic_results_not_detector_performance"
+        "synthetic_results_not_detector_performance",
+        "delay_theorem_local_kl_support_unverified",
+        "delay_theorem_score_transform_separation_unverified",
+        "pfa_claim_requires_exchangeable_episode_scores_and_independent_randomizers"
       ],
       "properties": {
         "episode_independence_is_assumption_not_proven": {
@@ -130,6 +133,15 @@
           "const": true
         },
         "synthetic_results_not_detector_performance": {
+          "const": true
+        },
+        "delay_theorem_local_kl_support_unverified": {
+          "const": true
+        },
+        "delay_theorem_score_transform_separation_unverified": {
+          "const": true
+        },
+        "pfa_claim_requires_exchangeable_episode_scores_and_independent_randomizers": {
           "const": true
         }
       }
