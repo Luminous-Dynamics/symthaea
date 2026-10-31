@@ -1311,3 +1311,5 @@ pub mod causal_analysis;
 pub mod fresh_instance;
 
 pub mod fresh_scoring;
+
+pub mod fresh_metamorphic;
