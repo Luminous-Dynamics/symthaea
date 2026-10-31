@@ -21,12 +21,18 @@ This decomposes the research lifecycle into separate failure surfaces. A high pr
 
 ## 2. What the current implementation does — and does not — establish
 
-The existing sequential direction campaign has four deterministic payoff families:
+The current sequential direction campaign now has eight deterministic payoff families:
 
 - delayed breakthrough;
 - no-new-direction null;
 - new-operator breakthrough;
-- rank reversal.
+- rank reversal;
+- deceptive proxy (a high initial score collapses while a slower arm ends higher);
+- heteroscedastic reward profiles (a high-variance arm versus stable alternatives);
+- correlated directions (near-parallel payoff profiles for two initial arms);
+- strict null/no-breakthrough (equal outcomes and no beneficial NEW direction).
+
+These are controlled deterministic surfaces, not evidence of stochastic real-world noise. The heteroscedastic family tests reward-variance sensitivity under a fixed schedule; seed-varying stochastic disturbances, multi-objective trade-offs, heterogeneous execution costs, semantic alias injection and verifier-label corruption remain separate planned controls rather than being implied by the eight current scalar families.
 
 Before policy-controlled actions, all policies receive the same three initial direction evaluations (A, B, C). Each subsequent action is either one direction evaluation or one NEW-direction proposal. Each action costs one synthetic unit. The verifier is currently a deterministic fixture that owns the payoff schedule and admits the one configured new operator direction.
 
@@ -145,18 +151,16 @@ MAP-Elites is relevant only when behavior descriptors have a defensible interpre
 
 ## 6. Landscape design
 
-Keep the original four landscapes as regression fixtures. Expand to at least six independent landscape families before confirmatory claims:
+The executable scalar suite currently has eight deterministic payoff families (listed in Section 2). Before confirmatory claims, extend it with separately versioned controls for:
 
-1. delayed breakthrough and early leader saturation;
-2. true null (no NEW direction is better);
-3. out-of-grammar primitive discovery;
-4. rank reversal / changing regimes;
-5. deceptive proxy and correlated directions;
-6. heteroscedastic noise and unequal evaluation variance;
-7. multi-objective improvement with resource trade-offs;
-8. heterogeneous costs, hard caps and unknown resource estimates;
-9. duplicate semantic aliases and verifier disagreement;
-10. negative controls where all candidate families are equivalent or every improvement is illusory.
+1. seed-varying heteroscedastic noise, with the realization key frozen independently of policy selection;
+2. multi-objective quality/robustness/resource trade-offs, scored as vectors with hypervolume/reference-point sensitivity;
+3. heterogeneous candidate execution costs, hard caps, retries and explicitly unknown resource estimates;
+4. duplicate semantic aliases and verifier-label disagreement/error injection;
+5. a sealed no-new-opportunity null and a verifier-corruption negative control;
+6. held-out grammar expansion and cross-family transfer.
+
+Do not label the current deterministic high-variance payoff fixture as stochastic noise, or the scalar benchmark as multi-objective.
 
 The six-family criterion is a floor, not a sample-size guarantee. Use at least 100 paired landscape instances/seeds per family for the initial confirmatory campaign, then set final sample size using pilot variance, a predeclared minimum effect and multiplicity control. Seeds generated from the same payoff template are not independent landscapes; uncertainty must be clustered at the independent landscape/template level.
 
