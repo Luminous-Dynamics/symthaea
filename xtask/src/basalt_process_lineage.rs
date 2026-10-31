@@ -814,6 +814,7 @@ mod tests {
         let reused = json!({"pid":101,"start_time_ticks":1100});
         oracle["events"][4]["observed_at_monotonic_ns"]=json!(150);
         receipt["events"][4]["observed_at_monotonic_ns"]=json!(151);
+        receipt["events"][5]["sequence"]=json!(8);
         oracle["processes"].as_array_mut().unwrap().push(json!({
             "identity":reused,"parent":{"relation":"parent","identity":{"pid":100,"start_time_ticks":1000}}
         }));
@@ -989,6 +990,7 @@ mod tests {
         let reused=json!({"pid":101,"start_time_ticks":1100});
         oracle["events"][4]["observed_at_monotonic_ns"]=json!(150);
         receipt2["events"][4]["observed_at_monotonic_ns"]=json!(151);
+        receipt2["events"][5]["sequence"]=json!(8);
         oracle["processes"].as_array_mut().unwrap().push(json!({"identity":reused,"parent":{"relation":"parent","identity":{"pid":100,"start_time_ticks":1000}}}));
         oracle["events"].as_array_mut().unwrap().extend([
           json!({"kind":"fork","process":reused,"observed_at_monotonic_ns":200}),
@@ -996,8 +998,8 @@ mod tests {
         ]);
         receipt2["processes"].as_array_mut().unwrap().push(json!({"identity":reused,"parent":{"relation":"parent","identity":{"pid":100,"start_time_ticks":1000}}}));
         receipt2["events"].as_array_mut().unwrap().extend([
-          json!({"source_id":"proc","sequence":7,"kind":"fork","process":reused,"observed_at_monotonic_ns":201,"evidence_digest":digest(14)}),
-          json!({"source_id":"proc","sequence":8,"kind":"exit","process":reused,"observed_at_monotonic_ns":801,"evidence_digest":digest(15)})
+          json!({"source_id":"proc","sequence":6,"kind":"fork","process":reused,"observed_at_monotonic_ns":201,"evidence_digest":digest(14)}),
+          json!({"source_id":"proc","sequence":7,"kind":"exit","process":reused,"observed_at_monotonic_ns":801,"evidence_digest":digest(15)})
         ]);
         receipt2["health"]["event_count"]=json!(8);
         let report=audit(&oracle,&receipt2);
