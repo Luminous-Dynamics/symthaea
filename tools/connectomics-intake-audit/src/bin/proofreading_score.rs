@@ -24,7 +24,7 @@ enum ReviewTimeBasis {
     SyntheticProxy,
 }
 
-#[derive(Debug, Clone, Copy, ValueEnum, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum EvaluationPartition {
     Development,
