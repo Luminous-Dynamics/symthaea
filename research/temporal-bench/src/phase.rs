@@ -133,10 +133,17 @@ impl fmt::Display for PhaseVerificationError {
             Self::StreamIdMismatch => write!(f, "phase task and oracle stream IDs differ"),
             Self::PublicDigestMismatch => write!(f, "phase public stream SHA-256 digest mismatch"),
             Self::OracleDigestMismatch => write!(f, "phase oracle SHA-256 digest mismatch"),
-            Self::SeedReplayMismatch => write!(f, "phase task/oracle do not match the supplied seed and configuration"),
+            Self::SeedReplayMismatch => write!(
+                f,
+                "phase task/oracle do not match the supplied seed and configuration"
+            ),
             Self::InvalidTaskContract => write!(f, "phase task timing or stream length is invalid"),
-            Self::InvalidOracleMode => write!(f, "phase oracle fields do not match the declared mode"),
-            Self::InvalidShiftSchedule => write!(f, "phase/frequency shift time is outside the allowed range"),
+            Self::InvalidOracleMode => {
+                write!(f, "phase oracle fields do not match the declared mode")
+            }
+            Self::InvalidShiftSchedule => {
+                write!(f, "phase/frequency shift time is outside the allowed range")
+            }
             Self::InvalidPhasePoint { index } => {
                 write!(f, "phase oracle point {index} disagrees with the fixed-point oscillator")
             }
