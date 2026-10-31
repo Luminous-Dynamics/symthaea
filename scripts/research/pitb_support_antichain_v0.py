@@ -217,8 +217,8 @@ def score_predictions(predictions, groups):
             raise ContractError(f"prediction {n}.route_sufficiency_probability must be null or lie in [0,1]")
         route = p["proposed_sufficient_route"]
         if p["abstained"]:
-            if necessary or route is not None:
-                raise ContractError("abstention must not include support claims")
+            if necessary or route is not None or route_probability is not None:
+                raise ContractError("abstention must not include support claims or a route-sufficiency probability")
         else:
             route = strings(route, f"prediction {n}.proposed_sufficient_route")
             universe = set(by_id[gid]["mutable_declaration_universe"])
@@ -357,6 +357,22 @@ def self_test():
         pass
     else:
         raise AssertionError("incomplete prediction coverage was accepted")
+    mixed_models = [dict(p) for p in predictions]
+    mixed_models[1]["model_version"] = "different-version"
+    try:
+        score_predictions(mixed_models, groups)
+    except ContractError:
+        pass
+    else:
+        raise AssertionError("mixed model versions were pooled")
+    abstention = dict(predictions[0], abstained=True, claimed_necessary_declarations=[],
+                      proposed_sufficient_route=None)
+    try:
+        score_predictions([abstention, predictions[1]], groups)
+    except ContractError:
+        pass
+    else:
+        raise AssertionError("abstention with a route probability was accepted")
     incomplete = alt[:-1]
     try:
         analyze_group(group_key(incomplete[0]), incomplete)
