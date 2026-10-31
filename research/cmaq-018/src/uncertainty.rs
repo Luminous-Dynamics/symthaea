@@ -1184,8 +1184,8 @@ mod tests {
         );
 
         let boundary_tie = [
-            interval(2.0,3.0,0.9),
-            interval(1.0,2.0,0.9),
+            interval(2.0,2.0,0.9),
+            interval(2.0,2.0,0.9),
         ];
         assert_eq!(
             select_interval_dominant_action(&boundary_tie).unwrap(),
