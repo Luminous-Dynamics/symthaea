@@ -53,6 +53,8 @@ pub enum JointDrawCoupling {
 pub struct JointActionSetSamples {
     pub history_sha256: String,
     pub horizon_steps: usize,
+    pub action_manifest_sha256: String,
+    pub outcome_channel: String,
     pub action_ids: Vec<u64>,
     pub joint_draw_ids: Vec<u64>,
     pub joint_draw_bank_sha256: String,
@@ -94,6 +96,8 @@ pub enum IntervalError {
     InvalidSelectedIndex,
     InvalidHorizon,
     InvalidHistoryDigest,
+    InvalidActionManifestDigest,
+    EmptyOutcomeChannel,
     InvalidJointDrawDigest,
     InsufficientJointDraws,
     DuplicateActionId,
@@ -188,6 +192,12 @@ pub fn validate_joint_action_set(
     }
     if !is_lower_hex_sha256(&bank.history_sha256) {
         return Err(IntervalError::InvalidHistoryDigest);
+    }
+    if !is_lower_hex_sha256(&bank.action_manifest_sha256) {
+        return Err(IntervalError::InvalidActionManifestDigest);
+    }
+    if bank.outcome_channel.trim().is_empty() {
+        return Err(IntervalError::EmptyOutcomeChannel);
     }
     if !is_lower_hex_sha256(&bank.joint_draw_bank_sha256) {
         return Err(IntervalError::InvalidJointDrawDigest);
@@ -511,6 +521,8 @@ mod tests {
         JointActionSetSamples {
             history_sha256: "a".repeat(64),
             horizon_steps: 5,
+            action_manifest_sha256: "c".repeat(64),
+            outcome_channel: "predicted_task_utility".into(),
             action_ids: vec![17, 3, 9],
             joint_draw_ids: vec![100, 101, 102, 103, 104],
             joint_draw_bank_sha256: "b".repeat(64),
@@ -570,6 +582,17 @@ mod tests {
         let mut bank = joint_bank_fixture();
         bank.outcome_samples[1].pop();
         assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::ActionSampleCardinalityMismatch));
+    }
+
+    #[test]
+    fn joint_action_bank_requires_action_semantics_and_outcome_channel_identity() {
+        let mut bank = joint_bank_fixture();
+        bank.action_manifest_sha256 = "bad".into();
+        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::InvalidActionManifestDigest));
+
+        let mut bank = joint_bank_fixture();
+        bank.outcome_channel = "  ".into();
+        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::EmptyOutcomeChannel));
     }
 
     #[test]
