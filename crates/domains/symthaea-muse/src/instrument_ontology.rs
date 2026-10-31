@@ -37,6 +37,7 @@ pub enum InstrumentEntityKind {
 pub enum InstrumentFamily {
     Keyboard,
     BowedStrings,
+    BowedAndPluckedStrings,
     PluckedStrings,
     Woodwind,
     Brass,
@@ -128,24 +129,24 @@ pub fn instrument_descriptors() -> [InstrumentDescriptor; CURRENT_INSTRUMENT_VAR
         descriptor!(PianoPP, "piano.pp", TimbreVariant, Keyboard, Measured),
         descriptor!(Violin, "violin", PhysicalInstrument, BowedStrings, Measured),
         descriptor!(Cello, "cello", PhysicalInstrument, BowedStrings, Measured),
-        descriptor!(Flute, "flute", PhysicalInstrument, Woodwind, Measured),
-        descriptor!(Organ, "organ", PhysicalInstrument, Keyboard, Measured),
+        descriptor!(Flute, "flute", PhysicalInstrument, Woodwind, Approximation),
+        descriptor!(Organ, "organ", PhysicalInstrument, Keyboard, Approximation),
         descriptor!(ElectricPiano, "electric_piano", PhysicalInstrument, Keyboard, SharedFallback),
         descriptor!(Bell, "bell", PhysicalInstrument, Idiophone, SharedFallback),
         descriptor!(AcousticGuitar, "acoustic_guitar", PhysicalInstrument, PluckedStrings, SharedFallback),
         descriptor!(Harp, "harp", PhysicalInstrument, PluckedStrings, SharedFallback),
         descriptor!(Pad, "pad", ElectronicSource, Electronic, SharedFallback),
-        descriptor!(Clarinet, "clarinet", PhysicalInstrument, Woodwind, Measured),
-        descriptor!(Trumpet, "trumpet", PhysicalInstrument, Brass, Measured),
-        descriptor!(Saxophone, "saxophone", PhysicalInstrument, Woodwind, Measured),
+        descriptor!(Clarinet, "clarinet", PhysicalInstrument, Woodwind, Approximation),
+        descriptor!(Trumpet, "trumpet", PhysicalInstrument, Brass, Approximation),
+        descriptor!(Saxophone, "saxophone", PhysicalInstrument, Woodwind, Approximation),
         descriptor!(Marimba, "marimba", PhysicalInstrument, Idiophone, SharedFallback),
-        descriptor!(Sitar, "sitar", PhysicalInstrument, PluckedStrings, Measured),
+        descriptor!(Sitar, "sitar", PhysicalInstrument, PluckedStrings, Approximation),
         descriptor!(Kalimba, "kalimba", PhysicalInstrument, Idiophone, SharedFallback),
         descriptor!(SawLead, "saw_lead", ElectronicSource, Electronic, Approximation),
         descriptor!(Koto, "koto", PhysicalInstrument, PluckedStrings, SharedFallback),
         descriptor!(Oud, "oud", PhysicalInstrument, PluckedStrings, SharedFallback),
         descriptor!(Ney, "ney", PhysicalInstrument, Woodwind, SharedFallback),
-        descriptor!(UprightBass, "upright_bass", PhysicalInstrument, PluckedStrings, SharedFallback),
+        descriptor!(UprightBass, "upright_bass", PhysicalInstrument, BowedAndPluckedStrings, SharedFallback),
         descriptor!(Viola, "viola", PhysicalInstrument, BowedStrings, Derived),
         descriptor!(Oboe, "oboe", PhysicalInstrument, Woodwind, Approximation),
         descriptor!(FrenchHorn, "french_horn", PhysicalInstrument, Brass, Approximation),
@@ -169,9 +170,59 @@ pub fn instrument_descriptors() -> [InstrumentDescriptor; CURRENT_INSTRUMENT_VAR
     ]
 }
 
+/// Keep this match exhaustive so adding a new `Instrument` variant forces
+/// the ontology catalogue to be reviewed and updated at compile time.
+fn require_explicit_variant_mapping(instrument: Instrument) {
+    match instrument {
+        Instrument::Piano
+        | Instrument::PianoPP
+        | Instrument::Violin
+        | Instrument::Cello
+        | Instrument::Flute
+        | Instrument::Organ
+        | Instrument::ElectricPiano
+        | Instrument::Bell
+        | Instrument::AcousticGuitar
+        | Instrument::Harp
+        | Instrument::Pad
+        | Instrument::Clarinet
+        | Instrument::Trumpet
+        | Instrument::Saxophone
+        | Instrument::Marimba
+        | Instrument::Sitar
+        | Instrument::Kalimba
+        | Instrument::SawLead
+        | Instrument::Koto
+        | Instrument::Oud
+        | Instrument::Ney
+        | Instrument::UprightBass
+        | Instrument::Viola
+        | Instrument::Oboe
+        | Instrument::FrenchHorn
+        | Instrument::Bassoon
+        | Instrument::Accordion
+        | Instrument::Mandolin
+        | Instrument::Banjo
+        | Instrument::Vibraphone
+        | Instrument::Celesta
+        | Instrument::ChoirAah
+        | Instrument::StringEnsemble
+        | Instrument::ElectricBass
+        | Instrument::Timpani
+        | Instrument::MusicBox
+        | Instrument::Harpsichord
+        | Instrument::Tuba
+        | Instrument::Trombone
+        | Instrument::Duduk
+        | Instrument::ChoirOoh
+        | Instrument::Xylophone => {}
+    }
+}
+
 /// Find the current descriptor for an enum variant. Returns `None` rather
 /// than silently manufacturing an identity for a future unmapped variant.
 pub fn descriptor_for(instrument: Instrument) -> Option<InstrumentDescriptor> {
+    require_explicit_variant_mapping(instrument);
     instrument_descriptors()
         .into_iter()
         .find(|entry| entry.instrument == instrument)
