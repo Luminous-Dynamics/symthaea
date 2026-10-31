@@ -466,3 +466,6 @@ The Rust tests include a synthetic two-pair end-to-end fixture, but no real trai
 
 The analysis report includes a SHA-256 digest of the exact serialized study input and a commitment to the Monte Carlo randomization-test seed. Keep the original study JSON, evaluator-only seeds, paired training audit records, manifests and final report together as the reproducibility bundle. The report's study digest must match byte-for-byte canonical serde JSON serialization under the declared hash domain.
 
+
+
+The intervention design also binds a per-replicate training RNG commitment: treatment and placebo use the same committed RNG schedule within a pair, while independent model-pair replicates must use distinct training RNG commitments. This is checked by the paired receipt validator and repeated-replicate analysis.
