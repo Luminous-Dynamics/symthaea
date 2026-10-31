@@ -45,7 +45,7 @@ pub enum RightsDisposition {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TrainingDisposition {
+pub enum PermittedUsePath {
     /// Registry discovery is not permission to ingest or train.
     BlockedPendingRightsReview,
     /// May be considered for non-commercial research only after checking
@@ -53,7 +53,7 @@ pub enum TrainingDisposition {
     NonCommercialResearchAfterVerification,
     /// Asset license is permissive, but exact files and provenance still
     /// need a pinned manifest before local use.
-    AssetUseAfterPinnedSourceVerification,
+    RendererAssetUseAfterPinnedSourceVerification,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -75,7 +75,7 @@ pub struct CorpusScopeCounts {
     pub audio_hours: Option<f64>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct MusicCorpusRecord {
     pub id: &'static str,
     pub title: &'static str,
@@ -321,7 +321,7 @@ pub const MUSIC_CORPORA: &[MusicCorpusRecord] = &[
     },
 ];
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MusicCorpusRegistry {
     pub schema: String,
     pub candidate_count: usize,
@@ -340,7 +340,7 @@ pub fn build_music_corpus_registry() -> MusicCorpusRegistry {
             .filter(|record| {
                 record.evidence_stage == CorpusEvidenceStage::IngestApproved
                     && record.rights_disposition == RightsDisposition::ApprovedForDeclaredUse
-                    && record.training_disposition != TrainingDisposition::BlockedPendingRightsReview
+                    && record.permitted_use_path != TrainingDisposition::BlockedPendingRightsReview
             })
             .count(),
         records,
