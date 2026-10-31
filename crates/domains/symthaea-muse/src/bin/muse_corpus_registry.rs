@@ -46,6 +46,10 @@ fn write_output(bytes: &[u8], output: Option<&str>) -> Result<(), String> {
 fn run() -> Result<(), String> {
     let mut args = env::args().skip(1);
     let command = args.next().ok_or_else(usage)?;
+    if command == "--help" || command == "-h" {
+        println!("{}", usage());
+        return Ok(());
+    }
     let mut input = None::<String>;
     let mut output = None::<String>;
 
@@ -63,7 +67,10 @@ fn run() -> Result<(), String> {
                     return Err("--output was supplied more than once".into());
                 }
             }
-            "--help" | "-h" => return Err(usage()),
+            "--help" | "-h" => {
+                println!("{}", usage());
+                return Ok(());
+            }
             other => return Err(format!("unknown argument {other:?}\n{}", usage())),
         }
     }
