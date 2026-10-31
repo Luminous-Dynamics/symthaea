@@ -16,6 +16,9 @@ use super::event_tape::{
     ActionIntent, ActionOutcome, BudgetModel, ComparisonMode, EventTape, EventTapeSummary,
     MeterValue, ResourceCostWeights, ResourceReceipt,
 };
+use super::offer_set::{
+    verify_matched_offer_sets, OfferSetManifest, OfferSetMatchSummary,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MatchedCampaignError {
@@ -160,6 +163,65 @@ fn add_meter(
         }
     }
     Ok(())
+}
+
+
+/// Unified result for the confirmatory mechanism-matched campaign gate.
+///
+/// A common event-tape contract and matching offer-set manifests are necessary, but not
+/// sufficient, for scientific superiority. This structure qualifies only execution fairness,
+/// complete batch schedules, fully metered receipts and equal realized normalized spend.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MatchedCampaignQualification {
+    pub campaign: MatchedCampaignSummary,
+    pub offer_sets: OfferSetMatchSummary,
+    pub qualification_blockers: Vec<String>,
+    pub qualified_for_confirmatory_comparison: bool,
+}
+
+/// Reconcile policy tapes and their per-policy offer manifests through one entry point.
+///
+/// Returns a structured not-qualified result when resource accounting, completed rounds,
+/// or equal realized spend are missing. It returns an error when the declared contracts or
+/// actual offered choices disagree. Neither outcome establishes scientific novelty or
+/// superiority; sealed verification and held-out transfer remain separate gates.
+pub fn qualify_mechanism_matched_campaign(
+    tapes: &[EventTape],
+    manifests: &[OfferSetManifest],
+) -> Result<MatchedCampaignQualification, MatchedCampaignError> {
+    let campaign = reconcile_mechanism_matched_campaign(tapes)?;
+    let offer_sets = verify_matched_offer_sets(tapes, manifests).map_err(|error| {
+        MatchedCampaignError::new("offer_sets", error.to_string())
+    })?;
+    let mut qualification_blockers = Vec::new();
+
+    if !campaign.all_execution_schedules_complete {
+        qualification_blockers.push(
+            "one or more event tapes contain an incomplete final batch or seat schedule".to_owned(),
+        );
+    }
+    if !campaign.resource_budget_qualified {
+        qualification_blockers.push(
+            "one or more event tapes contain unknown resource meters or an unqualified normalized charge".to_owned(),
+        );
+    }
+    if !campaign.normalized_budget_spend_matched {
+        qualification_blockers.push(
+            "policies did not spend the same fully measured normalized budget".to_owned(),
+        );
+    }
+    if offer_sets.shared_decision_boundaries == 0 {
+        qualification_blockers.push(
+            "no shared offer-set decision boundaries were verified".to_owned(),
+        );
+    }
+
+    Ok(MatchedCampaignQualification {
+        campaign,
+        offer_sets,
+        qualified_for_confirmatory_comparison: qualification_blockers.is_empty(),
+        qualification_blockers,
+    })
 }
 
 #[derive(Serialize)]
@@ -768,5 +830,68 @@ mod tests {
         assert!(!summary.normalized_budget_spend_matched);
         assert!(summary.resource_budget_qualified);
     }
+
+    fn offer_manifest(tape: &EventTape) -> OfferSetManifest {
+        let snapshot = super::super::offer_set::OfferSetSnapshot::new(
+            1,
+            None,
+            0,
+            vec!["A".to_owned()],
+            true,
+            H2,
+        )
+        .unwrap();
+        OfferSetManifest::new(tape, vec![snapshot]).unwrap()
+    }
+
+    #[test]
+    fn unified_qualification_requires_contract_offer_set_resources_and_equal_spend() {
+        let left = policy_tape("board", "board-build-1", json!({"alpha": 0.5}), 0.91, false);
+        let right = policy_tape("thompson", "thompson-build-1", json!({"prior": 1.0}), 0.91, false);
+        let left_manifest = offer_manifest(&left);
+        let right_manifest = offer_manifest(&right);
+        let qualification = qualify_mechanism_matched_campaign(
+            &[left, right],
+            &[left_manifest, right_manifest],
+        )
+        .unwrap();
+        assert!(qualification.qualified_for_confirmatory_comparison);
+        assert!(qualification.qualification_blockers.is_empty());
+        assert_eq!(qualification.offer_sets.shared_decision_boundaries, 1);
+    }
+
+    #[test]
+    fn unified_qualification_reports_unknown_resources_as_a_blocker() {
+        let left = policy_tape("board", "board-build-1", json!({"alpha": 0.5}), 0.91, true);
+        let right = policy_tape("thompson", "thompson-build-1", json!({"prior": 1.0}), 0.91, false);
+        let left_manifest = offer_manifest(&left);
+        let right_manifest = offer_manifest(&right);
+        let qualification = qualify_mechanism_matched_campaign(
+            &[left, right],
+            &[left_manifest, right_manifest],
+        )
+        .unwrap();
+        assert!(!qualification.qualified_for_confirmatory_comparison);
+        assert!(qualification
+            .qualification_blockers
+            .iter()
+            .any(|blocker| blocker.contains("unknown resource meters")));
+    }
+
+    #[test]
+    fn unified_qualification_rejects_different_offered_choices() {
+        let left = policy_tape("board", "board-build-1", json!({"alpha": 0.5}), 0.91, false);
+        let right = policy_tape("thompson", "thompson-build-1", json!({"prior": 1.0}), 0.91, false);
+        let left_manifest = offer_manifest(&left);
+        let mut right_manifest = offer_manifest(&right);
+        right_manifest.snapshots[0].available_direction_ids = vec!["A".to_owned(), "B".to_owned()];
+        // Mutation also invalidates the manifest digest; a mismatch cannot be normalized away.
+        assert!(qualify_mechanism_matched_campaign(
+            &[left, right],
+            &[left_manifest, right_manifest],
+        )
+        .is_err());
+    }
+
 
 }
