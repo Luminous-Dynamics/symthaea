@@ -289,6 +289,8 @@ pub struct EventTapeSummary {
     /// None means at least one action's normalized charge is unknown.
     pub total_charged_budget_microunits: Option<u64>,
     pub fully_metered: bool,
+    /// False when the final batched round has not filled its declared advisory seats.
+    pub execution_schedule_complete: bool,
     pub registered_direction_ids: Vec<String>,
 }
 
@@ -714,6 +716,19 @@ impl EventTape {
 
         let total_charged_budget_microunits =
             if charge_is_complete { Some(total_charge) } else { None };
+        let execution_schedule_complete = match self.header.execution.mode {
+            ExecutionMode::Sequential => true,
+            ExecutionMode::Batched => self.events.last().is_some_and(|last_event| {
+                let last_batch_id = last_event.payload.batch_id.as_deref();
+                let completed_seats = self
+                    .events
+                    .iter()
+                    .rev()
+                    .take_while(|event| event.payload.batch_id.as_deref() == last_batch_id)
+                    .count();
+                completed_seats == self.header.execution.seats_per_round as usize
+            }),
+        };
         let mut registered_direction_ids: Vec<String> = registered.into_iter().collect();
         registered_direction_ids.sort_unstable();
 
@@ -727,6 +742,7 @@ impl EventTape {
             inconclusive_proposals,
             total_charged_budget_microunits,
             fully_metered,
+            execution_schedule_complete,
             registered_direction_ids,
         })
     }
@@ -742,27 +758,11 @@ impl EventTape {
             ));
         }
         let summary = self.validate_integrity()?;
-        if self.header.execution.mode == ExecutionMode::Batched {
-            if let Some(last_event) = self.events.last() {
-                let last_batch_id = last_event.payload.batch_id.as_deref().ok_or_else(|| {
-                    EventTapeError::new("events", "batched tape ends without a batch ID")
-                })?;
-                let completed_seats = self
-                    .events
-                    .iter()
-                    .rev()
-                    .take_while(|event| event.payload.batch_id.as_deref() == Some(last_batch_id))
-                    .count();
-                if completed_seats != self.header.execution.seats_per_round as usize {
-                    return Err(EventTapeError::new(
-                        "events.last_batch",
-                        format!(
-                            "last batch has {completed_seats} actions; expected {} advisory seats",
-                            self.header.execution.seats_per_round
-                        ),
-                    ));
-                }
-            }
+        if !summary.execution_schedule_complete {
+            return Err(EventTapeError::new(
+                "events.last_batch",
+                "final batch does not fill the declared advisory seats",
+            ));
         }
         if !summary.fully_metered || summary.total_charged_budget_microunits.is_none() {
             return Err(EventTapeError::new(
