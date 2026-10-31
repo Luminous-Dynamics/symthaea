@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "analysis_id": "synthetic-query-reconstruction-fixture-v1",
+  "dataset_revision_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "scope_coverage": "exhaustive_declared_scenario_space",
+  "scenarios": [
+    {
+      "scenario_id": "path-present",
+      "graph_sha256": "e4da16c92f233d293f28328eb9f14d4a71941c0b28c107686c6008db28a2a269",
+      "lineage_groups": ["synthetic-source-volume-v1", "synthetic-segmentation-family-A"],
+      "edges": [
+        { "source": 1, "target": 2, "weight": 1.0 },
+        { "source": 2, "target": 3, "weight": 1.0 },
+        { "source": 3, "target": 4, "weight": 1.0 },
+        { "source": 10, "target": 11, "weight": 1.0 }
+      ]
+    },
+    {
+      "scenario_id": "path-absent",
+      "graph_sha256": "c2ae778e52d61e31055a7d2c617427ab1f6c5bbc56d677dd31fe70faa4d9d47f",
+      "lineage_groups": ["synthetic-source-volume-v1", "synthetic-segmentation-family-A"],
+      "edges": [
+        { "source": 1, "target": 2, "weight": 1.0 },
+        { "source": 3, "target": 4, "weight": 1.0 },
+        { "source": 10, "target": 11, "weight": 0.25 }
+      ]
+    },
+    {
+      "scenario_id": "path-present-alternative",
+      "graph_sha256": "748f444d9f150253a9f48ec6ce46dcc828a8fbb33402558d33df29580cebd5dd",
+      "lineage_groups": ["synthetic-source-volume-v1", "independent-adjudication-branch-B"],
+      "edges": [
+        { "source": 1, "target": 2, "weight": 1.0 },
+        { "source": 2, "target": 3, "weight": 1.0 },
+        { "source": 3, "target": 4, "weight": 1.0 }
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "query_id": "critical-path-1-to-4",
+      "metric": { "kind": "path_exists", "source": 1, "target": 4 },
+      "decision": { "kind": "boolean_is", "value": true }
+    },
+    {
+      "query_id": "spurious-edge-below-threshold",
+      "metric": { "kind": "edge_weight", "source": 10, "target": 11 },
+      "decision": { "kind": "less_than", "threshold": 0.5 }
+    },
+    {
+      "query_id": "node-3-outgoing-weight",
+      "metric": { "kind": "out_degree", "node": 3 },
+      "decision": { "kind": "greater_or_equal", "threshold": 1.0 }
+    }
+  ]
+}
