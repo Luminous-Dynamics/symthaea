@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/fresh-instance-sealed-oracle-v1.json",
+  "title": "Fresh inference-time sealed oracle packet v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "batch_id",
+    "generation_seed_hex",
+    "generation_seed_commitment_sha256",
+    "item_count",
+    "entries",
+    "sealed_oracle_sha256",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.fresh_instance_sealed_oracle.v1"
+    },
+    "batch_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generation_seed_hex": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{2}){32,}$"
+    },
+    "generation_seed_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "item_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "item_id",
+          "parameters",
+          "solution",
+          "parameter_sha256",
+          "answer_sha256"
+        ],
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "a11",
+              "a12",
+              "a21",
+              "a22",
+              "b1",
+              "b2"
+            ],
+            "properties": {
+              "a11": {
+                "type": "integer"
+              },
+              "a12": {
+                "type": "integer"
+              },
+              "a21": {
+                "type": "integer"
+              },
+              "a22": {
+                "type": "integer"
+              },
+              "b1": {
+                "type": "integer"
+              },
+              "b2": {
+                "type": "integer"
+              }
+            }
+          },
+          "solution": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "type": "integer"
+              },
+              "y": {
+                "type": "integer"
+              }
+            }
+          },
+          "parameter_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "answer_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "sealed_oracle_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
