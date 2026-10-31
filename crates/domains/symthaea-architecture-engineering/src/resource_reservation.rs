@@ -67,13 +67,14 @@ pub enum ReservationEventKind {
     Expired,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ResourceReservationRecord {
     /// Idempotency key: exact action scope SHA-256.
     pub reservation_id: String,
     pub action_id: String,
     pub preflight_receipt_sha256: String,
+    pub preflight_receipt: NasActionPreflightReceipt,
     pub resource_registry_sha256: String,
     pub resource_budget_sha256: String,
     pub resource_cost_sha256: String,
@@ -321,6 +322,7 @@ impl ResourceReservationLedger {
             reservation_id: proof.scope_sha256.clone(),
             action_id: proof.preflight_receipt.action_id.clone(),
             preflight_receipt_sha256: proof.preflight_receipt.receipt_sha256.clone(),
+            preflight_receipt: proof.preflight_receipt.clone(),
             resource_registry_sha256: self.resource_registry.registry_sha256.clone(),
             resource_budget_sha256: proof.resource_budget_sha256.clone(),
             resource_cost_sha256,
@@ -588,6 +590,29 @@ pub fn verify_resource_reservation_ledger(
 
     let mut records = HashMap::with_capacity(ledger.reservations.len());
     for (index, record) in ledger.reservations.iter().enumerate() {
+        verify_action_preflight_receipt_digest(&record.preflight_receipt)
+            .map_err(|error| ResourceReservationError::new(
+                format!("reservations[{index}].preflight_receipt"),
+                error.to_string(),
+            ))?;
+        if record.preflight_receipt.receipt_sha256 != record.preflight_receipt_sha256
+            || record.preflight_receipt.scope_sha256 != record.reservation_id
+            || record.preflight_receipt.run_id != ledger.run_id
+            || record.preflight_receipt.action_id != record.action_id
+            || record.preflight_receipt.action_kind != NasActionKind::AcquireMeasurement
+            || record.preflight_receipt.disposition != "PREFLIGHT_ELIGIBLE_NO_RESERVATION_NO_EXECUTION"
+            || record.preflight_receipt.resource_registry_sha256.as_deref()
+                != Some(ledger.resource_registry.registry_sha256.as_str())
+            || record.preflight_receipt.resource_budget_sha256.as_deref()
+                != Some(budget_sha.as_str())
+            || record.preflight_receipt.resource_cost_sha256.as_deref()
+                != Some(record.resource_cost_sha256.as_str())
+        {
+            return Err(ResourceReservationError::new(
+                format!("reservations[{index}].preflight_receipt"),
+                "stored preflight receipt does not bind the reservation run, action, scope, registry, budget, and cost",
+            ));
+        }
         if !is_sha256(&record.reservation_id)
             || !is_sha256(&record.preflight_receipt_sha256)
             || record.action_id.trim().is_empty()
