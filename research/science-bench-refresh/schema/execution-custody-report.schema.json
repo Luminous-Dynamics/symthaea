@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/execution-custody-report.schema.json",
+  "title": "Symthaea Execution Custody Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "fields",
+    "report_commitment_sha256"
+  ],
+  "properties": {
+    "fields": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "run_id",
+        "analyzer_source_revision",
+        "analyzer_worktree_clean",
+        "plan_sha256",
+        "receipt_sha256",
+        "plan_commitment_sha256",
+        "event_count",
+        "event_merkle_root_sha256",
+        "execution_bundle_sha256",
+        "planned_condition_count",
+        "observed_condition_count",
+        "completed_condition_count",
+        "timed_out_condition_count",
+        "blocked_condition_count",
+        "invalid_receipt_condition_count",
+        "not_started_condition_count",
+        "failed_condition_count",
+        "tool_call_count",
+        "total_evaluator_call_count",
+        "total_evaluator_token_count",
+        "total_rendered_input_bytes",
+        "total_output_bytes",
+        "timestamps_monotonic",
+        "event_sequence_contiguous",
+        "event_chain_valid",
+        "external_checkpoint_present",
+        "external_checkpoint_matches_bundle",
+        "external_inclusion_proof_valid",
+        "external_checkpoint_authenticity_proven",
+        "runner_identity_authenticated",
+        "raw_prompt_custody_proven",
+        "evaluator_execution_proven",
+        "wall_clock_authenticity_proven",
+        "external_anchor_required",
+        "scoring_eligible_declared",
+        "conditions",
+        "claim_boundary"
+      ],
+      "properties": {
+        "schema": {
+          "const": "symthaea.science_bench_refresh_execution_custody_report.v1"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "analyzer_source_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "analyzer_worktree_clean": {
+          "type": "boolean"
+        },
+        "plan_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "plan_commitment_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "event_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "event_merkle_root_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "execution_bundle_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "planned_condition_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "observed_condition_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "completed_condition_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timed_out_condition_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blocked_condition_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "invalid_receipt_condition_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "not_started_condition_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed_condition_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tool_call_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_evaluator_call_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_evaluator_token_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_rendered_input_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_output_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timestamps_monotonic": {
+          "const": true
+        },
+        "event_sequence_contiguous": {
+          "const": true
+        },
+        "event_chain_valid": {
+          "const": true
+        },
+        "external_checkpoint_present": {
+          "type": "boolean"
+        },
+        "external_checkpoint_matches_bundle": {
+          "type": "boolean"
+        },
+        "external_inclusion_proof_valid": {
+          "type": "boolean"
+        },
+        "external_checkpoint_authenticity_proven": {
+          "const": false
+        },
+        "runner_identity_authenticated": {
+          "const": false
+        },
+        "raw_prompt_custody_proven": {
+          "const": false
+        },
+        "evaluator_execution_proven": {
+          "const": false
+        },
+        "wall_clock_authenticity_proven": {
+          "const": false
+        },
+        "external_anchor_required": {
+          "const": true
+        },
+        "scoring_eligible_declared": {
+          "const": false
+        },
+        "conditions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "condition_id",
+              "planned_ordinal",
+              "input_rendered",
+              "evaluation_started",
+              "terminal_status",
+              "tool_call_count",
+              "input_sha256",
+              "output_sha256",
+              "evaluator_call_count",
+              "evaluator_token_count"
+            ],
+            "properties": {
+              "condition_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "planned_ordinal": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "input_rendered": {
+                "type": "boolean"
+              },
+              "evaluation_started": {
+                "type": "boolean"
+              },
+              "terminal_status": {
+                "enum": [
+                  "completed",
+                  "timed_out",
+                  "blocked",
+                  "invalid_receipt",
+                  "not_started",
+                  "failed"
+                ]
+              },
+              "tool_call_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "input_sha256": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "output_sha256": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "evaluator_call_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "evaluator_token_count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "claim_boundary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "report_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
