@@ -36,6 +36,7 @@ cargo run --locked \
   --features hardsec-adaptive-evasion-audit \
   --example hardsec_adaptive_evasion_audit -- \
   --predictions tests/fixtures/hardsec/adaptive-evasion-v1/predictions.json \
+  --baseline-predictions tests/fixtures/hardsec/adaptive-evasion-v1/baseline-predictions.json \
   --manifest tests/fixtures/hardsec/adaptive-evasion-v1/case-manifest.json \
   --truth tests/fixtures/hardsec/adaptive-evasion-v1/evaluator-truth.json \
   --receipt /tmp/hardsec-adaptive-evasion-receipt.json
@@ -53,14 +54,16 @@ cargo run --locked \
 - Deterministic equal-group percentile bootstrap intervals (10,000 resamples) are emitted for attack-family, adaptation-family, program, execution and benign-program macro rates only when at least 10 declared independent groups exist. Resampling is at the group level, never at the window/case level. Seed derivation uses campaign ID, grouping axis and algorithm version—not prediction bytes—so matched model arms can use common resamples when group IDs match. These are descriptive intervals conditional on caller-declared independence/exchangeability, not proof of independence or family-wise population guarantees.
 - When fewer than 10 independent groups exist, point estimates and per-group support remain visible but the bootstrap interval is explicitly unavailable. The nine-case known-answer fixture intentionally exercises this unavailable path.
 - Exact one-sided Clopper–Pearson upper bounds are also reported for the group-level probability of at least one successful-attack miss or at least one benign false alert. The Bernoulli unit is the independent group, not a case/window. Six predeclared group-risk endpoints share a 5% family-wise alpha budget by Bonferroni (alpha=0.05/6 per endpoint). These bounds are conditional on caller-declared independent/exchangeable groups and are not per-case FNR/FPR.
+- Optional `--baseline-predictions` adds paired candidate-versus-baseline comparisons for attack-family, adaptation-family/level, program, execution and benign-program false-alert rates. It requires identical campaign IDs and exact shared manifest/oracle/test case IDs; each group-level metric also requires identical ordered group IDs. Positive deltas are defined to favor the candidate (higher recall, lower benign false-alert rate).
+- Paired point estimates are means of within-group deltas. When at least 10 matched groups exist, the evaluator uses 10,000 paired-group bootstrap resamples with a deterministic common seed; below 10 it preserves point estimates/support but withholds the interval. This is a descriptive paired comparison, not a significance test or proof of independence.
 - The evaluator checks class/oracle consistency: benign cases must use attack/adaptation family none; malicious cases must name an attack family; named adaptation families require positive levels.
 - Benign false-alert rate is reported overall and on valid-sensor cases; valid-sensor true-negative rate excludes invalid telemetry.
 - Holdout checks require disjoint program, execution, attack-family and adaptation-family IDs across train/validation/test; the sentinel value none is excluded from attack/adaptation-family grouping for benign/no-adaptation cases.
-- Twenty-three Rust unit tests are authored, including direct attack-family and adaptation-family leakage mutations plus small-group interval suppression, reproducible equal-group bootstrap and known-answer support-count checks.
+- Thirty-one Rust unit tests are authored, including direct attack-family/adaptation-family leakage mutations, bootstrap and exact group-risk bounds, identical-group enforcement, paired improvement known answers, and deterministic paired bootstrap checks.
 - Sensor-invalid cases are counted separately. Any clear response on a missing, stale, misaligned, multiplexed or untrusted sensor is reported as an integrity violation.
 - Acquisition and inference nanoseconds, telemetry bytes and peak memory are summarized only where their required per-case measurements are complete. Energy is not inferred.
 
-The receipt binds exact prediction, manifest and truth input bytes. It is unsigned, deterministic and no-overwrite. The tool reports result=evaluated; it does not automatically call a detector safe or successful.
+The receipt binds exact candidate prediction, optional baseline prediction, manifest and truth input bytes. For paired mode it also binds the baseline-prediction digest and emits identical-group checks plus per-group paired deltas. It is unsigned, deterministic and no-overwrite. The tool reports result=evaluated; it does not automatically call a detector safe or successful.
 
 ## 4. Versioned input contracts
 
@@ -72,7 +75,7 @@ The JSON schemas specify record shape; Rust performs cross-file joins and holdou
 
 ## 5. Known-answer fixture
 
-The fixture in tests/fixtures/hardsec/adaptive-evasion-v1/ contains nine test cases plus one training and one validation metadata case. Its synthetic cases deliberately include:
+The fixture directory contains candidate and baseline prediction ledgers plus a shared case manifest and evaluator oracle, with nine test cases plus one training and one validation metadata case. Its synthetic cases deliberately include:
 - three observed successful attack effects, of which one is alerted, one cleared and one abstained;
 - one malicious attempt with no observed effect;
 - one malicious attempt with unknown effect;
@@ -93,7 +96,7 @@ These numbers are intentionally illustrative fixture behavior, not detection-per
 
 The fixture has fewer than ten independent groups on every reported axis. The expected statistical-support section therefore emits no confidence intervals, even though there are nine test cases. This is intentional: raw case count is not independent-group support.
 
-Fourteen Rust unit tests cover known-answer outcomes, program/attack/adaptation-family holdout leakage, oracle/manifest class consistency, named-adaptation level semantics, attack-family macro reporting, duplicate/missing case IDs, failed/unknown effect semantics, invalid sensor clear verdicts, incomplete cost, calibration, adaptation-stratum reporting and evidence-domain separation.
+The baseline ledger deliberately changes the candidate operating profile. On the same held-out groups the candidate has program-macro attack-effect recall 1/3 versus 0 for the baseline, and macro benign false-alert rate 0.25 versus 0.50. These are paired evaluator-mechanics outputs from a tiny synthetic fixture, not detector-performance evidence; both confidence intervals are withheld because there are fewer than 10 groups.
 
 ## 6. Mandatory comparison arms
 
