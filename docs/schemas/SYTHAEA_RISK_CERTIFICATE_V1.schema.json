@@ -51,7 +51,7 @@
      "then":{"properties":{"manifest":{"properties":{"proof_lane":{"const":"exact_finite_exchangeability"}}}}}},
     {"if":{"properties":{"manifest":{"properties":{"risk_target":{"properties":{"kind":{"const":"supfdr"}}}}}}},
      "then":{"properties":{"manifest":{"properties":{"proof_lane":{"const":"theorem_backed_eprocess"}}}}}},
-    {"if":{"properties":{"manifest":{"properties":{"proof_lane":{"const":"simulation_only"}}}}},
+    {"if":{"properties":{"manifest":{"properties":{"proof_lane":{"const":"simulation_only"}}}}}},
      "then":{"properties":{"receipt":{"properties":{"status":{"enum":["fail","inconclusive"]}}}}}
   ]
 }
