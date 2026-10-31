@@ -1,0 +1,45 @@
+{
+  "schema_version": "cmaq-018-joint-action-bank-v0.1",
+  "claim_ceiling": "joint_draw_bank_shape_and_pairing_contract_only_no_calibration_or_coupling_attestation",
+  "history_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "horizon_steps": 5,
+  "action_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "outcome_channel": "predicted_task_utility",
+  "action_ids": [
+    17,
+    3,
+    9
+  ],
+  "joint_draw_ids": [
+    100,
+    101,
+    102,
+    103,
+    104
+  ],
+  "joint_draw_bank_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "coupling": "shared_posterior_and_world_noise",
+  "outcome_samples": [
+    [
+      100,
+      110,
+      120,
+      130,
+      140
+    ],
+    [
+      99,
+      109,
+      119,
+      129,
+      139
+    ],
+    [
+      97,
+      107,
+      117,
+      127,
+      137
+    ]
+  ]
+}
