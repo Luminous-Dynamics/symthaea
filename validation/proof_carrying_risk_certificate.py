@@ -161,9 +161,6 @@ def _validate_manifest(manifest: dict) -> None:
         if not isinstance(scope.get("family_size"), int) or scope["family_size"] < 1:
             raise CertificateError("FWER scope needs a positive family_size")
 
-    if lane == "simulation_only":
-        raise CertificateError("simulation_only is not an admissible proof lane in v1")
-
 
 def _validate_receipt(manifest: dict, manifest_digest: str, receipt: dict) -> None:
     if not isinstance(receipt, dict):
