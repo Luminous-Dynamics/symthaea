@@ -123,6 +123,9 @@
     },
     "claim_ceiling": {
       "const": "digest_bound_run_record_not_independently_verified_by_v0_2_cli"
+    },
+    "fixture_only": {
+      "type": "boolean"
     }
   }
 }
