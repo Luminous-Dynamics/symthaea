@@ -1875,6 +1875,139 @@ pub fn reference_population_digest(
     )))
 }
 
+fn gene_effect_audits_well_formed(
+    recipe: &HybridStyleSpec,
+    trials: &[GenomeTrial],
+    audits: &[GenomeGeneEffectAudit],
+) -> bool {
+    let donor_axes = [
+        GenomeAxis::Melody,
+        GenomeAxis::Rhythm,
+        GenomeAxis::Harmony,
+        GenomeAxis::Performance,
+        GenomeAxis::Ensemble,
+        GenomeAxis::Production,
+    ];
+    let expected_axes: Vec<_> = donor_axes
+        .into_iter()
+        .filter_map(|axis| axis.catalog_id(recipe).map(|catalog_id| (axis, catalog_id)))
+        .collect();
+    if expected_axes.len() != audits.len() {
+        return false;
+    }
+
+    for ((expected_axis, expected_catalog_id), audit) in expected_axes.iter().zip(audits) {
+        if audit.axis != *expected_axis
+            || audit.catalog_id != *expected_catalog_id
+            || audit.seed_count != trials.len()
+            || audit.layer
+                != match audit.axis {
+                    GenomeAxis::Ensemble | GenomeAxis::Production => GeneEffectLayer::Renderer,
+                    _ => GeneEffectLayer::Symbolic,
+                }
+        {
+            return false;
+        }
+
+        if audit.layer == GeneEffectLayer::Renderer {
+            if audit.status != GeneEffectStatus::RendererPending
+                || audit.reason.as_ref().is_none_or(|reason| reason.trim().is_empty())
+                || !audit.paired_trials.is_empty()
+                || audit.changed_seed_count != 0
+            {
+                return false;
+            }
+            continue;
+        }
+
+        let mut invalid_pairs = 0usize;
+        let mut changed_pairs = 0usize;
+        if !audit.paired_trials.is_empty() && audit.paired_trials.len() != trials.len() {
+            return false;
+        }
+
+        for (index, pair) in audit.paired_trials.iter().enumerate() {
+            let Some(candidate) = trials.get(index) else {
+                return false;
+            };
+            if pair.seed != candidate.seed
+                || pair.candidate_score_sha256 != candidate.score_sha256
+                || pair.candidate_plan_signature != candidate.grammar_plan_signature
+                || !is_sha256_hex(&pair.candidate_score_sha256)
+            {
+                return false;
+            }
+
+            if pair.counterfactual_valid {
+                if !pair.counterfactual_failure_codes.is_empty()
+                    || !is_sha256_hex(&pair.counterfactual_score_sha256)
+                    || pair.counterfactual_plan_signature
+                        .as_ref()
+                        .is_none_or(|value| !is_sha256_hex(value))
+                    || pair.counterfactual_grammar_transformations.is_empty()
+                {
+                    return false;
+                }
+            } else {
+                invalid_pairs += 1;
+                if pair.counterfactual_failure_codes.is_empty() {
+                    return false;
+                }
+            }
+
+            let mut expected_changed = Vec::new();
+            if pair.candidate_score_sha256 != pair.counterfactual_score_sha256 {
+                expected_changed.push("symbolic_score".to_string());
+            }
+            if pair.candidate_plan_signature != pair.counterfactual_plan_signature {
+                expected_changed.push("grammar_plan_topology".to_string());
+            }
+            if candidate.grammar_transformations != pair.counterfactual_grammar_transformations {
+                expected_changed.push("grammar_operations".to_string());
+            }
+            if expected_changed != pair.changed_dimensions {
+                return false;
+            }
+            if pair.counterfactual_valid && !expected_changed.is_empty() {
+                changed_pairs += 1;
+            }
+        }
+
+        if changed_pairs != audit.changed_seed_count {
+            return false;
+        }
+        match audit.status {
+            GeneEffectStatus::Observed => {
+                if audit.paired_trials.len() != trials.len()
+                    || invalid_pairs != 0
+                    || changed_pairs == 0
+                    || audit.reason.is_some()
+                {
+                    return false;
+                }
+            }
+            GeneEffectStatus::NoObservedEffect => {
+                if audit.paired_trials.len() != trials.len()
+                    || invalid_pairs != 0
+                    || changed_pairs != 0
+                    || audit.reason.as_ref().is_none_or(|reason| reason.trim().is_empty())
+                {
+                    return false;
+                }
+            }
+            GeneEffectStatus::CounterfactualUnavailable => {
+                if audit.reason.as_ref().is_none_or(|reason| reason.trim().is_empty())
+                    || !(audit.paired_trials.is_empty() || invalid_pairs > 0)
+                {
+                    return false;
+                }
+            }
+            GeneEffectStatus::RendererPending => return false,
+        }
+    }
+    true
+}
+
 impl GenomeEvaluation {
     pub fn verify_digest(&self) -> bool {
         let reference_binding_valid = match &self.reference_population_sha256 {
@@ -1898,6 +2031,11 @@ impl GenomeEvaluation {
             && reference_binding_valid
             && self.seed_count == self.evaluation_config.seeds.len()
             && self.seed_count == self.trials.len()
+            && gene_effect_audits_well_formed(
+                &self.genome.recipe,
+                &self.trials,
+                &self.gene_effect_audits,
+            )
             && self.trials.iter().all(|trial| {
                 is_sha256_hex(&trial.score_sha256)
                     && grammar_plan_name(&trial.grammar_plan) == trial.grammar_plan_kind
