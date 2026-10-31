@@ -634,7 +634,12 @@ impl ScoreReport {
             self.token_sum as f64 / denominator,
             self.model_call_sum as f64 / denominator,
             self.hard_gate_pass,
-            self.hard_gate_pass && self.exact_case_matches == self.cases,
+            self.hard_gate_pass
+                && self.exact_case_matches == self.cases
+                && self.write_stage_matches == self.cases
+                && self.maintenance_stage_matches == self.cases
+                && self.retrieval_stage_matches == self.cases
+                && self.use_stage_matches == self.cases,
             self.agent_input_sha256,
             self.oracle_sha256,
             self.candidate_sha256
