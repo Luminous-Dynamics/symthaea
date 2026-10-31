@@ -174,11 +174,15 @@ fn validate_record_contract(
 ) -> bool {
     let mut valid = true;
     if !valid_digest(&record.event_sha256) {
-        issues.push(format!("records[{index}].event_sha256 is not a valid digest"));
+        issues.push(format!(
+            "records[{index}].event_sha256 is not a valid digest"
+        ));
         valid = false;
     }
     if !CLASSIFICATIONS.contains(&record.classification.as_str()) {
-        issues.push(format!("records[{index}] has an unsupported classification"));
+        issues.push(format!(
+            "records[{index}] has an unsupported classification"
+        ));
         return false;
     }
     if !MATCH_METHODS.contains(&record.match_method.as_str()) {
@@ -188,12 +192,20 @@ fn validate_record_contract(
     if record.match_score_micros > MAX_SCORE_MICROS
         || record.decision_threshold_micros > MAX_SCORE_MICROS
     {
-        issues.push(format!("records[{index}] score/threshold exceeds 1,000,000"));
+        issues.push(format!(
+            "records[{index}] score/threshold exceeds 1,000,000"
+        ));
         valid = false;
     }
     for (label, digest) in [
-        ("protected_reference_sha256", record.protected_reference_sha256.as_deref()),
-        ("evidence_artifact_sha256", record.evidence_artifact_sha256.as_deref()),
+        (
+            "protected_reference_sha256",
+            record.protected_reference_sha256.as_deref(),
+        ),
+        (
+            "evidence_artifact_sha256",
+            record.evidence_artifact_sha256.as_deref(),
+        ),
     ] {
         if digest.is_some_and(|value| !valid_digest(value)) {
             issues.push(format!("records[{index}].{label} is not a valid digest"));
@@ -329,21 +341,40 @@ pub fn verify_search_exposure_match_report(
     }
     for (label, digest) in [
         ("receipt_sha256", report.receipt_sha256.as_str()),
-        ("receipt_commitment_sha256", report.receipt_commitment_sha256.as_str()),
-        ("protected_index_sha256", report.protected_index_sha256.as_str()),
-        ("matcher_revision_sha256", report.matcher_revision_sha256.as_str()),
-        ("decision_rules_sha256", report.decision_rules_sha256.as_str()),
-        ("report_commitment_sha256", report.report_commitment_sha256.as_str()),
+        (
+            "receipt_commitment_sha256",
+            report.receipt_commitment_sha256.as_str(),
+        ),
+        (
+            "protected_index_sha256",
+            report.protected_index_sha256.as_str(),
+        ),
+        (
+            "matcher_revision_sha256",
+            report.matcher_revision_sha256.as_str(),
+        ),
+        (
+            "decision_rules_sha256",
+            report.decision_rules_sha256.as_str(),
+        ),
+        (
+            "report_commitment_sha256",
+            report.report_commitment_sha256.as_str(),
+        ),
     ] {
         if !valid_digest(digest) {
             return Err(format!("{label} must be 64 lowercase hex characters"));
         }
     }
     if report.records.len() > MAX_MATCH_RECORDS {
-        return Err(format!("match report exceeds safety limit of {MAX_MATCH_RECORDS} records"));
+        return Err(format!(
+            "match report exceeds safety limit of {MAX_MATCH_RECORDS} records"
+        ));
     }
     if report.expected_event_count > MAX_MATCH_RECORDS as u64 {
-        return Err(format!("match expected_event_count exceeds {MAX_MATCH_RECORDS}"));
+        return Err(format!(
+            "match expected_event_count exceeds {MAX_MATCH_RECORDS}"
+        ));
     }
 
     let mut issues = Vec::new();
@@ -406,8 +437,7 @@ pub fn verify_search_exposure_match_report(
     }
 
     let report_commitment_recomputed = match_commitment(&report)?;
-    let report_commitment_matches =
-        report_commitment_recomputed == report.report_commitment_sha256;
+    let report_commitment_matches = report_commitment_recomputed == report.report_commitment_sha256;
     if !report_commitment_matches {
         issues.push("match report commitment does not match contents".to_owned());
     }
@@ -478,13 +508,17 @@ mod tests {
         SEARCH_RECEIPT_SCHEMA, SearchExposureEventV1, event_hash, receipt_hash,
     };
 
-    const ZERO: &str =
-        "0000000000000000000000000000000000000000000000000000000000000000";
+    const ZERO: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
     fn sealed_receipt(response_present: bool) -> SearchExposureReceiptV1 {
         let mut event = SearchExposureEventV1 {
             sequence: 0,
-            event_kind: if response_present { "fetch" } else { "network_request" }.to_owned(),
+            event_kind: if response_present {
+                "fetch"
+            } else {
+                "network_request"
+            }
+            .to_owned(),
             decision: if response_present { "allow" } else { "block" }.to_owned(),
             request_sha256: sha256_hex(b"query"),
             host: "search.example.org".to_owned(),
@@ -558,18 +592,9 @@ mod tests {
     fn complete_no_match_report_passes_with_full_event_coverage() {
         let receipt = sealed_receipt(true);
         let receipt_bytes = serde_json::to_vec(&receipt).unwrap();
-        let report = match_report(
-            &receipt_bytes,
-            "no_match",
-            "none",
-            0,
-            0,
-            None,
-            None,
-        );
+        let report = match_report(&receipt_bytes, "no_match", "none", 0, 0, None, None);
         let report_bytes = serde_json::to_vec(&report).unwrap();
-        let verified =
-            verify_search_exposure_match_report(&receipt_bytes, &report_bytes).unwrap();
+        let verified = verify_search_exposure_match_report(&receipt_bytes, &report_bytes).unwrap();
         assert!(verified.integrity_valid);
         assert_eq!(
             verified.admission,
@@ -581,15 +606,7 @@ mod tests {
     fn blocked_event_must_be_marked_not_evaluable() {
         let receipt = sealed_receipt(false);
         let receipt_bytes = serde_json::to_vec(&receipt).unwrap();
-        let report = match_report(
-            &receipt_bytes,
-            "not_evaluable",
-            "none",
-            0,
-            0,
-            None,
-            None,
-        );
+        let report = match_report(&receipt_bytes, "not_evaluable", "none", 0, 0, None, None);
         let verified = verify_search_exposure_match_report(
             &receipt_bytes,
             &serde_json::to_vec(&report).unwrap(),
@@ -640,7 +657,9 @@ mod tests {
                 "exact_digest",
                 MAX_SCORE_MICROS,
                 MAX_SCORE_MICROS,
-                Some(sha256_hex(format!("opaque-reference:{classification}").as_bytes())),
+                Some(sha256_hex(
+                    format!("opaque-reference:{classification}").as_bytes(),
+                )),
                 Some(sha256_hex(b"same-exact-matched-artifact")),
             );
             let verified = verify_search_exposure_match_report(
@@ -658,15 +677,7 @@ mod tests {
     fn missing_records_and_mutated_match_report_fail_closed() {
         let receipt = sealed_receipt(true);
         let receipt_bytes = serde_json::to_vec(&receipt).unwrap();
-        let report = match_report(
-            &receipt_bytes,
-            "no_match",
-            "none",
-            0,
-            0,
-            None,
-            None,
-        );
+        let report = match_report(&receipt_bytes, "no_match", "none", 0, 0, None, None);
         let mut missing = report.clone();
         missing.records.clear();
         missing.report_commitment_sha256 = match_commitment(&missing).unwrap();
@@ -693,15 +704,7 @@ mod tests {
     fn a_match_report_cannot_rebind_to_another_receipt() {
         let receipt = sealed_receipt(true);
         let receipt_bytes = serde_json::to_vec(&receipt).unwrap();
-        let report = match_report(
-            &receipt_bytes,
-            "no_match",
-            "none",
-            0,
-            0,
-            None,
-            None,
-        );
+        let report = match_report(&receipt_bytes, "no_match", "none", 0, 0, None, None);
         let mut altered_receipt = receipt;
         altered_receipt.run_id = "different-run".to_owned();
         let altered_bytes = serde_json::to_vec(&altered_receipt).unwrap();
