@@ -7,14 +7,16 @@
   "candidate_policy_pr": 9616,
   "status": "source_authored_not_executed",
   "event_interval_semantics": "half_open_start_inclusive_end_exclusive",
-  "direct_observability": "at_least_one_candidate_observation_timestamp_inside_hidden_event_interval",
+  "direct_observability": "at_least_one_sample_inside_half_open_event_window_and_absolute_amplitude_at_or_above_evaluator_declared_minimum",
   "outcome_categories": [
     "directly_observable",
     "detected_observable",
+    "anticipated_before_event_onset_with_prediction_lead_time",
     "missed_observable",
     "unobserved",
     "inferred_without_direct_observation",
-    "false_detection_unknown_event_id"
+    "false_detection_unknown_event_id",
+    "below_sensor_amplitude_floor"
   ],
   "metrics": [
     "event_observability_ppm",
@@ -26,7 +28,9 @@
     "energy_budget_exceeded",
     "false_detection_ids",
     "unobserved_event_ids",
-    "inferred_without_direct_observation_ids"
+    "inferred_without_direct_observation_ids",
+    "prediction_lead_time_us",
+    "minimum_detectable_amplitude_milli"
   ],
   "alias_pair_contract": {
     "signal_model": "piecewise_linear_integer_microsecond_timestamps_integer_milli_unit_values",
@@ -51,7 +55,7 @@
     "timestamp_quantization",
     "delayed_observation_delivery"
   ],
-  "test_functions_authored": 10,
+  "test_functions_authored": 12,
   "tests_executed": false,
   "candidate_hidden_label_exposure": false,
   "OS_level_isolation_dependency": 9437,
