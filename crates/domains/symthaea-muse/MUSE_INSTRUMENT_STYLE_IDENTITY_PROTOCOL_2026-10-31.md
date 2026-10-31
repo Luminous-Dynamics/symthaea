@@ -375,3 +375,24 @@ Proposed (not measured) success gates:
 
 Use Bradley–Terry or an equivalent paired-comparison model with prompt and rater structure, not a raw win percentage alone. Keep expert and non-expert cohorts separately reportable. Include blinded duplicates, hidden reference pairs, fixed prompt cards, exact audio digests, and analysis code. Metrics such as FAD, CLAP similarity, aesthetic predictors, instrument classifiers and symbolic scores must be calibrated to the human corpus; no single automated metric becomes a quality authority.
 
+
+### 9.5 Representation is a first-order competitive variable (2026 research update)
+
+The October frontier suggests that the next useful experiment is not simply “make the model larger.” Compare the information carried by the representation before changing model scale.
+
+- **Agogic (arXiv:2608.03999, submitted 2026-08-04)** holds the Qwen3.5 backbone family, data, training budget and decoding fixed while comparing seven music tokenizations. Its authors report that a 34× backbone scale increase moved Fréchet Music Distance (FMD) much less than switching representation. Their 10 ms Performance-Timed Music (PMT) representation carries per-note velocity and multi-track texture; they report FMD 159 for a 0.8B PMT model versus 272–286 for beat-grid representations, with non-overlapping bootstrap intervals. They also report that snapping PMT onsets to beat-grid resolution does not remove the distributional advantage. **Important limitation:** FMD is a distributional metric, not a human preference or musical-usefulness result; the paper leaves audible advantage open and preregisters a human study. Treat these as author-reported research results pending independent reproduction. https://arxiv.org/abs/2608.03999
+- **Qwen-Music Technical Report v3 (arXiv:2607.11699, v3 submitted 2026-09-16)** describes a 25 Hz semantic-token tokenizer, autoregressive semantic planning with Melody-CoT, and a separate generative stereo renderer. It reports more than five million training hours and author-reported results on 600 Chinese/English prompts. This is a major scale/architecture reference, but its audio-first full-song tasks are not directly equivalent to Muse's symbolic Score and instrumental production tasks. https://arxiv.org/abs/2607.11699
+- **Muse (Findings of ACL 2026, July 2026)** releases a long-form song-generation pipeline with 116k licensed synthetic songs, segment-level style conditioning, Qwen-based language modeling and discrete audio tokens. The paper is a reproducibility and fine-grained control reference; its synthetic data is paired with audio synthesized by Suno V5, a lineage dependency that should be disclosed when interpreting its results. https://aclanthology.org/2026.findings-acl.1129/
+- **Open-Qwen-Music (arXiv:2609.31652, 2026-09-14)** describes an open tokenizer + 3B autoregressive Music LLM + diffusion renderer system, accompanied by training/inference/evaluation pipelines, datasets, provenance manifests and model artifacts. Its authors explicitly frame it as an auditable research baseline, not evidence of quality parity with closed Qwen-Music. It is a useful future reproduction target for component-boundary and provenance experiments. https://arxiv.org/abs/2609.31652
+
+**Implication for Muse:** its current Score already stores rational beat-time onset/duration, MIDI pitch, velocity and stable part identity, but a single global tempo and legacy integer quarter-note meter do not yet express the complete performance timeline, written meter/grouping or per-note controller semantics. Keep symbolic score time, performed event time and rendered sample time distinct. Do not replace exact rational score time with a fixed 10 ms grid merely because PMT uses one; compare the trade-off.
+
+A new [MUSE-REP-001 #9476](https://github.com/Luminous-Dynamics/symthaea/issues/9476) benchmark now specifies:
+1. exact Score-native and MIDI 1.0 round trips;
+2. beat-grid lossy controls at declared subdivisions;
+3. performance-timed multi-track events with a 1–50 ms resolution sweep;
+4. optional per-note expression/MPE only for a pinned compatible target;
+5. structural, timing, texture, dynamic, efficiency and robustness outcomes;
+6. human listening / musician annotation to test whether distributional or signal gains are actually audible and useful.
+
+This is a proposed representation benchmark, not an implemented PMT codec or a claim that Muse beats Agogic, Qwen-Music or commercial systems. Its first goal is to find and quantify information loss in our existing Score → performance → MIDI/audio boundaries.
