@@ -1,0 +1,31 @@
+name: PITB Exact Support Landscape Power V2
+
+on:
+  pull_request:
+    paths:
+      - "scripts/research/pitb_support_landscape_power_v2.py"
+      - ".github/workflows/pitb-support-landscape-power-v2.yml"
+      - "docs/research/pitb-support-landscape-exact-confidence-2026-10-31.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  power-screen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact proposed commit
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Run exact Clopper-Pearson power planner controls
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/research/pitb_support_landscape_power_v2.py
+          python scripts/research/pitb_support_landscape_power_v2.py --self-test
+          python scripts/research/pitb_support_landscape_power_v2.py --context-counts 4,8,16,64,256
