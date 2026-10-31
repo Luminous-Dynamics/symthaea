@@ -1,0 +1,40 @@
+{
+  "schema_version": "broca-closed-world-event-fixtures-v1",
+  "protocol_version": "BROCA-CLOSED-WORLD-EVENTS-V1",
+  "source_kind": "synthetic deterministic conformance fixtures; not benchmark observations",
+  "case_count": 4,
+  "cases": [
+    {
+      "case_id": "complete-inventory-complete-extraction-trusted-speakers",
+      "inventory_complete": true,
+      "extraction_complete": true,
+      "speaker_attribution_complete": true,
+      "matching_event_count": 1,
+      "answer_is_permitted": true
+    },
+    {
+      "case_id": "unsupported-source-explicit-disposition",
+      "inventory_complete": true,
+      "extraction_complete": false,
+      "speaker_attribution_complete": true,
+      "matching_event_count": 1,
+      "answer_is_permitted": false
+    },
+    {
+      "case_id": "potentially-relevant-event-with-unknown-speaker",
+      "inventory_complete": true,
+      "extraction_complete": true,
+      "speaker_attribution_complete": false,
+      "matching_event_count": 1,
+      "answer_is_permitted": false
+    },
+    {
+      "case_id": "truncated-inventory",
+      "inventory_complete": false,
+      "extraction_complete": true,
+      "speaker_attribution_complete": true,
+      "matching_event_count": 1,
+      "answer_is_permitted": false
+    }
+  ]
+}
