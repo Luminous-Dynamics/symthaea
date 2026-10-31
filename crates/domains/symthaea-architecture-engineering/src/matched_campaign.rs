@@ -176,7 +176,7 @@ pub struct MatchedCampaignQualification {
     pub campaign: MatchedCampaignSummary,
     pub offer_sets: OfferSetMatchSummary,
     pub qualification_blockers: Vec<String>,
-    pub qualified_for_confirmatory_comparison: bool,
+    pub matched_execution_qualified: bool,
 }
 
 /// Reconcile policy tapes and their per-policy offer manifests through one entry point.
@@ -219,7 +219,7 @@ pub fn qualify_mechanism_matched_campaign(
     Ok(MatchedCampaignQualification {
         campaign,
         offer_sets,
-        qualified_for_confirmatory_comparison: qualification_blockers.is_empty(),
+        matched_execution_qualified: qualification_blockers.is_empty(),
         qualification_blockers,
     })
 }
@@ -855,7 +855,7 @@ mod tests {
             &[left_manifest, right_manifest],
         )
         .unwrap();
-        assert!(qualification.qualified_for_confirmatory_comparison);
+        assert!(qualification.matched_execution_qualified);
         assert!(qualification.qualification_blockers.is_empty());
         assert_eq!(qualification.offer_sets.shared_decision_boundaries, 1);
     }
