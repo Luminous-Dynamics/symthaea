@@ -199,6 +199,8 @@ def build_projective_intersection_paths(
         raise ValueError("coordinate path length mismatch")
     if any(x < 0 for row in paths for x in row):
         raise ValueError("coordinate e-values must be nonnegative")
+    if any(row[0] > 1 for row in paths):
+        raise ValueError("coordinate e-process initial values must be at most one")
     if any(x < 0 for x in w) or sum(w) > 1:
         raise ValueError("weights must be nonnegative and globally summable to <= 1")
     for t, mask in enumerate(active_masks):
@@ -292,6 +294,8 @@ def verify_dynamic_collection(
         raise ValueError("intersection path length does not match active timeline")
     if any(x < 0 for row in paths.values() for x in row):
         raise ValueError("adjusted intersection values must be nonnegative")
+    if any(row[0] > 1 for row in paths.values()):
+        raise ValueError("adjusted intersection e-processes must start at most one")
 
     failures = []
     monotonicity_checks = 0
@@ -561,13 +565,9 @@ def verify_dynamic_decision_sequence(
     adjuster_spec: dict[str, Any],
 ) -> dict[str, Any]:
     """Independent dynamic replay including optimality over all feasible sets."""
-    paths = tuple(tuple(as_fraction(x) for x in row) for row in coordinate_paths)
-    w = tuple(as_fraction(x) for x in weights)
-    active = tuple(active_masks)
-    level = as_fraction(alpha)
-    v = tuple(as_fraction(x) for x in values)
-    c = tuple(as_fraction(x) for x in costs)
-    capacity = tuple(as_fraction(x) for x in capacities)
+    paths, w, active, level, v, c, capacity = _normalise_stream(
+        coordinate_paths, weights, active_masks, alpha, values, costs, capacities
+    )
     n = len(paths)
     t_count = len(active)
     failures = []
