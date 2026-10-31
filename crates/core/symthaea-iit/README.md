@@ -530,6 +530,23 @@ a global optimum, or guarantee lower total RSS. The existing cutset sweep
 remains the exact numeric oracle for complete retained-factor parity on its
 pinned separator fixtures.
 
+The current preflight fixtures pin the following candidate-family sizes and
+non-dominated choices. Each tuple is (exact branches, residual width, predicted
+peak factor entries); these are planning regression targets, not timed results.
+
+| Grid | Candidate sets | Pareto frontier |
+|---:|---:|---|
+| 4×4 | 19 | (16, 2, 8), (256, 1, 4) |
+| 5×5 | 30 | (32, 2, 8) |
+| 6×6 | 43 | (64, 3, 16), (4,096, 2, 8) |
+| 8×8 | 75 | (256, 4, 32), (65,536, 3, 16) |
+
+The 8×8 example makes the resource exchange visible: a two-line band halves
+the predicted peak table size relative to a single-line separator, but raises
+the exact branch count from 256 to 65,536. Neither option dominates the other;
+the appropriate choice depends on the caller's memory and inference-time
+budgets.
+
 Run:
 
     cargo run --release --locked -p symthaea-iit --example cutset_frontier_sweep
