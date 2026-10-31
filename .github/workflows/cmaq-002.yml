@@ -53,6 +53,61 @@ jobs:
           assert activearena_lock["policy_baseline"]["checkpoint_bundle"]["status"] == "unpinned_not_downloaded"
           assert activearena_lock["benchmark"]["candidate_visible_camera"] == "head"
           assert activearena_lock["benchmark"]["action_dimension"] == 18
+
+          custody_schema = json.loads(Path("activearena-adapter-contract.schema.json").read_text())
+          Draft202012Validator.check_schema(custody_schema)
+          custody = json.loads(Path("fixtures/activearena-adapter-contract.example.json").read_text())
+          validate(instance=custody, schema=custody_schema)
+          assert custody["status"] == "metadata_only"
+          assert custody["candidate_observation"]["camera"] == "head"
+          assert all(event["camera"] == "head" for event in custody["observation_memory"])
+          assert all(event["memory_promoted"] is False for event in custody["forecasts"])
+          assert custody["evaluator_only"]["candidate_visible"] is False
+          assert custody["dataset"]["immutable_revision"] is None
+
+          hostile = json.loads(json.dumps(custody))
+          hostile["candidate_observation"]["camera"] = "side"
+          try:
+              validate(instance=hostile, schema=custody_schema)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError("ActiveArena custody admitted side-camera candidate observation")
+
+          hostile = json.loads(json.dumps(custody))
+          hostile["evaluator_only"]["candidate_visible"] = True
+          try:
+              validate(instance=hostile, schema=custody_schema)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError("ActiveArena custody admitted evaluator-only data to candidate")
+
+          hostile = json.loads(json.dumps(custody))
+          hostile["observation_memory"].append({
+              "event_type": "predicted_future",
+              "camera": "head",
+              "observation_sha256": "0" * 64,
+              "capture_timestamp_ms": 2000.0,
+              "action_chunk_id": 1,
+              "candidate_visible": True
+          })
+          try:
+              validate(instance=hostile, schema=custody_schema)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError("ActiveArena custody admitted predicted future as observation memory")
+
+          hostile = json.loads(json.dumps(custody))
+          hostile["status"] = "qualification_ready"
+          try:
+              validate(instance=hostile, schema=custody_schema)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError("ActiveArena custody admitted qualification without dataset/license gates")
+
           report = json.loads(Path("/tmp/cmaq-002-report.json").read_text())
           validate(instance=report, schema=schema)
           assert report["schema_version"] == "cmaq-002-evoi-report-v0.3"
