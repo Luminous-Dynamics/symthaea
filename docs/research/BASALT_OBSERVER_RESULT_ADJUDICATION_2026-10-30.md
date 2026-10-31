@@ -111,6 +111,38 @@ This tests a separate boundary from an omitted rerun declaration. Cargo's curren
 
 The evidence still states `independent_kernel_observation=false` and `qualification_eligible=false`; it demonstrates a controlled Cargo cache behavior, not an observer pass. References: [Cargo build scripts](https://doc.rust-lang.org/cargo/reference/build-scripts.html), [Cargo configuration hierarchy](https://doc.rust-lang.org/cargo/reference/config.html).
 
+## Independent Cargo mtime evidence replay
+
+The separate command `basalt-cargo-mtime-evidence-verify` consumes the retained mtime evidence and the exact challenge catalog. It does not trust the runner's success flag alone. It independently checks the catalog digest, embedded fixture digest, Cargo/rustc binary/version/sysroot identity, PATH digest, retained workspace identity, Git baseline, ignored/untracked state, changed input digests, build-script source digests and exact recorded mtime.
+
+It then creates a new empty verifier CARGO_HOME, reruns Cargo against the retained warm target directory and compares that output with the original warm-cache evidence, then performs a fresh target replay and requires the mutated value. The verifier refuses to reuse its own CARGO_HOME or fresh replay target directories.
+
+Run it after the mtime fixture has emitted its evidence:
+
+```sh
+cargo run -p xtask --bin xtask -- basalt-cargo-mtime-evidence-verify \
+  --evidence reports/basalt-cargo-mtime-fixtures/<run-id>/cargo-mtime-fixture-evidence.v1.json \
+  --catalog benchmarks/basalt/coverage/observer-challenges.v1.json
+```
+
+This provides a second-process replay check, not an independent trust root: the verifier is still part of the same repository/toolchain, does not observe the build-script file open at kernel level, and does not authenticate a signature. Its `oracle_authenticity_established` and `qualification_eligible` fields remain hard false.
+
+## Independent Cargo mtime evidence replay
+
+The separate command `basalt-cargo-mtime-evidence-verify` consumes retained mtime evidence and the exact challenge catalog. It checks the catalog digest, embedded fixture digest and every retained fixture-template file; Cargo/rustc binary, version, sysroot and PATH identity; retained Git baseline and clean working tree; ignored/untracked input state; final input bytes and content digests; build-script source digests; and exact recorded mtime.
+
+It then creates a new empty verifier CARGO_HOME, reruns Cargo against the retained warm target directory and compares output and digest with the original warm-cache evidence. Finally, it performs a new fresh-target replay and requires the mutated value and digest.
+
+Run it after the mtime fixture has emitted its evidence:
+
+```sh
+cargo run -p xtask --bin xtask -- basalt-cargo-mtime-evidence-verify \
+  --evidence reports/basalt-cargo-mtime-fixtures/<run-id>/cargo-mtime-fixture-evidence.v1.json \
+  --catalog benchmarks/basalt/coverage/observer-challenges.v1.json
+```
+
+This is a second-process replay check, not an independent trust root: the verifier remains in the same repository/toolchain, does not observe the build-script file open at kernel level, and does not authenticate a signature. Its `oracle_authenticity_established` and `qualification_eligible` fields remain hard false.
+
 ## Next paradigm shift: access is not semantic influence
 
 The first fixture runner currently distinguishes a task that reads a resource from a task that never opens it. That is a necessary baseline, but it is not the full evidence-retention problem.
@@ -293,4 +325,4 @@ The existing qualification note already identifies why fanotify alone cannot est
 
 ## Execution status and limitations
 
-This branch authors the scoped result adjudicator, separate worker executable, fixture runner, schemas, CLI integration, benchmark protocol, research documentation and corpus correction. Thirty Rust unit tests are authored across the adjudicator, filesystem fixture, Cargo fixtures and worker binary (19 adjudicator, 2 filesystem fixture, 3 undeclared-input fixture, 3 mtime fixture, 3 worker tests). The environment used for this work has no `cargo`, `rustc` or `rustfmt`; Rust compilation, formatting, unit-test execution, filesystem fixture execution, the undeclared-input Cargo fixture, the mtime Cargo fixture and observer qualification have **not** been run here. The filesystem worker's byte-count field is still a worker claim. The Cargo fixture exercises a real offline Cargo build-script/cache path, but remains a source-controlled challenge without independent kernel observation. The next step is to execute both fixture runners on an exact checkout, then attach an independent kernel/process observation lane to the real Cargo build-script child and compare its receipt against the fixture supervisor and fresh replay. Broader adapters should follow only after this first Linux path has pinned hook coverage, process lineage and event-loss accounting. Oracle signing, a separately trusted replay verifier and observer receipts remain future work. The report's strict-false policy remains in force even for a passing unit test or future green CI run.
+This branch authors the scoped result adjudicator, separate worker executable, fixture runner, schemas, CLI integration, benchmark protocol, research documentation and corpus correction. Thirty-three Rust unit tests are authored across the adjudicator, filesystem fixture, Cargo fixtures and worker binary (19 adjudicator, 2 filesystem fixture, 3 undeclared-input fixture, 6 mtime/replay-verifier tests, 3 worker tests). The environment used for this work has no `cargo`, `rustc` or `rustfmt`; Rust compilation, formatting, unit-test execution, filesystem fixture execution, the undeclared-input Cargo fixture, the mtime Cargo fixture and observer qualification have **not** been run here. The filesystem worker's byte-count field is still a worker claim. The Cargo fixture exercises a real offline Cargo build-script/cache path, but remains a source-controlled challenge without independent kernel observation. The next step is to execute both fixture runners on an exact checkout, then attach an independent kernel/process observation lane to the real Cargo build-script child and compare its receipt against the fixture supervisor and fresh replay. Broader adapters should follow only after this first Linux path has pinned hook coverage, process lineage and event-loss accounting. Oracle signing, a separately trusted replay verifier and observer receipts remain future work. The report's strict-false policy remains in force even for a passing unit test or future green CI run.

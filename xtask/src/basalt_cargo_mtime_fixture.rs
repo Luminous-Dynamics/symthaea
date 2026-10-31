@@ -536,6 +536,20 @@ mod tests {
     }
 
     #[test]
+    fn evidence_string_reader_rejects_missing_and_non_string_fields() {
+        assert!(required_str(&serde_json::json!({}), "run_id").is_err());
+        assert!(required_str(&serde_json::json!({"run_id": 4}), "run_id").is_err());
+        assert_eq!(required_str(&serde_json::json!({"run_id":"r"}), "run_id").unwrap(), "r");
+    }
+
+    #[test]
+    fn evidence_integer_reader_rejects_negative_and_non_integer_fields() {
+        assert!(required_u64(&serde_json::json!({"mtime":-1}), "mtime").is_err());
+        assert!(required_u64(&serde_json::json!({"mtime":"1"}), "mtime").is_err());
+        assert_eq!(required_u64(&serde_json::json!({"mtime":1}), "mtime").unwrap(), 1);
+    }
+
+    #[test]
     fn exact_mtime_restore_helper_preserves_timestamp_after_content_change() {
         let path=env::temp_dir().join(format!("basalt-mtime-fixture-{}-{}",std::process::id(),
             SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
@@ -546,4 +560,267 @@ mod tests {
         assert_eq!(fs::metadata(&path).unwrap().modified().unwrap(),original);
         fs::remove_file(path).unwrap();
     }
+}
+
+
+#[derive(Debug, Serialize)]
+pub struct MtimeEvidenceVerifyReport {
+    pub report_version: u32,
+    pub run_id: String,
+    pub verification_passed: bool,
+    pub catalog_identity_verified: bool,
+    pub toolchain_identity_verified: bool,
+    pub workspace_identity_verified: bool,
+    pub mtime_identity_verified: bool,
+    pub original_warm_replay_matches: bool,
+    pub independent_fresh_replay_matches: bool,
+    pub warm_replay_process_id: u32,
+    pub fresh_replay_process_id: u32,
+    pub warm_output_digest: String,
+    pub fresh_output_digest: String,
+    pub oracle_authenticity_established: bool,
+    pub qualification_eligible: bool,
+}
+
+/// Independently reopens a retained mtime fixture run, validates its identity,
+/// replays its warm target, and performs a new fresh-target build.
+/// This verifies a fixture execution, not the authenticity of the oracle or an observer.
+pub fn verify(evidence_path: &Path, catalog_path: &Path) -> anyhow::Result<MtimeEvidenceVerifyReport> {
+    let evidence_bytes = read_bounded(evidence_path, 4 * 1024 * 1024)?;
+    let evidence: Value = serde_json::from_slice(&evidence_bytes)?;
+    let run_root = evidence_path.parent().context("evidence file has no parent run directory")?
+        .canonicalize().context("canonicalizing evidence run directory")?;
+    let workspace_relative = required_str(&evidence, "workspace_relative_path")?;
+    if workspace_relative != "workspace" {
+        bail!("unsupported workspace_relative_path {workspace_relative}");
+    }
+    let workspace = run_root.join(workspace_relative);
+    let canonical_workspace = workspace.canonicalize().context("resolving retained fixture workspace")?;
+    if canonical_workspace != workspace {
+        bail!("fixture workspace resolved through a symlink or path alias");
+    }
+
+    let catalog_bytes = read_bounded(catalog_path, 16 * 1024 * 1024)?;
+    let catalog_audit = crate::basalt_observer::audit_bytes(&catalog_bytes);
+    if !catalog_audit.structurally_valid {
+        bail!("challenge catalog failed structural validation");
+    }
+    let catalog_digest = sha256(&catalog_bytes);
+    if required_str(&evidence, "catalog_digest")? != catalog_digest {
+        bail!("evidence catalog digest does not match supplied catalog");
+    }
+    validate_catalog_case(&serde_json::from_slice(&catalog_bytes)?)?;
+
+    if required_str(&evidence, "fixture_digest")? != fixture_digest()? {
+        bail!("evidence fixture digest does not match this verifier's embedded fixture");
+    }
+    for (relative, expected) in FIXTURE {
+        let actual = fs::read(workspace.join(relative))
+            .with_context(|| format!("reading retained fixture file {relative}"))?;
+        if actual != expected.as_bytes() {
+            bail!("retained fixture file {relative} differs from the pinned template");
+        }
+    }
+
+    let cargo_name = env::var_os("CARGO").unwrap_or_else(|| OsStr::new("cargo").to_os_string());
+    let cargo = resolve_executable(&cargo_name)?;
+    let cargo_binary_digest = sha256_file(&cargo)?;
+    let cargo_version = cargo_version(&cargo)?;
+    let (rustc_launcher, rustc_version, rustc_sysroot, rustc_binary) = rustc_identity()?;
+    let rustc_launcher_digest = sha256_file(&rustc_launcher)?;
+    let rustc_binary_digest = sha256_file(&rustc_binary)?;
+    let path_digest = env::var_os("PATH")
+        .map(|value| sha256(value.to_string_lossy().as_bytes()))
+        .unwrap_or_else(|| sha256(b"<PATH-unset>"));
+
+    let toolchain_identity_verified =
+        required_str(&evidence, "cargo_binary_digest")? == cargo_binary_digest
+        && required_str(&evidence, "cargo_version")? == cargo_version
+        && required_str(&evidence, "rustc_launcher_digest")? == rustc_launcher_digest
+        && required_str(&evidence, "rustc_sysroot_binary_digest")? == rustc_binary_digest
+        && required_str(&evidence, "rustc_version")? == rustc_version
+        && required_str(&evidence, "rustc_sysroot")? == rustc_sysroot
+        && required_str(&evidence, "path_environment_digest")? == path_digest;
+    if !toolchain_identity_verified {
+        bail!("Cargo/rustc/PATH identity differs from the recorded fixture evidence");
+    }
+
+    let cargo_home_path = run_root.join(required_str(&evidence, "cargo_home_relative_path")?);
+    if !cargo_home_path.is_dir() {
+        bail!("recorded isolated CARGO_HOME is missing");
+    }
+    if cargo_home_path.join("config.toml").exists() || cargo_home_path.join("config").exists() {
+        bail!("recorded CARGO_HOME contains an unexpected Cargo configuration file");
+    }
+    if required_str(&evidence, "cargo_configuration_policy")?
+        != "isolated_empty_cargo_home_no_ancestor_dot_cargo_config"
+        || !evidence.get("ancestor_cargo_config_absent").and_then(Value::as_bool).unwrap_or(false)
+    {
+        bail!("recorded Cargo configuration policy is not the supported isolated policy");
+    }
+    ensure_no_ancestor_cargo_config(&workspace.join("declared"))?;
+    ensure_no_ancestor_cargo_config(&workspace.join("mtime"))?;
+
+    let git_commit = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(&workspace)
+        .output()
+        .context("checking retained fixture Git baseline")?;
+    if !git_commit.status.success()
+        || String::from_utf8(git_commit.stdout)?.trim()
+            != required_str(&evidence, "git_baseline_commit")?
+    {
+        bail!("retained fixture Git HEAD differs from recorded baseline");
+    }
+    let git_status = Command::new("git")
+        .args(["status", "--porcelain", "--untracked-files=all"])
+        .current_dir(&workspace)
+        .output()
+        .context("checking retained fixture working tree")?;
+    if !git_status.status.success() || !git_status.stdout.is_empty() {
+        bail!("retained fixture tracked/untracked state changed after its baseline commit");
+    }
+    if required_str(&evidence, "input_git_state")? != "ignored_untracked" {
+        bail!("unsupported input Git-state classification");
+    }
+
+    let declared_input = workspace.join("declared/build.rs-input.txt");
+    let mtime_input = workspace.join("mtime/build.rs-input.txt");
+    let after_digest = sha256(AFTER);
+    if required_str(&evidence, "before_content_digest")? != sha256(BEFORE)
+        || required_str(&evidence, "after_content_digest")? != after_digest
+        || sha256(&fs::read(&declared_input)?) != after_digest
+        || sha256(&fs::read(&mtime_input)?) != after_digest
+    {
+        bail!("retained input bytes do not match the recorded before/after content digests");
+    }
+    let recorded_mtime = required_u64(&evidence, "mtime_after_unix_ns")?;
+    let actual_mtime = unix_nanos(fs::metadata(&mtime_input)?.modified()?)?;
+    let mtime_identity_verified =
+        evidence.get("mtime_preserved_exactly").and_then(Value::as_bool) == Some(true)
+        && required_u64(&evidence, "mtime_before_unix_ns")? == recorded_mtime
+        && actual_mtime == recorded_mtime;
+    if !mtime_identity_verified {
+        bail!("retained mtime input does not preserve its recorded exact timestamp");
+    }
+
+    let declared_source = fs::read_to_string(workspace.join("declared/build.rs"))?;
+    let mtime_source = fs::read_to_string(workspace.join("mtime/build.rs"))?;
+    if sha256(declared_source.as_bytes()) != required_str(&evidence, "declared_build_script_digest")?
+        || sha256(mtime_source.as_bytes()) != required_str(&evidence, "mtime_build_script_digest")?
+    {
+        bail!("retained build-script source differs from the recorded fixture digests");
+    }
+    if required_str(&evidence, "resource_id")? != RESOURCE_ID {
+        bail!("recorded resource identity does not match this mtime fixture verifier");
+    }
+    verify_ignored_untracked(
+        &workspace,
+        &[
+            Path::new("declared/build.rs-input.txt"),
+            Path::new("mtime/build.rs-input.txt"),
+        ],
+    )?;
+
+    let declared_control = evidence.get("declared_control_after_advanced_mtime")
+        .context("missing declared positive-control execution")?;
+    if declared_control.get("stdout_value").and_then(Value::as_str) != Some(input_value(AFTER).as_str()) {
+        bail!("recorded declared positive control did not output the mutated value");
+    }
+    if evidence.get("declared_control_detected_mutation").and_then(Value::as_bool) != Some(true) {
+        bail!("recorded declared positive control did not detect mutation");
+    }
+    if evidence.get("fresh_replay_detected_mutation").and_then(Value::as_bool) != Some(true) {
+        bail!("recorded fresh replay did not detect mutation");
+    }
+
+    let cargo_home = run_root.join("verifier-cargo-home");
+    if cargo_home.exists() {
+        bail!("verifier CARGO_HOME already exists; refusing to reuse it");
+    }
+    fs::create_dir(&cargo_home)?;
+    let mtime_dir = workspace.join("mtime");
+    let warm_replay = run_cargo(
+        &cargo,
+        &rustc_binary,
+        &cargo_home,
+        &run_root,
+        &mtime_dir,
+        "mtime_control_after_preserving_mutation",
+        "mtime",
+    )?;
+    let warm_record = evidence.get("mtime_control_after_preserving_mutation")
+        .context("missing recorded warm mtime execution")?;
+    let recorded_warm_value = warm_record.get("stdout_value")
+        .and_then(Value::as_str).context("recorded warm execution lacks stdout_value")?;
+    let recorded_warm_digest = warm_record.get("stdout_digest")
+        .and_then(Value::as_str).context("recorded warm execution lacks stdout_digest")?;
+    let warm_replay_matches = warm_replay.stdout_value == recorded_warm_value
+        && warm_replay.stdout_digest == recorded_warm_digest
+        && recorded_warm_digest == sha256(recorded_warm_value.as_bytes());
+    let recorded_missed = evidence.get("cargo_incremental_missed_same_mtime_mutation")
+        .and_then(Value::as_bool).context("recorded mtime cache outcome is not boolean")?;
+    if recorded_missed != (recorded_warm_value == input_value(BEFORE)) {
+        bail!("recorded same-mtime miss flag contradicts the recorded warm output");
+    }
+    if !warm_replay_matches {
+        bail!("independent warm replay output/digest differs from recorded warm-cache evidence");
+    }
+
+    let fresh_root = run_root.join("verifier-fresh-replay");
+    if fresh_root.exists() {
+        bail!("verifier fresh target already exists; refusing to reuse it");
+    }
+    fs::create_dir(&fresh_root)?;
+    let fresh_replay = run_cargo(
+        &cargo,
+        &rustc_binary,
+        &cargo_home,
+        &fresh_root,
+        &mtime_dir,
+        "mtime_control_fresh_replay",
+        "mtime",
+    )?;
+    let expected_fresh_value = input_value(AFTER);
+    let expected_fresh_digest = sha256(expected_fresh_value.as_bytes());
+    let recorded_fresh = evidence.get("mtime_control_fresh_replay")
+        .context("missing recorded fresh execution")?;
+    if recorded_fresh.get("stdout_value").and_then(Value::as_str) != Some(expected_fresh_value.as_str())
+        || recorded_fresh.get("stdout_digest").and_then(Value::as_str) != Some(expected_fresh_digest.as_str())
+    {
+        bail!("recorded fresh replay evidence does not match the mutated input value/digest");
+    }
+    let fresh_replay_matches = fresh_replay.stdout_value == expected_fresh_value
+        && fresh_replay.stdout_digest == expected_fresh_digest;
+    if !fresh_replay_matches {
+        bail!("independent fresh replay did not emit the mutated input value/digest");
+    }
+
+    Ok(MtimeEvidenceVerifyReport {
+        report_version: 1,
+        run_id: required_str(&evidence, "run_id")?.to_string(),
+        verification_passed: true,
+        catalog_identity_verified: true,
+        toolchain_identity_verified,
+        workspace_identity_verified: true,
+        mtime_identity_verified,
+        original_warm_replay_matches: warm_replay_matches,
+        independent_fresh_replay_matches: fresh_replay_matches,
+        warm_replay_process_id: warm_replay.cargo_process_id,
+        fresh_replay_process_id: fresh_replay.cargo_process_id,
+        warm_output_digest: warm_replay.stdout_digest,
+        fresh_output_digest: fresh_replay.stdout_digest,
+        oracle_authenticity_established: false,
+        qualification_eligible: false,
+    })
+}
+
+fn required_str<'a>(value: &'a Value, key: &str) -> anyhow::Result<&'a str> {
+    value.get(key).and_then(Value::as_str)
+        .with_context(|| format!("missing or invalid evidence string field {key}"))
+}
+
+fn required_u64(value: &Value, key: &str) -> anyhow::Result<u64> {
+    value.get(key).and_then(Value::as_u64)
+        .with_context(|| format!("missing or invalid evidence integer field {key}"))
 }

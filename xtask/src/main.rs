@@ -71,6 +71,15 @@ enum Commands {
         #[arg(long)]
         out_dir: PathBuf,
     },
+    /// Independently verify a retained Cargo mtime fixture and replay its warm/fresh states.
+    BasaltCargoMtimeEvidenceVerify {
+        /// Path to cargo-mtime-fixture-evidence.v1.json.
+        #[arg(long)]
+        evidence: PathBuf,
+        /// Path to the exact observer challenge catalog.
+        #[arg(long)]
+        catalog: PathBuf,
+    },
     /// Validate a BASALT versioned run record and its cross-record evidence invariants.
     BasaltValidate {
         /// Path to the run-record JSON file.
@@ -179,6 +188,10 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::BasaltCargoMtimeFixtureRun { catalog, out_dir } => {
             let report = basalt_cargo_mtime_fixture::run(&catalog, &out_dir)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Commands::BasaltCargoMtimeEvidenceVerify { evidence, catalog } => {
+            let report = basalt_cargo_mtime_fixture::verify(&evidence, &catalog)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
         Commands::BasaltValidate { input, manifest, spec_root } => {
