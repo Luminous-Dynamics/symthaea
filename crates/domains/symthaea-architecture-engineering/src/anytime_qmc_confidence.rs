@@ -25,6 +25,7 @@
 use std::error::Error;
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 const RECEIPT_DOMAIN: &[u8] = b"symthaea.nas.anytime-bounded-mean-receipt.v0.1";
@@ -34,7 +35,8 @@ const MAX_LOOK_INDEX: u64 = 1_000_000;
 const MAX_REPLICATES: usize = 1_000_000;
 const MIN_REPLICATES: usize = 1;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum AnytimeDecision {
     AtOrAboveThreshold,
     BelowThreshold,
@@ -61,7 +63,8 @@ pub struct AnytimeBoundedMeanConfig {
     pub threshold: f64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AnytimeBoundedMeanReceipt {
     pub schema: String,
     pub version: String,
