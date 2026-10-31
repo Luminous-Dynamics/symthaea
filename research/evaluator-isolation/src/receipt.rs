@@ -751,6 +751,10 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let ledger_dir = temp.path().join("ledger");
         std::fs::create_dir(&ledger_dir).unwrap();
+        std::fs::set_permissions(
+            &ledger_dir,
+            std::os::unix::fs::PermissionsExt::from_mode(0o700),
+        ).unwrap();
         let signing_key = SigningKey::from_bytes(&[51_u8; 32]);
         let verifier = signing_key.verifying_key();
         let ledger = ReplayLedger::new(&ledger_dir);
@@ -769,6 +773,10 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let ledger_dir = temp.path().join("ledger");
         std::fs::create_dir(&ledger_dir).unwrap();
+        std::fs::set_permissions(
+            &ledger_dir,
+            std::os::unix::fs::PermissionsExt::from_mode(0o700),
+        ).unwrap();
         let signing_key = SigningKey::from_bytes(&[52_u8; 32]);
         let verifier = signing_key.verifying_key();
         let ledger = ReplayLedger::new(&ledger_dir);
@@ -791,6 +799,10 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let ledger_dir = temp.path().join("ledger");
         std::fs::create_dir(&ledger_dir).unwrap();
+        std::fs::set_permissions(
+            &ledger_dir,
+            std::os::unix::fs::PermissionsExt::from_mode(0o700),
+        ).unwrap();
         let signing_key = SigningKey::from_bytes(&[53_u8; 32]);
         let verifier = signing_key.verifying_key();
         let ledger = ReplayLedger::new(&ledger_dir);
@@ -822,6 +834,10 @@ mod tests {
         std::fs::create_dir(&ledger_dir).unwrap();
         std::fs::set_permissions(
             &ledger_dir,
+            std::os::unix::fs::PermissionsExt::from_mode(0o700),
+        ).unwrap();
+        std::fs::set_permissions(
+            &ledger_dir,
             std::os::unix::fs::PermissionsExt::from_mode(0o755),
         ).unwrap();
         let signing_key = SigningKey::from_bytes(&[56_u8; 32]);
@@ -837,6 +853,10 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let ledger_dir = temp.path().join("ledger");
         std::fs::create_dir(&ledger_dir).unwrap();
+        std::fs::set_permissions(
+            &ledger_dir,
+            std::os::unix::fs::PermissionsExt::from_mode(0o700),
+        ).unwrap();
         let signing_key = SigningKey::from_bytes(&[57_u8; 32]);
         let verifier = signing_key.verifying_key();
         let ledger = ReplayLedger::new(&ledger_dir);
@@ -862,6 +882,10 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let ledger_dir = temp.path().join("ledger");
         std::fs::create_dir(&ledger_dir).unwrap();
+        std::fs::set_permissions(
+            &ledger_dir,
+            std::os::unix::fs::PermissionsExt::from_mode(0o700),
+        ).unwrap();
         let signing_key = SigningKey::from_bytes(&[54_u8; 32]);
         let other_key = SigningKey::from_bytes(&[55_u8; 32]);
         let receipt = sign_receipt(payload(), &signing_key).unwrap();
