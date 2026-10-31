@@ -21,7 +21,9 @@
   "branch_metrics": [
     "branch_outcome_mae",
     "branch_state_mae",
-    "terminal_false_safe_rate"
+    "terminal_false_safe_rate",
+    "branch_outcome_mae_episode_count",
+    "branch_state_mae_episode_count"
   ],
   "uncertainty": {
     "method": "episode-history percentile bootstrap",
@@ -32,5 +34,5 @@
   },
   "sample_unit": "episode_history",
   "pair_count_per_history": 21,
-  "denominator_policy": "emit per-metric defined episode count; null metric count=0; no confidence interval below two independent histories"
+  "denominator_policy": "emit per-metric defined episode count; null metric count=0; no confidence interval below two independent histories; report branch-outcome and branch-state defined episode counts separately; pairwise-effect-only predictor has no absolute branch-error denominator"
 }
