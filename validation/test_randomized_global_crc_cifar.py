@@ -161,6 +161,41 @@ class RandomizedGlobalCommonDepthTests(unittest.TestCase):
         altered_receipt["verifier_receipt"]["states_checked"]-=1
         self.assertFalse(engine.verify_certificate(altered_receipt,probabilities)["valid"])
 
+
+    def test_certificate_fails_closed_on_proof_lane_and_malformed_dual(self):
+        import copy
+        engine=RandomizedCommonDepthCRC(5,.2,(70,20,10))
+        result=engine.solve()
+        probabilities=np.asarray(result["probabilities"])
+        bad_lane=copy.deepcopy(result["certificate"])
+        bad_lane["proof_lane"]="SimulationOnly"
+        self.assertFalse(engine.verify_certificate(bad_lane,probabilities)["valid"])
+        bad_dual=copy.deepcopy(result["certificate"])
+        bad_dual["optimization_receipt"]["dual_witness"]["inequality_marginals"][0]="not-a-number"
+        self.assertFalse(engine.verify_certificate(bad_dual,probabilities)["valid"])
+        short_dual=copy.deepcopy(result["certificate"])
+        short_dual["optimization_receipt"]["dual_witness"]["equality_marginals"].pop()
+        self.assertFalse(engine.verify_certificate(short_dual,probabilities)["valid"])
+
+    def test_certificate_fails_closed_on_kkt_summary_tampering(self):
+        import copy
+        engine=RandomizedCommonDepthCRC(5,.2,(70,20,10))
+        result=engine.solve()
+        probabilities=np.asarray(result["probabilities"])
+        altered=copy.deepcopy(result["certificate"])
+        altered["optimization_receipt"]["kkt_summary"]["stationarity_max_abs"]+=1e-3
+        verified=engine.verify_certificate(altered,probabilities)
+        self.assertFalse(verified["valid"])
+        self.assertIn("KKT summary mismatch",verified["reason"])
+
+    def test_serialized_certificate_round_trip_is_still_verifiable(self):
+        import json
+        engine=RandomizedCommonDepthCRC(5,.2,(70,20,10))
+        result=engine.solve()
+        certificate=json.loads(json.dumps(result["certificate"],sort_keys=True,allow_nan=False))
+        verified=engine.verify_certificate(certificate,np.asarray(result["probabilities"]))
+        self.assertTrue(verified["valid"],verified)
+
     def test_invalid_population_and_action_grid_fail_closed(self):
         with self.assertRaises(ValueError):
             RandomizedCommonDepthCRC(50,.1,(10,10,10))
