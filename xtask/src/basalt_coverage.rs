@@ -302,8 +302,10 @@ fn validate_profile(profile: &Profile, report: &mut CoverageAuditReport) {
     if profile.profile_status != "candidate_not_qualified" {
         push_error(report, "E_PROFILE_STATUS", "profile.profile_status", "candidate profile must remain candidate_not_qualified until independent qualification");
     }
-    if profile.platform.os != "linux" || profile.platform.architectures.is_empty() {
-        push_error(report, "E_PROFILE_PLATFORM", "profile.platform", "candidate profile must name Linux and at least one supported architecture");
+    if profile.platform.os != "linux" || profile.platform.architectures.is_empty()
+        || profile.platform.architectures.iter().any(|arch| arch != "x86_64" && arch != "aarch64")
+    {
+        push_error(report, "E_PROFILE_PLATFORM", "profile.platform", "candidate profile must name Linux and only supported x86_64/aarch64 architectures");
     }
     if profile.channels.is_empty() || profile.channels.len() > MAX_CHANNELS {
         push_error(report, "E_PROFILE_CHANNEL_COUNT", "profile.channels", "profile must declare 1..=64 channels");
@@ -363,6 +365,13 @@ fn validate_receipt_shape(receipt: &Receipt, report: &mut CoverageAuditReport) {
         || !valid_digest(&receipt.sandbox_policy_digest)
     {
         push_error(report, "E_DIGEST", "receipt", "profile, observer and runner digests must be lowercase sha256 digests");
+    }
+    if receipt.platform.os.trim().is_empty() || receipt.platform.os.len() > 64
+        || receipt.platform.architecture.trim().is_empty() || receipt.platform.architecture.len() > 64
+        || receipt.platform.kernel_release.trim().is_empty() || receipt.platform.kernel_release.len() > 128
+        || receipt.platform.kernel_build_id.as_ref().is_some_and(|value| value.len() > 256)
+    {
+        push_error(report, "E_PLATFORM_STRING_BOUNDS", "receipt.platform", "platform strings exceed their limits or are empty");
     }
     if receipt.claim != "complete_within_profile" && receipt.claim != "incomplete" && receipt.claim != "unsupported" {
         push_error(report, "E_CLAIM", "receipt.claim", "claim must be complete_within_profile, incomplete or unsupported");
@@ -466,7 +475,7 @@ fn validate_channels(profile: &Profile, receipt: &Receipt, report: &mut Coverage
                     }
                 }
                 "unresolved" | "excluded" => {
-                    if event.reason.as_deref().is_none_or(|reason| reason.trim().is_empty()) || event.evidence_digest.is_some() {
+                    if event.reason.as_deref().is_none_or(|reason| reason.trim().is_empty() || reason.len() > 1024) || event.evidence_digest.is_some() {
                         push_error(report, "E_UNRESOLVED_EVENT_WITNESS", &format!("{event_path}"), "unresolved/excluded events require a reason and must not claim an observation digest");
                     } else if event.status == "unresolved" {
                         report.counts.unresolved_event_kinds += 1;
@@ -500,7 +509,7 @@ fn valid_digest(value: &str) -> bool {
 }
 
 fn valid_absolute_root(value: &str) -> bool {
-    if !value.starts_with('/') || value.trim().is_empty() || value.contains('\\') || value.contains("//") {
+    if !value.starts_with('/') || value.trim().is_empty() || value.len() > 4096 || value.contains('\\') || value.contains("//") {
         return false;
     }
     if value.len() > 1 && value.ends_with('/') {
@@ -790,6 +799,27 @@ mod tests {
         let report = audit_bytes(&profile, &serde_json::to_vec(&value).unwrap());
         assert!(report.overstated_claim);
         assert!(!report.coverage_complete_within_profile);
+    }
+
+    #[test]
+    fn rejects_missing_observer_configuration_or_snapshot_commitments() {
+        for (section, field) in [
+            ("", "observer_configuration_digest"),
+            ("", "hook_set_digest"),
+            ("", "sandbox_policy_digest"),
+            ("capture", "snapshot_manifest_digest")
+        ] {
+            let (profile, receipt) = encoded_pair("complete_within_profile");
+            let mut value: Value = serde_json::from_slice(&receipt).unwrap();
+            if section.is_empty() {
+                value.as_object_mut().unwrap().remove(field);
+            } else {
+                value[section].as_object_mut().unwrap().remove(field);
+            }
+            let report = audit_bytes(&profile, &serde_json::to_vec(&value).unwrap());
+            assert!(!report.receipt_well_formed, "{section}.{field}");
+            assert!(!report.coverage_complete_within_profile);
+        }
     }
 
     #[test]
