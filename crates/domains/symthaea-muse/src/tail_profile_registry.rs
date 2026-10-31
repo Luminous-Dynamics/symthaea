@@ -1227,7 +1227,7 @@ mod tests {
     }
 
     fn signed_test_profile(
-        context: TailProfileContext,
+        topology_attestation: RendererTopologyAttestation,
         key_id: &str,
         signing_key: &SigningKey,
     ) -> TailProfile {
@@ -1258,7 +1258,8 @@ mod tests {
         }
         let mut profile = create_profile_unsigned(
             &build_spec,
-            context,
+            &topology_attestation,
+            context(&topology_attestation),
             &observations,
             &digest("manifest"),
             &digest("audit"),
@@ -1344,8 +1345,18 @@ mod tests {
     #[test]
     fn empty_qualification_or_cross_split_lineages_are_rejected() {
         let mut observations = vec![observation(0, 1, TailProfileSplit::Calibration, 20)];
+        let key = signing_key();
+        let attestation = topology_attestation("k", &key);
         assert!(matches!(
-            create_profile_unsigned(&spec(), context(&topology_attestation("k", &signing_key())), &observations, &digest("manifest"), &digest("audit"), "k"),
+            create_profile_unsigned(
+                &spec(),
+                &attestation,
+                context(&attestation),
+                &observations,
+                &digest("manifest"),
+                &digest("audit"),
+                "k",
+            ),
             Err(TailProfileError::InsufficientCalibrationLineages)
         ));
         observations.push(observation(1, 1, TailProfileSplit::Qualification, 10));
@@ -1363,9 +1374,12 @@ mod tests {
     fn incomplete_trailing_quiet_windows_reject_profile_construction() {
         let mut observation = observation(0, 1, TailProfileSplit::Calibration, 20);
         observation.trailing_quiet_windows = 2;
+        let key = signing_key();
+        let attestation = topology_attestation("tail-profile-authority", &key);
         let result = create_profile_unsigned(
             &spec(),
-            context(&topology_attestation("tail-profile-authority", &signing_key())),
+            &attestation,
+            context(&attestation),
             &[observation],
             &digest("manifest"),
             &digest("audit"),
@@ -1394,7 +1408,7 @@ mod tests {
         let key = signing_key();
         let authority = authority("profile-publisher-v1", &key);
         let attestation = topology_attestation("profile-publisher-v1", &key);
-        let profile = signed_test_profile(context(&attestation), "profile-publisher-v1", &key);
+        let profile = signed_test_profile(attestation.clone(), "profile-publisher-v1", &key);
         let profile_sha = profile.profile_sha256.clone();
         let mut registry = TailProfileRegistry::new(vec![authority]).unwrap();
         registry.register_profile(profile.clone()).unwrap();
