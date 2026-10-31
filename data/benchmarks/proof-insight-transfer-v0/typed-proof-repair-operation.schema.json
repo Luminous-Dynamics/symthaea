@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb.typed-proof-repair-operation.v0.schema.json",
+  "title": "PITB typed proof repair operation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "episode_id",
+    "operation_id",
+    "sequence_index",
+    "target_theorem_id",
+    "target_statement_sha256_before",
+    "target_statement_sha256_after",
+    "blueprint_sha256_before",
+    "blueprint_sha256_after",
+    "operation",
+    "affected_node_ids",
+    "declared_support",
+    "decision",
+    "lean_check",
+    "operation_receipt_sha256",
+    "run_receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.typed-proof-repair-operation.v0"
+    },
+    "episode_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sequence_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "target_theorem_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_statement_sha256_before": {
+      "$ref": "#/$defs/sha256"
+    },
+    "target_statement_sha256_after": {
+      "$ref": "#/$defs/sha256"
+    },
+    "blueprint_sha256_before": {
+      "$ref": "#/$defs/sha256"
+    },
+    "blueprint_sha256_after": {
+      "$ref": "#/$defs/sha256"
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "node_id"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "add_dependency",
+            "remove_dependency",
+            "replace_dependency",
+            "refine_obligation",
+            "split_obligation",
+            "merge_obligations",
+            "strengthen_precondition",
+            "weaken_precondition"
+          ]
+        },
+        "node_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_node_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "destination_node_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "replacement_node_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale_code": {
+          "enum": [
+            "missing_support",
+            "stale_dependency",
+            "wrong_direction",
+            "overstrong_obligation",
+            "underconstrained_obligation",
+            "duplicate_obligation",
+            "dependency_cycle",
+            "other"
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "affected_node_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "declared_support": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "decision": {
+      "enum": [
+        "applied",
+        "rejected",
+        "abstained"
+      ]
+    },
+    "lean_check": {
+      "enum": [
+        "passed",
+        "failed",
+        "not_run"
+      ]
+    },
+    "operation_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "run_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "rejection_code": {
+      "enum": [
+        "precondition_failed",
+        "target_mutation_attempt",
+        "ill_typed_edit",
+        "cycle_or_scope_violation",
+        "unsupported_node",
+        "budget_exhausted",
+        "review_required",
+        "other"
+      ]
+    },
+    "review_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "const": "applied"
+          }
+        },
+        "required": [
+          "decision"
+        ]
+      },
+      "then": {
+        "properties": {
+          "lean_check": {
+            "const": "passed"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "const": "rejected"
+          }
+        },
+        "required": [
+          "decision"
+        ]
+      },
+      "then": {
+        "required": [
+          "rejection_code"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "const": "abstained"
+          }
+        },
+        "required": [
+          "decision"
+        ]
+      },
+      "then": {
+        "properties": {
+          "lean_check": {
+            "const": "not_run"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "description": "Structural schema only. A trajectory validator must enforce target_statement_sha256_before == target_statement_sha256_after, exclude target_theorem_id from affected_node_ids, bind operation node references to before/after blueprints, validate sequence continuity, and authenticate receipt bytes."
+}
