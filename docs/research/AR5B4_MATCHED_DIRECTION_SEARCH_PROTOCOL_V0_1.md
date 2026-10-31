@@ -59,9 +59,9 @@ This is a probability-of-target-hit baseline, not a general continuous-reward Th
 
 Every run now carries a typed frozen policy-parameter snapshot and its SHA-256 digest. This is useful configuration evidence, but it is not a signature and does not authenticate the runner or the result artifact.
 
-The common event-tape contract is now implemented in `campaign_tape.rs` and exported by the architecture-engineering crate. It provides domain-separated event/tape digests, hash chaining, evaluator-assigned admission/duplicate/rejection decisions, round/worker visibility cutoffs, claim caps, multi-worker action slots, unknown-is-not-zero resource aggregation, conservative within-round peak-memory aggregation, hard-cap enforcement and matched-header validation. Sixteen authored tests cover these invariants.
+The common event-tape contract is implemented in `campaign_tape.rs` and exported by the architecture-engineering crate. It provides domain-separated event/tape digests, hash chaining, evaluator-assigned admission/duplicate/rejection decisions, round/worker visibility cutoffs, claim caps, multi-worker action slots, unknown-is-not-zero resource aggregation, conservative within-round peak-memory aggregation, hard-cap enforcement and matched-header validation. Sixteen authored tape tests cover these invariants. The sequential direction campaign now reconstructs a tape for each run, stores its digest in `DirectionCampaignRun`, and validates the reconstructed digest during aggregation and paired comparison. The three shared bootstrap evaluations are encoded as one policy-invisible batch; policy-selected actions occupy subsequent sequential rounds. Four additional campaign tests cover per-policy tape reconstruction, matched headers, canonical NEW admission and stale-receipt rejection.
 
-**Limitations that remain:** the existing policy campaign is still sequential, unit-cost, synthetic and evaluator-known; the event tape is a separate contract and is not yet wired into the campaign runner. The tape provides hash integrity but no signature, trusted key registry, out-of-process verifier, external proposal generator, sealed split, or independently controlled replay process. Coral's four-seat/batched policy adapter is not integrated. A direct merged Coral-vs-DirectionBoard score table would still be methodologically invalid until both use the same event tape and worker/claim semantics.
+**Limitations that remain:** the campaign is still sequential, unit-cost, synthetic and evaluator-known; its non-action runtime resource fields are honestly recorded as unknown because this fixture does not measure them. The tape provides hash integrity but no signature, trusted key registry, out-of-process verifier, external proposal generator, sealed split, or independently controlled replay process. Coral's four-seat/batched policy adapter is not integrated. A direct merged Coral-vs-DirectionBoard score table would still be methodologically invalid until Coral uses the same tape and worker/claim semantics.
 
 ## 3. Common action tape required for fair policy comparison
 
@@ -234,9 +234,8 @@ Do not compare reported scores from different task sets, models, budgets, judge 
 
 ## 10. Next implementation sequence
 
-1. Wire the implemented event tape into the sequential campaign runner and make its run receipt a required output.
-2. Add the Coral adapter with the exact four-seat batch contract and an explicitly separate sequential ablation.
-3. Add a shared worker/claim-cap model and ensure every baseline respects the same batch and budget rules.
+1. Add the Coral adapter with the exact four-seat batch contract and an explicitly separate sequential ablation.
+2. Add a shared worker/claim-cap model and ensure every baseline respects the same batch and budget rules.
 4. Add the six-plus landscape suite, including nulls, correlated directions and noisy/nonstationary payoffs.
 5. Add matched-seed statistics with cluster bootstrap at the landscape/template level, pre-registered primary endpoints and multiplicity treatment.
 6. Connect full resource receipts from the single-worker Pareto allocator; only then add atomic multi-worker reservations.
