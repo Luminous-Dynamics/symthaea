@@ -16,7 +16,8 @@
     "observer_attached",
     "workload_executed",
     "event_capture_established",
-    "qualification_eligible"
+    "qualification_eligible",
+    "process_context"
   ],
   "properties": {
     "report_version": {
@@ -61,6 +62,9 @@
     },
     "qualification_eligible": {
       "const": false
+    },
+    "process_context": {
+      "$ref": "#/$defs/processSecurityContext"
     }
   },
   "$defs": {
@@ -70,8 +74,7 @@
       "required": [
         "release",
         "architecture",
-        "boot_id_digest",
-        "mount_namespace_inode"
+        "boot_id_digest"
       ],
       "properties": {
         "release": {
@@ -90,13 +93,6 @@
             "null"
           ],
           "pattern": "^sha256:[0-9a-f]{64}$"
-        },
-        "mount_namespace_inode": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "minimum": 0
         }
       }
     },
@@ -201,6 +197,95 @@
         },
         "workload_processes_spawned": {
           "const": false
+        }
+      }
+    },
+    "processSecurityContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "effective_uid",
+        "effective_gid",
+        "cap_eff_hex",
+        "cap_bnd_hex",
+        "no_new_privs",
+        "seccomp_mode",
+        "mount_namespace_inode",
+        "user_namespace_inode",
+        "pid_namespace_inode"
+      ],
+      "properties": {
+        "effective_uid": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "effective_gid": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cap_eff_hex": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]+$"
+        },
+        "cap_bnd_hex": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]+$"
+        },
+        "no_new_privs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "enum": [
+            0,
+            1,
+            null
+          ]
+        },
+        "seccomp_mode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "enum": [
+            0,
+            1,
+            2,
+            null
+          ]
+        },
+        "mount_namespace_inode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "user_namespace_inode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "pid_namespace_inode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
         }
       }
     }
