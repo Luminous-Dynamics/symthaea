@@ -118,6 +118,24 @@ impl ReceiptPayload {
         if self.energy_budget_nj.is_some() && self.measured_energy_nj.is_none() {
             return Err(ReceiptError::EnergyMeasurementMissing);
         }
+        let energy_over_budget = matches!(
+            (self.energy_budget_nj, self.measured_energy_nj),
+            (Some(budget), Some(used)) if used > budget
+        );
+        let over_budget = self.bytes_used > self.byte_budget
+            || self.compute_used > self.compute_budget
+            || self.refreshes_used > self.refresh_budget
+            || self.observations_used > self.observation_budget
+            || energy_over_budget;
+        if over_budget && self.disposition != ReceiptDisposition::OutOfBudget {
+            return Err(ReceiptError::BudgetDispositionMismatch);
+        }
+        if !over_budget && self.disposition == ReceiptDisposition::OutOfBudget {
+            return Err(ReceiptError::BudgetDispositionMismatch);
+        }
+        if (self.disposition == ReceiptDisposition::Completed) != (self.failure_code == 0) {
+            return Err(ReceiptError::FailureCodeMismatch);
+        }
         Ok(())
     }
 
@@ -267,6 +285,8 @@ pub enum ReceiptError {
     InvalidPayload,
     ExposureExceedsEpisode,
     EnergyMeasurementMissing,
+    BudgetDispositionMismatch,
+    FailureCodeMismatch,
     ArithmeticOverflow,
     MalformedEnvelope,
     SigningKeyIdMismatch,
@@ -281,6 +301,8 @@ impl fmt::Display for ReceiptError {
             Self::InvalidPayload => write!(f, "receipt payload has invalid version, run ID, nonce, counter or timestamp"),
             Self::ExposureExceedsEpisode => write!(f, "receipt exposure exceeds total episode duration"),
             Self::EnergyMeasurementMissing => write!(f, "receipt declares an energy budget but contains no measured energy"),
+            Self::BudgetDispositionMismatch => write!(f, "receipt disposition does not agree with measured resource budget use"),
+            Self::FailureCodeMismatch => write!(f, "completed receipts require failure code zero; non-completed receipts require a nonzero code"),
             Self::ArithmeticOverflow => write!(f, "receipt arithmetic overflowed"),
             Self::MalformedEnvelope => write!(f, "receipt envelope is malformed or has trailing bytes"),
             Self::SigningKeyIdMismatch => write!(f, "receipt signing key ID does not match the trusted public key"),
@@ -895,6 +917,38 @@ mod tests {
             Err(ReplayError::Receipt(ReceiptError::SigningKeyIdMismatch))
         ));
         assert_eq!(std::fs::read_dir(&ledger_dir).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn resource_overruns_require_explicit_out_of_budget_disposition() {
+        let mut over_budget = payload();
+        over_budget.bytes_used = over_budget.byte_budget + 1;
+        assert_eq!(
+            over_budget.validate(),
+            Err(ReceiptError::BudgetDispositionMismatch)
+        );
+        over_budget.disposition = ReceiptDisposition::OutOfBudget;
+        over_budget.failure_code = 1;
+        assert_eq!(over_budget.validate(), Ok(()));
+
+        let mut energy_overrun = payload();
+        energy_overrun.measured_energy_nj = Some(energy_overrun.energy_budget_nj.unwrap() + 1);
+        assert_eq!(
+            energy_overrun.validate(),
+            Err(ReceiptError::BudgetDispositionMismatch)
+        );
+    }
+
+    #[test]
+    fn noncompleted_receipts_require_nonzero_failure_code() {
+        let mut invalid = payload();
+        invalid.disposition = ReceiptDisposition::Abstained;
+        assert_eq!(
+            invalid.validate(),
+            Err(ReceiptError::FailureCodeMismatch)
+        );
+        invalid.failure_code = 17;
+        assert_eq!(invalid.validate(), Ok(()));
     }
 
     #[test]
