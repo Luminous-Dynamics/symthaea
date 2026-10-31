@@ -348,9 +348,9 @@ pub fn qualify_voc_model(
         &mut failure_reasons,
     );
     check_at_most(
-        "mean_credible_set_size",
-        metrics.mean_credible_set_size,
-        thresholds.max_mean_credible_set_size,
+        "mean_credible_set_size_fraction",
+        metrics.mean_credible_set_size_fraction,
+        thresholds.max_mean_credible_set_size_fraction,
         &mut failure_reasons,
     );
     let coverage_error =
