@@ -1573,7 +1573,7 @@ mod tests {
 
     fn resources(charge: u64) -> ResourceReceipt {
         ResourceReceipt {
-            host_cpu_millis: meter(10),
+            host_cpu_millis: meter(charge),
             wall_millis: meter(2),
             accelerator_millis: meter(0),
             peak_memory_bytes: meter(1024),
@@ -1590,6 +1590,21 @@ mod tests {
 
     fn header(mode: ExecutionMode, worker_count: u32, budget: u64) -> EventTapeHeader {
         let config = json!({"exploration": 0.55, "seed": 17});
+        let budget_model = BudgetModel::WeightedResources {
+            weights: ResourceCostWeights {
+                host_cpu_millis: 1,
+                wall_millis: 0,
+                accelerator_millis: 0,
+                host_memory_byte_millis: 0,
+                accelerator_memory_byte_millis: 0,
+                energy_millijoules: 0,
+                input_tokens: 0,
+                output_tokens: 0,
+                tool_calls: 0,
+                evaluator_calls: 0,
+                verifier_calls: 0,
+            },
+        };
         EventTapeHeader {
             schema: TAPE_SCHEMA.to_owned(),
             version: TAPE_VERSION.to_owned(),
@@ -1604,7 +1619,8 @@ mod tests {
             evaluator_sha256: H3.to_owned(),
             verifier_sha256: H4.to_owned(),
             budget_model_id: "test-microcost-v1".to_owned(),
-            budget_model_sha256: H3.to_owned(),
+            budget_model_sha256: digest_serializable(&budget_model).unwrap(),
+            budget_model,
             budget_limit_microunits: budget,
             initial_direction_ids: vec!["A".to_owned(), "B".to_owned()],
             execution: ExecutionContract {
@@ -1684,6 +1700,45 @@ mod tests {
         assert_eq!(summary.candidate_evaluations, 2);
         assert_eq!(summary.total_charged_budget_microunits, Some(15));
         assert!(summary.fully_metered);
+    }
+
+
+    #[test]
+    fn weighted_budget_model_recomputes_charge_and_rejects_tampering() {
+        let mut h = header(ExecutionMode::Sequential, 1, 30);
+        let model = BudgetModel::WeightedResources {
+            weights: ResourceCostWeights {
+                host_cpu_millis: 2,
+                wall_millis: 1,
+                accelerator_millis: 0,
+                host_memory_byte_millis: 0,
+                accelerator_memory_byte_millis: 0,
+                energy_millijoules: 0,
+                input_tokens: 0,
+                output_tokens: 0,
+                tool_calls: 0,
+                evaluator_calls: 0,
+                verifier_calls: 0,
+            },
+        };
+        h.budget_model_sha256 = digest_serializable(&model).unwrap();
+        h.budget_model = model;
+        let mut tape = EventTape::new(h).unwrap();
+        let (intent, outcome) = verified_evaluation("A", H5);
+        let mut action = event("e1", 0, 1, None, 0, intent, outcome, 10);
+        action.resources.charged_budget_microunits = meter(22);
+        tape.append(action.clone()).unwrap();
+        assert_eq!(
+            tape.validate().unwrap().total_charged_budget_microunits,
+            Some(22)
+        );
+
+        action.event_id = "e2".to_owned();
+        action.round_id = 2;
+        action.observed_through_sequence = 1;
+        action.resources.charged_budget_microunits = meter(21);
+        assert!(tape.append(action).is_err());
+        assert_eq!(tape.events().len(), 1);
     }
 
     #[test]
@@ -1775,6 +1830,9 @@ mod tests {
         let mut action = event("e1", 0, 1, None, 0, intent, outcome, 7);
         action.resources.charged_budget_microunits = MeterValue::Unknown {
             reason: "billing receipt unavailable".to_owned(),
+        };
+        action.resources.host_cpu_millis = MeterValue::Unknown {
+            reason: "CPU meter unavailable for this unknown-cost control".to_owned(),
         };
         tape.append(action).unwrap();
 
