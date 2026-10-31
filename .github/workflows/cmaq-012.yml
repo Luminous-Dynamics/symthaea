@@ -1,0 +1,63 @@
+name: CMAQ-012 paired advantage-of-prediction auditor
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/cmaq-012/**"
+      - ".github/workflows/cmaq-012.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/cmaq-012/**"
+      - ".github/workflows/cmaq-012.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  paired-aop:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-012
+        run: cargo test --locked
+      - name: Generate and validate smoke report
+        working-directory: research/cmaq-012
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked -- --input fixtures/qualification-smoke.tsv --replicates 500 --bootstrap-seed 42 > /tmp/cmaq-012-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-012-report.json").read_text())
+          assert report["schema_version"] == "cmaq-012-paired-aop-report-v0.1"
+          assert report["auditor_version"] == "0.1.0"
+          assert len(report["input_sha256"]) == 64
+          assert report["bootstrap_replicates"] == 500
+          assert report["bootstrap_seed"] == 42
+          assert report["minimum_qualification_pairs"] == 20
+          assert len(report["groups"]) == 1
+          group = report["groups"][0]
+          assert group["task"] == "halfcheetah"
+          assert group["capability"] == "control"
+          assert group["episode_count"] == 4
+          assert group["eligibility"] == "smoke_only"
+          assert set(group["arms"]) == {"D0", "D1", "W1", "W2", "W3"}
+          assert group["arms"]["W1"]["timed_out_count"] == 1
+          assert group["arms"]["W1"]["success_count"] == 3
+          assert len(group["contrasts"]) == 5
+          contrasts = {row["estimand"]: row for row in group["contrasts"]}
+          assert contrasts["advantage_of_prediction"]["numerator"] == "W1"
+          assert contrasts["advantage_of_prediction"]["denominator"] == "D1"
+          assert abs(contrasts["advantage_of_prediction"]["return_mean_delta"] - 1.75) < 1e-8
+          assert abs(contrasts["prediction_mediation"]["return_mean_delta"] - 1.75) < 1e-8
+          assert abs(contrasts["compute_only_gain"]["return_mean_delta"] - 1.0) < 1e-8
+          print("CMAQ-012 report schema, pairing, contrasts, timeout retention and smoke-only eligibility validated")
+          PY
