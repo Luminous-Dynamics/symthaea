@@ -10,7 +10,7 @@ Run the formatter and tests with:
 ## Current scope
 
 - Requires exact judge slots for every planned trial, including explicit abstain, failed, and missing outcomes.
-- Fits a strongest-single comparator and smoothed per-judge calibration weights from calibration trials only.
+- Fits a strongest-single comparator using balanced accuracy, plus smoothed per-judge calibration weights derived from separate sensitivity and specificity estimates on both reference classes.
 - Reports judge-specific accuracy and confidence Brier score.
 - Reports pairwise double-fault rates and phi correlation of error indicators on jointly scored calibration items.
 - Compares strongest single, unweighted majority, dependency-family-capped voting, and calibration-weighted voting on a disjoint evaluation split.
