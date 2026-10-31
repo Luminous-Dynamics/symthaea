@@ -64,6 +64,10 @@ pub struct EventTapeHeader {
     pub schema: String,
     pub version: String,
     pub campaign_id: String,
+    /// Exact source commit that built the policy/evaluator harness.
+    pub source_commit: String,
+    /// Digest of the runtime, toolchain, dependency lock and hardware manifest.
+    pub execution_environment_sha256: String,
     pub comparison_mode: ComparisonMode,
     pub proposal_source_id: String,
     /// Required for mechanism-matched comparisons; identifies the shared proposal stream.
@@ -72,6 +76,10 @@ pub struct EventTapeHeader {
     pub comparison_profile_sha256: String,
     pub evaluator_sha256: String,
     pub verifier_sha256: String,
+    /// Human-readable normalized-cost model identity.
+    pub budget_model_id: String,
+    /// Digest of the exact conversion weights and accounting rules.
+    pub budget_model_sha256: String,
     pub budget_limit_microunits: u64,
     pub initial_direction_ids: Vec<String>,
     pub execution: ExecutionContract,
@@ -1054,6 +1062,13 @@ fn validate_header(header: &EventTapeHeader) -> Result<(), EventTapeError> {
         ));
     }
     validate_non_empty(&header.campaign_id, "header.campaign_id")?;
+    validate_git_commit(&header.source_commit, "header.source_commit")?;
+    validate_sha256(
+        &header.execution_environment_sha256,
+        "header.execution_environment_sha256",
+    )?;
+    validate_non_empty(&header.budget_model_id, "header.budget_model_id")?;
+    validate_sha256(&header.budget_model_sha256, "header.budget_model_sha256")?;
     validate_non_empty(&header.proposal_source_id, "header.proposal_source_id")?;
     validate_sha256(&header.task_recipe_sha256, "header.task_recipe_sha256")?;
     validate_sha256(
@@ -1149,6 +1164,21 @@ fn validate_header(header: &EventTapeHeader) -> Result<(), EventTapeError> {
                 "duplicate initial direction ID",
             ));
         }
+    }
+    Ok(())
+}
+
+
+fn validate_git_commit(value: &str, path: &str) -> Result<(), EventTapeError> {
+    if (value.len() != 40 && value.len() != 64)
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(EventTapeError::new(
+            path,
+            "expected a lowercase 40- or 64-character Git commit ID",
+        ));
     }
     Ok(())
 }
@@ -1283,6 +1313,8 @@ mod tests {
             schema: TAPE_SCHEMA.to_owned(),
             version: TAPE_VERSION.to_owned(),
             campaign_id: "campaign-test-01".to_owned(),
+            source_commit: "0123456789abcdef0123456789abcdef01234567".to_owned(),
+            execution_environment_sha256: H5.to_owned(),
             comparison_mode: ComparisonMode::MechanismMatched,
             proposal_source_id: "frozen-proposal-generator-v1".to_owned(),
             proposal_stream_sha256: Some(H5.to_owned()),
@@ -1290,6 +1322,8 @@ mod tests {
             comparison_profile_sha256: H2.to_owned(),
             evaluator_sha256: H3.to_owned(),
             verifier_sha256: H4.to_owned(),
+            budget_model_id: "test-microcost-v1".to_owned(),
+            budget_model_sha256: H3.to_owned(),
             budget_limit_microunits: budget,
             initial_direction_ids: vec!["A".to_owned(), "B".to_owned()],
             execution: ExecutionContract {
