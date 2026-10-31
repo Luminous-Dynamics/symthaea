@@ -40,12 +40,12 @@ Each policy is evaluated at candidate-query budgets `8, 32, 128, 512` over 256 d
 
 For each scenario × budget × policy, the JSON report emits:
 - mean true selected return and regret from the known optimum;
-- mean reference-model selected return (the central point-predictor head);
-- optimizer optimism gap and selected-action error;
+- mean score assigned by the model actually used for action selection;
+- optimizer optimism gap (selected model score minus true selected return);
 - fraction of episodes selecting the predeclared exploit pocket;
-- candidate-query count per episode and uniform-grid prediction MSE.
+- candidate-sequence queries and model-head evaluations per episode;\n- uniform-grid MSE of the central point predictor, computed on 201 evaluator-only grid points per episode. These offline diagnostic evaluations are disclosed separately and are not included in the planner's candidate-query budget.
 
-Direct-policy and oracle controls have no model score or optimizer-optimism value; those report fields are null, not copied from environment truth. The prediction MSE is descriptive only. It is never substituted for selected-action error, realized utility or regret. The five-head policy's larger head-evaluation count is a real compute cost and must be included in any quality/cost comparison.
+Direct-policy and oracle controls have no model score or optimizer-optimism value; those report fields are null, not copied from environment truth. The prediction MSE is descriptive only. It is never substituted for selected-action error, realized utility or regret. The five-head policy's larger head-evaluation count is a real compute cost and must be included in any quality/cost comparison. Direct-policy and oracle controls have no selected model score or optimism gap; those fields are null rather than copied from environment truth.
 
 ## Execution
 
