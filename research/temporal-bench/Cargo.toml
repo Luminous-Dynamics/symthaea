@@ -6,4 +6,7 @@ license = "AGPL-3.0-or-later"
 publish = false
 description = "Deterministic synthetic temporal benchmark controls for Symthaea research"
 
+[dependencies]
+sha2 = "0.10"
+
 [workspace]
