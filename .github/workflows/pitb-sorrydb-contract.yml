@@ -386,13 +386,54 @@ jobs:
             checkout="$GITHUB_WORKSPACE/_pitb-smoke/$project"
             log="$RUNNER_TEMP/pitb-lean-capture-compat-$project.log"
             olean="$RUNNER_TEMP/pitb-lean-capture-compat-$project.olean"
-            (cd "$checkout" && lake env lean "$shim" -o "$olean") 2>&1 | tee "$log"
+            (cd "$checkout" && lake env lean -o "$olean" "$shim") 2>&1 | tee "$log"
             grep -q "PITB_LOCAL_INSTANCE_COMPAT_PASS:" "$log"
           done
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path(__import__("os").environ["GITHUB_WORKSPACE"])
+          runner = Path(__import__("os").environ["RUNNER_TEMP"])
+          expected = {
+              "lean-course25": "leanprover/lean4:v4.24.0",
+              "prime-number-theorem": "leanprover/lean4:v4.26.0",
+              "clap-lean": "leanprover/lean4:v4.26.0-rc2",
+          }
+          receipts = []
+          marker = "PITB_LOCAL_INSTANCE_COMPAT_PASS:"
+          for project, toolchain in expected.items():
+              checkout = root / "_pitb-smoke" / project
+              actual_toolchain = (checkout / "lean-toolchain").read_text().strip()
+              if actual_toolchain != toolchain:
+                  raise SystemExit(f"{project}: toolchain mismatch: {actual_toolchain}")
+              log = runner / f"pitb-lean-capture-compat-{project}.log"
+              matches = [line.split(marker, 1)[1].strip() for line in log.read_text().splitlines() if marker in line]
+              if len(matches) != 1:
+                  raise SystemExit(f"{project}: expected exactly one capture receipt, found {len(matches)}")
+              receipt = json.loads(matches[0])
+              if receipt.get("schema_version") != "pitb.local-instance-api-compat.v0":
+                  raise SystemExit(f"{project}: incompatible capture receipt schema")
+              if receipt.get("local_instance_count") != 1 or len(receipt.get("local_instances", [])) != 1:
+                  raise SystemExit(f"{project}: local instance count mismatch")
+              instance = receipt["local_instances"][0]
+              if instance.get("class_name") != "Decidable":
+                  raise SystemExit(f"{project}: expected Decidable local instance")
+              if instance.get("binder_is_instance_implicit") is not True:
+                  raise SystemExit(f"{project}: binder instance metadata was not preserved")
+              if "Decidable" not in instance.get("type", ""):
+                  raise SystemExit(f"{project}: local instance type does not mention Decidable")
+              receipts.append({"project": project, "lean_toolchain": actual_toolchain, **receipt})
+          out = runner / "pitb-lean-local-instance-compatibility.receipts.json"
+          out.write_text(json.dumps({"schema_version":"pitb.local-instance-api-compat-report.v0","receipts":receipts}, indent=2) + "\n")
+          print("PITB_LOCAL_INSTANCE_COMPAT_REPORT_PASS: 3 pinned toolchains, 3 exact Decidable local-instance receipts")
+          PY
       - name: Retain Lean LocalInstances compatibility receipts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pitb-lean-local-instance-compatibility
-          path: ${{ runner.temp }}/pitb-lean-capture-compat-*.log
+          path: |
+            ${{ runner.temp }}/pitb-lean-capture-compat-*.log
+            ${{ runner.temp }}/pitb-lean-local-instance-compatibility.receipts.json
           if-no-files-found: warn
