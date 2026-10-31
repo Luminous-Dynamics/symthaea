@@ -276,7 +276,6 @@ fn simulated_pair_effect(
     rng: &mut SplitMix64,
     direct_effect: f64,
     spillover_effect: f64,
-    actual_exposure_fraction: f64,
 ) -> f64 {
     let pair_shift = config.between_model_pair_sd_permille * rng.normal();
     let family_count = config.task_family_count as usize;
@@ -300,7 +299,6 @@ fn simulated_pair_effect(
                 + spillover_effect + exposure_effect;
         }
     }
-    let _ = actual_exposure_fraction;
     total / f64::from(config.clusters_per_model_pair)
 }
 
@@ -329,7 +327,7 @@ fn run_scenario(
         f64::from(config.pair_failure_probability_permille) / 1_000.0;
     for _simulation in 0..config.simulation_replicates {
         let mut pair_effects = Vec::with_capacity(pair_count as usize);
-        for _pair in 0..pair_count {
+        for _pair in 0..*pair_count {
             if rng.uniform_open01() < failure_probability {
                 continue;
             }
@@ -339,7 +337,6 @@ fn run_scenario(
                 rng,
                 direct_effect,
                 spillover_effect,
-                actual_exposure_fraction,
             ));
         }
         if pair_effects.len() < 2 {
@@ -357,7 +354,9 @@ fn run_scenario(
             center.abs() / se > critical
         };
         counts.evaluable += 1;
-        counts.rejected += u32::from(rejected);
+        if rejected {
+            counts.rejected += 1;
+        }
         counts.surviving_pair_sum += pair_effects.len() as u64;
         counts.effect_sd_sum += sd;
         counts.effect_se_sum += se;
