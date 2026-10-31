@@ -865,7 +865,15 @@ mod tests {
     fn seeded_verifier_rejects_recommitted_task_mutation() {
         let cfg = config();
         let (mut task, oracle) = generate_knowledge_stream(cfg).unwrap();
-        task.events[0].ordinal ^= 1;
+        let distractor = task.events.iter_mut().find(|event| matches!(
+            &event.kind,
+            KnowledgeEventKind::Version { fact_id, .. } if *fact_id != oracle.target_fact_id
+        )).unwrap();
+        if let KnowledgeEventKind::Version { value, .. } = &mut distractor.kind {
+            if let Some(value) = value {
+                *value = value.saturating_add(1);
+            }
+        }
         task.content_sha256 = knowledge_task_digest(&task);
         assert_eq!(
             verify_knowledge_stream_seeded(&task, &oracle, cfg),
