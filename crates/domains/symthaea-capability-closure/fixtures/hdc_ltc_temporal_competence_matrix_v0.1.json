@@ -424,7 +424,10 @@
     "braintrace_d_rtrl_online_snn",
     "braintrace_pp_prop_online_snn",
     "braintrace_eprop_online_snn",
-    "bptt_gradient_reference_small_scale"
+    "bptt_gradient_reference_small_scale",
+    "stdl_spatiotemporal_decoupled_snn",
+    "stdl_ell_local_learning_control",
+    "stdl_decolle_local_learning_control"
   ],
   "fairness_controls": {
     "paired_instances": true,
@@ -434,7 +437,8 @@
     "precision_pinned": true,
     "preprocessing_included_in_system_measurement": true,
     "paper_scores_are_not_reproduction": true,
-    "baseline_commit_and_config_digest_required": true
+    "baseline_commit_and_config_digest_required": true,
+    "spatio_temporal_local_baselines_required": true
   },
   "data_strata": {
     "synthetic_exact": {
@@ -479,7 +483,13 @@
     "idle_false_triggers_per_monitored_hour_with_exposure",
     "always_on_idle_power_w",
     "energy_per_correct_event_detection",
-    "energy_per_hour_of_continuous_monitoring"
+    "energy_per_hour_of_continuous_monitoring",
+    "auxiliary_subnetwork_parameter_and_buffer_bytes",
+    "local_partition_activation_bytes",
+    "training_peak_allocated_and_reserved_gpu_memory",
+    "training_peak_host_rss",
+    "training_joules_per_correct_update",
+    "wall_clock_to_fixed_confirmatory_quality"
   ],
   "statistical_design": {
     "pilot_paired_seeds_min": 10,
@@ -555,6 +565,70 @@
         "bptt_sequence_memory": "Paper reports memory increasing with sequence length and a GPU run failure at 400 steps for its specific experiment.",
         "caveat": "pp-prop is a factorized/approximated trace; its approximation quality can depend on firing statistics and network depth. Do not report it as an exact D-RTRL/BPTT gradient."
       }
+    },
+    "STDL": {
+      "publication": "Ma et al., IEEE Transactions on Neural Networks and Learning Systems 37(9), 4597-4611 (2026-09)",
+      "doi": "10.1109/TNNLS.2026.3671461",
+      "paper_pubmed": "https://pubmed.ncbi.nlm.nih.gov/41824348/",
+      "paper_repository": "https://github.com/ChenxiangMA/STDL",
+      "repository_commit": "e5e483332ade02c94d8354583ab46aa63e99ecf1",
+      "commit_date": "2025-06-27",
+      "paper_to_code_exact_revision_verified": false,
+      "source_blobs": {
+        "README.md": "af0b4b84da93abce506f04b88f12434b8fc641c7",
+        "run.sh": "87fd14f6db82bbe577ad6642f33306d74620183c",
+        "main_train.py": "e461fc6b0ae9c9bf090d9cace25ef815f8f4eef0",
+        "models/spk_model.py": "c30b88ffcd764ec0a38620c45d7238f53c70cfa0",
+        "models/spk_cifar_resnet_local.py": "0d5a0d42c33f45dfa61e1518722dd8e277097c9e",
+        "models/configs.py": "47222fbb04391e30a7f6a33b58d179fdfa00ebd6",
+        "spk_neuron/neuron.py": "fd941ee6c66c4bf0ab8ab3c4ba20072b45298dcb",
+        "load_dataset.py": "99a25f5c94ee772d7a70d45bbf3c6bc4c8777234",
+        "tools/utils.py": "e873effc8c7bb0e74886b2821ca381c5a56975aa"
+      },
+      "methods": [
+        "STDL_memory_constrained_auxiliary_subnetworks",
+        "ELL_local_learning_control",
+        "DECOLLE_local_learning_control"
+      ],
+      "task_scope": {
+        "direct_static_vision": [
+          "CIFAR10",
+          "CIFAR100",
+          "SVHN",
+          "ImageNet"
+        ],
+        "direct_event_vision": [
+          "CIFAR10DVS",
+          "HARDVS"
+        ],
+        "not_drop_in_for_synthetic_temporal_streams": true
+      },
+      "source_findings": {
+        "spatial_partition": "LocalResNet calls an auxiliary classifier at configured stage/block boundaries, backpropagates the local loss and detaches the backbone activation before later stages; final classifier loss is also backpropagated.",
+        "auxiliary_context": "mem-configured AuxNetwork can include selected downstream layers. ResNet18 mem_1800 selects [6,7,8] from local boundary 1 and [6,8] from boundary 3; config names must not be mistaken for measured byte budgets.",
+        "temporal_boundary": "SpkModel resets state per forward call, loops over time_window, and LIFNode supports detach_mem/detach_reset. Example run.sh STDL configs enable both detach flags.",
+        "training_hardware": "main_train.py asserts CUDA availability and wraps the model with DataParallel().cuda().",
+        "checkpoint_selection": "CIFAR10/CIFAR100/SVHN/CIFAR10DVS/HARDVS load test splits into val_loader; training loop evaluates loader every epoch and selects best checkpoint. Separate dev and one-shot confirmatory splits required.",
+        "imageNet": "ImageNet valdir also used for checkpoint selection; treat as dev for strict reproduction.",
+        "memory_reporting": "Allocated/peak CUDA allocated memory logging is present but not full peak host/device/system footprint or energy measurement.",
+        "seed_reporting": "Default seed 9 and Python/NumPy/PyTorch/CUDA seeding exists; multi-seed paper protocol still needs explicit verification.",
+        "framework_lock": "No complete dependency lock found in inspected repository snapshot; lock PyTorch/torchvision/CUDA/cuDNN/data transforms for reproduction."
+      },
+      "literature_claims": {
+        "paper_evaluates_seven_static_and_event_vision_datasets": true,
+        "paper_reports_comparable_accuracy_to_bptt": true,
+        "paper_reports_4x_lower_gpu_memory_on_imagenet": true,
+        "imported_as_symthaea_results": false,
+        "scope": "Literature claims only; no Symthaea measurements or STDL reproduction performed."
+      },
+      "reproduction_status": "static_code_audit_only_not_run",
+      "caveats": [
+        "Repository head commit predates journal publication; final-paper runner mapping is unverified.",
+        "Public test splits are used as per-epoch validation/model-selection data for CIFAR10/CIFAR100/SVHN/CIFAR10DVS/HARDVS.",
+        "CUDA-only entrypoint; no CPU-compatible reproduction was performed.",
+        "Peak allocated GPU memory logs do not measure joules or the full deployment boundary."
+      ],
+      "audit_document": "docs/research/STDL_REFERENCE_AUDIT_V0_1.md"
     }
   }
 }
