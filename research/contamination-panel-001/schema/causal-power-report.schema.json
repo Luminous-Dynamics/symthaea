@@ -11,6 +11,9 @@
     "config_sha256",
     "simulation_seed_commitment_sha256",
     "simulation_replicates",
+    "clusters_per_model_pair",
+    "task_family_count",
+    "maximum_inconclusive_fraction_permille",
     "nominal_alpha_permille",
     "target_power_permille",
     "target_interval_coverage_permille",
@@ -148,6 +151,19 @@
     "report_sha256": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
+    },
+    "clusters_per_model_pair": {
+      "type": "integer",
+      "minimum": 4
+    },
+    "task_family_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "maximum_inconclusive_fraction_permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 500
     }
   },
   "$defs": {
