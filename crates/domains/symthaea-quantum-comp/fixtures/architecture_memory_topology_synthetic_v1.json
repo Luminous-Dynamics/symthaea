@@ -11,7 +11,6 @@
       "workload_fingerprint": "synthetic-hdc-retrieval-workload-v1",
       "workload_regime_profile_id": "synthetic-regime-hdc-retrieval-v1",
       "comparison_contract_fingerprint": "synthetic-comparison-contract-v1",
-      "architecture_evidence_receipt_id": "synthetic-evidence-receipt-cpu",
       "source": {
         "origin": "synthetic_fixture",
         "source_reference": "synthetic://qarch-022/cpu",
@@ -152,7 +151,18 @@
         "warm_steady_state",
         "capacity_overflow"
       ],
-      "notes": "Synthetic fixture only. Does not represent measured hardware, published specifications, or achieved performance."
+      "notes": "Synthetic fixture only. Does not represent measured hardware, published specifications, or achieved performance.",
+      "routes": [
+        {
+          "route_id": "synthetic-qarch-022-cpu-main-path",
+          "source_region_id": "cpu_ddr",
+          "destination_region_id": "cpu_l3",
+          "edge_ids": [
+            "cpu-ddr-to-l3"
+          ],
+          "require_acyclic": true
+        }
+      ]
     },
     {
       "schema_version": "symthaea.quantum_comp.architecture_memory_topology.v1",
@@ -162,7 +172,6 @@
       "workload_fingerprint": "synthetic-hdc-retrieval-workload-v1",
       "workload_regime_profile_id": "synthetic-regime-hdc-retrieval-v1",
       "comparison_contract_fingerprint": "synthetic-comparison-contract-v1",
-      "architecture_evidence_receipt_id": "synthetic-evidence-receipt-gpu",
       "source": {
         "origin": "synthetic_fixture",
         "source_reference": "synthetic://qarch-022/gpu",
@@ -303,7 +312,18 @@
         "warm_steady_state",
         "capacity_overflow"
       ],
-      "notes": "Synthetic fixture only. Does not represent measured hardware, published specifications, or achieved performance."
+      "notes": "Synthetic fixture only. Does not represent measured hardware, published specifications, or achieved performance.",
+      "routes": [
+        {
+          "route_id": "synthetic-qarch-022-gpu-main-path",
+          "source_region_id": "gpu_hbm",
+          "destination_region_id": "gpu_sram",
+          "edge_ids": [
+            "gpu-hbm-to-sram"
+          ],
+          "require_acyclic": true
+        }
+      ]
     }
   ],
   "expected_semantic_rejections": [
