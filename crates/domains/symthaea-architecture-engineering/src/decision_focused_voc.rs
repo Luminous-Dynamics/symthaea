@@ -470,10 +470,13 @@ fn validate_config(
             "total budget must be positive and already-spent cost cannot exceed it",
         ));
     }
-    if !config.cost_penalty_per_unit.is_finite() || config.cost_penalty_per_unit < 0.0 {
+    if !config.cost_penalty_per_unit.is_finite()
+        || config.cost_penalty_per_unit < 0.0
+        || !(config.cost_penalty_per_unit * config.total_budget_units as f64).is_finite()
+    {
         return Err(DecisionFocusedVoCError::new(
             "cost_penalty_per_unit",
-            "must be finite and non-negative",
+            "must be finite, non-negative and finite when multiplied by the maximum budget",
         ));
     }
     let mut reserve_kinds = HashSet::new();
@@ -501,6 +504,22 @@ fn validate_config(
         return Err(DecisionFocusedVoCError::new(
             "spend_by_kind",
             "classified action spend cannot exceed total already-spent units",
+        ));
+    }
+    let remaining_budget = config.total_budget_units - config.already_spent_units;
+    let outstanding_reserves = config.reserves.iter().try_fold(0u64, |total, reserve| {
+        let spent = config.spend_by_kind.iter()
+            .find(|record| record.kind == reserve.kind)
+            .map(|record| record.spent_units)
+            .unwrap_or(0);
+        total.checked_add(reserve.reserve_units.saturating_sub(spent))
+    }).ok_or_else(|| {
+        DecisionFocusedVoCError::new("reserves", "protected reserve sum overflows u64")
+    })?;
+    if outstanding_reserves > remaining_budget {
+        return Err(DecisionFocusedVoCError::new(
+            "reserves",
+            "outstanding protected reserves exceed the remaining resource budget",
         ));
     }
     Ok(())
