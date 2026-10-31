@@ -874,7 +874,7 @@ pub fn score_fresh_metamorphic_submission(
         let valid_response_count = tasks.iter()
             .filter(|task| matches!(
                 status_by_id.get(task.item_id.as_str()),
-                Some(FreshItemScoreStatusV1::Correct | FreshItemScoreStatusV1::Incorrect)
+                Some(&FreshItemScoreStatusV1::Correct) | Some(&FreshItemScoreStatusV1::Incorrect)
             ))
             .count() as u64;
         let correct_in_group = tasks.iter()
@@ -943,7 +943,6 @@ pub fn score_fresh_metamorphic_submission(
         .ok_or_else(|| "metamorphic valid response count overflowed".to_owned())?;
     let answered_count = item_count.checked_sub(abstained_count)
         .ok_or_else(|| "metamorphic answered count underflowed".to_owned())?;
-    let transformed_count = transformed_item_count;
     let base_accuracy_denom = base_item_count as f64;
     let transformed_accuracy_denom = transformed_item_count as f64;
     let mut report = FreshMetamorphicScoreReportV1 {
@@ -1006,7 +1005,6 @@ pub fn score_fresh_metamorphic_submission(
         report_sha256: String::new(),
         claim_boundary: "exact_solution_and_cross_form_agreement_under_registered_row_operations_only;run_receipt_not_authenticated;no_general_reasoning_claim".to_owned(),
     };
-    let _ = transformed_count;
     report.report_sha256 = report_digest(&report)?;
     Ok(report)
 }
@@ -1014,11 +1012,8 @@ pub fn score_fresh_metamorphic_submission(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        fresh_instance::{
-            generate_fresh_challenge_bundle, FreshChallengeConfigV1, FRESH_CONFIG_SCHEMA,
-        },
-        fresh_scoring::{submission_digest as base_submission_digest, FRESH_EXACT_METRIC_ID},
+    use crate::fresh_instance::{
+        generate_fresh_challenge_bundle, FreshChallengeConfigV1, FRESH_CONFIG_SCHEMA,
     };
     use serde_json::Value;
 
