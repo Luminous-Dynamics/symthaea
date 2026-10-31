@@ -67,3 +67,14 @@ For each round, it freezes the pre-round board digest, the exact advisory alloca
 The recommendation remains advisory. The adapter records deviation between suggested and actual seat allocation instead of forcing a worker to follow a board recommendation. This reflects Coral Discovery's documented workflow in which agents finish a line of work, consult the direction board, and choose; duplicate/crowding checks are separate from the board's advisory allocation. The adapter is not presented as a complete reproduction of the multi-agent runtime or as proof of Coral's empirical result.
 
 The event-batch reconciliation requires strict event-tape qualification, including measured resource receipts. Synthetic data with unknown resource dimensions cannot pass this gate. Each round-plan artifact should be stored next to its event tape; the content-derived batch ID creates a deterministic cross-reference, while the plan digest remains independently auditable.
+
+
+## Content-addressed offer-set manifests
+
+The `offer_set` module closes a gap that a shared proposal-stream digest cannot close. A per-policy manifest records, for each sequential decision or batched round, the visible-prefix cutoff, sorted canonical direction IDs actually available, whether NEW was permitted, and the digest of the evaluator-owned pre-decision state from which those choices were derived.
+
+Manifest validation requires exact coverage of all and only the event tape's decision boundaries. Every candidate evaluation must target a direction in that boundary's offered set; every direction proposal requires NEW permission. Every snapshot and the manifest root are content-addressed. Cross-policy comparison requires identical snapshot digests for each round/batch key, not merely the same declared random seed or generator name.
+
+The state digest is still a commitment, not the state artifact itself. The campaign evidence bundle must retain the underlying evaluator-owned state/offer-set artifact, and an independent auditor must recompute `source_state_sha256`. Without that artifact, the manifest establishes cross-policy digest consistency but not the truth of the offered choices. The current API intentionally does not claim cryptographic identity of the evaluator process or a remote timestamp.
+
+The `matched_campaign` summary also aggregates full per-policy resource vectors (host CPU, wall time, accelerator time, host/accelerator memory, energy, tokens, tools, evaluator/verifier calls and normalized charges) rather than exposing only a scalar. It separately reports whether normalized total spend is equal across policies. Equal budget ceilings are not equal realized spend; a campaign can reconcile its common contract while explicitly failing the equal-spend comparison gate.
