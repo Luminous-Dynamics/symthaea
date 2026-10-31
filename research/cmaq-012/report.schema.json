@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://luminousdynamics.io/schemas/cmaq-012-paired-aop-report-v0.2.json",
-  "title": "CMAQ-012 paired advantage-of-prediction report with resource-vector qualification",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-012-paired-aop-report-v0.3.json",
+  "title": "CMAQ-012 paired advantage-of-prediction report with independent artifact-content verification",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,11 +11,12 @@
     "bootstrap_replicates",
     "bootstrap_seed",
     "minimum_qualification_pairs",
-    "groups"
+    "groups",
+    "artifact_verification"
   ],
   "properties": {
     "schema_version": {
-      "const": "cmaq-012-paired-aop-report-v0.2"
+      "const": "cmaq-012-paired-aop-report-v0.3"
     },
     "auditor_version": {
       "type": "string"
@@ -68,6 +69,8 @@
             "enum": [
               "smoke_only",
               "budget_match_unverified",
+              "budget_match_receipts_verified",
+              "synthetic_fixture_only",
               "qualification_candidate",
               "budget_unmatched",
               "resource_unmeasured"
@@ -853,7 +856,12 @@
                 "pattern": "^[a-f0-9]{64}$"
               },
               "receipt_verification_status": {
-                "const": "digest_only_not_independently_verified"
+                "const": "digest_only_not_independently_verified",
+                "enum": [
+                  "digest_only_not_independently_verified",
+                  "content_verified_origin_unattested",
+                  "synthetic_fixture_content_verified_origin_unattested"
+                ]
               },
               "d1_role_valid": {
                 "type": "boolean"
@@ -986,6 +994,41 @@
           }
         },
         "additionalProperties": false
+      }
+    },
+    "artifact_verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "profiles_verified",
+        "receipts_verified",
+        "fixture_only",
+        "claim_ceiling"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "digest_only_not_independently_verified",
+            "content_verified_origin_unattested",
+            "synthetic_fixture_content_verified_origin_unattested"
+          ]
+        },
+        "profiles_verified": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "receipts_verified": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fixture_only": {
+          "type": "boolean"
+        },
+        "claim_ceiling": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     }
   }
