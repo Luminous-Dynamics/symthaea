@@ -397,7 +397,8 @@
         "seed_derivation",
         "unit_of_analysis",
         "paired_seed_design",
-        "mechanism_family_split"
+        "mechanism_family_split",
+        "episode_count_scope"
       ],
       "properties": {
         "episode_count": {
@@ -453,6 +454,13 @@
               "type": "boolean"
             }
           }
+        },
+        "episode_count_scope": {
+          "enum": [
+            "per_scenario_model_condition",
+            "per_task_stratum",
+            "total_run"
+          ]
         }
       }
     },
