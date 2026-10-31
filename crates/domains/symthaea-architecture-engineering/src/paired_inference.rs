@@ -17,7 +17,7 @@ use super::event_tape::EventTape;
 use super::matched_campaign::{
     qualify_mechanism_matched_campaign, MatchedCampaignError, MatchedCampaignQualification,
 };
-use super::offer_set::OfferSetManifest;
+use super::offer_set::{OfferSetManifest, OfferSetSnapshot};
 
 const SCHEMA: &str = "symthaea.architecture-engineering.paired-inference";
 const VERSION: &str = "0.1.0";
