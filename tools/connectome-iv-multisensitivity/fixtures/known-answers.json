@@ -1,0 +1,107 @@
+{
+  "schema_version": "1.0.0",
+  "evidence_class": "synthetic_known_answer",
+  "claim_ceiling": "SYNTHETIC_ONLY",
+  "sampling_model": {
+    "conditional_gaussian": true,
+    "fixed_design": true,
+    "homoskedastic": true,
+    "independent_rows": true,
+    "intercept_only": true,
+    "instrument_count": 2,
+    "sample_size": 8,
+    "residual_degrees_of_freedom": 5,
+    "f_critical_f95_df2_df5": 5.786135043349963
+  },
+  "data_generating_process": {
+    "structural_effect": 3,
+    "first_stage_coefficients": [
+      2,
+      0.5
+    ],
+    "direct_effect_coefficients": [
+      0.6,
+      -0.4
+    ],
+    "residual_treatment_scale": 0.1,
+    "residual_outcome_scale": 0.2
+  },
+  "known_answers": [
+    {
+      "id": "two_instrument_diagnostics",
+      "instrument_gram": [
+        [
+          8,
+          0
+        ],
+        [
+          0,
+          8
+        ]
+      ],
+      "first_stage_coefficients": [
+        2,
+        0.5
+      ],
+      "first_stage_joint_f": 1062.5,
+      "reduced_form_coefficients": [
+        6.6,
+        1.1
+      ],
+      "two_stage_least_squares": 3.235294117647059
+    },
+    {
+      "id": "broad_rms_support",
+      "candidate_effect": 3,
+      "direct_effect_rms_bound": 0.8,
+      "implied_direct_effect_coefficients": [
+        0.6,
+        -0.4
+      ],
+      "implied_direct_effect_rms": 0.7211102550927979,
+      "exact_exclusion_ar_statistic": 65,
+      "profiled_ar_statistic": 0,
+      "profiled_ar_over_instruments": 0,
+      "accepted": true
+    },
+    {
+      "id": "intermediate_rms_support",
+      "candidate_effect": 3,
+      "direct_effect_rms_bound": 0.5,
+      "profiled_ar_statistic": 6.111218113400259,
+      "profiled_ar_over_instruments": 3.0556090567001295,
+      "f_critical_value": 5.786135043349963,
+      "accepted": true
+    },
+    {
+      "id": "tight_rms_support",
+      "candidate_effect": 3,
+      "direct_effect_rms_bound": 0.3,
+      "profiled_ar_statistic": 22.166730868040155,
+      "profiled_ar_over_instruments": 11.083365434020077,
+      "f_critical_value": 5.786135043349963,
+      "accepted": false
+    },
+    {
+      "id": "one_instrument_scalar_reduction",
+      "instrument_count": 1,
+      "sample_size": 20,
+      "first_stage_joint_f": 1210.3134479271994,
+      "candidate_effect": 3,
+      "direct_effect_rms_bound": 0.31,
+      "profiled_ar_statistic": 2.740946271084397,
+      "f_critical_value": 4.413873419170566,
+      "accepted": true
+    },
+    {
+      "id": "weak_joint_first_stage",
+      "first_stage_coefficients": [
+        0.05,
+        0.02
+      ],
+      "first_stage_joint_f": 0.725,
+      "notes": "Continuous weak-first-stage diagnostic; no universal threshold is applied."
+    }
+  ],
+  "notes": "All numerical results are synthetic and conditional on the stipulated design. No biological inference is claimed."
+}
