@@ -394,23 +394,29 @@ pub fn verify_retention_trace(
         _ => return Err(RetentionVerificationError::InvalidTargetStore),
     }
 
-    let invalidation_count = task
+    let all_invalidation_events: Vec<_> = task
         .events
         .iter()
-        .filter(|event| {
-            matches!(
-                &event.kind,
-                RetentionEventKind::Invalidate { record_id }
-                    if *record_id == oracle.target_record_id
-            )
+        .filter_map(|event| match &event.kind {
+            RetentionEventKind::Invalidate { record_id } => {
+                Some((event.step, *record_id))
+            }
+            _ => None,
         })
+        .collect();
+    let invalidation_count = all_invalidation_events
+        .iter()
+        .filter(|(_, record_id)| *record_id == oracle.target_record_id)
         .count();
     let actual_invalidation = task.events.iter().find_map(|event| match &event.kind {
         RetentionEventKind::Invalidate { record_id }
             if *record_id == oracle.target_record_id => Some(event.step),
         _ => None,
     });
-    if invalidation_count != 1 || actual_invalidation != Some(expected_invalidation) {
+    if invalidation_count != 1
+        || all_invalidation_events.len() != 1
+        || actual_invalidation != Some(expected_invalidation)
+    {
         return Err(RetentionVerificationError::InvalidInvalidation);
     }
 
@@ -671,6 +677,26 @@ mod tests {
         assert_eq!(
             verify_retention_trace(&task, &oracle),
             Err(RetentionVerificationError::InvalidInvalidation)
+        );
+    }
+
+    #[test]
+    fn verifier_rejects_extra_invalidation_for_unknown_record() {
+        let (mut task, oracle) =
+            generate_retention_task(config(DistractorSimilarity::High)).unwrap();
+        let insertion_step = task.events[task.events.len() - 1].step.saturating_add(1);
+        task.events.insert(
+            task.events.len() - 1,
+            RetentionEvent {
+                step: insertion_step,
+                ordinal: 0,
+                kind: RetentionEventKind::Invalidate { record_id: 999 },
+            },
+        );
+        task.content_sha256 = retention_content_digest(&task);
+        assert_eq!(
+            verify_retention_trace(&task, &oracle),
+            Err(RetentionVerificationError::InvalidEventCount)
         );
     }
 
