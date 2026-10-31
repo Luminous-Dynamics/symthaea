@@ -799,7 +799,7 @@ mod tests {
                 user_namespace_inode: None, pid_namespace_inode: None,
             },
             permission_class_probe_requested: false,
-            probes: Vec::new(),
+            probes: vec![not_attempted("bpf_lsm_load_attach", "schema fixture")],
             side_effects: SideEffectClaims {
                 bpf_programs_loaded_or_attached: false, tracepoints_enabled_or_attached: false,
                 fanotify_marks_added: false, landlock_rulesets_created_or_enforced: false,
@@ -818,6 +818,23 @@ mod tests {
             .map(|field| field.as_str().unwrap().to_string()).collect();
         actual.sort(); required.sort();
         assert_eq!(actual, required);
+        let nested = [
+            ("kernel", "kernelIdentity"),
+            ("process_context", "processSecurityContext"),
+            ("probes[0]", "probeObservation"),
+            ("side_effects", "sideEffectClaims"),
+        ];
+        for (instance_path, definition) in nested {
+            let instance = if instance_path == "probes[0]" { &value["probes"][0] } else { &value[instance_path] };
+            let mut actual: Vec<String> = instance.as_object().unwrap().keys().cloned().collect();
+            let definition_schema = &schema["$defs"][definition];
+            let mut properties: Vec<String> = definition_schema["properties"].as_object().unwrap().keys().cloned().collect();
+            let mut required: Vec<String> = definition_schema["required"].as_array().unwrap().iter()
+                .map(|field| field.as_str().unwrap().to_string()).collect();
+            actual.sort(); properties.sort(); required.sort();
+            assert_eq!(actual, properties, "{definition} properties differ from serialized Rust fields");
+            assert_eq!(actual, required, "{definition} required fields differ from serialized Rust fields");
+        }
     }
     #[test]
     fn probe_status_serde_values_match_the_report_schema() {
