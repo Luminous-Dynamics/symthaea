@@ -24,6 +24,7 @@
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs::{self, OpenOptions};
@@ -96,9 +97,25 @@ struct Assignment {
 }
 
 #[derive(Debug, Clone)]
+struct OrderStatisticNode {
+    key: f64,
+    multiplicity: usize,
+    subtree_count: usize,
+    height: i32,
+    left: Option<Box<OrderStatisticNode>>,
+    right: Option<Box<OrderStatisticNode>>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct OrderStatisticAvl {
+    root: Option<Box<OrderStatisticNode>>,
+    total_count: usize,
+}
+
+#[derive(Debug, Clone)]
 struct ContextState {
     alpha: f64,
-    history_transformed_scores: Vec<f64>,
+    history: OrderStatisticAvl,
     log_weighted_products: Vec<f64>,
     log_fixed_start_products: Vec<f64>,
     valid_episode_count: usize,
@@ -551,6 +568,153 @@ fn parse_context_receipt(
     Ok(map)
 }
 
+fn avl_height(node: &Option<Box<OrderStatisticNode>>) -> i32 {
+    node.as_ref().map_or(0, |n| n.height)
+}
+
+fn avl_count(node: &Option<Box<OrderStatisticNode>>) -> usize {
+    node.as_ref().map_or(0, |n| n.subtree_count)
+}
+
+fn avl_refresh(node: &mut Box<OrderStatisticNode>) {
+    node.height = 1 + avl_height(&node.left).max(avl_height(&node.right));
+    node.subtree_count =
+        node.multiplicity + avl_count(&node.left) + avl_count(&node.right);
+}
+
+fn avl_balance(node: &Option<Box<OrderStatisticNode>>) -> i32 {
+    node.as_ref()
+        .map_or(0, |n| avl_height(&n.left) - avl_height(&n.right))
+}
+
+fn avl_rotate_right(mut root: Box<OrderStatisticNode>) -> Box<OrderStatisticNode> {
+    let mut pivot = root.left.take().expect("right rotation requires a left child");
+    root.left = pivot.right.take();
+    avl_refresh(&mut root);
+    pivot.right = Some(root);
+    avl_refresh(&mut pivot);
+    pivot
+}
+
+fn avl_rotate_left(mut root: Box<OrderStatisticNode>) -> Box<OrderStatisticNode> {
+    let mut pivot = root.right.take().expect("left rotation requires a right child");
+    root.right = pivot.left.take();
+    avl_refresh(&mut root);
+    pivot.left = Some(root);
+    avl_refresh(&mut pivot);
+    pivot
+}
+
+fn avl_rebalance(mut node: Box<OrderStatisticNode>) -> Box<OrderStatisticNode> {
+    avl_refresh(&mut node);
+    let balance = avl_height(&node.left) - avl_height(&node.right);
+    if balance > 1 {
+        if avl_balance(&node.left) < 0 {
+            let left = node.left.take().expect("left-heavy node has a left child");
+            node.left = Some(avl_rotate_left(left));
+        }
+        return avl_rotate_right(node);
+    }
+    if balance < -1 {
+        if avl_balance(&node.right) > 0 {
+            let right = node.right.take().expect("right-heavy node has a right child");
+            node.right = Some(avl_rotate_right(right));
+        }
+        return avl_rotate_left(node);
+    }
+    node
+}
+
+fn avl_insert_node(
+    root: Option<Box<OrderStatisticNode>>,
+    key: f64,
+) -> Box<OrderStatisticNode> {
+    let Some(mut node) = root else {
+        return Box::new(OrderStatisticNode {
+            key,
+            multiplicity: 1,
+            subtree_count: 1,
+            height: 1,
+            left: None,
+            right: None,
+        });
+    };
+
+    match key.total_cmp(&node.key) {
+        Ordering::Less => {
+            node.left = Some(avl_insert_node(node.left.take(), key));
+        }
+        Ordering::Greater => {
+            node.right = Some(avl_insert_node(node.right.take(), key));
+        }
+        Ordering::Equal => {
+            node.multiplicity += 1;
+            avl_refresh(&mut node);
+            return node;
+        }
+    }
+    avl_rebalance(node)
+}
+
+impl OrderStatisticAvl {
+    fn insert(&mut self, key: f64) -> Result<(), String> {
+        if !key.is_finite() {
+            return Err("order-statistics AVL key must be finite".to_owned());
+        }
+        let root = self.root.take();
+        self.root = Some(avl_insert_node(root, key));
+        self.total_count += 1;
+        Ok(())
+    }
+
+    // Returns the count of previous keys strictly less than key and equal to key.
+    fn rank_and_equal(&self, key: f64) -> Result<(usize, usize), String> {
+        if !key.is_finite() {
+            return Err("order-statistics AVL query key must be finite".to_owned());
+        }
+        let mut less = 0usize;
+        let mut cursor = self.root.as_deref();
+        while let Some(node) = cursor {
+            match key.total_cmp(&node.key) {
+                Ordering::Less => cursor = node.left.as_deref(),
+                Ordering::Equal => {
+                    less += avl_count(&node.left);
+                    return Ok((less, node.multiplicity));
+                }
+                Ordering::Greater => {
+                    less += avl_count(&node.left) + node.multiplicity;
+                    cursor = node.right.as_deref();
+                }
+            }
+        }
+        Ok((less, 0))
+    }
+
+    fn height(&self) -> i32 {
+        avl_height(&self.root)
+    }
+}
+
+fn randomized_conformal_p_from_counts(
+    less_count: usize,
+    equal_count: usize,
+    observation_count: usize,
+    randomizer_u: f64,
+) -> Result<f64, String> {
+    if !(0.0..1.0).contains(&randomizer_u) {
+        return Err("randomizer_u must be strictly between zero and one".to_owned());
+    }
+    if observation_count == 0 || less_count + equal_count >= observation_count {
+        return Err("conformal rank counts are inconsistent with observation_count".to_owned());
+    }
+    let p = (less_count as f64 + randomizer_u * (equal_count as f64 + 1.0))
+        / observation_count as f64;
+    if !p.is_finite() || !(0.0..1.0).contains(&p) {
+        return Err(format!("randomized conformal p-value is outside (0,1): {p}"));
+    }
+    Ok(p)
+}
+
 fn log_add_exp(a: f64, b: f64) -> f64 {
     if a == f64::NEG_INFINITY { return b; }
     if b == f64::NEG_INFINITY { return a; }
@@ -587,30 +751,25 @@ fn online_randomized_conformal_p(
     anomaly_score: f64,
     randomizer_u: f64,
 ) -> Result<f64, String> {
-    if !(0.0..1.0).contains(&randomizer_u) {
-        return Err("randomizer_u must be strictly between zero and one".to_owned());
-    }
     if !anomaly_score.is_finite() {
         return Err("episode anomaly score must be finite".to_owned());
     }
-    // Negate scores so larger anomaly scores occupy the lower tail.
     let transformed = -anomaly_score;
     let less_count = previous_transformed_scores.iter().filter(|old| **old < transformed).count();
-    // Include the current item in its own tie block.
-    let equal_count = previous_transformed_scores.iter().filter(|old| **old == transformed).count() + 1;
-    let t = previous_transformed_scores.len() + 1;
-    let p = (less_count as f64 + randomizer_u * equal_count as f64) / t as f64;
-    if !p.is_finite() || !(0.0..1.0).contains(&p) {
-        return Err(format!("randomized conformal p-value is outside (0,1): {p}"));
-    }
-    Ok(p)
+    let equal_count = previous_transformed_scores.iter().filter(|old| **old == transformed).count();
+    randomized_conformal_p_from_counts(
+        less_count,
+        equal_count,
+        previous_transformed_scores.len() + 1,
+        randomizer_u,
+    )
 }
 
 impl ContextState {
     fn new(alpha: f64, betting_family: &[BettingTerm]) -> Self {
         Self {
             alpha,
-            history_transformed_scores: Vec::new(),
+            history: OrderStatisticAvl::default(),
             log_weighted_products: vec![f64::NEG_INFINITY; betting_family.len()],
             log_fixed_start_products: vec![0.0; betting_family.len()],
             valid_episode_count: 0,
@@ -628,9 +787,18 @@ impl ContextState {
         sequence_index: usize,
         betting_family: &[BettingTerm],
     ) -> Result<(f64, f64, f64, f64, bool, bool), String> {
-        let p = online_randomized_conformal_p(&self.history_transformed_scores, score, randomizer_u)?;
+        if !score.is_finite() {
+            return Err("episode anomaly score must be finite".to_owned());
+        }
         let transformed = -score;
-        self.history_transformed_scores.push(transformed);
+        let (less_count, equal_count) = self.history.rank_and_equal(transformed)?;
+        let p = randomized_conformal_p_from_counts(
+            less_count,
+            equal_count,
+            self.history.total_count + 1,
+            randomizer_u,
+        )?;
+        self.history.insert(transformed)?;
         self.valid_episode_count += 1;
         let k = self.valid_episode_count;
         let log_weight = near_harmonic_restart_weight(k).ln();
