@@ -76,7 +76,42 @@ Any non-anatomical channel must retain its own evidence class and provenance. It
 
 The Randi et al. atlas has limits that must remain visible: its animals were immobilized and awake, stimulation/recording were performed under the study's transgenic configuration, and its functional map is an effective lower bound conditioned on its sampling and response-detection procedure. It is an external perturbation benchmark, not a perfect census of all physiological interactions.
 
-## 3. Dataset tiers and evidence eligibility
+## 3. Pairwise versus combinatorial perturbation evidence
+
+A single-target perturbation atlas estimates pairwise effective responses under its particular intervention and observation protocol. It does not identify arbitrary nonlinear interactions among simultaneous inputs.
+
+Randi et al. explicitly note that patterned simultaneous stimulation of multiple neurons would be needed to probe nonlinear interactions within groups. The next experiment must therefore distinguish:
+- pairwise effective-response kernels;
+- two-way factorial non-additivity;
+- higher-order interaction terms;
+- state/context dependence;
+- stimulus/indicator observation nonlinearities.
+
+For outcome Y under interventions A and B in state s and horizon t, define:
+
+    I_AB(s,t) = Y(AB,s,t) - Y(A,s,t) - Y(B,s,t) + Y({},s,t)
+
+For three interventions:
+
+    I_ABC = Y(ABC) - Y(AB) - Y(AC) - Y(BC) + Y(A) + Y(B) + Y(C) - Y({})
+
+These are experimental finite-difference contrasts. A nonzero interaction establishes non-additivity for the measured outcome under the declared protocol; it does not by itself identify a molecular interaction, direct synaptic mechanism or causal mediation path.
+
+The synthetic oracle linked from [#9550](https://github.com/Luminous-Dynamics/symthaea/pull/9550) now contains exact threshold, additive, saturation, third-order and state-gated fixtures. Their purpose is to verify factorial estimators and evaluator semantics before biological multi-target data are available.
+
+### Measurement model and uncertainty boundary
+
+Observed calcium fluorescence is not the latent neural state. The benchmark must specify the observation kernel, filtering/indicator kinetics, sampling interval, missing-neuron handling and measurement noise separately from the latent neural dynamics. Where voltage or electrophysiological measurements exist, report them as a distinct modality rather than pooling units.
+
+For each neuron pair or intervention combination, preserve three evidence states:
+- **EFFECT_SUPPORTED:** response is supported under the preregistered effect criterion.
+- **EQUIVALENT_TO_NULL_WITHIN_BOUND:** equivalence testing supports a response inside the declared tolerance.
+- **UNRESOLVED:** neither positive-effect nor equivalence evidence is sufficient.
+
+Failure to reject a response is not evidence of no response. The equivalence margin, multiplicity procedure and independent experimental unit must be preregistered.
+
+
+## 4. Dataset tiers and evidence eligibility
 
 ### Tier A — C. elegans optogenetic perturbation
 
@@ -130,7 +165,7 @@ ZAPBench provides whole-brain zebrafish activity forecasting data for more than 
 
 A version identifier is meaningful only within its named datastack and source product. The MICrONS tutorial currently lists materialization version 1926 for the minnie65_public datastack (timestamp 2026-09-28T22:44:42.598563Z). This must not be transplanted to Fish1.5, Phase 1 or Fish Fire&Wire. Every adapter must pin its own dataset/datastack, segmentation, annotation, registration, activity and transformation revisions.
 
-## 4. Formal prediction contract
+## 5. Formal prediction contract
 
 For a declared biological system and context, define a finite-horizon dynamical model:
 
@@ -147,7 +182,7 @@ The model report must identify which terms are constrained by anatomy and which 
 
 Synapse counts are not synaptic conductances. Anatomical polarity is not automatically physiological sign. A structural edge is not proof of transmission in every context. Keep synapse, cell identity, structural path, perturbation response and model parameter evidence as distinct typed objects.
 
-## 5. Frozen evaluation tasks
+## 6. Frozen evaluation tasks
 
 ### P1 — Perturbation impulse-response prediction
 
@@ -173,7 +208,7 @@ Where inputs, neural state, anatomy and motor/behavior outputs are aligned in th
 
 Only for same-specimen, same-cell paired cohorts, compare baseline and independently proofread reconstruction versions using identical eligible cells, intervention trials, model capacity, train/test partitions and training budgets. When the connectome is a canonical template from another animal, this paired edit estimand is NOT_ESTIMABLE.
 
-## 6. Baseline matrix
+## 7. Baseline matrix
 
 All comparable arms receive identical eligible observations, split manifests, training budgets and evaluation targets.
 
@@ -192,7 +227,7 @@ All comparable arms receive identical eligible observations, split manifests, tr
 
 A candidate may win one task and lose another. Do not pool species, measurement modalities, intervention designs or response variables into one leaderboard score.
 
-## 7. Leakage and statistical contract
+## 8. Leakage and statistical contract
 
 - Split by animal for cross-animal claims; by intervention target/session for held-out-target claims; keep related trials and cell lineages within their declared partitions.
 - Pin preprocessing, registration, cell identity, connectome version, intervention protocol and exclusions in immutable manifests.
@@ -205,7 +240,7 @@ A candidate may win one task and lose another. Do not pool species, measurement 
 - Unsupported strata, inaccessible artifacts, insufficient independent clusters and unidentifiable effects return NOT_ESTIMABLE.
 - Direct-edge, necessity, sufficiency or synaptic-mechanism claims require a separate design that identifies that estimand.
 
-## 8. Adversarial fixtures
+## 9. Adversarial fixtures
 
 At minimum, include:
 - strong observational correlation with no measured intervention response;
@@ -223,7 +258,7 @@ At minimum, include:
 - strong neural-response prediction but failed motor/behavior prediction;
 - missing modalities or intervention dose silently treated as valid evidence.
 
-## 9. Primary metrics
+## 10. Primary metrics
 
 - Held-out perturbation-response negative log likelihood where the observation model is appropriate.
 - Noise-normalized trajectory error/explained variance with an explicit noise-ceiling estimator.
@@ -236,7 +271,7 @@ At minimum, include:
 - Query/decision value and cost per verified predictive improvement.
 - Runtime, memory, energy and data-access/annotation cost under matched hardware and policies.
 
-## 10. Promotion gates (research goals, not results)
+## 11. Promotion gates (research goals, not results)
 
 - Reproduce the published C. elegans baseline on its exact versioned data, split and metric before claiming improvement.
 - Demonstrate structural value over activity-only, spatial-only and matched-capacity unconstrained models on preregistered held-out targets/animals, with cluster-aware intervals and a predeclared practical-effect threshold.
@@ -247,7 +282,7 @@ At minimum, include:
 - No biological SOTA claim from synthetic fixtures, one-species reproduction or controlled-access unpublished data.
 - Reconstruction-change claims require same-specimen pairing and independent anatomical adjudication.
 
-## 11. Implementation sequence
+## 12. Implementation sequence
 
 1. Define a versioned dataset/task eligibility manifest and run-record schema.
 2. Build exact synthetic fixtures for direct, delayed, indirect, recurrent and confounded perturbation effects.
@@ -258,7 +293,7 @@ At minimum, include:
 7. Pursue Fish Fire&Wire only through its official collaboration process and obey snapshot, access, authorship and publication restrictions.
 8. After retrospective reproduction, preregister a prospective perturbation/behavior evaluation where technically and ethically feasible.
 
-## 12. Integration and claim ceiling
+## 13. Integration and claim ceiling
 
 Related work:
 - #9501 / PR #9503 — held-out observational structure-to-function validation.
