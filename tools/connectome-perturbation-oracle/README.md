@@ -25,7 +25,7 @@ The crate is a standalone workspace under tools/ and has no third-party dependen
 5. Shared external input that creates passive co-variation but no interventional effect at the untreated recipient.
 6. A rewired-topology negative control that fails to reproduce the reference response.
 
-The scorer compares complete finite-horizon trajectories, not only peak response or correlation. The library also exposes directed reachability and an exact pairwise edge-deletion interaction oracle. Its fixtures distinguish redundant parallel routes (two individually dispensable edges become jointly critical) from serial bottlenecks (each edge is individually critical). This graph-query interaction is separate from physiological causal effect. Invalid node/edge indices, duplicate removals, zero delays, non-finite parameters, invalid horizons, unreachable baselines for interaction contrasts, and shape mismatches fail closed.
+The scorer compares complete finite-horizon trajectories, not only peak response or correlation. A byte-exact golden-fixture test pins the deterministic JSON report to the checked-in expected output. The library also exposes directed reachability, an exact pairwise edge-deletion interaction oracle, and a typed extrasynaptic channel that is simulated separately from the anatomical graph. Its fixtures distinguish redundant parallel routes (two individually dispensable edges become jointly critical) from serial bottlenecks (each edge is individually critical). This graph-query interaction is separate from physiological causal effect. Invalid node/edge indices, duplicate removals, zero delays, non-finite parameters, invalid horizons, unreachable baselines for interaction contrasts, and shape mismatches fail closed.
 
 ## Scientific claim ceiling
 
@@ -37,7 +37,7 @@ The report always labels its evidence class `synthetic_known_answer` and claim c
 
 `I(a,b) = L(G \\ {a,b}) - L(G \\ {a}) - L(G \\ {b}) + L(G)`
 
-A positive interaction in the parallel-route fixture means neither deletion alone breaks reachability, but their joint deletion does. A negative interaction in the serial-chain fixture means either deletion alone already breaks the query. These are graph-query semantics, not biological importance scores; biological criticality remains task-, state- and model-dependent.
+A positive interaction in the parallel-route fixture means neither deletion alone breaks reachability, but their joint deletion does. A negative interaction in the serial-chain fixture means either deletion alone already breaks the query. These are graph-query semantics, not biological importance scores; biological criticality remains task-, state- and model-dependent. The extrasynaptic fixture demonstrates that an intervention can produce a measured effective response at a node with no direct anatomical edge, without rewriting the anatomical graph. This is a phenomenological test channel, not an identified peptide/receptor mechanism.
 
 ## Planned extensions
 
