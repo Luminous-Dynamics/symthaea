@@ -103,3 +103,13 @@ A result on the nine synthetic AR-5B landscapes (eight deterministic surfaces pl
 ## AR-5B synthetic benchmark claim ceiling
 
 The current scalar suite has eight deterministic surfaces plus one seed-matched stochastic heteroscedastic surface. The seeded stochastic surface uses common random numbers keyed by campaign seed, direction ID and within-direction evaluation index, so policies receive identical potential outcomes. Simple regret uses evaluator-side expected reward, not a lucky observation. These are mechanism controls, not a scientific-agent SOTA result.
+
+## Benchmark update: October 31, 2026
+
+Two practical lessons sharpen the competitive plan:
+
+- CodeEvolve's October 2026 EMNLP Findings paper reports matching or exceeding reported AlphaEvolve results on five of nine tasks and outperforming OpenEvolve/ShinkaEvolve on six of nine under its matched conditions. It combines island evolution, inspiration crossover, depth refinement, CVT-MAP-Elites and an LLM ensemble. This is a real end-to-end competitor, not a scheduler-only baseline; replicate its components as ablations and compare the complete system only in the best-practical-system track. The task-specific results do not establish general scientific-discovery superiority.
+- FormulaCode (ICML 2026) evaluates 957 repository performance bottlenecks with expert patches and roughly 264.6 workloads per task, emphasizing correctness-constrained, multi-objective optimization. We should borrow its lifecycle framing—triage, diagnosis, patch, correctness, workload performance—but keep Rust/Nix repository tasks in a separate language/build-system stratum rather than pretending the Python-heavy benchmark is directly representative.
+- OpenScience's October 1, 2026 benchmark update explicitly says its evaluation setup had comparison problems and that results would be rerun after harness improvements. Treat those public rankings as provisional until the corrected protocol and rerun are published; this is a useful example of why every benchmark release needs versioned conditions and a correction log.
+
+Sources: CodeEvolve, https://aclanthology.org/2026.findings-emnlp.1345/; FormulaCode, https://proceedings.mlr.press/v306/sehgal26a.html; OpenScience benchmark update, https://www.openscience.sh/benchmark.
