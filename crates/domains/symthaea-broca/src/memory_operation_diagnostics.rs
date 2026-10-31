@@ -205,6 +205,25 @@ impl MemoryOperationDiagnosticReport {
         Ok(())
     }
 
+    /// Recompute the report from the original examiner observations before
+    /// using the defect counts for benchmark qualification.
+    pub fn verify_against(
+        &self,
+        observations: &[MemoryOperationObservation],
+    ) -> Result<(), String> {
+        self.verify_internal_consistency()?;
+        let recomputed = diagnose_memory_operations(
+            &self.benchmark_id,
+            &self.benchmark_revision,
+            &self.evaluation_protocol_sha256,
+            observations,
+        )?;
+        if &recomputed != self {
+            return Err("memory diagnostic report does not match independent recomputation".into());
+        }
+        Ok(())
+    }
+
     fn computed_report_sha256(&self) -> Result<String, String> {
         let mut canonical = self.clone();
         canonical.report_sha256.clear();
@@ -419,6 +438,34 @@ mod tests {
         assert!(diagnose_memory_operations(
             "benchmark", "v1", &digest("rubric"), &[first, second]
         ).unwrap_err().contains("duplicate memory diagnostic question ID"));
+    }
+
+    #[test]
+    fn authoritative_diagnostic_verification_recomputes_from_observations() {
+        let observations = vec![
+            MemoryOperationObservation {
+                question_id: "Q-1".into(),
+                encoding_state: EncodingExaminerState::GoldEvidencePresent,
+                retrieval_state: RetrievalExaminerState::GoldEvidenceMissed,
+                generation_state: GenerationExaminerState::HallucinatedWithoutSupport,
+            },
+            MemoryOperationObservation {
+                question_id: "Q-2".into(),
+                encoding_state: EncodingExaminerState::GoldEvidencePresent,
+                retrieval_state: RetrievalExaminerState::UsableGoldEvidenceRetrieved,
+                generation_state: GenerationExaminerState::CorrectAndSupported,
+            },
+        ];
+        let report = diagnose_memory_operations(
+            "LongMemEval-S", "2026-v1", &digest("protocol"), &observations
+        ).unwrap();
+        report.verify_against(&observations).unwrap();
+
+        let mut altered = observations.clone();
+        altered[0].encoding_state = EncodingExaminerState::GoldEvidenceMissing;
+        assert!(report.verify_against(&altered)
+            .unwrap_err()
+            .contains("independent recomputation"));
     }
 
     #[test]
