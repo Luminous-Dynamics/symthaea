@@ -1027,8 +1027,8 @@ fn payoff(
     if schedule.is_empty() {
         return 0.0;
     }
-    // Exact deterministic schedules make the oracle truly exact. Policy randomness is
-    // introduced only through arm selection, never by perturbing evaluator ground truth.
+    // This returns the evaluator-side expected reward. The stochastic fixture applies
+    // its seed-matched noise only in stochastic_payoff, so oracle ranking uses expectations.
     schedule[evaluation_index.min(schedule.len() - 1)]
 }
 
@@ -1347,7 +1347,7 @@ impl DirectionCampaignRun {
                     landscape_id, action.arm_id, evaluation_index
                 ));
                 let semantic_delta_sha256 =
-                    digest(&format!("synthetic-delta:{}:{}", landscape_id, action.arm_id));
+                    digest(&format!("synthetic-delta:{candidate_sha256}"));
                 (
                     ActionIntent::EvaluateCandidate {
                         candidate_sha256: candidate_sha256.clone(),
