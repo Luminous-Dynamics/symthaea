@@ -33,7 +33,6 @@ use crate::pareto_hypervolume_qmc::{
 };
 
 const PROBABILITY_TOLERANCE: f64 = 1e-9;
-const DECISION_TOLERANCE: f64 = 1e-12;
 const ACTION_DOMAIN: &[u8] = b"symthaea.nas.portfolio-voc-action.v0.1";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -231,10 +230,10 @@ pub fn evaluate_portfolio_class_regret(
     )?;
 
     let replicate_count = design.scramble_replicates();
-    if replicate_count < 8 || replicate_count % 2 != 0 {
+    if replicate_count < 16 || replicate_count % 2 != 0 {
         return Err(PortfolioVoCError::new(
             "qmc_design",
-            "portfolio selection requires an even number of at least eight scrambles",
+            "portfolio selection requires an even number of at least sixteen scrambles (eight per split)",
         ));
     }
     let split = replicate_count / 2;
@@ -900,7 +899,7 @@ fn standard_error(values: &[f64]) -> f64 {
 mod tests {
     use super::*;
     use crate::hardware_objectives::{
-        compute_objective_registry_sha256, MeasurementCost, ObjectiveDefinition,
+        compute_objective_registry_sha256, ObjectiveDefinition,
         ObjectiveDirection, ObjectiveNormalization, ObjectiveSource,
     };
 
@@ -1061,6 +1060,29 @@ mod tests {
         assert!(result.selected_portfolio_expected_hypervolume < 0.30);
         assert!(result.portfolio_class_regret > 0.10);
         assert_eq!(result.selected_portfolio_id, "B-only");
+    }
+
+    #[test]
+    fn rejects_underpowered_selection_validation_scramble_split() {
+        let small_design = HypervolumeQmcDesign::new(
+            &[0.0, 0.0],
+            &crate::pareto_hypervolume_qmc::HypervolumeQmcConfig {
+                samples_per_replicate: 4096,
+                scramble_replicates: 8,
+                seed: 7,
+            },
+        )
+        .unwrap();
+        assert!(evaluate_portfolio_class_regret(
+            &posterior(),
+            &portfolios(),
+            &ParetoPortfolioConfig {
+                target_k: 1,
+                minimum_feasible_utility: vec![0.0, 0.0],
+            },
+            &small_design,
+        )
+        .is_err());
     }
 
     #[test]
