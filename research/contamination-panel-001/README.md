@@ -705,3 +705,69 @@ The normalized threshold is computed with exact integer comparisons; it is not a
 
 This helps prevent near-singular systems from being accidentally mixed into the same task difficulty band. It does not yet make the problem generator psychometrically calibrated: difficulty also depends on coefficient/solution magnitudes, cancellation, representation, and model-specific skill. These factors need separate calibration experiments.
 
+
+
+## Search-time contamination and retrieval exposure
+
+The module src/search_time.rs records and audits inference-time information-access traces. It covers web search, browser navigation, HTTP APIs, remote MCP, vector stores, local caches, mounted files, agent memory and explicitly unknown/other channels.
+
+This is the third complementary lane next to static benchmarks and post-freeze fresh instances. Fresh question instances do not help if an agent can search for the task or retrieve its answer while being evaluated.
+
+### Trace contract
+
+Each run trace binds:
+- run, benchmark/version, checkpoint and challenge-packet identities;
+- network policy and enforcement-build digests;
+- access mode: network-disabled, allowlisted or unrestricted;
+- allowlisted normalized-destination digests (required only in allowlisted mode);
+- every known information channel as instrumented or explicitly unobserved;
+- contiguous event sequence and unique invocation IDs;
+- event channel/provider, normalized destination digest, request digest, response digest/byte count, UTC time and allowed/blocked disposition;
+- previous-event digest, event digest and final trace root.
+
+Blocked events cannot claim response bytes. Accepted response bytes require an exact response digest. Timestamps must be real UTC calendar values and monotonic with event sequence.
+
+### Offline audit
+
+~~~sh
+cargo run --locked -- audit-search-time-trace \
+  /secure/evaluator/search-time-trace.json \
+  /secure/evaluator/search-time-trace-audit.json
+~~~
+
+The auditor replays the event chain, validates per-event and root digests, checks sequence/time invariants, verifies network-disabled policy behavior, checks allowlisted network destinations, and rejects event channels missing from the declared instrumentation set.
+
+The declaration must account for all known channel types as either instrumented or unobserved. Merely omitting a channel does not make the perimeter complete.
+
+### Evaluator-supplied retrieval findings
+
+The separate findings artifact binds a classification to an allowed event and the exact trace root. Each finding records:
+- metadata-only, context-bearing, answer-bearing or unknown;
+- matched benchmark item IDs;
+- digest of evaluator-side matching evidence;
+- method (exact, fuzzy, semantic review, human adjudication or other);
+- confidence in permille.
+
+Audit findings:
+
+~~~sh
+cargo run --locked -- audit-search-time-findings \
+  /secure/evaluator/search-time-trace.json \
+  /secure/evaluator/search-time-findings.json \
+  /secure/evaluator/search-time-findings-audit.json
+~~~
+
+The current module validates classification record bindings; it does not implement fuzzy/semantic matching. Raw page content, search queries, credentials and private URLs must stay in evaluator-controlled storage. The public findings file should contain only digests, item references, method and bounded/redacted evidence as policy permits.
+
+### Claim boundary
+
+Hash-chain replay establishes internal integrity of the supplied trace, not completeness of the network/proxy/tool instrumentation. A well-formed trace cannot rule out an unobserved cache, side channel, local file, external process or compromised logger. The audit hard-codes complete_mediation_verified=false and independently_verified=false.
+
+Likewise, an answer-bearing retrieval event is evidence of access, not proof that the retrieved content caused the model's answer. Causal influence needs a paired network-disabled versus network-enabled experiment with matched budgets and independent run replication.
+
+Schemas:
+- schema/search-time-exposure-trace.schema.json
+- schema/search-time-exposure-audit.schema.json
+- schema/search-time-exposure-findings.schema.json
+- schema/search-time-exposure-findings-audit.schema.json
+
