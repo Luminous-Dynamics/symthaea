@@ -18,6 +18,7 @@ hardsec-pmu-metrology-audit = []
 hardsec-context-sequential-monitor = []
 hardsec-context-cctm-monitor = []
 hardsec-context-assignment-audit = []
+hardsec-episode-restarted-monitor = []
 
 [dependencies]
 serde_json = "=1.0.150"
@@ -52,3 +53,8 @@ required-features = ["hardsec-context-cctm-monitor"]
 name = "hardsec_context_assignment_audit"
 path = "../../examples/hardsec_context_assignment_audit.rs"
 required-features = ["hardsec-context-assignment-audit"]
+
+[[example]]
+name = "hardsec_episode_restarted_monitor"
+path = "../../examples/hardsec_episode_restarted_monitor.rs"
+required-features = ["hardsec-episode-restarted-monitor"]
