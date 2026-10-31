@@ -6,11 +6,13 @@
       "input": [
         "observed_history.x",
         "observed_history.v",
-        "canonical_action"
+        "canonical_action",
+        "forecast_kind"
       ],
       "output": [
         "predicted_utility",
-        "predicted_next_state"
+        "predicted_next_state",
+        "forecast_kind_provenance"
       ],
       "model": "shared_history_bias_plus_linear_action_response"
     },
@@ -20,10 +22,12 @@
         "observed_history.x",
         "observed_history.v",
         "left_action",
-        "right_action"
+        "right_action",
+        "forecast_kind"
       ],
       "output": [
-        "predicted_pairwise_utility_delta"
+        "predicted_pairwise_utility_delta",
+        "forecast_kind_provenance"
       ],
       "model": "history_sign_slope_plus_grip_delta"
     },
@@ -80,5 +84,18 @@
     "force_max_milli": 750,
     "grip_exact_milli": 0
   },
-  "note": "These are fixed synthetic predictors, not trained Symthaea model weights."
+  "note": "These are fixed synthetic predictors, not trained Symthaea model weights.",
+  "forecast_kinds": [
+    "predicted",
+    "counterfactual"
+  ],
+  "forecast_semantics": {
+    "predicted": "forecast of the policy's currently requested/committed action",
+    "counterfactual": "forecast of a hypothetical alternative action from the same observed history"
+  },
+  "memory_boundary": {
+    "forecast_is_observation": false,
+    "predictor_interface_has_memory_mutation": false,
+    "promotion_requires_new_sensor_evidence": true
+  }
 }
