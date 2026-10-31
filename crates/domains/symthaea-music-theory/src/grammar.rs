@@ -108,10 +108,28 @@ pub enum GrammarPlanEvidence {
     ModalArc(crate::modal_arc::ModalArcPlan),
     CallResponse(crate::call_response::CallResponsePlan),
     JazzChorus(crate::jazz_chorus::JazzChorusPlan),
+    ProgSuite(crate::prog_suite::ProgSuitePlan),
+    Sonata(SonataPlanEvidence),
+    Renaissance(RenaissancePlanEvidence),
     Compatibility {
         family: GrammarFamily,
         form_available: bool,
     },
+}
+
+/// Sonata plan paired with its independent score-side obligation results.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SonataPlanEvidence {
+    pub plan: crate::sonata::SonataPlan,
+    pub resolution: crate::obligation::ObligationLedger,
+    pub verification: Vec<crate::sonata::SonataObligationEvidence>,
+}
+
+/// Renaissance plan paired with the checks computed from the realized score.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RenaissancePlanEvidence {
+    pub plan: crate::renaissance::RenaissancePlan,
+    pub verification: crate::renaissance::RenaissanceVerification,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -194,6 +212,61 @@ pub fn compose_with_grammar_plan(
                 trace: Default::default(),
             }
         }
+        GrammarFamily::Developmental => match spec.form_kind(intent.seed) {
+            crate::spec::FormKind::ProgSuite => {
+                let realized = crate::composer::compose_prog_suite_with_plan(intent, spec)
+                    .expect("ProgSuite form must expose its exact plan");
+                GrammarRealization {
+                    score: realized.score,
+                    form: None,
+                    plan: GrammarPlanEvidence::ProgSuite(realized.plan),
+                    trace: Default::default(),
+                }
+            }
+            crate::spec::FormKind::Sonata => {
+                let realized = crate::composer::compose_sonata_with_plan(intent, spec)
+                    .expect("Sonata form must expose its plan and verification");
+                GrammarRealization {
+                    score: realized.score,
+                    form: None,
+                    plan: GrammarPlanEvidence::Sonata(SonataPlanEvidence {
+                        plan: realized.plan,
+                        resolution: realized.resolution,
+                        verification: realized.verification,
+                    }),
+                    trace: Default::default(),
+                }
+            }
+            crate::spec::FormKind::Renaissance => {
+                let realized = crate::composer::compose_renaissance_with_plan(intent, spec)
+                    .expect("Renaissance form must expose its plan and verification");
+                GrammarRealization {
+                    score: realized.score,
+                    form: None,
+                    plan: GrammarPlanEvidence::Renaissance(RenaissancePlanEvidence {
+                        plan: realized.plan,
+                        verification: realized.verification,
+                    }),
+                    trace: Default::default(),
+                }
+            }
+            _ => {
+                let (score, form) = crate::composer::compose_with_spec_and_form_and_grammar(
+                    intent,
+                    spec,
+                    Some(profile),
+                );
+                GrammarRealization {
+                    score,
+                    plan: GrammarPlanEvidence::Compatibility {
+                        family: GrammarFamily::Developmental,
+                        form_available: form.is_some(),
+                    },
+                    form,
+                    trace: Default::default(),
+                }
+            }
+        },
         GrammarFamily::Contrapuntal => {
             let key = spec
                 .mode
@@ -301,8 +374,8 @@ pub fn compose_with_grammar_plan(
         }
     };
     // Universal safety net: every dedicated engine (GrooveCycle,
-    // ProcessAdditive, RagaModalArc, BluesCallResponse, the fugue/period
-    // pipeline) gets the same de-overlap/metadata-sync pass the shared
+    // ProcessAdditive, RagaModalArc, Blues/Jazz, ProgSuite, Sonata,
+    // Renaissance, Fugue, and the shared period pipeline) receives the same
     // pipeline applies internally, so the trace below and the debug gate
     // after it both see the corrected score, not a pre-correction one.
     crate::composer::deoverlap_all_voices(&mut realized.score);
