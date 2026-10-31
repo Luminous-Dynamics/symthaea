@@ -116,6 +116,8 @@ struct Report {
     species_counts: BTreeMap<String, u64>,
     sample_type_counts: BTreeMap<String, u64>,
     route_counts: BTreeMap<String, u64>,
+    /// Metadata-sidecar declared modality coverage by deterministic population stratum.
+    modality_coverage: BTreeMap<String, ModalityCoverage>,
     operation_lineage_group_count: usize,
     spatial_cube_group_count: usize,
     root_ids_shared_across_splits: usize,
@@ -124,6 +126,81 @@ struct Report {
     errors: Vec<Finding>,
     warnings: Vec<Finding>,
     scope_note: &'static str,
+}
+
+#[derive(Debug, Default, Serialize)]
+struct ModalityCoverage {
+    total_rows: u64,
+    geometry_rows: u64,
+    em_any_rows: u64,
+    em_missing_rows: u64,
+    em_usable_rows: u64,
+    em_best_present_rows: u64,
+    geometry_without_usable_em_rows: u64,
+    fused_geometry_em_rows: u64,
+    em_any_fraction: Option<f64>,
+    em_usable_fraction: Option<f64>,
+    fused_fraction: Option<f64>,
+}
+
+impl ModalityCoverage {
+    fn observe(&mut self, row: &Row, slots: &BTreeSet<String>) {
+        self.total_rows += 1;
+        let has_geometry = row.has_single_mask || row.has_dual_mask;
+        let has_usable_em = ["em_xy", "em_xz", "em_yz"]
+            .iter()
+            .any(|slot| slots.contains(*slot));
+        let has_em_best = slots.contains("em_best");
+        if has_geometry {
+            self.geometry_rows += 1;
+        }
+        if row.has_em {
+            self.em_any_rows += 1;
+        } else {
+            self.em_missing_rows += 1;
+        }
+        if has_usable_em {
+            self.em_usable_rows += 1;
+        }
+        if has_em_best {
+            self.em_best_present_rows += 1;
+        }
+        if has_geometry && !has_usable_em {
+            self.geometry_without_usable_em_rows += 1;
+        }
+        if has_geometry && has_usable_em {
+            self.fused_geometry_em_rows += 1;
+        }
+    }
+
+    fn finalize(&mut self) {
+        let total = self.total_rows as f64;
+        self.em_any_fraction = (self.total_rows > 0)
+            .then_some(self.em_any_rows as f64 / total);
+        self.em_usable_fraction = (self.total_rows > 0)
+            .then_some(self.em_usable_rows as f64 / total);
+        self.fused_fraction = (self.total_rows > 0)
+            .then_some(self.fused_geometry_em_rows as f64 / total);
+    }
+}
+
+fn modality_coverage_keys(row: &Row, split: &str) -> Vec<String> {
+    let mut keys = vec![
+        "overall".to_string(),
+        format!("sample_type|{}", row.sample_type),
+        format!("species|{}", row.species),
+        format!("split|{split}"),
+        format!("source_archive|{}", row.source_archive),
+        format!("sample_type_species_split|{}|{}|{split}", row.sample_type, row.species),
+    ];
+    let routes = row.task_routing.iter().cloned().collect::<BTreeSet<_>>();
+    for route in routes {
+        keys.push(format!("task_route|{route}"));
+        keys.push(format!("task_route_species_split|{route}|{}|{split}", row.species));
+    }
+    keys.sort();
+    keys.dedup();
+    keys
 }
 
 #[derive(Debug, Clone)]
@@ -362,6 +439,7 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
     let mut species_counts = BTreeMap::<String, u64>::new();
     let mut sample_type_counts = BTreeMap::<String, u64>::new();
     let mut route_counts = BTreeMap::<String, u64>::new();
+    let mut modality_coverage = BTreeMap::<String, ModalityCoverage>::new();
     let mut seen_samples = BTreeSet::<String>::new();
     let mut lineage_splits = BTreeMap::<String, BTreeSet<String>>::new();
     let mut cube_splits = BTreeMap::<String, BTreeSet<String>>::new();
@@ -462,6 +540,9 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
         }
 
         let present_slot_set: BTreeSet<String> = row.present_slots.iter().cloned().collect();
+        for key in modality_coverage_keys(row, split) {
+            modality_coverage.entry(key).or_default().observe(row, &present_slot_set);
+        }
         if present_slot_set.len() != row.present_slots.len() {
             errors.push(Finding::row("duplicate_present_slot", row, "present_slots contains duplicate entries"));
         }
@@ -567,6 +648,10 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
         ));
     }
 
+    for coverage in modality_coverage.values_mut() {
+        coverage.finalize();
+    }
+
     let operation_lineage_group_count = lineage_splits.len();
     let spatial_cube_group_count = cube_splits.len();
     let root_ids_shared_across_splits = shared_root_entries.len();
@@ -587,6 +672,7 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
         species_counts,
         sample_type_counts,
         route_counts,
+        modality_coverage,
         operation_lineage_group_count,
         spatial_cube_group_count,
         root_ids_shared_across_splits,
@@ -594,7 +680,7 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
         status: if errors.is_empty() { "PASS" } else { "FAIL" },
         errors,
         warnings,
-        scope_note: "PASS validates row-level dataset identity, declared label/route/mask consistency, upstream operation-group isolation, and available 50 um spatial-cube isolation. It does not prove ground-truth correctness, image-byte integrity, biological independence, or model performance. Cross-split root identities are warnings because neurons may span spatial cubes.",
+        scope_note: "PASS validates row-level dataset identity, declared label/route/mask consistency, upstream operation-group isolation, and available 50 um spatial-cube isolation. modality_coverage is computed from sidecar-declared present_slots/has_em only; it does not verify Parquet payload bytes, prove ground-truth correctness, biological independence, or model performance. em_usable_rows counts em_xy/em_xz/em_yz only and excludes label-conditioned em_best; this is metadata eligibility, not proof of readable payload bytes. Cross-split root identities are warnings because neurons may span spatial cubes.",
     }
 }
 
