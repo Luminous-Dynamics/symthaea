@@ -77,10 +77,11 @@ def largest_piecewise_feasible_depth(
             return max(Fraction(0), a0)
 
         # For a >= 1: h1*(a-1) + (h2+1)*a/2 <= budget.
-        slope1 = Fraction(h1) + Fraction(h2 + 1, 2)
+        # Type-1 loss is (a-1)_+ / 2, not (a-1)_+.
+        slope1 = Fraction(h1 + h2 + 1, 2)
         if slope1 == 0:
             return Fraction(2)
-        candidate = (budget + h1) / slope1
+        candidate = (2 * budget + h1) / (h1 + h2 + 1)
         return min(Fraction(2), max(Fraction(1), candidate))
 
     # Standard CRC uses the constant unseen-test-loss envelope U(a)=1.
@@ -91,10 +92,11 @@ def largest_piecewise_feasible_depth(
     if a0 < 1:
         return max(Fraction(0), a0)
 
-    slope1 = Fraction(h1) + Fraction(h2, 2)
+    # Type-1 loss is (a-1)_+ / 2, not (a-1)_+.
+    slope1 = Fraction(h1 + h2, 2)
     if slope1 == 0:
         return Fraction(2)
-    candidate = (budget - 1 + h1) / slope1
+    candidate = (2 * (budget - 1) + h1) / (h1 + h2)
     return min(Fraction(2), max(Fraction(1), candidate))
 
 
