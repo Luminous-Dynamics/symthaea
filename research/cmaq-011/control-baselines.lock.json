@@ -1,7 +1,7 @@
 {
   "schema_version": "cmaq-011-baseline-catalog-v0.1",
   "status": "external-reference-locks-not-reproduced",
-  "policy": "All listed projects remain external baselines. Pin code, checkpoints, task wrappers, reward transforms and runtime before executing. Do not copy code into Symthaea. Upstream reference scores are not local reproductions.",
+  "policy": "All listed projects remain external baselines. Pin code, checkpoints, task wrappers, reward transforms and runtime before executing. Do not copy code into Symthaea. Upstream reference scores are not local reproductions. The WIMLE source is MIT-licensed and remains an isolated external runtime; MRS.Q remains CC BY-NC 4.0 and is not vendored.",
   "baselines": [
     {
       "id": "mrsq",
@@ -63,6 +63,20 @@
         }
       },
       "caveat": "Checked-in author results, not local reproduction. Environment and reward settings must be reproduced before matching."
+    },
+    {
+      "id": "wimle",
+      "role": "uncertainty-aware stochastic world-model control; especially relevant DMC and HumanoidBench comparator",
+      "algorithm_type": "IMLE multi-modal transition model ensemble with aleatoric/epistemic uncertainty and uncertainty-weighted synthetic transitions",
+      "paper_url": "https://arxiv.org/abs/2602.14351",
+      "project_url": "https://mehranagh20.github.io/wimle/",
+      "repository_url": "https://github.com/mehranagh20/wimle",
+      "commit": "be730d6e7cd1538ca5519b8f505feff126b92938",
+      "commit_date": "2026-04-01T22:26:51Z",
+      "license": "MIT",
+      "task_coverage": "40 continuous-control tasks across DeepMind Control Suite, HumanoidBench and MyoSuite. Exact task list and training horizon overrides are locked in wimle-baseline.lock.json.",
+      "upstream_result_artifacts": "results/wimle.csv; results/wimle.pkl; results/np_results/{dmc,hb,myo}/. Upstream README describes 100 evaluation points every 10,000 environment steps (1M total per run).",
+      "caveat": "Paper-reported results and checked-in upstream arrays are reference artifacts, not local reproductions. Its native DMC wrapper uses one dm_control step per action and a 1,000-step episode; MRS.Q defaults to action_repeat=2 and sums reward across two underlying steps. Use a paper-native reproduction track and a separately labelled wrapper-normalized head-to-head. Compare only on actual shared tasks. WIMLE's isolated JAX/CUDA runtime must be version-pinned."
     },
     {
       "id": "td-mpc2",
