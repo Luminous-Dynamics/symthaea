@@ -67,7 +67,17 @@ If the kernel lacks openat2 (ENOSYS), the code refuses the operation; it does no
 
 This does not by itself create an atomic snapshot of a maliciously-written source file. The evaluator binds and parses the private copied byte sequence only, checks the expected run/task/model/schema digests, and treats any malformed or mismatched artifact as invalid. The digest must be included in the signed receipt.
 
-## 4. Required systemd and host checks
+## 4. Canonical receipts and replay consumption
+
+Package file: `research/evaluator-isolation/src/receipt.rs`.
+
+The receipt uses a versioned little-endian binary encoding with a domain tag and an Ed25519 signature from `ed25519-dalek` 3.0.0. It binds a run ID, nonce, monotonic counter, issue time, task hash, oracle commitment (not oracle bytes), candidate prediction hash, model/config/evaluator-profile hashes, three separate TED exposure components, and resource measurements including retained byte-time, read/write bytes and optional measured energy. The signing key is loaded only from the evaluator's systemd credential directory, with a single-link 32-byte private file, and the seed buffer is explicitly zeroized after key construction.
+
+`ReplayLedger` first verifies the signature against an allow-listed public key, then consumes nonce, run ID and per-key counter markers using create-only files. A per-key counter file is protected with `flock`, and marker files/directories are synced before the counter high-water mark is updated. A crash after marker creation can waste a nonce/run ID/counter but cannot make that identifier reusable. The ledger lives in evaluator-private/replay-ledger (0700) and is never candidate-readable.
+
+This is a local filesystem replay primitive, not a distributed consensus ledger. Backup/restore of evaluator-private state can roll back consumed markers; a production deployment must bind the ledger to protected monotonic storage or independently reconcile receipt counters/nonce state before accepting new results. Key rotation/revocation and durable recovery policy are not yet implemented. A valid Ed25519 signature proves origin/integrity under the trusted key; it does not itself prevent replay.
+
+## 5. Required systemd and host checks
 
 On a disposable target NixOS host, import the module, set executable/credential paths and rebuild. Before starting any candidate code:
 
@@ -84,7 +94,7 @@ systemctl cat symthaea-temporal-evaluator.service
 
 Then execute the host attack suite in the README. systemd-analyze security is diagnostic and not a proof. PrivateNetwork=yes is not a blanket AF_UNIX restriction; inspect and deny relevant host sockets explicitly. systemd may be unable to apply some namespace restrictions on a host lacking the required kernel features; never assume that directives alone establish isolation.
 
-## 5. Evidence to preserve
+## 6. Evidence to preserve
 
 For each qualification attempt, capture:
 - NixOS generation, kernel and systemd versions;
@@ -95,7 +105,7 @@ For each qualification attempt, capture:
 - evaluator copy digest, size, run/task/model binding and disposition;
 - failed/invalid/timeout cases, not just successful cases.
 
-## 6. Remaining work
+## 7. Remaining work
 
 - Wire the taskgen/candidate/evaluator binaries to run-specific artifacts and enforce unique run IDs.
 - Integrate the canonical Ed25519 receipt module and evaluator-only LoadCredentialEncrypted key into the actual evaluator executable.
@@ -104,7 +114,7 @@ For each qualification attempt, capture:
 - Run Nix evaluation and systemd unit verification on actual target NixOS.
 - Run adversarial isolation tests before any confirmatory temporal benchmark.
 
-## 7. Security claim ceiling
+## 8. Security claim ceiling
 
 The module, openat2 intake, canonical Ed25519 receipt and replay-ledger sources are authored, not security-qualified. Their tests have not been executed. Even a future passing test only supports the declared NixOS/kernel/systemd/filesystem and threat model. It does not establish resistance to kernel compromise, root, privileged operator, hypervisor or hardware side-channel attacks.
 
