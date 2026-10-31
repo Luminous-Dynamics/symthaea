@@ -239,7 +239,7 @@ Authored in this branch:
 - `irregular_metrics.rs`: exposes exact piecewise-linear reference beside MSE/MAE/CSE/CAE;
 - `lib.rs`: exports both new modules.
 
-This adds 21 authored tests to the 208-test parent branch description (229 authored test functions expected across the combined branch). The sources have not been compiled, formatted, linted or executed: this environment has no `cargo`, `rustc` or `rustfmt`. The counts are source-level authored tests, not passing tests.
+This adds 21 authored tests to the 209 source-counted test functions on the exact parent branch (230 authored test functions expected across the combined branch). The sources have not been compiled, formatted, linted or executed: this environment has no `cargo`, `rustc` or `rustfmt`. The counts are source-level authored tests, not passing tests.
 
 No temporal-value predictor, HDC-LTC production integration, baseline training, data adapter, confirmatory evaluation, hardware measurement or energy result is claimed.
 
