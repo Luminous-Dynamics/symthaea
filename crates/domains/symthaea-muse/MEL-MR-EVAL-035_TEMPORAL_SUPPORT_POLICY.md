@@ -62,7 +62,7 @@ A tail extension is a conservative declared support bound, not observed physical
 
 ## Adversarial tests authored
 
-Seven focused temporal detector tests were added:
+Eight focused temporal detector tests were added:
 1. A high enter crossing followed by lower release-positive windows remains one episode even after falling below enter.
 2. An isolated high window remains raw evidence but is rejected when minimum support duration is two.
 3. A single bounded below-release gap bridges; a gap longer than the limit closes the episode.
@@ -70,6 +70,7 @@ Seven focused temporal detector tests were added:
 5. Measured-empty support remains empty even under a non-zero tail-extension policy.
 6. Channels are qualified independently before their intervals are unioned.
 7. Invalid release ratios, minimum-window counts and tail bounds fail closed.
+8. Shared channel support unions before tail extension, so output tail frames are counted once, not once per channel.
 
 The existing renderer-backed influence test now asserts that report trace length equals the calibrated window/channel count and that tampering with the support policy or a per-window decision invalidates the report receipt. The adapter test also contains a raw-spike/empty-qualified-support negative control: the raw interval is preserved in evidence, while the planner support remains empty.
 
