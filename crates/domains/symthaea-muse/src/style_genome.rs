@@ -633,7 +633,7 @@ pub fn evaluate_genome(
         );
         let composer_trace = composer_trace_from_theory(
             &realization.trace,
-            &score_sha256_for_trace_placeholder(&realization.score),
+            &score_sha256,
             0,
             Some(("motif-primary", 1)),
         );
@@ -794,11 +794,6 @@ pub fn evaluate_genome(
     };
     evaluation.evaluation_sha256 = evaluation_digest(&evaluation)?;
     Ok(evaluation)
-}
-
-fn score_sha256_for_trace_placeholder(score: &Score) -> String {
-    let bytes = serde_json::to_vec(score).unwrap_or_default();
-    domain_sha256(b"symthaea:muse-style-genome-score:v1\n", &bytes)
 }
 
 fn listen_bundle_for_score(
