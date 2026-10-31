@@ -14,7 +14,7 @@ use symthaea_muse_protocol::catalog::{
     CanonicalStyle, HybridStyleSpec, StyleStatus, catalog_entry,
 };
 use symthaea_music_theory::{
-    CompositionSpec, GrammarProfile, MusicalIntent, Score, Style, MUSIC_THEORY_ENGINE_VERSION,
+    CompositionSpec, MusicalIntent, Score, Style, MUSIC_THEORY_ENGINE_VERSION,
     compose_with_grammar_plan,
 };
 
