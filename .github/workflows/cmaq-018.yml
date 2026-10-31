@@ -101,6 +101,18 @@ jobs:
               return hashlib.sha256(payload).hexdigest()
 
           assert canonical_joint_draw_bank_digest(joint_bank) == joint_bank["joint_draw_bank_sha256"]
+          assert joint_bank["joint_draw_bank_sha256"] == (
+              "47a1f2b937faef8235704f6907523967c946cad8184bf7c5f643916bd3441979"
+          )
+
+          permuted_bank = json.loads(json.dumps(joint_bank))
+          permuted_bank["action_ids"] = [9, 17, 3]
+          permuted_bank["outcome_samples"] = [
+              joint_bank["outcome_samples"][2],
+              joint_bank["outcome_samples"][0],
+              joint_bank["outcome_samples"][1],
+          ]
+          assert canonical_joint_draw_bank_digest(permuted_bank) != joint_bank["joint_draw_bank_sha256"]
 
           hostile_bank = json.loads(json.dumps(joint_bank))
           hostile_bank["action_ids"][1] = hostile_bank["action_ids"][0]
