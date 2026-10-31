@@ -230,8 +230,9 @@ fn parse_manifest(value: &Value) -> Result<(String, String, Vec<String>, Vec<Cas
             adaptation_level,
             sensor_state,
         };
-        if meta.adaptation_family_id == "none" && meta.adaptation_level != 0 {
-            return Err(format!("{ctx}: adaptation_family_id=none requires adaptation_level=0"));
+        if (meta.adaptation_family_id == "none" && meta.adaptation_level != 0)
+            || (meta.adaptation_family_id != "none" && meta.adaptation_level == 0) {
+            return Err(format!("{ctx}: adaptation_family_id=none requires level 0; a named adaptation family requires a positive level"));
         }
         output.push(meta);
     }
@@ -389,6 +390,7 @@ fn audit_values(
     let mut invalid_sensor_cases = 0usize;
     let mut invalid_sensor_clear_verdicts = 0usize;
 
+    let mut attack_family_groups: BTreeMap<String, RecallCounts> = BTreeMap::new();
     let mut adaptation_groups: BTreeMap<String, RecallCounts> = BTreeMap::new();
     let mut adaptation_family_groups: BTreeMap<String, RecallCounts> = BTreeMap::new();
     let mut program_groups: BTreeMap<String, RecallCounts> = BTreeMap::new();
@@ -429,8 +431,12 @@ fn audit_values(
         match truth.class.as_str() {
             "malicious" => match truth.effect.as_str() {
                 "observed" => {
+                    if meta.attack_family_id == "none" {
+                        return Err(format!("malicious observed-effect case {case_id} cannot use attack_family_id=none"));
+                    }
                     success_attack_cases += 1;
                     let key = format!("{}|{}", meta.adaptation_family_id, meta.adaptation_level);
+                    add_recall(attack_family_groups.entry(meta.attack_family_id.clone()).or_default(), &prediction.response);
                     add_recall(adaptation_groups.entry(key).or_default(), &prediction.response);
                     add_recall(adaptation_family_groups.entry(meta.adaptation_family_id.clone()).or_default(), &prediction.response);
                     add_recall(program_groups.entry(meta.program_group_id.clone()).or_default(), &prediction.response);
@@ -443,12 +449,18 @@ fn audit_values(
                     }
                 }
                 "not_observed" => {
+                    if meta.attack_family_id == "none" {
+                        return Err(format!("malicious failed-attempt case {case_id} cannot use attack_family_id=none"));
+                    }
                     failed_attack_attempts += 1;
                     if prediction.response == "alert" {
                         failed_attack_alerts += 1;
                     }
                 }
                 "unknown" => {
+                    if meta.attack_family_id == "none" {
+                        return Err(format!("malicious unknown-effect case {case_id} cannot use attack_family_id=none"));
+                    }
                     unknown_effect_attempts += 1;
                     if prediction.response == "alert" {
                         unknown_effect_alerts += 1;
@@ -457,6 +469,9 @@ fn audit_values(
                 _ => return Err(format!("invalid malicious attack_effect for {case_id}")),
             },
             "benign" => {
+                if meta.attack_family_id != "none" || meta.adaptation_family_id != "none" || meta.adaptation_level != 0 {
+                    return Err(format!("benign case {case_id} must use attack/adaptation family none and level 0"));
+                }
                 benign_cases += 1;
                 if invalid_sensor {
                     invalid_benign_cases += 1;
@@ -508,6 +523,7 @@ fn audit_values(
         }
     }
 
+    let (attack_family_macro, attack_family_worst, attack_family_count) = macro_recall(&attack_family_groups);
     let (adaptation_macro, adaptation_worst, adaptation_group_count) = macro_recall(&adaptation_groups);
     let (adaptation_family_macro, adaptation_family_worst, adaptation_family_count) = macro_recall(&adaptation_family_groups);
 
@@ -592,6 +608,14 @@ fn audit_values(
         "energy": "not_measured_by_this_evaluator"
     });
 
+    let by_attack_family: Vec<Value> = attack_family_groups.iter().map(|(group, stats)| json!({
+        "attack_family_id": group,
+        "successful_attack_cases": stats.cases,
+        "detected": stats.detected,
+        "cleared": stats.cleared,
+        "abstained": stats.abstained,
+        "attack_effect_recall": recall(stats)
+    })).collect();
     let by_adaptation_family: Vec<Value> = adaptation_family_groups.iter().map(|(group, stats)| json!({
         "adaptation_family_id": group,
         "successful_attack_cases": stats.cases,
@@ -675,6 +699,10 @@ fn audit_values(
             "abstention_rate": abstention_rate
         },
         "generalization": {
+            "attack_family_level": by_attack_family,
+            "attack_family_macro_recall": attack_family_macro,
+            "worst_attack_family_recall": attack_family_worst,
+            "attack_family_group_count": attack_family_count,
             "adaptation_family_level": by_adaptation,
             "adaptation_family_level_macro_recall": adaptation_macro,
             "worst_adaptation_family_level_recall": adaptation_worst,
@@ -915,6 +943,39 @@ mod tests {
         m["cases"][0]["adaptation_level"] = json!(1);
         let mb = serde_json::to_vec(&m).unwrap();
         assert!(audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap_err().contains("adaptation_family holdout"));
+    }
+
+    #[test]
+    fn rejects_malicious_case_with_none_attack_family() {
+        let (p,mut m,t,pb,_,tb) = fixture_values();
+        m["cases"][2]["attack_family_id"] = json!("none");
+        let mb = serde_json::to_vec(&m).unwrap();
+        assert!(audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap_err().contains("cannot use attack_family_id=none"));
+    }
+
+    #[test]
+    fn rejects_benign_case_tagged_with_attack_family() {
+        let (p,mut m,t,pb,_,tb) = fixture_values();
+        m["cases"][5]["attack_family_id"] = json!("evasive-spectre");
+        let mb = serde_json::to_vec(&m).unwrap();
+        assert!(audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap_err().contains("benign case"));
+    }
+
+    #[test]
+    fn rejects_named_adaptation_family_at_zero_level() {
+        let (p,mut m,t,pb,_,tb) = fixture_values();
+        m["cases"][2]["adaptation_level"] = json!(0);
+        let mb = serde_json::to_vec(&m).unwrap();
+        assert!(audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap_err().contains("named adaptation family requires a positive level"));
+    }
+
+    #[test]
+    fn reports_attack_family_macro_recall() {
+        let (p,m,t,pb,mb,tb) = fixture_values();
+        let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
+        assert_eq!(receipt["generalization"]["attack_family_group_count"], 1);
+        assert_eq!(receipt["generalization"]["attack_family_level"].as_array().unwrap().len(), 1);
+        assert_eq!(receipt["generalization"]["attack_family_macro_recall"], 1.0/3.0);
     }
 
     #[test]
