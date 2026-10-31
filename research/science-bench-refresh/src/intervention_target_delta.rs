@@ -608,18 +608,19 @@ fn target_delta_validity(
         return (FinalCandidateValidityV1::Ambiguous, false);
     };
     let scope_matches = observed.changed_claims == candidate.expected_changed_claim_ids_sha256;
-    if observed.change == candidate.expected_target_change
-        && scope_matches
-        && observed.collateral == CollateralChangeV1::NoneObserved
-    {
-        (FinalCandidateValidityV1::Valid, true)
-    } else if observed.change == TargetChangeKindV1::OtherDeclaredChange
-        || observed.collateral == CollateralChangeV1::Ambiguous
-    {
-        (FinalCandidateValidityV1::Ambiguous, scope_matches)
-    } else {
-        (FinalCandidateValidityV1::Invalid, scope_matches)
+    if observed.change == TargetChangeKindV1::OtherDeclaredChange {
+        return (FinalCandidateValidityV1::Ambiguous, scope_matches);
     }
+    if observed.change != candidate.expected_target_change
+        || !scope_matches
+        || observed.collateral == CollateralChangeV1::MaterialChangeOutsideAllowedScope
+    {
+        return (FinalCandidateValidityV1::Invalid, scope_matches);
+    }
+    if observed.collateral == CollateralChangeV1::Ambiguous {
+        return (FinalCandidateValidityV1::Ambiguous, scope_matches);
+    }
+    (FinalCandidateValidityV1::Valid, true)
 }
 
 fn combine_validity(
