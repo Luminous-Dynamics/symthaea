@@ -244,6 +244,7 @@ struct TapeDigestPayload<'a> {
     version: &'a str,
     tape_id: &'a str,
     policy_id: &'a str,
+    policy_config_sha256: &'a str,
     config: &'a CampaignTapeConfig,
     events: &'a [CampaignEvent],
 }
@@ -256,6 +257,8 @@ pub struct CampaignTape {
     version: String,
     pub tape_id: String,
     pub policy_id: String,
+    /// Hash of the exact scheduler parameters/config, distinct across compared policies.
+    pub policy_config_sha256: String,
     pub config: CampaignTapeConfig,
     pub events: Vec<CampaignEvent>,
     pub tape_sha256: String,
@@ -265,18 +268,22 @@ impl CampaignTape {
     pub fn new(
         tape_id: impl Into<String>,
         policy_id: impl Into<String>,
+        policy_config_sha256: impl Into<String>,
         config: CampaignTapeConfig,
     ) -> Result<Self, CampaignTapeError> {
         config.validate()?;
         let tape_id = tape_id.into();
         let policy_id = policy_id.into();
+        let policy_config_sha256 = policy_config_sha256.into();
         validate_id("tape_id", &tape_id)?;
         validate_id("policy_id", &policy_id)?;
+        validate_sha256("policy_config_sha256", &policy_config_sha256)?;
         Ok(Self {
             schema: TAPE_SCHEMA.to_owned(),
             version: TAPE_VERSION.to_owned(),
             tape_id,
             policy_id,
+            policy_config_sha256,
             config,
             events: Vec::new(),
             tape_sha256: String::new(),
@@ -330,6 +337,7 @@ impl CampaignTape {
         }
         validate_id("tape_id", &self.tape_id)?;
         validate_id("policy_id", &self.policy_id)?;
+        validate_sha256("policy_config_sha256", &self.policy_config_sha256)?;
         self.config.validate()?;
         if self.events.is_empty() {
             return Err(CampaignTapeError::new("events", "tape must contain at least one action"));
@@ -352,6 +360,7 @@ impl CampaignTape {
             version: &self.version,
             tape_id: &self.tape_id,
             policy_id: &self.policy_id,
+            policy_config_sha256: &self.policy_config_sha256,
             config: &self.config,
             events: &self.events,
         };
@@ -898,7 +907,12 @@ mod tests {
     }
 
     fn tape(policy_id: &str) -> CampaignTape {
-        CampaignTape::new(format!("tape-{policy_id}"), policy_id, config()).unwrap()
+        CampaignTape::new(
+            format!("tape-{policy_id}"),
+            policy_id,
+            A,
+            config(),
+        ).unwrap()
     }
 
     #[test]
@@ -994,7 +1008,7 @@ mod tests {
     fn same_round_duplicate_can_map_to_a_direction_admitted_in_that_batch() {
         let mut batch_config = config();
         batch_config.new_direction_claim_cap = 2;
-        let mut tape = CampaignTape::new("tape-same-round-duplicate", "same-round-duplicate", batch_config).unwrap();
+        let mut tape = CampaignTape::new("tape-same-round-duplicate", "same-round-duplicate", A, batch_config).unwrap();
         tape.append(proposal_event(
             "p1",
             1,
