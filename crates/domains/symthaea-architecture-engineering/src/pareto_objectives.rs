@@ -146,6 +146,7 @@ impl ParetoAnalysisPlan {
             if !objective.scale_lower.is_finite()
                 || !objective.scale_upper.is_finite()
                 || objective.scale_lower >= objective.scale_upper
+                || !(objective.scale_upper - objective.scale_lower).is_finite()
             {
                 return Err(ParetoError::new(
                     format!("plan.objective_specs[{index}].scale"),
@@ -263,6 +264,9 @@ pub struct ParetoCandidateResult {
     pub candidate_id: String,
     pub utility_vector: Vec<f64>,
     pub feasible: bool,
+    pub constraint_violations: Vec<String>,
+    /// Digest of the independently retained evaluation/evidence artifact.
+    pub evidence_sha256: String,
     pub on_pareto_front: bool,
     /// Deterministic witness: lexicographically first feasible candidate that dominates this one.
     pub dominated_by: Option<String>,
@@ -383,6 +387,8 @@ pub fn analyze_pareto(plan: &ParetoAnalysisPlan) -> Result<ParetoAnalysisSummary
             candidate_id: candidate.candidate_id.clone(),
             utility_vector: utilities[index].clone(),
             feasible: candidate.feasible,
+            constraint_violations: candidate.constraint_violations.clone(),
+            evidence_sha256: candidate.evidence_sha256.clone(),
             on_pareto_front: nondominated.contains(&index),
             dominated_by: dominated_by[index].clone(),
         })
