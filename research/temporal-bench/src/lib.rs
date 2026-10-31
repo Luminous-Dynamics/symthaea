@@ -15,6 +15,7 @@ pub mod dms;
 pub mod evidence;
 pub mod fast_event;
 pub mod irregular;
+pub mod irregular_metrics;
 pub mod knowledge_stream;
 pub mod knowledge_trajectory;
 pub mod phase;
