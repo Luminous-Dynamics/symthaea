@@ -920,6 +920,48 @@ mod tests {
             &manifest.evaluator_checks[0]
         ).unwrap().as_object().unwrap().keys().cloned().collect();
         assert_eq!(check_properties, actual_check);
+
+        let env_properties: BTreeSet<String> =
+            manifest_schema["properties"]["environment"]["properties"]
+                .as_object().unwrap().keys().cloned().collect();
+        let actual_env: BTreeSet<String> = serde_json::to_value(&manifest.environment)
+            .unwrap().as_object().unwrap().keys().cloned().collect();
+        assert_eq!(env_properties, actual_env);
+        let truth_properties: BTreeSet<String> =
+            manifest_schema["properties"]["ground_truth"]["properties"]
+                .as_object().unwrap().keys().cloned().collect();
+        let actual_truth: BTreeSet<String> = serde_json::to_value(&manifest.ground_truth)
+            .unwrap().as_object().unwrap().keys().cloned().collect();
+        assert_eq!(truth_properties, actual_truth);
+        let eval_properties: BTreeSet<String> =
+            manifest_schema["properties"]["evaluation"]["properties"]
+                .as_object().unwrap().keys().cloned().collect();
+        let actual_eval: BTreeSet<String> = serde_json::to_value(&manifest.evaluation)
+            .unwrap().as_object().unwrap().keys().cloned().collect();
+        assert_eq!(eval_properties, actual_eval);
+
+        let mut reviewed_manifest = manifest.clone();
+        reviewed_manifest.review_findings.push(BenchmarkComponentReviewFindingV1 {
+            finding_id: "FIND-SCHEMA".to_owned(),
+            component: BenchmarkComponentKindV1::Evaluation,
+            defect_class: ComponentDefectClassV1::GraderBlindSpot,
+            severity: ComponentFindingSeverityV1::Minor,
+            evidence_sha256: digest("schema-evidence"),
+            affected_requirement_ids: vec!["REQ-001".to_owned()],
+            review_method: ComponentReviewMethodV1::HumanReview,
+            reviewer_identity_commitment_sha256: digest("reviewer"),
+            reviewer_attestation_sha256: digest("review-attestation"),
+            disposition: ComponentFindingDispositionV1::Proposed,
+        });
+        reviewed_manifest.manifest_sha256 =
+            benchmark_component_manifest_digest(&reviewed_manifest).unwrap();
+        let finding_properties: BTreeSet<String> =
+            manifest_schema["properties"]["review_findings"]["items"]["properties"]
+                .as_object().unwrap().keys().cloned().collect();
+        let actual_finding: BTreeSet<String> = serde_json::to_value(
+            &reviewed_manifest.review_findings[0]
+        ).unwrap().as_object().unwrap().keys().cloned().collect();
+        assert_eq!(finding_properties, actual_finding);
     }
 
     #[test]
@@ -1045,6 +1087,8 @@ mod tests {
         assert_eq!(report.model_triage_finding_count, 1);
         assert!(report.issues.iter().any(|issue| issue.contains("cannot self-assert human confirmation")));
         assert!(!report.valid);
+        assert!(!report.valid);
+        assert!(!report.review_dispositions_valid);
         assert!(!report.reviewer_attestations_authenticated);
         assert!(!report.qualified_for_confirmatory_use);
     }
