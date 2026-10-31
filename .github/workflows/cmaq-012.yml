@@ -46,6 +46,19 @@ jobs:
           Draft202012Validator.check_schema(schema)
           Draft202012Validator.check_schema(profile_schema)
           Draft202012Validator.check_schema(receipt_schema)
+          profile_example = json.loads(Path("fixtures/resource-profile.example.json").read_text())
+          receipt_example = json.loads(Path("fixtures/profiling-receipt.example.json").read_text())
+          validate(instance=profile_example, schema=profile_schema)
+          validate(instance=receipt_example, schema=receipt_schema)
+          assert profile_example["fixture_only"] is True
+          assert receipt_example["fixture_only"] is True
+          assert profile_example["claim_ceiling"] == (
+              "measurement_profile_contract_only_receipt_bytes_must_be_independently_verified"
+          )
+          assert receipt_example["resource_profile_sha256"] == "a" * 64
+          assert receipt_example["claim_ceiling"] == (
+              "digest_bound_run_record_not_independently_verified_by_v0_2_cli"
+          )
           validate(instance=report, schema=schema)
           assert report["schema_version"] == "cmaq-012-paired-aop-report-v0.2"
           assert report["auditor_version"] == "0.2.0"
