@@ -51,7 +51,7 @@ These are exact synthetic model semantics. They demonstrate that a pairwise line
 
 `I(a,b) = L(G \\ {a,b}) - L(G \\ {a}) - L(G \\ {b}) + L(G)`
 
-A positive interaction in the parallel-route fixture means neither deletion alone breaks reachability, but their joint deletion does. A negative interaction in the serial-chain fixture means either deletion alone already breaks the query. These are graph-query semantics, not biological importance scores; biological criticality remains task-, state- and model-dependent. The extrasynaptic fixture demonstrates that an intervention can produce a measured effective response at a node with no direct anatomical edge, without rewriting the anatomical graph. This is a phenomenological test channel, not an identified peptide/receptor mechanism.
+A positive interaction in the parallel-route fixture means neither deletion alone breaks reachability, but their joint deletion does. A negative interaction in the serial-chain fixture means either deletion alone already breaks the query. These are graph-query semantics, not biological importance scores; biological criticality remains task-, state- and model-dependent. The linear dynamic edge-deletion fixture gives zero interaction for two parallel paths because their continuous outputs add, but a positive interaction for a serial bottleneck because either deletion alone removes the response. Those are two distinct estimands. The extrasynaptic fixture demonstrates that an intervention can produce a measured effective response at a node with no direct anatomical edge, without rewriting the anatomical graph. This is a phenomenological test channel, not an identified peptide/receptor mechanism.
 
 ## Planned extensions
 
