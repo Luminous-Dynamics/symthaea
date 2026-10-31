@@ -18,6 +18,13 @@ const HOEFFDING_LOG_95: f64 = 3.688_879_454_113_936_3;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+pub enum MultipleTestingProcedureV1 {
+    BenjaminiHochberg,
+    BenjaminiYekutieli,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum ReferenceDesignV1 {
     SharedPerFeatureBank,
     IndependentPerHypothesis,
@@ -40,6 +47,7 @@ pub struct FtdCalibrationConfigV1 {
     pub tail_direction: ReferenceTailV1,
     pub weight_policy: FtdWeightPolicyV1,
     pub softmax_temperature_milli: Option<u16>,
+    pub final_multiple_testing: MultipleTestingProcedureV1,
     pub alpha_permille: u16,
 }
 
@@ -80,7 +88,7 @@ pub struct FtdCalibrationReportV1 {
     pub mean_selected_fraction: BoundedEstimateV1,
     pub mean_selected_clean_count: f64,
     pub mean_selected_contaminated_count: f64,
-    pub mean_bh_retained_count: f64,
+    pub mean_final_selected_count: f64,
     pub pvalue_calibration_by_feature: Vec<PValueCalibrationDiagnosticV1>,
     pub combined_null_pvalue_calibration: Option<PValueCalibrationDiagnosticV1>,
     pub fdr_target: f64,
@@ -384,6 +392,49 @@ fn summarize_calibration_diagnostic(
     })
 }
 
+fn final_multiple_testing_rejections(
+    p_values: &[f64],
+    alpha: f64,
+    procedure: MultipleTestingProcedureV1,
+) -> Result<Vec<bool>, String> {
+    if p_values.is_empty() {
+        return Err("final multiple-testing p-value set must not be empty".to_owned());
+    }
+    if !alpha.is_finite() || !(0.0..1.0).contains(&alpha) {
+        return Err("final multiple-testing alpha must be finite and in (0, 1)".to_owned());
+    }
+    let mut indexed = Vec::with_capacity(p_values.len());
+    for (index, value) in p_values.iter().copied().enumerate() {
+        if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+            return Err("final multiple-testing p-values must be finite and in [0, 1]".to_owned());
+        }
+        indexed.push((value, index));
+    }
+    indexed.sort_by(|left, right| {
+        left.0.total_cmp(&right.0).then_with(|| left.1.cmp(&right.1))
+    });
+    let n = p_values.len() as f64;
+    let dependence_factor = match procedure {
+        MultipleTestingProcedureV1::BenjaminiHochberg => 1.0,
+        MultipleTestingProcedureV1::BenjaminiYekutieli => {
+            (1..=p_values.len()).map(|rank| 1.0 / rank as f64).sum::<f64>()
+        }
+    };
+    let mut largest_valid_rank = 0_usize;
+    for (zero_index, (p_value, _)) in indexed.iter().enumerate() {
+        let rank = (zero_index + 1) as f64;
+        let threshold = alpha * rank / (n * dependence_factor);
+        if *p_value <= threshold {
+            largest_valid_rank = zero_index + 1;
+        }
+    }
+    let mut rejected = vec![false; p_values.len()];
+    for (_, original_index) in indexed.into_iter().take(largest_valid_rank) {
+        rejected[original_index] = true;
+    }
+    Ok(rejected)
+}
+
 fn bounded_estimate(values: &[f64]) -> Result<BoundedEstimateV1, String> {
     if values.is_empty() {
         return Err("cannot estimate an empty Monte Carlo outcome vector".to_owned());
@@ -462,6 +513,16 @@ pub fn run_ftd_calibration(
             config.weight_policy,
             config.softmax_temperature_milli,
         )?;
+        let combined_p_values: Vec<f64> = fused
+            .combined_p_values
+            .iter()
+            .map(|row| row.p_value)
+            .collect();
+        let final_rejections = final_multiple_testing_rejections(
+            &combined_p_values,
+            alpha,
+            config.final_multiple_testing,
+        )?;
 
         let null_combined_p_values: Vec<f64> = fused
             .combined_p_values
@@ -478,8 +539,8 @@ pub fn run_ftd_calibration(
         let mut selected = 0_u64;
         let mut selected_clean = 0_u64;
         let mut selected_contaminated = 0_u64;
-        for row in &fused.combined_p_values {
-            if !row.retained_as_clean {
+        for (row_index, row) in fused.combined_p_values.iter().enumerate() {
+            if !final_rejections[row_index] {
                 continue;
             }
             let index = row.pair_id.strip_prefix("item-")
@@ -549,9 +610,10 @@ pub fn run_ftd_calibration(
         mean_selected_fraction: selected_fraction,
         mean_selected_clean_count: selected_clean_total as f64 / repetitions,
         mean_selected_contaminated_count: selected_contaminated_total as f64 / repetitions,
-        mean_bh_retained_count: selected_total as f64 / repetitions,
+        mean_final_selected_count: selected_total as f64 / repetitions,
         pvalue_calibration_by_feature,
         combined_null_pvalue_calibration,
+        final_multiple_testing: config.final_multiple_testing,
         fdr_target,
         run_fdr_exceedance_upper_95_hoeffding: exceedance_estimate.upper_95_hoeffding,
         calibration_design: match config.reference_design {
@@ -585,6 +647,7 @@ mod tests {
             tail_direction: ReferenceTailV1::Greater,
             weight_policy: FtdWeightPolicyV1::PaperNormalizedRejectionCounts,
             softmax_temperature_milli: None,
+            final_multiple_testing: MultipleTestingProcedureV1::BenjaminiHochberg,
             alpha_permille: 50,
         }
     }
@@ -639,6 +702,23 @@ mod tests {
         let report = run_ftd_calibration(&cfg, &[0x55; 32]).unwrap();
         assert_eq!(report.calibration_design,
             "independent_finite_reference_bank_per_feature_and_test_item");
+    }
+
+    #[test]
+    fn by_is_no_less_conservative_than_bh_for_the_same_p_values() {
+        let values = [0.001, 0.01, 0.02, 0.04, 0.2, 0.8];
+        let bh = final_multiple_testing_rejections(
+            &values,
+            0.05,
+            MultipleTestingProcedureV1::BenjaminiHochberg,
+        ).unwrap();
+        let by = final_multiple_testing_rejections(
+            &values,
+            0.05,
+            MultipleTestingProcedureV1::BenjaminiYekutieli,
+        ).unwrap();
+        assert!(by.iter().filter(|value| **value).count()
+            <= bh.iter().filter(|value| **value).count());
     }
 
     #[test]
