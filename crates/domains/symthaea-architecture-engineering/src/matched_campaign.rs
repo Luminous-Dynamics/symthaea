@@ -221,7 +221,7 @@ pub fn reconcile_mechanism_matched_campaign(
                             direction_id.clone(),
                             parent_candidate_sha256.clone(),
                             semantic_delta_sha256.clone(),
-                            outcome.clone(),
+                            (*outcome).clone(),
                             BTreeSet::new(),
                         )
                     });
@@ -249,7 +249,7 @@ pub fn reconcile_mechanism_matched_campaign(
                         (
                             parent_direction_id.clone(),
                             semantic_delta_sha256.clone(),
-                            outcome.clone(),
+                            (*outcome).clone(),
                             BTreeSet::new(),
                         )
                     });
