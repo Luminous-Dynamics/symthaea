@@ -1,0 +1,199 @@
+{
+  "schema_version": "cmaq-015-hostile-cases-v0.1",
+  "status": "specification_only_not_executed",
+  "cases": [
+    {
+      "id": "raw-evidence-bytes-changed",
+      "mutation": "Change the raw evidence bytes while retaining the signed subject_sha256 in the unchanged payload.",
+      "expected": {
+        "byte_integrity": "fail",
+        "cryptographic_authenticity": "pass",
+        "decision_qualification": "not_qualified"
+      }
+    },
+    {
+      "id": "payload-subject-digest-tamper",
+      "mutation": "Change evidence.subject_sha256 in the signed payload without generating a new signature.",
+      "expected": {
+        "cryptographic_authenticity": "fail"
+      }
+    },
+    {
+      "id": "invalid-signature",
+      "mutation": "Replace signature bytes with a different same-length value.",
+      "expected": {
+        "cryptographic_authenticity": "fail"
+      }
+    },
+    {
+      "id": "unknown-signer",
+      "mutation": "Use a key ID absent from the trusted key registry.",
+      "expected": {
+        "purpose_authorization": "fail"
+      }
+    },
+    {
+      "id": "wrong-purpose",
+      "mutation": "Use a valid key whose trust record does not include CmaqBenchmarkEvidenceReceipt.",
+      "expected": {
+        "purpose_authorization": "fail"
+      }
+    },
+    {
+      "id": "expired-signer",
+      "mutation": "Use an expired key under current-policy verification.",
+      "expected": {
+        "purpose_authorization": "fail"
+      }
+    },
+    {
+      "id": "revoked-signer",
+      "mutation": "Use a revoked key under current-policy verification.",
+      "expected": {
+        "purpose_authorization": "fail"
+      }
+    },
+    {
+      "id": "historical-after-revocation",
+      "mutation": "Verify an immutable historically signed receipt after the signer is revoked.",
+      "expected": {
+        "cryptographic_authenticity": "pass",
+        "purpose_authorization": "fail_for_current_policy",
+        "replay_status": "historical_only"
+      }
+    },
+    {
+      "id": "key-alias-sybil",
+      "mutation": "Present six authorized key IDs resolving to one source commitment.",
+      "expected": {
+        "cryptographic_authenticity": "may_pass",
+        "claim_relative_independence": "same_source"
+      }
+    },
+    {
+      "id": "self-asserted-independence",
+      "mutation": "Modify producer-controlled metadata to claim independent=true without a matching registry/profile proof.",
+      "expected": {
+        "claim_relative_independence": "indeterminate_or_same_source"
+      }
+    },
+    {
+      "id": "missing-parent",
+      "mutation": "Remove a required parent edge from the receipt lineage.",
+      "expected": {
+        "lineage_completeness": "incomplete"
+      }
+    },
+    {
+      "id": "unknown-parent",
+      "mutation": "Reference a parent digest absent from the authenticated lineage registry/receipt store.",
+      "expected": {
+        "lineage_completeness": "incomplete"
+      }
+    },
+    {
+      "id": "lineage-cycle",
+      "mutation": "Create a cycle in parent ancestry across otherwise valid receipts.",
+      "expected": {
+        "lineage_completeness": "cyclic"
+      }
+    },
+    {
+      "id": "direct-ancestor-disguised",
+      "mutation": "Present source and target endpoints where one is an ancestor of the other but endpoint labels differ.",
+      "expected": {
+        "claim_relative_independence": "known_common_mode"
+      }
+    },
+    {
+      "id": "duplicate-parent",
+      "mutation": "Repeat one parent receipt digest.",
+      "expected": {
+        "schema_or_semantic_validation": "fail"
+      }
+    },
+    {
+      "id": "unordered-parents",
+      "mutation": "Reorder parent digests without changing their set.",
+      "expected": {
+        "schema": "may_pass",
+        "canonical_lineage_validation": "fail"
+      }
+    },
+    {
+      "id": "cross-task-transplant",
+      "mutation": "Reuse a signature while changing benchmark/task identity or task manifest digest.",
+      "expected": {
+        "cryptographic_authenticity": "fail"
+      }
+    },
+    {
+      "id": "cross-action-transplant",
+      "mutation": "Reuse a signature for another observation/action/candidate-set digest.",
+      "expected": {
+        "cryptographic_authenticity": "fail"
+      }
+    },
+    {
+      "id": "stale-context-epoch",
+      "mutation": "Replay evidence from an older epoch after a context/regime transition.",
+      "expected": {
+        "replay_status": "replayed_or_stale_context"
+      }
+    },
+    {
+      "id": "reused-live-challenge",
+      "mutation": "Submit a second live receipt against an already consumed challenge.",
+      "expected": {
+        "replay_status": "replayed"
+      }
+    },
+    {
+      "id": "source-sequence-equivocation",
+      "mutation": "Submit different payload digests for the same source epoch and sequence.",
+      "expected": {
+        "replay_status": "equivocation"
+      }
+    },
+    {
+      "id": "trust-snapshot-rollback",
+      "mutation": "Verify against a trust snapshot sequence below the persisted checkpoint.",
+      "expected": {
+        "trust_snapshot_status": "rollback"
+      }
+    },
+    {
+      "id": "trust-sequence-collision",
+      "mutation": "Submit same sequence with a different trust snapshot digest.",
+      "expected": {
+        "trust_snapshot_status": "collision"
+      }
+    },
+    {
+      "id": "registry-rollback",
+      "mutation": "Resolve lineage against a stale/rolled-back registry snapshot.",
+      "expected": {
+        "lineage_completeness": "unknown",
+        "claim_relative_independence": "indeterminate"
+      }
+    },
+    {
+      "id": "valid-signature-false-content",
+      "mutation": "Sign a fabricated or Byzantine observation with an otherwise authorized key.",
+      "expected": {
+        "cryptographic_authenticity": "pass",
+        "empirical_validity": "unsupported_or_contradicted",
+        "decision_qualification": "not_qualified"
+      }
+    },
+    {
+      "id": "valid-receipt-contaminated-evaluator",
+      "mutation": "Use a real signed result receipt whose scoring process was contaminated or policy-visible.",
+      "expected": {
+        "cryptographic_authenticity": "pass",
+        "evaluator_integrity": "contaminated",
+        "decision_qualification": "not_qualified"
+      }
+    }
+  ]
+}

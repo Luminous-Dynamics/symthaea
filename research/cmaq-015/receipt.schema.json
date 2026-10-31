@@ -1,0 +1,376 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-015-signed-receipt-v0.1.json",
+  "title": "CMAQ-015 Signed Evidence Receipt v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "payload",
+    "signature"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-015-signed-receipt-v0.1"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "receipt_id",
+        "benchmark",
+        "context",
+        "evidence",
+        "freshness",
+        "lineage",
+        "resources",
+        "result",
+        "signer"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "cmaq-015-evidence-payload-v0.1"
+        },
+        "receipt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "benchmark": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "benchmark_id",
+            "track",
+            "task_id",
+            "split",
+            "run_id"
+          ],
+          "properties": {
+            "benchmark_id": {
+              "enum": [
+                "cmaq-010",
+                "cmaq-011"
+              ]
+            },
+            "track": {
+              "enum": [
+                "evidence_integrity",
+                "vector_control",
+                "visual_embodied"
+              ]
+            },
+            "task_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "split": {
+              "enum": [
+                "development",
+                "qualification",
+                "hidden_qualification"
+              ]
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_revision_sha",
+            "model_artifact_sha256",
+            "policy_sha256",
+            "action_proposer_sha256",
+            "action_candidate_set_sha256",
+            "observation_sha256",
+            "selected_action_sha256",
+            "environment_config_sha256",
+            "task_manifest_sha256",
+            "evaluator_sha256",
+            "scorer_sha256"
+          ],
+          "properties": {
+            "source_revision_sha": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "model_artifact_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "policy_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "action_proposer_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "action_candidate_set_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "observation_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "selected_action_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "environment_config_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "task_manifest_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "evaluator_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "scorer_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "evidence_class",
+            "media_type",
+            "subject_sha256"
+          ],
+          "properties": {
+            "evidence_class": {
+              "enum": [
+                "synthetic_observation",
+                "simulator_transition",
+                "policy_decision",
+                "environment_result",
+                "evaluator_report"
+              ]
+            },
+            "media_type": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9.+-]+/[a-z0-9.+-]+$"
+            },
+            "subject_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "freshness": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "epoch",
+            "sequence",
+            "nonce_hex",
+            "observed_at_unix_ms",
+            "challenge_consumption_receipt_sha256"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "historical",
+                "live"
+              ]
+            },
+            "epoch": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "nonce_hex": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$"
+            },
+            "observed_at_unix_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "challenge_consumption_receipt_sha256": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "mode": {
+                    "const": "live"
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "challenge_consumption_receipt_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "mode": {
+                    "const": "historical"
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "challenge_consumption_receipt_sha256": {
+                    "type": "null"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "lineage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_commitment_sha256",
+            "registry_entry_sha256",
+            "registry_snapshot_sha256",
+            "independence_profile_sha256",
+            "parent_receipt_sha256"
+          ],
+          "properties": {
+            "source_commitment_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "registry_entry_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "registry_snapshot_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "independence_profile_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "parent_receipt_sha256": {
+              "type": "array",
+              "maxItems": 64,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "budget_contract_sha256",
+            "observed_resource_counters_sha256"
+          ],
+          "properties": {
+            "budget_contract_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "observed_resource_counters_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "result": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "raw_episode_artifact_sha256",
+            "result_row_sha256",
+            "scoring_artifact_sha256"
+          ],
+          "properties": {
+            "raw_episode_artifact_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "result_row_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "scoring_artifact_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "signer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "algorithm",
+            "key_id",
+            "key_usage"
+          ],
+          "properties": {
+            "algorithm": {
+              "enum": [
+                "ed25519",
+                "ml-dsa-65",
+                "ml-dsa-87"
+              ]
+            },
+            "key_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[^\\u0000-\\u0020]+$"
+            },
+            "key_usage": {
+              "const": "CmaqBenchmarkEvidenceReceipt"
+            }
+          }
+        }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "encoding",
+        "value"
+      ],
+      "properties": {
+        "encoding": {
+          "const": "base64"
+        },
+        "value": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 16384,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

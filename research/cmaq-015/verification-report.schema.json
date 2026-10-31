@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-015-verification-report-v0.1.json",
+  "title": "CMAQ-015 Verification Report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_sha256",
+    "subject_sha256",
+    "verifier",
+    "axes",
+    "violations",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-015-verification-report-v0.1"
+    },
+    "receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "subject_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "build_revision_sha",
+        "policy_sha256",
+        "trust_snapshot_sha256",
+        "lineage_registry_sha256",
+        "replay_checkpoint_sha256",
+        "evaluated_at_unix_ms"
+      ],
+      "properties": {
+        "build_revision_sha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "trust_snapshot_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lineage_registry_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "replay_checkpoint_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evaluated_at_unix_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "axes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "byte_integrity",
+        "cryptographic_authenticity",
+        "purpose_authorization",
+        "trust_snapshot_status",
+        "replay_status",
+        "lineage_completeness",
+        "claim_relative_independence",
+        "evaluator_integrity",
+        "empirical_validity",
+        "decision_qualification"
+      ],
+      "properties": {
+        "byte_integrity": {
+          "$ref": "#/$defs/passfail"
+        },
+        "cryptographic_authenticity": {
+          "$ref": "#/$defs/passfail"
+        },
+        "purpose_authorization": {
+          "$ref": "#/$defs/passfail"
+        },
+        "trust_snapshot_status": {
+          "enum": [
+            "fresh",
+            "stale",
+            "rollback",
+            "collision",
+            "unknown",
+            "not_run",
+            "not_applicable"
+          ]
+        },
+        "replay_status": {
+          "enum": [
+            "historical_only",
+            "fresh_single_use",
+            "replayed",
+            "equivocation",
+            "unknown",
+            "not_run"
+          ]
+        },
+        "lineage_completeness": {
+          "enum": [
+            "complete",
+            "incomplete",
+            "cyclic",
+            "unknown",
+            "not_run"
+          ]
+        },
+        "claim_relative_independence": {
+          "enum": [
+            "independent_under_profile",
+            "partially_independent",
+            "known_common_mode",
+            "same_source",
+            "indeterminate",
+            "not_run"
+          ]
+        },
+        "evaluator_integrity": {
+          "enum": [
+            "verified",
+            "contaminated",
+            "unverified",
+            "not_run"
+          ]
+        },
+        "empirical_validity": {
+          "enum": [
+            "independently_validated",
+            "contradicted",
+            "unsupported",
+            "synthetic_only",
+            "not_run"
+          ]
+        },
+        "decision_qualification": {
+          "enum": [
+            "qualified_for_declared_scope",
+            "not_qualified",
+            "not_applicable",
+            "not_run"
+          ]
+        }
+      }
+    },
+    "violations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "passfail": {
+      "enum": [
+        "pass",
+        "fail",
+        "not_run"
+      ]
+    }
+  }
+}
