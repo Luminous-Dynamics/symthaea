@@ -24,8 +24,8 @@ class OnlineEclosureCapacityTests(unittest.TestCase):
         decisions = result["decisions"]
         self.assertEqual(decisions[0]["rejections"], [1])
         self.assertEqual(decisions[1]["rejections"], [1, 2])
-        self.assertLessEqual(decisions[0]["cumulative_cost"], 1)
-        self.assertLessEqual(decisions[1]["cumulative_cost"], 2)
+        self.assertLessEqual(decisions[0]["cumulative_cost"][0] / decisions[0]["cumulative_cost"][1], 1)
+        self.assertLessEqual(decisions[1]["cumulative_cost"][0] / decisions[1]["cumulative_cost"][1], 2)
         self.assertTrue(result["verification"]["valid"])
         # The receipt is canonical-JSON-friendly for immutable replay.
         json.dumps(result, sort_keys=True, separators=(",", ":"))
