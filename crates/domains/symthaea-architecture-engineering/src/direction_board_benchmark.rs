@@ -679,7 +679,7 @@ fn select_global_ucb(
 fn action_reward(action: &DirectionCampaignAction) -> f64 {
     if action.is_new_proposal {
         if action.proposal_disposition == Some(NewDirectionDisposition::Admitted) {
-            1.0
+            NEW_DIRECTION_CREDIT
         } else {
             0.0
         }
@@ -731,7 +731,7 @@ fn select_discounted_ucb(
             None => true,
             Some((best_id, best_value)) => {
                 potential.total_cmp(best_value).is_gt()
-                    || (potential.total_cmp(best_value).is_eq() && arm_id < *best_id)
+                    || (potential.total_cmp(best_value).is_eq() && arm_id.as_str() < best_id.as_str())
             }
         };
         if replace {
@@ -791,7 +791,7 @@ fn select_gaussian_thompson(
             None => true,
             Some((best_id, best_value)) => {
                 sample.total_cmp(best_value).is_gt()
-                    || (sample.total_cmp(best_value).is_eq() && arm_id < *best_id)
+                    || (sample.total_cmp(best_value).is_eq() && arm_id.as_str() < best_id.as_str())
             }
         };
         if replace {
