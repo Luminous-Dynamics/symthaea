@@ -120,6 +120,12 @@
       "target": 0
     },
     {
+      "id": "known_loss_not_promoted_as_loss_free",
+      "class": "safety",
+      "unit": "count",
+      "target": 0
+    },
+    {
       "id": "verification_p95_100k_events",
       "class": "efficiency",
       "unit": "milliseconds",
