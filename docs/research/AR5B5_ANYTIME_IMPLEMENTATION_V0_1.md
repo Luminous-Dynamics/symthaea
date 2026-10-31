@@ -150,3 +150,8 @@ Expected complexity: incremental appends are O(log n) for indexed identity check
 The writer now appends incrementally, and the analyzer avoids recomputing target metrics for failed/invalid/timed-out attempts, verifier rejections, and auxiliary events that do not change evidence-level eligibility. It still performs batch Pareto analysis when an eligible candidate/promotion changes a target archive. Repeated full batch extraction at every successful candidate can become expensive for large runs.
 
 Issue #9610 tracks incremental evidence-level nondominated archives and prefix metrics. The existing batch Pareto evaluator must remain the independent oracle; randomized prefix-equivalence tests are required before using the incremental path for benchmark claims. No measured analysis speedup is claimed.
+
+
+### Empty-run resource semantics
+
+An empty history now reports unknown resource totals and fails strict resource qualification rather than presenting zero cost. The first retained event establishes the measured accumulation baseline. A not-started/unexecuted run is not evidence of free computation. An authored test covers the empty-history receipt.
