@@ -65,6 +65,11 @@
       "id": "SEAL-012",
       "mutation": "Replay a prior valid generation against a newer external checkpoint",
       "expected": "not_implemented_in_v1"
+    },
+    {
+      "id": "SEAL-013",
+      "mutation": "Omit the required previous_seal_digest field instead of supplying null for generation 1",
+      "expected": "reject_missing_required_field"
     }
   ],
   "metrics": [
