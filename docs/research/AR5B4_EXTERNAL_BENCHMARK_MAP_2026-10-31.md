@@ -199,3 +199,32 @@ The baseline fixtures now use a hypervolume reference point below the normalized
 ### Claim ceiling
 
 Three algorithms can now be compared on identical synthetic budgets by one shared deterministic analysis harness. This is not yet a benchmark leaderboard: runs have not been executed, methods have not been cross-checked against PlatEMO 4.16, and no wall-clock, energy or hardware telemetry comparison is included. We have not established any algorithm wins.
+
+## SMS-EMOA and matched three-algorithm comparison — 2026-10-31
+
+The evolutionary baseline set now includes three distinct methods:
+- NSGA-II (rank/crowding and elitist population selection);
+- MOEA/D-DE (weight-vector decomposition and Tchebycheff scalarization);
+- SMS-EMOA (exclusive hypervolume contribution in the worst Pareto front).
+
+Added `pareto_smsemoa.rs`, `pareto_baseline_comparison.rs`, and the corresponding baseline protocol documents. The shared comparison entry point replay-verifies every optimizer, then requires the same benchmark problem, seed, objective-evaluation count, objective definitions/scale anchors, hypervolume reference point and reference Pareto front. It reports HV, IGD+ and additive epsilon through the same analysis implementation and binds all run/analysis/comparison digests.
+
+The integration fixture compares all three algorithms on ZDT1 with 10 decision dimensions and exactly 60 objective evaluations each. It rejects a valid 61-evaluation run, a different seed, duplicate method IDs and incompatible objective/reference contracts. This validates protocol behavior only; it is not an optimization result.
+
+### Benchmarking methodology: fixed-budget and fixed-target
+
+COCO explicitly distinguishes:
+- **fixed-budget:** compare achieved quality after a common number of objective evaluations;
+- **fixed-target:** compare objective evaluations/runtime needed to reach one or more predeclared quality-indicator targets.
+
+The programme should report both. Target-attainment curves and runlength distributions are more informative than one final HV value because they show whether one method improves early, steadily, or only near budget exhaustion. COCO recommends retaining every nondominated solution in the run archive so indicator values can be recalculated as the reference front/reference values improve. It also versions its HV reference values in the benchmark data.
+
+Sources:
+- PlatEMO 4.16 release notes (July 19, 2026; 360 algorithms, 630 problems): https://github.com/BIMK/PlatEMO/releases/tag/v4.16
+- COCO biobjective target-based assessment and retained nondominated archives: https://numbbo.github.io/coco-doc/bbob-biobj/perf-assessment/
+- COCO general fixed-budget/fixed-target performance assessment: https://numbbo.github.io/coco-doc/perf-assessment/
+- COCO official benchmark data archive, including bbob-biobj and constrained/noisy suites: https://coco-platform.org/data-archive/index.html
+
+### Updated claim ceiling
+
+The three methods are compact in-repository reference variants on ZDT1/DTLZ2. No results have been compiled, run, cross-checked against PlatEMO 4.16, or measured for CPU/GPU/energy. Do not call the harness an industry leaderboard yet. Next work is external implementation parity, larger test families, multiple seeds, target-attainment evaluation and real resource telemetry.
