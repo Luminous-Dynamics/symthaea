@@ -59,9 +59,13 @@ This is a probability-of-target-hit baseline, not a general continuous-reward Th
 
 Every run now carries a typed frozen policy-parameter snapshot and its SHA-256 digest. This is useful configuration evidence, but it is not a signature and does not authenticate the runner or the result artifact.
 
-The common event-tape contract is now implemented in `campaign_tape.rs` and exported by the architecture-engineering crate. It provides domain-separated event/tape digests, hash chaining, evaluator-assigned admission/duplicate/rejection decisions, round/worker visibility cutoffs, claim caps, multi-worker action slots, unknown-is-not-zero resource aggregation, conservative within-round peak-memory aggregation, hard-cap enforcement and matched-header validation. Sixteen authored tests cover these invariants.
+The common event-tape contract is implemented in `campaign_tape.rs` and exported by the architecture-engineering crate. It provides domain-separated event/tape digests, hash chaining, evaluator-assigned admission/duplicate/rejection decisions, round/worker visibility cutoffs, claim caps, multi-worker action slots, unknown-is-not-zero resource aggregation, conservative within-round peak-memory aggregation, hard-cap enforcement and matched-header validation. The tape also has a `NovelCandidateEvaluation` event for systems such as Coral in which one NEW-arm worker action both evaluates a candidate and receives the verifier's admission/duplicate/rejection decision. A mapped duplicate remains charged to the NEW arm; it is not silently reclassified as a direction assignment. The current tape module has 27 authored tests.
 
-**Limitations that remain:** the existing policy campaign is still sequential, unit-cost, synthetic and evaluator-known; the event tape is a separate contract and is not yet wired into the campaign runner. The tape provides hash integrity but no signature, trusted key registry, out-of-process verifier, external proposal generator, sealed split, or independently controlled replay process. Coral's four-seat/batched policy adapter is not integrated. A direct merged Coral-vs-DirectionBoard score table would still be methodologically invalid until both use the same event tape and worker/claim semantics.
+The sequential DirectionBoard campaign reconstructs a tape for each run, stores its digest in `DirectionCampaignRun`, and validates the reconstructed digest during aggregation and paired comparison. The three shared bootstrap evaluations are encoded as one policy-invisible batch; policy-selected actions occupy subsequent sequential rounds. The direction campaign contains tests for per-policy tape reconstruction, matched headers, canonical NEW admission and stale-receipt rejection.
+
+A four-seat Coral scheduler adapter is now implemented in `coral_batch_benchmark.rs`. It preserves the reference configuration (W=32, prior_n=4, k=3, kappa=0.05, four seats, first-round cap one, steady-state cap two), fixes all four allocations from one pre-batch snapshot, records idle seats rather than reassigning blocked claims, and captures the NEW direction's opening global best before processing any result from its admitting batch. Its seven authored tests cover parameter identity, batch visibility, caps, scored/rejected NEW attempts, and opening-best semantics.
+
+**Limitations that remain:** the DirectionBoard runner is still sequential, unit-cost, synthetic and evaluator-known; the Coral adapter is also synthetic and uses the same payoff fixture primitives, not real candidate generation or measured runtime telemetry. Resource dimensions other than action units remain unknown. The event tape provides hash integrity but no signature, trusted key registry, out-of-process verifier, external proposal generator, sealed split, or independently controlled replay process. The Coral adapter does not reproduce the complete Coral Discovery multi-agent execution/verifier/orchestration system. A direct Coral-vs-DirectionBoard score table is still invalid until all policies consume the same fixed candidate stream and share the same four-seat worker/batch semantics.
 
 ## 3. Common action tape required for fair policy comparison
 
@@ -91,6 +95,8 @@ Required fields:
 - verifier decision: admitted, duplicate(existing_direction_id), rejected or inconclusive;
 - reason-class and verifier receipt.
 
+For schedulers where a NEW worker action is itself a scored candidate attempt (the Coral seat semantics), use `NovelCandidateEvaluation`: it binds candidate, parent, semantic delta, proposed descriptor, verifier decision and optional score into one event and one charge. Admitted/duplicate outcomes require a finite score; rejected/inconclusive outcomes cannot publish a score. The proposal-only `DirectionProposal` event remains available for systems that actually spend a separate proposal action before later evaluation. These forms must not be substituted for one another in budget comparisons.
+
 A candidate generator cannot authoritatively declare its own direction novel. A duplicate proposal maps to an already registered arm; it does not create a new arm or receive an admission reward. A rejected or inconclusive proposal still consumes its full charged cost.
 
 ### Resource and replay rules
@@ -108,7 +114,7 @@ This action tape is a prerequisite to comparing all policy families, not a cosme
 
 Do not call all direction boards "Coral" or silently change the paper's parameters.
 
-The published Coral Discovery scheduler uses W=32, prior_n=4, first-k infancy k=3, kappa=0.05, a historical maximum-yield exploration scale, largest-remainder seat allocation and first-round/steady-state direction claim caps. Its four-agent configuration is an allocation of simultaneous advisory seats, not four independent sequential choices. The implementation in #9336 reproduces the scheduler equations and caps but does not reproduce the complete Coral agent/verifier/orchestration system.
+The published Coral Discovery scheduler uses W=32, prior_n=4, first-k infancy k=3, kappa=0.05, a historical maximum-yield exploration scale, largest-remainder seat allocation and first-round/steady-state direction claim caps. Its four-agent configuration is an allocation of simultaneous advisory seats, not four independent sequential choices. The formula baseline in #9336 reproduces the scheduler equations and caps. The new `coral_batch_benchmark.rs` adapter feeds the reference configuration through four-seat pre-batch assignment and the common event tape, but it remains a deterministic synthetic scheduler adapter—not the complete Coral agent/verifier/orchestration system.
 
 For an exact-formula comparison:
 
@@ -234,9 +240,8 @@ Do not compare reported scores from different task sets, models, budgets, judge 
 
 ## 10. Next implementation sequence
 
-1. Wire the implemented event tape into the sequential campaign runner and make its run receipt a required output.
-2. Add the Coral adapter with the exact four-seat batch contract and an explicitly separate sequential ablation.
-3. Add a shared worker/claim-cap model and ensure every baseline respects the same batch and budget rules.
+1. Port the remaining baseline policies into four-seat adapters that use the same batch visibility, claim caps and common evaluator-owned candidate stream; retain separate sequential ablations.
+2. Implement candidate-stream parity and verifier canonicalization for fixed-proposal mechanism comparisons.
 4. Add the six-plus landscape suite, including nulls, correlated directions and noisy/nonstationary payoffs.
 5. Add matched-seed statistics with cluster bootstrap at the landscape/template level, pre-registered primary endpoints and multiplicity treatment.
 6. Connect full resource receipts from the single-worker Pareto allocator; only then add atomic multi-worker reservations.

@@ -108,6 +108,9 @@ pub struct CampaignTapeConfig {
     /// Digest of the evaluator-owned candidate/proposal stream supplied to all policies.
     pub candidate_stream_sha256: String,
     pub worker_count: u16,
+    /// First round in which the policy has made an allocation decision. Earlier rounds
+    /// may contain common evaluator-owned bootstrap evaluations.
+    pub first_allocation_round: u64,
     pub first_round_direction_claim_cap: u16,
     pub steady_state_direction_claim_cap: u16,
     pub new_direction_claim_cap: u16,
@@ -127,6 +130,9 @@ impl CampaignTapeConfig {
         }
         if self.worker_count == 0 {
             return Err(CampaignTapeError::new("config.worker_count", "must be non-zero"));
+        }
+        if self.first_allocation_round == 0 {
+            return Err(CampaignTapeError::new("config.first_allocation_round", "must be non-zero"));
         }
         if self.first_round_direction_claim_cap == 0
             || self.steady_state_direction_claim_cap == 0
@@ -195,6 +201,8 @@ pub enum CampaignEventPayload {
         parent_candidate_sha256: String,
         semantic_delta_sha256: String,
         direction_id: String,
+        parent_score: Option<f64>,
+        inspired_by_scores: Vec<f64>,
         disposition: CandidateDisposition,
         score: Option<f64>,
     },
@@ -203,6 +211,23 @@ pub enum CampaignEventPayload {
         descriptor_sha256: String,
         parent_candidate_sha256: Option<String>,
         disposition: DirectionProposalDisposition,
+    },
+    /// One paid candidate evaluation that also asks the verifier to admit or map its
+    /// proposed direction. This is the correct representation for Coral-style NEW agents:
+    /// proposal and scored attempt are one work unit, not two separately charged actions.
+    NovelCandidateEvaluation {
+        candidate_sha256: String,
+        parent_candidate_sha256: String,
+        semantic_delta_sha256: String,
+        proposal_sha256: String,
+        descriptor_sha256: String,
+        parent_score: Option<f64>,
+        inspired_by_scores: Vec<f64>,
+        /// Evaluator snapshot before any outcome from the admitting batch was visible.
+        opening_evaluation_count: Option<u64>,
+        opening_global_best: Option<f64>,
+        disposition: DirectionProposalDisposition,
+        score: Option<f64>,
     },
 }
 
@@ -244,6 +269,7 @@ struct TapeDigestPayload<'a> {
     version: &'a str,
     tape_id: &'a str,
     policy_id: &'a str,
+    policy_config_sha256: &'a str,
     config: &'a CampaignTapeConfig,
     events: &'a [CampaignEvent],
 }
@@ -256,6 +282,8 @@ pub struct CampaignTape {
     version: String,
     pub tape_id: String,
     pub policy_id: String,
+    /// Hash of the exact scheduler parameters/config, distinct across compared policies.
+    pub policy_config_sha256: String,
     pub config: CampaignTapeConfig,
     pub events: Vec<CampaignEvent>,
     pub tape_sha256: String,
@@ -265,18 +293,22 @@ impl CampaignTape {
     pub fn new(
         tape_id: impl Into<String>,
         policy_id: impl Into<String>,
+        policy_config_sha256: impl Into<String>,
         config: CampaignTapeConfig,
     ) -> Result<Self, CampaignTapeError> {
         config.validate()?;
         let tape_id = tape_id.into();
         let policy_id = policy_id.into();
+        let policy_config_sha256 = policy_config_sha256.into();
         validate_id("tape_id", &tape_id)?;
         validate_id("policy_id", &policy_id)?;
+        validate_sha256("policy_config_sha256", &policy_config_sha256)?;
         Ok(Self {
             schema: TAPE_SCHEMA.to_owned(),
             version: TAPE_VERSION.to_owned(),
             tape_id,
             policy_id,
+            policy_config_sha256,
             config,
             events: Vec::new(),
             tape_sha256: String::new(),
@@ -330,6 +362,7 @@ impl CampaignTape {
         }
         validate_id("tape_id", &self.tape_id)?;
         validate_id("policy_id", &self.policy_id)?;
+        validate_sha256("policy_config_sha256", &self.policy_config_sha256)?;
         self.config.validate()?;
         if self.events.is_empty() {
             return Err(CampaignTapeError::new("events", "tape must contain at least one action"));
@@ -352,6 +385,7 @@ impl CampaignTape {
             version: &self.version,
             tape_id: &self.tape_id,
             policy_id: &self.policy_id,
+            policy_config_sha256: &self.policy_config_sha256,
             config: &self.config,
             events: &self.events,
         };
@@ -370,6 +404,8 @@ impl CampaignTape {
         let mut previous_round = 0_u64;
         let mut known_directions: BTreeSet<String> =
             self.config.initial_direction_ids.iter().cloned().collect();
+        let mut scored_evaluation_count = 0_u64;
+        let mut global_best_score: Option<f64> = None;
         let mut index = 0usize;
 
         while index < self.events.len() {
@@ -391,6 +427,9 @@ impl CampaignTape {
                     "round contains more actions than configured workers",
                 ));
             }
+            let round_opening_evaluation_count = scored_evaluation_count;
+            let round_opening_global_best = global_best_score;
+            let mut round_scored_scores = Vec::new();
             let visibility_cutoff = round[0].policy_visible_through_sequence;
             if visibility_cutoff != round[0].sequence_number - 1 {
                 return Err(CampaignTapeError::new(
@@ -489,6 +528,8 @@ impl CampaignTape {
                             parent_candidate_sha256,
                             semantic_delta_sha256,
                             direction_id: payload_direction,
+                            parent_score,
+                            inspired_by_scores,
                             disposition,
                             score,
                         },
@@ -506,8 +547,18 @@ impl CampaignTape {
                         validate_sha256("candidate_sha256", candidate_sha256)?;
                         validate_sha256("parent_candidate_sha256", parent_candidate_sha256)?;
                         validate_sha256("semantic_delta_sha256", semantic_delta_sha256)?;
+                        if parent_score.is_some_and(|value| !value.is_finite())
+                            || inspired_by_scores.iter().any(|value| !value.is_finite())
+                        {
+                            return Err(CampaignTapeError::new(
+                                format!("events[{event_index}].parent_or_inspired_score"),
+                                "parent and inspiration scores must be finite when present",
+                            ));
+                        }
                         match (disposition, score) {
-                            (CandidateDisposition::Verified, Some(value)) if value.is_finite() => {}
+                            (CandidateDisposition::Verified, Some(value)) if value.is_finite() => {
+                                round_scored_scores.push(value);
+                            }
                             (CandidateDisposition::Verified, _) => {
                                 return Err(CampaignTapeError::new(
                                     format!("events[{event_index}].score"),
@@ -523,6 +574,121 @@ impl CampaignTape {
                             }
                         }
                         *direction_claims.entry(direction_id.clone()).or_default() += 1;
+                    }
+                    (
+                        ArmClaim::NewDirection,
+                        CampaignEventPayload::NovelCandidateEvaluation {
+                            candidate_sha256,
+                            parent_candidate_sha256,
+                            semantic_delta_sha256,
+                            proposal_sha256,
+                            descriptor_sha256,
+                            parent_score,
+                            inspired_by_scores,
+                            opening_evaluation_count,
+                            opening_global_best,
+                            disposition,
+                            score,
+                        },
+                    ) => {
+                        validate_sha256("candidate_sha256", candidate_sha256)?;
+                        validate_sha256("parent_candidate_sha256", parent_candidate_sha256)?;
+                        validate_sha256("semantic_delta_sha256", semantic_delta_sha256)?;
+                        validate_sha256("proposal_sha256", proposal_sha256)?;
+                        validate_sha256("descriptor_sha256", descriptor_sha256)?;
+                        if parent_score.is_some_and(|value| !value.is_finite())
+                            || inspired_by_scores.iter().any(|value| !value.is_finite())
+                            || opening_global_best.is_some_and(|value| !value.is_finite())
+                        {
+                            return Err(CampaignTapeError::new(
+                                format!("events[{event_index}].score_context"),
+                                "parent, inspiration and opening-best values must be finite when present",
+                            ));
+                        }
+                        match (disposition, score) {
+                            (
+                                DirectionProposalDisposition::Admitted { .. }
+                                | DirectionProposalDisposition::Duplicate { .. },
+                                Some(value),
+                            ) if value.is_finite() => {}
+                            (
+                                DirectionProposalDisposition::Admitted { .. }
+                                | DirectionProposalDisposition::Duplicate { .. },
+                                _,
+                            ) => {
+                                return Err(CampaignTapeError::new(
+                                    format!("events[{event_index}].score"),
+                                    "admitted or duplicate novel candidate requires a finite verified score",
+                                ));
+                            }
+                            (
+                                DirectionProposalDisposition::Rejected { .. }
+                                | DirectionProposalDisposition::Inconclusive { .. },
+                                None,
+                            ) => {}
+                            (
+                                DirectionProposalDisposition::Rejected { .. }
+                                | DirectionProposalDisposition::Inconclusive { .. },
+                                Some(_),
+                            ) => {
+                                return Err(CampaignTapeError::new(
+                                    format!("events[{event_index}].score"),
+                                    "rejected or inconclusive novel candidate cannot publish a score",
+                                ));
+                            }
+                        }
+                        new_claims += 1;
+                        match disposition {
+                            DirectionProposalDisposition::Admitted { canonical_direction_id } => {
+                                if *opening_evaluation_count != Some(round_opening_evaluation_count)
+                                    || *opening_global_best != round_opening_global_best
+                                {
+                                    return Err(CampaignTapeError::new(
+                                        format!("events[{event_index}].opening_context"),
+                                        "new direction opening context must equal the pre-batch evaluation count/global best",
+                                    ));
+                                }
+                                validate_id("canonical_direction_id", canonical_direction_id)?;
+                                if known_directions.contains(canonical_direction_id)
+                                    || !pending_new_directions.insert(canonical_direction_id.clone())
+                                {
+                                    return Err(CampaignTapeError::new(
+                                        format!("events[{event_index}].disposition"),
+                                        "new admission must create a unique canonical direction",
+                                    ));
+                                }
+                            }
+                            DirectionProposalDisposition::Duplicate { existing_direction_id } => {
+                                if opening_evaluation_count.is_some() || opening_global_best.is_some() {
+                                    return Err(CampaignTapeError::new(
+                                        format!("events[{event_index}].opening_context"),
+                                        "duplicate mapping cannot declare a new direction opening context",
+                                    ));
+                                }
+                                validate_id("existing_direction_id", existing_direction_id)?;
+                                if !known_directions.contains(existing_direction_id)
+                                    && !pending_new_directions.contains(existing_direction_id)
+                                {
+                                    return Err(CampaignTapeError::new(
+                                        format!("events[{event_index}].disposition"),
+                                        "duplicate must map to an already known or same-round admitted direction",
+                                    ));
+                                }
+                            }
+                            DirectionProposalDisposition::Rejected { reason_code }
+                            | DirectionProposalDisposition::Inconclusive { reason_code } => {
+                                if opening_evaluation_count.is_some() || opening_global_best.is_some() {
+                                    return Err(CampaignTapeError::new(
+                                        format!("events[{event_index}].opening_context"),
+                                        "rejected or inconclusive proposal cannot open a direction",
+                                    ));
+                                }
+                                validate_id("reason_code", reason_code)?;
+                            }
+                        }
+                        if let Some(value) = score {
+                            round_scored_scores.push(*value);
+                        }
                     }
                     (
                         ArmClaim::NewDirection,
@@ -577,7 +743,7 @@ impl CampaignTape {
                 }
             }
 
-            let direction_cap = if round_id == 1 {
+            let direction_cap = if round_id <= self.config.first_allocation_round {
                 self.config.first_round_direction_claim_cap
             } else {
                 self.config.steady_state_direction_claim_cap
@@ -597,6 +763,12 @@ impl CampaignTape {
                 ));
             }
             known_directions.extend(pending_new_directions);
+            scored_evaluation_count = scored_evaluation_count
+                .checked_add(round_scored_scores.len() as u64)
+                .ok_or_else(|| CampaignTapeError::new("scored_evaluation_count", "overflow"))?;
+            if let Some(round_best) = round_scored_scores.into_iter().max_by(f64::total_cmp) {
+                global_best_score = Some(global_best_score.map_or(round_best, |best| best.max(round_best)));
+            }
             previous_round = round_id;
         }
 
@@ -811,6 +983,7 @@ mod tests {
             comparison_profile_sha256: C.to_owned(),
             candidate_stream_sha256: D.to_owned(),
             worker_count: 2,
+            first_allocation_round: 1,
             first_round_direction_claim_cap: 1,
             steady_state_direction_claim_cap: 2,
             new_direction_claim_cap: 1,
@@ -865,6 +1038,8 @@ mod tests {
                 parent_candidate_sha256: A.to_owned(),
                 semantic_delta_sha256: B.to_owned(),
                 direction_id: direction.to_owned(),
+                parent_score: None,
+                inspired_by_scores: Vec::new(),
                 disposition: CandidateDisposition::Verified,
                 score: Some(0.75),
             },
@@ -897,8 +1072,53 @@ mod tests {
         }
     }
 
+    fn novel_candidate_event(
+        event_id: &str,
+        round: u64,
+        worker: &str,
+        cutoff: u64,
+        disposition: DirectionProposalDisposition,
+        score: Option<f64>,
+    ) -> CampaignEvent {
+        CampaignEvent {
+            event_id: event_id.to_owned(),
+            sequence_number: 0,
+            round_id: round,
+            worker_id: worker.to_owned(),
+            policy_visible_through_sequence: cutoff,
+            claimed_arm: ArmClaim::NewDirection,
+            task_recipe_sha256: A.to_owned(),
+            evaluator_sha256: B.to_owned(),
+            comparison_profile_sha256: C.to_owned(),
+            payload: CampaignEventPayload::NovelCandidateEvaluation {
+                candidate_sha256: D.to_owned(),
+                parent_candidate_sha256: A.to_owned(),
+                semantic_delta_sha256: B.to_owned(),
+                proposal_sha256: C.to_owned(),
+                descriptor_sha256: D.to_owned(),
+                parent_score: None,
+                inspired_by_scores: Vec::new(),
+                opening_evaluation_count: if matches!(
+                    &disposition,
+                    DirectionProposalDisposition::Admitted { .. }
+                ) { Some(0) } else { None },
+                opening_global_best: None,
+                disposition,
+                score,
+            },
+            resource_usage: usage(),
+            previous_event_sha256: String::new(),
+            event_sha256: String::new(),
+        }
+    }
+
     fn tape(policy_id: &str) -> CampaignTape {
-        CampaignTape::new(format!("tape-{policy_id}"), policy_id, config()).unwrap()
+        CampaignTape::new(
+            format!("tape-{policy_id}"),
+            policy_id,
+            A,
+            config(),
+        ).unwrap()
     }
 
     #[test]
@@ -994,7 +1214,7 @@ mod tests {
     fn same_round_duplicate_can_map_to_a_direction_admitted_in_that_batch() {
         let mut batch_config = config();
         batch_config.new_direction_claim_cap = 2;
-        let mut tape = CampaignTape::new("tape-same-round-duplicate", "same-round-duplicate", batch_config).unwrap();
+        let mut tape = CampaignTape::new("tape-same-round-duplicate", "same-round-duplicate", A, batch_config).unwrap();
         tape.append(proposal_event(
             "p1",
             1,
@@ -1093,6 +1313,252 @@ mod tests {
         let mut second = evaluation_event("o2", 2, "w1", 1, "B");
         second.resource_usage.wall_millis = Some(1);
         tape.append(second).unwrap();
+        assert!(tape.seal().is_err());
+    }
+
+    #[test]
+    fn novel_candidate_admission_is_one_charged_action_and_direction_opens_next_round() {
+        let mut tape = tape("novel-admit");
+        tape.append(novel_candidate_event(
+            "n1",
+            1,
+            "w1",
+            0,
+            DirectionProposalDisposition::Admitted {
+                canonical_direction_id: "D".to_owned(),
+            },
+            Some(0.81),
+        )).unwrap();
+        tape.append(evaluation_event("e2", 2, "w1", 1, "D")).unwrap();
+        tape.seal().unwrap();
+        let totals = tape.totals().unwrap();
+        assert_eq!(totals.action_units, 2);
+        assert_eq!(tape.events.len(), 2);
+    }
+
+    #[test]
+    fn novel_candidate_duplicate_maps_to_existing_arm_with_one_charge() {
+        let mut tape = tape("novel-duplicate");
+        tape.append(novel_candidate_event(
+            "n1",
+            1,
+            "w1",
+            0,
+            DirectionProposalDisposition::Duplicate {
+                existing_direction_id: "A".to_owned(),
+            },
+            Some(0.77),
+        )).unwrap();
+        tape.seal().unwrap();
+        assert_eq!(tape.totals().unwrap().action_units, 1);
+    }
+
+    #[test]
+    fn novel_candidate_admission_and_duplicate_can_share_a_batch() {
+        let mut batch_config = config();
+        batch_config.new_direction_claim_cap = 2;
+        let mut tape = CampaignTape::new(
+            "tape-novel-same-batch",
+            "novel_same_batch",
+            A,
+            batch_config,
+        ).unwrap();
+        tape.append(novel_candidate_event(
+            "n1",
+            1,
+            "w1",
+            0,
+            DirectionProposalDisposition::Admitted {
+                canonical_direction_id: "D".to_owned(),
+            },
+            Some(0.80),
+        )).unwrap();
+        tape.append(novel_candidate_event(
+            "n2",
+            1,
+            "w2",
+            0,
+            DirectionProposalDisposition::Duplicate {
+                existing_direction_id: "D".to_owned(),
+            },
+            Some(0.82),
+        )).unwrap();
+        tape.seal().unwrap();
+        assert_eq!(tape.totals().unwrap().action_units, 2);
+    }
+
+    #[test]
+    fn duplicate_novel_candidates_consume_new_arm_claim_capacity() {
+        let mut campaign_config = config();
+        campaign_config.worker_count = 3;
+        let mut tape = CampaignTape::new(
+            "tape-novel-duplicate-cap",
+            "novel_duplicate_cap",
+            A,
+            campaign_config,
+        ).unwrap();
+        tape.append(evaluation_event("e1", 1, "bootstrap", 0, "A")).unwrap();
+        tape.append(novel_candidate_event(
+            "n2",
+            2,
+            "w1",
+            1,
+            DirectionProposalDisposition::Duplicate {
+                existing_direction_id: "A".to_owned(),
+            },
+            Some(0.78),
+        )).unwrap();
+        tape.append(novel_candidate_event(
+            "n3",
+            2,
+            "w2",
+            1,
+            DirectionProposalDisposition::Rejected {
+                reason_code: "not_novel".to_owned(),
+            },
+            None,
+        )).unwrap();
+        assert!(tape.seal().is_err());
+    }
+
+    #[test]
+    fn rejected_and_inconclusive_novel_candidates_cannot_publish_a_score() {
+        for (policy, disposition) in [
+            ("novel-rejected", DirectionProposalDisposition::Rejected {
+                reason_code: "not_novel".to_owned(),
+            }),
+            ("novel-inconclusive", DirectionProposalDisposition::Inconclusive {
+                reason_code: "insufficient_evidence".to_owned(),
+            }),
+        ] {
+            let mut tape = tape(policy);
+            tape.append(novel_candidate_event(
+                "n1", 1, "w1", 0, disposition, None,
+            )).unwrap();
+            tape.seal().unwrap();
+            assert_eq!(tape.totals().unwrap().action_units, 1);
+        }
+    }
+
+    #[test]
+    fn rejected_novel_candidate_with_score_is_invalid() {
+        let mut tape = tape("novel-rejected-with-score");
+        tape.append(novel_candidate_event(
+            "n1",
+            1,
+            "w1",
+            0,
+            DirectionProposalDisposition::Rejected {
+                reason_code: "not_novel".to_owned(),
+            },
+            Some(0.95),
+        )).unwrap();
+        assert!(tape.seal().is_err());
+    }
+
+    #[test]
+    fn novel_candidate_admission_is_one_charged_action_and_direction_opens_next_round() {
+        let mut tape = tape("novel-admit");
+        tape.append(novel_candidate_event(
+            "n1",
+            1,
+            "w1",
+            0,
+            DirectionProposalDisposition::Admitted {
+                canonical_direction_id: "D".to_owned(),
+            },
+            Some(0.81),
+        )).unwrap();
+        tape.append(evaluation_event("e2", 2, "w1", 1, "D")).unwrap();
+        tape.seal().unwrap();
+        let totals = tape.totals().unwrap();
+        assert_eq!(totals.action_units, 2);
+        assert_eq!(tape.events.len(), 2);
+    }
+
+    #[test]
+    fn novel_candidate_duplicate_maps_to_existing_arm_with_one_charge() {
+        let mut tape = tape("novel-duplicate");
+        tape.append(novel_candidate_event(
+            "n1",
+            1,
+            "w1",
+            0,
+            DirectionProposalDisposition::Duplicate {
+                existing_direction_id: "A".to_owned(),
+            },
+            Some(0.77),
+        )).unwrap();
+        tape.seal().unwrap();
+        assert_eq!(tape.totals().unwrap().action_units, 1);
+    }
+
+    #[test]
+    fn novel_candidate_admission_and_duplicate_can_share_a_batch() {
+        let mut batch_config = config();
+        batch_config.new_direction_claim_cap = 2;
+        let mut tape = CampaignTape::new(
+            "tape-novel-same-batch",
+            "novel_same_batch",
+            A,
+            batch_config,
+        ).unwrap();
+        tape.append(novel_candidate_event(
+            "n1",
+            1,
+            "w1",
+            0,
+            DirectionProposalDisposition::Admitted {
+                canonical_direction_id: "D".to_owned(),
+            },
+            Some(0.80),
+        )).unwrap();
+        tape.append(novel_candidate_event(
+            "n2",
+            1,
+            "w2",
+            0,
+            DirectionProposalDisposition::Duplicate {
+                existing_direction_id: "D".to_owned(),
+            },
+            Some(0.82),
+        )).unwrap();
+        tape.seal().unwrap();
+        assert_eq!(tape.totals().unwrap().action_units, 2);
+    }
+
+    #[test]
+    fn rejected_and_inconclusive_novel_candidates_cannot_publish_a_score() {
+        for (policy, disposition) in [
+            ("novel-rejected", DirectionProposalDisposition::Rejected {
+                reason_code: "not_novel".to_owned(),
+            }),
+            ("novel-inconclusive", DirectionProposalDisposition::Inconclusive {
+                reason_code: "insufficient_evidence".to_owned(),
+            }),
+        ] {
+            let mut tape = tape(policy);
+            tape.append(novel_candidate_event(
+                "n1", 1, "w1", 0, disposition, None,
+            )).unwrap();
+            tape.seal().unwrap();
+            assert_eq!(tape.totals().unwrap().action_units, 1);
+        }
+    }
+
+    #[test]
+    fn rejected_novel_candidate_with_score_is_invalid() {
+        let mut tape = tape("novel-rejected-with-score");
+        tape.append(novel_candidate_event(
+            "n1",
+            1,
+            "w1",
+            0,
+            DirectionProposalDisposition::Rejected {
+                reason_code: "not_novel".to_owned(),
+            },
+            Some(0.95),
+        )).unwrap();
         assert!(tape.seal().is_err());
     }
 
