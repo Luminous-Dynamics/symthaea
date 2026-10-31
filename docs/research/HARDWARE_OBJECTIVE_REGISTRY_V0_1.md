@@ -34,7 +34,7 @@ A profile binds:
 - instrument model and instrument ID;
 - sampling frequency.
 
-The profile digest is calculated over the complete canonical profile with the digest field cleared. The objective registry contains the profile manifests themselves, not just free-floating hash strings. Registry validation checks each profile digest, rejects duplicate profile IDs/digests, requires every physical or imported physical objective to reference a profile in the registry, and requires the profile's protocol digest to match the objective's protocol digest.
+The profile digest is calculated over the complete canonical profile with the digest field cleared. The objective registry contains the profile manifests themselves, not just free-floating hash strings, and includes them in its own canonical digest. Registry validation checks each profile digest, rejects duplicate profile IDs/digests, requires every physical or imported physical objective to reference a profile in the registry, and requires the profile's protocol digest to match the objective's protocol digest.
 
 A digest establishes identity, not truth. Acquisition still has to verify that firmware and instrument logs correspond to the claimed hardware.
 
@@ -103,7 +103,7 @@ Do not impute latency, current, power or energy for flash-infeasible candidates.
 
 ## 7. Tests and boundaries
 
-Fifteen authored Rust tests currently cover profile digest binding, missing profile rejection, registry order invariance, registry tampering, maximize/minimize normalization, range rejection, physical device/protocol mismatch, acquisition-cost unit mismatch, positive cost requirements and distinct measured/infeasible/not-measured/failed outcomes.
+Sixteen authored Rust tests currently cover profile digest binding, missing profile rejection, registry order invariance, registry tampering, maximize/minimize normalization, range rejection, physical device/protocol mismatch, imported-profile existence and protocol matching, acquisition-cost unit mismatch, positive cost requirements and distinct measured/infeasible/not-measured/failed outcomes.
 
 The code has not been compiled or executed in the current environment; `cargo`, `rustc` and `rustfmt` are unavailable. The Zenodo export has not been downloaded here, so there are no acquired-file hashes or import measurements yet.
 
