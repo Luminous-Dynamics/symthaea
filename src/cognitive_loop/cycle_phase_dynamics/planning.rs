@@ -520,33 +520,27 @@ impl CognitiveLoopService {
             }
         }
 
-        // 5a. JEPA: parallel latent-space prediction alongside CfC.
-        // Uses the CfC input as "current state" and the multi-scale prediction
-        // as "next state" approximation. The JEPA predictor learns to anticipate
-        // the target encoder's representation of the next state — cheaper than
-        // full observation-space prediction (128D latent vs full CfC dimension).
+        // 5a. JEPA: action-conditioned latent prediction against observed transitions.
+        // Resolve the previous cycle's frozen (source, selected action) prediction
+        // against THIS cycle's actual input, then stage this observation as the next
+        // transition source. The action is attached only after FEP selects it below.
+        // This avoids training on the CfC prediction approximation as its own target.
         #[cfg(feature = "jepa")]
         if let Some(ref mut jepa) = self.jepa_engine {
             let jepa_dim = jepa.config().input_dim;
-            // Normalize both vectors to JEPA's input_dim (pad with zeros or truncate)
             let mut current_vec = input_array.to_vec();
             current_vec.resize(jepa_dim, 0.0);
-            let current_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(current_vec);
-            let mut next_vec = prediction.clone();
-            next_vec.resize(jepa_dim, 0.0);
-            let next_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(next_vec);
-
-            // Use last cycle's FEP action (stored on fep module after each FEP step).
-            // CfC planning runs before this cycle's FEP, so we use the previous action.
-            // This is correct: JEPA predicts "given what I did last, what state am I in now?"
-            let action = self.fep.last_action_idx;
+            let current_hv =
+                symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(current_vec);
             let lr = self.config.cfc_config.learning_rate;
 
-            // Train step: forward + backward + EMA update (inline — latent ops are cheap)
-            let _jepa_loss = jepa.train_step(&current_hv, &next_hv, action, lr);
-
-            // Track energy cost in substrate manager
-            self.substrate_manager.jepa_energy += jepa.config().energy_cost_per_forward;
+            if let Err(error) = jepa.resolve_pending_transition(&current_hv, lr) {
+                tracing::warn!(%error, "JEPA observed transition resolution skipped");
+                jepa.discard_pending_transition();
+            }
+            if let Err(error) = jepa.stage_transition_source(&current_hv) {
+                tracing::warn!(%error, "JEPA transition source staging skipped");
+            }
         }
 
         // Return the buffer to CLS for reuse next cycle (zero-alloc swap)
