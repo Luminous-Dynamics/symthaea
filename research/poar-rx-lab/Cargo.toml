@@ -1,0 +1,13 @@
+[package]
+name = "poar-rx-lab"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Standalone deterministic fault simulator for POAR-RX"
+
+[workspace]
+
+[dependencies]
+pod-meta-lab = { path = "../pod-meta-lab" }
