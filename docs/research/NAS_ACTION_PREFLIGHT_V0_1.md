@@ -2,7 +2,7 @@
 
 Tracking: [NAS-AUTHZ-001 / #9467](https://github.com/Luminous-Dynamics/symthaea/issues/9467)
 
-Implementation branch: `research/nas-action-authorization-v0.1`
+Implementation branch: `research/nas-resource-reservation-v0.1`
 
 ## 1. Purpose and claim boundary
 
@@ -24,7 +24,7 @@ The `NasMeasurementActionScope` commits to:
 - full QMC design digest and disjoint selection/validation replicate-set digests;
 - exact physical hardware-profile, measurement-protocol, and instrument-identity digests;
 - measurement action's likelihood-model digest;
-- resource registry, budget state (including spent values and protected reserves), and complete action-cost-vector digests.
+- resource registry, budget state (including spent values and protected reserves), complete action-cost-vector digest, and the exact compare-and-swap reservation-ledger head observed before preflight.
 
 The confidence stream ID is derived as `measurement:<scope_sha256>`. The manifest family ID must equal the run ID. This prevents replaying an otherwise valid confidence stream against another candidate configuration, device, protocol, posterior, QMC split, or resource budget.
 
@@ -66,33 +66,37 @@ Candidate promotion is deliberately rejected until #9388 supplies a private, non
 
 This PR does not implement a promotion bypass. It explicitly fails closed.
 
-## 6. Transactional execution is a separate gate
+## 6. Compare-and-swap reservation reference implementation
 
-Preflight reads the resource budget and verifies current headroom, but does not lock or debit it. Concurrent preflights could see the same remaining budget. Before any external action, a separate reservation service must implement an atomic or idempotent two-phase transition:
+The follow-on [#9485 / NAS-RESERVE-001](https://github.com/Luminous-Dynamics/symthaea/issues/9485) adds `resource_reservation.rs` and a private-field, non-serializable `VerifiedMeasurementReservation` capability issued only by `prepare_measurement_reservation` after full preflight. The measurement scope now includes the exact reservation-ledger head that the preflight observed.
 
-`UNRESERVED -> RESERVED -> COMMITTED`
+The reference ledger provides:
+- exact-head compare-and-swap reservation;
+- action-scope digest as idempotency key;
+- complete integer resource-vector accounting after base spend, protected reserves, active reservations and committed consumption;
+- one-way COMMITTED state, pre-commit RELEASED state, and monotone-epoch EXPIRED state;
+- domain-separated event chain, record/ledger digest, and independent replay;
+- stale competing preflight rejection and lost-response idempotency.
 
-with:
-- unique idempotency key = action scope digest;
-- atomic component-wise resource reservation and run-wide risk debit;
-- expiry/lease and explicit cancellation;
-- idempotent retry after network failure;
-- crash recovery with a durable write-ahead log;
-- rollback only before execution starts;
-- no refund of already consumed physical/device/instrument resources;
-- replay protection bound to the run ID and exact target commit.
+This is still an in-process reference state machine. It is not a distributed or durable transaction service, does not authenticate callers, and does not provide trusted time or crash recovery. Production must move the expected-head check and all resource-coordinate reservations into one durable serializable transaction or dedicated service.
 
-No claim of concurrent safety can be made from a pure preflight function.
+## 7. Production transactional adapter is still required
 
-## 7. Tests and limitations
+The #9485 reference ledger now performs an expected-head compare-and-swap inside one in-process mutable state machine, atomically applies each transition to a candidate copy, and replays a hash-chained history. It prevents stale concurrent callers in that state machine: only one distinct reservation can mutate from a given revision head. It also provides exact-scope idempotency, bounded leases, release before commit, and irreversible resource consumption at commit.
+
+This does **not** provide cross-process or distributed atomicity. The `&mut self` API serializes operations only within one process; it has no durable database transaction, authentication, trusted clock, write-ahead log, or crash recovery. A production adapter must execute the expected-head compare-and-swap and all resource-coordinate holds in one durable serializable transaction or dedicated service, with authenticated callers, idempotent retries, lease recovery, and a write-ahead log. No production concurrency-safety claim can be made from the reference model alone.
+
+The reference transition is `RESERVED -> COMMITTED | RELEASED | EXPIRED`. COMMITTED consumes the full reservation conservatively and can never be refunded automatically.
+
+## 8. Tests and limitations
 
 Twelve Rust unit tests are authored for scope mutation, commit/candidate replay, event-ID binding, valid and disabled run-wide pruning events, promotion blocking, objective-order hashing, instrument identity mutation, malformed scopes, and receipt digest integrity.
 
-The successful measurement path also requires a full exact-fixture integration test that exercises all upstream crates together. The current authoring environment lacks `cargo`, `rustc`, and `rustfmt`; no compile/test/CI result is claimed.
+The successful measurement path includes an authored exact-fixture integration test that exercises preflight -> reservation -> commit across the upstream crates. The reservation state machine has a separate 15-test suite. Neither suite has been compiled or executed: the current authoring environment lacks `cargo`, `rustc`, and `rustfmt`; no compile/test/CI result is claimed.
 
 The preflight receipt digest detects accidental or malicious field edits only when the consumer independently recomputes the receipt and trusts the evidence source. It is not a signature or authorization capability. Consumers must re-run the full preflight against exact source evidence, not accept an externally supplied receipt on its hash alone.
 
-## 8. Current research baseline and new RQMC direction
+## 9. Current research baseline and new RQMC direction
 
 Industry baselines:
 - ConNAS (ICLR 2026) reports architectures within 0.14% of the optimal feasible NATS-Bench architecture under its tested constraints: https://proceedings.iclr.cc/paper_files/paper/2026/hash/7c9f851081499ed5c60c51e312d3235f-Abstract-Conference.html
@@ -104,7 +108,7 @@ Important additional statistical result:
 - The paper studies empirical-Bernstein and hedged-betting confidence intervals for bounded RQMC integrands. For total budget (N=R n) split into (R) independent RQMC replicates of (n) points each, it derives an oracle Bennett-interval allocation (n=Theta(N^{1/(\theta+1)})) under RQMC variance (Theta(n^{-\theta})), and reports HBCIs often narrower than EBCIs in its experiments.
 - This directly motivates a two-level optimizer for Symthaea: choose both the number of independent randomized replicates (R) and the point count (n) per replicate, rather than assuming a fixed 16-scramble QMC design. It is not safe to copy the asymptotic rate without verifying smoothness/variance assumptions for our discontinuous hypervolume indicator and the actual randomization scheme. A NAS-specific coverage and cost experiment is required.
 
-## 9. Qualification and comparison targets
+## 10. Qualification and comparison targets
 
 Use matched vector-resource budgets and fixed held-out tasks. Report:
 - held-out hypervolume and portfolio-class regret;
