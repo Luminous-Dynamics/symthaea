@@ -43,7 +43,7 @@ Module: `src/symbolic_edit_verifier.rs`, gated behind the existing `theory` feat
 Public interface:
 - `symbolic_score_sha256`: domain-separated digest over the canonical serialized Score.
 - `verify_symbolic_edit_contract`: compares actual source/target Score inputs to the frozen contract.
-- `SymbolicEditVerification`: includes source/target/contract hashes, symbolic verdict, verified IDs, failed IDs, pending external IDs and failures.
+- `SymbolicEditVerification`: includes source/target/contract hashes, a symbolic verdict, a separate overall verdict, verified IDs, failed IDs, pending external IDs and failures. A correct symbolic edit can have symbolic `pass` and overall `incomplete` until audio/renderer evidence arrives.
 - `verify_symbolic_edit_verification`: re-runs the check from source, target and contract and rejects tampered reports.
 
 A symbolic pass does not imply an end-to-end pass. The current pitch contracts also require:
@@ -58,7 +58,7 @@ Any symbolic failure takes precedence over pending evidence. A clean symbolic re
 
 ## Adversarial source tests
 
-Ten tests are authored:
+Eleven tests are authored:
 
 1. Valid pitch-at change passes symbolic checks but remains audio-incomplete.
 2. No-op pitch request is rejected even when the target Score hash matches.
@@ -70,6 +70,7 @@ Ten tests are authored:
 8. Source/target digest mismatches are rejected.
 9. Tampered verification receipts fail replay.
 10. Noncanonical score event IDs fail closed.
+11. Event IDs resolve against the onset-sorted renderer event stream even when backing note storage is deliberately unsorted.
 
 ## Qualification targets
 
@@ -94,4 +95,4 @@ These are gates, not measured results.
 
 This module verifies only symbolic pitch-at/transpose transformations. It does not establish that a renderer used the verified Score, that output PCM corresponds to it, that protected audio is perceptually unchanged, or that listeners accept the result. An end-to-end certificate requires the independent renderer receipt, acoustic preservation report and perceptual validation to be composed with this symbolic report.
 
-The ten tests are authored but not compiled or run in the current environment. No CI pass or measured editing improvement is claimed.
+The eleven tests are authored but not compiled or run in the current environment. No CI pass or measured editing improvement is claimed.
