@@ -93,6 +93,18 @@ pub enum AdjudicationDecisionV1 {
     Indeterminate,
 }
 
+impl AdjudicationDecisionV1 {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::SameTargetSameInstance => "same_target_same_instance",
+            Self::SameConstructDifferentInstance => "same_construct_different_instance",
+            Self::SharedRecipeDifferentInstance => "shared_recipe_different_instance",
+            Self::DifferentConstruct => "different_construct",
+            Self::Indeterminate => "indeterminate",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct GeneratorConfigV1 {
@@ -788,7 +800,7 @@ pub fn audit_blinded_adjudications(
                     pair.pair_id, record.independence_group
                 ));
             }
-            let decision = format!("{:?}", record.decision).to_ascii_lowercase();
+            let decision = record.decision.as_str().to_owned();
             let count = decision_counts.entry(decision).or_default();
             *count = count
                 .checked_add(1)
@@ -949,6 +961,48 @@ mod tests {
                 2
             );
         }
+    }
+
+    #[test]
+    fn exact_duplicate_and_exact_negative_have_distinct_source_lineage() {
+        let bundle = generate_challenge_bundle(&config(), &seed(10)).unwrap();
+        let key: SealedChallengeKeyV1 = serde_json::from_slice(&bundle.sealed_key_bytes).unwrap();
+
+        let positive = key
+            .pair_truth
+            .iter()
+            .find(|row| {
+                row.target_tier == TierV1::T1Exact
+                    && row.target_control_label == TargetControlLabelV1::PositiveForTargetTier
+            })
+            .unwrap();
+        assert_eq!(
+            positive.left_source_lineage_sha256,
+            positive.right_source_lineage_sha256
+        );
+        assert!(positive.planted_mechanisms_present.contains(
+            &ExposureMechanismV1::ExactInstance
+        ));
+
+        let negative = key
+            .pair_truth
+            .iter()
+            .find(|row| {
+                row.target_tier == TierV1::T1Exact
+                    && row.target_control_label == TargetControlLabelV1::NegativeForTargetTier
+            })
+            .unwrap();
+        assert_ne!(
+            negative.left_source_lineage_sha256,
+            negative.right_source_lineage_sha256
+        );
+        assert_eq!(
+            negative.left_recipe_family_sha256,
+            negative.right_recipe_family_sha256
+        );
+        assert!(!negative.planted_mechanisms_present.contains(
+            &ExposureMechanismV1::ExactInstance
+        ));
     }
 
     #[test]
