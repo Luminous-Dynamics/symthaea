@@ -222,6 +222,7 @@ fn run_fixture(fixture: &Fixture, repeats: usize) -> Result<(), String> {
     ) {
         Ok(report) => report,
         Err(SparseCausalError::FactorGraph(FactorGraphError::IntermediateTooLarge { entries, limit })) => {
+            let evidence = format!("required_entries={entries};limit={limit}");
             println!(
                 "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
                 fixture.topology.label(),
@@ -239,7 +240,7 @@ fn run_fixture(fixture: &Fixture, repeats: usize) -> Result<(), String> {
                 "",
                 "",
                 "",
-                format!("required_entries={entries};limit={limit}"),
+                evidence,
             );
             return Ok(());
         }
@@ -272,9 +273,10 @@ fn run_fixture(fixture: &Fixture, repeats: usize) -> Result<(), String> {
 
     let p50_ns = median(&samples).as_nanos();
     let p95_ns = percentile_95(&samples).as_nanos();
-    let min_ns = samples.iter().map(Duration::as_nanos).min().unwrap_or(0);
+    let min_ns = samples.iter().map(Duration::as_nanos).min().unwrap_or_default();
     let forward_sum: f64 = warmup.forward_likelihood.iter().sum();
     let finite = warmup.forward_likelihood.iter().all(|value| value.is_finite());
+    let evidence = format!("receipt={receipt};forward_sum={forward_sum:.17};finite={finite}");
 
     println!(
         "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
@@ -293,7 +295,7 @@ fn run_fixture(fixture: &Fixture, repeats: usize) -> Result<(), String> {
         p50_ns,
         p95_ns,
         min_ns,
-        format!("receipt={receipt};forward_sum={forward_sum:.17};finite={finite}"),
+        evidence,
     );
     if !finite || !forward_sum.is_finite() {
         return Err(format!("non-finite Eq. 4 output for {} n={}", fixture.topology.label(), fixture.substrate_units));
