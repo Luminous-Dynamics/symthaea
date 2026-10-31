@@ -537,6 +537,7 @@ pub fn audit_benchmark_components(
                 known_preconditions_for_check.push(precondition_id.as_str());
             } else {
                 no_unknown_precondition_refs = false;
+                all_requirement_preconditions_covered = false;
                 unknown_precondition_reference_count += 1;
                 issues.push(format!("evaluator check {} references unknown environment precondition {}", check.check_id, precondition_id));
             }
@@ -891,6 +892,34 @@ mod tests {
         }
         assert!(audit.valid);
         assert!(!audit.qualified_for_confirmatory_use);
+
+        let user_properties: BTreeSet<String> =
+            manifest_schema["properties"]["user_task"]["properties"]
+                .as_object().unwrap().keys().cloned().collect();
+        let actual_user: BTreeSet<String> = serde_json::to_value(&manifest.user_task)
+            .unwrap().as_object().unwrap().keys().cloned().collect();
+        assert_eq!(user_properties, actual_user);
+        let requirement_properties: BTreeSet<String> =
+            manifest_schema["properties"]["user_task"]["properties"]["requirements"]["items"]["properties"]
+                .as_object().unwrap().keys().cloned().collect();
+        let actual_requirement: BTreeSet<String> = serde_json::to_value(
+            &manifest.user_task.requirements[0]
+        ).unwrap().as_object().unwrap().keys().cloned().collect();
+        assert_eq!(requirement_properties, actual_requirement);
+        let interface_properties: BTreeSet<String> =
+            manifest_schema["properties"]["interfaces"]["items"]["properties"]
+                .as_object().unwrap().keys().cloned().collect();
+        let actual_interface: BTreeSet<String> = serde_json::to_value(
+            &manifest.interfaces[0]
+        ).unwrap().as_object().unwrap().keys().cloned().collect();
+        assert_eq!(interface_properties, actual_interface);
+        let check_properties: BTreeSet<String> =
+            manifest_schema["properties"]["evaluator_checks"]["items"]["properties"]
+                .as_object().unwrap().keys().cloned().collect();
+        let actual_check: BTreeSet<String> = serde_json::to_value(
+            &manifest.evaluator_checks[0]
+        ).unwrap().as_object().unwrap().keys().cloned().collect();
+        assert_eq!(check_properties, actual_check);
     }
 
     #[test]
