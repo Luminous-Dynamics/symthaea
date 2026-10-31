@@ -14,6 +14,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use super::event_tape::{
+    ActionEvent, ActionIntent, ActionOutcome, BudgetModel, CandidateDisposition, ComparisonMode,
+    EventTape, EventTapeHeader, ExecutionContract, ExecutionMode, MeterValue,
+    PolicySnapshot, ProposalDisposition, ResourceReceipt,
+};
+
 use super::direction_board::{
     AllocationArm, AttemptDisposition, DirectionAttempt, DirectionBoard, DirectionBoardConfig,
     DirectionDescriptor, NewDirectionDisposition, NewDirectionProposal,
@@ -41,6 +47,16 @@ pub enum DirectionLandscapeFamily {
     NewOperatorBreakthrough,
     /// The early score ranking reverses after a delayed intervention.
     RankReversal,
+    /// A high-scoring proxy collapses while a slower direction yields better final transfer.
+    DeceptiveProxy,
+    /// One direction has high payoff variance while another is stable but less flashy.
+    HeteroscedasticRewards,
+    /// Two initial directions share a strongly correlated payoff profile.
+    CorrelatedDirections,
+    /// Explicit no-breakthrough/no-new-opportunity null control.
+    NullNoBreakthrough,
+    /// Seeded stochastic rewards with arm-specific variance and policy-matched realizations.
+    SeededHeteroscedasticNoise,
 }
 
 /// Search policies compared under identical action budgets and payoff schedules.
@@ -71,7 +87,10 @@ pub struct DirectionCampaignAction {
     pub slot: usize,
     pub arm_id: String,
     pub is_new_proposal: bool,
+    /// Score revealed to the policy by the evaluator.
     pub observed_score: Option<f64>,
+    /// Evaluator-side expected reward for this exact candidate; never a policy observation.
+    pub expected_score: Option<f64>,
     pub proposal_disposition: Option<NewDirectionDisposition>,
     pub cost_units: u64,
 }
@@ -107,7 +126,10 @@ pub struct DirectionCampaignRun {
     pub total_cost_units: u64,
     pub target_score: f64,
     pub actions_to_target: Option<usize>,
+    /// Best realized observation (can be lucky under noisy rewards).
     pub final_best_score: f64,
+    /// Best expected reward among evaluated candidates, computed from evaluator truth.
+    pub final_best_expected_score: f64,
     pub final_best_direction: String,
     pub oracle_best_score: f64,
     pub simple_regret: f64,
@@ -128,6 +150,7 @@ pub struct DirectionCampaignAggregate {
     pub seed_count: usize,
     pub mean_final_best_score: f64,
     pub final_best_score_sample_sd: f64,
+    pub mean_final_best_expected_score: f64,
     pub mean_simple_regret: f64,
     pub target_hit_rate: f64,
     /// Mean actions-to-target among target-hitting runs only.
@@ -145,9 +168,11 @@ pub struct DirectionCampaignPairedComparison {
     pub baseline_policy: DirectionCampaignPolicy,
     pub action_budget: usize,
     pub pair_count: usize,
-    /// Positive values favor the candidate policy.
+    /// Difference in best realized observations; can be noise-sensitive.
     pub mean_final_score_delta: f64,
     pub final_score_delta_sample_sd: f64,
+    /// Difference in evaluator-side expected scores, not sampled noisy observations.
+    pub mean_final_expected_score_delta: f64,
     /// Positive values mean the candidate reduced simple regret.
     pub mean_simple_regret_reduction: f64,
     pub candidate_win_rate: f64,
@@ -294,6 +319,7 @@ pub fn run_direction_campaign(
                 arm_id: "NEW".to_owned(),
                 is_new_proposal: true,
                 observed_score: None,
+                expected_score: None,
                 proposal_disposition: Some(disposition),
                 cost_units: 1,
             });
@@ -316,6 +342,11 @@ pub fn run_direction_campaign(
     let final_board_sha256 = board.digest().map_err(|error| error.to_string())?;
     let (final_best_direction, final_best_score) =
         best_observed_direction(&observations)?;
+    let final_best_expected_score = actions
+        .iter()
+        .filter_map(|action| action.expected_score)
+        .max_by(f64::total_cmp)
+        .ok_or_else(|| "campaign has no expected-score evaluation receipts".to_owned())?;
     let oracle_best_score = oracle_best_score(landscape);
     let policy_config = DirectionCampaignPolicyConfig {
         target_score: TARGET_SCORE,
@@ -330,8 +361,10 @@ pub fn run_direction_campaign(
         action_cost_units: 1,
         oracle_uses_hidden_payoff_schedule: policy == DirectionCampaignPolicy::OracleUpperBound,
     };
-    let policy_config_bytes = serde_json::to_vec(&policy_config)
+    let policy_config_value = serde_json::to_value(&policy_config)
         .map_err(|error| format!("policy config serialization failed: {error}"))?;
+    let policy_config_bytes = serde_json::to_vec(&policy_config_value)
+        .map_err(|error| format!("policy config encoding failed: {error}"))?;
     let policy_config_sha256 = digest_bytes(&policy_config_bytes);
     Ok(DirectionCampaignRun {
         schema: "symthaea.direction-campaign.run".to_owned(),
@@ -347,9 +380,10 @@ pub fn run_direction_campaign(
         target_score: TARGET_SCORE,
         actions_to_target,
         final_best_score,
+        final_best_expected_score,
         final_best_direction,
         oracle_best_score,
-        simple_regret: (oracle_best_score - final_best_score).max(0.0),
+        simple_regret: (oracle_best_score - final_best_expected_score).max(0.0),
         admitted_new_directions,
         duplicate_new_proposals,
         rejected_new_proposals,
@@ -439,6 +473,11 @@ pub fn aggregate_direction_campaign_runs(
             seed_count: group.len(),
             mean_final_best_score: mean,
             final_best_score_sample_sd: sample_variance.sqrt(),
+            mean_final_best_expected_score: group
+                .iter()
+                .map(|run| run.final_best_expected_score)
+                .sum::<f64>()
+                / count,
             mean_simple_regret: group.iter().map(|run| run.simple_regret).sum::<f64>() / count,
             target_hit_rate: hit_runs.len() as f64 / count,
             mean_actions_to_target,
@@ -513,7 +552,7 @@ pub fn compare_paired_direction_campaign_runs(
 
     let mut paired: BTreeMap<
         (DirectionLandscapeFamily, DirectionCampaignPolicy, usize),
-        Vec<(f64, f64)>,
+        Vec<(f64, f64, f64)>,
     > = BTreeMap::new();
     for ((landscape, budget, _seed), policies) in &cells {
         let candidate = policies
@@ -529,6 +568,7 @@ pub fn compare_paired_direction_campaign_runs(
                 .push((
                     candidate.final_best_score - baseline.final_best_score,
                     baseline.simple_regret - candidate.simple_regret,
+                    candidate.final_best_expected_score - baseline.final_best_expected_score,
                 ));
         }
     }
@@ -539,18 +579,20 @@ pub fn compare_paired_direction_campaign_runs(
             continue;
         }
         let count = deltas.len() as f64;
-        let mean_delta = deltas.iter().map(|(score, _)| *score).sum::<f64>() / count;
+        let mean_delta = deltas.iter().map(|(score, _, _)| *score).sum::<f64>() / count;
+        let mean_expected_delta =
+            deltas.iter().map(|(_, _, expected)| *expected).sum::<f64>() / count;
         let variance = if deltas.len() < 2 {
             0.0
         } else {
             deltas
                 .iter()
-                .map(|(score, _)| (score - mean_delta).powi(2))
+                .map(|(score, _, _)| (score - mean_delta).powi(2))
                 .sum::<f64>()
                 / (deltas.len() - 1) as f64
         };
-        let wins = deltas.iter().filter(|(score, _)| *score > 1e-12).count();
-        let ties = deltas.iter().filter(|(score, _)| score.abs() <= 1e-12).count();
+        let wins = deltas.iter().filter(|(score, _, _)| *score > 1e-12).count();
+        let ties = deltas.iter().filter(|(score, _, _)| score.abs() <= 1e-12).count();
         comparisons.push(DirectionCampaignPairedComparison {
             landscape,
             candidate_policy,
@@ -559,9 +601,10 @@ pub fn compare_paired_direction_campaign_runs(
             pair_count: deltas.len(),
             mean_final_score_delta: mean_delta,
             final_score_delta_sample_sd: variance.sqrt(),
+            mean_final_expected_score_delta: mean_expected_delta,
             mean_simple_regret_reduction: deltas
                 .iter()
-                .map(|(_, regret_reduction)| *regret_reduction)
+                .map(|(_, regret_reduction, _)| *regret_reduction)
                 .sum::<f64>()
                 / count,
             candidate_win_rate: wins as f64 / count,
@@ -586,7 +629,7 @@ fn evaluate_direction(
         .get_mut(direction_id)
         .ok_or_else(|| format!("selected unknown direction {direction_id:?}"))?;
     let evaluation_index = values.len();
-    let score = payoff(landscape, direction_id, evaluation_index);
+    let score = stochastic_payoff(landscape, direction_id, evaluation_index, seed);
     let direction_sha = direction_digests
         .get(direction_id)
         .ok_or_else(|| format!("missing canonical digest for direction {direction_id:?}"))?
@@ -619,6 +662,7 @@ fn evaluate_direction(
         arm_id: direction_id.to_owned(),
         is_new_proposal: false,
         observed_score: Some(score),
+        expected_score: Some(payoff(landscape, direction_id, evaluation_index)),
         proposal_disposition: None,
         cost_units: 1,
     });
@@ -983,9 +1027,44 @@ fn payoff(
     if schedule.is_empty() {
         return 0.0;
     }
-    // Exact deterministic schedules make the oracle truly exact. Policy randomness is
-    // introduced only through arm selection, never by perturbing evaluator ground truth.
+    // This returns the evaluator-side expected reward. The stochastic fixture applies
+    // its seed-matched noise only in stochastic_payoff, so oracle ranking uses expectations.
     schedule[evaluation_index.min(schedule.len() - 1)]
+}
+
+/// Generate a deterministic-by-seed evaluator observation for the stochastic landscape.
+///
+/// The surface expectation is frozen by the mean schedule; only the observation is noisy. The
+/// random stream is keyed by campaign seed, direction ID and within-direction evaluation index,
+/// so every policy sees the same realized potential outcome for a given arm/seed/index,
+/// independent of the order in which it chooses arms.
+fn stochastic_payoff(
+    landscape: DirectionLandscapeFamily,
+    direction_id: &str,
+    evaluation_index: usize,
+    seed: u64,
+) -> f64 {
+    if landscape != DirectionLandscapeFamily::SeededHeteroscedasticNoise {
+        return payoff(landscape, direction_id, evaluation_index);
+    }
+    let mean = payoff(landscape, direction_id, evaluation_index);
+    let standard_deviation = match direction_id {
+        "A" => 0.28,
+        "B" => 0.025,
+        "C" => 0.06,
+        _ => 0.0,
+    };
+    if standard_deviation == 0.0 {
+        return mean;
+    }
+    let arm_hash = direction_id.bytes().fold(
+        0xcbf2_9ce4_8422_2325u64,
+        |hash, byte| (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3),
+    );
+    let mut state = seed
+        ^ arm_hash
+        ^ (evaluation_index as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15);
+    (mean + standard_deviation * standard_normal(&mut state)).clamp(0.0, 1.0)
 }
 
 fn schedule(
@@ -1006,6 +1085,45 @@ fn schedule(
         (DirectionLandscapeFamily::RankReversal, "A") => &[0.92, 0.42, 0.25],
         (DirectionLandscapeFamily::RankReversal, "B") => &[0.18, 0.35, 0.95],
         (DirectionLandscapeFamily::RankReversal, "C") => &[0.58, 0.60, 0.61],
+        (DirectionLandscapeFamily::DeceptiveProxy, "A") => &[0.93, 0.92, 0.35, 0.25],
+        (DirectionLandscapeFamily::DeceptiveProxy, "B") => &[0.45, 0.55, 0.75, 0.96],
+        (DirectionLandscapeFamily::DeceptiveProxy, "C") => &[0.62, 0.63, 0.64, 0.65],
+        (DirectionLandscapeFamily::HeteroscedasticRewards, "A") => {
+            &[0.50, 0.92, 0.32, 0.88, 0.28, 0.95]
+        }
+        (DirectionLandscapeFamily::HeteroscedasticRewards, "B") => {
+            &[0.65, 0.66, 0.64, 0.66, 0.65, 0.66]
+        }
+        (DirectionLandscapeFamily::HeteroscedasticRewards, "C") => {
+            &[0.55, 0.57, 0.56, 0.59, 0.58, 0.60]
+        }
+        (DirectionLandscapeFamily::CorrelatedDirections, "A") => {
+            &[0.60, 0.66, 0.70, 0.73, 0.75]
+        }
+        (DirectionLandscapeFamily::CorrelatedDirections, "B") => {
+            &[0.61, 0.65, 0.71, 0.72, 0.74]
+        }
+        (DirectionLandscapeFamily::CorrelatedDirections, "C") => {
+            &[0.50, 0.52, 0.55, 0.57, 0.58]
+        }
+        (DirectionLandscapeFamily::NullNoBreakthrough, "A") => {
+            &[0.60, 0.60, 0.60, 0.60, 0.60]
+        }
+        (DirectionLandscapeFamily::NullNoBreakthrough, "B") => {
+            &[0.60, 0.60, 0.60, 0.60, 0.60]
+        }
+        (DirectionLandscapeFamily::NullNoBreakthrough, "C") => {
+            &[0.60, 0.60, 0.60, 0.60, 0.60]
+        }
+        (DirectionLandscapeFamily::SeededHeteroscedasticNoise, "A") => {
+            &[0.72, 0.72, 0.72, 0.72, 0.72, 0.72]
+        }
+        (DirectionLandscapeFamily::SeededHeteroscedasticNoise, "B") => {
+            &[0.74, 0.74, 0.74, 0.74, 0.74, 0.74]
+        }
+        (DirectionLandscapeFamily::SeededHeteroscedasticNoise, "C") => {
+            &[0.67, 0.67, 0.67, 0.67, 0.67, 0.67]
+        }
         _ => &[],
     }
 }
@@ -1032,11 +1150,290 @@ fn splitmix64(mut value: u64) -> u64 {
     z ^ (z >> 31)
 }
 
+
+/// Convert this synthetic campaign into the common AR-5B4 event tape.
+///
+/// This adapter intentionally marks unmeasured host/accelerator/energy/token dimensions as
+/// Unknown. The resulting tape is integrity-checkable but cannot pass the qualified
+/// matched-budget gate until those resource dimensions are instrumented.
+impl DirectionCampaignRun {
+    pub fn to_event_tape(
+        &self,
+        source_commit: &str,
+        execution_environment_sha256: &str,
+    ) -> Result<EventTape, String> {
+        if self.action_count != self.actions.len() {
+            return Err("action_count does not match the recorded action list".to_owned());
+        }
+        if self.action_count > self.action_budget {
+            return Err("recorded actions exceed the declared action budget".to_owned());
+        }
+        let summed_cost = self.actions.iter().try_fold(0u64, |sum, action| {
+            sum.checked_add(action.cost_units)
+                .ok_or_else(|| "synthetic action cost overflow".to_owned())
+        })?;
+        if summed_cost != self.total_cost_units {
+            return Err("recorded action costs do not reconcile to total_cost_units".to_owned());
+        }
+
+        let landscape_id = serde_json::to_value(self.landscape)
+            .map_err(|error| format!("landscape serialization failed: {error}"))?
+            .as_str()
+            .ok_or_else(|| "landscape serialization was not a string".to_owned())?
+            .to_owned();
+        let policy_id = serde_json::to_value(self.policy)
+            .map_err(|error| format!("policy serialization failed: {error}"))?
+            .as_str()
+            .ok_or_else(|| "policy serialization was not a string".to_owned())?
+            .to_owned();
+        let config = serde_json::to_value(&self.policy_config)
+            .map_err(|error| format!("policy config serialization failed: {error}"))?;
+        let config_sha256 = digest_bytes(
+            &serde_json::to_vec(&config)
+                .map_err(|error| format!("policy config encoding failed: {error}"))?,
+        );
+        if config_sha256 != self.policy_config_sha256 {
+            return Err("policy configuration digest does not match the run snapshot".to_owned());
+        }
+
+        let campaign_id = format!(
+            "ar5b4-synthetic-{landscape_id}-seed-{}-budget-{}",
+            self.seed, self.action_budget
+        );
+        let task_recipe_sha256 = digest("symthaea.synthetic-direction.recipe.v0.1");
+        let evaluator_sha256 = digest("symthaea.synthetic-direction.evaluator.v0.1");
+        let verifier_sha256 = digest("symthaea.synthetic-direction.verifier.v0.1");
+        let proposal_stream_sha256 =
+            digest(&format!("synthetic-payoff-stream:{landscape_id}:{}", self.seed));
+        let action_cost_microunits = self
+            .policy_config
+            .action_cost_units
+            .checked_mul(1_000_000)
+            .ok_or_else(|| "normalized action-unit price overflow".to_owned())?;
+        let budget_limit_microunits = u64::try_from(self.action_budget)
+            .map_err(|_| "action budget does not fit u64".to_owned())?
+            .checked_mul(action_cost_microunits)
+            .ok_or_else(|| "normalized action budget overflow".to_owned())?;
+        let budget_model = BudgetModel::ActionUnit {
+            charge_per_action_microunits: action_cost_microunits,
+        };
+        let budget_model_sha256 = digest_bytes(
+            &serde_json::to_vec(&budget_model)
+                .map_err(|error| format!("budget model encoding failed: {error}"))?,
+        );
+
+        let mut tape = EventTape::new(EventTapeHeader {
+            schema: "symthaea.ar5b4.event-tape".to_owned(),
+            version: "0.1.0".to_owned(),
+            campaign_id,
+            source_commit: source_commit.to_owned(),
+            execution_environment_sha256: execution_environment_sha256.to_owned(),
+            comparison_mode: ComparisonMode::MechanismMatched,
+            proposal_source_id: "synthetic-direction-campaign-v0.1".to_owned(),
+            proposal_stream_sha256: Some(proposal_stream_sha256),
+            task_recipe_sha256: task_recipe_sha256.clone(),
+            comparison_profile_sha256: PROFILE_SHA256.to_owned(),
+            evaluator_sha256: evaluator_sha256.clone(),
+            verifier_sha256: verifier_sha256.clone(),
+            budget_model_id: "synthetic-action-unit-v0.1".to_owned(),
+            budget_model,
+            budget_model_sha256,
+            budget_limit_microunits,
+            initial_direction_ids: vec!["A".to_owned(), "B".to_owned(), "C".to_owned()],
+            execution: ExecutionContract {
+                mode: ExecutionMode::Sequential,
+                worker_count: 1,
+                seats_per_round: 1,
+                first_round_claim_cap: None,
+                steady_state_claim_cap: None,
+            },
+            policy: PolicySnapshot {
+                policy_id: policy_id.clone(),
+                algorithm_id: format!("symthaea-direction-policy-{policy_id}-v0.1"),
+                config_sha256,
+                config,
+                has_hidden_oracle_access: self.policy
+                    == DirectionCampaignPolicy::OracleUpperBound,
+            },
+        })
+        .map_err(|error| error.to_string())?;
+
+        let mut evaluations_per_direction = BTreeMap::<String, u64>::new();
+        let mut proposal_index = 0u64;
+        for action in &self.actions {
+            if action.cost_units != self.policy_config.action_cost_units {
+                return Err(format!(
+                    "action slot {} has cost {}, but the frozen synthetic action-unit model requires {}",
+                    action.slot, action.cost_units, self.policy_config.action_cost_units
+                ));
+            }
+            let slot = u64::try_from(action.slot)
+                .map_err(|_| "action slot does not fit u64".to_owned())?;
+            if slot == 0 || slot != tape.events().len() as u64 + 1 {
+                return Err("action slots must be contiguous and start at one".to_owned());
+            }
+            let event_id = format!("{}:event:{slot}", tape.header().campaign_id);
+            let (intent, outcome) = if action.is_new_proposal {
+                proposal_index = proposal_index
+                    .checked_add(1)
+                    .ok_or_else(|| "proposal index overflow".to_owned())?;
+                let disposition = match action.proposal_disposition {
+                    Some(NewDirectionDisposition::Admitted) => {
+                        ProposalDisposition::Admitted {
+                            canonical_direction_id: "D".to_owned(),
+                        }
+                    }
+                    Some(NewDirectionDisposition::Duplicate) => {
+                        ProposalDisposition::Duplicate {
+                            canonical_direction_id: "D".to_owned(),
+                        }
+                    }
+                    Some(NewDirectionDisposition::Rejected) => ProposalDisposition::Rejected,
+                    Some(NewDirectionDisposition::Inconclusive) => {
+                        ProposalDisposition::Inconclusive
+                    }
+                    None => {
+                        return Err(format!(
+                            "NEW proposal at action slot {} lacks verifier disposition",
+                            action.slot
+                        ));
+                    }
+                };
+                let descriptor_sha256 = digest(&format!(
+                    "synthetic-direction-descriptor:{}:{}",
+                    landscape_id, proposal_index
+                ));
+                (
+                    ActionIntent::ProposeDirection {
+                        descriptor_sha256: descriptor_sha256.clone(),
+                        parent_direction_id: None,
+                        semantic_delta_sha256: descriptor_sha256,
+                    },
+                    ActionOutcome::DirectionVerification {
+                        task_recipe_sha256: task_recipe_sha256.clone(),
+                        comparison_profile_sha256: PROFILE_SHA256.to_owned(),
+                        verifier_sha256: verifier_sha256.clone(),
+                        verifier_receipt_sha256: digest(&format!(
+                            "synthetic-verifier-receipt:{}:{}",
+                            landscape_id, proposal_index
+                        )),
+                        disposition,
+                    },
+                )
+            } else {
+                if action.proposal_disposition.is_some() {
+                    return Err(format!(
+                        "candidate evaluation at action slot {} has a proposal disposition",
+                        action.slot
+                    ));
+                }
+                let score = action.observed_score.ok_or_else(|| {
+                    format!(
+                        "candidate evaluation at action slot {} lacks a verified score",
+                        action.slot
+                    )
+                })?;
+                let evaluation_index = {
+                    let count = evaluations_per_direction
+                        .entry(action.arm_id.clone())
+                        .or_default();
+                    *count = count
+                        .checked_add(1)
+                        .ok_or_else(|| "direction evaluation index overflow".to_owned())?;
+                    *count
+                };
+                let candidate_sha256 = digest(&format!(
+                    "synthetic-candidate:{}:{}:{}",
+                    landscape_id, action.arm_id, evaluation_index
+                ));
+                let semantic_delta_sha256 =
+                    digest(&format!("synthetic-delta:{candidate_sha256}"));
+                (
+                    ActionIntent::EvaluateCandidate {
+                        candidate_sha256: candidate_sha256.clone(),
+                        parent_candidate_sha256: None,
+                        semantic_delta_sha256,
+                        direction_id: action.arm_id.clone(),
+                    },
+                    ActionOutcome::CandidateEvaluation {
+                        task_recipe_sha256: task_recipe_sha256.clone(),
+                        comparison_profile_sha256: PROFILE_SHA256.to_owned(),
+                        evaluator_sha256: evaluator_sha256.clone(),
+                        verifier_sha256: verifier_sha256.clone(),
+                        verifier_receipt_sha256: digest(&format!(
+                            "synthetic-candidate-verifier-receipt:{}:{}",
+                            candidate_sha256, evaluation_index
+                        )),
+                        disposition: CandidateDisposition::Verified,
+                        score: Some(score),
+                        uncertainty: None,
+                        evidence_sha256: Some(digest(&format!(
+                            "synthetic-evidence:{}:{}:{score:.17}",
+                            candidate_sha256, evaluation_index
+                        ))),
+                    },
+                )
+            };
+            let charge = action
+                .cost_units
+                .checked_mul(1_000_000)
+                .ok_or_else(|| "normalized action charge overflow".to_owned())?;
+            let unknown = |reason: &str| MeterValue::Unknown {
+                reason: reason.to_owned(),
+            };
+            let resources = ResourceReceipt {
+                host_cpu_millis: unknown("synthetic campaign does not meter host CPU"),
+                wall_millis: unknown("synthetic campaign does not meter per-action wall time"),
+                accelerator_millis: unknown("synthetic campaign does not meter accelerator time"),
+                peak_memory_bytes: unknown("synthetic campaign does not meter host peak memory"),
+                accelerator_peak_memory_bytes: unknown(
+                    "synthetic campaign does not meter accelerator peak memory"
+                ),
+                energy_millijoules: unknown("synthetic campaign does not meter energy"),
+                input_tokens: unknown("synthetic campaign does not meter model tokens"),
+                output_tokens: unknown("synthetic campaign does not meter model tokens"),
+                tool_calls: unknown("synthetic campaign does not meter external tool calls"),
+                evaluator_calls: meter_value(if action.is_new_proposal { 0 } else { 1 }),
+                verifier_calls: meter_value(1),
+                charged_budget_microunits: meter_value(charge),
+            };
+            tape.append(ActionEvent {
+                event_id,
+                policy_id: policy_id.clone(),
+                worker_id: 0,
+                round_id: slot,
+                batch_id: None,
+                observed_through_sequence: slot - 1,
+                visible_history_sha256: String::new(),
+                retry_of_event_id: None,
+                intent,
+                outcome,
+                resources,
+            })
+            .map_err(|error| error.to_string())?;
+        }
+
+        let summary = tape.validate_integrity().map_err(|error| error.to_string())?;
+        let expected_total_charge = self
+            .total_cost_units
+            .checked_mul(1_000_000)
+            .ok_or_else(|| "synthetic campaign normalized cost overflow".to_owned())?;
+        if summary.total_charged_budget_microunits != Some(expected_total_charge) {
+            return Err("event-tape charge does not reconcile to the campaign cost".to_owned());
+        }
+        Ok(tape)
+    }
+}
+
+fn meter_value(value: u64) -> MeterValue {
+    MeterValue::Measured { value }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const POLICIES: [DirectionCampaignPolicy; 6] = [
+    const POLICIES: [DirectionCampaignPolicy; 8] = [
         DirectionCampaignPolicy::ScoreOnlyWinnerTakesAll,
         DirectionCampaignPolicy::FixedRoundRobin,
         DirectionCampaignPolicy::Random,
@@ -1047,11 +1444,16 @@ mod tests {
         DirectionCampaignPolicy::OracleUpperBound,
     ];
 
-    const LANDSCAPES: [DirectionLandscapeFamily; 4] = [
+    const LANDSCAPES: [DirectionLandscapeFamily; 9] = [
         DirectionLandscapeFamily::DelayedBreakthrough,
         DirectionLandscapeFamily::NoNewDirection,
         DirectionLandscapeFamily::NewOperatorBreakthrough,
         DirectionLandscapeFamily::RankReversal,
+        DirectionLandscapeFamily::DeceptiveProxy,
+        DirectionLandscapeFamily::HeteroscedasticRewards,
+        DirectionLandscapeFamily::CorrelatedDirections,
+        DirectionLandscapeFamily::NullNoBreakthrough,
+        DirectionLandscapeFamily::SeededHeteroscedasticNoise,
     ];
 
     #[test]
@@ -1104,7 +1506,8 @@ mod tests {
             0xabc,
         )
         .expect("campaign should run");
-        let bytes = serde_json::to_vec(&run.policy_config).expect("config serializes");
+        let value = serde_json::to_value(&run.policy_config).expect("config serializes");
+        let bytes = serde_json::to_vec(&value).expect("config value encodes");
         assert_eq!(run.policy_config_sha256, digest_bytes(&bytes));
         assert_eq!(run.policy_config.target_score, TARGET_SCORE);
         assert_eq!(run.policy_config.common_bootstrap_evaluations, 3);
@@ -1256,4 +1659,178 @@ mod tests {
         assert_eq!(aggregate[0].mean_total_cost_units, 32.0);
         assert!(aggregate_direction_campaign_runs(&[run.clone(), run]).is_err());
     }
+
+
+    #[test]
+    fn seeded_heteroscedastic_noise_replays_exactly_and_varies_by_arm() {
+        let first = stochastic_payoff(
+            DirectionLandscapeFamily::SeededHeteroscedasticNoise,
+            "A",
+            0,
+            0x5eed,
+        );
+        let replay = stochastic_payoff(
+            DirectionLandscapeFamily::SeededHeteroscedasticNoise,
+            "A",
+            0,
+            0x5eed,
+        );
+        let other_seed = stochastic_payoff(
+            DirectionLandscapeFamily::SeededHeteroscedasticNoise,
+            "A",
+            0,
+            0x5eee,
+        );
+        assert_eq!(first, replay);
+        assert_ne!(first, other_seed);
+
+        let variance = |direction: &str| {
+            let values: Vec<f64> = (0..512u64)
+                .map(|seed| {
+                    stochastic_payoff(
+                        DirectionLandscapeFamily::SeededHeteroscedasticNoise,
+                        direction,
+                        0,
+                        seed,
+                    )
+                })
+                .collect();
+            let mean = values.iter().sum::<f64>() / values.len() as f64;
+            values
+                .iter()
+                .map(|value| (value - mean).powi(2))
+                .sum::<f64>()
+                / values.len() as f64
+        };
+        assert!(
+            variance("A") > variance("B") * 20.0,
+            "arm A must have materially higher observation variance than arm B"
+        );
+    }
+
+    #[test]
+    fn stochastic_landscape_campaign_is_reproducible_but_not_a_deterministic_reward_fixture() {
+        let first = run_direction_campaign(
+            DirectionLandscapeFamily::SeededHeteroscedasticNoise,
+            DirectionCampaignPolicy::ThompsonSampling,
+            64,
+            0x5eed,
+        )
+        .unwrap();
+        let replay = run_direction_campaign(
+            DirectionLandscapeFamily::SeededHeteroscedasticNoise,
+            DirectionCampaignPolicy::ThompsonSampling,
+            64,
+            0x5eed,
+        )
+        .unwrap();
+        let other_seed = run_direction_campaign(
+            DirectionLandscapeFamily::SeededHeteroscedasticNoise,
+            DirectionCampaignPolicy::ThompsonSampling,
+            64,
+            0x5eee,
+        )
+        .unwrap();
+        assert_eq!(first, replay);
+        assert_ne!(first.actions, other_seed.actions);
+        assert_eq!(first.action_count, 64);
+        assert_eq!(first.total_cost_units, 64);
+        assert_eq!(
+            first.simple_regret,
+            (first.oracle_best_score - first.final_best_expected_score).max(0.0),
+            "simple regret must use expected reward, not a lucky noisy observation"
+        );
+        assert_eq!(
+            first.final_best_expected_score,
+            first
+                .actions
+                .iter()
+                .filter_map(|action| action.expected_score)
+                .max_by(f64::total_cmp)
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn deceptive_proxy_reverses_final_best_direction_after_an_early_proxy_lead() {
+        let early_proxy = payoff(DirectionLandscapeFamily::DeceptiveProxy, "A", 0);
+        let delayed_transfer = payoff(DirectionLandscapeFamily::DeceptiveProxy, "B", 3);
+        assert!(early_proxy > delayed_transfer * 0.9);
+        assert!(delayed_transfer > early_proxy);
+        assert_eq!(oracle_best_score(DirectionLandscapeFamily::DeceptiveProxy), 0.96);
+        assert!(!landscape_has_new_operator(DirectionLandscapeFamily::DeceptiveProxy));
+    }
+
+    #[test]
+    fn heteroscedastic_reward_control_has_distinct_arm_variances() {
+        let high_variance = schedule(
+            DirectionLandscapeFamily::HeteroscedasticRewards,
+            "A",
+        );
+        let low_variance = schedule(
+            DirectionLandscapeFamily::HeteroscedasticRewards,
+            "B",
+        );
+        let variance = |values: &[f64]| {
+            let mean = values.iter().sum::<f64>() / values.len() as f64;
+            values
+                .iter()
+                .map(|value| (value - mean).powi(2))
+                .sum::<f64>()
+                / values.len() as f64
+        };
+        assert!(variance(high_variance) > variance(low_variance) * 20.0);
+    }
+
+    #[test]
+    fn correlated_direction_control_uses_near_parallel_reward_profiles() {
+        let left = schedule(DirectionLandscapeFamily::CorrelatedDirections, "A");
+        let right = schedule(DirectionLandscapeFamily::CorrelatedDirections, "B");
+        assert_eq!(left.len(), right.len());
+        assert!(left.iter().zip(right).all(|(a, b)| (a - b).abs() <= 0.02));
+        assert!(!landscape_has_new_operator(DirectionLandscapeFamily::CorrelatedDirections));
+    }
+
+    #[test]
+    fn null_no_breakthrough_control_has_no_directional_or_new_operator_advantage() {
+        let a = schedule(DirectionLandscapeFamily::NullNoBreakthrough, "A");
+        let b = schedule(DirectionLandscapeFamily::NullNoBreakthrough, "B");
+        let c = schedule(DirectionLandscapeFamily::NullNoBreakthrough, "C");
+        assert!(a.iter().all(|value| *value == 0.60));
+        assert_eq!(a, b);
+        assert_eq!(b, c);
+        assert!(!landscape_has_new_operator(DirectionLandscapeFamily::NullNoBreakthrough));
+        assert_eq!(oracle_best_score(DirectionLandscapeFamily::NullNoBreakthrough), 0.60);
+    }
+
+    #[test]
+    fn synthetic_campaign_emits_integrity_checkable_but_unmetered_event_tape() {
+        let run = run_direction_campaign(
+            DirectionLandscapeFamily::NewOperatorBreakthrough,
+            DirectionCampaignPolicy::ThompsonSampling,
+            48,
+            0x5eed,
+        )
+        .expect("synthetic campaign should run");
+        let tape = run
+            .to_event_tape(
+                "0123456789abcdef0123456789abcdef01234567",
+                &digest("synthetic-test-environment-v0.1"),
+            )
+            .expect("campaign should convert to the common event tape");
+        let summary = tape
+            .validate_integrity()
+            .expect("synthetic tape structure and action charges should validate");
+        assert_eq!(summary.event_count, run.action_count);
+        assert_eq!(
+            summary.total_charged_budget_microunits,
+            Some(run.total_cost_units * 1_000_000)
+        );
+        assert!(!summary.fully_metered);
+        assert!(
+            tape.validate().is_err(),
+            "synthetic action-count receipts must not masquerade as complete host/energy metering"
+        );
+    }
+
 }

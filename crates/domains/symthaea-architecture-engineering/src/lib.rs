@@ -11,13 +11,21 @@ use std::fmt;
 use serde_json::Value;
 
 pub mod paired_evaluation;
+pub mod paired_inference;
 pub mod synthetic_search;
 pub mod multi_fidelity;
 pub mod multi_fidelity_benchmark;
 pub mod analytical_benchmark;
 pub mod direction_board;
 pub mod direction_board_benchmark;
+pub mod event_tape;
+pub mod matched_campaign;
+pub mod offer_set;
+pub mod offer_set_evidence;
+pub mod pareto_objectives;
+pub mod pareto_benchmarks;
 pub mod coral_baseline;
+pub mod coral_execution;
 pub mod resource_pareto;
 
 const MATRIX_SCHEMA: &str = "symthaea.architecture-engineering.candidate-matrix";
