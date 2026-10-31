@@ -248,7 +248,7 @@ fn make_profile(judge: &JudgeSpec, trials: &[Trial]) -> JudgeProfile {
                     }
                     if let Some(probability) = confidence_correct_probability {
                         let target = if correct { 1.0 } else { 0.0 };
-                        brier_sum += (probability - target).powi(2);
+                        brier_sum += (*probability - target).powi(2);
                         confidence_scored_decisions += 1;
                     }
                 }
@@ -530,6 +530,17 @@ pub fn evaluate_ensemble(
         .collect();
     if judge_ids != profile_ids || judges.len() != policy.profiles.len() {
         return Err("evaluation judge panel differs from the frozen calibration panel".to_owned());
+    }
+    if !judge_ids.contains(policy.best_single_judge_id.as_str()) {
+        return Err("best-single judge is not in the frozen panel".to_owned());
+    }
+    for profile in &policy.profiles {
+        if profile.dependency_group_id.trim().is_empty()
+            || !profile.calibration_weight.is_finite()
+            || profile.calibration_weight < 0.0
+        {
+            return Err(format!("judge {} has an invalid calibrated profile", profile.judge_id));
+        }
     }
     for judge in judges {
         let profile = policy
