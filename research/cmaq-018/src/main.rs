@@ -120,6 +120,8 @@ struct BranchObservation {
 #[derive(Clone, Copy, Debug)]
 struct BranchPrediction {
     utility: f64,
+    next_x: f64,
+    next_v: f64,
     terminal: bool,
 }
 
@@ -133,6 +135,7 @@ struct PairMetrics {
     null_false_effect_rate: Option<f64>,
     branch_coverage: f64,
     branch_outcome_mae: Option<f64>,
+    branch_state_mae: Option<f64>,
     terminal_false_safe_rate: Option<f64>,
     branch_prediction_evaluations: usize,
     pair_effect_evaluations: usize,
@@ -151,6 +154,7 @@ struct Summary {
     mean_null_false_effect_rate: Option<f64>,
     mean_branch_coverage: f64,
     mean_branch_outcome_mae: Option<f64>,
+    mean_branch_state_mae: Option<f64>,
     mean_terminal_false_safe_rate: Option<f64>,
     mean_branch_prediction_evaluations: f64,
     mean_pair_effect_evaluations: f64,
@@ -217,13 +221,7 @@ fn true_effect(
         Scenario::Interaction => {
             0.20 * f + 0.10 * g + 0.80 * f * g - 0.20 * f * f - 0.15 * g * g
         }
-        Scenario::TerminationSeam => {
-            if f >= 0.75 && g > 0.50 {
-                -2.0
-            } else {
-                0.25 * f + 0.05 * g
-            }
-        }
+        Scenario::TerminationSeam => 0.25 * f + 0.05 * g,
         Scenario::HiddenRegime => {
             let slope = if hidden_regime_positive { 0.65 } else { -0.65 };
             slope * f - 0.12 * f * f + 0.08 * g
@@ -265,6 +263,8 @@ fn point_outcome_prediction(history: ObservedHistory, action: Intervention) -> B
             + common_bias
             + 0.45 * action.force
             + 0.10 * action.grip,
+        next_x: history.x + 0.12 * action.force + 0.03 * action.grip,
+        next_v: 0.75 * history.v + 0.08 * action.force - 0.04 * action.grip,
         terminal: false,
     }
 }
@@ -293,6 +293,8 @@ fn branch_predictions(
                 let truth = true_outcome(case, scenario, *action);
                 Some(BranchPrediction {
                     utility: truth.utility,
+                    next_x: truth.next_x,
+                    next_v: truth.next_v,
                     terminal: truth.terminal,
                 })
             }
@@ -441,6 +443,17 @@ fn evaluate_episode(
             prediction.map(|predicted| (predicted.utility - branch.outcome.utility).abs())
         })
         .collect();
+    let branch_state_errors: Vec<f64> = branches
+        .iter()
+        .zip(&predictions)
+        .filter_map(|(branch, prediction)| {
+            prediction.map(|predicted| {
+                ((predicted.next_x - branch.outcome.next_x).abs()
+                    + (predicted.next_v - branch.outcome.next_v).abs())
+                    / 2.0
+            })
+        })
+        .collect();
     let terminal_pairs: Vec<(bool, bool)> = branches
         .iter()
         .zip(&predictions)
@@ -476,6 +489,9 @@ fn evaluate_episode(
         branch_coverage,
         branch_outcome_mae: (!branch_outcome_errors.is_empty()).then(|| {
             branch_outcome_errors.iter().sum::<f64>() / branch_outcome_errors.len() as f64
+        }),
+        branch_state_mae: (!branch_state_errors.is_empty()).then(|| {
+            branch_state_errors.iter().sum::<f64>() / branch_state_errors.len() as f64
         }),
         terminal_false_safe_rate,
         branch_prediction_evaluations,
@@ -520,6 +536,9 @@ fn summarize(scenario: Scenario, model: Model) -> Summary {
         mean_branch_coverage: rows.iter().map(|row| row.branch_coverage).sum::<f64>() / denominator,
         mean_branch_outcome_mae: mean_optional(
             &rows.iter().map(|row| row.branch_outcome_mae).collect::<Vec<_>>(),
+        ),
+        mean_branch_state_mae: mean_optional(
+            &rows.iter().map(|row| row.branch_state_mae).collect::<Vec<_>>(),
         ),
         mean_terminal_false_safe_rate: mean_optional(
             &rows.iter().map(|row| row.terminal_false_safe_rate).collect::<Vec<_>>(),
@@ -615,6 +634,8 @@ fn render_report() -> String {
             )
             .expect("writing to String cannot fail");
             write_optional(&mut output, row.mean_branch_outcome_mae);
+            output.push_str(",\"mean_branch_state_mae\":");
+            write_optional(&mut output, row.mean_branch_state_mae);
             output.push_str(",\"mean_terminal_false_safe_rate\":");
             write_optional(&mut output, row.mean_terminal_false_safe_rate);
             write!(
@@ -787,6 +808,8 @@ mod tests {
         let case = make_episode_case(BASE_SEED);
         let metrics = evaluate_episode(Scenario::HiddenRegime, Model::Oracle, case, &ACTIONS);
         assert_eq!(metrics.effect_magnitude_mae.unwrap(), 0.0);
+        assert_eq!(metrics.branch_outcome_mae.unwrap(), 0.0);
+        assert_eq!(metrics.branch_state_mae.unwrap(), 0.0);
         assert_eq!(metrics.top1_regret.unwrap(), 0.0);
         assert_eq!(metrics.pair_coverage, 1.0);
     }
