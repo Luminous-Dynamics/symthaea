@@ -113,3 +113,21 @@ Two practical lessons sharpen the competitive plan:
 - OpenScience's October 1, 2026 benchmark update explicitly says its evaluation setup had comparison problems and that results would be rerun after harness improvements. Treat those public rankings as provisional until the corrected protocol and rerun are published; this is a useful example of why every benchmark release needs versioned conditions and a correction log.
 
 Sources: CodeEvolve, https://aclanthology.org/2026.findings-emnlp.1345/; FormulaCode, https://proceedings.mlr.press/v306/sehgal26a.html; OpenScience benchmark update, https://www.openscience.sh/benchmark.
+
+## Multi-objective optimization standards and new AR-5B5 implementation
+
+The new `pareto_objectives.rs` module is distinct from the existing `resource_pareto.rs`: the latter selects actions under hard multi-resource limits, while the new module evaluates candidate outcome vectors, feasibility, nondominance and dominated volume.
+
+The external method baseline should follow COCO's biobjective assessment design: evaluate the nondominated archive with hypervolume, measure function-evaluation/runtime cost to predeclared target values, and preserve the full archive plus versioned reference values so analyses can be recalculated. COCO explicitly warns, through its workflow, that a single HV number is insufficient without normalized objective space, a defined reference point and target-attainment behavior.
+
+For algorithmic coverage use ZDT (2-objective sanity), DTLZ (scalable objectives and front geometry), WFG (nonseparable/deceptive/mixed fronts), and constrained DTLZ feasibility cases. Compare NSGA-II, NSGA-III, MOEA/D, SMS-EMOA and RVEA alongside the Symthaea direction allocator. The v0.1 exact-hypervolume implementation is intentionally capped at 2–4 objectives; higher-dimensional runs must use an explicitly versioned approximation or separate indicator set.
+
+Do not use HV alone. An indicator-reliability study found that HV, IGD, IGD+ and additive epsilon can rank real-world algorithms differently, and even HV rankings can change with the chosen reference point. AR-5B5 therefore records reference sensitivity and should add IGD+, additive epsilon, attainment curves and uncertainty over independent instances before confirmatory claims.
+
+Sources:
+- COCO biobjective performance assessment: https://numbbo.github.io/coco-doc/bbob-biobj/perf-assessment/
+- Reliability of indicator-based comparison results: https://scholars.cityu.edu.hk/en/publications/reliability-of-indicator-based-comparison-results-of-evolutionary/
+- DTLZ/WFG/ZCAT/LSMOP benchmark families: https://academic.oup.com/jcde/article/13/2/1/8407630
+- PlatEMO and standard multi-objective algorithm/test-suite coverage: https://link.springer.com/article/10.1007/s42979-020-00265-1
+
+Current implementation boundary: the Pareto evaluator is a batch analysis primitive and accepts a digest reference for each evidence artifact. It does not yet adapt EventTape receipts into per-candidate objective vectors or retrieve and independently verify the candidate artifacts. Those are explicit follow-on tasks in issue #9469.
