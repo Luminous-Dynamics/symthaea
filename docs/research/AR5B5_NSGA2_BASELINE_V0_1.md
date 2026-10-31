@@ -110,3 +110,5 @@ cargo clippy -p symthaea-architecture-engineering --all-targets -- -D warnings
 No claim that this NSGA-II implementation beats SOTA is made. Its purpose is to create a reproducible, auditable baseline for fair evaluation.
 
 The implementation limits population size to 2,048 because its fast nondominated sorting retains pairwise domination relationships. This is an explicit memory guard for the current reference implementation, not a theoretical NSGA-II limit.
+
+For the normalized utility-space hypervolume comparisons in the shared harness, the frozen reference point is placed below the normalized feasible range (for example -0.1 per dimension). A zero reference coordinate would assign zero dominated volume to a solution lying exactly on a normalized objective boundary and could distort selection or ranking.
