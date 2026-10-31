@@ -1,0 +1,197 @@
+{
+  "schema_version": "mace-evaluator-oracles-v0.1",
+  "oracles": [
+    {
+      "case_id": "MACE-104",
+      "family": "observational_confounding",
+      "pair": {
+        "pair_id": "PAIR-OBS-01",
+        "role": "anchor"
+      },
+      "evaluator_oracle": {
+        "causal_status": "not_identified",
+        "expected_transfer": "record_association_only",
+        "expected_action": "seek_intervention_or_preserve_uncertainty",
+        "expected_completion_state": "not_applicable",
+        "reason_codes": [
+          "PUMP_AND_VALVE_CHANGED_TOGETHER",
+          "NO_SEPARATING_INTERVENTION"
+        ],
+        "expected_write": "store_association_only",
+        "expected_maintain": "preserve_uncertainty",
+        "expected_retrieve": "retrieve_association_evidence",
+        "expected_use": "do_not_generalize_causal_effect"
+      }
+    },
+    {
+      "case_id": "MACE-287",
+      "family": "observational_confounding",
+      "pair": {
+        "pair_id": "PAIR-OBS-01",
+        "role": "irrelevant_control"
+      },
+      "evaluator_oracle": {
+        "causal_status": "not_identified",
+        "expected_transfer": "record_association_only",
+        "expected_action": "seek_intervention_or_preserve_uncertainty",
+        "expected_completion_state": "not_applicable",
+        "reason_codes": [
+          "IRRELEVANT_UPDATE_INVARIANCE",
+          "PUMP_AND_VALVE_CHANGED_TOGETHER"
+        ],
+        "expected_write": "store_association_only",
+        "expected_maintain": "preserve_uncertainty",
+        "expected_retrieve": "retrieve_association_evidence",
+        "expected_use": "do_not_generalize_causal_effect"
+      }
+    },
+    {
+      "case_id": "MACE-319",
+      "family": "controlled_intervention",
+      "pair": {
+        "pair_id": "PAIR-INT-01",
+        "role": "anchor"
+      },
+      "evaluator_oracle": {
+        "causal_status": "identified",
+        "expected_transfer": "reuse_qualified_transition",
+        "expected_action": "reuse_valve_effect_with_preconditions",
+        "expected_completion_state": "not_applicable",
+        "identified_effect": {
+          "variable": "valve_open",
+          "direction": "positive",
+          "preconditions": [
+            "pump=on",
+            "microgrid-lab operating envelope unchanged"
+          ]
+        },
+        "reason_codes": [
+          "CONTROLLED_ASSIGNMENT",
+          "PRECONDITIONS_MATCH"
+        ],
+        "expected_write": "store_qualified_transition",
+        "expected_maintain": "retain_with_preconditions",
+        "expected_retrieve": "retrieve_preconditioned_transition",
+        "expected_use": "reuse_if_preconditions_hold"
+      }
+    },
+    {
+      "case_id": "MACE-604",
+      "family": "controlled_intervention",
+      "pair": {
+        "pair_id": "PAIR-INT-01",
+        "role": "irrelevant_control"
+      },
+      "evaluator_oracle": {
+        "causal_status": "identified",
+        "expected_transfer": "reuse_qualified_transition",
+        "expected_action": "reuse_valve_effect_with_preconditions",
+        "expected_completion_state": "not_applicable",
+        "identified_effect": {
+          "variable": "valve_open",
+          "direction": "positive",
+          "preconditions": [
+            "pump=on",
+            "microgrid-lab operating envelope unchanged"
+          ]
+        },
+        "reason_codes": [
+          "IRRELEVANT_UPDATE_INVARIANCE",
+          "CONTROLLED_ASSIGNMENT"
+        ],
+        "expected_write": "store_qualified_transition",
+        "expected_maintain": "retain_with_preconditions",
+        "expected_retrieve": "retrieve_preconditioned_transition",
+        "expected_use": "reuse_if_preconditions_hold"
+      }
+    },
+    {
+      "case_id": "MACE-622",
+      "family": "regime_shift",
+      "pair": {
+        "pair_id": "PAIR-REGIME-01",
+        "role": "anchor"
+      },
+      "evaluator_oracle": {
+        "causal_status": "regime_shifted",
+        "expected_transfer": "requalify_before_reuse",
+        "expected_action": "request_new_measurement_or_abstain",
+        "expected_completion_state": "not_applicable",
+        "reason_codes": [
+          "RELEVANT_REGIME_VARIABLE_CHANGED",
+          "OLD_MODEL_PRECONDITIONS_FAIL"
+        ],
+        "expected_write": "store_transition_with_regime",
+        "expected_maintain": "mark_stale_on_regime_change",
+        "expected_retrieve": "retrieve_with_regime_warning",
+        "expected_use": "requalify_before_action"
+      }
+    },
+    {
+      "case_id": "MACE-731",
+      "family": "regime_shift",
+      "pair": {
+        "pair_id": "PAIR-REGIME-01",
+        "role": "irrelevant_control"
+      },
+      "evaluator_oracle": {
+        "causal_status": "regime_shifted",
+        "expected_transfer": "requalify_before_reuse",
+        "expected_action": "request_new_measurement_or_abstain",
+        "expected_completion_state": "not_applicable",
+        "reason_codes": [
+          "IRRELEVANT_UPDATE_INVARIANCE",
+          "RELEVANT_REGIME_VARIABLE_CHANGED"
+        ],
+        "expected_write": "store_transition_with_regime",
+        "expected_maintain": "mark_stale_on_regime_change",
+        "expected_retrieve": "retrieve_with_regime_warning",
+        "expected_use": "requalify_before_action"
+      }
+    },
+    {
+      "case_id": "MACE-845",
+      "family": "outcome_misattribution",
+      "pair": {
+        "pair_id": "PAIR-OUTCOME-01",
+        "role": "anchor"
+      },
+      "evaluator_oracle": {
+        "causal_status": "outcome_unverified",
+        "expected_transfer": "mark_outcome_unknown",
+        "expected_action": "reconcile_external_state_before_reuse_or_retry",
+        "expected_completion_state": "unknown_pending_reconciliation",
+        "reason_codes": [
+          "TOOL_ACCEPTED_BUT_POST_STATE_DISAGREES",
+          "NO_COMPLETION_RECEIPT"
+        ],
+        "expected_write": "store_outcome_unknown",
+        "expected_maintain": "retain_unknown_until_reconciled",
+        "expected_retrieve": "retrieve_execution_conflict",
+        "expected_use": "reconcile_before_retry"
+      }
+    },
+    {
+      "case_id": "MACE-902",
+      "family": "outcome_misattribution",
+      "pair": {
+        "pair_id": "PAIR-OUTCOME-01",
+        "role": "irrelevant_control"
+      },
+      "evaluator_oracle": {
+        "causal_status": "outcome_unverified",
+        "expected_transfer": "mark_outcome_unknown",
+        "expected_action": "reconcile_external_state_before_reuse_or_retry",
+        "expected_completion_state": "unknown_pending_reconciliation",
+        "reason_codes": [
+          "IRRELEVANT_UPDATE_INVARIANCE",
+          "TOOL_ACCEPTED_BUT_POST_STATE_DISAGREES"
+        ],
+        "expected_write": "store_outcome_unknown",
+        "expected_maintain": "retain_unknown_until_reconciled",
+        "expected_retrieve": "retrieve_execution_conflict",
+        "expected_use": "reconcile_before_retry"
+      }
+    }
+  ]
+}

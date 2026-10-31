@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace-candidate-trace-v0.1.schema.json",
+  "title": "MACE Candidate Trace v0.1",
+  "description": "Candidate output only. The evaluator/oracle columns and labels must not be supplied to the candidate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace-candidate-trace-v0.1"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "causal_status",
+          "transfer_decision",
+          "action_decision",
+          "completion_state",
+          "prediction_before_action",
+          "prediction_record_id",
+          "latency_us",
+          "memory_bytes",
+          "tokens",
+          "model_calls",
+          "write_decision",
+          "maintenance_decision",
+          "retrieval_decision",
+          "use_decision"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^MACE-[0-9]{3}$"
+          },
+          "causal_status": {
+            "enum": [
+              "not_identified",
+              "identified",
+              "regime_shifted",
+              "outcome_unverified"
+            ]
+          },
+          "transfer_decision": {
+            "enum": [
+              "record_association_only",
+              "reuse_qualified_transition",
+              "requalify_before_reuse",
+              "mark_outcome_unknown"
+            ]
+          },
+          "action_decision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "completion_state": {
+            "enum": [
+              "not_applicable",
+              "verified_effect",
+              "not_effect_verified",
+              "unknown_pending_reconciliation"
+            ]
+          },
+          "prediction_before_action": {
+            "type": "boolean"
+          },
+          "prediction_record_id": {
+            "type": "string"
+          },
+          "latency_us": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "memory_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "model_calls": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "write_decision": {
+            "enum": [
+              "store_association_only",
+              "store_qualified_transition",
+              "store_transition_with_regime",
+              "store_outcome_unknown"
+            ]
+          },
+          "maintenance_decision": {
+            "enum": [
+              "preserve_uncertainty",
+              "retain_with_preconditions",
+              "mark_stale_on_regime_change",
+              "retain_unknown_until_reconciled"
+            ]
+          },
+          "retrieval_decision": {
+            "enum": [
+              "retrieve_association_evidence",
+              "retrieve_preconditioned_transition",
+              "retrieve_with_regime_warning",
+              "retrieve_execution_conflict",
+              "retrieve_more_evidence"
+            ]
+          },
+          "use_decision": {
+            "enum": [
+              "do_not_generalize_causal_effect",
+              "reuse_if_preconditions_hold",
+              "requalify_before_action",
+              "reconcile_before_retry"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

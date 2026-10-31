@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace-agent-input-v0.1.schema.json",
+  "title": "MACE Agent Input v0.1",
+  "description": "Agent-visible inputs only. Contains opaque case IDs and task input; no benchmark family, pair role or evaluator label.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace-agent-inputs-v0.1"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "agent_view"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^MACE-[0-9]{3}$"
+          },
+          "agent_view": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scenario_context",
+              "historical_events",
+              "current_state",
+              "objective",
+              "current_task",
+              "resource_budget"
+            ],
+            "properties": {
+              "scenario_context": {
+                "type": "object"
+              },
+              "historical_events": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "event_id",
+                    "session_id",
+                    "event_kind",
+                    "payload"
+                  ],
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "session_id": {
+                      "type": "string"
+                    },
+                    "event_kind": {
+                      "type": "string"
+                    },
+                    "payload": {
+                      "type": "object"
+                    }
+                  }
+                }
+              },
+              "current_state": {
+                "type": "object"
+              },
+              "objective": {
+                "type": "object",
+                "required": [
+                  "objective_id",
+                  "description",
+                  "hard_constraints"
+                ],
+                "properties": {
+                  "objective_id": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "hard_constraints": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "current_task": {
+                "type": "string"
+              },
+              "resource_budget": {
+                "type": "object",
+                "required": [
+                  "memory_tokens",
+                  "action_calls",
+                  "observation_calls"
+                ],
+                "properties": {
+                  "memory_tokens": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "action_calls": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "observation_calls": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
