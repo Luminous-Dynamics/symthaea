@@ -750,4 +750,18 @@ mod tests {
         let summary = analyze_paired_metric(&plan, &rows).unwrap();
         assert_ne!(summary.decision, InferenceDecision::EvidenceOfSuperiority);
     }
+    #[test]
+    fn seeded_monte_carlo_sign_flip_is_reproducible() {
+        let mut plan = plan(MetricDirection::HigherIsBetter);
+        plan.exact_randomization_max_clusters = 6;
+        let rows = observations(MetricDirection::HigherIsBetter, 12, 8, 0.03);
+        let left = analyze_paired_metric(&plan, &rows).unwrap();
+        let right = analyze_paired_metric(&plan, &rows).unwrap();
+        assert_eq!(
+            left.paired_randomization_p_value,
+            right.paired_randomization_p_value
+        );
+        assert_eq!(left.inference_receipt_sha256, right.inference_receipt_sha256);
+    }
+
 }
