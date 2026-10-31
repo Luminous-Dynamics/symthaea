@@ -5,7 +5,7 @@
 //! target labels. This module intentionally returns both artifacts for local
 //! prototype testing; it is NOT a sealed evaluator boundary.
 
-use super::{mix64, SplitMix64};
+use super::{digest::CanonicalHasher, mix64, SplitMix64};
 use std::fmt;
 
 const MAX_STEPS: usize = 100_000;
@@ -46,6 +46,35 @@ pub struct MultiTimescaleTask {
     pub forecast_horizon: u64,
     pub feedback_delay: u64,
     pub events: Vec<TemporalEvent>,
+    /// SHA-256 over the versioned canonical public multiscale stream.
+    pub content_sha256: [u8; 32],
+}
+
+/// Domain-separated canonical SHA-256 of a public multiscale stream.
+pub fn multiscale_content_digest(task: &MultiTimescaleTask) -> [u8; 32] {
+    let mut hash = CanonicalHasher::new(b"symthaea.temporal.multiscale.public.v1");
+    hash.u64(task.stream_id);
+    hash.u64(task.forecast_horizon);
+    hash.u64(task.feedback_delay);
+    hash.usize(task.events.len());
+    for event in &task.events {
+        hash.u64(event.step);
+        hash.u8(event.ordinal);
+        match &event.kind {
+            TemporalEventKind::Observation { fast, medium, slow } => {
+                hash.u8(0);
+                hash.u16(*fast as u16);
+                hash.u16(*medium as u16);
+                hash.u16(*slow as u16);
+            }
+            TemporalEventKind::Feedback { source_step, label } => {
+                hash.u8(1);
+                hash.u64(*source_step);
+                hash.u8(*label as u8);
+            }
+        }
+    }
+    hash.finish()
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -69,6 +98,7 @@ pub struct MultiTimescaleOracle {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TemporalVerificationError {
     StreamIdMismatch,
+    ContentDigestMismatch,
     OracleLengthMismatch,
     InvalidOracleTarget { source_step: u64 },
     MissingObservation { step: u64 },
@@ -82,6 +112,7 @@ impl fmt::Display for TemporalVerificationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::StreamIdMismatch => write!(f, "public task and oracle stream IDs differ"),
+            Self::ContentDigestMismatch => write!(f, "multiscale public task SHA-256 digest does not match its contents"),
             Self::OracleLengthMismatch => write!(f, "oracle target count differs from observation count"),
             Self::InvalidOracleTarget { source_step } => {
                 write!(f, "oracle target record is invalid at source step {source_step}")
@@ -117,6 +148,9 @@ pub fn verify_multiscale_trace(
 ) -> Result<(), TemporalVerificationError> {
     if task.stream_id != oracle.stream_id {
         return Err(TemporalVerificationError::StreamIdMismatch);
+    }
+    if task.content_sha256 != multiscale_content_digest(task) {
+        return Err(TemporalVerificationError::ContentDigestMismatch);
     }
 
     let target_count = u64::try_from(oracle.targets.len()).unwrap_or(u64::MAX);
@@ -293,13 +327,17 @@ pub fn generate_multiscale_task(
         }
     }
 
+    let mut public_task = MultiTimescaleTask {
+        stream_id,
+        forecast_horizon: config.forecast_horizon,
+        feedback_delay: config.feedback_delay,
+        events,
+        content_sha256: [0; 32],
+    };
+    public_task.content_sha256 = multiscale_content_digest(&public_task);
+
     Ok((
-        MultiTimescaleTask {
-            stream_id,
-            forecast_horizon: config.forecast_horizon,
-            feedback_delay: config.feedback_delay,
-            events,
-        },
+        public_task,
         MultiTimescaleOracle {
             stream_id,
             targets,
@@ -482,6 +520,22 @@ mod tests {
     fn generated_trace_passes_independent_oracle_verifier() {
         let (task, oracle) = generate_multiscale_task(config(true)).unwrap();
         assert_eq!(verify_multiscale_trace(&task, &oracle), Ok(()));
+    }
+
+    #[test]
+    fn generated_public_stream_has_valid_sha256() {
+        let (task, _) = generate_multiscale_task(config(true)).unwrap();
+        assert_eq!(task.content_sha256, multiscale_content_digest(&task));
+    }
+
+    #[test]
+    fn verifier_rejects_post_generation_observation_mutation() {
+        let (mut task, oracle) = generate_multiscale_task(config(true)).unwrap();
+        task.events[0].step = task.events[0].step.saturating_add(1);
+        assert_eq!(
+            verify_multiscale_trace(&task, &oracle),
+            Err(TemporalVerificationError::ContentDigestMismatch)
+        );
     }
 
     #[test]
