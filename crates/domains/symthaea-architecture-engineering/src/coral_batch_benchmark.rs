@@ -258,6 +258,16 @@ pub fn run_coral_batch_campaign(
             })
             .collect();
         let global_best_at_batch_start = board.global_best_score.or(Some(0.0));
+        // The verifier canonicalizes/adopts a genuinely new direction before any batch
+        // result is committed. Its opening-best snapshot must be the pre-batch global best.
+        let mut new_direction_admission_pending = false;
+        if landscape == DirectionLandscapeFamily::NewOperatorBreakthrough
+            && !board.directions.contains_key("D")
+            && selected_arms.iter().any(|arm| matches!(arm, CoralArm::New))
+        {
+            board.register_direction("D").map_err(|error| error.to_string())?;
+            new_direction_admission_pending = true;
+        }
         let mut round_actions = Vec::new();
         let mut staged_events = Vec::new();
 
@@ -326,111 +336,89 @@ pub fn run_coral_batch_campaign(
                     });
                 }
                 CoralArm::New => {
-                    let known_new_direction = board.directions.contains_key("D");
-                    let (disposition, score, canonical) = if landscape == DirectionLandscapeFamily::NewOperatorBreakthrough {
-                        if known_new_direction {
-                            let direction_id = "D";
-                            if !board.directions.contains_key(direction_id) {
-                                return Err("D direction disappeared after verifier admission".to_owned());
-                            }
-                            let parent_score = round_parent_scores.get(direction_id)
-                                .copied()
-                                .flatten()
-                                .or(global_best_at_batch_start);
-                            let eval_index = direction_eval_counts.get(direction_id).copied().unwrap_or(0);
-                            let score = payoff(landscape, direction_id, eval_index);
-                            (
-                                DirectionProposalDisposition::Duplicate {
-                                    existing_direction_id: direction_id.to_owned(),
-                                },
-                                Some(score),
-                                Some(direction_id.to_owned()),
-                            )
-                        } else {
-                            let direction_id = "D";
-                            let global_best_before = global_best_at_batch_start;
-                            board.register_direction(direction_id).map_err(|error| error.to_string())?;
-                            let eval_index = direction_eval_counts.get(direction_id).copied().unwrap_or(0);
-                            let score = payoff(landscape, direction_id, eval_index);
-                            let attempt_id = format!("{action_id}-evaluation");
-                            board.record_evaluation(
-                                &attempt_id,
-                                direction_id,
-                                Some(score),
-                                global_best_before,
-                                Vec::new(),
-                                1,
-                            ).map_err(|error| error.to_string())?;
-                            *direction_eval_counts.entry(direction_id.to_owned()).or_default() += 1;
-                            if best_observed.as_ref().is_none_or(|(_, best)| score > *best) {
-                                best_observed = Some((direction_id.to_owned(), score));
-                            }
-                            let action_index = (total_action_units + round_actions.len() as u64 + 1) as usize;
-                            if actions_to_target.is_none() && score >= TARGET_SCORE {
-                                actions_to_target = Some(action_index);
-                            }
-                            let event = make_novel_event(
-                                tape_round_id,
-                                worker_id.clone(),
-                                visible_through_sequence,
-                                landscape,
-                                seed,
-                                &attempt_id,
-                                new_attempt_index,
-                                DirectionProposalDisposition::Admitted {
-                                    canonical_direction_id: direction_id.to_owned(),
-                                },
-                                Some(score),
-                            );
-                            staged_events.push(event);
-                            round_actions.push(CoralBatchAction {
-                                action_id,
-                                round_id: tape_round_id,
-                                worker_id,
-                                assigned_arm: CoralArm::New,
-                                canonical_direction_id: Some(direction_id.to_owned()),
-                                disposition: Some(DirectionProposalDisposition::Admitted {
-                                    canonical_direction_id: direction_id.to_owned(),
-                                }),
-                                score: Some(score),
-                                action_units: 1,
-                            });
-                            new_attempt_index += 1;
-                            continue;
-                        }
-                    } else {
-                        (
-                            DirectionProposalDisposition::Rejected {
-                                reason_code: "synthetic_verifier_no_new_grammar_payoff".to_owned(),
-                            },
-                            None,
-                            None,
-                        )
-                    };
-
                     let attempt_id = format!("{action_id}-novel-attempt");
-                    if let Some(direction_id) = canonical.as_deref() {
+                    if new_direction_admission_pending {
+                        new_direction_admission_pending = false;
+                        let direction_id = "D";
+                        let eval_index = direction_eval_counts.get(direction_id).copied().unwrap_or(0);
+                        let score = payoff(landscape, direction_id, eval_index);
+                        board.record_evaluation(
+                            &attempt_id,
+                            direction_id,
+                            Some(score),
+                            global_best_at_batch_start,
+                            Vec::new(),
+                            1,
+                        ).map_err(|error| error.to_string())?;
+                        *direction_eval_counts.entry(direction_id.to_owned()).or_default() += 1;
+                        if best_observed.as_ref().is_none_or(|(_, best)| score > *best) {
+                            best_observed = Some((direction_id.to_owned(), score));
+                        }
+                        let action_index = usize::try_from(
+                            total_action_units + round_actions.len() as u64 + 1
+                        ).map_err(|_| "action index does not fit usize".to_owned())?;
+                        if actions_to_target.is_none() && score >= TARGET_SCORE {
+                            actions_to_target = Some(action_index);
+                        }
+                        let disposition = DirectionProposalDisposition::Admitted {
+                            canonical_direction_id: direction_id.to_owned(),
+                        };
+                        staged_events.push(make_novel_event(
+                            tape_round_id,
+                            worker_id.clone(),
+                            visible_through_sequence,
+                            landscape,
+                            seed,
+                            &attempt_id,
+                            new_attempt_index,
+                            disposition.clone(),
+                            Some(score),
+                        ));
+                        round_actions.push(CoralBatchAction {
+                            action_id,
+                            round_id: tape_round_id,
+                            worker_id,
+                            assigned_arm: CoralArm::New,
+                            canonical_direction_id: Some(direction_id.to_owned()),
+                            disposition: Some(disposition),
+                            score: Some(score),
+                            action_units: 1,
+                        });
+                        new_attempt_index += 1;
+                        continue;
+                    }
+
+                    if landscape == DirectionLandscapeFamily::NewOperatorBreakthrough
+                        && board.directions.contains_key("D")
+                    {
+                        let direction_id = "D";
                         let parent_score = round_parent_scores.get(direction_id)
                             .copied()
                             .flatten()
                             .or(global_best_at_batch_start);
-                        let score_value = score.ok_or_else(|| "duplicate needs a score".to_owned())?;
+                        let eval_index = direction_eval_counts.get(direction_id).copied().unwrap_or(0);
+                        let score = payoff(landscape, direction_id, eval_index);
                         board.record_evaluation(
                             &attempt_id,
                             direction_id,
-                            Some(score_value),
+                            Some(score),
                             parent_score,
                             Vec::new(),
                             1,
                         ).map_err(|error| error.to_string())?;
                         *direction_eval_counts.entry(direction_id.to_owned()).or_default() += 1;
-                        if best_observed.as_ref().is_none_or(|(_, best)| score_value > *best) {
-                            best_observed = Some((direction_id.to_owned(), score_value));
+                        if best_observed.as_ref().is_none_or(|(_, best)| score > *best) {
+                            best_observed = Some((direction_id.to_owned(), score));
                         }
-                        let action_index = (total_action_units + round_actions.len() as u64 + 1) as usize;
-                        if actions_to_target.is_none() && score_value >= TARGET_SCORE {
+                        let action_index = usize::try_from(
+                            total_action_units + round_actions.len() as u64 + 1
+                        ).map_err(|_| "action index does not fit usize".to_owned())?;
+                        if actions_to_target.is_none() && score >= TARGET_SCORE {
                             actions_to_target = Some(action_index);
                         }
+                        let disposition = DirectionProposalDisposition::Duplicate {
+                            existing_direction_id: direction_id.to_owned(),
+                        };
                         staged_events.push(make_novel_event(
                             tape_round_id,
                             worker_id.clone(),
@@ -440,9 +428,23 @@ pub fn run_coral_batch_campaign(
                             &attempt_id,
                             new_attempt_index,
                             disposition.clone(),
-                            Some(score_value),
+                            Some(score),
                         ));
+                        round_actions.push(CoralBatchAction {
+                            action_id,
+                            round_id: tape_round_id,
+                            worker_id,
+                            assigned_arm: CoralArm::New,
+                            canonical_direction_id: Some(direction_id.to_owned()),
+                            disposition: Some(disposition),
+                            score: Some(score),
+                            action_units: 1,
+                        });
+                        new_attempt_index += 1;
                     } else {
+                        let disposition = DirectionProposalDisposition::Rejected {
+                            reason_code: "synthetic_verifier_no_new_grammar_payoff".to_owned(),
+                        };
                         staged_events.push(make_novel_event(
                             tape_round_id,
                             worker_id.clone(),
@@ -454,18 +456,18 @@ pub fn run_coral_batch_campaign(
                             disposition.clone(),
                             None,
                         ));
+                        round_actions.push(CoralBatchAction {
+                            action_id,
+                            round_id: tape_round_id,
+                            worker_id,
+                            assigned_arm: CoralArm::New,
+                            canonical_direction_id: None,
+                            disposition: Some(disposition),
+                            score: None,
+                            action_units: 1,
+                        });
+                        new_attempt_index += 1;
                     }
-                    round_actions.push(CoralBatchAction {
-                        action_id,
-                        round_id: tape_round_id,
-                        worker_id,
-                        assigned_arm: CoralArm::New,
-                        canonical_direction_id: canonical,
-                        disposition: Some(disposition),
-                        score,
-                        action_units: 1,
-                    });
-                    new_attempt_index += 1;
                 }
             }
         }
