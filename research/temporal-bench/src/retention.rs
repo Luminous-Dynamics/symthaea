@@ -115,6 +115,7 @@ pub enum RetentionVerificationError {
     InvalidInvalidation,
     InvalidOracleAnswer { query_id: u64 },
     InvalidEventOrder { index: usize },
+    SeedReplayMismatch,
 }
 
 impl fmt::Display for RetentionVerificationError {
@@ -141,6 +142,9 @@ impl fmt::Display for RetentionVerificationError {
             }
             Self::InvalidEventOrder { index } => {
                 write!(f, "retention event {index} is not strictly ordered")
+            }
+            Self::SeedReplayMismatch => {
+                write!(f, "retention trace does not match evaluator-held seed/configuration")
             }
         }
     }
@@ -237,6 +241,7 @@ pub fn generate_retention_task(
     events.push(RetentionEvent {
         step: invalidation_step,
         ordinal: 0,
+        ordinal: 1,
         kind: RetentionEventKind::Invalidate {
             record_id: target_record_id,
         },
@@ -588,6 +593,22 @@ mod tests {
             distractor_count: 32,
             delay_steps: 16,
             similarity,
+        }
+    }
+
+    #[test]
+    fn one_step_delay_has_unambiguous_query_then_invalidation_order() {
+        let mut cfg = config(DistractorSimilarity::High);
+        cfg.delay_steps = 1;
+        let (task, oracle) = generate_retention_task(cfg).unwrap();
+        assert_eq!(verify_retention_trace(&task, &oracle), Ok(()));
+        let same_step: Vec<_> = task.events
+            .iter()
+            .filter(|event| event.step == oracle.invalidated_at_step)
+            .collect();
+        assert!(same_step.len() >= 2);
+        for pair in same_step.windows(2) {
+            assert!(pair[0].ordinal < pair[1].ordinal);
         }
     }
 
