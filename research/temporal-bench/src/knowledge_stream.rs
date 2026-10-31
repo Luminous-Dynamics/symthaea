@@ -70,6 +70,7 @@ pub struct KnowledgeStreamTask {
     pub stream_id: u64,
     pub target_entity_id: u64,
     pub target_predicate_id: u32,
+    pub distractor_count: usize,
     pub query_issued_at: u64,
     pub events: Vec<KnowledgeEvent>,
     pub content_sha256: [u8; 32],
@@ -315,6 +316,7 @@ pub fn generate_knowledge_stream(
         stream_id,
         target_entity_id,
         target_predicate_id,
+        distractor_count: config.distractor_count,
         query_issued_at,
         events,
         content_sha256: [0; 32],
@@ -385,6 +387,7 @@ pub fn knowledge_task_digest(task: &KnowledgeStreamTask) -> [u8; 32] {
     hash.u64(task.stream_id);
     hash.u64(task.target_entity_id);
     hash.u32(task.target_predicate_id);
+    hash.usize(task.distractor_count);
     hash.u64(task.query_issued_at);
     hash.usize(task.events.len());
     for event in &task.events {
@@ -467,11 +470,6 @@ pub fn verify_knowledge_stream(
     if oracle.content_sha256 != knowledge_oracle_digest(oracle) {
         return Err(KnowledgeVerificationError::OracleDigestMismatch);
     }
-    let expected_event_count = oracle
-        .answers
-        .len()
-        .saturating_add(oracle.target_fact_id as usize)
-        .saturating_add(2);
     if task.target_entity_id != oracle.target_entity_id
         || task.target_predicate_id != oracle.target_predicate_id
         || oracle.target_fact_id != 1
@@ -479,7 +477,8 @@ pub fn verify_knowledge_stream(
         || oracle.correction_observed_at >= oracle.retraction_observed_at
         || oracle.retraction_observed_at >= task.query_issued_at
         || oracle.answers.len() != 5
-        || task.events.len() < oracle.answers.len().saturating_add(3)
+        || task.distractor_count > MAX_KNOWLEDGE_DISTRACTORS
+        || task.events.len() != task.distractor_count.saturating_add(8)
     {
         return Err(KnowledgeVerificationError::InvalidTimeline);
     }
@@ -589,7 +588,7 @@ pub fn verify_knowledge_stream(
     if query_answers.len() != oracle.answers.len()
         || query_count != oracle.answers.len()
         || target_revision_count != 3
-        || fact_ids.len() != task.events.len().saturating_sub(oracle.answers.len() + 3)
+        || fact_ids.len() != task.distractor_count
     {
         return Err(KnowledgeVerificationError::InvalidTimeline);
     }
