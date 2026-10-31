@@ -118,3 +118,14 @@ cargo clippy -p symthaea-architecture-engineering --all-targets -- -D warnings
 \`\`\`
 
 Then perform deterministic two-run replay from clean state and cross-check target metrics/reference-front behavior against the pinned benchmark implementation. GitHub workflow conclusions marked skipped are not passes.
+
+
+## 6. Separate artifact-byte verification primitive
+
+The content-addressed byte verification foundation is now in \`crates/domains/symthaea-architecture-engineering/src/evidence_artifact.rs\`, exported from the crate.
+
+It provides canonical run/candidate/source-commit-bound artifact manifests; exact byte-length and SHA-256 verification for a complete resolved byte set; a verifier-build-bound byte receipt; and deterministic receipt reconstruction. Its authored tests cover byte mutation, missing/extra/duplicate artifacts, canonical ordering and tampered receipts.
+
+This primitive receives bytes from its caller. It does not retrieve from CAS/Holochain/object storage, authenticate a remote store, authenticate digital signatures, or establish semantic correctness. Integration with the anytime verifier promotion and bounded CAS retrieval is tracked separately in [Issue #9608](https://github.com/Luminous-Dynamics/symthaea/issues/9608). The implementation and limits are documented in \`AR5B5_EVIDENCE_ARTIFACT_BYTES_V0_1.md\`.
+
+All tests remain authored and unexecuted; no byte-verification or science-validity pass is claimed.
