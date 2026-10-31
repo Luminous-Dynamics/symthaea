@@ -135,10 +135,24 @@ pub struct StyleCoverageStateCount {
     pub count: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConstellationCoverageCount {
+    pub constellation: String,
+    pub style_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CatalogStatusCoverageCount {
+    pub status: String,
+    pub style_count: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StyleCoverageSummary {
     pub catalog_entry_count: usize,
     pub constellation_count: usize,
+    pub styles_by_constellation: Vec<ConstellationCoverageCount>,
+    pub styles_by_catalog_status: Vec<CatalogStatusCoverageCount>,
     pub catalog_routes_declared: usize,
     pub composer_routes_resolved: usize,
     pub catalog_entries_without_routes: usize,
@@ -322,6 +336,26 @@ pub fn collect_style_coverage() -> StyleCoverageReport {
     }
 
     let axes_by_state = summarize_axes(&styles);
+    let mut constellation_counts = BTreeMap::<String, usize>::new();
+    let mut status_counts = BTreeMap::<String, usize>::new();
+    for style in &styles {
+        *constellation_counts.entry(style.constellation.clone()).or_default() += 1;
+        *status_counts.entry(style.catalog_status.clone()).or_default() += 1;
+    }
+    let styles_by_constellation = constellation_counts
+        .into_iter()
+        .map(|(constellation, style_count)| ConstellationCoverageCount {
+            constellation,
+            style_count,
+        })
+        .collect();
+    let styles_by_catalog_status = status_counts
+        .into_iter()
+        .map(|(status, style_count)| CatalogStatusCoverageCount {
+            status,
+            style_count,
+        })
+        .collect();
     let report = StyleCoverageReport {
         schema: STYLE_COVERAGE_SCHEMA.into(),
         music_theory_engine_version: MUSIC_THEORY_ENGINE_VERSION.into(),
@@ -330,6 +364,8 @@ pub fn collect_style_coverage() -> StyleCoverageReport {
         summary: StyleCoverageSummary {
             catalog_entry_count: styles.len(),
             constellation_count: Constellation::ALL.len(),
+            styles_by_constellation,
+            styles_by_catalog_status,
             catalog_routes_declared,
             composer_routes_resolved,
             catalog_entries_without_routes: styles.len().saturating_sub(catalog_routes_declared),
