@@ -107,6 +107,7 @@ pub enum RetentionVerificationError {
     StreamIdMismatch,
     PublicDigestMismatch,
     OracleDigestMismatch,
+    SeedReplayMismatch,
     InvalidEventCount,
     InvalidTargetStore,
     InvalidDistractor { index: usize },
@@ -122,6 +123,7 @@ impl fmt::Display for RetentionVerificationError {
             Self::StreamIdMismatch => write!(f, "retention task and oracle stream IDs differ"),
             Self::PublicDigestMismatch => write!(f, "retention public SHA-256 digest mismatch"),
             Self::OracleDigestMismatch => write!(f, "retention oracle SHA-256 digest mismatch"),
+            Self::SeedReplayMismatch => write!(f, "retention task/oracle do not match the supplied seed and configuration"),
             Self::InvalidEventCount => write!(f, "retention event count is inconsistent"),
             Self::InvalidTargetStore => write!(f, "target store event is missing or invalid"),
             Self::InvalidDistractor { index } => {
@@ -516,6 +518,22 @@ pub fn verify_retention_trace(
     Ok(())
 }
 
+/// Verify a retention trace by replaying the complete generator under
+/// evaluator-held seed/configuration, after checking its semantic contract.
+pub fn verify_retention_trace_seeded(
+    task: &RetentionTask,
+    oracle: &RetentionOracle,
+    config: RetentionConfig,
+) -> Result<(), RetentionVerificationError> {
+    verify_retention_trace(task, oracle)?;
+    let (expected_task, expected_oracle) = generate_retention_task(config)
+        .map_err(|_| RetentionVerificationError::SeedReplayMismatch)?;
+    if task != &expected_task || oracle != &expected_oracle {
+        return Err(RetentionVerificationError::SeedReplayMismatch);
+    }
+    Ok(())
+}
+
 fn retention_stream_id(config: RetentionConfig) -> u64 {
     let mut value = config.seed ^ config.delay_steps.rotate_left(19);
     value ^= (config.distractor_count as u64).rotate_left(37);
@@ -627,6 +645,20 @@ mod tests {
             generate_retention_task(config(DistractorSimilarity::High)).unwrap();
         assert_eq!(task.content_sha256, retention_content_digest(&task));
         assert_eq!(oracle.content_sha256, retention_oracle_digest(&oracle));
+    }
+
+    #[test]
+    fn seeded_verifier_rejects_recommitted_distractor_value_change() {
+        let cfg = config(DistractorSimilarity::High);
+        let (mut task, oracle) = generate_retention_task(cfg).unwrap();
+        if let RetentionEventKind::Store { value, .. } = &mut task.events[1].kind {
+            *value ^= 1;
+        }
+        task.content_sha256 = retention_content_digest(&task);
+        assert_eq!(
+            verify_retention_trace_seeded(&task, &oracle, cfg),
+            Err(RetentionVerificationError::SeedReplayMismatch)
+        );
     }
 
     #[test]
