@@ -92,8 +92,8 @@ pub struct CapabilityProof {
     pub independent_verifier_sha256: String,
     /// Must equal the renderer build requested by the capability cell.
     pub renderer_build_sha256: String,
-    /// Required for sample-backed or hybrid realization; optional for a
-    /// purely procedural synthesis model.
+    /// Required for a *qualified* sample-backed or hybrid cell; explicit
+    /// Unsupported evidence may prove that the requested asset is absent.
     pub asset_sha256: Option<String>,
     /// Identifier of the trusted verifier key that signed this exact claim.
     pub verifier_key_id: String,
@@ -248,10 +248,18 @@ fn validate_request(request: &CapabilityRequest) -> Result<(), String> {
             request.velocity
         ));
     }
-    if let CapabilityPitch::Unpitched(token) = &request.pitch {
-        if !nonempty(token) {
+    match &request.pitch {
+        CapabilityPitch::PitchedMidi(pitch) | CapabilityPitch::PercussionKey(pitch)
+            if *pitch > 127 =>
+        {
+            return Err(format!(
+                "pitch/percussion key {pitch} is outside the supported 0..=127 representation"
+            ));
+        }
+        CapabilityPitch::Unpitched(token) if !nonempty(token) => {
             return Err("unpitched capability token must be non-empty".into());
         }
+        _ => {}
     }
     if !valid_sha256(&request.renderer_build_sha256) {
         return Err("renderer_build_sha256 must be a 64-character hexadecimal SHA-256 digest".into());
@@ -262,6 +270,9 @@ fn validate_request(request: &CapabilityRequest) -> Result<(), String> {
 fn decode_signature_hex(value: &str) -> Result<[u8; 64], String> {
     if value.len() != 128 {
         return Err("attestation_signature_hex must encode exactly 64 bytes".into());
+    }
+    if !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("attestation_signature_hex contains non-hexadecimal data".into());
     }
     let mut signature = [0u8; 64];
     for (index, byte) in signature.iter_mut().enumerate() {
@@ -302,10 +313,12 @@ fn validate_proof(
             return Err("asset_sha256 must be a 64-character hexadecimal SHA-256 digest".into());
         }
     }
-    if matches!(
-        request.realization,
-        CapabilityRealization::SampleAsset | CapabilityRealization::Hybrid
-    ) && proof.asset_sha256.is_none()
+    if cell.outcome == CapabilityEvidenceOutcome::Qualified
+        && matches!(
+            request.realization,
+            CapabilityRealization::SampleAsset | CapabilityRealization::Hybrid
+        )
+        && proof.asset_sha256.is_none()
     {
         return Err("sample-backed and hybrid capability cells require an immutable asset SHA-256".into());
     }
@@ -626,6 +639,34 @@ mod tests {
     }
 
     #[test]
+    fn unsupported_missing_sample_cell_does_not_require_an_asset_digest() {
+        let request = request();
+        let key = signing_key();
+        let trust = trust_store(&key);
+        let reason = "no source sample covers this pitch";
+        let mut proof = proof(
+            &request,
+            CapabilityEvidenceOutcome::Unsupported,
+            Some(reason),
+            &key,
+        );
+        proof.asset_sha256 = None;
+        let mut cell = CapabilityEvidenceCell {
+            request: request.clone(),
+            outcome: CapabilityEvidenceOutcome::Unsupported,
+            reason: Some(reason.into()),
+            proof: Some(proof),
+        };
+        let message = capability_attestation_message(&cell).unwrap();
+        cell.proof.as_mut().unwrap().attestation_signature_hex =
+            encode_hex(&key.sign(&message).to_bytes());
+        assert!(matches!(
+            resolve_capability(&request, &[cell], &trust),
+            CapabilityDecision::Unsupported { .. }
+        ));
+    }
+
+    #[test]
     fn unsigned_or_malformed_qualified_proof_is_invalid_not_supported() {
         let request = request();
         let key = signing_key();
@@ -736,6 +777,13 @@ mod tests {
         malformed.renderer_build_sha256 = "not-a-digest".into();
         assert!(matches!(
             resolve_capability(&malformed, &[], &empty_trust),
+            CapabilityDecision::InvalidEvidence { .. }
+        ));
+
+        let mut bad_pitch = request();
+        bad_pitch.pitch = CapabilityPitch::PitchedMidi(200);
+        assert!(matches!(
+            resolve_capability(&bad_pitch, &[], &empty_trust),
             CapabilityDecision::InvalidEvidence { .. }
         ));
 
