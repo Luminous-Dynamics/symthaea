@@ -668,8 +668,12 @@ mod tests {
     fn verifier_rejects_recommitted_seed_inconsistent_observation() {
         let config = EvidenceConfig::braintrace_reference(321);
         let (mut task, oracle) = generate_evidence_task(config).unwrap();
-        task.observations[0].active_channels.push(99);
-        task.observations[0].active_channels.sort_unstable();
+        let observation = task
+            .observations
+            .iter_mut()
+            .find(|observation| !observation.active_channels.is_empty())
+            .unwrap();
+        observation.active_channels.pop();
         task.content_sha256 = evidence_content_digest(&task);
         assert_eq!(
             verify_evidence_trace(&task, &oracle),
