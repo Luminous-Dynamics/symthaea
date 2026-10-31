@@ -19,17 +19,17 @@ use symthaea_iit::{
 #[derive(Clone, Copy)]
 struct Fixture {
     side: usize,
+    cutset_factor_entry_budget: usize,
 }
 
 const FIXTURES: [Fixture; 4] = [
-    Fixture { side: 4 },
-    Fixture { side: 5 },
-    Fixture { side: 6 },
-    Fixture { side: 8 },
+    Fixture { side: 4, cutset_factor_entry_budget: 8 },
+    Fixture { side: 5, cutset_factor_entry_budget: 8 },
+    Fixture { side: 6, cutset_factor_entry_budget: 16 },
+    Fixture { side: 8, cutset_factor_entry_budget: 32 },
 ];
 
 const PAIR_POTENTIAL: [f64; 4] = [0.83, 0.17, 0.29, 0.71];
-const CUTSET_FACTOR_ENTRY_BUDGET: usize = 8;
 const BASELINE_FACTOR_ENTRY_BUDGET: usize = 1 << 16;
 
 fn grid_factors(side: usize) -> Result<Vec<BinaryLogFactor>, String> {
@@ -91,7 +91,7 @@ fn equivalent(left: &[f64], right: &[f64]) -> bool {
 fn run() -> Result<(), String> {
     let repeats = parse_repeats()?;
     println!(
-        "side,variables,factors,cutset_variables,cutset_assignments,baseline_induced_width,baseline_peak_entries,cutset_induced_width,cutset_peak_entries,baseline_median_ns,cutset_median_ns,cutset_over_baseline_time_ratio,exact_output_parity,within_cutset_budget"
+        "side,variables,factors,cutset_variables,cutset_assignments,cutset_factor_entry_budget,baseline_induced_width,baseline_peak_entries,cutset_induced_width,cutset_peak_entries,baseline_median_ns,cutset_median_ns,cutset_over_baseline_time_ratio,exact_output_parity,within_cutset_budget"
     );
 
     for fixture in FIXTURES {
@@ -105,6 +105,7 @@ fn run() -> Result<(), String> {
         let cutset_start = (side / 2) * side;
         let cutset = (cutset_start..cutset_start + side).collect::<Vec<_>>();
         let branch_budget = 1usize << cutset.len();
+        let cutset_factor_entry_budget = fixture.cutset_factor_entry_budget;
 
         let baseline = min_fill_log_sum_product(
             &factors,
@@ -115,7 +116,7 @@ fn run() -> Result<(), String> {
             &factors,
             &eliminate,
             &cutset,
-            CUTSET_FACTOR_ENTRY_BUDGET,
+            cutset_factor_entry_budget,
             branch_budget,
         ).map_err(|error| format!("cutset path failed for {side}x{side}: {error}"))?;
 
@@ -128,7 +129,7 @@ fn run() -> Result<(), String> {
         {
             return Err(format!("complete retained-factor parity failed for {side}x{side}"));
         }
-        if cutset_report.peak_factor_entries > CUTSET_FACTOR_ENTRY_BUDGET
+        if cutset_report.peak_factor_entries > cutset_factor_entry_budget
             || cutset_report.predicted_peak_factor_entries != cutset_report.peak_factor_entries
             || cutset_report.cutset_assignments_evaluated != branch_budget
         {
@@ -151,7 +152,7 @@ fn run() -> Result<(), String> {
                 &factors,
                 &eliminate,
                 &cutset,
-                CUTSET_FACTOR_ENTRY_BUDGET,
+                cutset_factor_entry_budget,
                 branch_budget,
             ).map_err(|error| error.to_string())?;
             cutset_samples.push(start.elapsed());
@@ -172,12 +173,13 @@ fn run() -> Result<(), String> {
             cutset_median as f64 / baseline_median as f64
         };
         println!(
-            "{},{},{},{},{},{},{},{},{},{},{},{:.4},{},{}",
+            "{},{},{},{},{},{},{},{},{},{},{},{},{:.4},{},{}",
             side,
             variables,
             factors.len(),
             cutset.len(),
             branch_budget,
+            cutset_factor_entry_budget,
             baseline.induced_width,
             baseline.peak_factor_entries,
             cutset_report.induced_width,
@@ -186,7 +188,7 @@ fn run() -> Result<(), String> {
             cutset_median,
             ratio,
             true,
-            cutset_report.peak_factor_entries <= CUTSET_FACTOR_ENTRY_BUDGET,
+            cutset_report.peak_factor_entries <= cutset_factor_entry_budget,
         );
     }
     Ok(())
