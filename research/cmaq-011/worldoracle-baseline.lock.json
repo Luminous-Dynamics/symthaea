@@ -50,7 +50,8 @@
       "contains_ground_truth": false,
       "policy": "Do not access or mirror the private test inputs. Test ground truth and leaderboard results remain withheld; submit through the official portal only."
     },
-    "validation_ground_truth_bytes_approx": 60600000000
+    "validation_ground_truth_bytes_approx": 60600000000,
+    "validation_total_file_size_bytes_approx": 60600000000
   },
   "evaluation_contract": {
     "input_conditioning": "Same initial observation and low-level action trajectory; predicted rollout is compared with its paired real-world execution.",
@@ -110,12 +111,12 @@
   "reproduction_constraints": {
     "validation_claim_ceiling": "Pinned official reference only. Dataset access remains unresolved/restricted; no download or evaluation is authorized until the GitHub README and Hugging Face visibility discrepancy is explicitly resolved.",
     "data_use": "Do not download or use the dataset while access is unresolved. If explicit permission is granted, CC BY-NC-SA 4.0 remains non-commercial/share-alike; the Apache-2.0 source license does not confer data-use or commercial training rights.",
-    "resource_requirements": "Record published source-reported resource requirements only; no local dataset download or validation evaluation is authorized by this lock.",
+    "resource_requirements": "Source documentation reports Linux/Python 3.10 and recommends CUDA for V-JEPA2, LPIPS and DINOv3. No dataset has been downloaded; resource estimates for data access remain informational only while access is unresolved.",
     "physical_judge_cost": "Evaluation uses an OpenAI-compatible VLM endpoint. Pin endpoint/model version and account for inference cost.",
     "no_test_leakage": "Do not use withheld test ground truth; use the official portal for test evaluation.",
     "source_and_data_pinning": "Source revision is pinned. Dataset revision/checksum inventory is reference metadata only and must not be retrieved or consumed until explicit authorized access resolves the public/private discrepancy."
   },
   "reproduction_status": "source_pinned_dataset_access_unresolved_do_not_download",
   "claim_ceiling": "Published validation scores are reference targets only. Dataset access is unresolved/restricted; no download, local evaluation, Symthaea measurement, matched comparison or SOTA claim is authorized.",
-  "published_validation_scores_note": "The official validation results file is indicative only; the authors warn that the validation set is substantially smaller and less diverse than the test set. It reports scores for selected platforms/tracks, not a complete table over all 67 validation episodes."
+  "published_validation_scores_note": "The official validation results file is indicative only and is a pinned published reference, not a Symthaea measurement. Dataset access remains unresolved/restricted; do not retrieve the dataset to verify or extend these figures until explicit access is authorized. The source report notes the validation set is smaller and less diverse than the hidden test set and reports selected platform/track combinations, not a complete table over all 67 episodes."
 }
