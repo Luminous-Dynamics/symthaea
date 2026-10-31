@@ -584,6 +584,19 @@ mod tests {
     }
 
     #[test]
+    fn all_cargo_fixture_packages_declare_independent_workspace_roots() {
+        for path in [
+            "declared/Cargo.toml",
+            "mtime/Cargo.toml",
+            "env-hidden/Cargo.toml",
+            "env-declared/Cargo.toml",
+        ] {
+            let manifest = FIXTURE.iter().find(|(candidate, _)| *candidate == path).unwrap().1;
+            assert!(manifest.lines().any(|line| line.trim() == "[workspace]"), "{path} must own its Cargo workspace");
+        }
+    }
+
+    #[test]
     fn future_positive_control_mtime_is_strictly_newer_than_baseline() {
         let baseline = UNIX_EPOCH + Duration::from_secs(100);
         let advanced = baseline.checked_add(Duration::from_secs(60)).unwrap();
