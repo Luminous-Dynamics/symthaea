@@ -4,6 +4,10 @@ pub struct OracleProjection {
     pub expected_transfer: &'static str,
     pub expected_action: &'static str,
     pub expected_completion: &'static str,
+    pub expected_write: &'static str,
+    pub expected_maintain: &'static str,
+    pub expected_retrieve: &'static str,
+    pub expected_use: &'static str,
 }
 
 fn confounded_flow(common_cause: bool, _pump_on: bool, _valve_open: bool) -> i32 {
@@ -251,6 +255,18 @@ pub fn projection_for_family(family: &str) -> Result<OracleProjection, String> {
                     expected_transfer: "record_association_only",
                     expected_action: "seek_intervention_or_preserve_uncertainty",
                     expected_completion: "not_applicable",
+                    expected_write: "store_transition_with_regime",
+                    expected_maintain: "mark_stale_on_regime_change",
+                    expected_retrieve: "retrieve_with_regime_warning",
+                    expected_use: "requalify_before_action",
+                    expected_write: "store_qualified_transition",
+                    expected_maintain: "retain_with_preconditions",
+                    expected_retrieve: "retrieve_preconditioned_transition",
+                    expected_use: "reuse_if_preconditions_hold",
+                    expected_write: "store_association_only",
+                    expected_maintain: "preserve_uncertainty",
+                    expected_retrieve: "retrieve_association_evidence",
+                    expected_use: "do_not_generalize_causal_effect",
                 })
             } else {
                 Err("observational-confounding SCM fixture no longer satisfies its contract".to_owned())
@@ -311,6 +327,10 @@ pub fn projection_for_family(family: &str) -> Result<OracleProjection, String> {
                     expected_transfer: "mark_outcome_unknown",
                     expected_action: "reconcile_external_state_before_reuse_or_retry",
                     expected_completion: "unknown_pending_reconciliation",
+                    expected_write: "store_outcome_unknown",
+                    expected_maintain: "retain_unknown_until_reconciled",
+                    expected_retrieve: "retrieve_execution_conflict",
+                    expected_use: "reconcile_before_retry",
                 })
             } else {
                 Err("relay outcome-misattribution fixture no longer contradicts the tool response".to_owned())
