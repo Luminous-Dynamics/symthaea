@@ -801,13 +801,14 @@ mod tests {
     fn detects_batch_tampering_even_when_outer_hashes_are_recomputed() {
         let mut ledger = ledger();
         append_anytime_confidence_look(&mut ledger, "energy", &[0.7, 0.8]).unwrap();
+        let manifest_sha256 = ledger.manifest.manifest_sha256.clone();
         let record = &mut ledger.streams[0].looks[0];
         record.replicate_batch[0] = 0.1;
         record.batch_sha256 = compute_batch_sha256(&record.replicate_batch);
         record.prefix_chain_sha256 =
             compute_prefix_chain_sha256(
                 None,
-                &ledger.manifest.manifest_sha256,
+                &manifest_sha256,
                 "energy",
                 1,
                 0,
@@ -869,6 +870,17 @@ mod tests {
         append_anytime_confidence_look(&mut second, "latency", &[0.2, 0.3]).unwrap();
         second.ledger_sha256 = "0".repeat(64);
         assert!(verify_anytime_confidence_ledger(&second).is_err());
+    }
+
+    #[test]
+    fn rejects_unknown_serialized_ledger_fields() {
+        let ledger = ledger();
+        let mut encoded = serde_json::to_value(&ledger).unwrap();
+        encoded
+            .as_object_mut()
+            .unwrap()
+            .insert("unapproved_field".to_owned(), serde_json::Value::Bool(true));
+        assert!(serde_json::from_value::<AnytimeConfidenceLedger>(encoded).is_err());
     }
 
     #[test]
