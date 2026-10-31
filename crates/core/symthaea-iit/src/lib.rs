@@ -40,9 +40,9 @@ use thiserror::Error;
 
 mod factor_graph;
 pub use factor_graph::{
-    min_fill_log_sum_product, min_fill_sum_product, plan_min_fill_elimination,
-    BinaryFactor, BinaryLogFactor, FactorEliminationPlan, FactorEliminationReport,
-    FactorGraphError, LogFactorEliminationReport,
+    min_fill_log_sum_product, min_fill_log_sum_product_with_cutset, min_fill_sum_product,
+    plan_min_fill_elimination, BinaryFactor, BinaryLogFactor, CutsetLogFactorEliminationReport,
+    FactorEliminationPlan, FactorEliminationReport, FactorGraphError, LogFactorEliminationReport,
 };
 
 mod sparse_causal;
