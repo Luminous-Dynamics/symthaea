@@ -572,8 +572,41 @@ fn parse_pmu_qualification(
         || string_field(observations_value, "evidence_domain", "pmu_observations")? != evidence_domain {
         return Err("PMU observations identity does not match the metrology plan".to_owned());
     }
-    if observations_value.get("trials").and_then(Value::as_array).is_none_or(|trials| trials.is_empty()) {
+    let observation_trials = observations_value.get("trials").and_then(Value::as_array)
+        .ok_or("PMU observations.trials must be an array")?;
+    if observation_trials.is_empty() {
         return Err("PMU observations must contain at least one trial".to_owned());
+    }
+    let mut observed_trial_ids = BTreeSet::new();
+    let mut observed_block_ids = BTreeSet::new();
+    let mut observed_conditions = BTreeSet::new();
+    for (index, trial) in observation_trials.iter().enumerate() {
+        let context = format!("pmu_observations.trials[{index}]");
+        let trial_id = string_field(trial, "trial_id", &context)?;
+        if !observed_trial_ids.insert(trial_id.to_owned()) {
+            return Err(format!("PMU observations contain duplicate trial_id {trial_id}"));
+        }
+        let block_id = string_field(trial, "block_id", &context)?;
+        observed_block_ids.insert(block_id.to_owned());
+        let condition = string_field(trial, "condition", &context)?;
+        if !matches!(condition, "baseline_no_pmu" | "singleton_per_event" | "grouped_co_scheduled" | "grouped_overcommitted") {
+            return Err(format!("{context}.condition is unsupported"));
+        }
+        observed_conditions.insert(condition.to_owned());
+        if string_field(trial, "protocol_id", &context)? != protocol_id
+            || string_field(trial, "platform_id", &context)? != platform_id
+            || string_field(trial, "workload_id", &context)? != workload_id {
+            return Err(format!("{context} protocol/platform/workload identity does not match the PMU plan"));
+        }
+    }
+    let required_conditions = BTreeSet::from([
+        "baseline_no_pmu".to_owned(),
+        "singleton_per_event".to_owned(),
+        "grouped_co_scheduled".to_owned(),
+        "grouped_overcommitted".to_owned(),
+    ]);
+    if observed_conditions != required_conditions {
+        return Err("PMU observations must contain all four canonical acquisition conditions".to_owned());
     }
 
     if string_field(receipt_value, "schema_version", "pmu_receipt")?
@@ -623,6 +656,14 @@ fn parse_pmu_qualification(
 
     let event_reports = receipt_value.get("event_qualification").and_then(Value::as_array)
         .ok_or("PMU receipt event_qualification must be an array")?;
+    let mut receipt_event_ids = BTreeSet::new();
+    for (index, report) in event_reports.iter().enumerate() {
+        let context = format!("pmu_receipt.event_qualification[{index}]");
+        let event_id = string_field(report, "event_id", &context)?;
+        if !receipt_event_ids.insert(event_id.to_owned()) {
+            return Err(format!("PMU receipt contains duplicate event qualification {event_id}"));
+        }
+    }
     let mut seen_event_ids = BTreeSet::new();
     for event_id in &monitor_plan.pmu_event_ids {
         let report = event_reports.iter().find(|report| {
@@ -648,6 +689,12 @@ fn parse_pmu_qualification(
     let trial_count = count_field(support, "trial_count", "pmu_receipt.support")?;
     if matched_block_count == 0 || trial_count == 0 {
         return Err("PMU metrology receipt has no matched blocks or trials".to_owned());
+    }
+    if trial_count != observation_trials.len() || matched_block_count != observed_block_ids.len() {
+        return Err(format!(
+            "PMU receipt support counts do not match observations: receipt reports {trial_count} trials/{matched_block_count} blocks, bytes contain {} trials/{} blocks",
+            observation_trials.len(), observed_block_ids.len()
+        ));
     }
 
     Ok(PmuQualification {
@@ -1501,9 +1548,9 @@ mod tests {
                 "observations_sha256":sha256(&observations_bytes)
             },
             "support":{
-                "matched_block_count":8,
-                "trial_count":32,
-                "trials_per_block":4,
+                "matched_block_count":2,
+                "trial_count":14,
+                "trials_per_block":7,
                 "independence_status":"not_established",
                 "effective_sample_size_estimate":null
             },
@@ -1613,6 +1660,36 @@ mod tests {
         let (p,mut e,c,_,_,_) = fixture();
         e["records"][0]["program_binary_sha256"] = json!("a".repeat(64));
         assert!(audit(&p,&e,&c).unwrap_err().contains("does not match the PMU-qualified workload binary"));
+    }
+
+
+    #[test]
+    fn rejects_pmu_receipt_support_counts_not_reconciled_to_observation_bytes() {
+        let (p,e,c,_,_,_) = fixture();
+        let (pp,po,mut pr,ppb,pob,_) = pmu_fixture();
+        pr["support"]["trial_count"] = json!(13);
+        let prb = encode(&pr);
+        let pb = encode(&p);
+        let eb = encode(&e);
+        let cb = encode(&c);
+        assert!(audit_values_with_pmu(
+            &p,&e,&c,&pp,&po,&pr,&pb,&eb,&cb,&ppb,&pob,&prb
+        ).unwrap_err().contains("support counts do not match observations"));
+    }
+
+    #[test]
+    fn rejects_duplicate_event_qualification_entries() {
+        let (p,e,c,_,_,_) = fixture();
+        let (pp,po,mut pr,ppb,pob,_) = pmu_fixture();
+        let duplicate = pr["event_qualification"][0].clone();
+        pr["event_qualification"].as_array_mut().unwrap().push(duplicate);
+        let prb = encode(&pr);
+        let pb = encode(&p);
+        let eb = encode(&e);
+        let cb = encode(&c);
+        assert!(audit_values_with_pmu(
+            &p,&e,&c,&pp,&po,&pr,&pb,&eb,&cb,&ppb,&pob,&prb
+        ).unwrap_err().contains("duplicate event qualification"));
     }
 
     #[test]
