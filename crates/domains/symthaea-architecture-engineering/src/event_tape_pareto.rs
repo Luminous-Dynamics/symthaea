@@ -150,8 +150,8 @@ impl EventTapeParetoConfig {
                     "objective direction conflicts with the mapped source metric",
                 ));
             }
-            if let CandidateObjectiveMetric::LowerConfidenceBoundVerifiedScore { z_value } = mapping.metric {
-                if !z_value.is_finite() || z_value < 0.0 {
+            if let CandidateObjectiveMetric::LowerConfidenceBoundVerifiedScore { z_value } = &mapping.metric {
+                if !z_value.is_finite() || *z_value < 0.0 {
                     return Err(EventTapeParetoError::new(
                         format!("config.objective_mappings[{index}].metric.z_value"),
                         "z value must be finite and non-negative",
@@ -492,7 +492,7 @@ pub fn event_tape_to_pareto(
 
         let mut objective_values = Vec::with_capacity(config.objective_mappings.len());
         for (index, mapping) in config.objective_mappings.iter().enumerate() {
-            let value = match mapping.metric {
+            let value = match &mapping.metric {
                 CandidateObjectiveMetric::MeanVerifiedScore => mean_score,
                 CandidateObjectiveMetric::MinimumVerifiedScore => minimum_score,
                 CandidateObjectiveMetric::LowerConfidenceBoundVerifiedScore { z_value } => {
@@ -509,7 +509,7 @@ pub fn event_tape_to_pareto(
                         let sample_variance = accumulator.scores.iter()
                             .map(|score| (score - mean).powi(2))
                             .sum::<f64>() / (n - 1.0);
-                        mean - z_value * (sample_variance.sqrt() / n.sqrt())
+                        mean - *z_value * (sample_variance.sqrt() / n.sqrt())
                     }
                 }
                 CandidateObjectiveMetric::VerifiedAttemptRate => verified_attempt_rate,
@@ -748,7 +748,7 @@ mod tests {
                 verifier_receipt_sha256: H2.to_owned(),
                 disposition,
                 score,
-                uncertainty: Some(0.0),
+                uncertainty: if disposition == CandidateDisposition::Verified { Some(0.0) } else { None },
                 evidence_sha256: evidence.map(str::to_owned),
             },
             resources: resources(cpu, wall, energy, peak, cpu),
@@ -882,7 +882,8 @@ mod tests {
             reason: "meter unavailable".to_owned(),
         };
         payload.resources.charged_budget_microunits = meter(10);
-        assert!(tape.append(payload).is_err());
+        tape.append(payload).unwrap();
+        assert!(event_tape_to_pareto(&tape, &config()).is_err());
     }
 
     #[test]
