@@ -590,6 +590,118 @@ pub struct PartitionEnumerationReport {
     pub total_cut_included: bool,
 }
 
+/// Exact combinatorial work estimate for IIT 4.0 directed system partitions.
+///
+/// This is a preflight count: it allocates only O(n) counters and does not
+/// materialize partitions or cut matrices. TotalCut is reported separately
+/// because it is a special candidate, not a directed set-partition labeling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PartitionEnumerationWorkEstimate {
+    pub candidate_units: usize,
+    pub raw_direction_labelings_equivalent: usize,
+    pub canonical_direction_assignments: usize,
+    pub redundant_direction_labelings_pruned: usize,
+    pub total_cut_included: bool,
+    pub total_partition_candidates: usize,
+}
+
+/// Count the exact directed-partition workload without constructing any cuts.
+///
+/// For each k-block set partition, PyPhi's raw direction family has 3^k
+/// labelings. The exact matrix quotient retains 3^k - 2^(k+1) + 2
+/// representatives for k >= 2. Multiplying these values by Stirling S(n,k)
+/// gives exact raw and canonical totals. All arithmetic is checked; large
+/// requests return CounterOverflow instead of wrapping.
+pub fn estimate_iit4_system_partition_work(
+    candidate_system: &[usize],
+    unit_count: usize,
+    include_total_cut: bool,
+) -> Result<PartitionEnumerationWorkEstimate, PartitionEnumerationError> {
+    if candidate_system.is_empty() {
+        return Err(PartitionEnumerationError::EmptyCandidateSystem);
+    }
+
+    let mut canonical_system = candidate_system.to_vec();
+    canonical_system.sort_unstable();
+    for (position, unit) in canonical_system.iter().copied().enumerate() {
+        if unit >= unit_count {
+            return Err(PartitionEnumerationError::UnitOutOfRange { unit, unit_count });
+        }
+        if position > 0 && canonical_system[position - 1] == unit {
+            return Err(PartitionEnumerationError::DuplicateUnit { unit });
+        }
+    }
+
+    let n = canonical_system.len();
+    let total_cut_included = n == 1 || include_total_cut;
+    let mut raw_direction_labelings_equivalent = 0usize;
+    let mut canonical_direction_assignments = 0usize;
+
+    // In-place Stirling-number recurrence. Descending k preserves the
+    // previous row: S(m,k) = k*S(m-1,k) + S(m-1,k-1).
+    let mut stirling = vec![0usize; n + 1];
+    stirling[0] = 1;
+    for current_size in 1..=n {
+        for block_count in (1..=current_size).rev() {
+            let same_block = stirling[block_count];
+            let new_block = stirling[block_count - 1];
+            stirling[block_count] = block_count
+                .checked_mul(same_block)
+                .and_then(|value| value.checked_add(new_block))
+                .ok_or(PartitionEnumerationError::CounterOverflow)?;
+        }
+        stirling[0] = 0;
+    }
+
+    for block_count in 2..=n {
+        let exponent = u32::try_from(block_count)
+            .map_err(|_| PartitionEnumerationError::CounterOverflow)?;
+        let raw_per_set_partition = 3usize
+            .checked_pow(exponent)
+            .ok_or(PartitionEnumerationError::CounterOverflow)?;
+        let two_exponent = exponent
+            .checked_add(1)
+            .ok_or(PartitionEnumerationError::CounterOverflow)?;
+        let twice_two_to_k = 1usize
+            .checked_shl(two_exponent)
+            .ok_or(PartitionEnumerationError::CounterOverflow)?;
+        let canonical_per_set_partition = raw_per_set_partition
+            .checked_sub(twice_two_to_k)
+            .and_then(|value| value.checked_add(2))
+            .ok_or(PartitionEnumerationError::CounterOverflow)?;
+
+        let set_partitions = stirling[block_count];
+        let raw_for_block_count = set_partitions
+            .checked_mul(raw_per_set_partition)
+            .ok_or(PartitionEnumerationError::CounterOverflow)?;
+        let canonical_for_block_count = set_partitions
+            .checked_mul(canonical_per_set_partition)
+            .ok_or(PartitionEnumerationError::CounterOverflow)?;
+        raw_direction_labelings_equivalent = raw_direction_labelings_equivalent
+            .checked_add(raw_for_block_count)
+            .ok_or(PartitionEnumerationError::CounterOverflow)?;
+        canonical_direction_assignments = canonical_direction_assignments
+            .checked_add(canonical_for_block_count)
+            .ok_or(PartitionEnumerationError::CounterOverflow)?;
+    }
+
+    let redundant_direction_labelings_pruned = raw_direction_labelings_equivalent
+        .checked_sub(canonical_direction_assignments)
+        .ok_or(PartitionEnumerationError::CounterOverflow)?;
+    let total_partition_candidates = canonical_direction_assignments
+        .checked_add(usize::from(total_cut_included))
+        .ok_or(PartitionEnumerationError::CounterOverflow)?;
+
+    Ok(PartitionEnumerationWorkEstimate {
+        candidate_units: n,
+        raw_direction_labelings_equivalent,
+        canonical_direction_assignments,
+        redundant_direction_labelings_pruned,
+        total_cut_included,
+        total_partition_candidates,
+    })
+}
+
 /// Failures from directed system-partition enumeration.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum PartitionEnumerationError {
@@ -646,6 +758,15 @@ pub fn enumerate_iit4_system_partitions_with_stats(
     include_total_cut: bool,
     max_combinations: usize,
 ) -> Result<PartitionEnumerationReport, PartitionEnumerationError> {
+    let estimate = estimate_iit4_system_partition_work(
+        candidate_system,
+        unit_count,
+        include_total_cut,
+    )?;
+    if estimate.canonical_direction_assignments > max_combinations {
+        return Err(PartitionEnumerationError::BudgetExceeded { max_combinations });
+    }
+
     if candidate_system.is_empty() {
         return Err(PartitionEnumerationError::EmptyCandidateSystem);
     }
@@ -4123,6 +4244,55 @@ mod tests {
         assert!(matches!(
             generalized_intrinsic_difference_at_state(&[f64::NAN, 1.0], &[0.0, 1.0], &[0.0, 1.0], 0),
             Err(RepertoireError::InvalidDistributionProbability { name: "forward", index: 0, .. })
+        ));
+    }
+
+    #[test]
+    fn partition_work_estimate_matches_materialized_counts_and_preflights_budget() {
+        let expected = [
+            (1usize, 0usize, 0usize, true),
+            (2, 9, 3, false),
+            (3, 54, 22, false),
+            (4, 306, 150, false),
+            (5, 1_863, 1_061, false),
+            (6, 12_348, 7_896, false),
+        ];
+        for (units, raw, canonical, total_cut) in expected {
+            let candidate = (0..units).collect::<Vec<_>>();
+            let estimate = estimate_iit4_system_partition_work(&candidate, units, false).unwrap();
+            assert_eq!(estimate.raw_direction_labelings_equivalent, raw);
+            assert_eq!(estimate.canonical_direction_assignments, canonical);
+            assert_eq!(estimate.redundant_direction_labelings_pruned, raw - canonical);
+            assert_eq!(estimate.total_cut_included, total_cut);
+            assert_eq!(
+                estimate.total_partition_candidates,
+                canonical + usize::from(total_cut)
+            );
+
+            let report = enumerate_iit4_system_partitions_with_stats(
+                &candidate,
+                units,
+                false,
+                canonical,
+            ).unwrap();
+            assert_eq!(
+                report.raw_direction_assignments_equivalent,
+                estimate.raw_direction_labelings_equivalent
+            );
+            assert_eq!(
+                report.canonical_direction_assignments_evaluated,
+                estimate.canonical_direction_assignments
+            );
+        }
+
+        let candidate = [0, 1, 2, 3, 4];
+        assert!(matches!(
+            enumerate_iit4_system_partitions_with_stats(&candidate, 5, false, 1_060),
+            Err(PartitionEnumerationError::BudgetExceeded { max_combinations: 1_060 })
+        ));
+        assert!(matches!(
+            estimate_iit4_system_partition_work(&[0, 0], 2, false),
+            Err(PartitionEnumerationError::DuplicateUnit { unit: 0 })
         ));
     }
 
