@@ -5,6 +5,7 @@
 //! polynomial mutation, fast non-dominated sorting and crowding-distance environmental selection.
 
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 
@@ -417,15 +418,20 @@ pub fn analyze_nsga2_report(
             "ZDT1 and DTLZ2 reference problems use native minimization objectives",
         ));
     }
-    let candidates = report.nondominated_front.iter()
-        .map(|candidate| ParetoCandidate {
-            candidate_id: candidate.candidate_id.clone(),
-            objective_values: candidate.objective_values.clone(),
-            feasible: true,
-            constraint_violations: Vec::new(),
-            evidence_sha256: candidate.candidate_id.clone(),
-        })
-        .collect::<Vec<_>>();
+    let mut unique_candidates = BTreeMap::<String, ParetoCandidate>::new();
+    for candidate in &report.nondominated_front {
+        let evidence_sha256 = digest_serializable(candidate)?;
+        unique_candidates.entry(candidate.candidate_id.clone()).or_insert_with(|| {
+            ParetoCandidate {
+                candidate_id: candidate.candidate_id.clone(),
+                objective_values: candidate.objective_values.clone(),
+                feasible: true,
+                constraint_violations: Vec::new(),
+                evidence_sha256,
+            }
+        });
+    }
+    let candidates = unique_candidates.into_values().collect::<Vec<_>>();
     if candidates.is_empty() {
         return Err(Nsga2Error::new(
             "report.nondominated_front",
