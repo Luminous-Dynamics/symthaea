@@ -1,0 +1,84 @@
+{
+  "schema_version": "cmaq-018-candidate-config-v0.1",
+  "candidate_interfaces": [
+    {
+      "id": "point_outcome",
+      "input": [
+        "observed_history.x",
+        "observed_history.v",
+        "canonical_action"
+      ],
+      "output": [
+        "predicted_utility",
+        "predicted_next_state"
+      ],
+      "model": "shared_history_bias_plus_linear_action_response"
+    },
+    {
+      "id": "explicit_effect_head",
+      "input": [
+        "observed_history.x",
+        "observed_history.v",
+        "left_action",
+        "right_action"
+      ],
+      "output": [
+        "predicted_pairwise_utility_delta"
+      ],
+      "model": "history_sign_slope_plus_grip_delta"
+    },
+    {
+      "id": "shuffled_action_labels",
+      "input": [
+        "observed_history.x",
+        "observed_history.v",
+        "canonical_action"
+      ],
+      "output": [
+        "predicted_utility",
+        "predicted_next_state"
+      ],
+      "model": "point_outcome_with_reversed_canonical_action_id"
+    },
+    {
+      "id": "support_aware_point",
+      "input": [
+        "observed_history.x",
+        "observed_history.v",
+        "canonical_action"
+      ],
+      "output": [
+        "prediction_or_abstain"
+      ],
+      "support_rule": "force_lte_0_75_and_grip_eq_0"
+    }
+  ],
+  "evaluator_only_reference": {
+    "id": "oracle",
+    "input": [
+      "evaluator_history",
+      "evaluator_hidden_regime",
+      "evaluator_disturbance",
+      "canonical_action"
+    ],
+    "output": [
+      "true_branch_outcome"
+    ],
+    "eligibility": "evaluator_only"
+  },
+  "point_outcome": {
+    "common_bias_x_milli": 200,
+    "common_bias_v_milli": 100,
+    "force_slope_milli": 450,
+    "grip_slope_milli": 100
+  },
+  "effect_head": {
+    "slope_magnitude_milli": 620,
+    "grip_slope_milli": 120
+  },
+  "supported_intervention": {
+    "force_max_milli": 750,
+    "grip_exact_milli": 0
+  },
+  "note": "These are fixed synthetic predictors, not trained Symthaea model weights."
+}
