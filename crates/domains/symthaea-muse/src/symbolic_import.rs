@@ -54,6 +54,16 @@ fn quarter_note_meter(numerator: u8, denominator: u32, source: &str) -> Result<u
         })
 }
 
+fn advance_midi_tick(current: u64, delta: u32) -> Result<u64, String> {
+    current
+        .checked_add(u64::from(delta))
+        .filter(|value| *value <= i64::MAX as u64)
+        .ok_or_else(|| {
+            "MIDI track event timeline exceeds the supported signed rational duration range"
+                .to_string()
+        })
+}
+
 fn midi_time_signature_meter(numerator: u8, denominator_exponent: u8) -> Result<u8, String> {
     let denominator = 1_u32
         .checked_shl(u32::from(denominator_exponent))
@@ -173,13 +183,7 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
         // Preserve overlapping repeated pitches and pair releases FIFO.
         let mut pending = BTreeMap::<(u8, u8), VecDeque<(u64, u8)>>::new();
         for event in track {
-            tick = tick
-                .checked_add(u64::from(event.delta.as_int()))
-                .filter(|value| *value <= i64::MAX as u64)
-                .ok_or_else(|| {
-                    "MIDI track event timeline exceeds the supported signed rational duration range"
-                        .to_string()
-                })?;
+            tick = advance_midi_tick(tick, event.delta.as_int())?;
             match event.kind {
                 TrackEventKind::Meta(MetaMessage::Tempo(value)) => {
                     let microseconds_per_beat = value.as_int();
@@ -616,6 +620,14 @@ mod tests {
             parse_midi(&midi).is_err(),
             "zero microseconds per beat must be rejected"
         );
+    }
+
+    #[test]
+    fn rejects_midi_tick_advance_beyond_signed_duration_range() {
+        let max_tick = i64::MAX as u64;
+        assert_eq!(advance_midi_tick(max_tick - 1, 1).unwrap(), max_tick);
+        assert!(advance_midi_tick(max_tick, 1).is_err());
+        assert!(advance_midi_tick(u64::MAX, 1).is_err());
     }
 
     #[test]
