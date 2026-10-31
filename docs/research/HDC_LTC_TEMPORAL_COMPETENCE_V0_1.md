@@ -167,6 +167,8 @@ For every baseline pin repository, exact commit/release, framework, configuratio
 - change detection and recovery latency;
 - cumulative regret and prior-regime retention;
 - phase error and forecast horizon;
+- phase prediction coverage, missing-prediction count, and full-stream denominator;
+- affine time-dilation equivariance: phase/sample invariance and linearly scaled physical crossing error;
 - calibration/robustness under jitter, gaps, and missingness;
 - worst-family and worst-delay performance;
 - exact-match accuracy at each `(valid_at, known_at)` bitemporal coordinate;
@@ -257,7 +259,7 @@ The repository contains a standalone Rust research crate under research/temporal
 - an irregular-time/missingness generator with jittered microsecond timestamps, explicit dropped-slot manifests, bounded noise, and latent oracle points;
 - a selective-retention/invalidation generator with before/after query semantics and stale-memory abstention;
 - an always-on sparse-event generator with rare target motifs, controlled distractor similarity, a quiet-idle control, event-level scoring, and false-trigger exposure accounting;
-- a phase-sensitive prediction generator with fixed-point oscillator phase, hidden phase/frequency shifts, exact next-crossing targets, and circular phase/timing scoring;
+- a phase-sensitive prediction generator with fixed-point oscillator phase, hidden phase/frequency shifts, exact next-crossing targets, circular phase/timing scoring, full-stream missing-prediction accounting, and exact affine time-dilation metamorphic controls;
 - a bitemporal continual-knowledge stream with retroactive correction, delayed retraction, distractor facts, and explicit `(valid_at, known_at)` query coordinates;
 - seed-bound deterministic stream regeneration and replay verification for delayed cue, multiscale forecasting/change-point, DMS, evidence accumulation, irregular/missingness, retention/invalidation, fast-event detection, phase prediction, and bitemporal knowledge stream;
 - canonical SHA-256 digests for public streams and oracle records, with mutation negative controls.
