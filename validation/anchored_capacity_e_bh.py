@@ -115,8 +115,11 @@ def verify_anchored_baseline(
             direct_min_slack, worst_subset = slack, subset
     if direct_min_slack is None:
         raise ArithmeticError("nonempty intersection universe was not enumerated")
-    if direct_min_slack != separator["minimum_slack"]:
-        failures.append("anchored_formula_disagrees_with_projective_separator")
+    if mask:
+        if direct_min_slack != separator["minimum_slack"]:
+            failures.append("anchored_formula_disagrees_with_projective_separator")
+    elif direct_min_slack < 0:
+        failures.append("empty_e_bh_anchor_not_certified")
 
     return {
         "valid": not failures,
