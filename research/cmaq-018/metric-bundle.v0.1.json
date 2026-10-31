@@ -1,0 +1,35 @@
+{
+  "schema_version": "cmaq-018-metric-bundle-v0.1",
+  "cross_track_pooling": false,
+  "per_scenario_model_rows": true,
+  "pair_metrics": {
+    "effect_sign_accuracy": "fraction of non-tied true pair deltas whose predicted delta has the same nonzero sign",
+    "effect_magnitude_mae": "mean absolute error in pairwise utility delta",
+    "kendall_tau_b": "pairwise ranking agreement with ties; Kendall tau-b",
+    "top1_regret": "best true utility in the frozen action bank minus selected action true utility, floored at zero",
+    "null_false_effect_rate": "fraction of covered pairs predicted nonzero when true scenario effect is identically zero"
+  },
+  "thresholds": {
+    "sign_tie_epsilon": 1e-9,
+    "null_nonzero_effect_epsilon": 1e-9
+  },
+  "coverage_metrics": [
+    "pair_coverage",
+    "branch_coverage"
+  ],
+  "branch_metrics": [
+    "branch_outcome_mae",
+    "branch_state_mae",
+    "terminal_false_safe_rate"
+  ],
+  "uncertainty": {
+    "method": "episode-history percentile bootstrap",
+    "resamples": 2000,
+    "confidence_level_percent": 95,
+    "minimum_episode_histories": 2,
+    "interval_order": "lower_lte_upper"
+  },
+  "sample_unit": "episode_history",
+  "pair_count_per_history": 21,
+  "denominator_policy": "emit per-metric defined episode count; null metric count=0; no confidence interval below two independent histories"
+}
