@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/fresh-metamorphic-audit-v1.json",
+  "title": "Fresh metamorphic generation audit v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "valid",
+    "deterministic_regeneration_matches",
+    "base_bundle_validated",
+    "all_variants_preserve_exact_solution",
+    "all_variants_preserve_stability_margin",
+    "all_groups_have_exact_form_universe",
+    "public_packet_contains_no_oracle_fields",
+    "group_count",
+    "item_count",
+    "forms_per_group",
+    "manifest_sha256",
+    "independently_verified",
+    "claim_boundary",
+    "issues"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.fresh_metamorphic_audit.v1"
+    },
+    "valid": {
+      "type": "boolean"
+    },
+    "deterministic_regeneration_matches": {
+      "type": "boolean"
+    },
+    "base_bundle_validated": {
+      "type": "boolean"
+    },
+    "all_variants_preserve_exact_solution": {
+      "type": "boolean"
+    },
+    "all_variants_preserve_stability_margin": {
+      "type": "boolean"
+    },
+    "all_groups_have_exact_form_universe": {
+      "type": "boolean"
+    },
+    "public_packet_contains_no_oracle_fields": {
+      "type": "boolean"
+    },
+    "group_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "item_count": {
+      "type": "integer",
+      "minimum": 5
+    },
+    "forms_per_group": {
+      "const": 5
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "independently_verified": {
+      "const": false
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
