@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/CONNECTOME_QUERY_ENSEMBLE_AUDIT_V1.json",
+  "title": "Finite connectome reconstruction scenario query audit input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "analysis_id",
+    "dataset_revision_commit_sha",
+    "scope_coverage",
+    "scenarios",
+    "queries"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "analysis_id": { "type": "string", "minLength": 1 },
+    "dataset_revision_commit_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "scope_coverage": {
+      "enum": ["exhaustive_declared_scenario_space", "sampled_sensitivity_set"],
+      "description": "Declares whether the submitted finite scenarios exhaust a formally defined finite space or are only a sensitivity subset. Neither declaration proves the space includes every biologically plausible reconstruction."
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scenario_id", "graph_sha256", "lineage_groups", "edges"],
+        "properties": {
+          "scenario_id": { "type": "string", "minLength": 1 },
+          "graph_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "lineage_groups": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Evidence ancestry groups. Shared group IDs identify common lineage; they are recorded, not interpreted as independent evidence."
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source", "target", "weight"],
+              "properties": {
+                "source": { "type": "integer", "minimum": 0 },
+                "target": { "type": "integer", "minimum": 0 },
+                "weight": { "type": "number", "exclusiveMinimum": 0 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "queries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["query_id", "metric", "decision"],
+        "properties": {
+          "query_id": { "type": "string", "minLength": 1 },
+          "metric": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "source", "target"],
+                "properties": {
+                  "kind": { "const": "edge_weight" },
+                  "source": { "type": "integer", "minimum": 0 },
+                  "target": { "type": "integer", "minimum": 0 }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "node"],
+                "properties": {
+                  "kind": { "const": "in_degree" },
+                  "node": { "type": "integer", "minimum": 0 }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "node"],
+                "properties": {
+                  "kind": { "const": "out_degree" },
+                  "node": { "type": "integer", "minimum": 0 }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "source", "target"],
+                "properties": {
+                  "kind": { "const": "path_exists" },
+                  "source": { "type": "integer", "minimum": 0 },
+                  "target": { "type": "integer", "minimum": 0 }
+                }
+              }
+            ]
+          },
+          "decision": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "value"],
+                "properties": {
+                  "kind": { "const": "boolean_is" },
+                  "value": { "type": "boolean" }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "threshold"],
+                "properties": {
+                  "kind": { "enum": ["greater_than", "greater_or_equal", "less_than", "less_or_equal"] },
+                  "threshold": { "type": "number" }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "lower", "upper"],
+                "properties": {
+                  "kind": { "const": "between_inclusive" },
+                  "lower": { "type": "number" },
+                  "upper": { "type": "number" }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
