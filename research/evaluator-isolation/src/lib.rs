@@ -381,3 +381,5 @@ mod tests {
         assert_eq!(fs::read(private.join("existing.bin")).unwrap(), b"keep");
     }
 }
+
+pub mod receipt;
