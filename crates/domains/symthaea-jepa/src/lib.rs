@@ -82,9 +82,10 @@ pub struct JepaTelemetry {
 
 /// JEPA engine: the top-level API composing all components.
 ///
-/// Call `forward()` each cognitive cycle with the current and next HDC states
-/// to get a latent prediction error. Call `train_step()` to update the
-/// context encoder and predictor (target encoder updates via EMA).
+/// Standalone callers may use forward()/train_step() with explicit state pairs.
+/// The cognitive-loop integration uses stage_transition_source(), binds the
+/// selected action with condition_pending_transition(), and resolves the pair
+/// only when the next real observation arrives. The latter avoids self-targets.
 struct PendingTransition {
     source: ContinuousHV,
     action: Option<u8>,
@@ -249,7 +250,8 @@ impl JepaEngine {
             return Err("JEPA pending transition is already action-conditioned".into());
         }
 
-        let context_latent = self.context.encode(&pending.source);
+        let source = pending.source.clone();
+        let context_latent = self.context.encode(&source);
         let predicted_latent = self.predictor.predict(&context_latent, action);
         if !context_latent.iter().all(|value| value.is_finite())
             || !predicted_latent.iter().all(|value| value.is_finite())
@@ -257,7 +259,10 @@ impl JepaEngine {
             return Err("JEPA action-conditioned prediction contains non-finite values".into());
         }
 
-        let pending = self.pending_transition.as_mut().expect("pending transition checked above");
+        let pending = self
+            .pending_transition
+            .as_mut()
+            .ok_or_else(|| "JEPA pending transition disappeared during action binding".to_string())?;
         pending.action = Some(action);
         pending.context_latent = Some(context_latent);
         pending.predicted_latent = Some(predicted_latent);
@@ -278,9 +283,9 @@ impl JepaEngine {
         actual_next: &ContinuousHV,
         learning_rate: f32,
     ) -> Result<Option<f32>, String> {
-        let Some(pending) = self.pending_transition.as_ref() else {
+        if self.pending_transition.is_none() {
             return Ok(None);
-        };
+        }
         if actual_next.dim() != self.config.input_dim {
             return Err(format!(
                 "JEPA next observation dimension mismatch: got {}, expected {}",
@@ -292,44 +297,58 @@ impl JepaEngine {
             return Err("JEPA next observation contains non-finite values".into());
         }
         if !learning_rate.is_finite() || learning_rate <= 0.0 {
-            return Err(format!("JEPA learning rate must be finite and > 0, got {learning_rate}"));
+            return Err(format!(
+                "JEPA learning rate must be finite and > 0, got {learning_rate}"
+            ));
         }
 
-        let (Some(action), Some(context_latent), Some(predicted_latent)) = (
-            pending.action,
-            pending.context_latent.as_ref(),
-            pending.predicted_latent.as_ref(),
-        ) else {
+        let ready = self.pending_transition.as_ref().is_some_and(|pending| {
+            pending.action.is_some()
+                && pending.context_latent.is_some()
+                && pending.predicted_latent.is_some()
+        });
+        if !ready {
             self.pending_transition = None;
             self.state.dropped_pending_transitions =
                 self.state.dropped_pending_transitions.saturating_add(1);
             return Ok(None);
-        };
+        }
 
-        let source = pending.source.clone();
-        let action = action;
-        let context_latent = context_latent.clone();
-        let predicted_latent = predicted_latent.clone();
         let target_latent = self.target.encode(actual_next);
         if !target_latent.iter().all(|value| value.is_finite()) {
             return Err("JEPA target encoder produced non-finite values".into());
         }
-
-        let cosine = cosine_loss(&predicted_latent, &target_latent);
+        let predicted_latent = self
+            .pending_transition
+            .as_ref()
+            .and_then(|pending| pending.predicted_latent.as_ref())
+            .ok_or_else(|| "JEPA pending prediction missing after readiness check".to_string())?;
+        let cosine = cosine_loss(predicted_latent, &target_latent);
         let variance_penalty = self.state.variance_penalty(self.config.variance_floor);
         let total_loss = cosine + variance_penalty;
         if !total_loss.is_finite() {
             return Err("JEPA transition loss is non-finite".into());
         }
 
+        let pending = self
+            .pending_transition
+            .take()
+            .ok_or_else(|| "JEPA pending transition disappeared before update".to_string())?;
+        let action = pending
+            .action
+            .ok_or_else(|| "JEPA pending action missing before update".to_string())?;
+        let context_latent = pending
+            .context_latent
+            .ok_or_else(|| "JEPA pending context latent missing before update".to_string())?;
+        let predicted_latent = pending
+            .predicted_latent
+            .ok_or_else(|| "JEPA pending prediction missing before update".to_string())?;
+
         let output_grad = cosine_loss_gradient(&predicted_latent, &target_latent);
-        let latent_grad = self.predictor.backward(
-            &context_latent,
-            action,
-            &output_grad,
-            learning_rate,
-        );
-        let (weight_grad, bias_grad) = self.context.backward(&source, &latent_grad);
+        let latent_grad =
+            self.predictor
+                .backward(&context_latent, action, &output_grad, learning_rate);
+        let (weight_grad, bias_grad) = self.context.backward(&pending.source, &latent_grad);
         self.context
             .apply_gradients(&weight_grad, &bias_grad, learning_rate, 1e-5);
         self.target
@@ -338,7 +357,6 @@ impl JepaEngine {
         self.state.last_pe = prediction_error(&predicted_latent, &target_latent);
         self.state.cumulative_loss += total_loss as f64;
         self.state.update_variance(&target_latent);
-        self.pending_transition = None;
         Ok(Some(total_loss))
     }
 
