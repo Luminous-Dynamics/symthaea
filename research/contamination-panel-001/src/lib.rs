@@ -29,6 +29,7 @@ const HASH_DOMAIN: &[u8] = b"symthaea.contamination_panel.hash.v1\0";
 const HMAC_DOMAIN: &[u8] = b"symthaea.contamination_panel.prf.v1\0";
 
 pub mod detectors;
+pub mod ftd;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
