@@ -762,7 +762,9 @@ mod tests {
                     assert_eq!(actual.prefix_lengths, expected.prefix_lengths);
                     assert_eq!(actual.cycle_starts.len(), expected.cycle_starts.len());
                     assert!(
-                        actual.cycle_starts.windows(2).all(|pair| pair[0] < pair[1]),
+                        actual.cycle_starts.windows(2).all(|pair| {
+                            pair[0].beats() < pair[1].beats()
+                        }),
                         "process donor must preserve a monotonic cycle timeline"
                     );
                 }
