@@ -1145,6 +1145,22 @@ mod tests {
         // ...while Classical's DrumPolicy::None honestly stays kit-free.
         let classical = channel9_note_ons(Style::Classical, "classical");
         assert!(classical.is_empty(), "unexpected drums: {classical:?}");
+
+        // The style-specific world-percussion layers must cross the same
+        // channel-9 MIDI boundary as their native renderer counterparts.
+        let afro = channel9_note_ons(Style::AfroCuban, "afro");
+        assert!(afro.contains(&75), "clave missing: {afro:?}");
+        assert!(afro.contains(&64), "low conga missing: {afro:?}");
+        assert!(afro.contains(&60), "high bongo missing: {afro:?}");
+        assert!(afro.contains(&56), "cowbell missing: {afro:?}");
+
+        let flamenco = channel9_note_ons(Style::Flamenco, "flamenco");
+        assert!(flamenco.contains(&39), "palmas/handclap missing: {flamenco:?}");
+
+        let bossa = channel9_note_ons(Style::BossaNova, "bossa");
+        assert!(bossa.contains(&69), "cabasa missing: {bossa:?}");
+        assert!(bossa.contains(&64), "conga missing: {bossa:?}");
+        assert!(!bossa.contains(&36) && !bossa.contains(&38), "generic backbeat leaked into Bossa: {bossa:?}");
     }
 
     #[test]
