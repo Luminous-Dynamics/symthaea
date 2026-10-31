@@ -1800,6 +1800,55 @@ mod tests {
     }
 
     #[test]
+    fn inapplicable_period_and_motif_axes_remain_none_not_zero() {
+        let dedicated = GenomeObjectives {
+            novelty_distance: None,
+            within_genome_diversity: 0.2,
+            motif_transformation_richness: None,
+            form_coverage: None,
+            grammar_topology_variation: 0.0,
+            grammar_operation_diversity: 0.0,
+        };
+        assert_eq!(
+            dedicated.axes(),
+            [None, Some(0.2), None, None, Some(0.0), Some(0.0)]
+        );
+
+        // A candidate cannot dominate another by treating an inapplicable
+        // period-form or generic motif-trace metric as a measured zero.
+        let generic = GenomeObjectives {
+            novelty_distance: None,
+            within_genome_diversity: 0.1,
+            motif_transformation_richness: Some(0.0),
+            form_coverage: Some(0.0),
+            grammar_topology_variation: 0.0,
+            grammar_operation_diversity: 0.0,
+        };
+        assert!(!objective_dominates(&dedicated, &generic));
+        assert!(!objective_dominates(&generic, &dedicated));
+    }
+
+    #[test]
+    fn grammar_plan_operation_sets_are_versioned_in_trial_receipts() {
+        let genome = classical_genome();
+        let config = GenomeEvaluationConfig {
+            seeds: vec![1, 2, 3],
+            ..GenomeEvaluationConfig::default()
+        };
+        let evaluation = evaluate_genome(&genome, &MusicalIntent::default(), &config, &[]).unwrap();
+        assert_eq!(
+            evaluation.grammar_plan_fingerprint_version,
+            STYLE_GENOME_GRAMMAR_PLAN_FINGERPRINT_VERSION
+        );
+        assert!(evaluation.trials.iter().all(|trial| {
+            trial.grammar_plan_well_formed
+                && trial.grammar_plan_signature.as_ref().is_some_and(|value| is_sha256_hex(value))
+                && !trial.grammar_transformations.is_empty()
+        }));
+        assert!(evaluation.verify_digest());
+    }
+
+    #[test]
     fn trace_reference_gate_is_separate_from_style_dependent_theory_findings() {
         let genome = classical_genome();
         let config = GenomeEvaluationConfig {
