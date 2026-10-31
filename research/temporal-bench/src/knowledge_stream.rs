@@ -71,6 +71,7 @@ pub struct KnowledgeStreamTask {
     pub target_entity_id: u64,
     pub target_predicate_id: u32,
     pub distractor_count: usize,
+    pub interval_steps: u64,
     pub query_issued_at: u64,
     pub events: Vec<KnowledgeEvent>,
     pub content_sha256: [u8; 32],
@@ -317,6 +318,7 @@ pub fn generate_knowledge_stream(
         target_entity_id,
         target_predicate_id,
         distractor_count: config.distractor_count,
+        interval_steps: config.interval_steps,
         query_issued_at,
         events,
         content_sha256: [0; 32],
@@ -388,6 +390,7 @@ pub fn knowledge_task_digest(task: &KnowledgeStreamTask) -> [u8; 32] {
     hash.u64(task.target_entity_id);
     hash.u32(task.target_predicate_id);
     hash.usize(task.distractor_count);
+    hash.u64(task.interval_steps);
     hash.u64(task.query_issued_at);
     hash.usize(task.events.len());
     for event in &task.events {
@@ -478,6 +481,7 @@ pub fn verify_knowledge_stream(
         || oracle.retraction_observed_at >= task.query_issued_at
         || oracle.answers.len() != 5
         || task.distractor_count > MAX_KNOWLEDGE_DISTRACTORS
+        || task.interval_steps == 0
         || task.events.len() != task.distractor_count.saturating_add(8)
     {
         return Err(KnowledgeVerificationError::InvalidTimeline);
@@ -490,6 +494,20 @@ pub fn verify_knowledge_stream(
     let mut query_answers = std::collections::BTreeMap::new();
     let mut query_count = 0_usize;
     let mut target_revision_count = 0_usize;
+    let mut distractor_index = 0_usize;
+
+    let count = u64::try_from(task.distractor_count).unwrap_or(u64::MAX);
+    let expected_correction_observed = count.saturating_add(1).saturating_mul(task.interval_steps);
+    let expected_retraction_observed = count.saturating_add(2).saturating_mul(task.interval_steps);
+    let expected_query_issued = count.saturating_add(3).saturating_mul(task.interval_steps);
+    if oracle.correction_valid_from != task.interval_steps.saturating_mul(2)
+        || oracle.retraction_valid_from != task.interval_steps.saturating_mul(3)
+        || oracle.correction_observed_at != expected_correction_observed
+        || oracle.retraction_observed_at != expected_retraction_observed
+        || task.query_issued_at != expected_query_issued
+    {
+        return Err(KnowledgeVerificationError::InvalidTimeline);
+    }
 
     for (index, event) in task.events.iter().enumerate() {
         let key = (event.observed_at, event.ordinal);
@@ -513,9 +531,19 @@ pub fn verify_knowledge_stream(
                 if *fact_id == oracle.target_fact_id {
                     target_revision_count = target_revision_count.saturating_add(1);
                 } else {
+                    distractor_index = distractor_index.saturating_add(1);
+                    let expected_fact_id =
+                        u64::try_from(distractor_index).unwrap_or(u64::MAX).saturating_add(1);
+                    let expected_observed_at = u64::try_from(distractor_index)
+                        .unwrap_or(u64::MAX)
+                        .saturating_mul(task.interval_steps);
                     let distance = (*entity_id ^ oracle.target_entity_id).count_ones();
-                    if *revision != 0
+                    if *fact_id != expected_fact_id
+                        || event.observed_at != expected_observed_at
+                        || event.ordinal != 0
+                        || *revision != 0
                         || *valid_from != 0
+                        || *predicate_id != task.target_predicate_id
                         || *operation != KnowledgeOperation::Assert
                         || value.is_none()
                         || !(1..=4).contains(&distance)
@@ -574,6 +602,7 @@ pub fn verify_knowledge_stream(
                     || *predicate_id != oracle.target_predicate_id
                     || *known_at > event.observed_at
                     || event.observed_at != task.query_issued_at
+                    || event.ordinal != u32::try_from(*query_id).unwrap_or(u32::MAX)
                 {
                     return Err(KnowledgeVerificationError::InvalidQuery { query_id: *query_id });
                 }
@@ -588,6 +617,7 @@ pub fn verify_knowledge_stream(
     if query_answers.len() != oracle.answers.len()
         || query_count != oracle.answers.len()
         || target_revision_count != 3
+        || distractor_index != task.distractor_count
         || fact_ids.len() != task.distractor_count
     {
         return Err(KnowledgeVerificationError::InvalidTimeline);
@@ -797,6 +827,22 @@ mod tests {
             verify_knowledge_stream(&task, &oracle),
             Err(KnowledgeVerificationError::PublicDigestMismatch)
         );
+    }
+
+    #[test]
+    fn verifier_rejects_recommitted_late_correction_time_mutation() {
+        let (mut task, oracle) = generate_knowledge_stream(config()).unwrap();
+        if let Some(event) = task.events.iter_mut().find(|event| matches!(
+            &event.kind,
+            KnowledgeEventKind::Version { revision: 1, .. }
+        )) {
+            event.observed_at = event.observed_at.saturating_sub(1);
+        }
+        task.content_sha256 = knowledge_task_digest(&task);
+        assert!(matches!(
+            verify_knowledge_stream(&task, &oracle),
+            Err(KnowledgeVerificationError::InvalidRevision { revision: 1, .. })
+        ));
     }
 
     #[test]
