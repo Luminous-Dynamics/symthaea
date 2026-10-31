@@ -418,9 +418,39 @@ pub fn resolve_capability(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ed25519_dalek::{Signer, SigningKey};
 
     fn digest(byte: char) -> String {
         std::iter::repeat(byte).take(64).collect()
+    }
+
+    fn signing_key() -> SigningKey {
+        // Deterministic test-only seed. Never use this key outside fixtures.
+        SigningKey::from_bytes(&[
+            0x9d, 0x61, 0xb1, 0x9d, 0xef, 0xfd, 0x5a, 0x60,
+            0xba, 0x84, 0x4a, 0xf4, 0x92, 0xec, 0x2c, 0xc4,
+            0x44, 0x49, 0xc5, 0x69, 0x7b, 0x32, 0x69, 0x19,
+            0x70, 0x3b, 0xac, 0x03, 0x1c, 0xae, 0x7f, 0x60,
+        ])
+    }
+
+    fn encode_hex(bytes: &[u8]) -> String {
+        const HEX: &[u8; 16] = b"0123456789abcdef";
+        let mut value = String::with_capacity(bytes.len() * 2);
+        for byte in bytes {
+            value.push(HEX[(byte >> 4) as usize] as char);
+            value.push(HEX[(byte & 0x0f) as usize] as char);
+        }
+        value
+    }
+
+    fn trust_store(key: &SigningKey) -> CapabilityTrustStore {
+        CapabilityTrustStore::new([TrustedCapabilityVerifier {
+            key_id: "muse-qualification-test-v1".into(),
+            public_key: key.verifying_key().to_bytes(),
+            verifier_build_sha256: digest('d'),
+        }])
+        .expect("test verifier trust root must be valid")
     }
 
     fn request() -> CapabilityRequest {
@@ -437,31 +467,55 @@ mod tests {
         }
     }
 
-    fn proof(request: &CapabilityRequest) -> CapabilityProof {
-        CapabilityProof {
+    fn proof(
+        request: &CapabilityRequest,
+        outcome: CapabilityEvidenceOutcome,
+        reason: Option<&str>,
+        signing_key: &SigningKey,
+    ) -> CapabilityProof {
+        let mut proof = CapabilityProof {
             receipt_sha256: digest('b'),
             source_manifest_sha256: digest('c'),
             independent_verifier_sha256: digest('d'),
             renderer_build_sha256: request.renderer_build_sha256.clone(),
             asset_sha256: Some(digest('e')),
-        }
+            verifier_key_id: "muse-qualification-test-v1".into(),
+            attestation_signature_hex: String::new(),
+        };
+        let cell = CapabilityEvidenceCell {
+            request: request.clone(),
+            outcome,
+            reason: reason.map(str::to_owned),
+            proof: Some(proof.clone()),
+        };
+        let message = capability_attestation_message(&cell)
+            .expect("well-formed cell must produce the signing message");
+        proof.attestation_signature_hex = encode_hex(&signing_key.sign(&message).to_bytes());
+        proof
     }
 
-    fn qualified_cell(request: &CapabilityRequest) -> CapabilityEvidenceCell {
+    fn cell(
+        request: &CapabilityRequest,
+        outcome: CapabilityEvidenceOutcome,
+        reason: Option<&str>,
+        signing_key: &SigningKey,
+    ) -> CapabilityEvidenceCell {
         CapabilityEvidenceCell {
             request: request.clone(),
-            outcome: CapabilityEvidenceOutcome::Qualified,
-            reason: None,
-            proof: Some(proof(request)),
+            outcome,
+            reason: reason.map(str::to_owned),
+            proof: Some(proof(request, outcome, reason, signing_key)),
         }
     }
 
     #[test]
-    fn exact_qualified_cell_is_supported() {
+    fn exact_cell_with_pinned_verifier_attestation_is_supported() {
         let request = request();
-        let decision = resolve_capability(&request, &[qualified_cell(&request)]);
+        let key = signing_key();
+        let trust = trust_store(&key);
+        let qualified = cell(&request, CapabilityEvidenceOutcome::Qualified, None, &key);
         assert_eq!(
-            decision,
+            resolve_capability(&request, &[qualified], &trust),
             CapabilityDecision::Supported {
                 receipt_sha256: digest('b')
             }
@@ -469,9 +523,11 @@ mod tests {
     }
 
     #[test]
-    fn evidence_does_not_transfer_across_pitch_velocity_technique_or_build() {
+    fn evidence_does_not_transfer_across_any_exact_request_dimension() {
         let original = request();
-        let cell = qualified_cell(&original);
+        let key = signing_key();
+        let trust = trust_store(&key);
+        let qualified = cell(&original, CapabilityEvidenceOutcome::Qualified, None, &key);
         let mut variants = Vec::new();
 
         let mut changed = original.clone();
@@ -509,7 +565,11 @@ mod tests {
         for changed in variants {
             assert!(
                 matches!(
-                    resolve_capability(&changed, std::slice::from_ref(&cell)),
+                    resolve_capability(
+                        &changed,
+                        std::slice::from_ref(&qualified),
+                        &trust
+                    ),
                     CapabilityDecision::Unknown { .. }
                 ),
                 "neighbouring request inherited support: {changed:?}"
@@ -521,7 +581,14 @@ mod tests {
     fn procedural_capability_does_not_require_a_sample_asset_digest() {
         let mut request = request();
         request.realization = CapabilityRealization::ProceduralSynthesis;
-        let mut proof = proof(&request);
+        let key = signing_key();
+        let trust = trust_store(&key);
+        let mut proof = proof(
+            &request,
+            CapabilityEvidenceOutcome::Qualified,
+            None,
+            &key,
+        );
         proof.asset_sha256 = None;
         let cell = CapabilityEvidenceCell {
             request: request.clone(),
@@ -529,8 +596,14 @@ mod tests {
             reason: None,
             proof: Some(proof),
         };
+        // The signature is deliberately regenerated after changing the asset
+        // field because the attestation binds the complete proof metadata.
+        let mut cell = cell;
+        let message = capability_attestation_message(&cell).unwrap();
+        cell.proof.as_mut().unwrap().attestation_signature_hex =
+            encode_hex(&key.sign(&message).to_bytes());
         assert!(matches!(
-            resolve_capability(&request, &[cell]),
+            resolve_capability(&request, &[cell], &trust),
             CapabilityDecision::Supported { .. }
         ));
     }
@@ -538,39 +611,86 @@ mod tests {
     #[test]
     fn explicit_negative_evidence_is_unsupported_not_unknown() {
         let request = request();
-        let cell = CapabilityEvidenceCell {
-            request: request.clone(),
-            outcome: CapabilityEvidenceOutcome::Unsupported,
-            reason: Some("this renderer has no arco sample at this pitch".into()),
-            proof: Some(proof(&request)),
-        };
+        let key = signing_key();
+        let trust = trust_store(&key);
+        let cell = cell(
+            &request,
+            CapabilityEvidenceOutcome::Unsupported,
+            Some("this renderer has no arco sample at this pitch"),
+            &key,
+        );
         assert!(matches!(
-            resolve_capability(&request, &[cell]),
+            resolve_capability(&request, &[cell], &trust),
             CapabilityDecision::Unsupported { .. }
         ));
     }
 
     #[test]
-    fn missing_or_malformed_qualified_proof_is_invalid_not_supported() {
+    fn unsigned_or_malformed_qualified_proof_is_invalid_not_supported() {
         let request = request();
-        let mut cell = qualified_cell(&request);
-        cell.proof = None;
+        let key = signing_key();
+        let trust = trust_store(&key);
+
+        let mut unsigned = cell(&request, CapabilityEvidenceOutcome::Qualified, None, &key);
+        unsigned.proof = None;
         assert!(matches!(
-            resolve_capability(&request, &[cell]),
+            resolve_capability(&request, &[unsigned], &trust),
             CapabilityDecision::InvalidEvidence { .. }
         ));
 
-        let mut cell = qualified_cell(&request);
-        cell.proof.as_mut().unwrap().asset_sha256 = None;
+        let mut missing_asset = cell(&request, CapabilityEvidenceOutcome::Qualified, None, &key);
+        missing_asset.proof.as_mut().unwrap().asset_sha256 = None;
         assert!(matches!(
-            resolve_capability(&request, &[cell]),
+            resolve_capability(&request, &[missing_asset], &trust),
             CapabilityDecision::InvalidEvidence { .. }
         ));
 
-        let mut cell = qualified_cell(&request);
-        cell.proof.as_mut().unwrap().renderer_build_sha256 = digest('f');
+        let mut wrong_renderer = cell(&request, CapabilityEvidenceOutcome::Qualified, None, &key);
+        wrong_renderer.proof.as_mut().unwrap().renderer_build_sha256 = digest('f');
         assert!(matches!(
-            resolve_capability(&request, &[cell]),
+            resolve_capability(&request, &[wrong_renderer], &trust),
+            CapabilityDecision::InvalidEvidence { .. }
+        ));
+
+        let mut bad_signature = cell(&request, CapabilityEvidenceOutcome::Qualified, None, &key);
+        bad_signature.proof.as_mut().unwrap().attestation_signature_hex = "00".repeat(64);
+        assert!(matches!(
+            resolve_capability(&request, &[bad_signature], &trust),
+            CapabilityDecision::InvalidEvidence { .. }
+        ));
+    }
+
+    #[test]
+    fn no_pinned_trust_root_means_claims_cannot_be_promoted() {
+        let request = request();
+        let key = signing_key();
+        let empty_trust = CapabilityTrustStore::default();
+        let qualified = cell(&request, CapabilityEvidenceOutcome::Qualified, None, &key);
+        assert!(matches!(
+            resolve_capability(&request, &[qualified], &empty_trust),
+            CapabilityDecision::InvalidEvidence { .. }
+        ));
+    }
+
+    #[test]
+    fn attestation_binds_outcome_reason_and_verifier_build() {
+        let request = request();
+        let key = signing_key();
+        let trust = trust_store(&key);
+        let qualified = cell(&request, CapabilityEvidenceOutcome::Qualified, None, &key);
+
+        let mut forged_outcome = qualified.clone();
+        forged_outcome.outcome = CapabilityEvidenceOutcome::Unsupported;
+        forged_outcome.reason = Some("forged negative reason".into());
+        assert!(matches!(
+            resolve_capability(&request, &[forged_outcome], &trust),
+            CapabilityDecision::InvalidEvidence { .. }
+        ));
+
+        let mut forged_build = qualified;
+        forged_build.proof.as_mut().unwrap().independent_verifier_sha256 = digest('f');
+        assert!(matches!(
+            resolve_capability(&request, &[forged_build], &trust),
             CapabilityDecision::InvalidEvidence { .. }
         ));
     }
@@ -578,9 +698,15 @@ mod tests {
     #[test]
     fn duplicate_exact_cells_are_invalid_evidence() {
         let request = request();
-        let cell = qualified_cell(&request);
+        let key = signing_key();
+        let trust = trust_store(&key);
+        let qualified = cell(&request, CapabilityEvidenceOutcome::Qualified, None, &key);
         assert!(matches!(
-            resolve_capability(&request, &[cell.clone(), cell]),
+            resolve_capability(
+                &request,
+                &[qualified.clone(), qualified],
+                &trust
+            ),
             CapabilityDecision::InvalidEvidence { .. }
         ));
     }
@@ -588,6 +714,7 @@ mod tests {
     #[test]
     fn not_evaluated_cell_remains_unknown() {
         let request = request();
+        let empty_trust = CapabilityTrustStore::default();
         let cell = CapabilityEvidenceCell {
             request: request.clone(),
             outcome: CapabilityEvidenceOutcome::NotEvaluated,
@@ -595,7 +722,7 @@ mod tests {
             proof: None,
         };
         assert_eq!(
-            resolve_capability(&request, &[cell]),
+            resolve_capability(&request, &[cell], &empty_trust),
             CapabilityDecision::Unknown {
                 reason: "not yet rendered".into()
             }
@@ -604,24 +731,25 @@ mod tests {
 
     #[test]
     fn malformed_requests_and_unknown_instruments_fail_closed() {
+        let empty_trust = CapabilityTrustStore::default();
         let mut malformed = request();
         malformed.renderer_build_sha256 = "not-a-digest".into();
         assert!(matches!(
-            resolve_capability(&malformed, &[]),
+            resolve_capability(&malformed, &[], &empty_trust),
             CapabilityDecision::InvalidEvidence { .. }
         ));
 
         let mut unknown = request();
         unknown.instrument_id = "not-in-catalogue".into();
         assert!(matches!(
-            resolve_capability(&unknown, &[]),
+            resolve_capability(&unknown, &[], &empty_trust),
             CapabilityDecision::InvalidEvidence { .. }
         ));
 
         let mut bad_velocity = request();
         bad_velocity.velocity = 200;
         assert!(matches!(
-            resolve_capability(&bad_velocity, &[]),
+            resolve_capability(&bad_velocity, &[], &empty_trust),
             CapabilityDecision::InvalidEvidence { .. }
         ));
     }
