@@ -512,6 +512,7 @@ pub fn audit_benchmark_components(
     let mut unknown_requirement_reference_count = 0_u64;
     let mut unknown_precondition_reference_count = 0_u64;
     let mut orphan_check_count = 0_u64;
+    let mut orphan_precondition_mapping_count = 0_u64;
     for check in &manifest.evaluator_checks {
         validate_id(&check.check_id, "evaluator_check.check_id")?;
         if !check_ids.insert(check.check_id.as_str()) {
