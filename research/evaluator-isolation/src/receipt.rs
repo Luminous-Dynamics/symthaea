@@ -787,7 +787,7 @@ mod tests {
     }
 
     #[test]
-    fn replay_ledger_rejects_counter_regression_and_run_reuse() {
+    fn replay_ledger_accepts_higher_counter_then_rejects_run_reuse() {
         let temp = tempfile::tempdir().unwrap();
         let ledger_dir = temp.path().join("ledger");
         std::fs::create_dir(&ledger_dir).unwrap();
