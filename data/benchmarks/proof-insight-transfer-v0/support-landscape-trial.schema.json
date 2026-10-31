@@ -352,5 +352,5 @@
       "uniqueItems": true
     }
   },
-  "description": "Structural schema only. The analyzer additionally verifies budget digest, dependency closure, ordered telescope constraints, paired-seed completeness, context/receipt identity, repeated-trial reliability, and group consistency."
+  "description": "Structural schema only. The analyzer additionally verifies budget digest, exact telescope order and prerequisite closure for every retained declaration (mutable and fixed), paired-seed completeness, context/receipt identity, repeated-trial reliability, and group consistency."
 }
