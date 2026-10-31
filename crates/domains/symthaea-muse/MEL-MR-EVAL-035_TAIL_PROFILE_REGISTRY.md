@@ -56,7 +56,7 @@ For each event:
 - final note-off is taken from the verified performed MIDI event lineage;
 - raw measured-support end and hysteresis-support end are retained separately;
 - observed tail duration is the maximum of raw and hysteresis tail durations;
-- all-channel trailing quiet windows are derived from the replayed EVAL-017 v0.2 window-segmentation trace.
+- all-channel trailing quiet-window counts are computed by EVAL-025 during replay of the EVAL-017 v0.2 window-segmentation trace, stored in each event's digest-bound support evidence, and consumed by the profile builder.
 
 An event is rejected as right-censored unless it has at least the preregistered minimum trailing quiet windows after the final influence window. A clipped output horizon or tail guard is never accepted as a complete tail observation.
 
