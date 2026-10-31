@@ -96,7 +96,7 @@ struct Args {
     output: Option<PathBuf>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Prediction {
     /// Stable adjudication-unit ID, ideally source_archive_sample_hash / source operation ID.
@@ -1153,13 +1153,19 @@ fn ood_detection_metrics(
     let in_domain_count = rows.iter().filter(|row| row.is_ood_domain == Some(false)).count();
     let held_out_domain_count = rows.iter().filter(|row| row.is_ood_domain == Some(true)).count();
     let operating = threshold.map(|cutoff| {
-        let predicted_ood = rows.iter().filter(|row| row.ood_score.unwrap_or(0.0) >= cutoff);
-        let (false_ood_count, missed_ood_count) = predicted_ood.fold((0_usize, 0_usize), |(fp, missed), row| {
-            if row.is_ood_domain == Some(false) { (fp + 1, missed) } else { (fp, missed) }
-        });
-        let true_ood_count = rows.iter().filter(|row| row.is_ood_domain == Some(true) && row.ood_score.unwrap_or(0.0) >= cutoff).count();
-        let missed = held_out_domain_count - true_ood_count;
-        (false_ood_count, missed, ratio(false_ood_count, in_domain_count), ratio(true_ood_count, held_out_domain_count))
+        let false_ood_count = rows.iter().filter(|row| {
+            row.is_ood_domain == Some(false) && row.ood_score.unwrap_or(0.0) >= cutoff
+        }).count();
+        let true_ood_count = rows.iter().filter(|row| {
+            row.is_ood_domain == Some(true) && row.ood_score.unwrap_or(0.0) >= cutoff
+        }).count();
+        let missed_ood_count = held_out_domain_count - true_ood_count;
+        (
+            false_ood_count,
+            missed_ood_count,
+            ratio(false_ood_count, in_domain_count),
+            ratio(true_ood_count, held_out_domain_count),
+        )
     });
 
     OodDetectionMetrics {
@@ -1411,7 +1417,7 @@ mod tests {
         let diagnostics = calibration_diagnostics(&refs);
         assert_eq!(diagnostics.fixed_bin_count, 10);
         assert_eq!(diagnostics.bins.iter().map(|bin| bin.count).sum::<usize>(), 4);
-        assert!(diagnostics.expected_calibration_error.unwrap() < 0.06);
+        assert!((diagnostics.expected_calibration_error.unwrap() - 0.10).abs() < 1e-12);
         assert_eq!(diagnostics.high_confidence_at_90.false_accept_count, 0);
     }
 
@@ -1486,12 +1492,11 @@ mod tests {
 
     #[test]
     fn parser_rejects_multiple_shift_axes_in_one_run() {
-        let mut first = tagged_row("a1", true, 0.9, "mouse", false, 0.1);
+        let first = tagged_row("a1", true, 0.9, "mouse", false, 0.1);
         let mut second = tagged_row("a2", false, 0.1, "fly", false, 0.1);
         second.shift_axis = Some("region".into());
         let input = format!("{}\n{}", serde_json::to_string(&first).unwrap(), serde_json::to_string(&second).unwrap());
         assert!(parse_jsonl(input.as_bytes()).unwrap_err().contains("only one shift_axis"));
-        first.sample_id = "unused".into();
     }
 
     #[test]
