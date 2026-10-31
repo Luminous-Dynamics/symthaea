@@ -48,6 +48,8 @@ No formal T1–T4 audit has yet been run against any evaluated model's training 
 
 Current evidence is limited to source-level controls:
 - Oracle truth labels are not fields on planner-facing `PlannerCase`.
+- `poar-graph-export` serializes planner-only and oracle-only TSV streams; planner artifact tests reject truth/gold records and the oracle header is bound to the planner's SHA-256.
+- The focused workflow smoke-tests both streams in one runner job and deletes the oracle afterward. This is not a secure process or permission boundary.
 - Development, calibration, and test have disjoint source IDs and source-family IDs by construction.
 - Source IDs vary by seed, while family IDs remain stable within a split for cluster-level analysis.
 - Development/calibration/test chain depths differ (8/32/64 claims) to avoid presenting identical depth distributions across splits.
