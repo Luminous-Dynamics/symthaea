@@ -36,7 +36,7 @@ const PROBABILITY_TOLERANCE: f64 = 1e-9;
 const DECISION_TOLERANCE: f64 = 1e-12;
 const ACTION_DOMAIN: &[u8] = b"symthaea.nas.portfolio-voc-action.v0.1";
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ParetoPortfolioParticle {
     pub particle_id: String,
     pub probability: f64,
@@ -45,7 +45,7 @@ pub struct ParetoPortfolioParticle {
     pub objective_values: Vec<Option<Vec<f64>>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ParetoPortfolioPosterior {
     /// Strictly sorted, unique candidate IDs bind every objective-vector column.
     pub candidate_ids: Vec<String>,
@@ -63,7 +63,7 @@ pub struct CandidatePortfolio {
     pub candidate_indices: Vec<usize>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ParetoPortfolioConfig {
     pub target_k: usize,
     /// Hard minimum normalized utility for each objective. A candidate below any floor is
@@ -100,6 +100,14 @@ pub struct ParetoPortfolioDecision {
     pub validation_replicate_indices: Vec<usize>,
     pub portfolio_selection_scores: Vec<PortfolioSelectionScore>,
     pub posterior_particle_count: usize,
+    /// Identity of the exact joint posterior, including candidate configuration hashes.
+    pub posterior_sha256: String,
+    /// Identity of the exact frozen family of candidate portfolios and feasibility config.
+    pub portfolio_family_sha256: String,
+    /// Immutable full QMC design plus disjoint selection/validation scramble subsets.
+    pub qmc_sampling_design_sha256: String,
+    pub selection_replicates_sha256: String,
+    pub validation_replicates_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -139,6 +147,8 @@ pub struct PortfolioParetoVoC {
     pub incremental_cost_units: u64,
     pub resource_unit: String,
     pub expected_observation_probabilities: Vec<(String, f64)>,
+    pub observation_likelihood_model_sha256: String,
+    pub objective_registry_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -302,6 +312,20 @@ pub fn evaluate_portfolio_class_regret(
         portfolio_class_regret + margin,
     );
 
+    let posterior_sha256 = digest_serializable(
+        b"posterior",
+        posterior,
+    )?;
+    let portfolio_family_sha256 = digest_portfolio_family(
+        &canonical_portfolios,
+        config,
+    )?;
+    let qmc_sampling_design_sha256 = design.sampling_design_sha256().to_owned();
+    let selection_replicates_sha256 =
+        digest_replicate_indices(&qmc_sampling_design_sha256, &selection_replicate_indices);
+    let validation_replicates_sha256 =
+        digest_replicate_indices(&qmc_sampling_design_sha256, &validation_replicate_indices);
+
     Ok(ParetoPortfolioDecision {
         oracle_expected_hypervolume: mean(&oracle_replicates),
         oracle_validation_standard_error: standard_error(&oracle_replicates),
@@ -317,6 +341,11 @@ pub fn evaluate_portfolio_class_regret(
         validation_replicate_indices,
         portfolio_selection_scores,
         posterior_particle_count: posterior.particles.len(),
+        posterior_sha256,
+        portfolio_family_sha256,
+        qmc_sampling_design_sha256,
+        selection_replicates_sha256,
+        validation_replicates_sha256,
     })
 }
 
@@ -423,6 +452,10 @@ pub fn evaluate_portfolio_measurement_voc(
         incremental_cost_units: action.incremental_cost_units,
         resource_unit: objective.measurement_cost_unit.clone(),
         expected_observation_probabilities,
+        observation_likelihood_model_sha256: action
+            .observation_likelihood_model_sha256
+            .clone(),
+        objective_registry_sha256: registry.registry_sha256.clone(),
     })
 }
 
@@ -794,6 +827,51 @@ fn feasible_points_for_indices(
         .collect()
 }
 
+fn digest_serializable<T: Serialize>(
+    domain: &[u8],
+    value: &T,
+) -> Result<String, PortfolioVoCError> {
+    let bytes = serde_json::to_vec(value)
+        .map_err(|error| PortfolioVoCError::new("serialization", error.to_string()))?;
+    let mut hasher = Sha256::new();
+    hasher.update((domain.len() as u64).to_be_bytes());
+    hasher.update(domain);
+    hasher.update((bytes.len() as u64).to_be_bytes());
+    hasher.update(bytes);
+    Ok(encode_digest(hasher.finalize().as_slice()))
+}
+
+fn digest_portfolio_family(
+    portfolios: &[CandidatePortfolio],
+    config: &ParetoPortfolioConfig,
+) -> Result<String, PortfolioVoCError> {
+    let mut canonical = portfolios.to_vec();
+    canonical.sort_by(|left, right| left.portfolio_id.cmp(&right.portfolio_id));
+    digest_serializable(
+        b"portfolio-family",
+        &(canonical, config),
+    )
+}
+
+fn digest_replicate_indices(base_digest: &str, indices: &[usize]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update((base_digest.len() as u64).to_be_bytes());
+    hasher.update(base_digest.as_bytes());
+    for index in indices {
+        hasher.update((*index as u64).to_be_bytes());
+    }
+    encode_digest(hasher.finalize().as_slice())
+}
+
+fn encode_digest(bytes: &[u8]) -> String {
+    let mut encoded = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        use std::fmt::Write as _;
+        let _ = write!(&mut encoded, "{byte:02x}");
+    }
+    encoded
+}
+
 fn is_sha256(value: &str) -> bool {
     value.len() == 64
         && value
@@ -983,6 +1061,26 @@ mod tests {
         assert!(result.selected_portfolio_expected_hypervolume < 0.30);
         assert!(result.portfolio_class_regret > 0.10);
         assert_eq!(result.selected_portfolio_id, "B-only");
+    }
+
+    #[test]
+    fn decision_receipt_binds_posterior_portfolio_family_and_qmc_design() {
+        let result = evaluate_portfolio_class_regret(
+            &posterior(),
+            &portfolios(),
+            &ParetoPortfolioConfig {
+                target_k: 1,
+                minimum_feasible_utility: vec![0.0, 0.0],
+            },
+            &design(),
+        )
+        .unwrap();
+        assert_eq!(result.posterior_sha256.len(), 64);
+        assert_eq!(result.portfolio_family_sha256.len(), 64);
+        assert_eq!(result.qmc_sampling_design_sha256.len(), 64);
+        assert_eq!(result.selection_replicates_sha256.len(), 64);
+        assert_eq!(result.validation_replicates_sha256.len(), 64);
+        assert_ne!(result.selection_replicates_sha256, result.validation_replicates_sha256);
     }
 
     #[test]
