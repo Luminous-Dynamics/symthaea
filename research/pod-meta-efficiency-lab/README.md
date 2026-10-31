@@ -1,6 +1,6 @@
 # POD-Meta Efficiency Lab
 
-A standalone, dependency-free Rust microbenchmark for the claim:
+A standalone Rust microbenchmark with one local dependency on the existing POD-Meta research crate and no third-party dependencies for the claim:
 
 **Proof-obligation-guided operation selection should produce more independently verified proof progress per unit of computation than generic reasoning allocation.**
 
@@ -29,7 +29,7 @@ The runner prints 280 data rows: 8 task profiles × 5 resource budgets × 7 poli
 
 ## Information boundary
 
-The planner-visible OperationSpec contains operation ID, advertised obligation/claim mask, generic predicted gain, abstract work-unit cost, and mandatory verification mask. The native POD-Meta arm maps these into its existing typed `Obligation`, `CandidateOperation`, `OperationKind`, `SchedulingClass`, and `SelectionContext` contracts.
+The planner-visible OperationSpec contains operation ID, advertised obligation/claim mask, generic predicted gain, abstract work-unit cost, and mandatory verification mask. The native-router arm maps this catalogue into the existing POD-Meta Obligation, CandidateOperation, OperationKind, SchedulingClass and SelectionContext contracts. The native POD-Meta arm maps these into its existing typed `Obligation`, `CandidateOperation`, `OperationKind`, `SchedulingClass`, and `SelectionContext` contracts.
 
 The evaluator-only verified support mask is stored separately and is not read by the operation chooser. It becomes visible to the controller only after that operation is selected and the simulated independent verifier returns the result.
 
@@ -47,7 +47,8 @@ A failed operation that targeted an open obligation is reported as a rejected ev
 - Abstract work units are not measured FLOPs, GPU time, energy, latency, or monetary cost.
 - The random baseline shares the same operation catalogue and total budget, but is budget-matched rather than realized-cost-matched. It is not a learned distribution over industry tool usage.
 - Generic VOC uses deterministic supplied predictions, not a calibrated learned predictor.
-- The oracle is computed in the same process for diagnostics; it is not a deployable policy. The POD-Meta adapter is a benchmark mapping into the existing scheduler types, not yet a production cognitive-operation producer or integration.
+- The oracle is computed in the same process for diagnostics; it is not a deployable policy.
+- The POD-Meta arm calls the existing typed research selector through a benchmark adapter. It is not yet connected to a real production cognitive-operation producer. The POD-Meta adapter is a benchmark mapping into the existing scheduler types, not yet a production cognitive-operation producer or integration.
 - The benchmark does not yet model natural-language generation, multiple models, tool latency distributions, real evidence sources or production adapters.
 
 Before any superiority claim, qualify the exact-head Rust crate, add generator/operator-family held-out splits and protected oracle execution, then run matched checkpoints with actual measured all-in resource budgets. Use official external evaluators independently for TEMPO, Vera-Life-Eval, LitTraceQA, GRACE, FaithCoT-Bench and ParaRecover.
