@@ -17,6 +17,7 @@
     "public_packet_sha256",
     "sealed_oracle_sha256",
     "transformation_rules_sha256",
+    "transformation_source_sha256",
     "item_set_sha256",
     "group_count",
     "item_count",
@@ -94,6 +95,10 @@
     "claim_boundary": {
       "type": "string",
       "minLength": 1
+    },
+    "transformation_source_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     }
   }
 }
