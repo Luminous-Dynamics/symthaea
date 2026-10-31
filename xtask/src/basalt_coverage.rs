@@ -46,7 +46,6 @@ pub struct CoverageCounts {
     pub unresolved_event_kinds: usize,
     pub excluded_event_kinds: usize,
     pub active_required_controls: usize,
-    pub monitored_roots: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -233,9 +232,10 @@ pub fn audit_bytes(profile_bytes: &[u8], receipt_bytes: &[u8]) -> CoverageAuditR
     validate_platform(&profile, &receipt, &mut report);
     validate_controls(&profile, &receipt, &mut report);
     validate_capture(&receipt, &mut report);
+    let root_scopes_complete = validate_root_scopes(&profile, &receipt, &mut report);
     validate_channels(&profile, &receipt, &mut report);
-    // Channel classification, capture identity and profile binding are part of
-    // receipt well-formedness, not merely advisory diagnostics.
+    // Channel classification, capture identity, root scopes and profile binding
+    // are part of receipt well-formedness, not merely advisory diagnostics.
     report.receipt_well_formed = report.errors.len() == before_receipt_errors;
 
     let all_events_observed = report.counts.required_event_kinds > 0
@@ -247,7 +247,6 @@ pub fn audit_bytes(profile_bytes: &[u8], receipt_bytes: &[u8]) -> CoverageAuditR
             || receipt.platform.kernel_build_id.as_deref().is_some_and(|value| !value.trim().is_empty()))
         && (!profile.platform.require_kernel_btf_digest
             || receipt.platform.kernel_btf_digest.as_deref().is_some_and(valid_digest));
-    let root_scopes_complete = validate_root_scopes(&profile, &receipt, &mut report);
     let capture_complete = receipt.capture.start_monotonic_ns < receipt.capture.end_monotonic_ns
         && receipt.capture.root_pid > 0
         && receipt.capture.process_tree_closed
@@ -479,6 +478,7 @@ fn validate_root_scopes(profile: &Profile, receipt: &Receipt, report: &mut Cover
         for (path_index, root) in scope.paths.iter().enumerate() {
             if !valid_absolute_root(root) || !unique_paths.insert(root.as_str()) {
                 push_error(report, "E_MONITORED_ROOT", &format!("{path}.paths[{path_index}]"), "root paths must be unique normalized absolute paths without dot or parent components");
+                complete = false;
             }
         }
         match scope.status.as_str() {
@@ -882,6 +882,17 @@ mod tests {
         let (profile, receipt) = encoded_pair("complete_within_profile");
         let mut value: Value = serde_json::from_slice(&receipt).unwrap();
         value["capture"]["root_scopes"].as_array_mut().unwrap().pop();
+        let report = audit_bytes(&profile, &serde_json::to_vec(&value).unwrap());
+        assert!(!report.receipt_well_formed);
+        assert!(report.overstated_claim);
+        assert!(!report.coverage_complete_within_profile);
+    }
+
+    #[test]
+    fn rejects_invalid_root_paths_as_malformed_not_complete() {
+        let (profile, receipt) = encoded_pair("complete_within_profile");
+        let mut value: Value = serde_json::from_slice(&receipt).unwrap();
+        value["capture"]["root_scopes"][0]["paths"] = json!(["/workspace/../etc"]);
         let report = audit_bytes(&profile, &serde_json::to_vec(&value).unwrap());
         assert!(!report.receipt_well_formed);
         assert!(report.overstated_claim);
