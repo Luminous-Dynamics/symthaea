@@ -14,8 +14,8 @@ use symthaea_muse_protocol::catalog::{
     CanonicalStyle, HybridStyleSpec, StyleStatus, catalog_entry,
 };
 use symthaea_music_theory::{
-    CompositionSpec, MusicalIntent, Score, Style, MUSIC_THEORY_ENGINE_VERSION,
-    compose_with_grammar_plan,
+    CompositionSpec, FormKind, GrammarFamily, MusicalIntent, Score, Style,
+    MUSIC_THEORY_ENGINE_VERSION, compose_with_grammar_plan,
 };
 
 pub const HYBRID_STYLE_COMPILER_SCHEMA: &str = "muse-hybrid-style-compiler-v1";
@@ -138,7 +138,47 @@ pub fn compile_hybrid_style(
         return Err(issues);
     };
 
+    // v1 deliberately compiles only the general period/sentence engine.
+    // Dedicated engines have different contracts: GrooveCycle panics unless
+    // the selected accompaniment is a cycle type; Fugue/Process/Raga/Opera
+    // consume only subsets of CompositionSpec. Until each has a family-aware
+    // adapter and a tested donor-consumption matrix, reject them rather than
+    // silently claiming every layer reached the score.
+    if structural_style.grammar_family() != GrammarFamily::PeriodSentence {
+        issues.push(StyleMixIssue {
+            code: "structural_engine_adapter_required".into(),
+            layer: Some(StyleMixLayer::Structure),
+            catalog_id: Some(structural_entry.id),
+            message: format!(
+                "the {} structural grammar ({:?}) requires its own hybrid donor adapter; compiler v1 supports only PeriodSentence",
+                structural_entry.display_name,
+                structural_style.grammar_family()
+            ),
+        });
+    }
+
     let mut spec = structural_style.spec();
+    if !spec.form_pool.iter().all(|form| {
+        matches!(form, FormKind::Ternary | FormKind::Rondo | FormKind::Variations)
+    }) {
+        issues.push(StyleMixIssue {
+            code: "structural_form_adapter_required".into(),
+            layer: Some(StyleMixLayer::Structure),
+            catalog_id: Some(structural_entry.id),
+            message: "compiler v1 only supports Ternary/Rondo/Variations form realization".into(),
+        });
+    }
+
+    // The melodic donor is realized through HookCell. Do not silently copy
+    // DNA into a structural preset whose own recipe disables that mechanism.
+    if melody.is_some() && !spec.texture.hook_cell {
+        issues.push(StyleMixIssue {
+            code: "melody_hook_adapter_required".into(),
+            layer: Some(StyleMixLayer::Melody),
+            catalog_id: melody.map(|(entry, _)| entry.id),
+            message: "the structural owner disables hook_cell, so its melodic DNA would not affect the score".into(),
+        });
+    }
 
     // A rhythm donor can contribute its accompaniment/cycle engine only
     // when its bar length is compatible with the structural owner's score.
@@ -457,6 +497,58 @@ mod tests {
             issue.code == "source_style_not_implemented"
                 || issue.code == "structural_owner_not_implemented"
         }));
+    }
+
+    #[test]
+    fn dedicated_structural_engines_are_rejected_until_family_adapter_exists() {
+        let hybrid = HybridStyleSpec {
+            structural_style_id: id_for_composer_style("AfroCuban"),
+            melodic_style_id: None,
+            rhythmic_style_id: Some(id_for_composer_style("Tango")),
+            harmonic_style_id: None,
+            ensemble_style_id: None,
+            performance_style_id: None,
+            production_style_id: None,
+            culturally_qualified_sources_acknowledged: true,
+        };
+        let issues = compile_hybrid_style(&hybrid).unwrap_err();
+        assert!(issues.iter().any(|issue| {
+            issue.code == "structural_engine_adapter_required"
+        }));
+    }
+
+    #[test]
+    fn melodic_donor_cannot_be_claimed_when_owner_disables_hook_cells() {
+        let mut hybrid = HybridStyleSpec {
+            structural_style_id: id_for_composer_style("Classical"),
+            melodic_style_id: Some(id_for_composer_style("Blues")),
+            rhythmic_style_id: None,
+            harmonic_style_id: None,
+            ensemble_style_id: None,
+            performance_style_id: None,
+            production_style_id: None,
+            culturally_qualified_sources_acknowledged: false,
+        };
+        // Classical currently has hook cells enabled; this test uses a
+        // focused helper-level contract by selecting a future no-hook owner
+        // through a synthetic spec is not possible through the public catalog.
+        // Instead assert that every preset with hook cells disabled is not
+        // falsely accepted as a melodic donor.
+        let candidate_ids = (1..=152).collect::<Vec<_>>();
+        let no_hook_name = candidate_ids.into_iter().find_map(|id| {
+            let entry = catalog_entry(id)?;
+            let style_name = entry.composer_style?;
+            let style = Style::ALL.into_iter()
+                .find(|style| format!("{style:?}") == style_name)?;
+            (!style.spec().texture.hook_cell).then_some(style_name)
+        });
+        if let Some(style_name) = no_hook_name {
+            hybrid.structural_style_id = id_for_composer_style(style_name);
+            let issues = compile_hybrid_style(&hybrid).unwrap_err();
+            assert!(issues.iter().any(|issue| {
+                issue.code == "melody_hook_adapter_required"
+            }));
+        }
     }
 
     #[test]
