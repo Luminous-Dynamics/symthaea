@@ -33,6 +33,11 @@ cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-v1
 - 43 authored unit tests: 24 scheduler/receipt tests, one POAR routing-suite test, and 18 graph/oracle tests.
 - Graph benchmarks report disposition correctness, false support/refutation, unsupported proof paths, citation completeness, temporal/scope/authority/integrity violations, retracted citations, correlated-source violations, plus ranked temporal evidence coverage@3 and precision@3; retrieval ranking is separate from final proof citations, and there is no composite score.
 
+## Research contracts
+
+- [POAR Artifact Boundary v1](POAR_ARTIFACT_BOUNDARY_V1.md): normative planner/oracle/prediction artifact separation, digest binding, and protected evaluator-job requirements.
+- [POAR Contamination Transparency Card v1](CONTAMINATION_TRANSPARENCY_CARD_V1.md): known public-template exposure, third-party training-provenance unknowns, and T1–T4 audit limitations.
+
 ## Deliberate limits
 
 This is a scheduler-mechanics prototype, not a production proof engine. The verifier receipt is supplied by the test fixture; the crate does not verify signatures, source authenticity, legal correctness, or whether a verifier is truly independent. The state SupportedUnderProfile is only a synthetic transition after an accepted, exactly-bound fixture receipt. Evidence admissibility is given by the fixture; it is not source authentication. The verifier/proposer distinction is only checked by declared IDs and does not establish true organizational or implementation independence.
