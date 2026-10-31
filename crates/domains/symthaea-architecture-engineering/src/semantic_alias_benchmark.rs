@@ -219,6 +219,188 @@ pub enum AliasCorruption {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AliasCorruptionRates {
+    /// Applied only to the first proposal of a genuinely new identity when another identity
+    /// has already been canonically admitted.
+    pub false_merge_probability: f64,
+    /// Applied only to later aliases of an identity that already has a canonical registration.
+    pub false_new_admission_probability: f64,
+    /// Applied to the first proposal of a new semantic identity.
+    pub false_novelty_rejection_probability: f64,
+    /// Applied after the other eligible corruption categories for each proposal.
+    pub inconclusive_probability: f64,
+}
+
+impl AliasCorruptionRates {
+    pub fn validate(&self) -> Result<(), SemanticAliasError> {
+        let values = [
+            self.false_merge_probability,
+            self.false_new_admission_probability,
+            self.false_novelty_rejection_probability,
+            self.inconclusive_probability,
+        ];
+        if values.iter().any(|value| !value.is_finite() || !(0.0..=1.0).contains(value)) {
+            return Err(SemanticAliasError::new(
+                "corruption_rates",
+                "all corruption probabilities must be finite and in [0, 1]",
+            ));
+        }
+        let sum = values.iter().sum::<f64>();
+        if !sum.is_finite() || sum > 1.0 {
+            return Err(SemanticAliasError::new(
+                "corruption_rates",
+                "corruption probabilities must sum to at most one",
+            ));
+        }
+        Ok(())
+    }
+}
+
+struct AliasScheduleRng {
+    state: u64,
+}
+
+impl AliasScheduleRng {
+    fn new(seed: u64) -> Self {
+        Self {
+            state: if seed == 0 { 0x9e37_79b9_7f4a_7c15 } else { seed },
+        }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        let mut value = self.state;
+        value ^= value >> 12;
+        value ^= value << 25;
+        value ^= value >> 27;
+        self.state = value;
+        value.wrapping_mul(0x2545_f491_4f6c_dd1d)
+    }
+
+    fn unit_f64(&mut self) -> f64 {
+        ((self.next_u64() >> 11) as f64) * (1.0 / ((1u64 << 53) as f64))
+    }
+}
+
+/// Create a deterministic corruption schedule using only the frozen challenge, evaluator key,
+/// clean reference trial, rates and seed. The key remains evaluator-only.
+pub fn seeded_alias_corruption_schedule(
+    challenge: &PolicyVisibleAliasChallenge,
+    adjudication: &AliasAdjudicationKey,
+    clean_trial: &AliasVerifierTrial,
+    rates: &AliasCorruptionRates,
+    seed: u64,
+) -> Result<Vec<AliasCorruption>, SemanticAliasError> {
+    challenge.validate()?;
+    adjudication.validate_for(challenge)?;
+    validate_trial_shape(challenge, clean_trial)?;
+    validate_decision_structure(challenge, clean_trial)?;
+    rates.validate()?;
+
+    let mut rng = AliasScheduleRng::new(seed);
+    let mut seen_truth = BTreeSet::<String>::new();
+    let mut canonical_by_truth = BTreeMap::<String, String>::new();
+    let mut corruptions = Vec::new();
+
+    for (index, proposal) in challenge.proposals.iter().enumerate() {
+        let truth = adjudication.truth_identity_by_proposal
+            .get(&proposal.proposal_id)
+            .ok_or_else(|| SemanticAliasError::new(
+                format!("adjudication[{}]", proposal.proposal_id),
+                "truth identity missing",
+            ))?;
+        let is_alias = !seen_truth.insert(truth.clone());
+        let draw = rng.unit_f64();
+        let mut threshold = 0.0;
+        let mut selected = None;
+
+        if is_alias {
+            if let Some(_canonical) = canonical_by_truth.get(truth) {
+                threshold += rates.false_new_admission_probability;
+                if draw < threshold {
+                    selected = Some(AliasCorruption::FalseNewAdmission {
+                        proposal_id: proposal.proposal_id.clone(),
+                        new_canonical_direction_id: format!("false-new-{}", proposal.proposal_id),
+                    });
+                }
+            } else {
+                // The first proposal may have been rejected or merged into a different ID.
+                // Without a registered canonical direction, do not emit an invalid Duplicate.
+                selected = Some(AliasCorruption::Inconclusive {
+                    proposal_id: proposal.proposal_id.clone(),
+                });
+            }
+            if selected.is_none() {
+                threshold += rates.inconclusive_probability;
+                if draw < threshold {
+                    selected = Some(AliasCorruption::Inconclusive {
+                        proposal_id: proposal.proposal_id.clone(),
+                    });
+                }
+            }
+        } else {
+            if !canonical_by_truth.is_empty() {
+                threshold += rates.false_merge_probability;
+                if draw < threshold {
+                    let existing = canonical_by_truth.values().next()
+                        .cloned()
+                        .ok_or_else(|| SemanticAliasError::new(
+                            "canonical_by_truth",
+                            "eligible false merge has no registered canonical direction",
+                        ))?;
+                    selected = Some(AliasCorruption::FalseMergeAsDuplicate {
+                        proposal_id: proposal.proposal_id.clone(),
+                        existing_canonical_direction_id: existing,
+                    });
+                }
+            }
+            if selected.is_none() {
+                threshold += rates.false_novelty_rejection_probability;
+                if draw < threshold {
+                    selected = Some(AliasCorruption::FalseNoveltyRejection {
+                        proposal_id: proposal.proposal_id.clone(),
+                    });
+                }
+            }
+            if selected.is_none() {
+                threshold += rates.inconclusive_probability;
+                if draw < threshold {
+                    selected = Some(AliasCorruption::Inconclusive {
+                        proposal_id: proposal.proposal_id.clone(),
+                    });
+                }
+            }
+        }
+
+        if let Some(corruption) = selected {
+            corruptions.push(corruption);
+            continue;
+        }
+
+        match &clean_trial.decisions[index] {
+            AliasVerifierDecision::Admitted { canonical_direction_id } if !is_alias => {
+                canonical_by_truth.insert(truth.clone(), canonical_direction_id.clone());
+            }
+            AliasVerifierDecision::Duplicate { canonical_direction_id } if is_alias => {
+                if canonical_by_truth.get(truth) != Some(canonical_direction_id) {
+                    return Err(SemanticAliasError::new(
+                        format!("clean_trial.decisions[{index}]"),
+                        "clean reference trial does not map this alias to the first canonical direction",
+                    ));
+                }
+            }
+            _ => {
+                return Err(SemanticAliasError::new(
+                    format!("clean_trial.decisions[{index}]"),
+                    "clean reference trial must admit first identities and duplicate subsequent aliases",
+                ));
+            }
+        }
+    }
+    Ok(corruptions)
+}
+
 /// Apply explicitly seeded/adjudicated corruptions to a clean verifier trial.
 /// The resulting trial remains policy-output-like; the evaluator key is never modified.
 pub fn inject_alias_corruptions(
@@ -775,6 +957,44 @@ mod tests {
 
         assert_eq!(report.false_novelty_rejection_count, 1);
         assert!(report.discovery_regret > 0.0);
+    }
+
+    #[test]
+    fn seeded_corruption_schedule_is_reproducible_and_produces_valid_trials() {
+        let (challenge, adjudication) = canonical_alias_fixture().unwrap();
+        let clean = clean_alias_trial(&challenge).unwrap();
+        let rates = AliasCorruptionRates {
+            false_merge_probability: 0.2,
+            false_new_admission_probability: 0.2,
+            false_novelty_rejection_probability: 0.2,
+            inconclusive_probability: 0.2,
+        };
+        let first = seeded_alias_corruption_schedule(
+            &challenge, &adjudication, &clean, &rates, 17,
+        ).unwrap();
+        let second = seeded_alias_corruption_schedule(
+            &challenge, &adjudication, &clean, &rates, 17,
+        ).unwrap();
+        assert_eq!(first, second);
+
+        let corrupted = inject_alias_corruptions(&challenge, &clean, &first).unwrap();
+        let report = evaluate_alias_trial(&challenge, &adjudication, &corrupted, 2).unwrap();
+        assert_eq!(report.challenge_sha256, challenge.challenge_sha256().unwrap());
+    }
+
+    #[test]
+    fn corruption_schedule_rejects_invalid_rate_sums() {
+        let (challenge, adjudication) = canonical_alias_fixture().unwrap();
+        let clean = clean_alias_trial(&challenge).unwrap();
+        let rates = AliasCorruptionRates {
+            false_merge_probability: 0.5,
+            false_new_admission_probability: 0.5,
+            false_novelty_rejection_probability: 0.5,
+            inconclusive_probability: 0.0,
+        };
+        assert!(seeded_alias_corruption_schedule(
+            &challenge, &adjudication, &clean, &rates, 17,
+        ).is_err());
     }
 
     #[test]
