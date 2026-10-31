@@ -20,7 +20,7 @@ A mechanism-matched tape must include a shared proposal-stream digest. A best-pr
 
 Every event contains a unique event ID, policy ID, worker and round, optional batch ID, the last event sequence visible to the policy, the digest of that exact visible prefix, an optional retry reference, the selected action intent, the evaluator/verifier outcome, and a complete resource receipt.
 
-Candidate evaluations bind candidate, parent, semantic-delta, task-recipe, comparison-profile, and evaluator digests. A verified result requires a finite score and evidence-artifact digest. Rejected, inconclusive, crashed, and timed-out actions remain in the tape and remain charged.
+Candidate evaluations bind candidate, parent, semantic-delta, task-recipe, comparison-profile, and evaluator digests. Every candidate outcome binds both evaluator and independent-verifier build digests plus a verifier receipt, including rejected, crashed, and timed-out work. A verified result additionally requires a finite score and evidence-artifact digest. Rejected, inconclusive, crashed, and timed-out actions remain in the tape and remain charged.
 
 Direction proposals bind a descriptor digest and semantic delta. Only the verifier may admit a canonical direction ID. A duplicate must map to an already registered ID and cannot mint another arm. An admitted ID must be genuinely new to the current registry.
 
@@ -40,7 +40,7 @@ Batched events use a common batch ID and round. All events in the batch must hav
 
 The tape is append-only at the API boundary. The first event's prior hash is the deterministic digest of the frozen header; each later event hash binds its sequence, prior event hash, and serialized payload. The header itself is read-only through the API. Validation checks sequence continuity, the hash chain, the policy/config identity, visible-prefix digest, action/outcome agreement, canonical direction registration, retry identity, resource receipts, worker/batch semantics, claim caps, and budget ceiling.
 
-A `PolicyReplay` adapter must identify the same policy ID and frozen config digest, then receives only the event prefix declared visible for a decision plus that decision's worker/round context. It must reproduce whether the policy selected a registered direction or requested a new direction. Candidate-generation and evaluator correctness remain separate responsibilities.
+A `PolicyReplay` adapter must identify the same policy ID, algorithm/build ID, and frozen config digest, then receives only the event prefix declared visible for a decision plus that decision's worker/round context. It must reproduce whether the policy selected a registered direction or requested a new direction. Candidate-generation and evaluator correctness remain separate responsibilities.
 
 The first event links to a digest of the frozen header, so changing the budget, worker count, policy snapshot or other header field invalidates the chain. The SHA-256 chain is tamper-evident only when the tape is retained and compared against a trusted digest. It does not authenticate who produced the tape. Signing, remote append-only storage, independent evaluator deployment, and cross-policy campaign reconciliation remain follow-on work.
 
