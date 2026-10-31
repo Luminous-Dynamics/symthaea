@@ -650,6 +650,12 @@ fn validate_action(
             "action cost must be positive",
         ));
     }
+    if !(config.cost_penalty_per_unit * action.incremental_cost_units as f64).is_finite() {
+        return Err(DecisionFocusedVoCError::new(
+            format!("actions[{index}].incremental_cost_units"),
+            "regret-equivalent action cost must remain finite",
+        ));
+    }
     if action.source_artifact_sha256 != manifest.source_artifact_sha256
         || action.posterior_model_sha256 != manifest.posterior_model_sha256
         || action.observation_likelihood_model_sha256
