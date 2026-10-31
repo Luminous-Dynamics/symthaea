@@ -270,6 +270,97 @@ fn plan_checks(plan: Option<&GrammarPlanEvidence>) -> Vec<AnalystCheck> {
                 ),
             ),
         ],
+        GrammarPlanEvidence::ProgSuite(plan) => vec![
+            observed_check(
+                "prog-suite-section-contract",
+                "ProgSuite declares its four-section 4/7/5/4 mixed-meter arc",
+                plan.sections.len() == 4
+                    && plan.sections.iter().map(|s| s.meter).collect::<Vec<_>>() == [4, 7, 5, 4]
+                    && plan.sections.windows(2).all(|pair| {
+                        (pair[0].end.beats() - pair[1].start.beats()).abs() <= 1e-7
+                    }),
+                "four contiguous sections with meters [4, 7, 5, 4]",
+                format!(
+                    "{} sections; meters {:?}; {} realized beats",
+                    plan.sections.len(),
+                    plan.sections.iter().map(|s| s.meter).collect::<Vec<_>>(),
+                    plan.expected_total_beats
+                ),
+            ),
+            observed_check(
+                "prog-suite-theme-return",
+                "The final section is an untransformed return of the opening theme",
+                plan.sections.len() == 4
+                    && format!("{:?}", plan.sections[0].role) == "A"
+                    && format!("{:?}", plan.sections[3].role) == "ReturnA"
+                    && plan.sections[0].transform.is_none()
+                    && plan.sections[3].transform.is_none()
+                    && plan.sections[0].meter == plan.sections[3].meter
+                    && plan.sections[0].key == plan.sections[3].key,
+                "opening A and final ReturnA share home key, meter and identity transform",
+                format!(
+                    "opening {:?} {:?} {:?}; return {:?} {:?} {:?}",
+                    plan.sections.first().map(|s| s.role),
+                    plan.sections.first().map(|s| s.key),
+                    plan.sections.first().and_then(|s| s.transform),
+                    plan.sections.last().map(|s| s.role),
+                    plan.sections.last().map(|s| s.key),
+                    plan.sections.last().and_then(|s| s.transform)
+                ),
+            ),
+        ],
+        GrammarPlanEvidence::Sonata(evidence) => vec![
+            observed_check(
+                "sonata-five-section-plan",
+                "Sonata retains the five tonal/thematic regions",
+                evidence.plan.sections.len() == 5,
+                "five sections: exposition P/S, development, recapitulation P/S",
+                format!("{} planned sections", evidence.plan.sections.len()),
+            ),
+            observed_check(
+                "sonata-score-side-obligations",
+                "Every reported Sonata obligation has score-side verification",
+                !evidence.verification.is_empty()
+                    && evidence.verification.iter().all(|item| item.verified),
+                "all obligation verification records are true",
+                format!(
+                    "{}/{} obligations verified",
+                    evidence.verification.iter().filter(|item| item.verified).count(),
+                    evidence.verification.len()
+                ),
+            ),
+        ],
+        GrammarPlanEvidence::Renaissance(evidence) => vec![
+            observed_check(
+                "renaissance-equal-voices",
+                "Renaissance composition preserves three equal voices without chordal harmony",
+                evidence.verification.equal_voices_present
+                    && evidence.verification.no_chordal_harmony_voice,
+                "Melody, CounterMelody and Bass present; Harmony absent",
+                format!("{:?}", evidence.verification),
+            ),
+            observed_check(
+                "renaissance-rotating-entry-orders",
+                "Renaissance points rotate voice entry order instead of using a Fugue answer",
+                evidence.verification.point_one_entry_order_verified
+                    && evidence.verification.point_two_entry_order_verified,
+                "bass-altus-superius, then superius-bass-altus",
+                format!(
+                    "point 1 {}; point 2 {}",
+                    evidence.verification.point_one_entry_order_verified,
+                    evidence.verification.point_two_entry_order_verified
+                ),
+            ),
+            observed_check(
+                "renaissance-clausula",
+                "The score resolves the 7-6 suspension and the 7-6-8 Landini under-third",
+                evidence.verification.alto_suspension_resolves_down_step
+                    && evidence.verification.soprano_landini_underthird_verified
+                    && evidence.verification.bass_closes_on_tonic,
+                "alto 7-6; soprano 7-6-8; bass tonic",
+                format!("{:?}", evidence.verification),
+            ),
+        ],
         GrammarPlanEvidence::Compatibility {
             family,
             form_available,
