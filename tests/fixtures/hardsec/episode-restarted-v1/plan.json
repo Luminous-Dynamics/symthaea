@@ -204,5 +204,7 @@
     "instret",
     "cycles",
     "l1_miss"
-  ]
+  ],
+  "trace_lineage_dataset_id": "hs021-episode-source-lineage-synthetic-v1",
+  "trace_lineage_source_corpus_sha256": "0b87aafd58bb85edd8e40d122a25109362ac578523068e22eaa2febdf7ad031f"
 }
