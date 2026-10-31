@@ -15,7 +15,8 @@
     "metrics",
     "aspirational_targets",
     "claim_rules",
-    "reference_implementations"
+    "reference_implementations",
+    "reference_calibration_design"
   ],
   "properties": {
     "schema_version": {
@@ -181,6 +182,94 @@
               "source_pinned_metrics_and_execution_not_reproduced"
             ]
           }
+        }
+      }
+    },
+    "reference_calibration_design": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_alpha_budget",
+        "total_dkw_delta_budget",
+        "context_count_for_fixture",
+        "alpha_per_context_for_fixture",
+        "delta_per_context_for_fixture",
+        "dkw_epsilon_formula",
+        "dkw_epsilon_at_n_600",
+        "required_independent_reference_units_per_context",
+        "unit_definition",
+        "iid_reference_assumption_required",
+        "windows_do_not_establish_reference_independence"
+      ],
+      "properties": {
+        "total_alpha_budget": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "total_dkw_delta_budget": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "context_count_for_fixture": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "alpha_per_context_for_fixture": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "delta_per_context_for_fixture": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "dkw_epsilon_formula": {
+          "type": "string"
+        },
+        "dkw_epsilon_at_n_600": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "required_independent_reference_units_per_context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "epsilon_le_0_05",
+            "epsilon_le_0_025",
+            "epsilon_le_0_01",
+            "epsilon_le_0_005"
+          ],
+          "properties": {
+            "epsilon_le_0_05": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "epsilon_le_0_025": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "epsilon_le_0_01": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "epsilon_le_0_005": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "unit_definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "iid_reference_assumption_required": {
+          "const": true
+        },
+        "windows_do_not_establish_reference_independence": {
+          "const": true
         }
       }
     }
