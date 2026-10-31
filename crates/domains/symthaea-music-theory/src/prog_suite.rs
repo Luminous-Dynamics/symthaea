@@ -91,7 +91,27 @@ pub struct ProgSuitePlan {
 pub struct ProgSuiteRealization {
     pub score: Score,
     pub plan: ProgSuitePlan,
+    pub verification: ProgSuiteVerification,
 }
+
+/// Score-side verification of the obligations declared by a ProgSuite plan.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProgSuiteVerification {
+    pub meter_sequence_valid: bool,
+    pub section_boundaries_contiguous: bool,
+    pub total_duration_matches: bool,
+    pub theme_return_identical: bool,
+}
+
+impl ProgSuiteVerification {
+    pub fn all_verified(&self) -> bool {
+        self.meter_sequence_valid
+            && self.section_boundaries_contiguous
+            && self.total_duration_matches
+            && self.theme_return_identical
+    }
+}
+
 
 fn identity_key(k: Key) -> Key {
     k
@@ -243,7 +263,56 @@ pub(crate) fn realize_prog_suite_with_plan(
         bars_per_section_phrase: bars as u8,
         expected_total_beats: cursor.beats(),
     };
-    ProgSuiteRealization { score, plan }
+    let expected_meters = [4, 7, 5, 4];
+    let meter_sequence_valid = plan.sections.len() == 4
+        && plan.opening_meter == score.meter
+        && plan
+            .sections
+            .iter()
+            .map(|section| section.meter)
+            .eq(expected_meters);
+    let section_boundaries_contiguous = plan.sections.len() == 4
+        && plan.sections.first().is_some_and(|section| section.start.beats() == 0.0)
+        && plan.sections.windows(2).all(|pair| {
+            (pair[0].end.beats() - pair[1].start.beats()).abs() <= 1e-7
+        });
+    let total_duration_matches =
+        (score.total_beats.beats() - plan.expected_total_beats).abs() <= 1e-7
+            && plan.sections.last().is_some_and(|section| {
+                (section.end.beats() - score.total_beats.beats()).abs() <= 1e-7
+            });
+    let melody_signature = |start: f64, end: f64| -> Vec<(u8, f64, f64)> {
+        score
+            .voice(crate::score::VoiceRole::Melody)
+            .into_iter()
+            .filter(|note| {
+                note.onset.beats() >= start - 1e-7 && note.onset.beats() < end - 1e-7
+            })
+            .map(|note| {
+                (
+                    note.pitch.midi(),
+                    note.onset.beats() - start,
+                    note.duration.beats(),
+                )
+            })
+            .collect()
+    };
+    let theme_return_identical = plan.sections.len() == 4
+        && plan.sections[0].role == SectionRole::A
+        && plan.sections[3].role == SectionRole::ReturnA
+        && plan.sections[0].key == plan.sections[3].key
+        && plan.sections[0].meter == plan.sections[3].meter
+        && plan.sections[0].transform.is_none()
+        && plan.sections[3].transform.is_none()
+        && melody_signature(plan.sections[0].start.beats(), plan.sections[0].end.beats())
+            == melody_signature(plan.sections[3].start.beats(), plan.sections[3].end.beats());
+    let verification = ProgSuiteVerification {
+        meter_sequence_valid,
+        section_boundaries_contiguous,
+        total_duration_matches,
+        theme_return_identical,
+    };
+    ProgSuiteRealization { score, plan, verification }
 }
 
 #[cfg(test)]
