@@ -1,0 +1,3617 @@
+{
+  "schema_version": "hardsec-predictive-rank-martingale-data-v1",
+  "evidence_domain": "synthetic_fixture",
+  "stream_id": "stream-prm-demo-01",
+  "evaluation_group_id": "heldout-prm-exec-01",
+  "context_id": "compute",
+  "scoring_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "tie_break_randomization_artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "calibration_execution_group_id": "calibration-prm-exec-01",
+  "evaluation_execution_group_id": "heldout-prm-exec-01",
+  "calibration_device_boot_group_id": "calibration-prm-boot-01",
+  "evaluation_device_boot_group_id": "evaluation-prm-boot-01",
+  "calibration_samples": [
+    {
+      "sample_unit_id": "cal-unit-0001",
+      "score": 0.0008333333333333334,
+      "tie_break_uniform": 0.6153460381143431
+    },
+    {
+      "sample_unit_id": "cal-unit-0002",
+      "score": 0.0025,
+      "tie_break_uniform": 0.23019057171514543
+    },
+    {
+      "sample_unit_id": "cal-unit-0003",
+      "score": 0.004166666666666667,
+      "tie_break_uniform": 0.8450351053159478
+    },
+    {
+      "sample_unit_id": "cal-unit-0004",
+      "score": 0.005833333333333334,
+      "tie_break_uniform": 0.45987963891675027
+    },
+    {
+      "sample_unit_id": "cal-unit-0005",
+      "score": 0.0075,
+      "tie_break_uniform": 0.07472417251755266
+    },
+    {
+      "sample_unit_id": "cal-unit-0006",
+      "score": 0.009166666666666667,
+      "tie_break_uniform": 0.6895687061183551
+    },
+    {
+      "sample_unit_id": "cal-unit-0007",
+      "score": 0.010833333333333334,
+      "tie_break_uniform": 0.30441323971915746
+    },
+    {
+      "sample_unit_id": "cal-unit-0008",
+      "score": 0.0125,
+      "tie_break_uniform": 0.9192577733199598
+    },
+    {
+      "sample_unit_id": "cal-unit-0009",
+      "score": 0.014166666666666666,
+      "tie_break_uniform": 0.5341023069207623
+    },
+    {
+      "sample_unit_id": "cal-unit-0010",
+      "score": 0.015833333333333335,
+      "tie_break_uniform": 0.1489468405215647
+    },
+    {
+      "sample_unit_id": "cal-unit-0011",
+      "score": 0.0175,
+      "tie_break_uniform": 0.7637913741223671
+    },
+    {
+      "sample_unit_id": "cal-unit-0012",
+      "score": 0.019166666666666665,
+      "tie_break_uniform": 0.3786359077231695
+    },
+    {
+      "sample_unit_id": "cal-unit-0013",
+      "score": 0.020833333333333332,
+      "tie_break_uniform": 0.993480441323972
+    },
+    {
+      "sample_unit_id": "cal-unit-0014",
+      "score": 0.0225,
+      "tie_break_uniform": 0.6083249749247743
+    },
+    {
+      "sample_unit_id": "cal-unit-0015",
+      "score": 0.024166666666666666,
+      "tie_break_uniform": 0.22316950852557674
+    },
+    {
+      "sample_unit_id": "cal-unit-0016",
+      "score": 0.025833333333333333,
+      "tie_break_uniform": 0.8380140421263791
+    },
+    {
+      "sample_unit_id": "cal-unit-0017",
+      "score": 0.0275,
+      "tie_break_uniform": 0.4528585757271815
+    },
+    {
+      "sample_unit_id": "cal-unit-0018",
+      "score": 0.029166666666666667,
+      "tie_break_uniform": 0.06770310932798396
+    },
+    {
+      "sample_unit_id": "cal-unit-0019",
+      "score": 0.030833333333333334,
+      "tie_break_uniform": 0.6825476429287863
+    },
+    {
+      "sample_unit_id": "cal-unit-0020",
+      "score": 0.0325,
+      "tie_break_uniform": 0.29739217652958877
+    },
+    {
+      "sample_unit_id": "cal-unit-0021",
+      "score": 0.034166666666666665,
+      "tie_break_uniform": 0.9122367101303912
+    },
+    {
+      "sample_unit_id": "cal-unit-0022",
+      "score": 0.035833333333333335,
+      "tie_break_uniform": 0.5270812437311936
+    },
+    {
+      "sample_unit_id": "cal-unit-0023",
+      "score": 0.0375,
+      "tie_break_uniform": 0.141925777331996
+    },
+    {
+      "sample_unit_id": "cal-unit-0024",
+      "score": 0.03916666666666667,
+      "tie_break_uniform": 0.7567703109327983
+    },
+    {
+      "sample_unit_id": "cal-unit-0025",
+      "score": 0.04083333333333333,
+      "tie_break_uniform": 0.37161484453360083
+    },
+    {
+      "sample_unit_id": "cal-unit-0026",
+      "score": 0.0425,
+      "tie_break_uniform": 0.9864593781344032
+    },
+    {
+      "sample_unit_id": "cal-unit-0027",
+      "score": 0.04416666666666667,
+      "tie_break_uniform": 0.6013039117352056
+    },
+    {
+      "sample_unit_id": "cal-unit-0028",
+      "score": 0.04583333333333333,
+      "tie_break_uniform": 0.21614844533600802
+    },
+    {
+      "sample_unit_id": "cal-unit-0029",
+      "score": 0.0475,
+      "tie_break_uniform": 0.8309929789368105
+    },
+    {
+      "sample_unit_id": "cal-unit-0030",
+      "score": 0.049166666666666664,
+      "tie_break_uniform": 0.44583751253761283
+    },
+    {
+      "sample_unit_id": "cal-unit-0031",
+      "score": 0.050833333333333335,
+      "tie_break_uniform": 0.06068204613841525
+    },
+    {
+      "sample_unit_id": "cal-unit-0032",
+      "score": 0.0525,
+      "tie_break_uniform": 0.6755265797392177
+    },
+    {
+      "sample_unit_id": "cal-unit-0033",
+      "score": 0.05416666666666667,
+      "tie_break_uniform": 0.2903711133400201
+    },
+    {
+      "sample_unit_id": "cal-unit-0034",
+      "score": 0.05583333333333333,
+      "tie_break_uniform": 0.9052156469408225
+    },
+    {
+      "sample_unit_id": "cal-unit-0035",
+      "score": 0.0575,
+      "tie_break_uniform": 0.5200601805416248
+    },
+    {
+      "sample_unit_id": "cal-unit-0036",
+      "score": 0.059166666666666666,
+      "tie_break_uniform": 0.13490471414242727
+    },
+    {
+      "sample_unit_id": "cal-unit-0037",
+      "score": 0.060833333333333336,
+      "tie_break_uniform": 0.7497492477432297
+    },
+    {
+      "sample_unit_id": "cal-unit-0038",
+      "score": 0.0625,
+      "tie_break_uniform": 0.3645937813440321
+    },
+    {
+      "sample_unit_id": "cal-unit-0039",
+      "score": 0.06416666666666666,
+      "tie_break_uniform": 0.9794383149448345
+    },
+    {
+      "sample_unit_id": "cal-unit-0040",
+      "score": 0.06583333333333333,
+      "tie_break_uniform": 0.594282848545637
+    },
+    {
+      "sample_unit_id": "cal-unit-0041",
+      "score": 0.0675,
+      "tie_break_uniform": 0.2091273821464393
+    },
+    {
+      "sample_unit_id": "cal-unit-0042",
+      "score": 0.06916666666666667,
+      "tie_break_uniform": 0.8239719157472417
+    },
+    {
+      "sample_unit_id": "cal-unit-0043",
+      "score": 0.07083333333333333,
+      "tie_break_uniform": 0.43881644934804415
+    },
+    {
+      "sample_unit_id": "cal-unit-0044",
+      "score": 0.0725,
+      "tie_break_uniform": 0.05366098294884654
+    },
+    {
+      "sample_unit_id": "cal-unit-0045",
+      "score": 0.07416666666666667,
+      "tie_break_uniform": 0.668505516549649
+    },
+    {
+      "sample_unit_id": "cal-unit-0046",
+      "score": 0.07583333333333334,
+      "tie_break_uniform": 0.28335005015045134
+    },
+    {
+      "sample_unit_id": "cal-unit-0047",
+      "score": 0.0775,
+      "tie_break_uniform": 0.8981945837512537
+    },
+    {
+      "sample_unit_id": "cal-unit-0048",
+      "score": 0.07916666666666666,
+      "tie_break_uniform": 0.5130391173520562
+    },
+    {
+      "sample_unit_id": "cal-unit-0049",
+      "score": 0.08083333333333333,
+      "tie_break_uniform": 0.12788365095285859
+    },
+    {
+      "sample_unit_id": "cal-unit-0050",
+      "score": 0.0825,
+      "tie_break_uniform": 0.742728184553661
+    },
+    {
+      "sample_unit_id": "cal-unit-0051",
+      "score": 0.08416666666666667,
+      "tie_break_uniform": 0.3575727181544634
+    },
+    {
+      "sample_unit_id": "cal-unit-0052",
+      "score": 0.08583333333333333,
+      "tie_break_uniform": 0.9724172517552658
+    },
+    {
+      "sample_unit_id": "cal-unit-0053",
+      "score": 0.0875,
+      "tie_break_uniform": 0.5872617853560682
+    },
+    {
+      "sample_unit_id": "cal-unit-0054",
+      "score": 0.08916666666666667,
+      "tie_break_uniform": 0.20210631895687062
+    },
+    {
+      "sample_unit_id": "cal-unit-0055",
+      "score": 0.09083333333333334,
+      "tie_break_uniform": 0.816950852557673
+    },
+    {
+      "sample_unit_id": "cal-unit-0056",
+      "score": 0.0925,
+      "tie_break_uniform": 0.4317953861584754
+    },
+    {
+      "sample_unit_id": "cal-unit-0057",
+      "score": 0.09416666666666666,
+      "tie_break_uniform": 0.04663991975927784
+    },
+    {
+      "sample_unit_id": "cal-unit-0058",
+      "score": 0.09583333333333334,
+      "tie_break_uniform": 0.6614844533600802
+    },
+    {
+      "sample_unit_id": "cal-unit-0059",
+      "score": 0.0975,
+      "tie_break_uniform": 0.27632898696088265
+    },
+    {
+      "sample_unit_id": "cal-unit-0060",
+      "score": 0.09916666666666667,
+      "tie_break_uniform": 0.8911735205616851
+    },
+    {
+      "sample_unit_id": "cal-unit-0061",
+      "score": 0.10083333333333333,
+      "tie_break_uniform": 0.5060180541624875
+    },
+    {
+      "sample_unit_id": "cal-unit-0062",
+      "score": 0.1025,
+      "tie_break_uniform": 0.12086258776328987
+    },
+    {
+      "sample_unit_id": "cal-unit-0063",
+      "score": 0.10416666666666667,
+      "tie_break_uniform": 0.7357071213640923
+    },
+    {
+      "sample_unit_id": "cal-unit-0064",
+      "score": 0.10583333333333333,
+      "tie_break_uniform": 0.3505516549648947
+    },
+    {
+      "sample_unit_id": "cal-unit-0065",
+      "score": 0.1075,
+      "tie_break_uniform": 0.9653961885656971
+    },
+    {
+      "sample_unit_id": "cal-unit-0066",
+      "score": 0.10916666666666666,
+      "tie_break_uniform": 0.5802407221664995
+    },
+    {
+      "sample_unit_id": "cal-unit-0067",
+      "score": 0.11083333333333334,
+      "tie_break_uniform": 0.1950852557673019
+    },
+    {
+      "sample_unit_id": "cal-unit-0068",
+      "score": 0.1125,
+      "tie_break_uniform": 0.8099297893681043
+    },
+    {
+      "sample_unit_id": "cal-unit-0069",
+      "score": 0.11416666666666667,
+      "tie_break_uniform": 0.4247743229689067
+    },
+    {
+      "sample_unit_id": "cal-unit-0070",
+      "score": 0.11583333333333333,
+      "tie_break_uniform": 0.03961885656970913
+    },
+    {
+      "sample_unit_id": "cal-unit-0071",
+      "score": 0.1175,
+      "tie_break_uniform": 0.6544633901705116
+    },
+    {
+      "sample_unit_id": "cal-unit-0072",
+      "score": 0.11916666666666667,
+      "tie_break_uniform": 0.26930792377131396
+    },
+    {
+      "sample_unit_id": "cal-unit-0073",
+      "score": 0.12083333333333333,
+      "tie_break_uniform": 0.8841524573721163
+    },
+    {
+      "sample_unit_id": "cal-unit-0074",
+      "score": 0.1225,
+      "tie_break_uniform": 0.4989969909729188
+    },
+    {
+      "sample_unit_id": "cal-unit-0075",
+      "score": 0.12416666666666666,
+      "tie_break_uniform": 0.11384152457372117
+    },
+    {
+      "sample_unit_id": "cal-unit-0076",
+      "score": 0.12583333333333332,
+      "tie_break_uniform": 0.7286860581745236
+    },
+    {
+      "sample_unit_id": "cal-unit-0077",
+      "score": 0.1275,
+      "tie_break_uniform": 0.34353059177532597
+    },
+    {
+      "sample_unit_id": "cal-unit-0078",
+      "score": 0.12916666666666668,
+      "tie_break_uniform": 0.9583751253761283
+    },
+    {
+      "sample_unit_id": "cal-unit-0079",
+      "score": 0.13083333333333333,
+      "tie_break_uniform": 0.5732196589769308
+    },
+    {
+      "sample_unit_id": "cal-unit-0080",
+      "score": 0.1325,
+      "tie_break_uniform": 0.18806419257773319
+    },
+    {
+      "sample_unit_id": "cal-unit-0081",
+      "score": 0.13416666666666666,
+      "tie_break_uniform": 0.8029087261785356
+    },
+    {
+      "sample_unit_id": "cal-unit-0082",
+      "score": 0.13583333333333333,
+      "tie_break_uniform": 0.417753259779338
+    },
+    {
+      "sample_unit_id": "cal-unit-0083",
+      "score": 0.1375,
+      "tie_break_uniform": 0.03259779338014042
+    },
+    {
+      "sample_unit_id": "cal-unit-0084",
+      "score": 0.13916666666666666,
+      "tie_break_uniform": 0.6474423269809428
+    },
+    {
+      "sample_unit_id": "cal-unit-0085",
+      "score": 0.14083333333333334,
+      "tie_break_uniform": 0.2622868605817452
+    },
+    {
+      "sample_unit_id": "cal-unit-0086",
+      "score": 0.1425,
+      "tie_break_uniform": 0.8771313941825476
+    },
+    {
+      "sample_unit_id": "cal-unit-0087",
+      "score": 0.14416666666666667,
+      "tie_break_uniform": 0.49197592778335003
+    },
+    {
+      "sample_unit_id": "cal-unit-0088",
+      "score": 0.14583333333333334,
+      "tie_break_uniform": 0.10682046138415245
+    },
+    {
+      "sample_unit_id": "cal-unit-0089",
+      "score": 0.1475,
+      "tie_break_uniform": 0.7216649949849548
+    },
+    {
+      "sample_unit_id": "cal-unit-0090",
+      "score": 0.14916666666666667,
+      "tie_break_uniform": 0.3365095285857573
+    },
+    {
+      "sample_unit_id": "cal-unit-0091",
+      "score": 0.15083333333333335,
+      "tie_break_uniform": 0.9513540621865597
+    },
+    {
+      "sample_unit_id": "cal-unit-0092",
+      "score": 0.1525,
+      "tie_break_uniform": 0.5661985957873621
+    },
+    {
+      "sample_unit_id": "cal-unit-0093",
+      "score": 0.15416666666666667,
+      "tie_break_uniform": 0.1810431293881645
+    },
+    {
+      "sample_unit_id": "cal-unit-0094",
+      "score": 0.15583333333333332,
+      "tie_break_uniform": 0.7958876629889668
+    },
+    {
+      "sample_unit_id": "cal-unit-0095",
+      "score": 0.1575,
+      "tie_break_uniform": 0.4107321965897693
+    },
+    {
+      "sample_unit_id": "cal-unit-0096",
+      "score": 0.15916666666666668,
+      "tie_break_uniform": 0.025576730190571714
+    },
+    {
+      "sample_unit_id": "cal-unit-0097",
+      "score": 0.16083333333333333,
+      "tie_break_uniform": 0.6404212637913741
+    },
+    {
+      "sample_unit_id": "cal-unit-0098",
+      "score": 0.1625,
+      "tie_break_uniform": 0.25526579739217653
+    },
+    {
+      "sample_unit_id": "cal-unit-0099",
+      "score": 0.16416666666666666,
+      "tie_break_uniform": 0.870110330992979
+    },
+    {
+      "sample_unit_id": "cal-unit-0100",
+      "score": 0.16583333333333333,
+      "tie_break_uniform": 0.48495486459378134
+    },
+    {
+      "sample_unit_id": "cal-unit-0101",
+      "score": 0.1675,
+      "tie_break_uniform": 0.09979939819458375
+    },
+    {
+      "sample_unit_id": "cal-unit-0102",
+      "score": 0.16916666666666666,
+      "tie_break_uniform": 0.7146439317953862
+    },
+    {
+      "sample_unit_id": "cal-unit-0103",
+      "score": 0.17083333333333334,
+      "tie_break_uniform": 0.3294884653961886
+    },
+    {
+      "sample_unit_id": "cal-unit-0104",
+      "score": 0.1725,
+      "tie_break_uniform": 0.944332998996991
+    },
+    {
+      "sample_unit_id": "cal-unit-0105",
+      "score": 0.17416666666666666,
+      "tie_break_uniform": 0.5591775325977933
+    },
+    {
+      "sample_unit_id": "cal-unit-0106",
+      "score": 0.17583333333333334,
+      "tie_break_uniform": 0.17402206619859578
+    },
+    {
+      "sample_unit_id": "cal-unit-0107",
+      "score": 0.1775,
+      "tie_break_uniform": 0.7888665997993982
+    },
+    {
+      "sample_unit_id": "cal-unit-0108",
+      "score": 0.17916666666666667,
+      "tie_break_uniform": 0.4037111334002006
+    },
+    {
+      "sample_unit_id": "cal-unit-0109",
+      "score": 0.18083333333333335,
+      "tie_break_uniform": 0.018555667001003008
+    },
+    {
+      "sample_unit_id": "cal-unit-0110",
+      "score": 0.1825,
+      "tie_break_uniform": 0.6334002006018055
+    },
+    {
+      "sample_unit_id": "cal-unit-0111",
+      "score": 0.18416666666666667,
+      "tie_break_uniform": 0.24824473420260781
+    },
+    {
+      "sample_unit_id": "cal-unit-0112",
+      "score": 0.18583333333333332,
+      "tie_break_uniform": 0.8630892678034102
+    },
+    {
+      "sample_unit_id": "cal-unit-0113",
+      "score": 0.1875,
+      "tie_break_uniform": 0.47793380140421265
+    },
+    {
+      "sample_unit_id": "cal-unit-0114",
+      "score": 0.18916666666666668,
+      "tie_break_uniform": 0.09277833500501505
+    },
+    {
+      "sample_unit_id": "cal-unit-0115",
+      "score": 0.19083333333333333,
+      "tie_break_uniform": 0.7076228686058175
+    },
+    {
+      "sample_unit_id": "cal-unit-0116",
+      "score": 0.1925,
+      "tie_break_uniform": 0.32246740220661985
+    },
+    {
+      "sample_unit_id": "cal-unit-0117",
+      "score": 0.19416666666666665,
+      "tie_break_uniform": 0.9373119358074222
+    },
+    {
+      "sample_unit_id": "cal-unit-0118",
+      "score": 0.19583333333333333,
+      "tie_break_uniform": 0.5521564694082247
+    },
+    {
+      "sample_unit_id": "cal-unit-0119",
+      "score": 0.1975,
+      "tie_break_uniform": 0.1670010030090271
+    },
+    {
+      "sample_unit_id": "cal-unit-0120",
+      "score": 0.19916666666666666,
+      "tie_break_uniform": 0.7818455366098295
+    },
+    {
+      "sample_unit_id": "cal-unit-0121",
+      "score": 0.20083333333333334,
+      "tie_break_uniform": 0.3966900702106319
+    },
+    {
+      "sample_unit_id": "cal-unit-0122",
+      "score": 0.2025,
+      "tie_break_uniform": 0.011534603811434303
+    },
+    {
+      "sample_unit_id": "cal-unit-0123",
+      "score": 0.20416666666666666,
+      "tie_break_uniform": 0.6263791374122367
+    },
+    {
+      "sample_unit_id": "cal-unit-0124",
+      "score": 0.20583333333333334,
+      "tie_break_uniform": 0.24122367101303913
+    },
+    {
+      "sample_unit_id": "cal-unit-0125",
+      "score": 0.2075,
+      "tie_break_uniform": 0.8560682046138415
+    },
+    {
+      "sample_unit_id": "cal-unit-0126",
+      "score": 0.20916666666666667,
+      "tie_break_uniform": 0.4709127382146439
+    },
+    {
+      "sample_unit_id": "cal-unit-0127",
+      "score": 0.21083333333333334,
+      "tie_break_uniform": 0.08575727181544635
+    },
+    {
+      "sample_unit_id": "cal-unit-0128",
+      "score": 0.2125,
+      "tie_break_uniform": 0.7006018054162487
+    },
+    {
+      "sample_unit_id": "cal-unit-0129",
+      "score": 0.21416666666666667,
+      "tie_break_uniform": 0.31544633901705116
+    },
+    {
+      "sample_unit_id": "cal-unit-0130",
+      "score": 0.21583333333333332,
+      "tie_break_uniform": 0.9302908726178536
+    },
+    {
+      "sample_unit_id": "cal-unit-0131",
+      "score": 0.2175,
+      "tie_break_uniform": 0.545135406218656
+    },
+    {
+      "sample_unit_id": "cal-unit-0132",
+      "score": 0.21916666666666668,
+      "tie_break_uniform": 0.15997993981945838
+    },
+    {
+      "sample_unit_id": "cal-unit-0133",
+      "score": 0.22083333333333333,
+      "tie_break_uniform": 0.7748244734202607
+    },
+    {
+      "sample_unit_id": "cal-unit-0134",
+      "score": 0.2225,
+      "tie_break_uniform": 0.38966900702106316
+    },
+    {
+      "sample_unit_id": "cal-unit-0135",
+      "score": 0.22416666666666665,
+      "tie_break_uniform": 0.004513540621865597
+    },
+    {
+      "sample_unit_id": "cal-unit-0136",
+      "score": 0.22583333333333333,
+      "tie_break_uniform": 0.619358074222668
+    },
+    {
+      "sample_unit_id": "cal-unit-0137",
+      "score": 0.2275,
+      "tie_break_uniform": 0.2342026078234704
+    },
+    {
+      "sample_unit_id": "cal-unit-0138",
+      "score": 0.22916666666666666,
+      "tie_break_uniform": 0.8490471414242728
+    },
+    {
+      "sample_unit_id": "cal-unit-0139",
+      "score": 0.23083333333333333,
+      "tie_break_uniform": 0.4638916750250752
+    },
+    {
+      "sample_unit_id": "cal-unit-0140",
+      "score": 0.2325,
+      "tie_break_uniform": 0.07873620862587763
+    },
+    {
+      "sample_unit_id": "cal-unit-0141",
+      "score": 0.23416666666666666,
+      "tie_break_uniform": 0.6935807422266801
+    },
+    {
+      "sample_unit_id": "cal-unit-0142",
+      "score": 0.23583333333333334,
+      "tie_break_uniform": 0.30842527582748247
+    },
+    {
+      "sample_unit_id": "cal-unit-0143",
+      "score": 0.2375,
+      "tie_break_uniform": 0.9232698094282848
+    },
+    {
+      "sample_unit_id": "cal-unit-0144",
+      "score": 0.23916666666666667,
+      "tie_break_uniform": 0.5381143430290872
+    },
+    {
+      "sample_unit_id": "cal-unit-0145",
+      "score": 0.24083333333333334,
+      "tie_break_uniform": 0.15295887662988966
+    },
+    {
+      "sample_unit_id": "cal-unit-0146",
+      "score": 0.2425,
+      "tie_break_uniform": 0.7678034102306921
+    },
+    {
+      "sample_unit_id": "cal-unit-0147",
+      "score": 0.24416666666666667,
+      "tie_break_uniform": 0.3826479438314945
+    },
+    {
+      "sample_unit_id": "cal-unit-0148",
+      "score": 0.24583333333333332,
+      "tie_break_uniform": 0.9974924774322969
+    },
+    {
+      "sample_unit_id": "cal-unit-0149",
+      "score": 0.2475,
+      "tie_break_uniform": 0.6123370110330993
+    },
+    {
+      "sample_unit_id": "cal-unit-0150",
+      "score": 0.24916666666666668,
+      "tie_break_uniform": 0.2271815446339017
+    },
+    {
+      "sample_unit_id": "cal-unit-0151",
+      "score": 0.25083333333333335,
+      "tie_break_uniform": 0.8420260782347041
+    },
+    {
+      "sample_unit_id": "cal-unit-0152",
+      "score": 0.2525,
+      "tie_break_uniform": 0.45687061183550653
+    },
+    {
+      "sample_unit_id": "cal-unit-0153",
+      "score": 0.25416666666666665,
+      "tie_break_uniform": 0.07171514543630893
+    },
+    {
+      "sample_unit_id": "cal-unit-0154",
+      "score": 0.25583333333333336,
+      "tie_break_uniform": 0.6865596790371113
+    },
+    {
+      "sample_unit_id": "cal-unit-0155",
+      "score": 0.2575,
+      "tie_break_uniform": 0.3014042126379137
+    },
+    {
+      "sample_unit_id": "cal-unit-0156",
+      "score": 0.25916666666666666,
+      "tie_break_uniform": 0.9162487462387161
+    },
+    {
+      "sample_unit_id": "cal-unit-0157",
+      "score": 0.2608333333333333,
+      "tie_break_uniform": 0.5310932798395186
+    },
+    {
+      "sample_unit_id": "cal-unit-0158",
+      "score": 0.2625,
+      "tie_break_uniform": 0.14593781344032097
+    },
+    {
+      "sample_unit_id": "cal-unit-0159",
+      "score": 0.26416666666666666,
+      "tie_break_uniform": 0.7607823470411234
+    },
+    {
+      "sample_unit_id": "cal-unit-0160",
+      "score": 0.2658333333333333,
+      "tie_break_uniform": 0.3756268806419258
+    },
+    {
+      "sample_unit_id": "cal-unit-0161",
+      "score": 0.2675,
+      "tie_break_uniform": 0.9904714142427282
+    },
+    {
+      "sample_unit_id": "cal-unit-0162",
+      "score": 0.26916666666666667,
+      "tie_break_uniform": 0.6053159478435306
+    },
+    {
+      "sample_unit_id": "cal-unit-0163",
+      "score": 0.2708333333333333,
+      "tie_break_uniform": 0.220160481444333
+    },
+    {
+      "sample_unit_id": "cal-unit-0164",
+      "score": 0.2725,
+      "tie_break_uniform": 0.8350050150451354
+    },
+    {
+      "sample_unit_id": "cal-unit-0165",
+      "score": 0.27416666666666667,
+      "tie_break_uniform": 0.4498495486459378
+    },
+    {
+      "sample_unit_id": "cal-unit-0166",
+      "score": 0.2758333333333333,
+      "tie_break_uniform": 0.06469408224674023
+    },
+    {
+      "sample_unit_id": "cal-unit-0167",
+      "score": 0.2775,
+      "tie_break_uniform": 0.6795386158475426
+    },
+    {
+      "sample_unit_id": "cal-unit-0168",
+      "score": 0.2791666666666667,
+      "tie_break_uniform": 0.29438314944834504
+    },
+    {
+      "sample_unit_id": "cal-unit-0169",
+      "score": 0.2808333333333333,
+      "tie_break_uniform": 0.9092276830491475
+    },
+    {
+      "sample_unit_id": "cal-unit-0170",
+      "score": 0.2825,
+      "tie_break_uniform": 0.5240722166499499
+    },
+    {
+      "sample_unit_id": "cal-unit-0171",
+      "score": 0.2841666666666667,
+      "tie_break_uniform": 0.13891675025075226
+    },
+    {
+      "sample_unit_id": "cal-unit-0172",
+      "score": 0.28583333333333333,
+      "tie_break_uniform": 0.7537612838515546
+    },
+    {
+      "sample_unit_id": "cal-unit-0173",
+      "score": 0.2875,
+      "tie_break_uniform": 0.3686058174523571
+    },
+    {
+      "sample_unit_id": "cal-unit-0174",
+      "score": 0.2891666666666667,
+      "tie_break_uniform": 0.9834503510531595
+    },
+    {
+      "sample_unit_id": "cal-unit-0175",
+      "score": 0.29083333333333333,
+      "tie_break_uniform": 0.5982948846539619
+    },
+    {
+      "sample_unit_id": "cal-unit-0176",
+      "score": 0.2925,
+      "tie_break_uniform": 0.2131394182547643
+    },
+    {
+      "sample_unit_id": "cal-unit-0177",
+      "score": 0.2941666666666667,
+      "tie_break_uniform": 0.8279839518555667
+    },
+    {
+      "sample_unit_id": "cal-unit-0178",
+      "score": 0.29583333333333334,
+      "tie_break_uniform": 0.4428284854563691
+    },
+    {
+      "sample_unit_id": "cal-unit-0179",
+      "score": 0.2975,
+      "tie_break_uniform": 0.057673019057171516
+    },
+    {
+      "sample_unit_id": "cal-unit-0180",
+      "score": 0.2991666666666667,
+      "tie_break_uniform": 0.672517552657974
+    },
+    {
+      "sample_unit_id": "cal-unit-0181",
+      "score": 0.30083333333333334,
+      "tie_break_uniform": 0.28736208625877635
+    },
+    {
+      "sample_unit_id": "cal-unit-0182",
+      "score": 0.3025,
+      "tie_break_uniform": 0.9022066198595787
+    },
+    {
+      "sample_unit_id": "cal-unit-0183",
+      "score": 0.30416666666666664,
+      "tie_break_uniform": 0.5170511534603811
+    },
+    {
+      "sample_unit_id": "cal-unit-0184",
+      "score": 0.30583333333333335,
+      "tie_break_uniform": 0.13189568706118354
+    },
+    {
+      "sample_unit_id": "cal-unit-0185",
+      "score": 0.3075,
+      "tie_break_uniform": 0.746740220661986
+    },
+    {
+      "sample_unit_id": "cal-unit-0186",
+      "score": 0.30916666666666665,
+      "tie_break_uniform": 0.36158475426278835
+    },
+    {
+      "sample_unit_id": "cal-unit-0187",
+      "score": 0.31083333333333335,
+      "tie_break_uniform": 0.9764292878635907
+    },
+    {
+      "sample_unit_id": "cal-unit-0188",
+      "score": 0.3125,
+      "tie_break_uniform": 0.5912738214643932
+    },
+    {
+      "sample_unit_id": "cal-unit-0189",
+      "score": 0.31416666666666665,
+      "tie_break_uniform": 0.20611835506519557
+    },
+    {
+      "sample_unit_id": "cal-unit-0190",
+      "score": 0.31583333333333335,
+      "tie_break_uniform": 0.820962888665998
+    },
+    {
+      "sample_unit_id": "cal-unit-0191",
+      "score": 0.3175,
+      "tie_break_uniform": 0.4358074222668004
+    },
+    {
+      "sample_unit_id": "cal-unit-0192",
+      "score": 0.31916666666666665,
+      "tie_break_uniform": 0.05065195586760281
+    },
+    {
+      "sample_unit_id": "cal-unit-0193",
+      "score": 0.32083333333333336,
+      "tie_break_uniform": 0.6654964894684052
+    },
+    {
+      "sample_unit_id": "cal-unit-0194",
+      "score": 0.3225,
+      "tie_break_uniform": 0.2803410230692076
+    },
+    {
+      "sample_unit_id": "cal-unit-0195",
+      "score": 0.32416666666666666,
+      "tie_break_uniform": 0.89518555667001
+    },
+    {
+      "sample_unit_id": "cal-unit-0196",
+      "score": 0.3258333333333333,
+      "tie_break_uniform": 0.5100300902708125
+    },
+    {
+      "sample_unit_id": "cal-unit-0197",
+      "score": 0.3275,
+      "tie_break_uniform": 0.12487462387161484
+    },
+    {
+      "sample_unit_id": "cal-unit-0198",
+      "score": 0.32916666666666666,
+      "tie_break_uniform": 0.7397191574724172
+    },
+    {
+      "sample_unit_id": "cal-unit-0199",
+      "score": 0.3308333333333333,
+      "tie_break_uniform": 0.35456369107321967
+    },
+    {
+      "sample_unit_id": "cal-unit-0200",
+      "score": 0.3325,
+      "tie_break_uniform": 0.9694082246740221
+    },
+    {
+      "sample_unit_id": "cal-unit-0201",
+      "score": 0.33416666666666667,
+      "tie_break_uniform": 0.5842527582748245
+    },
+    {
+      "sample_unit_id": "cal-unit-0202",
+      "score": 0.3358333333333333,
+      "tie_break_uniform": 0.1990972918756269
+    },
+    {
+      "sample_unit_id": "cal-unit-0203",
+      "score": 0.3375,
+      "tie_break_uniform": 0.8139418254764292
+    },
+    {
+      "sample_unit_id": "cal-unit-0204",
+      "score": 0.33916666666666667,
+      "tie_break_uniform": 0.42878635907723167
+    },
+    {
+      "sample_unit_id": "cal-unit-0205",
+      "score": 0.3408333333333333,
+      "tie_break_uniform": 0.043630892678034106
+    },
+    {
+      "sample_unit_id": "cal-unit-0206",
+      "score": 0.3425,
+      "tie_break_uniform": 0.6584754262788365
+    },
+    {
+      "sample_unit_id": "cal-unit-0207",
+      "score": 0.3441666666666667,
+      "tie_break_uniform": 0.2733199598796389
+    },
+    {
+      "sample_unit_id": "cal-unit-0208",
+      "score": 0.3458333333333333,
+      "tie_break_uniform": 0.8881644934804414
+    },
+    {
+      "sample_unit_id": "cal-unit-0209",
+      "score": 0.3475,
+      "tie_break_uniform": 0.5030090270812437
+    },
+    {
+      "sample_unit_id": "cal-unit-0210",
+      "score": 0.3491666666666667,
+      "tie_break_uniform": 0.11785356068204614
+    },
+    {
+      "sample_unit_id": "cal-unit-0211",
+      "score": 0.35083333333333333,
+      "tie_break_uniform": 0.7326980942828486
+    },
+    {
+      "sample_unit_id": "cal-unit-0212",
+      "score": 0.3525,
+      "tie_break_uniform": 0.347542627883651
+    },
+    {
+      "sample_unit_id": "cal-unit-0213",
+      "score": 0.3541666666666667,
+      "tie_break_uniform": 0.9623871614844534
+    },
+    {
+      "sample_unit_id": "cal-unit-0214",
+      "score": 0.35583333333333333,
+      "tie_break_uniform": 0.5772316950852557
+    },
+    {
+      "sample_unit_id": "cal-unit-0215",
+      "score": 0.3575,
+      "tie_break_uniform": 0.19207622868605817
+    },
+    {
+      "sample_unit_id": "cal-unit-0216",
+      "score": 0.3591666666666667,
+      "tie_break_uniform": 0.8069207622868606
+    },
+    {
+      "sample_unit_id": "cal-unit-0217",
+      "score": 0.36083333333333334,
+      "tie_break_uniform": 0.421765295887663
+    },
+    {
+      "sample_unit_id": "cal-unit-0218",
+      "score": 0.3625,
+      "tie_break_uniform": 0.0366098294884654
+    },
+    {
+      "sample_unit_id": "cal-unit-0219",
+      "score": 0.3641666666666667,
+      "tie_break_uniform": 0.6514543630892679
+    },
+    {
+      "sample_unit_id": "cal-unit-0220",
+      "score": 0.36583333333333334,
+      "tie_break_uniform": 0.26629889669007023
+    },
+    {
+      "sample_unit_id": "cal-unit-0221",
+      "score": 0.3675,
+      "tie_break_uniform": 0.8811434302908726
+    },
+    {
+      "sample_unit_id": "cal-unit-0222",
+      "score": 0.36916666666666664,
+      "tie_break_uniform": 0.49598796389167504
+    },
+    {
+      "sample_unit_id": "cal-unit-0223",
+      "score": 0.37083333333333335,
+      "tie_break_uniform": 0.11083249749247744
+    },
+    {
+      "sample_unit_id": "cal-unit-0224",
+      "score": 0.3725,
+      "tie_break_uniform": 0.7256770310932799
+    },
+    {
+      "sample_unit_id": "cal-unit-0225",
+      "score": 0.37416666666666665,
+      "tie_break_uniform": 0.34052156469408223
+    },
+    {
+      "sample_unit_id": "cal-unit-0226",
+      "score": 0.37583333333333335,
+      "tie_break_uniform": 0.9553660982948846
+    },
+    {
+      "sample_unit_id": "cal-unit-0227",
+      "score": 0.3775,
+      "tie_break_uniform": 0.5702106318956871
+    },
+    {
+      "sample_unit_id": "cal-unit-0228",
+      "score": 0.37916666666666665,
+      "tie_break_uniform": 0.18505516549648948
+    },
+    {
+      "sample_unit_id": "cal-unit-0229",
+      "score": 0.38083333333333336,
+      "tie_break_uniform": 0.7998996990972919
+    },
+    {
+      "sample_unit_id": "cal-unit-0230",
+      "score": 0.3825,
+      "tie_break_uniform": 0.4147442326980943
+    },
+    {
+      "sample_unit_id": "cal-unit-0231",
+      "score": 0.38416666666666666,
+      "tie_break_uniform": 0.02958876629889669
+    },
+    {
+      "sample_unit_id": "cal-unit-0232",
+      "score": 0.3858333333333333,
+      "tie_break_uniform": 0.6444332998996991
+    },
+    {
+      "sample_unit_id": "cal-unit-0233",
+      "score": 0.3875,
+      "tie_break_uniform": 0.2592778335005015
+    },
+    {
+      "sample_unit_id": "cal-unit-0234",
+      "score": 0.38916666666666666,
+      "tie_break_uniform": 0.8741223671013039
+    },
+    {
+      "sample_unit_id": "cal-unit-0235",
+      "score": 0.3908333333333333,
+      "tie_break_uniform": 0.4889669007021063
+    },
+    {
+      "sample_unit_id": "cal-unit-0236",
+      "score": 0.3925,
+      "tie_break_uniform": 0.10381143430290872
+    },
+    {
+      "sample_unit_id": "cal-unit-0237",
+      "score": 0.39416666666666667,
+      "tie_break_uniform": 0.7186559679037111
+    },
+    {
+      "sample_unit_id": "cal-unit-0238",
+      "score": 0.3958333333333333,
+      "tie_break_uniform": 0.33350050150451355
+    },
+    {
+      "sample_unit_id": "cal-unit-0239",
+      "score": 0.3975,
+      "tie_break_uniform": 0.948345035105316
+    },
+    {
+      "sample_unit_id": "cal-unit-0240",
+      "score": 0.39916666666666667,
+      "tie_break_uniform": 0.5631895687061184
+    },
+    {
+      "sample_unit_id": "cal-unit-0241",
+      "score": 0.4008333333333333,
+      "tie_break_uniform": 0.17803410230692077
+    },
+    {
+      "sample_unit_id": "cal-unit-0242",
+      "score": 0.4025,
+      "tie_break_uniform": 0.7928786359077231
+    },
+    {
+      "sample_unit_id": "cal-unit-0243",
+      "score": 0.4041666666666667,
+      "tie_break_uniform": 0.40772316950852555
+    },
+    {
+      "sample_unit_id": "cal-unit-0244",
+      "score": 0.4058333333333333,
+      "tie_break_uniform": 0.022567703109327986
+    },
+    {
+      "sample_unit_id": "cal-unit-0245",
+      "score": 0.4075,
+      "tie_break_uniform": 0.6374122367101304
+    },
+    {
+      "sample_unit_id": "cal-unit-0246",
+      "score": 0.4091666666666667,
+      "tie_break_uniform": 0.2522567703109328
+    },
+    {
+      "sample_unit_id": "cal-unit-0247",
+      "score": 0.41083333333333333,
+      "tie_break_uniform": 0.8671013039117352
+    },
+    {
+      "sample_unit_id": "cal-unit-0248",
+      "score": 0.4125,
+      "tie_break_uniform": 0.4819458375125376
+    },
+    {
+      "sample_unit_id": "cal-unit-0249",
+      "score": 0.4141666666666667,
+      "tie_break_uniform": 0.09679037111334002
+    },
+    {
+      "sample_unit_id": "cal-unit-0250",
+      "score": 0.41583333333333333,
+      "tie_break_uniform": 0.7116349047141425
+    },
+    {
+      "sample_unit_id": "cal-unit-0251",
+      "score": 0.4175,
+      "tie_break_uniform": 0.32647943831494486
+    },
+    {
+      "sample_unit_id": "cal-unit-0252",
+      "score": 0.4191666666666667,
+      "tie_break_uniform": 0.9413239719157472
+    },
+    {
+      "sample_unit_id": "cal-unit-0253",
+      "score": 0.42083333333333334,
+      "tie_break_uniform": 0.5561685055165496
+    },
+    {
+      "sample_unit_id": "cal-unit-0254",
+      "score": 0.4225,
+      "tie_break_uniform": 0.17101303911735205
+    },
+    {
+      "sample_unit_id": "cal-unit-0255",
+      "score": 0.4241666666666667,
+      "tie_break_uniform": 0.7858575727181545
+    },
+    {
+      "sample_unit_id": "cal-unit-0256",
+      "score": 0.42583333333333334,
+      "tie_break_uniform": 0.40070210631895686
+    },
+    {
+      "sample_unit_id": "cal-unit-0257",
+      "score": 0.4275,
+      "tie_break_uniform": 0.015546639919759278
+    },
+    {
+      "sample_unit_id": "cal-unit-0258",
+      "score": 0.42916666666666664,
+      "tie_break_uniform": 0.6303911735205617
+    },
+    {
+      "sample_unit_id": "cal-unit-0259",
+      "score": 0.43083333333333335,
+      "tie_break_uniform": 0.24523570712136408
+    },
+    {
+      "sample_unit_id": "cal-unit-0260",
+      "score": 0.4325,
+      "tie_break_uniform": 0.8600802407221665
+    },
+    {
+      "sample_unit_id": "cal-unit-0261",
+      "score": 0.43416666666666665,
+      "tie_break_uniform": 0.4749247743229689
+    },
+    {
+      "sample_unit_id": "cal-unit-0262",
+      "score": 0.43583333333333335,
+      "tie_break_uniform": 0.08976930792377132
+    },
+    {
+      "sample_unit_id": "cal-unit-0263",
+      "score": 0.4375,
+      "tie_break_uniform": 0.7046138415245737
+    },
+    {
+      "sample_unit_id": "cal-unit-0264",
+      "score": 0.43916666666666665,
+      "tie_break_uniform": 0.3194583751253761
+    },
+    {
+      "sample_unit_id": "cal-unit-0265",
+      "score": 0.44083333333333335,
+      "tie_break_uniform": 0.9343029087261785
+    },
+    {
+      "sample_unit_id": "cal-unit-0266",
+      "score": 0.4425,
+      "tie_break_uniform": 0.549147442326981
+    },
+    {
+      "sample_unit_id": "cal-unit-0267",
+      "score": 0.44416666666666665,
+      "tie_break_uniform": 0.16399197592778336
+    },
+    {
+      "sample_unit_id": "cal-unit-0268",
+      "score": 0.44583333333333336,
+      "tie_break_uniform": 0.7788365095285857
+    },
+    {
+      "sample_unit_id": "cal-unit-0269",
+      "score": 0.4475,
+      "tie_break_uniform": 0.3936810431293882
+    },
+    {
+      "sample_unit_id": "cal-unit-0270",
+      "score": 0.44916666666666666,
+      "tie_break_uniform": 0.008525576730190571
+    },
+    {
+      "sample_unit_id": "cal-unit-0271",
+      "score": 0.4508333333333333,
+      "tie_break_uniform": 0.623370110330993
+    },
+    {
+      "sample_unit_id": "cal-unit-0272",
+      "score": 0.4525,
+      "tie_break_uniform": 0.2382146439317954
+    },
+    {
+      "sample_unit_id": "cal-unit-0273",
+      "score": 0.45416666666666666,
+      "tie_break_uniform": 0.8530591775325977
+    },
+    {
+      "sample_unit_id": "cal-unit-0274",
+      "score": 0.4558333333333333,
+      "tie_break_uniform": 0.4679037111334002
+    },
+    {
+      "sample_unit_id": "cal-unit-0275",
+      "score": 0.4575,
+      "tie_break_uniform": 0.08274824473420261
+    },
+    {
+      "sample_unit_id": "cal-unit-0276",
+      "score": 0.45916666666666667,
+      "tie_break_uniform": 0.697592778335005
+    },
+    {
+      "sample_unit_id": "cal-unit-0277",
+      "score": 0.4608333333333333,
+      "tie_break_uniform": 0.3124373119358074
+    },
+    {
+      "sample_unit_id": "cal-unit-0278",
+      "score": 0.4625,
+      "tie_break_uniform": 0.9272818455366099
+    },
+    {
+      "sample_unit_id": "cal-unit-0279",
+      "score": 0.46416666666666667,
+      "tie_break_uniform": 0.5421263791374122
+    },
+    {
+      "sample_unit_id": "cal-unit-0280",
+      "score": 0.4658333333333333,
+      "tie_break_uniform": 0.15697091273821465
+    },
+    {
+      "sample_unit_id": "cal-unit-0281",
+      "score": 0.4675,
+      "tie_break_uniform": 0.771815446339017
+    },
+    {
+      "sample_unit_id": "cal-unit-0282",
+      "score": 0.4691666666666667,
+      "tie_break_uniform": 0.38665997993981943
+    },
+    {
+      "sample_unit_id": "cal-unit-0283",
+      "score": 0.4708333333333333,
+      "tie_break_uniform": 0.0015045135406218655
+    },
+    {
+      "sample_unit_id": "cal-unit-0284",
+      "score": 0.4725,
+      "tie_break_uniform": 0.6163490471414242
+    },
+    {
+      "sample_unit_id": "cal-unit-0285",
+      "score": 0.4741666666666667,
+      "tie_break_uniform": 0.23119358074222668
+    },
+    {
+      "sample_unit_id": "cal-unit-0286",
+      "score": 0.47583333333333333,
+      "tie_break_uniform": 0.8460381143430291
+    },
+    {
+      "sample_unit_id": "cal-unit-0287",
+      "score": 0.4775,
+      "tie_break_uniform": 0.4608826479438315
+    },
+    {
+      "sample_unit_id": "cal-unit-0288",
+      "score": 0.4791666666666667,
+      "tie_break_uniform": 0.0757271815446339
+    },
+    {
+      "sample_unit_id": "cal-unit-0289",
+      "score": 0.48083333333333333,
+      "tie_break_uniform": 0.6905717151454364
+    },
+    {
+      "sample_unit_id": "cal-unit-0290",
+      "score": 0.4825,
+      "tie_break_uniform": 0.30541624874623874
+    },
+    {
+      "sample_unit_id": "cal-unit-0291",
+      "score": 0.4841666666666667,
+      "tie_break_uniform": 0.9202607823470411
+    },
+    {
+      "sample_unit_id": "cal-unit-0292",
+      "score": 0.48583333333333334,
+      "tie_break_uniform": 0.5351053159478435
+    },
+    {
+      "sample_unit_id": "cal-unit-0293",
+      "score": 0.4875,
+      "tie_break_uniform": 0.14994984954864593
+    },
+    {
+      "sample_unit_id": "cal-unit-0294",
+      "score": 0.4891666666666667,
+      "tie_break_uniform": 0.7647943831494484
+    },
+    {
+      "sample_unit_id": "cal-unit-0295",
+      "score": 0.49083333333333334,
+      "tie_break_uniform": 0.37963891675025074
+    },
+    {
+      "sample_unit_id": "cal-unit-0296",
+      "score": 0.4925,
+      "tie_break_uniform": 0.9944834503510531
+    },
+    {
+      "sample_unit_id": "cal-unit-0297",
+      "score": 0.49416666666666664,
+      "tie_break_uniform": 0.6093279839518556
+    },
+    {
+      "sample_unit_id": "cal-unit-0298",
+      "score": 0.49583333333333335,
+      "tie_break_uniform": 0.22417251755265796
+    },
+    {
+      "sample_unit_id": "cal-unit-0299",
+      "score": 0.4975,
+      "tie_break_uniform": 0.8390170511534604
+    },
+    {
+      "sample_unit_id": "cal-unit-0300",
+      "score": 0.49916666666666665,
+      "tie_break_uniform": 0.4538615847542628
+    },
+    {
+      "sample_unit_id": "cal-unit-0301",
+      "score": 0.5008333333333334,
+      "tie_break_uniform": 0.0687061183550652
+    },
+    {
+      "sample_unit_id": "cal-unit-0302",
+      "score": 0.5025,
+      "tie_break_uniform": 0.6835506519558676
+    },
+    {
+      "sample_unit_id": "cal-unit-0303",
+      "score": 0.5041666666666667,
+      "tie_break_uniform": 0.29839518555667
+    },
+    {
+      "sample_unit_id": "cal-unit-0304",
+      "score": 0.5058333333333334,
+      "tie_break_uniform": 0.9132397191574724
+    },
+    {
+      "sample_unit_id": "cal-unit-0305",
+      "score": 0.5075,
+      "tie_break_uniform": 0.5280842527582749
+    },
+    {
+      "sample_unit_id": "cal-unit-0306",
+      "score": 0.5091666666666667,
+      "tie_break_uniform": 0.14292878635907724
+    },
+    {
+      "sample_unit_id": "cal-unit-0307",
+      "score": 0.5108333333333334,
+      "tie_break_uniform": 0.7577733199598796
+    },
+    {
+      "sample_unit_id": "cal-unit-0308",
+      "score": 0.5125,
+      "tie_break_uniform": 0.37261785356068206
+    },
+    {
+      "sample_unit_id": "cal-unit-0309",
+      "score": 0.5141666666666667,
+      "tie_break_uniform": 0.9874623871614845
+    },
+    {
+      "sample_unit_id": "cal-unit-0310",
+      "score": 0.5158333333333334,
+      "tie_break_uniform": 0.6023069207622869
+    },
+    {
+      "sample_unit_id": "cal-unit-0311",
+      "score": 0.5175,
+      "tie_break_uniform": 0.21715145436308927
+    },
+    {
+      "sample_unit_id": "cal-unit-0312",
+      "score": 0.5191666666666667,
+      "tie_break_uniform": 0.8319959879638916
+    },
+    {
+      "sample_unit_id": "cal-unit-0313",
+      "score": 0.5208333333333334,
+      "tie_break_uniform": 0.44684052156469406
+    },
+    {
+      "sample_unit_id": "cal-unit-0314",
+      "score": 0.5225,
+      "tie_break_uniform": 0.06168505516549649
+    },
+    {
+      "sample_unit_id": "cal-unit-0315",
+      "score": 0.5241666666666667,
+      "tie_break_uniform": 0.6765295887662989
+    },
+    {
+      "sample_unit_id": "cal-unit-0316",
+      "score": 0.5258333333333334,
+      "tie_break_uniform": 0.2913741223671013
+    },
+    {
+      "sample_unit_id": "cal-unit-0317",
+      "score": 0.5275,
+      "tie_break_uniform": 0.9062186559679037
+    },
+    {
+      "sample_unit_id": "cal-unit-0318",
+      "score": 0.5291666666666667,
+      "tie_break_uniform": 0.5210631895687061
+    },
+    {
+      "sample_unit_id": "cal-unit-0319",
+      "score": 0.5308333333333334,
+      "tie_break_uniform": 0.13590772316950853
+    },
+    {
+      "sample_unit_id": "cal-unit-0320",
+      "score": 0.5325,
+      "tie_break_uniform": 0.7507522567703109
+    },
+    {
+      "sample_unit_id": "cal-unit-0321",
+      "score": 0.5341666666666667,
+      "tie_break_uniform": 0.36559679037111337
+    },
+    {
+      "sample_unit_id": "cal-unit-0322",
+      "score": 0.5358333333333334,
+      "tie_break_uniform": 0.9804413239719157
+    },
+    {
+      "sample_unit_id": "cal-unit-0323",
+      "score": 0.5375,
+      "tie_break_uniform": 0.5952858575727181
+    },
+    {
+      "sample_unit_id": "cal-unit-0324",
+      "score": 0.5391666666666667,
+      "tie_break_uniform": 0.21013039117352056
+    },
+    {
+      "sample_unit_id": "cal-unit-0325",
+      "score": 0.5408333333333334,
+      "tie_break_uniform": 0.824974924774323
+    },
+    {
+      "sample_unit_id": "cal-unit-0326",
+      "score": 0.5425,
+      "tie_break_uniform": 0.43981945837512537
+    },
+    {
+      "sample_unit_id": "cal-unit-0327",
+      "score": 0.5441666666666667,
+      "tie_break_uniform": 0.054663991975927785
+    },
+    {
+      "sample_unit_id": "cal-unit-0328",
+      "score": 0.5458333333333333,
+      "tie_break_uniform": 0.6695085255767302
+    },
+    {
+      "sample_unit_id": "cal-unit-0329",
+      "score": 0.5475,
+      "tie_break_uniform": 0.2843530591775326
+    },
+    {
+      "sample_unit_id": "cal-unit-0330",
+      "score": 0.5491666666666667,
+      "tie_break_uniform": 0.899197592778335
+    },
+    {
+      "sample_unit_id": "cal-unit-0331",
+      "score": 0.5508333333333333,
+      "tie_break_uniform": 0.5140421263791374
+    },
+    {
+      "sample_unit_id": "cal-unit-0332",
+      "score": 0.5525,
+      "tie_break_uniform": 0.1288866599799398
+    },
+    {
+      "sample_unit_id": "cal-unit-0333",
+      "score": 0.5541666666666667,
+      "tie_break_uniform": 0.7437311935807422
+    },
+    {
+      "sample_unit_id": "cal-unit-0334",
+      "score": 0.5558333333333333,
+      "tie_break_uniform": 0.3585757271815446
+    },
+    {
+      "sample_unit_id": "cal-unit-0335",
+      "score": 0.5575,
+      "tie_break_uniform": 0.973420260782347
+    },
+    {
+      "sample_unit_id": "cal-unit-0336",
+      "score": 0.5591666666666667,
+      "tie_break_uniform": 0.5882647943831495
+    },
+    {
+      "sample_unit_id": "cal-unit-0337",
+      "score": 0.5608333333333333,
+      "tie_break_uniform": 0.20310932798395184
+    },
+    {
+      "sample_unit_id": "cal-unit-0338",
+      "score": 0.5625,
+      "tie_break_uniform": 0.8179538615847542
+    },
+    {
+      "sample_unit_id": "cal-unit-0339",
+      "score": 0.5641666666666667,
+      "tie_break_uniform": 0.4327983951855567
+    },
+    {
+      "sample_unit_id": "cal-unit-0340",
+      "score": 0.5658333333333333,
+      "tie_break_uniform": 0.047642928786359076
+    },
+    {
+      "sample_unit_id": "cal-unit-0341",
+      "score": 0.5675,
+      "tie_break_uniform": 0.6624874623871615
+    },
+    {
+      "sample_unit_id": "cal-unit-0342",
+      "score": 0.5691666666666667,
+      "tie_break_uniform": 0.2773319959879639
+    },
+    {
+      "sample_unit_id": "cal-unit-0343",
+      "score": 0.5708333333333333,
+      "tie_break_uniform": 0.8921765295887663
+    },
+    {
+      "sample_unit_id": "cal-unit-0344",
+      "score": 0.5725,
+      "tie_break_uniform": 0.5070210631895687
+    },
+    {
+      "sample_unit_id": "cal-unit-0345",
+      "score": 0.5741666666666667,
+      "tie_break_uniform": 0.12186559679037111
+    },
+    {
+      "sample_unit_id": "cal-unit-0346",
+      "score": 0.5758333333333333,
+      "tie_break_uniform": 0.7367101303911735
+    },
+    {
+      "sample_unit_id": "cal-unit-0347",
+      "score": 0.5775,
+      "tie_break_uniform": 0.35155466399197594
+    },
+    {
+      "sample_unit_id": "cal-unit-0348",
+      "score": 0.5791666666666667,
+      "tie_break_uniform": 0.9663991975927784
+    },
+    {
+      "sample_unit_id": "cal-unit-0349",
+      "score": 0.5808333333333333,
+      "tie_break_uniform": 0.5812437311935807
+    },
+    {
+      "sample_unit_id": "cal-unit-0350",
+      "score": 0.5825,
+      "tie_break_uniform": 0.19608826479438315
+    },
+    {
+      "sample_unit_id": "cal-unit-0351",
+      "score": 0.5841666666666666,
+      "tie_break_uniform": 0.8109327983951855
+    },
+    {
+      "sample_unit_id": "cal-unit-0352",
+      "score": 0.5858333333333333,
+      "tie_break_uniform": 0.42577733199598794
+    },
+    {
+      "sample_unit_id": "cal-unit-0353",
+      "score": 0.5875,
+      "tie_break_uniform": 0.040621865596790374
+    },
+    {
+      "sample_unit_id": "cal-unit-0354",
+      "score": 0.5891666666666666,
+      "tie_break_uniform": 0.6554663991975928
+    },
+    {
+      "sample_unit_id": "cal-unit-0355",
+      "score": 0.5908333333333333,
+      "tie_break_uniform": 0.2703109327983952
+    },
+    {
+      "sample_unit_id": "cal-unit-0356",
+      "score": 0.5925,
+      "tie_break_uniform": 0.8851554663991976
+    },
+    {
+      "sample_unit_id": "cal-unit-0357",
+      "score": 0.5941666666666666,
+      "tie_break_uniform": 0.5
+    },
+    {
+      "sample_unit_id": "cal-unit-0358",
+      "score": 0.5958333333333333,
+      "tie_break_uniform": 0.1148445336008024
+    },
+    {
+      "sample_unit_id": "cal-unit-0359",
+      "score": 0.5975,
+      "tie_break_uniform": 0.7296890672016049
+    },
+    {
+      "sample_unit_id": "cal-unit-0360",
+      "score": 0.5991666666666666,
+      "tie_break_uniform": 0.34453360080240725
+    },
+    {
+      "sample_unit_id": "cal-unit-0361",
+      "score": 0.6008333333333333,
+      "tie_break_uniform": 0.9593781344032096
+    },
+    {
+      "sample_unit_id": "cal-unit-0362",
+      "score": 0.6025,
+      "tie_break_uniform": 0.574222668004012
+    },
+    {
+      "sample_unit_id": "cal-unit-0363",
+      "score": 0.6041666666666666,
+      "tie_break_uniform": 0.18906720160481444
+    },
+    {
+      "sample_unit_id": "cal-unit-0364",
+      "score": 0.6058333333333333,
+      "tie_break_uniform": 0.8039117352056169
+    },
+    {
+      "sample_unit_id": "cal-unit-0365",
+      "score": 0.6075,
+      "tie_break_uniform": 0.41875626880641925
+    },
+    {
+      "sample_unit_id": "cal-unit-0366",
+      "score": 0.6091666666666666,
+      "tie_break_uniform": 0.033600802407221665
+    },
+    {
+      "sample_unit_id": "cal-unit-0367",
+      "score": 0.6108333333333333,
+      "tie_break_uniform": 0.6484453360080241
+    },
+    {
+      "sample_unit_id": "cal-unit-0368",
+      "score": 0.6125,
+      "tie_break_uniform": 0.2632898696088265
+    },
+    {
+      "sample_unit_id": "cal-unit-0369",
+      "score": 0.6141666666666666,
+      "tie_break_uniform": 0.8781344032096289
+    },
+    {
+      "sample_unit_id": "cal-unit-0370",
+      "score": 0.6158333333333333,
+      "tie_break_uniform": 0.4929789368104313
+    },
+    {
+      "sample_unit_id": "cal-unit-0371",
+      "score": 0.6175,
+      "tie_break_uniform": 0.1078234704112337
+    },
+    {
+      "sample_unit_id": "cal-unit-0372",
+      "score": 0.6191666666666666,
+      "tie_break_uniform": 0.7226680040120361
+    },
+    {
+      "sample_unit_id": "cal-unit-0373",
+      "score": 0.6208333333333333,
+      "tie_break_uniform": 0.3375125376128385
+    },
+    {
+      "sample_unit_id": "cal-unit-0374",
+      "score": 0.6225,
+      "tie_break_uniform": 0.9523570712136409
+    },
+    {
+      "sample_unit_id": "cal-unit-0375",
+      "score": 0.6241666666666666,
+      "tie_break_uniform": 0.5672016048144434
+    },
+    {
+      "sample_unit_id": "cal-unit-0376",
+      "score": 0.6258333333333334,
+      "tie_break_uniform": 0.18204613841524575
+    },
+    {
+      "sample_unit_id": "cal-unit-0377",
+      "score": 0.6275,
+      "tie_break_uniform": 0.7968906720160481
+    },
+    {
+      "sample_unit_id": "cal-unit-0378",
+      "score": 0.6291666666666667,
+      "tie_break_uniform": 0.41173520561685056
+    },
+    {
+      "sample_unit_id": "cal-unit-0379",
+      "score": 0.6308333333333334,
+      "tie_break_uniform": 0.02657973921765296
+    },
+    {
+      "sample_unit_id": "cal-unit-0380",
+      "score": 0.6325,
+      "tie_break_uniform": 0.6414242728184554
+    },
+    {
+      "sample_unit_id": "cal-unit-0381",
+      "score": 0.6341666666666667,
+      "tie_break_uniform": 0.25626880641925776
+    },
+    {
+      "sample_unit_id": "cal-unit-0382",
+      "score": 0.6358333333333334,
+      "tie_break_uniform": 0.8711133400200601
+    },
+    {
+      "sample_unit_id": "cal-unit-0383",
+      "score": 0.6375,
+      "tie_break_uniform": 0.48595787362086257
+    },
+    {
+      "sample_unit_id": "cal-unit-0384",
+      "score": 0.6391666666666667,
+      "tie_break_uniform": 0.10080240722166499
+    },
+    {
+      "sample_unit_id": "cal-unit-0385",
+      "score": 0.6408333333333334,
+      "tie_break_uniform": 0.7156469408224674
+    },
+    {
+      "sample_unit_id": "cal-unit-0386",
+      "score": 0.6425,
+      "tie_break_uniform": 0.3304914744232698
+    },
+    {
+      "sample_unit_id": "cal-unit-0387",
+      "score": 0.6441666666666667,
+      "tie_break_uniform": 0.9453360080240722
+    },
+    {
+      "sample_unit_id": "cal-unit-0388",
+      "score": 0.6458333333333334,
+      "tie_break_uniform": 0.5601805416248746
+    },
+    {
+      "sample_unit_id": "cal-unit-0389",
+      "score": 0.6475,
+      "tie_break_uniform": 0.17502507522567703
+    },
+    {
+      "sample_unit_id": "cal-unit-0390",
+      "score": 0.6491666666666667,
+      "tie_break_uniform": 0.7898696088264794
+    },
+    {
+      "sample_unit_id": "cal-unit-0391",
+      "score": 0.6508333333333334,
+      "tie_break_uniform": 0.4047141424272818
+    },
+    {
+      "sample_unit_id": "cal-unit-0392",
+      "score": 0.6525,
+      "tie_break_uniform": 0.019558676028084254
+    },
+    {
+      "sample_unit_id": "cal-unit-0393",
+      "score": 0.6541666666666667,
+      "tie_break_uniform": 0.6344032096288866
+    },
+    {
+      "sample_unit_id": "cal-unit-0394",
+      "score": 0.6558333333333334,
+      "tie_break_uniform": 0.24924774322968907
+    },
+    {
+      "sample_unit_id": "cal-unit-0395",
+      "score": 0.6575,
+      "tie_break_uniform": 0.8640922768304915
+    },
+    {
+      "sample_unit_id": "cal-unit-0396",
+      "score": 0.6591666666666667,
+      "tie_break_uniform": 0.4789368104312939
+    },
+    {
+      "sample_unit_id": "cal-unit-0397",
+      "score": 0.6608333333333334,
+      "tie_break_uniform": 0.09378134403209629
+    },
+    {
+      "sample_unit_id": "cal-unit-0398",
+      "score": 0.6625,
+      "tie_break_uniform": 0.7086258776328987
+    },
+    {
+      "sample_unit_id": "cal-unit-0399",
+      "score": 0.6641666666666667,
+      "tie_break_uniform": 0.3234704112337011
+    },
+    {
+      "sample_unit_id": "cal-unit-0400",
+      "score": 0.6658333333333334,
+      "tie_break_uniform": 0.9383149448345035
+    },
+    {
+      "sample_unit_id": "cal-unit-0401",
+      "score": 0.6675,
+      "tie_break_uniform": 0.5531594784353059
+    },
+    {
+      "sample_unit_id": "cal-unit-0402",
+      "score": 0.6691666666666667,
+      "tie_break_uniform": 0.16800401203610832
+    },
+    {
+      "sample_unit_id": "cal-unit-0403",
+      "score": 0.6708333333333333,
+      "tie_break_uniform": 0.7828485456369108
+    },
+    {
+      "sample_unit_id": "cal-unit-0404",
+      "score": 0.6725,
+      "tie_break_uniform": 0.39769307923771313
+    },
+    {
+      "sample_unit_id": "cal-unit-0405",
+      "score": 0.6741666666666667,
+      "tie_break_uniform": 0.012537612838515547
+    },
+    {
+      "sample_unit_id": "cal-unit-0406",
+      "score": 0.6758333333333333,
+      "tie_break_uniform": 0.627382146439318
+    },
+    {
+      "sample_unit_id": "cal-unit-0407",
+      "score": 0.6775,
+      "tie_break_uniform": 0.24222668004012035
+    },
+    {
+      "sample_unit_id": "cal-unit-0408",
+      "score": 0.6791666666666667,
+      "tie_break_uniform": 0.8570712136409228
+    },
+    {
+      "sample_unit_id": "cal-unit-0409",
+      "score": 0.6808333333333333,
+      "tie_break_uniform": 0.4719157472417252
+    },
+    {
+      "sample_unit_id": "cal-unit-0410",
+      "score": 0.6825,
+      "tie_break_uniform": 0.08676028084252758
+    },
+    {
+      "sample_unit_id": "cal-unit-0411",
+      "score": 0.6841666666666667,
+      "tie_break_uniform": 0.70160481444333
+    },
+    {
+      "sample_unit_id": "cal-unit-0412",
+      "score": 0.6858333333333333,
+      "tie_break_uniform": 0.3164493480441324
+    },
+    {
+      "sample_unit_id": "cal-unit-0413",
+      "score": 0.6875,
+      "tie_break_uniform": 0.9312938816449348
+    },
+    {
+      "sample_unit_id": "cal-unit-0414",
+      "score": 0.6891666666666667,
+      "tie_break_uniform": 0.5461384152457373
+    },
+    {
+      "sample_unit_id": "cal-unit-0415",
+      "score": 0.6908333333333333,
+      "tie_break_uniform": 0.16098294884653963
+    },
+    {
+      "sample_unit_id": "cal-unit-0416",
+      "score": 0.6925,
+      "tie_break_uniform": 0.775827482447342
+    },
+    {
+      "sample_unit_id": "cal-unit-0417",
+      "score": 0.6941666666666667,
+      "tie_break_uniform": 0.39067201604814444
+    },
+    {
+      "sample_unit_id": "cal-unit-0418",
+      "score": 0.6958333333333333,
+      "tie_break_uniform": 0.005516549648946841
+    },
+    {
+      "sample_unit_id": "cal-unit-0419",
+      "score": 0.6975,
+      "tie_break_uniform": 0.6203610832497493
+    },
+    {
+      "sample_unit_id": "cal-unit-0420",
+      "score": 0.6991666666666667,
+      "tie_break_uniform": 0.23520561685055166
+    },
+    {
+      "sample_unit_id": "cal-unit-0421",
+      "score": 0.7008333333333333,
+      "tie_break_uniform": 0.850050150451354
+    },
+    {
+      "sample_unit_id": "cal-unit-0422",
+      "score": 0.7025,
+      "tie_break_uniform": 0.46489468405215645
+    },
+    {
+      "sample_unit_id": "cal-unit-0423",
+      "score": 0.7041666666666667,
+      "tie_break_uniform": 0.07973921765295888
+    },
+    {
+      "sample_unit_id": "cal-unit-0424",
+      "score": 0.7058333333333333,
+      "tie_break_uniform": 0.6945837512537613
+    },
+    {
+      "sample_unit_id": "cal-unit-0425",
+      "score": 0.7075,
+      "tie_break_uniform": 0.3094282848545637
+    },
+    {
+      "sample_unit_id": "cal-unit-0426",
+      "score": 0.7091666666666666,
+      "tie_break_uniform": 0.9242728184553661
+    },
+    {
+      "sample_unit_id": "cal-unit-0427",
+      "score": 0.7108333333333333,
+      "tie_break_uniform": 0.5391173520561685
+    },
+    {
+      "sample_unit_id": "cal-unit-0428",
+      "score": 0.7125,
+      "tie_break_uniform": 0.15396188565697091
+    },
+    {
+      "sample_unit_id": "cal-unit-0429",
+      "score": 0.7141666666666666,
+      "tie_break_uniform": 0.7688064192577733
+    },
+    {
+      "sample_unit_id": "cal-unit-0430",
+      "score": 0.7158333333333333,
+      "tie_break_uniform": 0.3836509528585757
+    },
+    {
+      "sample_unit_id": "cal-unit-0431",
+      "score": 0.7175,
+      "tie_break_uniform": 0.9984954864593781
+    },
+    {
+      "sample_unit_id": "cal-unit-0432",
+      "score": 0.7191666666666666,
+      "tie_break_uniform": 0.6133400200601805
+    },
+    {
+      "sample_unit_id": "cal-unit-0433",
+      "score": 0.7208333333333333,
+      "tie_break_uniform": 0.22818455366098295
+    },
+    {
+      "sample_unit_id": "cal-unit-0434",
+      "score": 0.7225,
+      "tie_break_uniform": 0.8430290872617854
+    },
+    {
+      "sample_unit_id": "cal-unit-0435",
+      "score": 0.7241666666666666,
+      "tie_break_uniform": 0.45787362086258776
+    },
+    {
+      "sample_unit_id": "cal-unit-0436",
+      "score": 0.7258333333333333,
+      "tie_break_uniform": 0.07271815446339017
+    },
+    {
+      "sample_unit_id": "cal-unit-0437",
+      "score": 0.7275,
+      "tie_break_uniform": 0.6875626880641926
+    },
+    {
+      "sample_unit_id": "cal-unit-0438",
+      "score": 0.7291666666666666,
+      "tie_break_uniform": 0.302407221664995
+    },
+    {
+      "sample_unit_id": "cal-unit-0439",
+      "score": 0.7308333333333333,
+      "tie_break_uniform": 0.9172517552657974
+    },
+    {
+      "sample_unit_id": "cal-unit-0440",
+      "score": 0.7325,
+      "tie_break_uniform": 0.5320962888665998
+    },
+    {
+      "sample_unit_id": "cal-unit-0441",
+      "score": 0.7341666666666666,
+      "tie_break_uniform": 0.1469408224674022
+    },
+    {
+      "sample_unit_id": "cal-unit-0442",
+      "score": 0.7358333333333333,
+      "tie_break_uniform": 0.7617853560682046
+    },
+    {
+      "sample_unit_id": "cal-unit-0443",
+      "score": 0.7375,
+      "tie_break_uniform": 0.376629889669007
+    },
+    {
+      "sample_unit_id": "cal-unit-0444",
+      "score": 0.7391666666666666,
+      "tie_break_uniform": 0.9914744232698094
+    },
+    {
+      "sample_unit_id": "cal-unit-0445",
+      "score": 0.7408333333333333,
+      "tie_break_uniform": 0.6063189568706119
+    },
+    {
+      "sample_unit_id": "cal-unit-0446",
+      "score": 0.7425,
+      "tie_break_uniform": 0.22116349047141423
+    },
+    {
+      "sample_unit_id": "cal-unit-0447",
+      "score": 0.7441666666666666,
+      "tie_break_uniform": 0.8360080240722166
+    },
+    {
+      "sample_unit_id": "cal-unit-0448",
+      "score": 0.7458333333333333,
+      "tie_break_uniform": 0.45085255767301907
+    },
+    {
+      "sample_unit_id": "cal-unit-0449",
+      "score": 0.7475,
+      "tie_break_uniform": 0.06569709127382146
+    },
+    {
+      "sample_unit_id": "cal-unit-0450",
+      "score": 0.7491666666666666,
+      "tie_break_uniform": 0.6805416248746239
+    },
+    {
+      "sample_unit_id": "cal-unit-0451",
+      "score": 0.7508333333333334,
+      "tie_break_uniform": 0.29538615847542626
+    },
+    {
+      "sample_unit_id": "cal-unit-0452",
+      "score": 0.7525,
+      "tie_break_uniform": 0.9102306920762286
+    },
+    {
+      "sample_unit_id": "cal-unit-0453",
+      "score": 0.7541666666666667,
+      "tie_break_uniform": 0.5250752256770311
+    },
+    {
+      "sample_unit_id": "cal-unit-0454",
+      "score": 0.7558333333333334,
+      "tie_break_uniform": 0.1399197592778335
+    },
+    {
+      "sample_unit_id": "cal-unit-0455",
+      "score": 0.7575,
+      "tie_break_uniform": 0.7547642928786359
+    },
+    {
+      "sample_unit_id": "cal-unit-0456",
+      "score": 0.7591666666666667,
+      "tie_break_uniform": 0.3696088264794383
+    },
+    {
+      "sample_unit_id": "cal-unit-0457",
+      "score": 0.7608333333333334,
+      "tie_break_uniform": 0.9844533600802408
+    },
+    {
+      "sample_unit_id": "cal-unit-0458",
+      "score": 0.7625,
+      "tie_break_uniform": 0.5992978936810431
+    },
+    {
+      "sample_unit_id": "cal-unit-0459",
+      "score": 0.7641666666666667,
+      "tie_break_uniform": 0.21414242728184554
+    },
+    {
+      "sample_unit_id": "cal-unit-0460",
+      "score": 0.7658333333333334,
+      "tie_break_uniform": 0.8289869608826479
+    },
+    {
+      "sample_unit_id": "cal-unit-0461",
+      "score": 0.7675,
+      "tie_break_uniform": 0.44383149448345033
+    },
+    {
+      "sample_unit_id": "cal-unit-0462",
+      "score": 0.7691666666666667,
+      "tie_break_uniform": 0.058676028084252756
+    },
+    {
+      "sample_unit_id": "cal-unit-0463",
+      "score": 0.7708333333333334,
+      "tie_break_uniform": 0.6735205616850551
+    },
+    {
+      "sample_unit_id": "cal-unit-0464",
+      "score": 0.7725,
+      "tie_break_uniform": 0.2883650952858576
+    },
+    {
+      "sample_unit_id": "cal-unit-0465",
+      "score": 0.7741666666666667,
+      "tie_break_uniform": 0.90320962888666
+    },
+    {
+      "sample_unit_id": "cal-unit-0466",
+      "score": 0.7758333333333334,
+      "tie_break_uniform": 0.5180541624874624
+    },
+    {
+      "sample_unit_id": "cal-unit-0467",
+      "score": 0.7775,
+      "tie_break_uniform": 0.1328986960882648
+    },
+    {
+      "sample_unit_id": "cal-unit-0468",
+      "score": 0.7791666666666667,
+      "tie_break_uniform": 0.7477432296890673
+    },
+    {
+      "sample_unit_id": "cal-unit-0469",
+      "score": 0.7808333333333334,
+      "tie_break_uniform": 0.36258776328986964
+    },
+    {
+      "sample_unit_id": "cal-unit-0470",
+      "score": 0.7825,
+      "tie_break_uniform": 0.977432296890672
+    },
+    {
+      "sample_unit_id": "cal-unit-0471",
+      "score": 0.7841666666666667,
+      "tie_break_uniform": 0.5922768304914744
+    },
+    {
+      "sample_unit_id": "cal-unit-0472",
+      "score": 0.7858333333333334,
+      "tie_break_uniform": 0.20712136409227683
+    },
+    {
+      "sample_unit_id": "cal-unit-0473",
+      "score": 0.7875,
+      "tie_break_uniform": 0.8219658976930793
+    },
+    {
+      "sample_unit_id": "cal-unit-0474",
+      "score": 0.7891666666666667,
+      "tie_break_uniform": 0.43681043129388164
+    },
+    {
+      "sample_unit_id": "cal-unit-0475",
+      "score": 0.7908333333333334,
+      "tie_break_uniform": 0.051654964894684054
+    },
+    {
+      "sample_unit_id": "cal-unit-0476",
+      "score": 0.7925,
+      "tie_break_uniform": 0.6664994984954865
+    },
+    {
+      "sample_unit_id": "cal-unit-0477",
+      "score": 0.7941666666666667,
+      "tie_break_uniform": 0.2813440320962889
+    },
+    {
+      "sample_unit_id": "cal-unit-0478",
+      "score": 0.7958333333333333,
+      "tie_break_uniform": 0.8961885656970913
+    },
+    {
+      "sample_unit_id": "cal-unit-0479",
+      "score": 0.7975,
+      "tie_break_uniform": 0.5110330992978936
+    },
+    {
+      "sample_unit_id": "cal-unit-0480",
+      "score": 0.7991666666666667,
+      "tie_break_uniform": 0.12587763289869608
+    },
+    {
+      "sample_unit_id": "cal-unit-0481",
+      "score": 0.8008333333333333,
+      "tie_break_uniform": 0.7407221664994985
+    },
+    {
+      "sample_unit_id": "cal-unit-0482",
+      "score": 0.8025,
+      "tie_break_uniform": 0.3555667001003009
+    },
+    {
+      "sample_unit_id": "cal-unit-0483",
+      "score": 0.8041666666666667,
+      "tie_break_uniform": 0.9704112337011033
+    },
+    {
+      "sample_unit_id": "cal-unit-0484",
+      "score": 0.8058333333333333,
+      "tie_break_uniform": 0.5852557673019058
+    },
+    {
+      "sample_unit_id": "cal-unit-0485",
+      "score": 0.8075,
+      "tie_break_uniform": 0.2001003009027081
+    },
+    {
+      "sample_unit_id": "cal-unit-0486",
+      "score": 0.8091666666666667,
+      "tie_break_uniform": 0.8149448345035105
+    },
+    {
+      "sample_unit_id": "cal-unit-0487",
+      "score": 0.8108333333333333,
+      "tie_break_uniform": 0.42978936810431295
+    },
+    {
+      "sample_unit_id": "cal-unit-0488",
+      "score": 0.8125,
+      "tie_break_uniform": 0.044633901705115345
+    },
+    {
+      "sample_unit_id": "cal-unit-0489",
+      "score": 0.8141666666666667,
+      "tie_break_uniform": 0.6594784353059178
+    },
+    {
+      "sample_unit_id": "cal-unit-0490",
+      "score": 0.8158333333333333,
+      "tie_break_uniform": 0.27432296890672014
+    },
+    {
+      "sample_unit_id": "cal-unit-0491",
+      "score": 0.8175,
+      "tie_break_uniform": 0.8891675025075225
+    },
+    {
+      "sample_unit_id": "cal-unit-0492",
+      "score": 0.8191666666666667,
+      "tie_break_uniform": 0.504012036108325
+    },
+    {
+      "sample_unit_id": "cal-unit-0493",
+      "score": 0.8208333333333333,
+      "tie_break_uniform": 0.11885656970912738
+    },
+    {
+      "sample_unit_id": "cal-unit-0494",
+      "score": 0.8225,
+      "tie_break_uniform": 0.7337011033099298
+    },
+    {
+      "sample_unit_id": "cal-unit-0495",
+      "score": 0.8241666666666667,
+      "tie_break_uniform": 0.3485456369107322
+    },
+    {
+      "sample_unit_id": "cal-unit-0496",
+      "score": 0.8258333333333333,
+      "tie_break_uniform": 0.9633901705115346
+    },
+    {
+      "sample_unit_id": "cal-unit-0497",
+      "score": 0.8275,
+      "tie_break_uniform": 0.578234704112337
+    },
+    {
+      "sample_unit_id": "cal-unit-0498",
+      "score": 0.8291666666666667,
+      "tie_break_uniform": 0.19307923771313942
+    },
+    {
+      "sample_unit_id": "cal-unit-0499",
+      "score": 0.8308333333333333,
+      "tie_break_uniform": 0.8079237713139418
+    },
+    {
+      "sample_unit_id": "cal-unit-0500",
+      "score": 0.8325,
+      "tie_break_uniform": 0.4227683049147442
+    },
+    {
+      "sample_unit_id": "cal-unit-0501",
+      "score": 0.8341666666666666,
+      "tie_break_uniform": 0.03761283851554664
+    },
+    {
+      "sample_unit_id": "cal-unit-0502",
+      "score": 0.8358333333333333,
+      "tie_break_uniform": 0.652457372116349
+    },
+    {
+      "sample_unit_id": "cal-unit-0503",
+      "score": 0.8375,
+      "tie_break_uniform": 0.26730190571715146
+    },
+    {
+      "sample_unit_id": "cal-unit-0504",
+      "score": 0.8391666666666666,
+      "tie_break_uniform": 0.8821464393179539
+    },
+    {
+      "sample_unit_id": "cal-unit-0505",
+      "score": 0.8408333333333333,
+      "tie_break_uniform": 0.49699097291875627
+    },
+    {
+      "sample_unit_id": "cal-unit-0506",
+      "score": 0.8425,
+      "tie_break_uniform": 0.11183550651955868
+    },
+    {
+      "sample_unit_id": "cal-unit-0507",
+      "score": 0.8441666666666666,
+      "tie_break_uniform": 0.7266800401203611
+    },
+    {
+      "sample_unit_id": "cal-unit-0508",
+      "score": 0.8458333333333333,
+      "tie_break_uniform": 0.3415245737211635
+    },
+    {
+      "sample_unit_id": "cal-unit-0509",
+      "score": 0.8475,
+      "tie_break_uniform": 0.9563691073219659
+    },
+    {
+      "sample_unit_id": "cal-unit-0510",
+      "score": 0.8491666666666666,
+      "tie_break_uniform": 0.5712136409227683
+    },
+    {
+      "sample_unit_id": "cal-unit-0511",
+      "score": 0.8508333333333333,
+      "tie_break_uniform": 0.1860581745235707
+    },
+    {
+      "sample_unit_id": "cal-unit-0512",
+      "score": 0.8525,
+      "tie_break_uniform": 0.8009027081243731
+    },
+    {
+      "sample_unit_id": "cal-unit-0513",
+      "score": 0.8541666666666666,
+      "tie_break_uniform": 0.4157472417251755
+    },
+    {
+      "sample_unit_id": "cal-unit-0514",
+      "score": 0.8558333333333333,
+      "tie_break_uniform": 0.030591775325977934
+    },
+    {
+      "sample_unit_id": "cal-unit-0515",
+      "score": 0.8575,
+      "tie_break_uniform": 0.6454363089267804
+    },
+    {
+      "sample_unit_id": "cal-unit-0516",
+      "score": 0.8591666666666666,
+      "tie_break_uniform": 0.26028084252758277
+    },
+    {
+      "sample_unit_id": "cal-unit-0517",
+      "score": 0.8608333333333333,
+      "tie_break_uniform": 0.8751253761283851
+    },
+    {
+      "sample_unit_id": "cal-unit-0518",
+      "score": 0.8625,
+      "tie_break_uniform": 0.4899699097291876
+    },
+    {
+      "sample_unit_id": "cal-unit-0519",
+      "score": 0.8641666666666666,
+      "tie_break_uniform": 0.10481444332998997
+    },
+    {
+      "sample_unit_id": "cal-unit-0520",
+      "score": 0.8658333333333333,
+      "tie_break_uniform": 0.7196589769307924
+    },
+    {
+      "sample_unit_id": "cal-unit-0521",
+      "score": 0.8675,
+      "tie_break_uniform": 0.33450351053159477
+    },
+    {
+      "sample_unit_id": "cal-unit-0522",
+      "score": 0.8691666666666666,
+      "tie_break_uniform": 0.9493480441323972
+    },
+    {
+      "sample_unit_id": "cal-unit-0523",
+      "score": 0.8708333333333333,
+      "tie_break_uniform": 0.5641925777331996
+    },
+    {
+      "sample_unit_id": "cal-unit-0524",
+      "score": 0.8725,
+      "tie_break_uniform": 0.17903711133400202
+    },
+    {
+      "sample_unit_id": "cal-unit-0525",
+      "score": 0.8741666666666666,
+      "tie_break_uniform": 0.7938816449348044
+    },
+    {
+      "sample_unit_id": "cal-unit-0526",
+      "score": 0.8758333333333334,
+      "tie_break_uniform": 0.40872617853560683
+    },
+    {
+      "sample_unit_id": "cal-unit-0527",
+      "score": 0.8775,
+      "tie_break_uniform": 0.02357071213640923
+    },
+    {
+      "sample_unit_id": "cal-unit-0528",
+      "score": 0.8791666666666667,
+      "tie_break_uniform": 0.6384152457372116
+    },
+    {
+      "sample_unit_id": "cal-unit-0529",
+      "score": 0.8808333333333334,
+      "tie_break_uniform": 0.253259779338014
+    },
+    {
+      "sample_unit_id": "cal-unit-0530",
+      "score": 0.8825,
+      "tie_break_uniform": 0.8681043129388164
+    },
+    {
+      "sample_unit_id": "cal-unit-0531",
+      "score": 0.8841666666666667,
+      "tie_break_uniform": 0.48294884653961884
+    },
+    {
+      "sample_unit_id": "cal-unit-0532",
+      "score": 0.8858333333333334,
+      "tie_break_uniform": 0.09779338014042126
+    },
+    {
+      "sample_unit_id": "cal-unit-0533",
+      "score": 0.8875,
+      "tie_break_uniform": 0.7126379137412236
+    },
+    {
+      "sample_unit_id": "cal-unit-0534",
+      "score": 0.8891666666666667,
+      "tie_break_uniform": 0.3274824473420261
+    },
+    {
+      "sample_unit_id": "cal-unit-0535",
+      "score": 0.8908333333333334,
+      "tie_break_uniform": 0.9423269809428285
+    },
+    {
+      "sample_unit_id": "cal-unit-0536",
+      "score": 0.8925,
+      "tie_break_uniform": 0.5571715145436309
+    },
+    {
+      "sample_unit_id": "cal-unit-0537",
+      "score": 0.8941666666666667,
+      "tie_break_uniform": 0.1720160481444333
+    },
+    {
+      "sample_unit_id": "cal-unit-0538",
+      "score": 0.8958333333333334,
+      "tie_break_uniform": 0.7868605817452357
+    },
+    {
+      "sample_unit_id": "cal-unit-0539",
+      "score": 0.8975,
+      "tie_break_uniform": 0.4017051153460381
+    },
+    {
+      "sample_unit_id": "cal-unit-0540",
+      "score": 0.8991666666666667,
+      "tie_break_uniform": 0.016549648946840523
+    },
+    {
+      "sample_unit_id": "cal-unit-0541",
+      "score": 0.9008333333333334,
+      "tie_break_uniform": 0.6313941825476429
+    },
+    {
+      "sample_unit_id": "cal-unit-0542",
+      "score": 0.9025,
+      "tie_break_uniform": 0.24623871614844534
+    },
+    {
+      "sample_unit_id": "cal-unit-0543",
+      "score": 0.9041666666666667,
+      "tie_break_uniform": 0.8610832497492478
+    },
+    {
+      "sample_unit_id": "cal-unit-0544",
+      "score": 0.9058333333333334,
+      "tie_break_uniform": 0.47592778335005015
+    },
+    {
+      "sample_unit_id": "cal-unit-0545",
+      "score": 0.9075,
+      "tie_break_uniform": 0.09077231695085256
+    },
+    {
+      "sample_unit_id": "cal-unit-0546",
+      "score": 0.9091666666666667,
+      "tie_break_uniform": 0.705616850551655
+    },
+    {
+      "sample_unit_id": "cal-unit-0547",
+      "score": 0.9108333333333334,
+      "tie_break_uniform": 0.3204613841524574
+    },
+    {
+      "sample_unit_id": "cal-unit-0548",
+      "score": 0.9125,
+      "tie_break_uniform": 0.9353059177532598
+    },
+    {
+      "sample_unit_id": "cal-unit-0549",
+      "score": 0.9141666666666667,
+      "tie_break_uniform": 0.5501504513540622
+    },
+    {
+      "sample_unit_id": "cal-unit-0550",
+      "score": 0.9158333333333334,
+      "tie_break_uniform": 0.1649949849548646
+    },
+    {
+      "sample_unit_id": "cal-unit-0551",
+      "score": 0.9175,
+      "tie_break_uniform": 0.779839518555667
+    },
+    {
+      "sample_unit_id": "cal-unit-0552",
+      "score": 0.9191666666666667,
+      "tie_break_uniform": 0.3946840521564694
+    },
+    {
+      "sample_unit_id": "cal-unit-0553",
+      "score": 0.9208333333333333,
+      "tie_break_uniform": 0.009528585757271816
+    },
+    {
+      "sample_unit_id": "cal-unit-0554",
+      "score": 0.9225,
+      "tie_break_uniform": 0.6243731193580743
+    },
+    {
+      "sample_unit_id": "cal-unit-0555",
+      "score": 0.9241666666666667,
+      "tie_break_uniform": 0.23921765295887662
+    },
+    {
+      "sample_unit_id": "cal-unit-0556",
+      "score": 0.9258333333333333,
+      "tie_break_uniform": 0.854062186559679
+    },
+    {
+      "sample_unit_id": "cal-unit-0557",
+      "score": 0.9275,
+      "tie_break_uniform": 0.46890672016048146
+    },
+    {
+      "sample_unit_id": "cal-unit-0558",
+      "score": 0.9291666666666667,
+      "tie_break_uniform": 0.08375125376128385
+    },
+    {
+      "sample_unit_id": "cal-unit-0559",
+      "score": 0.9308333333333333,
+      "tie_break_uniform": 0.6985957873620863
+    },
+    {
+      "sample_unit_id": "cal-unit-0560",
+      "score": 0.9325,
+      "tie_break_uniform": 0.31344032096288865
+    },
+    {
+      "sample_unit_id": "cal-unit-0561",
+      "score": 0.9341666666666667,
+      "tie_break_uniform": 0.928284854563691
+    },
+    {
+      "sample_unit_id": "cal-unit-0562",
+      "score": 0.9358333333333333,
+      "tie_break_uniform": 0.5431293881644935
+    },
+    {
+      "sample_unit_id": "cal-unit-0563",
+      "score": 0.9375,
+      "tie_break_uniform": 0.1579739217652959
+    },
+    {
+      "sample_unit_id": "cal-unit-0564",
+      "score": 0.9391666666666667,
+      "tie_break_uniform": 0.7728184553660983
+    },
+    {
+      "sample_unit_id": "cal-unit-0565",
+      "score": 0.9408333333333333,
+      "tie_break_uniform": 0.3876629889669007
+    },
+    {
+      "sample_unit_id": "cal-unit-0566",
+      "score": 0.9425,
+      "tie_break_uniform": 0.0025075225677031092
+    },
+    {
+      "sample_unit_id": "cal-unit-0567",
+      "score": 0.9441666666666667,
+      "tie_break_uniform": 0.6173520561685055
+    },
+    {
+      "sample_unit_id": "cal-unit-0568",
+      "score": 0.9458333333333333,
+      "tie_break_uniform": 0.23219658976930793
+    },
+    {
+      "sample_unit_id": "cal-unit-0569",
+      "score": 0.9475,
+      "tie_break_uniform": 0.8470411233701103
+    },
+    {
+      "sample_unit_id": "cal-unit-0570",
+      "score": 0.9491666666666667,
+      "tie_break_uniform": 0.4618856569709127
+    },
+    {
+      "sample_unit_id": "cal-unit-0571",
+      "score": 0.9508333333333333,
+      "tie_break_uniform": 0.07673019057171515
+    },
+    {
+      "sample_unit_id": "cal-unit-0572",
+      "score": 0.9525,
+      "tie_break_uniform": 0.6915747241725175
+    },
+    {
+      "sample_unit_id": "cal-unit-0573",
+      "score": 0.9541666666666667,
+      "tie_break_uniform": 0.30641925777331996
+    },
+    {
+      "sample_unit_id": "cal-unit-0574",
+      "score": 0.9558333333333333,
+      "tie_break_uniform": 0.9212637913741224
+    },
+    {
+      "sample_unit_id": "cal-unit-0575",
+      "score": 0.9575,
+      "tie_break_uniform": 0.5361083249749248
+    },
+    {
+      "sample_unit_id": "cal-unit-0576",
+      "score": 0.9591666666666666,
+      "tie_break_uniform": 0.15095285857572718
+    },
+    {
+      "sample_unit_id": "cal-unit-0577",
+      "score": 0.9608333333333333,
+      "tie_break_uniform": 0.7657973921765295
+    },
+    {
+      "sample_unit_id": "cal-unit-0578",
+      "score": 0.9625,
+      "tie_break_uniform": 0.38064192577733197
+    },
+    {
+      "sample_unit_id": "cal-unit-0579",
+      "score": 0.9641666666666666,
+      "tie_break_uniform": 0.9954864593781344
+    },
+    {
+      "sample_unit_id": "cal-unit-0580",
+      "score": 0.9658333333333333,
+      "tie_break_uniform": 0.6103309929789368
+    },
+    {
+      "sample_unit_id": "cal-unit-0581",
+      "score": 0.9675,
+      "tie_break_uniform": 0.22517552657973922
+    },
+    {
+      "sample_unit_id": "cal-unit-0582",
+      "score": 0.9691666666666666,
+      "tie_break_uniform": 0.8400200601805417
+    },
+    {
+      "sample_unit_id": "cal-unit-0583",
+      "score": 0.9708333333333333,
+      "tie_break_uniform": 0.45486459378134403
+    },
+    {
+      "sample_unit_id": "cal-unit-0584",
+      "score": 0.9725,
+      "tie_break_uniform": 0.06970912738214644
+    },
+    {
+      "sample_unit_id": "cal-unit-0585",
+      "score": 0.9741666666666666,
+      "tie_break_uniform": 0.6845536609829489
+    },
+    {
+      "sample_unit_id": "cal-unit-0586",
+      "score": 0.9758333333333333,
+      "tie_break_uniform": 0.2993981945837513
+    },
+    {
+      "sample_unit_id": "cal-unit-0587",
+      "score": 0.9775,
+      "tie_break_uniform": 0.9142427281845537
+    },
+    {
+      "sample_unit_id": "cal-unit-0588",
+      "score": 0.9791666666666666,
+      "tie_break_uniform": 0.529087261785356
+    },
+    {
+      "sample_unit_id": "cal-unit-0589",
+      "score": 0.9808333333333333,
+      "tie_break_uniform": 0.14393179538615847
+    },
+    {
+      "sample_unit_id": "cal-unit-0590",
+      "score": 0.9825,
+      "tie_break_uniform": 0.7587763289869609
+    },
+    {
+      "sample_unit_id": "cal-unit-0591",
+      "score": 0.9841666666666666,
+      "tie_break_uniform": 0.3736208625877633
+    },
+    {
+      "sample_unit_id": "cal-unit-0592",
+      "score": 0.9858333333333333,
+      "tie_break_uniform": 0.9884653961885657
+    },
+    {
+      "sample_unit_id": "cal-unit-0593",
+      "score": 0.9875,
+      "tie_break_uniform": 0.6033099297893681
+    },
+    {
+      "sample_unit_id": "cal-unit-0594",
+      "score": 0.9891666666666666,
+      "tie_break_uniform": 0.2181544633901705
+    },
+    {
+      "sample_unit_id": "cal-unit-0595",
+      "score": 0.9908333333333333,
+      "tie_break_uniform": 0.8329989969909729
+    },
+    {
+      "sample_unit_id": "cal-unit-0596",
+      "score": 0.9925,
+      "tie_break_uniform": 0.44784353059177534
+    },
+    {
+      "sample_unit_id": "cal-unit-0597",
+      "score": 0.9941666666666666,
+      "tie_break_uniform": 0.06268806419257773
+    },
+    {
+      "sample_unit_id": "cal-unit-0598",
+      "score": 0.9958333333333333,
+      "tie_break_uniform": 0.6775325977933802
+    },
+    {
+      "sample_unit_id": "cal-unit-0599",
+      "score": 0.9975,
+      "tie_break_uniform": 0.29237713139418253
+    },
+    {
+      "sample_unit_id": "cal-unit-0600",
+      "score": 0.9991666666666666,
+      "tie_break_uniform": 0.9072216649949849
+    }
+  ],
+  "online_records": [
+    {
+      "sequence_index": 1,
+      "window_id": "prm-window-001",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0001",
+      "anomaly_score": 0.071,
+      "tie_break_uniform": 0.07171514543630893,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 2,
+      "window_id": "prm-window-002",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0002",
+      "anomaly_score": 0.142,
+      "tie_break_uniform": 0.49398194583751254,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 3,
+      "window_id": "prm-window-003",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0003",
+      "anomaly_score": 0.213,
+      "tie_break_uniform": 0.9162487462387161,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 4,
+      "window_id": "prm-window-004",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0004",
+      "anomaly_score": 0.284,
+      "tie_break_uniform": 0.3385155466399198,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 5,
+      "window_id": "prm-window-005",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0005",
+      "anomaly_score": 0.355,
+      "tie_break_uniform": 0.7607823470411234,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 6,
+      "window_id": "prm-window-006",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0006",
+      "anomaly_score": 0.426,
+      "tie_break_uniform": 0.18304914744232698,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 7,
+      "window_id": "prm-window-007",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0007",
+      "anomaly_score": 0.497,
+      "tie_break_uniform": 0.6053159478435306,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 8,
+      "window_id": "prm-window-008",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0008",
+      "anomaly_score": 0.568,
+      "tie_break_uniform": 0.027582748244734202,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 9,
+      "window_id": "prm-window-009",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0009",
+      "anomaly_score": 0.639,
+      "tie_break_uniform": 0.4498495486459378,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 10,
+      "window_id": "prm-window-010",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0010",
+      "anomaly_score": 0.71,
+      "tie_break_uniform": 0.8721163490471414,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 11,
+      "window_id": "prm-window-011",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0011",
+      "anomaly_score": 0.788,
+      "tie_break_uniform": 0.29438314944834504,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 12,
+      "window_id": "prm-window-012",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0012",
+      "anomaly_score": 0.796,
+      "tie_break_uniform": 0.7166499498495487,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 13,
+      "window_id": "prm-window-013",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0013",
+      "anomaly_score": 0.804,
+      "tie_break_uniform": 0.13891675025075226,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 14,
+      "window_id": "prm-window-014",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0014",
+      "anomaly_score": 0.812,
+      "tie_break_uniform": 0.5611835506519559,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 15,
+      "window_id": "prm-window-015",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0015",
+      "anomaly_score": 0.82,
+      "tie_break_uniform": 0.9834503510531595,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 16,
+      "window_id": "prm-window-016",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0016",
+      "anomaly_score": 0.828,
+      "tie_break_uniform": 0.4057171514543631,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 17,
+      "window_id": "prm-window-017",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0017",
+      "anomaly_score": 0.836,
+      "tie_break_uniform": 0.8279839518555667,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 18,
+      "window_id": "prm-window-018",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0018",
+      "anomaly_score": 0.844,
+      "tie_break_uniform": 0.2502507522567703,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 19,
+      "window_id": "prm-window-019",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0019",
+      "anomaly_score": 0.852,
+      "tie_break_uniform": 0.672517552657974,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 20,
+      "window_id": "prm-window-020",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0020",
+      "anomaly_score": 0.86,
+      "tie_break_uniform": 0.09478435305917753,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 21,
+      "window_id": "prm-window-021",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0021",
+      "anomaly_score": 0.868,
+      "tie_break_uniform": 0.5170511534603811,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 22,
+      "window_id": "prm-window-022",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0022",
+      "anomaly_score": 0.876,
+      "tie_break_uniform": 0.9393179538615848,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 23,
+      "window_id": "prm-window-023",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0023",
+      "anomaly_score": 0.884,
+      "tie_break_uniform": 0.36158475426278835,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 24,
+      "window_id": "prm-window-024",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0024",
+      "anomaly_score": 0.892,
+      "tie_break_uniform": 0.7838515546639919,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 25,
+      "window_id": "prm-window-025",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0025",
+      "anomaly_score": 0.9,
+      "tie_break_uniform": 0.20611835506519557,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 26,
+      "window_id": "prm-window-026",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0026",
+      "anomaly_score": 0.908,
+      "tie_break_uniform": 0.6283851554663992,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 27,
+      "window_id": "prm-window-027",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0027",
+      "anomaly_score": 0.916,
+      "tie_break_uniform": 0.05065195586760281,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 28,
+      "window_id": "prm-window-028",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0028",
+      "anomaly_score": 0.924,
+      "tie_break_uniform": 0.4729187562688064,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 29,
+      "window_id": "prm-window-029",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0029",
+      "anomaly_score": 0.932,
+      "tie_break_uniform": 0.89518555667001,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 30,
+      "window_id": "prm-window-030",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0030",
+      "anomaly_score": 0.94,
+      "tie_break_uniform": 0.31745235707121366,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 31,
+      "window_id": "prm-window-031",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0031",
+      "anomaly_score": 0.948,
+      "tie_break_uniform": 0.7397191574724172,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 32,
+      "window_id": "prm-window-032",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0032",
+      "anomaly_score": 0.956,
+      "tie_break_uniform": 0.16198595787362086,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 33,
+      "window_id": "prm-window-033",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0033",
+      "anomaly_score": 0.964,
+      "tie_break_uniform": 0.5842527582748245,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 34,
+      "window_id": "prm-window-034",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0034",
+      "anomaly_score": 0.972,
+      "tie_break_uniform": 0.006519558676028084,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 35,
+      "window_id": "prm-window-035",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0035",
+      "anomaly_score": 0.98,
+      "tie_break_uniform": 0.42878635907723167,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 36,
+      "window_id": "prm-window-036",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0036",
+      "anomaly_score": 0.0157,
+      "tie_break_uniform": 0.8510531594784353,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 37,
+      "window_id": "prm-window-037",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0037",
+      "anomaly_score": 0.9836,
+      "tie_break_uniform": 0.2733199598796389,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 38,
+      "window_id": "prm-window-038",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0038",
+      "anomaly_score": 0.0171,
+      "tie_break_uniform": 0.6955867602808425,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 39,
+      "window_id": "prm-window-039",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0039",
+      "anomaly_score": 0.9822,
+      "tie_break_uniform": 0.11785356068204614,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 40,
+      "window_id": "prm-window-040",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0040",
+      "anomaly_score": 0.0185,
+      "tie_break_uniform": 0.5401203610832498,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 41,
+      "window_id": "prm-window-041",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0041",
+      "anomaly_score": 0.9808,
+      "tie_break_uniform": 0.9623871614844534,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 42,
+      "window_id": "prm-window-042",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0042",
+      "anomaly_score": 0.0199,
+      "tie_break_uniform": 0.384653961885657,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 43,
+      "window_id": "prm-window-043",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0043",
+      "anomaly_score": 0.9794,
+      "tie_break_uniform": 0.8069207622868606,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 44,
+      "window_id": "prm-window-044",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0044",
+      "anomaly_score": 0.0213,
+      "tie_break_uniform": 0.2291875626880642,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 45,
+      "window_id": "prm-window-045",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0045",
+      "anomaly_score": 0.978,
+      "tie_break_uniform": 0.6514543630892679,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 46,
+      "window_id": "prm-window-046",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0046",
+      "anomaly_score": 0.0227,
+      "tie_break_uniform": 0.07372116349047142,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 47,
+      "window_id": "prm-window-047",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0047",
+      "anomaly_score": 0.9766,
+      "tie_break_uniform": 0.49598796389167504,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 48,
+      "window_id": "prm-window-048",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0048",
+      "anomaly_score": 0.0241,
+      "tie_break_uniform": 0.9182547642928787,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 49,
+      "window_id": "prm-window-049",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0049",
+      "anomaly_score": 0.9752,
+      "tie_break_uniform": 0.34052156469408223,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 50,
+      "window_id": "prm-window-050",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0050",
+      "anomaly_score": 0.0255,
+      "tie_break_uniform": 0.7627883650952858,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 51,
+      "window_id": "prm-window-051",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0051",
+      "anomaly_score": 0.9738,
+      "tie_break_uniform": 0.18505516549648948,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 52,
+      "window_id": "prm-window-052",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0052",
+      "anomaly_score": 0.0269,
+      "tie_break_uniform": 0.607321965897693,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 53,
+      "window_id": "prm-window-053",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0053",
+      "anomaly_score": 0.9724,
+      "tie_break_uniform": 0.02958876629889669,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 54,
+      "window_id": "prm-window-054",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0054",
+      "anomaly_score": 0.0283,
+      "tie_break_uniform": 0.4518555667001003,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 55,
+      "window_id": "prm-window-055",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0055",
+      "anomaly_score": 0.971,
+      "tie_break_uniform": 0.8741223671013039,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 56,
+      "window_id": "prm-window-056",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0056",
+      "anomaly_score": 0.0297,
+      "tie_break_uniform": 0.29638916750250754,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 57,
+      "window_id": "prm-window-057",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0057",
+      "anomaly_score": 0.9696,
+      "tie_break_uniform": 0.7186559679037111,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 58,
+      "window_id": "prm-window-058",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0058",
+      "anomaly_score": 0.0311,
+      "tie_break_uniform": 0.14092276830491474,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 59,
+      "window_id": "prm-window-059",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0059",
+      "anomaly_score": 0.9682,
+      "tie_break_uniform": 0.5631895687061184,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 60,
+      "window_id": "prm-window-060",
+      "context_id": "compute",
+      "sample_unit_id": "eval-unit-0060",
+      "anomaly_score": 0.0325,
+      "tie_break_uniform": 0.9854563691073219,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    }
+  ]
+}
