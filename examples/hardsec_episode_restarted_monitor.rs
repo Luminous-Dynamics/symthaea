@@ -1497,6 +1497,12 @@ mod tests {
 
         for _run in 0..runs {
             let mut score = 0.0_f64;
+            for _ in 0..12 {
+                innovation_rng = (1_664_525_u64 * innovation_rng
+                    + 1_013_904_223_u64) % 4_294_967_296_u64;
+                score += innovation_rng as f64 / 4_294_967_296.0;
+            }
+            score -= 6.0; // approximate stationary initial AR(1) state, variance near one.
             let mut state = ContextState::new(0.025, &family);
             let mut crossed = false;
             for episode_index in 1..=horizon {
