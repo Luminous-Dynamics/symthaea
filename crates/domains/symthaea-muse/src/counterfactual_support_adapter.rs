@@ -750,6 +750,57 @@ mod tests {
         VerifiedCounterfactualEventSupport { evidence }
     }
 
+    fn influence_window(index: usize, channel: usize, quiet: bool) -> crate::counterfactual_influence::InfluenceWindowSegmentation {
+        let start_frame = index * 10;
+        crate::counterfactual_influence::InfluenceWindowSegmentation {
+            window_index: index,
+            start_frame,
+            end_frame: start_frame + 10,
+            channel,
+            onset_rms_exceeded: !quiet,
+            onset_spectral_exceeded: false,
+            onset_triggered: !quiet,
+            release_rms_threshold: 0.1,
+            release_spectral_threshold: 0.1,
+            release_rms_exceeded: !quiet,
+            release_spectral_exceeded: false,
+            release_triggered: !quiet,
+            hysteresis_active: !quiet,
+        }
+    }
+
+    #[test]
+    fn trailing_quiet_windows_must_begin_after_final_note_off_on_every_channel() {
+        let mut windows = Vec::new();
+        for index in 0..5 {
+            for channel in 0..2 {
+                windows.push(influence_window(index, channel, index >= 2));
+            }
+        }
+        assert_eq!(trailing_quiet_windows_after_note_off(&windows, 2, 20, 50).unwrap(), (3, 5));
+        assert_eq!(trailing_quiet_windows_after_note_off(&windows, 2, 30, 50).unwrap(), (2, 5));
+    }
+
+    #[test]
+    fn active_last_channel_window_censors_tail_clearance() {
+        let mut windows = Vec::new();
+        for index in 0..5 {
+            for channel in 0..2 {
+                windows.push(influence_window(index, channel, index >= 2));
+            }
+        }
+        windows.last_mut().unwrap().release_triggered = true;
+        assert_eq!(trailing_quiet_windows_after_note_off(&windows, 2, 20, 50).unwrap(), (0, 5));
+    }
+
+    #[test]
+    fn malformed_channel_window_trace_fails_closed() {
+        let windows = vec![influence_window(0, 0, true), influence_window(1, 1, true)];
+        assert_eq!(
+            trailing_quiet_windows_after_note_off(&windows, 2, 0, 20).unwrap_err(),
+            CounterfactualSupportAdapterError::InvalidInfluenceWindowTrace
+        );
+    }
     #[test]
     fn measured_empty_support_still_has_replay_evidence_digest() {
         let verified = event(0, Vec::new());
