@@ -484,7 +484,7 @@ pub fn generate_poar_graph_suite(seed: u64, split: DatasetSplit) -> GraphSuite {
         claim("base",vec![alt("base-path",Polarity::Supports,vec![ProofRequirement::Evidence("e-base".into())],1)]),
         claim("root",vec![alt("root-via-base",Polarity::Supports,vec![
             ProofRequirement::Claim{claim_id:"base".into(),polarity:Polarity::Supports},
-        ],1)]),
+        ],0)]),
     ],vec![ev(split,"retraction","e-base","base",Polarity::Supports,"g-base",(t,None),(t,None),"scope-a","authority-a")],
     &[("e-base",HiddenTruth::SupportsAssertion)]);
 
@@ -536,7 +536,7 @@ pub fn generate_poar_graph_suite(seed: u64, split: DatasetSplit) -> GraphSuite {
                     vec![ProofRequirement::Claim {
                         claim_id: format!("chain-{:03}", index + 1),
                         polarity: Polarity::Supports,
-                    }], 1)
+                    }], 0)
             };
             claims.push(ClaimNode { id, alternatives: vec![alternative] });
         }
