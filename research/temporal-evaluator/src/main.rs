@@ -121,6 +121,8 @@ pub struct SubsetSummary {
     pub subset_mask: u64,
     pub selected_item_ids: Vec<u64>,
     pub bytes_used: u64,
+    /// Evaluator-measured retained-memory occupancy integrated over time.
+    pub retained_byte_us: u128,
     pub measured_cost: MeasuredRunCost,
     pub outcome: ExposureOutcome,
 }
