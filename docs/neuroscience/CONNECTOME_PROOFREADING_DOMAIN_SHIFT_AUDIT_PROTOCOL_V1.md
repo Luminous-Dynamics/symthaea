@@ -88,7 +88,7 @@ The placeholders above must be replaced with the exact pinned dataset and profil
 - Keep source volume, neuron/root, operation, physical PSU and related reconstruction lineages within the declared split boundary.
 - Distinguish held-out-domain transfer from covariate-shift stress within a represented domain.
 - Do not treat image crops, skeleton windows, synapses or repeated pipeline variants as independent clusters.
-- Report the independent domain, volume, neuron/root and PSU counts. The current extension emits descriptive domain cluster counts but does not yet add cluster-bootstrap intervals for ECE, MCE or OOD AUROC; do not use those point estimates as promotion evidence without the follow-on uncertainty implementation.
+- Report the independent domain, volume, neuron/root and PSU counts. The scorer now reports deterministic cluster-bootstrap 95% percentile intervals for ECE, MCE and Brier score overall and per domain, plus OOD AUROC/AUPRC where a resampled replicate retains both OOD classes. Clusters are resampled as complete units, never individual rows. An interval is withheld if fewer than two clusters exist or fewer than 80% of requested replicates are estimable. This is a minimum engineering safeguard, not a claim that two clusters provide adequate inferential power; promotion requires materially larger, independently justified cluster counts, coverage simulations and a source-volume-aware sampling design.
 - Preserve indeterminate adjudications and reviewer disagreement. The label reference is an adjudication process, not infallible biological truth.
 - If a domain/family has inadequate independent support, mark it NOT_ESTIMABLE and refer to human/specialist review.
 
