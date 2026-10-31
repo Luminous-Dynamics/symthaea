@@ -43,8 +43,6 @@ pub struct ProofCandidateAdmission {
     pub source_sha256: String,
     pub source_pointer: String,
     pub source_family_id: String,
-    /// Trusted canonical session identity. It must not be guessed from text.
-    pub source_session_id: Option<String>,
     pub scope_id: String,
     /// Digest of the exact EvidenceIndex state that produced this hit.
     pub index_state_sha256: String,
@@ -232,14 +230,6 @@ pub fn admit_lexical_hits_for_proof_budget(
                 admission.evidence_id
             ));
         }
-        if admission.source_session_id.as_ref().is_some_and(|session_id| {
-            session_id.trim().is_empty() || session_id.trim() != session_id
-        }) {
-            return Err(format!(
-                "admission {:?} has an invalid source session ID",
-                admission.evidence_id
-            ));
-        }
         if admission.source_trajectory_id != hit.source.trajectory_id
             || admission.source_step_id != hit.source.step_id
             || admission.source_step_index != hit.source.step_index
@@ -298,7 +288,10 @@ pub fn admit_lexical_hits_for_proof_budget(
             source_span_start: 0,
             source_span_end: span_len,
             source_family_id: admission.source_family_id.clone(),
-            source_session_id: admission.source_session_id.clone(),
+            // Session identity is derived from the exact source trajectory
+            // returned by the index and matched against the trusted admission.
+            // AML ingestion sets trajectory_id directly from Add.session_id.
+            source_session_id: Some(admission.source_trajectory_id.clone()),
             scope_id: admission.scope_id.clone(),
             payload_sha256: hit.content_sha256.clone(),
             source_span_sha256: resolved_digest.clone(),
@@ -389,9 +382,6 @@ mod tests {
             source_sha256: digest("canonical source"),
             source_pointer: "/messages/2/content".into(),
             source_family_id: format!("family-{id}"),
-            // In the AML Text/Coding ingestion adapter, trajectory_id is the
-            // immutable session_id copied from the Add request.
-            source_session_id: Some("trajectory-1".into()),
             scope_id: "scope-1".into(),
             index_state_sha256: digest("index state"),
             recorded_at_unix_ms: 100,
@@ -551,14 +541,12 @@ mod tests {
         // The trusted admission envelope must preserve that exact mapping.
         let mut admission_a = admission("A");
         admission_a.source_trajectory_id = hit_a.source.trajectory_id.clone();
-        admission_a.source_session_id = Some("session-1".into());
         let mut admission_b = admission("B");
         admission_b.source_trajectory_id = "session-2".into();
         admission_b.source_sha256 = hit_b.source.source_sha256.clone();
         admission_b.source_pointer = hit_b.source.source_pointer.clone();
         admission_b.source_step_id = hit_b.source.step_id.clone();
         admission_b.source_step_index = hit_b.source.step_index;
-        admission_b.source_session_id = Some("session-2".into());
 
         let admitted = admit_lexical_hits_for_proof_budget(
             proof_request,
@@ -579,24 +567,30 @@ mod tests {
     }
 
     #[test]
-    fn refuses_to_satisfy_multisession_claim_without_trusted_session_provenance() {
+    fn session_provenance_is_derived_from_indexed_trajectory_not_admission_guess() {
         let mut proof_request = request();
         proof_request.obligations[0].minimum_distinct_sessions = 1;
-        let mut no_session = admission("A");
-        no_session.source_session_id = None;
+        let indexed_hit = hit("A", "evidence", 1.0);
+        let mut mismatched_admission = admission("A");
+        mismatched_admission.source_trajectory_id = "forged-other-session".into();
+
+        let error = admit_lexical_hits_for_proof_budget(
+            proof_request.clone(),
+            &[indexed_hit],
+            &[mismatched_admission],
+            &snapshot_receipt(),
+        ).unwrap_err();
+        assert!(error.contains("trajectory"));
 
         let admitted = admit_lexical_hits_for_proof_budget(
             proof_request,
             &[hit("A", "evidence", 1.0)],
-            &[no_session],
+            &[admission("A")],
             &snapshot_receipt(),
         ).unwrap();
         let result = solve_proof_budget(admitted).unwrap();
-
-        assert_eq!(result.status, ProofBudgetStatus::NoEligibleProof);
-        assert!(result.justification_rejections.iter().any(|rejection| {
-            rejection.reason == crate::memory_proof_budget::JustificationRejectionReason::SessionProvenanceMissing
-        }));
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        assert_eq!(result.evidence[0].source_session_id.as_deref(), Some("trajectory-1"));
     }
 
     #[test]
