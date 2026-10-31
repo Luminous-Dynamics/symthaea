@@ -119,3 +119,30 @@ The strongest claim would be a reproducible Pareto improvement in held-out task 
 - No BrainTrace baseline was run.
 - No scores or energy values were imported.
 - Exact commit/blob identifiers are recorded above to enable a later reproduction.
+
+
+## 8. Published complexity/performance anchors (literature only)
+
+The Nature Communications article's full text provides useful, explicitly scoped reference points:
+
+- The paper states pp-prop stores two traces representing pre- and postsynaptic activity and gives memory complexity `O(BN)`, with batch size `B` and neuron count `N`.
+- It describes D-RTRL memory as `O(BP)`, where `P` is parameter count; in a dense recurrent network this can grow quadratically with neuron count.
+- In its LIF Gesture comparison, the paper reports 0.5 GB for pp-prop versus 17.5 GB for D-RTRL (35× lower memory) and about a 10× compute-time advantage over D-RTRL. It reports BPTT GPU memory increasing with sequence length and a crash at 400 steps in that particular experiment.
+- The article reports pp-prop matching BPTT in most settings and beating the strongest stated baseline by more than 10 percentage points on SHD in its experiment table.
+
+These are **paper-reported results for the paper's model, tasks, training code, hardware and memory boundary**. They are not measurements of Symthaea, not a fair direct comparison to its HDC state footprint, and not a guarantee that the public experiment scripts exactly reproduce each paper result.
+
+The article also explicitly notes that pp-prop's approximation quality can depend on firing statistics and network depth. The method builds its low-memory trace approximation with exponential smoothing and a low-pass filter. Therefore a matched replication must sweep/preregister trace decay and report approximation drift/gradient fidelity against D-RTRL or BPTT on tractable settings; it must not present pp-prop as an exact gradient.
+
+### Required head-to-head measurements
+
+For each method, report separately:
+
+1. persistent model parameters and hidden state;
+2. eligibility-trace/optimizer memory, including peak temporary buffers;
+3. growth with neuron count and sequence length;
+4. learning throughput and time-to-target-quality;
+5. held-out accuracy by delay and after regime change;
+6. energy per correctly learned decision, including compilation/warmup and full update work.
+
+Do not compare pp-prop's eligibility memory alone with HDC-LTC's whole neuron memory, or vice versa. Normalize both to a full system boundary and add a component-level breakdown.
