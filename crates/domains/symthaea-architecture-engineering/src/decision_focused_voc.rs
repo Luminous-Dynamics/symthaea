@@ -21,6 +21,7 @@ use std::fmt;
 
 use sha2::{Digest, Sha256};
 
+use super::multi_fidelity_tabular_nas::{FidelityCostModel, FidelityLevel};
 use super::tabular_nas_firewall::MetricDirection;
 
 const VOC_DOMAIN: &[u8] = b"symthaea.nas.decision-focused-voc.v0.1";
@@ -47,6 +48,9 @@ pub struct DecisionFocusedVoCModelManifest {
     pub metric_direction: MetricDirection,
     pub evaluation_task_id: String,
     pub calibration_task_ids: Vec<String>,
+    pub fidelity_levels: Vec<FidelityLevel>,
+    pub fidelity_cost_model: FidelityCostModel,
+    pub resource_unit: String,
     pub source_artifact_sha256: String,
     pub posterior_model_sha256: String,
     pub observation_likelihood_model_sha256: String,
@@ -76,6 +80,9 @@ pub struct VoCAction {
     pub kind: VoCActionKind,
     /// Required for FidelityQuery and DormantReactivation; absent for aggregate SentinelAudit.
     pub candidate_id: Option<String>,
+    pub fidelity_id: String,
+    pub fidelity_index: usize,
+    pub current_fidelity_index: Option<usize>,
     pub resource_unit: String,
     pub incremental_cost_units: u64,
     pub source_artifact_sha256: String,
@@ -126,6 +133,9 @@ pub struct VoCActionEvaluation {
     pub action_id: String,
     pub kind: VoCActionKind,
     pub candidate_id: Option<String>,
+    pub fidelity_id: String,
+    pub fidelity_index: usize,
+    pub current_fidelity_index: Option<usize>,
     pub incremental_cost_units: u64,
     pub expected_posterior_regret: f64,
     pub expected_regret_reduction: f64,
@@ -196,6 +206,12 @@ pub fn plan_decision_focused_voc(
     validate_manifest(manifest)?;
     validate_posterior(posterior)?;
     validate_config(config, posterior.candidate_ids.len())?;
+    if config.resource_unit != manifest.resource_unit {
+        return Err(DecisionFocusedVoCError::new(
+            "resource_unit",
+            "planner resource unit must match the frozen fidelity manifest",
+        ));
+    }
     if compute_posterior_model_sha256(posterior) != manifest.posterior_model_sha256 {
         return Err(DecisionFocusedVoCError::new(
             "posterior_model_sha256",
@@ -270,6 +286,9 @@ pub fn plan_decision_focused_voc(
             action_id: action.action_id.clone(),
             kind: action.kind,
             candidate_id: action.candidate_id.clone(),
+            fidelity_id: action.fidelity_id.clone(),
+            fidelity_index: action.fidelity_index,
+            current_fidelity_index: action.current_fidelity_index,
             incremental_cost_units: action.incremental_cost_units,
             expected_posterior_regret,
             expected_regret_reduction,
@@ -354,6 +373,7 @@ fn validate_manifest(
         ("benchmark_id", manifest.benchmark_id.as_str()),
         ("target_metric_id", manifest.target_metric_id.as_str()),
         ("evaluation_task_id", manifest.evaluation_task_id.as_str()),
+        ("resource_unit", manifest.resource_unit.as_str()),
     ] {
         if value.trim().is_empty() {
             return Err(DecisionFocusedVoCError::new(field, "must be non-empty"));
@@ -365,6 +385,29 @@ fn validate_manifest(
         &manifest.observation_likelihood_model_sha256,
         "observation_likelihood_model_sha256",
     )?;
+    if manifest.fidelity_levels.len() < 2 {
+        return Err(DecisionFocusedVoCError::new(
+            "fidelity_levels",
+            "at least two ordered fidelity levels are required",
+        ));
+    }
+    let mut fidelity_ids = HashSet::with_capacity(manifest.fidelity_levels.len());
+    let mut previous_cost = 0u64;
+    for (index, level) in manifest.fidelity_levels.iter().enumerate() {
+        if level.id.trim().is_empty() || !fidelity_ids.insert(level.id.as_str()) {
+            return Err(DecisionFocusedVoCError::new(
+                format!("fidelity_levels[{index}].id"),
+                "fidelity IDs must be non-empty and unique",
+            ));
+        }
+        if level.cumulative_cost_units <= previous_cost {
+            return Err(DecisionFocusedVoCError::new(
+                format!("fidelity_levels[{index}].cumulative_cost_units"),
+                "cumulative fidelity costs must be strictly increasing and positive",
+            ));
+        }
+        previous_cost = level.cumulative_cost_units;
+    }
     if !manifest.task_calibration_qualified {
         return Err(DecisionFocusedVoCError::new(
             "task_calibration_qualified",
@@ -539,10 +582,50 @@ fn validate_action(
             "action IDs must be non-empty and unique",
         ));
     }
-    if action.resource_unit != config.resource_unit {
+    if action.resource_unit != config.resource_unit
+        || action.resource_unit != manifest.resource_unit
+    {
         return Err(DecisionFocusedVoCError::new(
             format!("actions[{index}].resource_unit"),
-            "all candidate actions must use the declared resource unit",
+            "all candidate actions must use the declared frozen resource unit",
+        ));
+    }
+    let Some(level) = manifest.fidelity_levels.get(action.fidelity_index) else {
+        return Err(DecisionFocusedVoCError::new(
+            format!("actions[{index}].fidelity_index"),
+            "action fidelity index is outside the frozen fidelity ladder",
+        ));
+    };
+    if level.id != action.fidelity_id {
+        return Err(DecisionFocusedVoCError::new(
+            format!("actions[{index}].fidelity_id"),
+            "fidelity ID does not match the frozen index-to-ID mapping",
+        ));
+    }
+    if let Some(current_index) = action.current_fidelity_index {
+        if current_index >= action.fidelity_index
+            || current_index >= manifest.fidelity_levels.len()
+        {
+            return Err(DecisionFocusedVoCError::new(
+                format!("actions[{index}].current_fidelity_index"),
+                "current fidelity must be a valid rung strictly below the requested fidelity",
+            ));
+        }
+    }
+    let expected_incremental_cost = match action.current_fidelity_index {
+        None => level.cumulative_cost_units,
+        Some(current_index) => match manifest.fidelity_cost_model {
+            FidelityCostModel::ResumablePrefix => {
+                level.cumulative_cost_units
+                    - manifest.fidelity_levels[current_index].cumulative_cost_units
+            }
+            FidelityCostModel::IndependentRuns => level.cumulative_cost_units,
+        },
+    };
+    if action.incremental_cost_units != expected_incremental_cost {
+        return Err(DecisionFocusedVoCError::new(
+            format!("actions[{index}].incremental_cost_units"),
+            "declared action cost does not match the frozen fidelity cost model",
         ));
     }
     if action.incremental_cost_units == 0 {
@@ -846,6 +929,15 @@ pub fn compute_observation_likelihood_model_sha256(
         update_string(&mut hasher, &action.action_id);
         hasher.update([action_kind_tag(action.kind)]);
         update_optional_string(&mut hasher, action.candidate_id.as_deref());
+        update_string(&mut hasher, &action.fidelity_id);
+        hasher.update((action.fidelity_index as u64).to_be_bytes());
+        match action.current_fidelity_index {
+            Some(index) => {
+                hasher.update([1]);
+                hasher.update((index as u64).to_be_bytes());
+            }
+            None => hasher.update([0]),
+        }
         update_string(&mut hasher, &action.resource_unit);
         hasher.update(action.incremental_cost_units.to_be_bytes());
         update_string(&mut hasher, &action.source_artifact_sha256);
@@ -898,6 +990,15 @@ fn digest_plan(
     update_string(&mut hasher, &manifest.source_artifact_sha256);
     update_string(&mut hasher, &manifest.posterior_model_sha256);
     update_string(&mut hasher, &manifest.observation_likelihood_model_sha256);
+    update_string(&mut hasher, &manifest.resource_unit);
+    hasher.update([match manifest.fidelity_cost_model {
+        FidelityCostModel::ResumablePrefix => 0,
+        FidelityCostModel::IndependentRuns => 1,
+    }]);
+    for level in &manifest.fidelity_levels {
+        update_string(&mut hasher, &level.id);
+        hasher.update(level.cumulative_cost_units.to_be_bytes());
+    }
     update_string(&mut hasher, &config.resource_unit);
     hasher.update((config.target_k as u64).to_be_bytes());
     hasher.update(config.total_budget_units.to_be_bytes());
@@ -923,6 +1024,15 @@ fn digest_plan(
         update_string(&mut hasher, &evaluation.action_id);
         hasher.update([action_kind_tag(evaluation.kind)]);
         update_optional_string(&mut hasher, evaluation.candidate_id.as_deref());
+        update_string(&mut hasher, &evaluation.fidelity_id);
+        hasher.update((evaluation.fidelity_index as u64).to_be_bytes());
+        match evaluation.current_fidelity_index {
+            Some(index) => {
+                hasher.update([1]);
+                hasher.update((index as u64).to_be_bytes());
+            }
+            None => hasher.update([0]),
+        }
         hasher.update(evaluation.incremental_cost_units.to_be_bytes());
         hasher.update(evaluation.expected_posterior_regret.to_bits().to_be_bytes());
         hasher.update(evaluation.expected_regret_reduction.to_bits().to_be_bytes());
