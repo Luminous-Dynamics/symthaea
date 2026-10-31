@@ -656,6 +656,8 @@ mod tests {
         assert_eq!(receipt["statistical_guarantees"]["null_stream_iid_assumption_status"], "assumption_not_verified");
         assert_eq!(receipt["statistical_guarantees"]["reference_sample_iid_assumption_status"], "assumption_not_verified");
         assert_eq!(receipt["statistical_guarantees"]["theorem_guarantee_status"], "not_established_from_input_receipts");
+        let unconditional = receipt["statistical_guarantees"]["unconditional_type_i_upper_bound_if_all_paper_assumptions_hold"].as_f64().unwrap();
+        assert!((unconditional - 0.05).abs() < 1e-12);
         assert_eq!(receipt["statistical_guarantees"]["effective_sample_size_estimate"], Value::Null);
     }
 
