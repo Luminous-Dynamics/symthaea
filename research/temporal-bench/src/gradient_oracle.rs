@@ -353,6 +353,17 @@ mod tests {
     }
 
     #[test]
+    fn reverse_mode_bptt_matches_independent_known_answer_vector() {
+        let config = ScalarRecurrentConfig::reference();
+        let gradient = full_bptt_gradient(&config).unwrap();
+        close(gradient.input_weight, 0.07154630345318397, 1.0e-12);
+        close(gradient.interlayer_weight, 0.04769753563545599, 1.0e-12);
+        close(gradient.readout_weight, 0.02384876781772800, 1.0e-12);
+        close(gradient.alpha, 0.05479641412485119, 1.0e-12);
+        close(gradient.beta, 0.06125805832273921, 1.0e-12);
+    }
+
+    #[test]
     fn reverse_mode_bptt_matches_centered_finite_difference() {
         let config = ScalarRecurrentConfig::reference();
         let reverse = full_bptt_gradient(&config).unwrap().as_array();
