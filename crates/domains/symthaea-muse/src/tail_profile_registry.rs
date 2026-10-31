@@ -1355,6 +1355,36 @@ mod tests {
     }
 
     #[test]
+    fn incomplete_trailing_quiet_windows_reject_profile_construction() {
+        let mut observation = observation(0, 1, TailProfileSplit::Calibration, 20);
+        observation.trailing_quiet_windows = 2;
+        let result = create_profile_unsigned(
+            &spec(),
+            context(&topology_attestation("tail-profile-authority", &signing_key())),
+            &[observation],
+            &digest("manifest"),
+            &digest("audit"),
+            "tail-profile-authority",
+        );
+        assert_eq!(result.unwrap_err(), TailProfileError::TailWindowCensored);
+    }
+
+    #[test]
+    fn lineage_tail_uses_raw_or_hysteresis_maximum_and_worst_clearance() {
+        let mut long_raw = observation(0, 1, TailProfileSplit::Calibration, 20);
+        long_raw.raw_measured_end_frame = Some(250);
+        long_raw.observed_tail_frames = 150;
+        long_raw.trailing_quiet_windows = 4;
+        let mut short_raw = observation(1, 1, TailProfileSplit::Calibration, 10);
+        short_raw.trailing_quiet_windows = 3;
+        let summaries = lineage_summaries(&[long_raw, short_raw]).unwrap();
+        assert_eq!(summaries.len(), 1);
+        assert_eq!(summaries[0].maximum_raw_tail_frames, 150);
+        assert_eq!(summaries[0].maximum_hysteresis_tail_frames, 20);
+        assert_eq!(summaries[0].maximum_observed_tail_frames, 150);
+        assert_eq!(summaries[0].minimum_trailing_quiet_windows, 3);
+    }
+    #[test]
     fn signed_profile_registry_requires_exact_context_and_revocation() {
         let key = signing_key();
         let authority = authority("profile-publisher-v1", &key);
