@@ -951,6 +951,36 @@ pub fn verify_tail_profile(
     profile: &TailProfile,
     authorities: &BTreeMap<String, TailProfileAuthority>,
 ) -> Result<(), TailProfileError> {
+    // Preserve and re-verify the renderer authority's original statement.
+    // The profile publisher may be a different authority from the renderer
+    // topology signer; both keys must be explicitly trusted by the registry.
+    let topology_authority = authorities
+        .get(&profile.topology_attestation.authority_key_id)
+        .ok_or(TailProfileError::InvalidAuthority)?;
+    let verified_topology = verify_renderer_topology_attestation(
+        &profile.topology_attestation,
+        topology_authority,
+    )?;
+    let attestation = &profile.topology_attestation;
+    if verified_topology.attestation_sha256() != profile.context.topology_attestation_sha256
+        || attestation.renderer_identity_sha256 != profile.context.renderer_identity_sha256
+        || attestation.renderer_executable_sha256 != profile.context.renderer_executable_sha256
+        || attestation.soundfont_sha256 != profile.context.soundfont_sha256
+        || attestation.renderer_config_sha256 != profile.context.renderer_config_sha256
+        || attestation.render_config_sha256 != profile.context.render_config_sha256
+        || attestation.effects_group_assignment != profile.context.effects_group_assignment
+        || attestation.effect_settings_sha256 != profile.context.effect_settings_sha256
+        || attestation.reverb_settings_sha256 != profile.context.reverb_settings_sha256
+        || attestation.chorus_settings_sha256 != profile.context.chorus_settings_sha256
+        || attestation.route_graph_sha256 != profile.context.route_graph_sha256
+        || attestation.output_chain_sha256 != profile.context.output_chain_sha256
+        || attestation.sample_rate_hz != profile.context.sample_rate_hz
+        || attestation.channels != profile.context.channels
+        || attestation.bits_per_sample != profile.context.bits_per_sample
+        || attestation.sample_format != profile.context.sample_format
+    {
+        return Err(TailProfileError::ProfileContextMismatch);
+    }
     if profile.version != PROFILE_VERSION
         || !profile.qualification.qualified
         || !valid_label(&profile.profile_id)
