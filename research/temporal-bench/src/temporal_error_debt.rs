@@ -114,6 +114,9 @@ pub struct TemporalErrorDebtScore {
     pub missed_correction_exposure: u128,
     pub stale_after_retraction_windows: usize,
     pub stale_after_retraction_exposure: u128,
+    /// Candidate state changes between adjacent checkpoints while the
+    /// evaluator's expected state for that fixed valid_at query is unchanged.
+    pub answer_oscillations: usize,
     /// Knowledge-time lag from correction arrival to first correct corrected value.
     pub correction_latency: Option<u64>,
     /// Knowledge-time lag from retraction arrival to first correct NoFact response.
@@ -265,16 +268,28 @@ pub fn score_temporal_error_debt(
         missed_correction_exposure: 0,
         stale_after_retraction_windows: 0,
         stale_after_retraction_exposure: 0,
+        answer_oscillations: 0,
         correction_latency: None,
         retraction_latency: None,
     };
 
+    let mut previous_query_state: BTreeMap<
+        u64,
+        (Option<i64>, Option<KnowledgeCandidateAnswer>),
+    > = BTreeMap::new();
     for window in windows {
         let duration = u128::from(window.duration);
         let prediction = predictions_by_key
             .get(&(window.query_id, window.checkpoint_index))
             .copied();
         let expected_value = resolve_expected_value(oracle, window.valid_at, window.known_at);
+        if let Some((previous_expected, previous_prediction)) =
+            previous_query_state.insert(window.query_id, (expected_value, prediction))
+        {
+            if previous_expected == expected_value && previous_prediction != prediction {
+                score.answer_oscillations = score.answer_oscillations.saturating_add(1);
+            }
+        }
 
         let Some(prediction) = prediction else {
             score.missing_predictions = score.missing_predictions.saturating_add(1);
@@ -650,6 +665,58 @@ mod tests {
             u128::from(oracle.correction_observed_at)
         );
         assert_eq!(score.wrong_belief_exposure, u128::from(oracle.correction_observed_at));
+    }
+
+    #[test]
+    fn answer_oscillations_count_state_changes_without_new_evidence() {
+        let (oracle, windows) = fixture();
+        let candidate = predictions(
+            KnowledgeCandidateAnswer::Value(oracle.initial_value),
+            KnowledgeCandidateAnswer::Value(oracle.corrected_value),
+            KnowledgeCandidateAnswer::Value(oracle.corrected_value),
+            KnowledgeCandidateAnswer::NoFact,
+        );
+        let mut windows = windows;
+        // The current-query expected state changes at correction and retraction.
+        // Add a historical lane where the expected answer is invariant; changing
+        // its candidate state is an unsupported oscillation.
+        for window in windows.iter_mut() {
+            if window.query_id == 77 {
+                window.valid_at = oracle.correction_valid_from.saturating_sub(1);
+            }
+        }
+        let mut history = vec![
+            KnowledgeExposureWindow {
+                query_id: 88,
+                checkpoint_index: 0,
+                valid_at: oracle.interval_steps,
+                known_at: 0,
+                duration: 8,
+            },
+            KnowledgeExposureWindow {
+                query_id: 88,
+                checkpoint_index: 1,
+                valid_at: oracle.interval_steps,
+                known_at: 8,
+                duration: 8,
+            },
+        ];
+        windows.extend(history.drain(..));
+        let mut predictions = candidate;
+        predictions.extend([
+            KnowledgeTimedPrediction {
+                query_id: 88,
+                checkpoint_index: 0,
+                answer: KnowledgeCandidateAnswer::Value(oracle.initial_value),
+            },
+            KnowledgeTimedPrediction {
+                query_id: 88,
+                checkpoint_index: 1,
+                answer: KnowledgeCandidateAnswer::Value(oracle.corrected_value),
+            },
+        ]);
+        let score = score_temporal_error_debt(&oracle, &windows, &predictions).unwrap();
+        assert_eq!(score.answer_oscillations, 1);
     }
 
     #[test]
