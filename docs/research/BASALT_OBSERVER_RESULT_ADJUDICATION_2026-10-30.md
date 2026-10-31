@@ -101,6 +101,8 @@ The fixture is dependency-free and network-disabled at invocation (--offline --l
 - https://doc.rust-lang.org/cargo/reference/build-scripts.html
 - https://doc.rust-lang.org/stable/cargo/reference/build-script-examples.html
 
+All five standalone Cargo fixture packages declare their own `[workspace]` root. This is deliberate: the runners can write their temporary workspaces beneath a repository checkout, and without an explicit root Cargo may discover the caller repository's outer workspace and reject or reinterpret the nested fixture. Unit tests enforce this boundary for the hidden-input, mtime, and environment packages.
+
 ## Cargo mtime-preserving dependency challenge
 
 A separate `basalt-cargo-mtime-fixture-run` command adds a correctly-declared positive control and an mtime-preserving adversarial control. Both build scripts read the same logical input and emit `rerun-if-changed=build.rs-input.txt`.
@@ -110,22 +112,6 @@ The positive control mutates the bytes and advances the input mtime, then requir
 This tests a separate boundary from an omitted rerun declaration. Cargo's current documentation says `rerun-if-changed` uses file modification timestamps. An observer that only mirrors the build system's invalidation decisions may therefore reproduce its blind spot. BASALT's proposed requirement is stronger: changed content must remain visible to the independent dependency observer even when mtime does not change. The runner records the observed Cargo behavior rather than assuming future Cargo releases remain mtime-blind.
 
 The evidence still states `independent_kernel_observation=false` and `qualification_eligible=false`; it demonstrates a controlled Cargo cache behavior, not an observer pass. References: [Cargo build scripts](https://doc.rust-lang.org/cargo/reference/build-scripts.html), [Cargo configuration hierarchy](https://doc.rust-lang.org/cargo/reference/config.html).
-
-## Independent Cargo mtime evidence replay
-
-The separate command `basalt-cargo-mtime-evidence-verify` consumes the retained mtime evidence and the exact challenge catalog. It does not trust the runner's success flag alone. It independently checks the catalog digest, embedded fixture digest, Cargo/rustc binary/version/sysroot identity, PATH digest, retained workspace identity, Git baseline, ignored/untracked state, changed input digests, build-script source digests and exact recorded mtime.
-
-It then creates a new empty verifier CARGO_HOME, reruns Cargo against the retained warm target directory and compares that output with the original warm-cache evidence, then performs a fresh target replay and requires the mutated value. The verifier refuses to reuse its own CARGO_HOME or fresh replay target directories.
-
-Run it after the mtime fixture has emitted its evidence:
-
-```sh
-cargo run -p xtask --bin xtask -- basalt-cargo-mtime-evidence-verify \
-  --evidence reports/basalt-cargo-mtime-fixtures/<run-id>/cargo-mtime-fixture-evidence.v1.json \
-  --catalog benchmarks/basalt/coverage/observer-challenges.v1.json
-```
-
-This provides a second-process replay check, not an independent trust root: the verifier is still part of the same repository/toolchain, does not observe the build-script file open at kernel level, and does not authenticate a signature. Its `oracle_authenticity_established` and `qualification_eligible` fields remain hard false.
 
 ## Independent Cargo mtime evidence replay
 
@@ -235,7 +221,7 @@ Every preserve control must be paired with a capture control over the **same res
 
 ## Paradigm shift: benchmark the evidence-retention frontier
 
-The executable benchmark contract is `benchmarks/basalt/observer-evidence-retention-benchmark.v1.json`. It freezes seven matched comparison arms and eleven metrics, including their numerators, denominators and targets. The protocol forbids compensating for a safety failure with a speed improvement; all seven safety gates must pass before selectivity or cost can influence a promotion decision.
+The executable benchmark contract is `benchmarks/basalt/observer-evidence-retention-benchmark.v1.json`. It freezes seven matched comparison arms and twelve metrics, including their numerators, denominators and targets. The protocol forbids compensating for a safety failure with a speed improvement; all eight safety gates must pass before selectivity or cost can influence a promotion decision.
 
 A conventional cache benchmark tends to optimize cache hit rate and rebuild time. BASALT should instead optimize a constrained frontier:
 
@@ -288,7 +274,7 @@ Bazel's own documentation identifies the precise failure class: without action s
 
 Nix sandboxing limits build visibility to declared store dependencies, the temporary build directory and selected special paths; on Linux it also uses private namespaces. Fixed-output derivations are an explicit network exception. This is a strong hermeticity boundary. BASALT should compare against it as a separate arm and treat any admitted external path or network exception as part of the declared profile.
 
-SLSA v1.2 is the approved specification. Its Build provenance describes the trusted builder/platform closure and resolved dependencies; the v1.2 provenance text describes dependency completeness as best-effort at Build L3. The SLSA future-directions page discusses complete input knowledge, hermetic builds and reproducible builds as possible Build L4 territory, not as a guarantee supplied by today's L3 provenance. This distinction is important: BASALT's proposed value is independently challenged runtime coverage, not another signature around an unverified dependency list.
+SLSA v1.2 is the approved specification; its published Build Track describes levels L0-L3, and its provenance model treats resolved-dependency completeness as best-effort through Build L3. The SLSA main-branch draft provenance text describes technically enforced dependency completeness as a proposed Build L4 requirement. Treat that as draft/future direction, not as an adopted v1.2 requirement or a guarantee supplied by today's L3 provenance. BASALT should report compatibility against the published SLSA version and compose with its provenance model rather than claim an equivalent SLSA level. This distinction is important: BASALT's proposed value is independently challenged runtime coverage, not another signature around an unverified dependency list.
 
 Reproducible Builds defines reproducibility as independent parties being able to recreate bit-identical artifacts from the same source, environment and instructions. That is an essential cross-check, but two identical outputs do not prove that every dependency was observed or that a prior incremental result was correctly invalidated after a hidden input changed.
 
@@ -314,7 +300,7 @@ Primary references:
 | Re-verification cost | At least 30% less work than global rerun, only after all safety gates pass |
 | Shifted engineering outcomes | +3 percentage points paired success over a strong matched baseline, or non-inferior success at materially lower cost |
 
-A 37-case conformance set is not a statistical qualification sample. For a one-sided 95% upper bound near 0.1% after zero misses, the simple binomial rule-of-three requires about 2,995 independent scenario units. Cluster related mutations by task/repository lineage, report channel-stratified intervals, keep an untouched holdout, and do not count syscalls/events as independent trials.
+A 38-case conformance set is not a statistical qualification sample. For a one-sided 95% upper bound near 0.1% after zero misses, the simple binomial rule-of-three requires about 2,995 independent scenario units. Cluster related mutations by task/repository lineage, report channel-stratified intervals, keep an untouched holdout, and do not count syscalls/events as independent trials.
 
 ## Critical next work: make the oracle independently executable
 
