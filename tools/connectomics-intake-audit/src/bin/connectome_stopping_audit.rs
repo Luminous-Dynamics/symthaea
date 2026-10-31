@@ -1165,6 +1165,23 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_false_stop_fixture_reports_stable_global_invariants_poor_completeness_and_query_drift() {
+        let bytes = include_str!("../../../../docs/neuroscience/examples/CONNECTOME_STOPPING_FALSE_STOP_COUNTEREXAMPLE.example.jsonl").as_bytes();
+        let snapshots = parse_jsonl(bytes).expect("false-stop fixture should parse");
+        let report = build_report(bytes, &snapshots, &args(3));
+        assert_eq!(report.status, "VALIDATED_NOT_STOPPED", "{:?}", report.errors);
+        assert_eq!(report.graph_invariants_stable_in_tail, Some(true));
+        assert_eq!(report.query_metrics_stable_in_tail, Some(false));
+        assert_eq!(report.synaptic_completeness.status, "AVAILABLE");
+        assert_eq!(report.synaptic_completeness.observed_snapshot_count, 3);
+        assert_eq!(report.synaptic_completeness.latest_total_synapse_count, Some(10_000));
+        assert_eq!(report.synaptic_completeness.latest_fully_proofread_partner_synapse_count, Some(2_000));
+        assert!((report.synaptic_completeness.latest_fraction.unwrap() - 0.20).abs() < 1.0e-12);
+        assert_eq!(report.synaptic_completeness.stability.stable_under_declared_tolerance, Some(true));
+        assert_eq!(report.recommendation, "CONTINUE_REVIEW");
+    }
+
+    #[test]
     fn checked_in_example_is_valid_and_shows_query_instability() {
         let bytes = include_str!("../../../../docs/neuroscience/examples/CONNECTOME_STOPPING_SNAPSHOTS.example.jsonl").as_bytes();
         let snapshots = parse_jsonl(bytes).expect("example should parse");
