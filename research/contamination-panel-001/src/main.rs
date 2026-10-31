@@ -11,6 +11,7 @@ use contamination_panel_bench::{
         RandomizedInterventionDesignV1, RandomizedInterventionManifestV1,
         audit_intervention, randomize_intervention,
     },
+    training_receipt::validate_paired_training_execution_receipt,
 };
 use std::{
     env,
@@ -251,6 +252,36 @@ fn audit_intervention_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn audit_training_receipt_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 6 {
+        return Err(
+            "usage: contamination-panel-bench audit-training-receipt <design.json> <intervention-manifest.json> <seed-hex> <paired-training-receipt.json> <audit-report.json>"
+                .into(),
+        );
+    }
+    let design: RandomizedInterventionDesignV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
+    let manifest: RandomizedInterventionManifestV1 =
+        serde_json::from_slice(&fs::read(&args[2])?)?;
+    let seed = decode_hex(&args[3]).map_err(io::Error::other)?;
+    let receipt_bytes = fs::read(&args[4])?;
+    let report = validate_paired_training_execution_receipt(
+        &design,
+        &manifest,
+        &seed,
+        &receipt_bytes,
+    ).map_err(io::Error::other)?;
+    write_bytes(&args[5], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "valid={} execution_consistent={} ready_for_external_verification={} independently_verified={}",
+        report.valid,
+        report.execution_consistent,
+        report.ready_for_independent_attestation_verification,
+        report.independently_verified
+    );
+    println!("attestation status: {}", report.external_attestation_verification);
+    Ok(())
+}
+
 fn audit_adjudications(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 4 {
         return Err(
@@ -302,9 +333,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("ftd-fuse") => ftd_fuse(&args),
         Some("randomize-intervention") => randomize_intervention_cli(&args),
         Some("audit-intervention") => audit_intervention_cli(&args),
+        Some("audit-training-receipt") => audit_training_receipt_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
