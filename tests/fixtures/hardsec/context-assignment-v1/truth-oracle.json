@@ -1,0 +1,103 @@
+{
+  "schema_version": "hardsec-context-assignment-truth-v1",
+  "evidence_domain": "synthetic_fixture",
+  "stream_id": "stream-cctm-demo-01",
+  "evaluation_group_id": "heldout-execution-cctm-01",
+  "records": [
+    {
+      "sequence_index": 1,
+      "window_id": "cctm-window-001",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 2,
+      "window_id": "cctm-window-002",
+      "true_context_id": "memory"
+    },
+    {
+      "sequence_index": 3,
+      "window_id": "cctm-window-003",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 4,
+      "window_id": "cctm-window-004",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 5,
+      "window_id": "cctm-window-005",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 6,
+      "window_id": "cctm-window-006",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 7,
+      "window_id": "cctm-window-007",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 8,
+      "window_id": "cctm-window-008",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 9,
+      "window_id": "cctm-window-009",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 10,
+      "window_id": "cctm-window-010",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 11,
+      "window_id": "cctm-window-011",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 12,
+      "window_id": "cctm-window-012",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 13,
+      "window_id": "cctm-window-013",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 14,
+      "window_id": "cctm-window-014",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 15,
+      "window_id": "cctm-window-015",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 16,
+      "window_id": "cctm-window-016",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 17,
+      "window_id": "cctm-window-017",
+      "true_context_id": "compute"
+    },
+    {
+      "sequence_index": 18,
+      "window_id": "cctm-window-018",
+      "true_context_id": "unknown"
+    },
+    {
+      "sequence_index": 19,
+      "window_id": "cctm-window-019",
+      "true_context_id": "memory"
+    }
+  ]
+}

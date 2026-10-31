@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/hardsec-context-assignment-stream-v1.schema.json",
+  "title": "HARDSEC context assignments v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_domain",
+    "policy_id",
+    "stream_id",
+    "evaluation_group_id",
+    "assignment_artifact_sha256",
+    "records"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-context-assignment-stream-v1"
+    },
+    "evidence_domain": {
+      "enum": [
+        "synthetic_fixture",
+        "simulator",
+        "physical_hardware"
+      ]
+    },
+    "policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stream_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_group_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "assignment_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence_index",
+          "window_id",
+          "candidate_scores",
+          "top1_context_id",
+          "top1_confidence",
+          "top1_top2_margin",
+          "sensor_state",
+          "decision_status",
+          "decision_reason",
+          "selected_context_id"
+        ],
+        "properties": {
+          "sequence_index": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "window_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "candidate_scores": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "context_id",
+                "probability"
+              ],
+              "properties": {
+                "context_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "probability": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            }
+          },
+          "top1_context_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "top1_confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "top1_top2_margin": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "sensor_state": {
+            "enum": [
+              "valid",
+              "missing",
+              "stale",
+              "misaligned",
+              "multiplexed",
+              "untrusted"
+            ]
+          },
+          "decision_status": {
+            "enum": [
+              "accepted",
+              "abstained"
+            ]
+          },
+          "decision_reason": {
+            "enum": [
+              "accepted",
+              "invalid_sensor",
+              "unknown_context",
+              "ambiguous_assignment"
+            ]
+          },
+          "selected_context_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

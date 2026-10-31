@@ -219,3 +219,33 @@ cargo run --locked \
 A dedicated Rust test constructs 10,000 equally weighted latent scores (U\in(0,1)), maps each to a null score (X=6U) under the fixture's uniform-score reference grid, and repeats each latent score for 100 consecutive observations. Each time position has the correct marginal null score distribution, but all observations within a stream are perfectly dependent. The fixed reference grid's ECDF is within the declared DKW band for the uniform CDF, isolating the failure of the test-stream i.i.d. assumption in this constructed diagnostic.
 
 A private numerical cross-check of this exact deterministic grid gives 7,917 threshold crossings out of 10,000 latent paths (79.17%) with the combined alpha+delta budget set to 5%. The Rust test asserts a broad 75–85% range to avoid a fragile exact floating-point count. This is a deterministic grid stress test, not a Monte Carlo confidence interval, measured PMU false-alarm probability, or claim about real hardware. Its purpose is to prevent this implementation from being represented as valid for arbitrary dependent telemetry.
+
+
+
+## 10. Mandatory context-assignment receipt (HARDSEC-020)
+
+The DKW-CCTM no longer treats a caller-provided context string as sufficient for a confirmatory stream. It requires the truth-free runtime mapping from [HARDSEC-020](https://github.com/Luminous-Dynamics/symthaea/issues/9484):
+
+```bash
+cargo run --locked \
+  --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml \
+  --features hardsec-context-assignment-audit \
+  --example hardsec_context_assignment_audit -- \
+  --policy tests/fixtures/hardsec/context-assignment-v1/policy.json \
+  --assignments tests/fixtures/hardsec/context-assignment-v1/assignments.json \
+  --truth tests/fixtures/hardsec/context-assignment-v1/truth-oracle.json \
+  --receipt /tmp/context-assignment-receipt.json
+
+cargo run --locked \
+  --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml \
+  --features hardsec-context-cctm-monitor \
+  --example hardsec_context_cctm_monitor -- \
+  --plan tests/fixtures/hardsec/context-cctm-v1/plan.json \
+  --stream tests/fixtures/hardsec/context-cctm-v1/stream.json \
+  --context-receipt /tmp/context-assignment-receipt.json \
+  --receipt /tmp/context-cctm-receipt.json
+```
+
+The CCTM checks exact policy ID, assignment-artifact SHA-256, score-artifact SHA-256, stream/evaluation identity, every sequence/window mapping, truth-free runtime-map status and aggregate accepted/abstained counts. A selected context must match the exact score-stream row. An abstained context assignment abstains in CCTM and cannot update wealth. Context assignment accuracy is reported offline against a separate truth oracle and is never copied into the runtime map.
+
+The focused CCTM workflow now runs the context-assignment auditor first, then supplies its generated runtime receipt to CCTM. The synthetic map accepts 16/19 records and abstains on stale, unseen and untrusted cases; this is fixture coverage, not model accuracy evidence.

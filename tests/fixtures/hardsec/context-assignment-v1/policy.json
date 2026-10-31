@@ -1,0 +1,28 @@
+{
+  "schema_version": "hardsec-context-assignment-policy-v1",
+  "policy_id": "hs020-frozen-workload-context-v1",
+  "evidence_domain": "synthetic_fixture",
+  "stream_id": "stream-cctm-demo-01",
+  "evaluation_group_id": "heldout-execution-cctm-01",
+  "assignment_mode": "frozen_classifier",
+  "assignment_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "anomaly_score_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "assignment_not_derived_from_anomaly_score": true,
+  "assignment_not_derived_from_sequential_wealth": true,
+  "allowed_contexts": [
+    "compute",
+    "memory"
+  ],
+  "minimum_top1_confidence": 0.8,
+  "minimum_top1_top2_margin": 0.2,
+  "classifier_training_group_ids": [
+    "context-train-exec-1",
+    "context-train-exec-2",
+    "context-train-exec-3"
+  ],
+  "classifier_calibration_group_ids": [
+    "context-calib-exec-1",
+    "context-calib-exec-2"
+  ],
+  "frozen_before_evaluation": true
+}

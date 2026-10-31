@@ -157,5 +157,7 @@
       "sensor_state": "untrusted",
       "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
     }
-  ]
+  ],
+  "context_assignment_policy_id": "hs020-frozen-workload-context-v1",
+  "context_assignment_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 }

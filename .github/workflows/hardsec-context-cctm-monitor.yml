@@ -1,14 +1,19 @@
-name: HARDSEC-019 DKW corrected context CCTM
+name: HARDSEC-019 DKW corrected context CCTM with HARDSEC-020 assignment gate
 
 on:
   pull_request:
     paths:
       - "examples/hardsec_context_cctm_monitor.rs"
+      - "examples/hardsec_context_assignment_audit.rs"
       - "docs/research/HARDSEC_019_CONTEXT_SEQUENTIAL_MONITOR.md"
+      - "docs/research/HARDSEC_020_CONTEXT_ASSIGNMENT_AUDITOR.md"
       - "schemas/hardsec-context-cctm-*.schema.json"
+      - "schemas/hardsec-context-assignment-*.schema.json"
       - "tests/fixtures/hardsec/context-cctm-v1/**"
+      - "tests/fixtures/hardsec/context-assignment-v1/**"
       - "tools/hardsec-adaptive-evasion-audit-harness/**"
       - ".github/workflows/hardsec-context-cctm-monitor.yml"
+      - ".github/workflows/hardsec-context-assignment-audit.yml"
   workflow_dispatch:
 
 permissions:
@@ -21,7 +26,7 @@ concurrency:
 jobs:
   context-cctm-monitor:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout exact pull request revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -32,20 +37,38 @@ jobs:
         with:
           components: rustfmt
       - name: Check formatting
-        run: rustfmt --edition 2024 --check examples/hardsec_context_cctm_monitor.rs
+        run: rustfmt --edition 2024 --check examples/hardsec_context_assignment_audit.rs examples/hardsec_context_cctm_monitor.rs
+      - name: Run focused context assignment unit suite
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-assignment-audit --example hardsec_context_assignment_audit
       - name: Run focused CCTM unit suite
         run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-cctm-monitor --example hardsec_context_cctm_monitor
-      - name: Audit synthetic DKW-corrected CCTM fixture
+      - name: Audit context assignments and run the CCTM
         shell: bash
         run: |
           set -euo pipefail
           out_dir="$(mktemp -d)"
+          cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-assignment-audit --example hardsec_context_assignment_audit -- \
+            --policy tests/fixtures/hardsec/context-assignment-v1/policy.json \
+            --assignments tests/fixtures/hardsec/context-assignment-v1/assignments.json \
+            --truth tests/fixtures/hardsec/context-assignment-v1/truth-oracle.json \
+            --receipt "$out_dir/context-assignment-receipt.json"
+          python3 - "$out_dir/context-assignment-receipt.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              assignment = json.load(handle)
+          assert assignment["result"] == "audited"
+          assert assignment["assignment_integrity"]["assignment_record_count"] == 19
+          assert assignment["assignment_integrity"]["accepted_count"] == 16
+          assert assignment["assignment_integrity"]["abstained_count"] == 3
+          assert assignment["runtime_mapping"]["contains_truth_labels"] is False
+          PY
           cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-cctm-monitor --example hardsec_context_cctm_monitor -- \
             --plan tests/fixtures/hardsec/context-cctm-v1/plan.json \
             --stream tests/fixtures/hardsec/context-cctm-v1/stream.json \
+            --context-receipt "$out_dir/context-assignment-receipt.json" \
             --receipt "$out_dir/cctm-receipt.json"
           python3 - "$out_dir/cctm-receipt.json" <<'PY'
-          import json, sys, math
+          import json, sys
           with open(sys.argv[1], "r", encoding="utf-8") as handle:
               receipt = json.load(handle)
           assert receipt["result"] == "alarm_threshold_crossed", receipt
@@ -56,6 +79,10 @@ jobs:
           assert len(monitor["window_decisions"]) == 19
           assert monitor["abstention_count"] == 3
           assert monitor["post_alarm_reset_count"] == 0
+          assert receipt["context_assignment"]["accepted_count"] == 16
+          assert receipt["context_assignment"]["abstained_count"] == 3
+          assert receipt["context_assignment"]["truth_labels_in_runtime_mapping"] is False
+          assert len(receipt["context_assignment"]["receipt_sha256"]) == 64
           assert len(receipt["reference_policy"]["contexts"]) == 2
           for ctx in receipt["reference_policy"]["contexts"]:
               assert ctx["reference_score_count"] == 600
@@ -69,5 +96,8 @@ jobs:
           assert abs(guarantee["unconditional_type_i_upper_bound_if_all_paper_assumptions_hold"] - 0.05) < 1e-12
           assert guarantee["effective_sample_size_estimate"] is None
           assert receipt["theoretical_contract"]["null_hypothesis"].find("i.i.d.") >= 0
-          assert any(row["abstention_reason"] == "unseen_workload_context" for row in monitor["window_decisions"])
+          rows = monitor["window_decisions"]
+          assert rows[16]["abstention_reason"] == "invalid_sensor_state"
+          assert rows[17]["abstention_reason"] == "context_assignment_not_accepted"
+          assert rows[18]["abstention_reason"] == "invalid_sensor_state"
           PY
