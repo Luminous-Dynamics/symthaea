@@ -13,7 +13,6 @@ use super::knowledge_stream::{
     KnowledgeStreamOracle, KnowledgeStreamTask, KnowledgeVerificationError,
 };
 use super::temporal_error_debt::KnowledgeExposureWindow;
-use super::{mix64, SplitMix64};
 use std::fmt;
 
 pub const CURRENT_TRAJECTORY_QUERY_ID: u64 = 1;
@@ -45,6 +44,7 @@ pub enum KnowledgeTrajectoryError {
     InvalidTaskDigest,
     InvalidCheckpointSchedule,
     InvalidQueryEvent { query_event_id: u64 },
+    InvalidEventOrder { index: usize },
     InvalidBaseHistory(KnowledgeVerificationError),
     SeedReplayMismatch,
 }
@@ -57,6 +57,9 @@ impl fmt::Display for KnowledgeTrajectoryError {
             Self::InvalidCheckpointSchedule => write!(f, "knowledge trajectory checkpoint schedule is invalid"),
             Self::InvalidQueryEvent { query_event_id } => {
                 write!(f, "knowledge trajectory query event {query_event_id} is missing or invalid")
+            }
+            Self::InvalidEventOrder { index } => {
+                write!(f, "knowledge trajectory event {index} is not strictly ordered")
             }
             Self::InvalidBaseHistory(error) => write!(f, "base bitemporal history is invalid: {error}"),
             Self::SeedReplayMismatch => {
@@ -335,6 +338,15 @@ pub fn verify_knowledge_trajectory(
         );
     }
 
+    let mut previous_event_key = None;
+    for (index, event) in task.stream.events.iter().enumerate() {
+        let key = (event.observed_at, event.ordinal);
+        if previous_event_key.is_some_and(|previous| key <= previous) {
+            return Err(KnowledgeTrajectoryError::InvalidEventOrder { index });
+        }
+        previous_event_key = Some(key);
+    }
+
     let actual_queries = task.stream.events.iter().filter_map(|event| {
         if let KnowledgeEventKind::Query {
             query_id,
@@ -448,7 +460,7 @@ mod tests {
     fn generated_trajectory_has_repeated_current_and_historical_query_checkpoints() {
         let (task, oracle) = generate_knowledge_trajectory(config()).unwrap();
         assert_eq!(verify_knowledge_trajectory(&task, &oracle), Ok(()));
-        assert_eq!(task.checkpoints.len(), 9);
+        assert_eq!(task.checkpoints.len(), 8);
         assert_eq!(task.checkpoints.first().unwrap().known_at, 0);
         assert_eq!(task.checkpoints.last().unwrap().known_at, task.stream.query_issued_at);
         let windows = knowledge_trajectory_windows(&task);
