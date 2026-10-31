@@ -15,7 +15,6 @@ use sha2::{Digest, Sha256};
 
 const TAPE_SCHEMA: &str = "symthaea.ar5b4.event-tape";
 const TAPE_VERSION: &str = "0.1.0";
-const ZERO_SHA256: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
 /// Which comparison question this tape belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -105,6 +104,7 @@ impl MeterValue {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceReceipt {
     pub host_cpu_millis: MeterValue,
+    pub wall_millis: MeterValue,
     pub accelerator_millis: MeterValue,
     pub peak_memory_bytes: MeterValue,
     pub energy_millijoules: MeterValue,
@@ -121,6 +121,7 @@ impl ResourceReceipt {
     fn has_unknown_measurement(&self) -> bool {
         [
             &self.host_cpu_millis,
+            &self.wall_millis,
             &self.accelerator_millis,
             &self.peak_memory_bytes,
             &self.energy_millijoules,
@@ -138,6 +139,7 @@ impl ResourceReceipt {
     fn validate_unknown_reasons(&self, path: &str) -> Result<(), EventTapeError> {
         let fields = [
             ("host_cpu_millis", &self.host_cpu_millis),
+            ("wall_millis", &self.wall_millis),
             ("accelerator_millis", &self.accelerator_millis),
             ("peak_memory_bytes", &self.peak_memory_bytes),
             ("energy_millijoules", &self.energy_millijoules),
@@ -254,8 +256,8 @@ pub struct EventEnvelope {
 /// The complete replayable record for one policy/campaign.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EventTape {
-    pub header: EventTapeHeader,
-    pub events: Vec<EventEnvelope>,
+    header: EventTapeHeader,
+    events: Vec<EventEnvelope>,
 }
 
 /// Summary produced by structural validation.
@@ -310,6 +312,16 @@ impl EventTape {
 
     /// Append one event, calculate its visible-history digest and chain hash, then validate.
     /// A failed append is rolled back; callers never receive a partially accepted event.
+    /// Read the frozen experiment header.
+    pub fn header(&self) -> &EventTapeHeader {
+        &self.header
+    }
+
+    /// Read the immutable accepted event prefix.
+    pub fn events(&self) -> &[EventEnvelope] {
+        &self.events
+    }
+
     pub fn append(&mut self, mut payload: ActionEvent) -> Result<(), EventTapeError> {
         let visible_count = usize::try_from(payload.observed_through_sequence).map_err(|_| {
             EventTapeError::new(
@@ -329,11 +341,10 @@ impl EventTape {
             .map_err(|_| EventTapeError::new("events", "event count overflow"))?
             .checked_add(1)
             .ok_or_else(|| EventTapeError::new("events", "sequence overflow"))?;
-        let previous_event_sha256 = self
-            .events
-            .last()
-            .map(|event| event.event_sha256.clone())
-            .unwrap_or_else(|| ZERO_SHA256.to_owned());
+        let previous_event_sha256 = match self.events.last() {
+            Some(event) => event.event_sha256.clone(),
+            None => digest_serializable(&self.header)?,
+        };
         let event_sha256 = hash_event(sequence, &previous_event_sha256, &payload)?;
         self.events.push(EventEnvelope {
             sequence,
@@ -357,7 +368,6 @@ impl EventTape {
         let mut registered: BTreeSet<String> =
             self.header.initial_direction_ids.iter().cloned().collect();
         let mut event_ids = BTreeSet::new();
-        let mut retry_targets = BTreeMap::<String, usize>::new();
         let mut total_charge = 0u64;
         let mut charge_is_complete = true;
         let mut fully_metered = true;
@@ -387,9 +397,9 @@ impl EventTape {
                 ));
             }
             let expected_previous = if index == 0 {
-                ZERO_SHA256
+                digest_serializable(&self.header)?
             } else {
-                self.events[index - 1].event_sha256.as_str()
+                self.events[index - 1].event_sha256.clone()
             };
             if envelope.previous_event_sha256 != expected_previous {
                 return Err(EventTapeError::new(
@@ -478,7 +488,6 @@ impl EventTape {
                         "retry target does not match the original candidate or proposal",
                     ));
                 }
-                retry_targets.insert(retry_id.clone(), index);
             }
 
             payload
@@ -711,6 +720,18 @@ impl EventTape {
         adapter: &A,
     ) -> Result<(), EventTapeError> {
         self.validate()?;
+        if adapter.policy_id() != self.header.policy.policy_id {
+            return Err(EventTapeError::new(
+                "replay.policy_id",
+                "replay adapter policy ID differs from the frozen tape policy",
+            ));
+        }
+        if adapter.config_sha256() != self.header.policy.config_sha256 {
+            return Err(EventTapeError::new(
+                "replay.config_sha256",
+                "replay adapter config digest differs from the frozen policy snapshot",
+            ));
+        }
         for (index, envelope) in self.events.iter().enumerate() {
             let payload = &envelope.payload;
             let visible_count = usize::try_from(payload.observed_through_sequence).map_err(|_| {
@@ -768,6 +789,12 @@ pub struct DecisionContext {
 /// Implement this for each policy to reproduce its choices from a visible event prefix.
 /// This is intentionally immutable: all policy state must be derivable from the supplied tape.
 pub trait PolicyReplay {
+    /// Exact policy identifier from the frozen tape header.
+    fn policy_id(&self) -> &str;
+
+    /// SHA-256 of the policy's frozen serialized configuration.
+    fn config_sha256(&self) -> &str;
+
     fn select_action(
         &self,
         visible_events: &[EventEnvelope],
@@ -1138,7 +1165,7 @@ fn hash_event(
 
 fn digest_serializable<T: Serialize>(value: &T) -> Result<String, EventTapeError> {
     let encoded = serde_json::to_vec(value).map_err(|error| {
-        EventTapeError::new("serialization", format!("canonical JSON encoding failed: {error}"))
+        EventTapeError::new("serialization", format!("deterministic JSON encoding failed: {error}"))
     })?;
     Ok(digest_bytes(&encoded))
 }
@@ -1166,6 +1193,7 @@ mod tests {
     fn resources(charge: u64) -> ResourceReceipt {
         ResourceReceipt {
             host_cpu_millis: meter(10),
+            wall_millis: meter(2),
             accelerator_millis: meter(0),
             peak_memory_bytes: meter(1024),
             energy_millijoules: meter(2),
@@ -1457,9 +1485,19 @@ mod tests {
         assert!(tape.validate_integrity().is_err());
     }
 
-    struct AlwaysEvaluateA;
+    struct AlwaysEvaluateA {
+        config_sha256: String,
+    }
 
     impl PolicyReplay for AlwaysEvaluateA {
+        fn policy_id(&self) -> &str {
+            "direction-board"
+        }
+
+        fn config_sha256(&self) -> &str {
+            &self.config_sha256
+        }
+
         fn select_action(
             &self,
             _visible_events: &[EventEnvelope],
@@ -1479,7 +1517,10 @@ mod tests {
         let (intent, outcome) = verified_evaluation("A", H4);
         tape.append(event("e2", 0, 2, None, 1, intent, outcome, 5)).unwrap();
 
-        tape.verify_policy_replay(&AlwaysEvaluateA).unwrap();
+        tape.verify_policy_replay(&AlwaysEvaluateA {
+            config_sha256: tape.header.policy.config_sha256.clone(),
+        })
+        .unwrap();
     }
 
     #[test]
