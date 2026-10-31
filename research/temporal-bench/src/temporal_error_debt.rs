@@ -387,7 +387,6 @@ fn classify_wrong_value(
     if window.known_at >= oracle.correction_observed_at
         && window.known_at < oracle.retraction_observed_at
         && window.valid_at >= oracle.correction_valid_from
-        && window.valid_at < oracle.retraction_valid_from
         && value == oracle.initial_value
     {
         score.missed_correction_windows = score.missed_correction_windows.saturating_add(1);
@@ -413,7 +412,6 @@ fn classify_wrong_nofact(
     if window.known_at >= oracle.correction_observed_at
         && window.known_at < oracle.retraction_observed_at
         && window.valid_at >= oracle.correction_valid_from
-        && window.valid_at < oracle.retraction_valid_from
     {
         score.missed_correction_windows = score.missed_correction_windows.saturating_add(1);
         score.missed_correction_exposure = score
@@ -432,7 +430,6 @@ fn update_correction_latency(
         || window.known_at < oracle.correction_observed_at
         || window.known_at >= oracle.retraction_observed_at
         || window.valid_at < oracle.correction_valid_from
-        || window.valid_at >= oracle.retraction_valid_from
     {
         return;
     }
@@ -679,7 +676,7 @@ mod tests {
     }
 
     #[test]
-    fn late_correction_equalizes_final_accuracy_but_not_time_integrated_debt() {
+    fn same_final_answer_can_hide_different_time_integrated_debt() {
         let (oracle, windows) = fixture();
         let immediate = predictions(
             KnowledgeCandidateAnswer::Value(oracle.initial_value),
