@@ -321,9 +321,10 @@ fn plan_checks(plan: Option<&GrammarPlanEvidence>) -> Vec<AnalystCheck> {
             observed_check(
                 "renaissance-equal-voices",
                 "Renaissance composition preserves three equal voices without chordal harmony",
-                evidence.verification.equal_voices_present
-                    && evidence.verification.no_chordal_harmony_voice,
-                "Melody, CounterMelody and Bass present; Harmony absent",
+                evidence.verification.three_independent_voices_present
+                    && evidence.verification.no_chordal_harmony_voice
+                    && evidence.verification.meter_and_duration_match,
+                "Melody, CounterMelody and Bass present; Harmony absent; declared nine-bar duration matches score",
                 format!("{:?}", evidence.verification),
             ),
             observed_check(
