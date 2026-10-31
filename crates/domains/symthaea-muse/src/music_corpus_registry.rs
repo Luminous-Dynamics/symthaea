@@ -340,6 +340,7 @@ pub fn build_music_corpus_registry() -> MusicCorpusRegistry {
             .filter(|record| {
                 record.evidence_stage == CorpusEvidenceStage::IngestApproved
                     && record.rights_disposition == RightsDisposition::ApprovedForDeclaredUse
+                    && record.training_disposition != TrainingDisposition::BlockedPendingRightsReview
             })
             .count(),
         records,
@@ -372,6 +373,7 @@ impl MusicCorpusRegistry {
         self.records.iter().filter(|record| {
             record.evidence_stage == CorpusEvidenceStage::IngestApproved
                 && record.rights_disposition == RightsDisposition::ApprovedForDeclaredUse
+                    && record.training_disposition != TrainingDisposition::BlockedPendingRightsReview
         })
     }
 }
