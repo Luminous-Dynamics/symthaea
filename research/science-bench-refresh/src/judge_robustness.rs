@@ -6,8 +6,8 @@
 //! byte binding only, not trusted timing, runner execution, adjudicator
 //! independence, or truth.
 
-use crate::sha256_hex;
 use crate::BUILT_GENERATOR_SOURCE_REVISION;
+use crate::sha256_hex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -94,18 +94,13 @@ impl RawJudgeDecisionV1 {
     fn normalize(self, order: CandidateOrderV1) -> SemanticDecisionV1 {
         match (self, order) {
             (Self::Left, CandidateOrderV1::CandidateAFirst)
-            | (Self::Right, CandidateOrderV1::CandidateBFirst) => {
-                SemanticDecisionV1::CandidateA
-            }
+            | (Self::Right, CandidateOrderV1::CandidateBFirst) => SemanticDecisionV1::CandidateA,
             (Self::Right, CandidateOrderV1::CandidateAFirst)
-            | (Self::Left, CandidateOrderV1::CandidateBFirst) => {
-                SemanticDecisionV1::CandidateB
-            }
+            | (Self::Left, CandidateOrderV1::CandidateBFirst) => SemanticDecisionV1::CandidateB,
             (Self::Tie, _) => SemanticDecisionV1::Tie,
             (Self::Abstain, _) => SemanticDecisionV1::Abstain,
         }
     }
-
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -396,9 +391,12 @@ fn validate_plan_fields(fields: &JudgeRobustnessPlanFieldsV1) -> Vec<String> {
     }
     if fields.purpose.qualified() {
         if !valid_revision(&fields.judge_source_revision) {
-            issues.push("qualified audit requires a non-zero lower-case judge revision SHA".to_owned());
+            issues.push(
+                "qualified audit requires a non-zero lower-case judge revision SHA".to_owned(),
+            );
         } else if fields.judge_source_revision != BUILT_GENERATOR_SOURCE_REVISION {
-            issues.push("judge source revision differs from the inspected build revision".to_owned());
+            issues
+                .push("judge source revision differs from the inspected build revision".to_owned());
         }
     } else if fields.judge_source_revision.trim().is_empty() {
         issues.push("example-only judge source revision marker must be non-empty".to_owned());
@@ -431,7 +429,10 @@ fn validate_plan_fields(fields: &JudgeRobustnessPlanFieldsV1) -> Vec<String> {
             ),
         ] {
             if !valid_digest(value, allow_zero) {
-                issues.push(format!("case {} {name} is not an eligible digest", case.case_id));
+                issues.push(format!(
+                    "case {} {name} is not an eligible digest",
+                    case.case_id
+                ));
             }
         }
 
@@ -451,7 +452,10 @@ fn validate_plan_fields(fields: &JudgeRobustnessPlanFieldsV1) -> Vec<String> {
             }
             JudgeAuditFamilyV1::PositionSwap => {
                 if case.baseline_order == case.variant_order {
-                    issues.push(format!("position-swap case {} must swap candidate order", case.case_id));
+                    issues.push(format!(
+                        "position-swap case {} must swap candidate order",
+                        case.case_id
+                    ));
                 }
                 if fields.purpose.qualified()
                     && (case.baseline_input_sha256 == case.variant_input_sha256
@@ -645,10 +649,7 @@ pub fn verify_judge_robustness_plan(
         .map_err(|error| format!("cannot serialize judge plan payload: {error}"))?;
     let recomputed = digest_domain_framed(PLAN_DOMAIN, &payload)?;
     let matches = plan.plan_commitment_sha256 == recomputed
-        && valid_digest(
-            &plan.plan_commitment_sha256,
-            !plan.purpose.qualified(),
-        );
+        && valid_digest(&plan.plan_commitment_sha256, !plan.purpose.qualified());
     if !matches {
         issues.push("judge plan commitment mismatch".to_owned());
     }
@@ -695,7 +696,9 @@ fn validate_report_fields(
 ) -> Result<(JudgeRobustnessPlanV1, Vec<String>), String> {
     let plan_verification = verify_judge_robustness_plan(plan_bytes)?;
     if !plan_verification.valid {
-        return Err("cannot verify judge report against an invalid or example-only plan".to_owned());
+        return Err(
+            "cannot verify judge report against an invalid or example-only plan".to_owned(),
+        );
     }
     let plan: JudgeRobustnessPlanV1 = serde_json::from_slice(plan_bytes)
         .map_err(|error| format!("judge robustness plan invalid: {error}"))?;
@@ -794,7 +797,10 @@ fn validate_report_fields(
         let mut seen_observations = BTreeSet::new();
         for observation in &outcome.observations {
             if observation.repeat_index >= plan.repeats_per_condition {
-                issues.push(format!("case {} has out-of-range repeat index", case.case_id));
+                issues.push(format!(
+                    "case {} has out-of-range repeat index",
+                    case.case_id
+                ));
             }
             let key = (observation.condition, observation.repeat_index);
             if !seen_observations.insert(key) {
@@ -807,9 +813,7 @@ fn validate_report_fields(
                 JudgeAuditConditionV1::Baseline => {
                     (&case.baseline_input_sha256, case.baseline_order)
                 }
-                JudgeAuditConditionV1::Variant => {
-                    (&case.variant_input_sha256, case.variant_order)
-                }
+                JudgeAuditConditionV1::Variant => (&case.variant_input_sha256, case.variant_order),
             };
             if observation.input_sha256 != *expected_input {
                 issues.push(format!(
@@ -823,17 +827,20 @@ fn validate_report_fields(
                     case.case_id
                 ));
             }
-            if !valid_digest(
-                &observation.input_sha256,
-                !fields.purpose.qualified(),
-            ) {
-                issues.push(format!("case {} has invalid observation input digest", case.case_id));
+            if !valid_digest(&observation.input_sha256, !fields.purpose.qualified()) {
+                issues.push(format!(
+                    "case {} has invalid observation input digest",
+                    case.case_id
+                ));
             }
             if !valid_digest(
                 &observation.judge_receipt_sha256,
                 !fields.purpose.qualified(),
             ) {
-                issues.push(format!("case {} has invalid judge receipt digest", case.case_id));
+                issues.push(format!(
+                    "case {} has invalid judge receipt digest",
+                    case.case_id
+                ));
             }
         }
         for condition in [
@@ -921,7 +928,9 @@ fn normalized_by_condition(
         .map(|observation| {
             (
                 (observation.condition, observation.repeat_index),
-                observation.raw_decision.normalize(observation.candidate_order),
+                observation
+                    .raw_decision
+                    .normalize(observation.candidate_order),
             )
         })
         .collect()
@@ -948,23 +957,26 @@ fn family_summaries(
             continue;
         };
         accumulator.observed_cases += 1;
-        accumulator.observed_observations =
-            accumulator.observed_observations.saturating_add(outcome.observations.len() as u64);
+        accumulator.observed_observations = accumulator
+            .observed_observations
+            .saturating_add(outcome.observations.len() as u64);
         let normalized = normalized_by_condition(outcome);
 
         let decision_groups: Vec<Vec<SemanticDecisionV1>> =
             if case.family == JudgeAuditFamilyV1::Repeatability {
                 // Both conditions are byte-identical for this family, so pool every
                 // repeat into one same-input group and count cross-condition pairs too.
-                vec![outcome
-                    .observations
-                    .iter()
-                    .map(|observation| {
-                        observation
-                            .raw_decision
-                            .normalize(observation.candidate_order)
-                    })
-                    .collect::<Vec<_>>()]
+                vec![
+                    outcome
+                        .observations
+                        .iter()
+                        .map(|observation| {
+                            observation
+                                .raw_decision
+                                .normalize(observation.candidate_order)
+                        })
+                        .collect::<Vec<_>>(),
+                ]
             } else {
                 [
                     JudgeAuditConditionV1::Baseline,
@@ -1040,7 +1052,9 @@ fn family_summaries(
             if observation.raw_decision == RawJudgeDecisionV1::Abstain {
                 accumulator.abstention_count += 1;
             }
-            let normalized = observation.raw_decision.normalize(observation.candidate_order);
+            let normalized = observation
+                .raw_decision
+                .normalize(observation.candidate_order);
             let reference = match observation.condition {
                 JudgeAuditConditionV1::Baseline => outcome.reference_baseline_decision,
                 JudgeAuditConditionV1::Variant => outcome.reference_variant_decision,
@@ -1134,9 +1148,8 @@ pub fn verify_judge_robustness_report(
         .iter()
         .map(|outcome| outcome.observations.len() as u64)
         .fold(0_u64, u64::saturating_add);
-    let missing_observation_count = planned_observation_count.saturating_sub(
-        observed_observation_count.min(planned_observation_count),
-    );
+    let missing_observation_count = planned_observation_count
+        .saturating_sub(observed_observation_count.min(planned_observation_count));
     let scorecard = if valid {
         Some(JudgeRobustnessScorecardV1 {
             schema: "symthaea.science_bench_refresh_judge_robustness_scorecard.v1".to_owned(),
@@ -1322,53 +1335,64 @@ mod tests {
                     } else {
                         SemanticDecisionV1::CandidateA
                     };
-                let observations = [JudgeAuditConditionV1::Baseline, JudgeAuditConditionV1::Variant]
-                    .into_iter()
-                    .flat_map(|condition| {
-                        (0..plan.repeats_per_condition).map(move |repeat_index| {
-                            let is_variant = condition == JudgeAuditConditionV1::Variant;
-                            let order = if is_variant {
-                                case.variant_order
+                let observations = [
+                    JudgeAuditConditionV1::Baseline,
+                    JudgeAuditConditionV1::Variant,
+                ]
+                .into_iter()
+                .flat_map(|condition| {
+                    (0..plan.repeats_per_condition).map(move |repeat_index| {
+                        let is_variant = condition == JudgeAuditConditionV1::Variant;
+                        let order = if is_variant {
+                            case.variant_order
+                        } else {
+                            case.baseline_order
+                        };
+                        // The synthetic oracle is semantically consistent for every
+                        // invariance case and changes its winner for the sensitivity control.
+                        let semantic_winner = if is_variant {
+                            reference_variant_decision
+                        } else {
+                            reference_baseline_decision
+                        };
+                        let raw_decision = match (semantic_winner, order) {
+                            (
+                                SemanticDecisionV1::CandidateA,
+                                CandidateOrderV1::CandidateAFirst,
+                            )
+                            | (
+                                SemanticDecisionV1::CandidateB,
+                                CandidateOrderV1::CandidateBFirst,
+                            ) => RawJudgeDecisionV1::Left,
+                            (
+                                SemanticDecisionV1::CandidateB,
+                                CandidateOrderV1::CandidateAFirst,
+                            )
+                            | (
+                                SemanticDecisionV1::CandidateA,
+                                CandidateOrderV1::CandidateBFirst,
+                            ) => RawJudgeDecisionV1::Right,
+                            (SemanticDecisionV1::Tie, _) => RawJudgeDecisionV1::Tie,
+                            (SemanticDecisionV1::Abstain, _) => RawJudgeDecisionV1::Abstain,
+                        };
+                        JudgeAuditObservationV1 {
+                            condition,
+                            repeat_index,
+                            input_sha256: if is_variant {
+                                case.variant_input_sha256.clone()
                             } else {
-                                case.baseline_order
-                            };
-                            // The synthetic oracle is semantically consistent for every
-                            // invariance case and changes its winner for the sensitivity control.
-                            let semantic_winner = if is_variant {
-                                reference_variant_decision
-                            } else {
-                                reference_baseline_decision
-                            };
-                            let raw_decision = match (semantic_winner, order) {
-                                (SemanticDecisionV1::CandidateA, CandidateOrderV1::CandidateAFirst)
-                                | (SemanticDecisionV1::CandidateB, CandidateOrderV1::CandidateBFirst) => {
-                                    RawJudgeDecisionV1::Left
-                                }
-                                (SemanticDecisionV1::CandidateB, CandidateOrderV1::CandidateAFirst)
-                                | (SemanticDecisionV1::CandidateA, CandidateOrderV1::CandidateBFirst) => {
-                                    RawJudgeDecisionV1::Right
-                                }
-                                (SemanticDecisionV1::Tie, _) => RawJudgeDecisionV1::Tie,
-                                (SemanticDecisionV1::Abstain, _) => RawJudgeDecisionV1::Abstain,
-                            };
-                            JudgeAuditObservationV1 {
-                                condition,
-                                repeat_index,
-                                input_sha256: if is_variant {
-                                    case.variant_input_sha256.clone()
-                                } else {
-                                    case.baseline_input_sha256.clone()
-                                },
-                                candidate_order: order,
-                                raw_decision,
-                                judge_receipt_sha256: digest(&format!(
-                                    "{}:{:?}:{}",
-                                    case.case_id, condition, repeat_index
-                                )),
-                            }
-                        })
+                                case.baseline_input_sha256.clone()
+                            },
+                            candidate_order: order,
+                            raw_decision,
+                            judge_receipt_sha256: digest(&format!(
+                                "{}:{:?}:{}",
+                                case.case_id, condition, repeat_index
+                            )),
+                        }
                     })
-                    .collect();
+                })
+                .collect();
                 JudgeAuditCaseOutcomeV1 {
                     case_id: case.case_id.clone(),
                     reference_baseline_decision,

@@ -7,16 +7,14 @@
 
 use crate::{
     BUILT_GENERATOR_SOURCE_REVISION, GenerationManifestV1, compute_artifact_commitment,
-    compute_protocol_commitment, sha256_hex,
-    validate_manifest_bytes, verify_reveal,
+    compute_protocol_commitment, sha256_hex, validate_manifest_bytes, verify_reveal,
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const GENERATOR_CONFIG_SCHEMA: &str =
-    "symthaea.science_bench_refresh_generator_config.v1";
+pub const GENERATOR_CONFIG_SCHEMA: &str = "symthaea.science_bench_refresh_generator_config.v1";
 const TASK_GENERATOR_DOMAIN: &[u8] = b"symthaea.science_bench_refresh.taskgen.v1\0";
 
 #[derive(Debug, Clone, Deserialize)]
@@ -138,7 +136,12 @@ fn decode_config(bytes: &[u8]) -> Result<GeneratorConfigV1, String> {
                 "identifiability_abstention",
                 "Determine what is identifiable from the narrow observed domain; state an equivalence class or abstain.",
             ),
-            _ => return Err(format!("unsupported generator recipe kind: {}", recipe.kind)),
+            _ => {
+                return Err(format!(
+                    "unsupported generator recipe kind: {}",
+                    recipe.kind
+                ));
+            }
         };
         if recipe.family_id != expected_family_id {
             return Err(format!(
@@ -193,8 +196,7 @@ fn seed_word(
     }
     let digest = hasher.finalize();
     u64::from_be_bytes([
-        digest[0], digest[1], digest[2], digest[3],
-        digest[4], digest[5], digest[6], digest[7],
+        digest[0], digest[1], digest[2], digest[3], digest[4], digest[5], digest[6], digest[7],
     ])
 }
 
@@ -261,8 +263,7 @@ fn generate_one_task(
     recipe: &FamilyRecipeV1,
     index: u64,
 ) -> Result<Value, String> {
-    let slope =
-        1.0 + unit_fraction(seed, generation_id, &recipe.family_id, index, "slope") * 4.0;
+    let slope = 1.0 + unit_fraction(seed, generation_id, &recipe.family_id, index, "slope") * 4.0;
     let intercept = coefficient(seed, generation_id, &recipe.family_id, index, "intercept");
     let instruction = recipe.instruction.clone();
     let count = usize::try_from(recipe.samples_per_task)
@@ -272,13 +273,9 @@ fn generate_one_task(
     let (policy_input, evaluator_only) = match recipe.kind.as_str() {
         "semantic_invariance" => {
             let scales = [0.25_f64, 0.5, 2.0, 4.0];
-            let scale_index = usize::try_from(seed_word(
-                seed,
-                generation_id,
-                &recipe.family_id,
-                index,
-                "scale",
-            ) % 4)
+            let scale_index = usize::try_from(
+                seed_word(seed, generation_id, &recipe.family_id, index, "scale") % 4,
+            )
             .unwrap_or(0);
             let scale = scales[scale_index];
             let offset = coefficient(
@@ -325,8 +322,12 @@ fn generate_one_task(
                     let x = recipe.x_start
                         + f64::from(u32::try_from(sample).unwrap_or(0)) * recipe.x_step;
                     let err = noise(
-                        seed, generation_id, &recipe.family_id, index,
-                        u64::try_from(sample).unwrap_or(0), recipe.noise_amplitude,
+                        seed,
+                        generation_id,
+                        &recipe.family_id,
+                        index,
+                        u64::try_from(sample).unwrap_or(0),
+                        recipe.noise_amplitude,
                     );
                     json!({"x": x, "y": slope * x + intercept + err})
                 })
@@ -351,12 +352,22 @@ fn generate_one_task(
                     let z = recipe.x_start
                         + f64::from(u32::try_from(sample).unwrap_or(0)) * recipe.x_step;
                     let x_err = noise(
-                        seed, generation_id, &recipe.family_id, index,
-                        u64::try_from(sample).unwrap_or(0).wrapping_mul(2), recipe.noise_amplitude,
+                        seed,
+                        generation_id,
+                        &recipe.family_id,
+                        index,
+                        u64::try_from(sample).unwrap_or(0).wrapping_mul(2),
+                        recipe.noise_amplitude,
                     );
                     let y_err = noise(
-                        seed, generation_id, &recipe.family_id, index,
-                        u64::try_from(sample).unwrap_or(0).wrapping_mul(2).wrapping_add(1),
+                        seed,
+                        generation_id,
+                        &recipe.family_id,
+                        index,
+                        u64::try_from(sample)
+                            .unwrap_or(0)
+                            .wrapping_mul(2)
+                            .wrapping_add(1),
                         recipe.noise_amplitude,
                     );
                     json!({"z": z, "x": z + x_err, "y": z + y_err})
@@ -444,7 +455,6 @@ fn generate_one_task(
     }))
 }
 
-
 fn finite_number(value: &Value, label: &str) -> Result<f64, String> {
     value
         .as_f64()
@@ -509,7 +519,8 @@ pub fn validate_synthetic_task_semantics(task_set_bytes: &[u8]) -> Result<(), St
                 let visible = &oracle["visible_coordinate_law"];
                 let latent = &oracle["latent_law"];
                 let transform = &oracle["inverse_coordinate_transform"];
-                let visible_slope = finite_number(&visible["slope"], &format!("{id}.visible_slope"))?;
+                let visible_slope =
+                    finite_number(&visible["slope"], &format!("{id}.visible_slope"))?;
                 let visible_intercept =
                     finite_number(&visible["intercept"], &format!("{id}.visible_intercept"))?;
                 let latent_slope = finite_number(&latent["slope"], &format!("{id}.latent_slope"))?;
@@ -519,9 +530,14 @@ pub fn validate_synthetic_task_semantics(task_set_bytes: &[u8]) -> Result<(), St
                 let offset = finite_number(&transform["offset"], &format!("{id}.offset"))?;
                 if scale <= 0.0
                     || !close_enough(visible_slope, latent_slope / scale)
-                    || !close_enough(visible_intercept, latent_intercept - latent_slope * offset / scale)
+                    || !close_enough(
+                        visible_intercept,
+                        latent_intercept - latent_slope * offset / scale,
+                    )
                 {
-                    return Err(format!("{id} visible law is not equivalent to its latent law"));
+                    return Err(format!(
+                        "{id} visible law is not equivalent to its latent law"
+                    ));
                 }
                 for (index, row) in observations.iter().enumerate() {
                     let u = finite_number(&row["u"], &format!("{id}.observations[{index}].u"))?;
@@ -551,7 +567,8 @@ pub fn validate_synthetic_task_semantics(task_set_bytes: &[u8]) -> Result<(), St
                 for (index, row) in observations.iter().enumerate() {
                     let x = finite_number(&row["x"], &format!("{id}.observations[{index}].x"))?;
                     let y = finite_number(&row["y"], &format!("{id}.observations[{index}].y"))?;
-                    if (y - (slope * x + intercept)).abs() > amplitude + 1.0e-9 * amplitude.max(1.0) {
+                    if (y - (slope * x + intercept)).abs() > amplitude + 1.0e-9 * amplitude.max(1.0)
+                    {
                         return Err(format!("{id} observation {index} exceeds noise bound"));
                     }
                 }
@@ -561,8 +578,7 @@ pub fn validate_synthetic_task_semantics(task_set_bytes: &[u8]) -> Result<(), St
                     != "no_direct_effect"
                     || finite_number(&oracle["direct_effect"], &format!("{id}.direct_effect"))?
                         != 0.0
-                    || required_text(&oracle["common_cause"], &format!("{id}.common_cause"))?
-                        != "z"
+                    || required_text(&oracle["common_cause"], &format!("{id}.common_cause"))? != "z"
                 {
                     return Err(format!("{id} is not a valid common-cause null"));
                 }
@@ -577,7 +593,9 @@ pub fn validate_synthetic_task_semantics(task_set_bytes: &[u8]) -> Result<(), St
                     let x = finite_number(&row["x"], &format!("{id}.observations[{index}].x"))?;
                     let y = finite_number(&row["y"], &format!("{id}.observations[{index}].y"))?;
                     if (x - z).abs() > limit || (y - z).abs() > limit {
-                        return Err(format!("{id} observation {index} violates common-cause bounds"));
+                        return Err(format!(
+                            "{id} observation {index} violates common-cause bounds"
+                        ));
                     }
                 }
             }
@@ -597,17 +615,24 @@ pub fn validate_synthetic_task_semantics(task_set_bytes: &[u8]) -> Result<(), St
                     != "linear_plus_vanishing_polynomial"
                     || !close_enough(
                         finite_number(&one["slope"], &format!("{id}.one.slope"))?,
-                        finite_number(&alternative["base_slope"], &format!("{id}.alternative.slope"))?,
+                        finite_number(
+                            &alternative["base_slope"],
+                            &format!("{id}.alternative.slope"),
+                        )?,
                     )
                     || !close_enough(
                         finite_number(&one["intercept"], &format!("{id}.one.intercept"))?,
-                        finite_number(&alternative["base_intercept"], &format!("{id}.alternative.intercept"))?,
+                        finite_number(
+                            &alternative["base_intercept"],
+                            &format!("{id}.alternative.intercept"),
+                        )?,
                     )
                     || alternative_coefficient == 0.0
                 {
                     return Err(format!("{id} lacks a distinct, compatible alternative law"));
                 }
-                let roots = required_array(&alternative["roots"], &format!("{id}.alternative.roots"))?;
+                let roots =
+                    required_array(&alternative["roots"], &format!("{id}.alternative.roots"))?;
                 if roots.len() != observations.len() {
                     return Err(format!("{id} alternative-law root count mismatch"));
                 }
@@ -636,18 +661,20 @@ pub fn validate_synthetic_task_semantics(task_set_bytes: &[u8]) -> Result<(), St
                 if challenge_x <= xs[xs.len() - 1] || xs.contains(&challenge_x) {
                     return Err(format!("{id} challenge point is not out of domain"));
                 }
-                let amplitude = finite_number(
-                    &oracle["noise_amplitude"],
-                    &format!("{id}.noise_amplitude"),
-                )?;
+                let amplitude =
+                    finite_number(&oracle["noise_amplitude"], &format!("{id}.noise_amplitude"))?;
                 if amplitude <= 0.0 {
-                    return Err(format!("{id} identifiability noise amplitude must be positive"));
+                    return Err(format!(
+                        "{id} identifiability noise amplitude must be positive"
+                    ));
                 }
                 let mut log_effect = alternative_coefficient.abs().ln();
                 for root in &xs {
                     let distance = (challenge_x - root).abs();
                     if distance == 0.0 {
-                        return Err(format!("{id} challenge point coincides with an observed root"));
+                        return Err(format!(
+                            "{id} challenge point coincides with an observed root"
+                        ));
                     }
                     log_effect += distance.ln();
                 }
@@ -703,7 +730,10 @@ pub fn generate_task_set_bytes(
         .map_err(|error| format!("cannot serialize manifest admission view: {error}"))?;
     let validation = validate_manifest_bytes(&admission_bytes)?;
     if !validation.valid {
-        return Err(format!("manifest is invalid for generation: {}", validation.issues.join("; ")));
+        return Err(format!(
+            "manifest is invalid for generation: {}",
+            validation.issues.join("; ")
+        ));
     }
     // Only commitment fields differ in the admission view, and all commitment
     // fields are excluded from the protocol context. Recheck the protocol
@@ -732,7 +762,9 @@ pub fn generate_task_set_bytes(
     }
     let actual_config_sha = sha256_hex(generator_config_bytes);
     if actual_config_sha != manifest.generator.configuration_sha256 {
-        return Err("generator config bytes do not match generator.configuration_sha256".to_owned());
+        return Err(
+            "generator config bytes do not match generator.configuration_sha256".to_owned(),
+        );
     }
     let computed_seed_commitment = compute_artifact_commitment(manifest_bytes, "seed", seed_bytes)?;
     if computed_seed_commitment != manifest.seed_commitment_sha256 {
@@ -772,11 +804,7 @@ pub fn generate_task_set_bytes(
     }
     // Sort by seed-derived opaque task IDs so tasks are not grouped by
     // constructor family in the policy-visible execution order.
-    tasks.sort_by(|left, right| {
-        left["task_id"]
-            .as_str()
-            .cmp(&right["task_id"].as_str())
-    });
+    tasks.sort_by(|left, right| left["task_id"].as_str().cmp(&right["task_id"].as_str()));
     let task_set = json!({
         "schema": crate::TASK_SET_SCHEMA,
         "generation_id": manifest.generation_id.clone(),
@@ -816,17 +844,19 @@ pub fn verify_regeneration(
     let task_set_contract_valid = reveal_report.task_set_contract_valid;
     let seed_commitment_matches = reveal_report.seed_commitment_matches;
     let mut issues = reveal_report.issues;
-    let synthetic_semantics_valid = match validate_synthetic_task_semantics(committed_task_set_bytes) {
-        Ok(()) => true,
-        Err(error) => {
-            issues.push(format!("committed task set failed semantic qualification: {error}"));
-            false
-        }
-    };
+    let synthetic_semantics_valid =
+        match validate_synthetic_task_semantics(committed_task_set_bytes) {
+            Ok(()) => true,
+            Err(error) => {
+                issues.push(format!(
+                    "committed task set failed semantic qualification: {error}"
+                ));
+                false
+            }
+        };
     if !byte_exact_match {
-        issues.push(
-            "regenerated task-set bytes differ from the revealed committed bytes".to_owned(),
-        );
+        issues
+            .push("regenerated task-set bytes differ from the revealed committed bytes".to_owned());
     }
     let verified = seed_commitment_matches
         && task_set_commitment_matches
@@ -935,8 +965,7 @@ mod tests {
     #[test]
     fn verify_regeneration_accepts_exact_replay_and_task_commitment() {
         let (manifest, seed, config, generated) = complete_manifest_and_tasks();
-        let final_manifest =
-            manifest_with_task_commitment(&manifest, &generated);
+        let final_manifest = manifest_with_task_commitment(&manifest, &generated);
         let report = verify_regeneration(&final_manifest, &seed, &config, &generated).unwrap();
         assert!(report.verified, "{:?}", report.issues);
         assert!(report.seed_commitment_matches);
@@ -944,7 +973,10 @@ mod tests {
         assert!(report.task_set_contract_valid);
         assert!(report.synthetic_semantics_valid);
         assert!(report.byte_exact_match);
-        assert_eq!(report.regenerated_task_set_sha256, report.committed_task_set_sha256);
+        assert_eq!(
+            report.regenerated_task_set_sha256,
+            report.committed_task_set_sha256
+        );
     }
 
     #[test]
@@ -970,8 +1002,7 @@ mod tests {
     #[test]
     fn different_seed_cannot_reproduce_committed_task_set() {
         let (manifest, seed, config, generated) = complete_manifest_and_tasks();
-        let final_manifest =
-            manifest_with_task_commitment(&manifest, &generated);
+        let final_manifest = manifest_with_task_commitment(&manifest, &generated);
         let mut different_seed = seed.clone();
         different_seed[0] ^= 1;
         let error = verify_regeneration(&final_manifest, &different_seed, &config, &generated)
@@ -981,10 +1012,9 @@ mod tests {
 
     #[test]
     fn generator_schema_fixture_is_valid_json_and_matches_audited_templates() {
-        let schema: Value = serde_json::from_str(include_str!(
-            "../schema/generator-config.schema.json"
-        ))
-        .expect("generator schema JSON");
+        let schema: Value =
+            serde_json::from_str(include_str!("../schema/generator-config.schema.json"))
+                .expect("generator schema JSON");
         assert_eq!(
             schema["properties"]["schema"]["const"].as_str(),
             Some(GENERATOR_CONFIG_SCHEMA)
@@ -1007,8 +1037,11 @@ mod tests {
     fn checked_in_generator_config_fixture_decodes_and_has_all_expected_families() {
         let bytes = include_bytes!("../fixtures/generator-config.example.json");
         let config = decode_config(bytes).expect("checked-in generator config must decode");
-        let families: BTreeSet<&str> =
-            config.recipes.iter().map(|recipe| recipe.family_id.as_str()).collect();
+        let families: BTreeSet<&str> = config
+            .recipes
+            .iter()
+            .map(|recipe| recipe.family_id.as_str())
+            .collect();
         assert_eq!(config.recipes.len(), 4);
         assert_eq!(
             families,
@@ -1094,7 +1127,11 @@ mod tests {
 
         assert_eq!(task_set_digests.len(), 64);
         assert_eq!(task_ids.len(), 64 * 8);
-        assert_eq!(scales.len(), 4, "all declared coordinate scales should appear");
+        assert_eq!(
+            scales.len(),
+            4,
+            "all declared coordinate scales should appear"
+        );
         assert_eq!(slope_bins, BTreeSet::from([1, 2, 3, 4]));
         assert!(
             noise_residuals.len() > 100,
@@ -1125,7 +1162,12 @@ mod tests {
             let family = task["family_id"].as_str().unwrap();
             assert!(!id.contains(family), "task ID must not reveal family label");
             let input = task["policy_input"].as_object().unwrap();
-            for forbidden in ["family_id", "task_family", "recipe_kind", "constructor_kind"] {
+            for forbidden in [
+                "family_id",
+                "task_family",
+                "recipe_kind",
+                "constructor_kind",
+            ] {
                 assert!(!input.contains_key(forbidden));
             }
         }
@@ -1171,7 +1213,9 @@ mod tests {
             .unwrap();
         let observations = task["policy_input"]["observations"].as_array().unwrap();
         let oracle = &task["evaluator_only"];
-        let roots = oracle["alternative_compatible_law"]["roots"].as_array().unwrap();
+        let roots = oracle["alternative_compatible_law"]["roots"]
+            .as_array()
+            .unwrap();
         assert_eq!(roots.len(), observations.len());
         for (root, observation) in roots.iter().zip(observations) {
             assert_eq!(root.as_f64(), observation["x"].as_f64());
@@ -1183,7 +1227,9 @@ mod tests {
             assert_eq!(product, 0.0);
         }
         let witness = &oracle["identifiability_witness"];
-        let challenge = witness["challenge_x_outside_observed_range"].as_f64().unwrap();
+        let challenge = witness["challenge_x_outside_observed_range"]
+            .as_f64()
+            .unwrap();
         assert!(challenge > observations.last().unwrap()["x"].as_f64().unwrap());
         assert!(roots.iter().all(|root| root.as_f64() != Some(challenge)));
         let mut out_of_domain_product = 1.0_f64;
@@ -1191,8 +1237,7 @@ mod tests {
             out_of_domain_product *= challenge - root.as_f64().unwrap();
         }
         assert!(
-            out_of_domain_product.abs()
-                > oracle["noise_amplitude"].as_f64().unwrap(),
+            out_of_domain_product.abs() > oracle["noise_amplitude"].as_f64().unwrap(),
             "alternative law must differ by more than the declared noise amplitude"
         );
     }
@@ -1250,9 +1295,8 @@ mod tests {
 
     fn manifest_with_task_commitment(manifest: &[u8], task_set: &[u8]) -> Vec<u8> {
         let mut value: Value = serde_json::from_slice(manifest).unwrap();
-        value["task_set_commitment_sha256"] = json!(
-            compute_artifact_commitment(manifest, "task-set", task_set).unwrap()
-        );
+        value["task_set_commitment_sha256"] =
+            json!(compute_artifact_commitment(manifest, "task-set", task_set).unwrap());
         serde_json::to_vec_pretty(&value).unwrap()
     }
 
@@ -1272,8 +1316,7 @@ mod tests {
         let config = demo_config();
         let seed = vec![0x6d; 32];
         let committed_seed_manifest = manifest_for_test(&config, &seed);
-        let mut manifest: Value =
-            serde_json::from_slice(&committed_seed_manifest).unwrap();
+        let mut manifest: Value = serde_json::from_slice(&committed_seed_manifest).unwrap();
         manifest["task_set_commitment_sha256"] = json!("0".repeat(64));
         let draft_manifest = serde_json::to_vec_pretty(&manifest).unwrap();
 
@@ -1301,8 +1344,7 @@ mod tests {
     #[test]
     fn recipe_cannot_smuggle_oracle_answer_through_policy_instruction() {
         let mut config: Value = serde_json::from_slice(&demo_config()).unwrap();
-        config["recipes"][0]["instruction"] =
-            json!("The true law is y = 3*x + 2; recover it.");
+        config["recipes"][0]["instruction"] = json!("The true law is y = 3*x + 2; recover it.");
         let config_bytes = serde_json::to_vec(&config).unwrap();
         let seed = vec![0x6d; 32];
         let mut manifest: Value =

@@ -22,6 +22,10 @@ use science_bench_refresh_validator::judge_robustness::{
 };
 use science_bench_refresh_validator::leakage_audit::audit_policy_input_overlap;
 use science_bench_refresh_validator::lineage_audit::audit_lineage_overlap;
+use science_bench_refresh_validator::mutation_validity::{
+    analyze_mutation_validity, compute_mutation_validity_plan_commitment,
+    verify_mutation_validity_plan, verify_mutation_validity_report,
+};
 use science_bench_refresh_validator::paired_outcome_analysis::analyze_paired_evidence_outcomes;
 use science_bench_refresh_validator::reference_assurance::{
     compute_reference_package_commitment, verify_reference_assurance_package,
@@ -62,6 +66,10 @@ fn usage(program: &str) {
             "  {program} commit-judge-factorial-plan PLAN_FIELDS.json\n",
             "  {program} verify-judge-factorial-plan PLAN.json\n",
             "  {program} analyze-judge-factorial PLAN.json RECEIPT.json\n",
+            "  {program} commit-mutation-validity-plan PLAN_FIELDS.json\n",
+            "  {program} verify-mutation-validity-plan PLAN.json\n",
+            "  {program} analyze-mutation-validity PLAN.json RECEIPT.json\n",
+            "  {program} verify-mutation-validity-report REPORT.json\n",
             "  {program} commit-reference-assurance-package-fields PACKAGE_FIELDS.json\n",
             "  {program} verify-reference-assurance-package PACKAGE.json\n",
             "  {program} analyze-paired-evidence-outcomes PLAN.json OUTCOME_REPORT.json ANALYSIS_PLAN.json\n",
@@ -178,6 +186,120 @@ fn run(args: &[String]) -> ExitCode {
                         "{}",
                         serde_json::to_string_pretty(&report)
                             .expect("judge factorial analysis report serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "commit-mutation-validity-plan" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let fields_bytes = match read(&args[1], "mutation validity plan fields") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match compute_mutation_validity_plan_commitment(&fields_bytes) {
+                Ok(commitment) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_mutation_validity_plan_commitment.v1",
+                            "plan_commitment_sha256": commitment
+                        }))
+                        .expect("mutation validity plan commitment serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "verify-mutation-validity-plan" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "mutation validity plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match verify_mutation_validity_plan(&plan_bytes) {
+                Ok((plan, plan_sha256)) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_mutation_validity_plan_verification.v1",
+                            "valid": true,
+                            "plan_sha256": plan_sha256,
+                            "plan_commitment_sha256": plan.plan_commitment_sha256,
+                            "analyzer_source_revision": plan.analyzer_source_revision,
+                            "study_id": plan.study_id,
+                            "planned_mutation_count": plan.variants.len(),
+                            "reviewers_per_mutation": plan.reviewers_per_mutation,
+                            "scoring_eligible": false,
+                            "external_anchor_required": true
+                        }))
+                        .expect("mutation validity plan verification serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "analyze-mutation-validity" => {
+            if args.len() != 3 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "mutation validity plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let receipt_bytes = match read(&args[2], "mutation validity receipt") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match analyze_mutation_validity(&plan_bytes, &receipt_bytes) {
+                Ok(report) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&report)
+                            .expect("mutation validity analysis report serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "verify-mutation-validity-report" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let report_bytes = match read(&args[1], "mutation validity report") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match verify_mutation_validity_report(&report_bytes) {
+                Ok(report) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&report)
+                            .expect("mutation validity report verification serializes")
                     );
                     ExitCode::SUCCESS
                 }

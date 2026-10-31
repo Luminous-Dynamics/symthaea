@@ -31,6 +31,10 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - src/judge_factorial.rs: strict full-factorial plan/receipt verification, exact condition/input binding, candidate-choice and score effects, per-criterion order effects, and all ten pairwise interactions.
 - schema/judge-factorial-plan.schema.json, schema/judge-factorial-receipt.schema.json and schema/judge-factorial-report.schema.json: preregistered plan, ordinal-bound complete-denominator receipt and typed report contracts.
 - tools/judge_factorial_fixture.py: deterministic synthetic 32-cell/two-repeat CLI fixture; no empirical judge run.
+- docs/research/SCI-MUTATION-VALIDITY-001.md: semantic qualification protocol for generated interventions and verified failure yield.
+- src/mutation_validity.rs: independent semantic-review adjudication, exact plan/receipt binding, failure de-duplication, complete resource accounting and report commitment verification.
+- schema/mutation-validity-plan.schema.json, schema/mutation-validity-receipt.schema.json and schema/mutation-validity-report.schema.json: strict mutation plan, review/execution receipt and claim-bounded report contracts.
+- tools/mutation_validity_fixture.py: deterministic synthetic preserving/changing, invalid, disputed, abstained and unreviewed mutation controls; no human study or empirical evaluator run.
 
 - `docs/research/SCI-BENCH-REFRESH-001.md`: benchmark-lifecycle protocol and competitive targets.
 - `schema/generation-manifest.schema.json`: versioned JSON Schema for the v1 generation manifest.
@@ -41,6 +45,26 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - `fixtures/generator-config.example.json`: four-family synthetic generator configuration whose exact bytes are SHA-256-pinned by a real manifest.
 - `src/lib.rs`, `src/generator.rs`, and `src/main.rs`: standalone Rust validator, commitment calculator, deterministic generator/replayer, task-set contract checker, and post-run reveal verifier.
 - `tools/reference_replay.py`: standard-library-only, test-only independent semantic reconstruction used by CI to cross-check Rust task generation; it is not part of production CLI paths.
+
+## Qualify semantic mutation validity and verified failure yield
+
+The mutation-validity auditor binds each planned variant to its baseline/variant input digests and modality-aware artifact commitments, preserves every independent reviewer vote, and separates confirmed-valid, confirmed-invalid, disputed, insufficient, abstained and unreviewed variants.
+
+Only evaluator relation failures on unanimously confirmed-valid mutations count as verified discoveries. Failures on invalid or unresolved variants are preserved as excluded counts. Duplicate failure fingerprints are counted once for unique discoveries. Generator, semantic-assistance, evaluator, human-review and wall-time counters remain explicit.
+
+```sh
+python3 research/science-bench-refresh/tools/mutation_validity_fixture.py /tmp/mutation-validity
+cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  verify-mutation-validity-plan /tmp/mutation-validity/mutation-validity-plan.example.json
+cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  analyze-mutation-validity /tmp/mutation-validity/mutation-validity-plan.example.json \
+  /tmp/mutation-validity/mutation-validity-receipt.example.json \
+  > /tmp/mutation-validity-report.json
+cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  verify-mutation-validity-report /tmp/mutation-validity-report.json
+```
+
+The fixed-receipt auditor does not authenticate reviewer identities, prove blinding, store/authenticate raw artifact bytes or evaluator execution, establish panel validity, identify causal effects, estimate generalized validity or grant scoring eligibility. See [SCI-MUTATION-VALIDITY-001](../../docs/research/SCI-MUTATION-VALIDITY-001.md).
 
 ## Analyze interacting judge nuisance factors
 

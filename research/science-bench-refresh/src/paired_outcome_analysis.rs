@@ -5,7 +5,9 @@
 //! into an evidence/trust scalar. Binary endpoints use an exact McNemar-style
 //! conditional test; numerical resource deltas are descriptive only.
 
-use crate::counterfactual_evidence::{EvidenceInterventionPlanV1, verify_evidence_intervention_plan};
+use crate::counterfactual_evidence::{
+    EvidenceInterventionPlanV1, verify_evidence_intervention_plan,
+};
 use crate::evidence_outcomes::{
     ClaimSupportV1, EvidenceOutcomeReportV1, EvidenceUseV1, OutcomeResponseStatusV1,
     OutcomeTerminalStatusV1, TaskCorrectnessV1, verify_evidence_outcome_report,
@@ -297,9 +299,7 @@ fn endpoint_value(
             }
             match record.evidence_use {
                 EvidenceUseV1::UsedRelevant => Some(1.0),
-                EvidenceUseV1::IgnoredRelevant | EvidenceUseV1::MisinterpretedRelevant => {
-                    Some(0.0)
-                }
+                EvidenceUseV1::IgnoredRelevant | EvidenceUseV1::MisinterpretedRelevant => Some(0.0),
                 EvidenceUseV1::NoRelevantEvidence | EvidenceUseV1::NotEvaluated => None,
             }
         }
@@ -307,8 +307,13 @@ fn endpoint_value(
             let expected = expected_response?;
             let matches = matches!(
                 (expected, record.response_status),
-                (ExpectedResponseV1::Answered, OutcomeResponseStatusV1::Answered)
-                    | (ExpectedResponseV1::Abstained, OutcomeResponseStatusV1::Abstained)
+                (
+                    ExpectedResponseV1::Answered,
+                    OutcomeResponseStatusV1::Answered
+                ) | (
+                    ExpectedResponseV1::Abstained,
+                    OutcomeResponseStatusV1::Abstained
+                )
             );
             Some(if matches { 1.0 } else { 0.0 })
         }
@@ -568,8 +573,8 @@ fn build_contrast(
         });
     }
 
-    let assigned = u64::try_from(pairs.len())
-        .map_err(|_| "assigned pair count exceeds u64".to_owned())?;
+    let assigned =
+        u64::try_from(pairs.len()).map_err(|_| "assigned pair count exceeds u64".to_owned())?;
     let is_resource = contrast.endpoint.is_resource();
     let (risk_difference, discordant, win_rate, win_low, win_high) = if is_resource {
         (None, None, None, None, None)
@@ -593,8 +598,8 @@ fn build_contrast(
             interval.map(|value| value.2),
         )
     };
-    let mcnemar_statistics =
-        if inferential_tests_allowed && !is_resource && eligible_pair_count > 0 {
+    let mcnemar_statistics = if inferential_tests_allowed && !is_resource && eligible_pair_count > 0
+    {
         Some(exact_mcnemar_statistics(wins, losses))
     } else {
         None
@@ -627,8 +632,16 @@ fn build_contrast(
         discordant_win_rate_wilson_95_low: win_low,
         discordant_win_rate_wilson_95_high: win_high,
         mean_resource_delta_treatment_minus_reference: mean_resource_delta,
-        metric_complete_pair_count: if is_resource { Some(eligible_pair_count) } else { None },
-        metric_incomplete_pair_count: if is_resource { Some(incomplete_pair_count) } else { None },
+        metric_complete_pair_count: if is_resource {
+            Some(eligible_pair_count)
+        } else {
+            None
+        },
+        metric_incomplete_pair_count: if is_resource {
+            Some(incomplete_pair_count)
+        } else {
+            None
+        },
         pair_results,
     })
 }
@@ -681,8 +694,7 @@ fn validate_analysis_plan(
     }
     if !valid_digest(&analysis.dependence_justification_sha256) {
         issues.push(
-            "dependence_justification_sha256 must be a nonzero lowercase SHA-256 digest"
-                .to_owned(),
+            "dependence_justification_sha256 must be a nonzero lowercase SHA-256 digest".to_owned(),
         );
     }
     match (
@@ -709,8 +721,16 @@ fn validate_analysis_plan(
     if analysis.contrasts.is_empty() {
         issues.push("at least one contrast must be preregistered".to_owned());
     }
-    let conditions = plan.required_conditions.iter().map(String::as_str).collect::<BTreeSet<_>>();
-    let pair_ids = plan.pairs.iter().map(|pair| pair.pair_id.as_str()).collect::<BTreeSet<_>>();
+    let conditions = plan
+        .required_conditions
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let pair_ids = plan
+        .pairs
+        .iter()
+        .map(|pair| pair.pair_id.as_str())
+        .collect::<BTreeSet<_>>();
     let uses_expected_response = analysis
         .contrasts
         .iter()
@@ -718,7 +738,9 @@ fn validate_analysis_plan(
     let mut contrast_ids = BTreeSet::new();
     for (index, contrast) in analysis.contrasts.iter().enumerate() {
         if contrast.contrast_id.trim().is_empty() || contrast.contrast_id.len() > 128 {
-            issues.push(format!("contrasts[{index}].contrast_id must be 1..=128 characters"));
+            issues.push(format!(
+                "contrasts[{index}].contrast_id must be 1..=128 characters"
+            ));
         }
         if !contrast_ids.insert(contrast.contrast_id.as_str()) {
             issues.push(format!("duplicate contrast_id: {}", contrast.contrast_id));
@@ -746,10 +768,14 @@ fn validate_analysis_plan(
     let mut seen = BTreeSet::new();
     for (index, rule) in analysis.expected_responses.iter().enumerate() {
         if !pair_ids.contains(rule.pair_id.as_str()) {
-            issues.push(format!("expected_responses[{index}] references an undeclared pair"));
+            issues.push(format!(
+                "expected_responses[{index}] references an undeclared pair"
+            ));
         }
         if !conditions.contains(rule.condition.as_str()) {
-            issues.push(format!("expected_responses[{index}] references an undeclared condition"));
+            issues.push(format!(
+                "expected_responses[{index}] references an undeclared condition"
+            ));
         }
         let key = PairConditionKey {
             pair_id: rule.pair_id.clone(),
@@ -763,7 +789,10 @@ fn validate_analysis_plan(
         }
     }
     if uses_expected_response {
-        let expected_count = plan.pairs.len().saturating_mul(plan.required_conditions.len());
+        let expected_count = plan
+            .pairs
+            .len()
+            .saturating_mul(plan.required_conditions.len());
         if expected.len() != expected_count {
             issues.push(format!(
                 "expected_response endpoint requires an expectation for every pair/condition: \

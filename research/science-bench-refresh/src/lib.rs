@@ -15,20 +15,21 @@ pub const TASK_SET_SCHEMA: &str = "symthaea.science_bench_refresh_task_set.v1";
 pub const BUILT_GENERATOR_SOURCE_REVISION: &str = env!("SBR_GENERATOR_SOURCE_REVISION");
 pub const BUILT_GENERATOR_WORKTREE_CLEAN: &str = env!("SBR_GENERATOR_WORKTREE_CLEAN");
 
-pub mod generator;
-pub mod leakage_audit;
-pub mod lineage_audit;
-pub mod search_exposure;
-pub mod search_exposure_match;
-pub mod exact_protected_matcher;
 pub mod counterfactual_evidence;
-pub mod evidence_outcomes;
-pub mod paired_outcome_analysis;
 pub mod evidence_behavior_contracts;
+pub mod evidence_outcomes;
+pub mod exact_protected_matcher;
+pub mod generator;
 pub mod judge_factorial;
 pub mod judge_robustness;
+pub mod leakage_audit;
+pub mod lineage_audit;
+pub mod mutation_validity;
+pub mod paired_outcome_analysis;
 pub mod reference_assurance;
-pub use generator::{generate_task_set_bytes, verify_regeneration, RegenerationReportV1};
+pub mod search_exposure;
+pub mod search_exposure_match;
+pub use generator::{RegenerationReportV1, generate_task_set_bytes, verify_regeneration};
 const WEIGHT_TOLERANCE: f64 = 1.0e-9;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -66,7 +67,6 @@ pub struct EvaluatorV1 {
     pub source_sha256: String,
     pub oracle_separation: String,
 }
-
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -163,8 +163,7 @@ pub struct RevealVerificationReportV1 {
     pub issues: Vec<String>,
 }
 
-pub const REVEAL_REPORT_SCHEMA: &str =
-    "symthaea.science_bench_refresh_reveal_verification.v1";
+pub const REVEAL_REPORT_SCHEMA: &str = "symthaea.science_bench_refresh_reveal_verification.v1";
 const COMMITMENT_PREFIX: &[u8] = b"symthaea.science_bench_refresh.commitment.v1\0";
 const MIN_SEED_BYTES: usize = 32;
 
@@ -190,9 +189,7 @@ fn protocol_context(manifest: &GenerationManifestV1) -> ProtocolCommitContextV1<
     }
 }
 
-fn protocol_commitment_for_manifest(
-    manifest: &GenerationManifestV1,
-) -> Result<String, String> {
+fn protocol_commitment_for_manifest(manifest: &GenerationManifestV1) -> Result<String, String> {
     let context = serde_json::to_vec(&protocol_context(manifest))
         .map_err(|error| format!("cannot serialize protocol commitment context: {error}"))?;
     let context_len = u64::try_from(context.len())
@@ -270,7 +267,6 @@ pub fn compute_artifact_commitment(
     artifact_commitment_for(kind, &protocol_commitment, artifact_bytes)
 }
 
-
 fn scan_policy_input_for_oracle_fields(
     value: &serde_json::Value,
     path: &str,
@@ -332,9 +328,7 @@ fn scan_policy_input_for_oracle_fields(
                 }
                 if key.is_empty()
                     || !key.chars().all(|character| {
-                        character.is_ascii_alphanumeric()
-                            || character == '_'
-                            || character == '-'
+                        character.is_ascii_alphanumeric() || character == '_' || character == '-'
                     })
                 {
                     issues.push(format!(
@@ -370,7 +364,9 @@ fn validate_task_set_contract(
     let task_set: TaskSetArtifactV1 = match serde_json::from_slice(task_set_bytes) {
         Ok(value) => value,
         Err(error) => {
-            return vec![format!("task-set artifact does not match the strict v1 shape: {error}")];
+            return vec![format!(
+                "task-set artifact does not match the strict v1 shape: {error}"
+            )];
         }
     };
     let mut issues = Vec::new();
@@ -402,12 +398,20 @@ fn validate_task_set_contract(
             issues.push(format!("duplicate task_id: {}", task.task_id));
         }
         if !expected_by_family.contains_key(&task.family_id) {
-            issues.push(format!("{prefix} has undeclared family_id {}", task.family_id));
+            issues.push(format!(
+                "{prefix} has undeclared family_id {}",
+                task.family_id
+            ));
         }
-        let observed = observed_by_family.entry(task.family_id.clone()).or_default();
+        let observed = observed_by_family
+            .entry(task.family_id.clone())
+            .or_default();
         match observed.checked_add(1) {
             Some(total) => *observed = total,
-            None => issues.push(format!("task count overflows for family {}", task.family_id)),
+            None => issues.push(format!(
+                "task count overflows for family {}",
+                task.family_id
+            )),
         }
         if !task.policy_input.is_object() {
             issues.push(format!("{prefix}.policy_input must be a JSON object"));
@@ -452,8 +456,7 @@ pub fn verify_reveal(
     }
     if manifest.purpose != "qualified_run" || manifest.lane != "sealed_refresh" {
         return Err(
-            "reveal verification requires purpose=qualified_run and lane=sealed_refresh"
-                .to_owned(),
+            "reveal verification requires purpose=qualified_run and lane=sealed_refresh".to_owned(),
         );
     }
     if seed_bytes.len() < MIN_SEED_BYTES {
@@ -519,29 +522,27 @@ fn is_zero_digest(value: &str) -> bool {
     !value.is_empty() && value.bytes().all(|byte| byte == b'0')
 }
 
-fn check_sha256(
-    field: &str,
-    value: &str,
-    require_nonzero: bool,
-    issues: &mut Vec<String>,
-) {
+fn check_sha256(field: &str, value: &str, require_nonzero: bool, issues: &mut Vec<String>) {
     if !is_lower_hex(value, 64) {
-        issues.push(format!("{field} must be 64 lowercase hexadecimal characters"));
+        issues.push(format!(
+            "{field} must be 64 lowercase hexadecimal characters"
+        ));
     } else if require_nonzero && is_zero_digest(value) {
-        issues.push(format!("{field} is an all-zero placeholder in a qualified run"));
+        issues.push(format!(
+            "{field} is an all-zero placeholder in a qualified run"
+        ));
     }
 }
 
-fn check_commit_sha(
-    field: &str,
-    value: &str,
-    require_nonzero: bool,
-    issues: &mut Vec<String>,
-) {
+fn check_commit_sha(field: &str, value: &str, require_nonzero: bool, issues: &mut Vec<String>) {
     if !is_lower_hex(value, 40) {
-        issues.push(format!("{field} must be a 40-character lowercase Git commit SHA"));
+        issues.push(format!(
+            "{field} must be a 40-character lowercase Git commit SHA"
+        ));
     } else if require_nonzero && value.bytes().all(|byte| byte == b'0') {
-        issues.push(format!("{field} is an all-zero placeholder in a qualified run"));
+        issues.push(format!(
+            "{field} is an all-zero placeholder in a qualified run"
+        ));
     }
 }
 
@@ -595,9 +596,7 @@ pub fn validate_manifest_bytes(bytes: &[u8]) -> Result<ValidationReportV1, Strin
         _ => false,
     };
     if !post_run_reveal_ok {
-        issues.push(
-            "post_run_reveal_policy is incompatible with the declared lane".to_owned(),
-        );
+        issues.push("post_run_reveal_policy is incompatible with the declared lane".to_owned());
     }
 
     if !matches!(
@@ -610,8 +609,7 @@ pub fn validate_manifest_bytes(bytes: &[u8]) -> Result<ValidationReportV1, Strin
         && manifest.evaluator.oracle_separation != "independent_evaluator_boundary_verified"
     {
         issues.push(
-            "qualified_run requires an independently verified evaluator/oracle boundary"
-                .to_owned(),
+            "qualified_run requires an independently verified evaluator/oracle boundary".to_owned(),
         );
     }
 
@@ -712,7 +710,9 @@ pub fn validate_manifest_bytes(bytes: &[u8]) -> Result<ValidationReportV1, Strin
             weight_sum += family.weight;
         }
         if family.planned_task_count == 0 {
-            issues.push(format!("{prefix}.planned_task_count must be greater than zero"));
+            issues.push(format!(
+                "{prefix}.planned_task_count must be greater than zero"
+            ));
         }
         match planned_task_count.checked_add(family.planned_task_count) {
             Some(total) => planned_task_count = total,
@@ -728,8 +728,7 @@ pub fn validate_manifest_bytes(bytes: &[u8]) -> Result<ValidationReportV1, Strin
                 "task denominator mismatch: expected_task_count={}, ",
                 "planned_task_count={}"
             ),
-            manifest.expected_task_count,
-            planned_task_count
+            manifest.expected_task_count, planned_task_count
         ));
     }
     if !weight_sum.is_finite() || (weight_sum - 1.0).abs() > WEIGHT_TOLERANCE {
@@ -903,7 +902,6 @@ mod tests {
         .expect("task-set serializes")
     }
 
-
     fn validate_value(value: &Value) -> Result<ValidationReportV1, String> {
         validate_manifest_bytes(&serde_json::to_vec(value).expect("JSON serializes"))
     }
@@ -928,9 +926,11 @@ mod tests {
         assert!(report.valid, "{:?}", report.issues);
         assert!(report.manifest_declares_scoring_eligible);
         assert!(report.manifest_declares_sealed_generalization_profile);
-        assert!(report
-            .admission_reason
-            .contains("cannot establish actual runner isolation"));
+        assert!(
+            report
+                .admission_reason
+                .contains("cannot establish actual runner isolation")
+        );
     }
 
     #[test]
@@ -940,7 +940,12 @@ mod tests {
         let report = validate_value(&value).unwrap();
         assert!(!report.valid);
         assert!(!report.manifest_declares_scoring_eligible);
-        assert!(report.issues.iter().any(|issue| issue.contains("denominator mismatch")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("denominator mismatch"))
+        );
     }
 
     #[test]
@@ -949,7 +954,12 @@ mod tests {
         value["task_family_mixture"][0]["weight"] = json!(0.2);
         let report = validate_value(&value).unwrap();
         assert!(!report.valid);
-        assert!(report.issues.iter().any(|issue| issue.contains("weights must sum to 1")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("weights must sum to 1"))
+        );
     }
 
     #[test]
@@ -958,7 +968,12 @@ mod tests {
         value["task_family_mixture"][1]["family_id"] = json!("family-a");
         let report = validate_value(&value).unwrap();
         assert!(!report.valid);
-        assert!(report.issues.iter().any(|issue| issue.contains("duplicate task-family ID")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("duplicate task-family ID"))
+        );
     }
 
     #[test]
@@ -967,10 +982,12 @@ mod tests {
         value["generator"]["revision"] = json!("main");
         let report = validate_value(&value).unwrap();
         assert!(!report.valid);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.contains("40-character lowercase Git commit SHA")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("40-character lowercase Git commit SHA"))
+        );
     }
 
     #[test]
@@ -979,7 +996,12 @@ mod tests {
         value["seed_commitment_sha256"] = json!(digest('0'));
         let report = validate_value(&value).unwrap();
         assert!(!report.valid);
-        assert!(report.issues.iter().any(|issue| issue.contains("all-zero placeholder")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("all-zero placeholder"))
+        );
     }
 
     #[test]
@@ -989,10 +1011,12 @@ mod tests {
         let report = validate_value(&value).unwrap();
         assert!(!report.valid);
         assert!(!report.manifest_declares_scoring_eligible);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.contains("independently verified evaluator/oracle boundary")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("independently verified evaluator/oracle boundary"))
+        );
     }
 
     #[test]
@@ -1001,10 +1025,12 @@ mod tests {
         value["post_run_reveal_policy"] = json!("open_from_start_not_sealed");
         let report = validate_value(&value).unwrap();
         assert!(!report.valid);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.contains("incompatible with the declared lane")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("incompatible with the declared lane"))
+        );
     }
 
     #[test]
@@ -1020,7 +1046,11 @@ mod tests {
         assert!(report.valid, "{:?}", report.issues);
         assert!(report.manifest_declares_scoring_eligible);
         assert!(!report.manifest_declares_sealed_generalization_profile);
-        assert!(report.admission_reason.contains("not sealed generalization evidence"));
+        assert!(
+            report
+                .admission_reason
+                .contains("not sealed generalization evidence")
+        );
     }
 
     #[test]
@@ -1037,7 +1067,12 @@ mod tests {
         value["schema"] = json!("symthaea.science_bench_refresh_manifest.v0");
         let report = validate_value(&value).unwrap();
         assert!(!report.valid);
-        assert!(report.issues.iter().any(|issue| issue.contains("schema must be")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("schema must be"))
+        );
     }
 
     #[test]
@@ -1046,7 +1081,12 @@ mod tests {
         value["analysis_plan_sha256"] = json!(digest('A'));
         let report = validate_value(&value).unwrap();
         assert!(!report.valid);
-        assert!(report.issues.iter().any(|issue| issue.contains("lowercase hexadecimal")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("lowercase hexadecimal"))
+        );
     }
 
     #[test]
@@ -1055,10 +1095,12 @@ mod tests {
         value["budget"]["max_wall_clock_seconds"] = json!(0);
         let report = validate_value(&value).unwrap();
         assert!(!report.valid);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.contains("max_wall_clock_seconds")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("max_wall_clock_seconds"))
+        );
     }
 
     #[test]
@@ -1074,26 +1116,28 @@ mod tests {
 
     #[test]
     fn schema_document_is_valid_json_and_matches_manifest_version() {
-        let schema: Value = serde_json::from_str(include_str!(
-            "../schema/generation-manifest.schema.json"
-        ))
-        .expect("schema document must be valid JSON");
+        let schema: Value =
+            serde_json::from_str(include_str!("../schema/generation-manifest.schema.json"))
+                .expect("schema document must be valid JSON");
         assert_eq!(
             schema["properties"]["schema"]["const"].as_str(),
             Some(MANIFEST_SCHEMA)
         );
-        assert!(schema["required"]
-            .as_array()
-            .expect("required fields array")
-            .iter()
-            .any(|field| field.as_str() == Some("expected_task_count")));
-        assert!(schema["required"]
-            .as_array()
-            .expect("required fields array")
-            .iter()
-            .any(|field| field.as_str() == Some("protocol_commitment_sha256")));
+        assert!(
+            schema["required"]
+                .as_array()
+                .expect("required fields array")
+                .iter()
+                .any(|field| field.as_str() == Some("expected_task_count"))
+        );
+        assert!(
+            schema["required"]
+                .as_array()
+                .expect("required fields array")
+                .iter()
+                .any(|field| field.as_str() == Some("protocol_commitment_sha256"))
+        );
     }
-
 
     #[test]
     fn schema_required_and_property_sets_match_for_strict_objects() {
@@ -1117,10 +1161,9 @@ mod tests {
                 .collect()
         }
 
-        let schema: Value = serde_json::from_str(include_str!(
-            "../schema/generation-manifest.schema.json"
-        ))
-        .expect("valid JSON Schema document");
+        let schema: Value =
+            serde_json::from_str(include_str!("../schema/generation-manifest.schema.json"))
+                .expect("valid JSON Schema document");
         assert_eq!(
             property_names(&schema["properties"]),
             required_names(&schema)
@@ -1176,10 +1219,8 @@ mod tests {
                 .collect()
         }
 
-        let schema: Value = serde_json::from_str(include_str!(
-            "../schema/task-set.schema.json"
-        ))
-        .expect("valid task-set JSON Schema");
+        let schema: Value = serde_json::from_str(include_str!("../schema/task-set.schema.json"))
+            .expect("valid task-set JSON Schema");
         assert_eq!(names(&schema), required(&schema));
         let record = &schema["properties"]["tasks"]["items"];
         assert_eq!(names(record), required(record));
@@ -1197,7 +1238,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn revealed_seed_and_task_set_verify_against_exact_commitments() {
         let manifest = valid_qualified_manifest("sealed_refresh");
@@ -1207,7 +1247,10 @@ mod tests {
         assert!(report.seed_commitment_matches);
         assert!(report.task_set_commitment_matches);
         assert_eq!(report.seed_bytes, 32);
-        assert_eq!(report.task_set_bytes, u64::try_from(test_task_set().len()).unwrap());
+        assert_eq!(
+            report.task_set_bytes,
+            u64::try_from(test_task_set().len()).unwrap()
+        );
     }
 
     #[test]
@@ -1220,7 +1263,12 @@ mod tests {
         assert!(!report.verified);
         assert!(!report.seed_commitment_matches);
         assert!(report.task_set_commitment_matches);
-        assert!(report.issues.iter().any(|issue| issue.contains("seed does not match")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("seed does not match"))
+        );
     }
 
     #[test]
@@ -1233,7 +1281,12 @@ mod tests {
         assert!(!report.verified);
         assert!(report.seed_commitment_matches);
         assert!(!report.task_set_commitment_matches);
-        assert!(report.issues.iter().any(|issue| issue.contains("task-set bytes do not match")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("task-set bytes do not match"))
+        );
     }
 
     #[test]
@@ -1242,10 +1295,12 @@ mod tests {
         manifest["budget"]["max_total_tokens"] = json!(50001);
         let report = validate_value(&manifest).unwrap();
         assert!(!report.valid);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.contains("does not match the frozen manifest context")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("does not match the frozen manifest context"))
+        );
     }
 
     #[test]
@@ -1253,8 +1308,7 @@ mod tests {
         let manifest = valid_qualified_manifest("sealed_refresh");
         let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
         let same_bytes = vec![0x44; 32];
-        let seed_hash =
-            compute_artifact_commitment(&manifest_bytes, "seed", &same_bytes).unwrap();
+        let seed_hash = compute_artifact_commitment(&manifest_bytes, "seed", &same_bytes).unwrap();
         let task_hash =
             compute_artifact_commitment(&manifest_bytes, "task-set", &same_bytes).unwrap();
         assert_ne!(seed_hash, task_hash);
@@ -1301,7 +1355,12 @@ mod tests {
         assert!(report.task_set_commitment_matches);
         assert!(!report.task_set_contract_valid);
         assert!(!report.verified);
-        assert!(report.issues.iter().any(|issue| issue.contains("record count")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("record count"))
+        );
     }
 
     #[test]
@@ -1318,15 +1377,19 @@ mod tests {
         let report = verify_reveal(&manifest_bytes, &test_seed(), &task_bytes).unwrap();
         assert!(report.task_set_commitment_matches);
         assert!(!report.task_set_contract_valid);
-        assert!(report.issues.iter().any(|issue| issue.contains("forbidden oracle field")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("forbidden oracle field"))
+        );
     }
 
     #[test]
     fn committed_task_set_with_nested_oracle_field_is_rejected() {
         let mut manifest = valid_qualified_manifest("sealed_refresh");
         let mut task_set: Value = serde_json::from_slice(&test_task_set()).unwrap();
-        task_set["tasks"][0]["policy_input"]["nested"] =
-            json!({"hidden_law": "y = 2*x"});
+        task_set["tasks"][0]["policy_input"]["nested"] = json!({"hidden_law": "y = 2*x"});
         let task_bytes = serde_json::to_vec(&task_set).unwrap();
         let initial_manifest_bytes = serde_json::to_vec(&manifest).unwrap();
         let commitment =
@@ -1337,10 +1400,12 @@ mod tests {
         assert!(report.task_set_commitment_matches);
         assert!(!report.task_set_contract_valid);
         assert!(!report.verified);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.contains("forbidden oracle field")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("forbidden oracle field"))
+        );
     }
 
     #[test]
@@ -1357,7 +1422,12 @@ mod tests {
         let report = verify_reveal(&manifest_bytes, &test_seed(), &task_bytes).unwrap();
         assert!(report.task_set_commitment_matches);
         assert!(!report.task_set_contract_valid);
-        assert!(report.issues.iter().any(|issue| issue.contains("duplicate task_id")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("duplicate task_id"))
+        );
     }
 
     #[test]
@@ -1379,15 +1449,17 @@ mod tests {
                     .unwrap()
             );
             let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
-            let report =
-                verify_reveal(&manifest_bytes, &test_seed(), &task_bytes).unwrap();
+            let report = verify_reveal(&manifest_bytes, &test_seed(), &task_bytes).unwrap();
             assert!(report.task_set_commitment_matches, "{forbidden_key}");
             assert!(
                 !report.task_set_contract_valid,
                 "oracle key variant should be rejected: {forbidden_key}"
             );
             assert!(
-                report.issues.iter().any(|issue| issue.contains("forbidden oracle field")),
+                report
+                    .issues
+                    .iter()
+                    .any(|issue| issue.contains("forbidden oracle field")),
                 "missing denylist diagnostic for {forbidden_key}"
             );
         }
@@ -1398,22 +1470,22 @@ mod tests {
         let mut manifest = valid_qualified_manifest("sealed_refresh");
         let mut task_set: Value = serde_json::from_slice(&test_task_set()).unwrap();
         // Cyrillic small te in an otherwise ASCII-looking ground-truth key.
-        task_set["tasks"][0]["policy_input"]["ground_truтh_law"] =
-            json!("fabricated-answer");
+        task_set["tasks"][0]["policy_input"]["ground_truтh_law"] = json!("fabricated-answer");
         let task_bytes = serde_json::to_vec(&task_set).unwrap();
         let initial_manifest_bytes = serde_json::to_vec(&manifest).unwrap();
         manifest["task_set_commitment_sha256"] = json!(
-            compute_artifact_commitment(&initial_manifest_bytes, "task-set", &task_bytes)
-                .unwrap()
+            compute_artifact_commitment(&initial_manifest_bytes, "task-set", &task_bytes).unwrap()
         );
         let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
         let report = verify_reveal(&manifest_bytes, &test_seed(), &task_bytes).unwrap();
         assert!(report.task_set_commitment_matches);
         assert!(!report.task_set_contract_valid);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| issue.contains("non-ASCII field name")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("non-ASCII field name"))
+        );
     }
 
     #[test]
@@ -1424,14 +1496,18 @@ mod tests {
         let task_bytes = serde_json::to_vec(&task_set).unwrap();
         let initial_manifest_bytes = serde_json::to_vec(&manifest).unwrap();
         manifest["task_set_commitment_sha256"] = json!(
-            compute_artifact_commitment(&initial_manifest_bytes, "task-set", &task_bytes)
-                .unwrap()
+            compute_artifact_commitment(&initial_manifest_bytes, "task-set", &task_bytes).unwrap()
         );
         let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
         let report = verify_reveal(&manifest_bytes, &test_seed(), &task_bytes).unwrap();
         assert!(report.task_set_commitment_matches);
         assert!(!report.task_set_contract_valid);
-        assert!(report.issues.iter().any(|issue| issue.contains("field name must match")));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.contains("field name must match"))
+        );
     }
 
     #[test]
@@ -1440,5 +1516,4 @@ mod tests {
             .expect_err("malformed JSON must not produce a report");
         assert!(error.contains("strict v1 shape"));
     }
-
 }

@@ -171,33 +171,48 @@ fn fields_from_plan(plan: &EvidenceInterventionPlanV1) -> EvidenceInterventionPl
 fn validate_fields(fields: &EvidenceInterventionPlanFieldsV1) -> Vec<String> {
     let mut issues = Vec::new();
     if fields.schema != EVIDENCE_INTERVENTION_PLAN_SCHEMA {
-        issues.push(format!("schema must be {EVIDENCE_INTERVENTION_PLAN_SCHEMA}"));
+        issues.push(format!(
+            "schema must be {EVIDENCE_INTERVENTION_PLAN_SCHEMA}"
+        ));
     }
     for (label, value, max_len) in [
         ("generation_id", fields.generation_id.as_str(), 128usize),
         ("plan_id", fields.plan_id.as_str(), 128usize),
     ] {
         if value.trim().is_empty() || value.len() > max_len {
-            issues.push(format!("{label} must be 1..={max_len} non-whitespace characters"));
+            issues.push(format!(
+                "{label} must be 1..={max_len} non-whitespace characters"
+            ));
         }
     }
 
     for (label, value) in [
-        ("policy_revision_sha256", fields.policy_revision_sha256.as_str()),
+        (
+            "policy_revision_sha256",
+            fields.policy_revision_sha256.as_str(),
+        ),
         ("configuration_sha256", fields.configuration_sha256.as_str()),
         ("prompt_sha256", fields.prompt_sha256.as_str()),
         ("tool_manifest_sha256", fields.tool_manifest_sha256.as_str()),
         ("budget_sha256", fields.budget_sha256.as_str()),
         ("analysis_plan_sha256", fields.analysis_plan_sha256.as_str()),
-        ("evaluator_revision_sha256", fields.evaluator_revision_sha256.as_str()),
-        ("decision_rules_sha256", fields.decision_rules_sha256.as_str()),
+        (
+            "evaluator_revision_sha256",
+            fields.evaluator_revision_sha256.as_str(),
+        ),
+        (
+            "decision_rules_sha256",
+            fields.decision_rules_sha256.as_str(),
+        ),
         (
             "randomization_commitment_sha256",
             fields.randomization_commitment_sha256.as_str(),
         ),
     ] {
         if !valid_digest(value) {
-            issues.push(format!("{label} must be 64 lowercase hexadecimal characters"));
+            issues.push(format!(
+                "{label} must be 64 lowercase hexadecimal characters"
+            ));
         }
     }
 
@@ -212,8 +227,13 @@ fn validate_fields(fields: &EvidenceInterventionPlanFieldsV1) -> Vec<String> {
     let mut seen_conditions = BTreeSet::new();
     let mut previous_rank = None;
     for (index, condition) in fields.required_conditions.iter().enumerate() {
-        let Some(rank) = CONDITIONS.iter().position(|candidate| *candidate == condition) else {
-            issues.push(format!("required_conditions[{index}] is unsupported: {condition}"));
+        let Some(rank) = CONDITIONS
+            .iter()
+            .position(|candidate| *candidate == condition)
+        else {
+            issues.push(format!(
+                "required_conditions[{index}] is unsupported: {condition}"
+            ));
             continue;
         };
         if !seen_conditions.insert(condition.as_str()) {
@@ -229,9 +249,15 @@ fn validate_fields(fields: &EvidenceInterventionPlanFieldsV1) -> Vec<String> {
     }
 
     if fields.pairs.is_empty() || fields.pairs.len() > MAX_PAIRS {
-        issues.push(format!("pairs must contain 1..={MAX_PAIRS} paired task records"));
+        issues.push(format!(
+            "pairs must contain 1..={MAX_PAIRS} paired task records"
+        ));
     }
-    let required: BTreeSet<&str> = fields.required_conditions.iter().map(String::as_str).collect();
+    let required: BTreeSet<&str> = fields
+        .required_conditions
+        .iter()
+        .map(String::as_str)
+        .collect();
     let mut pair_ids = BTreeSet::new();
     let mut trial_ids = BTreeSet::new();
     for (pair_index, pair) in fields.pairs.iter().enumerate() {
@@ -247,7 +273,9 @@ fn validate_fields(fields: &EvidenceInterventionPlanFieldsV1) -> Vec<String> {
             ));
         }
         if pair.task_family_id.trim().is_empty() || pair.task_family_id.len() > 128 {
-            issues.push(format!("{pair_prefix}.task_family_id must be 1..=128 characters"));
+            issues.push(format!(
+                "{pair_prefix}.task_family_id must be 1..=128 characters"
+            ));
         }
         if pair.trials.len() != fields.required_conditions.len() {
             issues.push(format!(
@@ -263,7 +291,9 @@ fn validate_fields(fields: &EvidenceInterventionPlanFieldsV1) -> Vec<String> {
         for (trial_index, trial) in pair.trials.iter().enumerate() {
             let trial_prefix = format!("{pair_prefix}.trials[{trial_index}]");
             if trial.trial_id.trim().is_empty() || trial.trial_id.len() > 160 {
-                issues.push(format!("{trial_prefix}.trial_id must be 1..=160 characters"));
+                issues.push(format!(
+                    "{trial_prefix}.trial_id must be 1..=160 characters"
+                ));
             } else if !trial_ids.insert(trial.trial_id.as_str()) {
                 issues.push(format!("duplicate trial_id: {}", trial.trial_id));
             }
@@ -316,8 +346,7 @@ fn validate_fields(fields: &EvidenceInterventionPlanFieldsV1) -> Vec<String> {
             ));
         }
         if orders.len() == fields.required_conditions.len()
-            && (0..fields.required_conditions.len())
-                .any(|order| !orders.contains(&(order as u32)))
+            && (0..fields.required_conditions.len()).any(|order| !orders.contains(&(order as u32)))
         {
             issues.push(format!(
                 "{pair_prefix}.randomization_order must be a complete permutation starting at zero"
@@ -366,16 +395,15 @@ pub fn verify_evidence_intervention_plan(
             String::new()
         }
     };
-    let commitment_matches = valid_digest(&plan.plan_commitment_sha256)
-        && plan.plan_commitment_sha256 == recomputed;
+    let commitment_matches =
+        valid_digest(&plan.plan_commitment_sha256) && plan.plan_commitment_sha256 == recomputed;
     if !commitment_matches {
         issues.push("plan commitment does not match the typed plan fields".to_owned());
     }
     let structural_valid = validate_fields(&fields).is_empty();
     let valid = structural_valid && commitment_matches && issues.is_empty();
     let pair_count = u64::try_from(plan.pairs.len()).unwrap_or(u64::MAX);
-    let conditions_per_pair =
-        u64::try_from(plan.required_conditions.len()).unwrap_or(u64::MAX);
+    let conditions_per_pair = u64::try_from(plan.required_conditions.len()).unwrap_or(u64::MAX);
     let planned_trial_count = pair_count.saturating_mul(conditions_per_pair);
     Ok(EvidenceInterventionPlanReportV1 {
         schema: EVIDENCE_INTERVENTION_REPORT_SCHEMA.to_owned(),
@@ -473,8 +501,16 @@ mod tests {
         fields.pairs[0].trials[1].trial_id = first_trial_id;
         fields.pairs[0].trials[1].randomization_order = first_order;
         let issues = validate_fields(&fields);
-        assert!(issues.iter().any(|issue| issue.contains("duplicate trial_id")));
-        assert!(issues.iter().any(|issue| issue.contains("duplicate randomization_order")));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.contains("duplicate trial_id"))
+        );
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.contains("duplicate randomization_order"))
+        );
     }
 
     #[test]
@@ -482,13 +518,20 @@ mod tests {
         let mut fields = fields();
         fields.required_conditions.swap(0, 1);
         fields.pairs[0].trials[0].policy_input_sha256 = "not-a-digest".to_owned();
-        let first_evidence_manifest =
-            fields.pairs[0].trials[0].evidence_manifest_sha256.clone();
+        let first_evidence_manifest = fields.pairs[0].trials[0].evidence_manifest_sha256.clone();
         fields.pairs[0].trials[1].evidence_manifest_sha256 = first_evidence_manifest;
         let issues = validate_fields(&fields);
         assert!(issues.iter().any(|issue| issue.contains("canonical order")));
-        assert!(issues.iter().any(|issue| issue.contains("policy_input_sha256")));
-        assert!(issues.iter().any(|issue| issue.contains("reuses evidence_manifest_sha256")));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.contains("policy_input_sha256"))
+        );
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.contains("reuses evidence_manifest_sha256"))
+        );
     }
 
     #[test]

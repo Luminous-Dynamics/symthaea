@@ -46,6 +46,7 @@ jobs:
           research/science-bench-refresh/src/main.rs
           research/science-bench-refresh/src/lib.rs
           research/science-bench-refresh/src/judge_factorial.rs
+          research/science-bench-refresh/src/mutation_validity.rs
           research/science-bench-refresh/src/evidence_behavior_contracts.rs
           research/science-bench-refresh/src/reference_assurance.rs
 
@@ -1049,6 +1050,30 @@ jobs:
           jq -e '.planned_block_count == 1 and .observed_block_count == 1 and .planned_condition_count == 64 and .observed_condition_count == 64 and .completed_condition_count == 64 and .ineligible_condition_count == 0 and .all_blocks_present == true and .all_conditions_present == true and .all_conditions_completed == true and .analyzer_worktree_clean == true and .balanced_repeat_count == 2 and .excluded_incomplete_repeat_count == 0 and .effects_use_only_fully_completed_repeats == true and ([.pairwise_interactions[] | select(.factor_a == "candidate_order" and .factor_b == "provenance_cue") | select(.complete_00_count == 16 and .complete_01_count == 16 and .complete_10_count == 16 and .complete_11_count == 16 and .decisive_00_count == 16 and .decisive_01_count == 16 and .decisive_10_count == 16 and .decisive_11_count == 16)] | length) == 1 and .execution_authenticity_proven == false and .randomization_proven == false and .raw_prompt_custody_proven == false and .semantic_equivalence_proven == false and .causal_effect_identified == false and .generalized_accuracy_estimated == false and .external_anchor_required == true and .scoring_eligible_declared == false and (.report_commitment_sha256 | test("^[0-9a-f]{64}$"))' /tmp/sbr-judge-factorial-report.json >/dev/null
           jq -e '([.main_effects[] | select(.factor == "candidate_order") | select((.candidate_score_gap_delta_millionths + 30000 | fabs) < 0.001 and (.candidate_a_choice_rate_delta_millionths + 500000 | fabs) < 0.001)] | length) == 1 and ([.main_effects[] | select(.factor == "provenance_cue") | select((.candidate_score_gap_delta_millionths - 20000 | fabs) < 0.001 and (.candidate_a_choice_rate_delta_millionths - 500000 | fabs) < 0.001)] | length) == 1 and ([.main_effects[] | select(.factor == "score_option_order") | select((.criterion_score_delta_millionths - 500000 | fabs) < 0.001)] | length) == 1 and ([.criterion_order_effects[] | select(.criterion_id == "evidence") | select((.reversed_minus_canonical_millionths - 1000000 | fabs) < 0.001)] | length) == 1 and ([.pairwise_interactions[] | select(.factor_a == "candidate_order" and .factor_b == "provenance_cue") | select((.candidate_score_gap_interaction_millionths - 40000 | fabs) < 0.001 and (.candidate_a_choice_interaction_millionths - 1000000 | fabs) < 0.001 and .decisive_00_count == 16 and .decisive_01_count == 16 and .decisive_10_count == 16 and .decisive_11_count == 16 and .excluded_conditions_across_four_cells == 0)] | length) == 1' /tmp/sbr-judge-factorial-report.json >/dev/null
 
+      - name: Semantic mutation validity and verified-failure controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq empty research/science-bench-refresh/schema/mutation-validity-plan.schema.json
+          jq empty research/science-bench-refresh/schema/mutation-validity-receipt.schema.json
+          jq empty research/science-bench-refresh/schema/mutation-validity-report.schema.json
+          python3 research/science-bench-refresh/tools/mutation_validity_fixture.py /tmp/sbr-mutation-validity
+          python3 research/science-bench-refresh/tools/mutation_validity_fixture.py /tmp/sbr-mutation-validity-repeat
+          cmp /tmp/sbr-mutation-validity/mutation-validity-plan.example.json /tmp/sbr-mutation-validity-repeat/mutation-validity-plan.example.json
+          cmp /tmp/sbr-mutation-validity/mutation-validity-receipt.example.json /tmp/sbr-mutation-validity-repeat/mutation-validity-receipt.example.json
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            verify-mutation-validity-plan /tmp/sbr-mutation-validity/mutation-validity-plan.example.json \
+            > /tmp/sbr-mutation-validity-plan-verification.json
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            analyze-mutation-validity /tmp/sbr-mutation-validity/mutation-validity-plan.example.json \
+            /tmp/sbr-mutation-validity/mutation-validity-receipt.example.json \
+            > /tmp/sbr-mutation-validity-report.json
+          jq -e '.planned_variant_count == 7 and .observed_variant_count == 7 and .completed_evaluation_count == 6 and .ineligible_evaluation_count == 1 and .planned_adjudication_slots == 21 and .observed_adjudication_count == 18 and .missing_adjudication_slots == 3 and .confirmed_valid_preserving_count == 2 and .confirmed_valid_changing_count == 1 and .confirmed_invalid_count == 1 and .disputed_count == 1 and .abstained_count == 1 and .unreviewed_count == 1 and .pairwise_review_agreement_count == 15 and .pairwise_review_disagreement_count == 3 and .evaluator_failure_observation_count == 4 and .verified_failure_observation_count == 2 and .excluded_invalid_mutation_failure_count == 1 and .excluded_unconfirmed_mutation_failure_count == 1 and .unique_verified_failure_count == 1 and .duplicate_verified_failure_observation_count == 1 and .total_token_count == 10200 and .total_human_review_seconds == 720 and .raw_artifact_custody_proven == false and .reviewer_identity_authenticated == false and .reviewer_blinding_proven == false and .panel_reference_validity_proven == false and .evaluator_execution_proven == false and .causal_effect_identified == false and .generalized_validity_estimated == false and .external_anchor_required == true and .scoring_eligible_declared == false and (.report_commitment_sha256 | test("^[0-9a-f]{64}$"))' /tmp/sbr-mutation-validity-report.json >/dev/null
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            verify-mutation-validity-report /tmp/sbr-mutation-validity-report.json \
+            > /tmp/sbr-mutation-validity-report-verification.json
+          jq -e '.report_commitment_sha256 | test("^[0-9a-f]{64}$")' /tmp/sbr-mutation-validity-report-verification.json >/dev/null
+
       - name: Reference assurance schema and example package
         shell: bash
         run: |
@@ -1090,7 +1115,7 @@ jobs:
           jq -e '.valid == true and .criterion_count == 4 and .declared_dimension_count == 4 and .hard_constraint_count == 3 and .test_count == 16 and .uncovered_criterion_count == 0 and .hard_constraints_veto_not_average == true and .empirical_dimensionality_estimated == false and .construct_validity_proven == false and .preference_fit_estimated == false and .adversarial_robustness_proven == false and .judge_execution_proven == false and .human_adjudication_proven == false and .scoring_eligible_declared == false' \
             /tmp/sbr-rubric-specification-audit.json >/dev/null
 
-- name: Reference assurance hostile controls
+      - name: Reference assurance hostile controls
         shell: bash
         run: |
           set -euo pipefail

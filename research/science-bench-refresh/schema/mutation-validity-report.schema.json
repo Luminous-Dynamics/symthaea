@@ -1,0 +1,431 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/mutation-validity-report.schema.json",
+  "title": "Symthaea Semantic Mutation Validity Analysis Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_commitment_sha256",
+    "schema",
+    "study_id",
+    "analyzer_source_revision",
+    "analyzer_worktree_clean",
+    "plan_sha256",
+    "receipt_sha256",
+    "plan_commitment_sha256",
+    "metamorphic_receipt_sha256",
+    "planned_variant_count",
+    "observed_variant_count",
+    "completed_evaluation_count",
+    "ineligible_evaluation_count",
+    "planned_adjudication_slots",
+    "observed_adjudication_count",
+    "missing_adjudication_slots",
+    "confirmed_valid_preserving_count",
+    "confirmed_valid_changing_count",
+    "confirmed_invalid_count",
+    "disputed_count",
+    "insufficient_count",
+    "abstained_count",
+    "unreviewed_count",
+    "adjudicable_confirmed_count",
+    "adjudicable_panel_concordance_millionths",
+    "confirmed_valid_yield_over_planned_millionths",
+    "pairwise_review_agreement_count",
+    "pairwise_review_disagreement_count",
+    "evaluator_failure_observation_count",
+    "verified_failure_observation_count",
+    "excluded_invalid_mutation_failure_count",
+    "excluded_unconfirmed_mutation_failure_count",
+    "unique_verified_failure_count",
+    "duplicate_verified_failure_observation_count",
+    "total_generator_call_count",
+    "total_generator_token_count",
+    "total_semantic_assistance_call_count",
+    "total_semantic_assistance_token_count",
+    "total_evaluator_call_count",
+    "total_evaluator_token_count",
+    "total_human_review_seconds",
+    "total_wall_time_milliseconds",
+    "total_token_count",
+    "tokens_per_confirmed_valid_mutation",
+    "tokens_per_unique_verified_failure",
+    "human_review_seconds_per_unique_verified_failure",
+    "variant_summaries",
+    "raw_artifact_custody_proven",
+    "reviewer_identity_authenticated",
+    "reviewer_blinding_proven",
+    "panel_reference_validity_proven",
+    "evaluator_execution_proven",
+    "causal_effect_identified",
+    "generalized_validity_estimated",
+    "external_anchor_required",
+    "scoring_eligible_declared",
+    "claim_boundary"
+  ],
+  "properties": {
+    "report_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "schema": {
+      "const": "symthaea.science_bench_refresh_mutation_validity_report.v1"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "analyzer_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "analyzer_worktree_clean": {
+      "type": "boolean"
+    },
+    "plan_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "plan_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "metamorphic_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "planned_variant_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "observed_variant_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "completed_evaluation_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "ineligible_evaluation_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "planned_adjudication_slots": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "observed_adjudication_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "missing_adjudication_slots": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "confirmed_valid_preserving_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "confirmed_valid_changing_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "confirmed_invalid_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "disputed_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "insufficient_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "abstained_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unreviewed_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "adjudicable_confirmed_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "adjudicable_panel_concordance_millionths": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "confirmed_valid_yield_over_planned_millionths": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pairwise_review_agreement_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "pairwise_review_disagreement_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "evaluator_failure_observation_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "verified_failure_observation_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "excluded_invalid_mutation_failure_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "excluded_unconfirmed_mutation_failure_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unique_verified_failure_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "duplicate_verified_failure_observation_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "total_generator_call_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "total_generator_token_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "total_semantic_assistance_call_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "total_semantic_assistance_token_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "total_evaluator_call_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "total_evaluator_token_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "total_human_review_seconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "total_wall_time_milliseconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "total_token_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tokens_per_confirmed_valid_mutation": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "tokens_per_unique_verified_failure": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "human_review_seconds_per_unique_verified_failure": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "variant_summaries": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/summary"
+      }
+    },
+    "raw_artifact_custody_proven": {
+      "const": false
+    },
+    "reviewer_identity_authenticated": {
+      "const": false
+    },
+    "reviewer_blinding_proven": {
+      "const": false
+    },
+    "panel_reference_validity_proven": {
+      "const": false
+    },
+    "evaluator_execution_proven": {
+      "const": false
+    },
+    "causal_effect_identified": {
+      "const": false
+    },
+    "generalized_validity_estimated": {
+      "const": false
+    },
+    "external_anchor_required": {
+      "const": true
+    },
+    "scoring_eligible_declared": {
+      "const": false
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mutation_id",
+        "intended_relation",
+        "review_count",
+        "pairwise_agreement_count",
+        "pairwise_disagreement_count",
+        "review_status",
+        "evaluation_status",
+        "evaluator_relation_pass",
+        "failure_counted_as_verified",
+        "failure_exclusion_reason",
+        "failure_fingerprint_sha256"
+      ],
+      "properties": {
+        "mutation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "intended_relation": {
+          "enum": [
+            "preserving",
+            "changing"
+          ]
+        },
+        "review_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 7
+        },
+        "pairwise_agreement_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pairwise_disagreement_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "review_status": {
+          "enum": [
+            "confirmed_valid_preserving",
+            "confirmed_valid_changing",
+            "confirmed_invalid",
+            "disputed",
+            "insufficient",
+            "abstained",
+            "unreviewed"
+          ]
+        },
+        "evaluation_status": {
+          "enum": [
+            "completed",
+            "timed_out",
+            "blocked",
+            "invalid_receipt",
+            "not_started"
+          ]
+        },
+        "evaluator_relation_pass": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failure_counted_as_verified": {
+          "type": "boolean"
+        },
+        "failure_exclusion_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failure_fingerprint_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "allOf": []
+}

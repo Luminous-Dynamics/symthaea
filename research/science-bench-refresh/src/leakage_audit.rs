@@ -4,7 +4,7 @@
 //! fingerprints are triage-only candidates: they must never be reported as
 //! confirmed leakage without lineage or domain-aware equivalence evidence.
 
-use crate::{sha256_hex, TaskSetArtifactV1, TASK_SET_SCHEMA};
+use crate::{TASK_SET_SCHEMA, TaskSetArtifactV1, sha256_hex};
 use serde::Serialize;
 use serde_json::{Map, Number, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -110,10 +110,7 @@ fn canonicalize(value: &Value, numeric_tolerant: bool) -> Result<Value, String> 
             keys.sort();
             let mut canonical = Map::new();
             for key in keys {
-                canonical.insert(
-                    key.clone(),
-                    canonicalize(&fields[key], numeric_tolerant)?,
-                );
+                canonical.insert(key.clone(), canonicalize(&fields[key], numeric_tolerant)?);
             }
             Ok(Value::Object(canonical))
         }
@@ -132,10 +129,7 @@ fn canonical_exact_number(number: &Number) -> Result<Number, String> {
         .ok_or_else(|| "exact canonicalization cannot represent a JSON number".to_owned())?;
     // Normalize integral decimal spellings such as 1 and 1.0 without losing
     // precision for integers beyond the exactly representable f64 range.
-    if value.is_finite()
-        && value.fract() == 0.0
-        && value.abs() <= 9_007_199_254_740_991.0
-    {
+    if value.is_finite() && value.fract() == 0.0 && value.abs() <= 9_007_199_254_740_991.0 {
         return Ok(Number::from(value as i64));
     }
     Ok(number.clone())
@@ -189,7 +183,10 @@ fn load_task_set(bytes: &[u8], label: &str) -> Result<TaskSetArtifactV1, String>
             return Err(format!("{label} contains an empty task_id"));
         }
         if !seen_ids.insert(task.task_id.as_str()) {
-            return Err(format!("{label} contains duplicate task_id {}", task.task_id));
+            return Err(format!(
+                "{label} contains duplicate task_id {}",
+                task.task_id
+            ));
         }
         if task.family_id.trim().is_empty() {
             return Err(format!("{label} contains an empty family_id"));
@@ -230,7 +227,10 @@ fn grouped<'a>(
 ) -> BTreeMap<String, Vec<&'a IndexedTask>> {
     let mut result = BTreeMap::<String, Vec<&IndexedTask>>::new();
     for task in tasks {
-        result.entry(select(task).to_owned()).or_default().push(task);
+        result
+            .entry(select(task).to_owned())
+            .or_default()
+            .push(task);
     }
     for group in result.values_mut() {
         group.sort_by(|left, right| left.task_id.cmp(&right.task_id));
@@ -272,7 +272,8 @@ fn build_exact_groups(
         groups.push(OverlapGroupV1 {
             fingerprint_sha256: digest.clone(),
             left_task_count: u64::try_from(left_tasks.len()).map_err(|_| "left count overflow")?,
-            right_task_count: u64::try_from(right_tasks.len()).map_err(|_| "right count overflow")?,
+            right_task_count: u64::try_from(right_tasks.len())
+                .map_err(|_| "right count overflow")?,
             cross_set_pair_count: pairs,
             left_task_ids_sample: sample_ids(left_tasks.iter().copied()),
             right_task_ids_sample: sample_ids(right_tasks.iter().copied()),
@@ -300,10 +301,14 @@ fn build_near_groups(
         let mut left_exact_counts = BTreeMap::<&str, usize>::new();
         let mut right_exact_counts = BTreeMap::<&str, usize>::new();
         for task in left_tasks {
-            *left_exact_counts.entry(&task.exact_fingerprint).or_default() += 1;
+            *left_exact_counts
+                .entry(&task.exact_fingerprint)
+                .or_default() += 1;
         }
         for task in right_tasks {
-            *right_exact_counts.entry(&task.exact_fingerprint).or_default() += 1;
+            *right_exact_counts
+                .entry(&task.exact_fingerprint)
+                .or_default() += 1;
         }
         let mut exact_pairs = 0_u64;
         for (exact, left_count) in &left_exact_counts {
@@ -411,8 +416,7 @@ pub fn audit_policy_input_overlap(
 
     let left_tasks = index_tasks(&left_set)?;
     let right_tasks = index_tasks(&right_set)?;
-    let (exact_overlap_pair_count, exact_overlaps) =
-        build_exact_groups(&left_tasks, &right_tasks)?;
+    let (exact_overlap_pair_count, exact_overlaps) = build_exact_groups(&left_tasks, &right_tasks)?;
     let (near_duplicate_candidate_pair_count, near_duplicate_candidates) =
         build_near_groups(&left_tasks, &right_tasks)?;
 
@@ -543,7 +547,10 @@ mod tests {
             audit_policy_input_overlap("development", &left, "refresh:g2", &right).unwrap();
         assert_eq!(report.exact_overlap_pair_count, 0);
         assert_eq!(report.near_duplicate_candidate_pair_count, 1);
-        assert_eq!(report.admission, "manual_review_required_for_numeric_near_duplicates");
+        assert_eq!(
+            report.admission,
+            "manual_review_required_for_numeric_near_duplicates"
+        );
     }
 
     #[test]
@@ -554,7 +561,10 @@ mod tests {
             audit_policy_input_overlap("development", &left, "refresh:g2", &right).unwrap();
         assert_eq!(report.exact_overlap_pair_count, 0);
         assert_eq!(report.near_duplicate_candidate_pair_count, 0);
-        assert_eq!(report.admission, "no_detected_exact_or_numeric_tolerant_overlap");
+        assert_eq!(
+            report.admission,
+            "no_detected_exact_or_numeric_tolerant_overlap"
+        );
     }
 
     #[test]
@@ -582,23 +592,27 @@ mod tests {
 
     #[test]
     fn duplicate_task_ids_and_unknown_split_roles_fail_closed() {
-        let duplicate_ids = task_set("d", json!([
-            task("same", input(1.0, 2.0)),
-            task("same", input(3.0, 4.0))
-        ]));
-        assert!(audit_policy_input_overlap(
-            "development",
-            &duplicate_ids,
-            "refresh:g2",
-            &task_set("r", json!([task("x", input(9.0, 10.0))])),
-        )
-        .is_err());
-        assert!(audit_policy_input_overlap(
-            "dev",
-            &task_set("d", json!([task("a", input(1.0, 2.0))])),
-            "refresh:g2",
-            &task_set("r", json!([task("b", input(9.0, 10.0))])),
-        )
-        .is_err());
+        let duplicate_ids = task_set(
+            "d",
+            json!([task("same", input(1.0, 2.0)), task("same", input(3.0, 4.0))]),
+        );
+        assert!(
+            audit_policy_input_overlap(
+                "development",
+                &duplicate_ids,
+                "refresh:g2",
+                &task_set("r", json!([task("x", input(9.0, 10.0))])),
+            )
+            .is_err()
+        );
+        assert!(
+            audit_policy_input_overlap(
+                "dev",
+                &task_set("d", json!([task("a", input(1.0, 2.0))])),
+                "refresh:g2",
+                &task_set("r", json!([task("b", input(9.0, 10.0))])),
+            )
+            .is_err()
+        );
     }
 }

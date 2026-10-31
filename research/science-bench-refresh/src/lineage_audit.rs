@@ -6,7 +6,7 @@
 //! the runner kept this ledger hidden or that the ledger's author is honest.
 
 use crate::{
-    TaskSetArtifactV1, TASK_SET_SCHEMA, leakage_audit::canonical_policy_input_sha256,
+    TASK_SET_SCHEMA, TaskSetArtifactV1, leakage_audit::canonical_policy_input_sha256,
     leakage_audit::validate_split_label, sha256_hex,
 };
 use serde::{Deserialize, Serialize};
@@ -114,7 +114,10 @@ fn read_task_set(bytes: &[u8], label: &str) -> Result<TaskSetArtifactV1, String>
             return Err(format!("{label} task set contains an empty task ID"));
         }
         if task.family_id.trim().is_empty() || task.family_id.len() > 128 {
-            return Err(format!("{label} task {} has invalid family_id", task.task_id));
+            return Err(format!(
+                "{label} task {} has invalid family_id",
+                task.task_id
+            ));
         }
         if !task_ids.insert(task.task_id.as_str()) {
             return Err(format!(
@@ -138,13 +141,14 @@ fn read_and_validate_ledger(
     label: &str,
 ) -> Result<(TaskSetArtifactV1, LineageLedgerV1), String> {
     let task_set = read_task_set(task_set_bytes, label)?;
-    let ledger: LineageLedgerV1 = serde_json::from_slice(ledger_bytes)
-        .map_err(|error| {
-            format!("{label} lineage ledger does not match strict v1 shape: {error}")
-        })?;
+    let ledger: LineageLedgerV1 = serde_json::from_slice(ledger_bytes).map_err(|error| {
+        format!("{label} lineage ledger does not match strict v1 shape: {error}")
+    })?;
 
     if ledger.schema != LEDGER_SCHEMA {
-        return Err(format!("{label} lineage-ledger schema must be {LEDGER_SCHEMA}"));
+        return Err(format!(
+            "{label} lineage-ledger schema must be {LEDGER_SCHEMA}"
+        ));
     }
     if ledger.generation_id != task_set.generation_id {
         return Err(format!(
@@ -160,7 +164,9 @@ fn read_and_validate_ledger(
     }
     let actual_task_set_sha256 = sha256_hex(task_set_bytes);
     if ledger.task_set_sha256 != actual_task_set_sha256 {
-        return Err(format!("{label} ledger does not bind the exact task-set bytes"));
+        return Err(format!(
+            "{label} ledger does not bind the exact task-set bytes"
+        ));
     }
     if ledger.records.len() != task_set.tasks.len() {
         return Err(format!(
@@ -185,11 +191,12 @@ fn read_and_validate_ledger(
                 record.task_id
             ));
         }
-        let task = task_by_id
-            .get(record.task_id.as_str())
-            .ok_or_else(|| {
-                format!("{label} lineage ledger has orphan task ID {}", record.task_id)
-            })?;
+        let task = task_by_id.get(record.task_id.as_str()).ok_or_else(|| {
+            format!(
+                "{label} lineage ledger has orphan task ID {}",
+                record.task_id
+            )
+        })?;
 
         if !is_lower_hex_digest(&record.policy_input_sha256) {
             return Err(format!(
@@ -244,7 +251,9 @@ fn read_and_validate_ledger(
     }
 
     if observed.len() != task_by_id.len() {
-        return Err(format!("{label} lineage ledger does not cover every task ID"));
+        return Err(format!(
+            "{label} lineage ledger does not cover every task ID"
+        ));
     }
     Ok((task_set, ledger))
 }
@@ -341,8 +350,8 @@ pub fn audit_lineage_overlap(
 
     let left_exposed_refresh_tasks = exposed_refresh_tasks(&left_ledger);
     let right_exposed_refresh_tasks = exposed_refresh_tasks(&right_ledger);
-    let shared_lineage_root_count = u64::try_from(shared_lineage.len())
-        .map_err(|_| "shared lineage root count overflow")?;
+    let shared_lineage_root_count =
+        u64::try_from(shared_lineage.len()).map_err(|_| "shared lineage root count overflow")?;
     let left_exposed_refresh_task_count = u64::try_from(left_exposed_refresh_tasks.len())
         .map_err(|_| "left exposed refresh task count overflow")?;
     let right_exposed_refresh_task_count = u64::try_from(right_exposed_refresh_tasks.len())
@@ -429,7 +438,8 @@ mod tests {
                     "commitment_sha256": lineage_digest
                 }]
             }]
-        })).unwrap()
+        }))
+        .unwrap()
     }
 
     #[test]
@@ -439,9 +449,8 @@ mod tests {
         let root = sha256_hex(b"same-latent-world");
         let left_ledger = ledger_for(&left_set, "development:g1", &root, "public_development");
         let right_ledger = ledger_for(&right_set, "refresh:g2", &root, "never_exposed");
-        let report = audit_lineage_overlap(
-            &left_set, &left_ledger, &right_set, &right_ledger
-        ).unwrap();
+        let report =
+            audit_lineage_overlap(&left_set, &left_ledger, &right_set, &right_ledger).unwrap();
 
         assert_eq!(report.shared_lineage_root_count, 1);
         assert_eq!(report.shared_lineage_task_pair_count, 1);
@@ -453,14 +462,19 @@ mod tests {
         let left_set = task_set("dev-g1", "dev-1", 1, 2);
         let right_set = task_set("refresh-g2", "refresh-9", 7, 14);
         let left_ledger = ledger_for(
-            &left_set, "development:g1", &sha256_hex(b"world-a"), "public_development"
+            &left_set,
+            "development:g1",
+            &sha256_hex(b"world-a"),
+            "public_development",
         );
         let right_ledger = ledger_for(
-            &right_set, "refresh:g2", &sha256_hex(b"world-b"), "never_exposed"
+            &right_set,
+            "refresh:g2",
+            &sha256_hex(b"world-b"),
+            "never_exposed",
         );
-        let report = audit_lineage_overlap(
-            &left_set, &left_ledger, &right_set, &right_ledger
-        ).unwrap();
+        let report =
+            audit_lineage_overlap(&left_set, &left_ledger, &right_set, &right_ledger).unwrap();
 
         assert_eq!(report.shared_lineage_root_count, 0);
         assert_eq!(
@@ -474,14 +488,19 @@ mod tests {
         let left_set = task_set("dev-g1", "dev-1", 1, 2);
         let right_set = task_set("refresh-g2", "refresh-9", 7, 14);
         let left_ledger = ledger_for(
-            &left_set, "development:g1", &sha256_hex(b"world-a"), "public_development"
+            &left_set,
+            "development:g1",
+            &sha256_hex(b"world-a"),
+            "public_development",
         );
         let right_ledger = ledger_for(
-            &right_set, "refresh:g2", &sha256_hex(b"world-b"), "prior_scored_refresh"
+            &right_set,
+            "refresh:g2",
+            &sha256_hex(b"world-b"),
+            "prior_scored_refresh",
         );
-        let report = audit_lineage_overlap(
-            &left_set, &left_ledger, &right_set, &right_ledger
-        ).unwrap();
+        let report =
+            audit_lineage_overlap(&left_set, &left_ledger, &right_set, &right_ledger).unwrap();
 
         assert_eq!(report.right_exposed_refresh_task_count, 1);
         assert_eq!(report.admission, "blocked_exposed_refresh_tasks");
@@ -491,28 +510,41 @@ mod tests {
     fn task_set_mutation_or_missing_lineage_record_fails_closed() {
         let set = task_set("refresh-g2", "refresh-9", 7, 14);
         let mut parsed: Value = serde_json::from_slice(&set).unwrap();
-        let ledger = ledger_for(
-            &set, "refresh:g2", &sha256_hex(b"world-b"), "never_exposed"
-        );
+        let ledger = ledger_for(&set, "refresh:g2", &sha256_hex(b"world-b"), "never_exposed");
         parsed["tasks"][0]["policy_input"]["observations"][0]["y"] = json!(99);
         let changed_set = serde_json::to_vec(&parsed).unwrap();
-        assert!(audit_lineage_overlap(
-            &changed_set, &ledger, &task_set("dev-g1", "dev-1", 1, 2),
-            &ledger_for(
+        assert!(
+            audit_lineage_overlap(
+                &changed_set,
+                &ledger,
                 &task_set("dev-g1", "dev-1", 1, 2),
-                "development:g1",
-                &sha256_hex(b"world-a"),
-                "public_development",
+                &ledger_for(
+                    &task_set("dev-g1", "dev-1", 1, 2),
+                    "development:g1",
+                    &sha256_hex(b"world-a"),
+                    "public_development",
+                )
             )
-        ).is_err());
+            .is_err()
+        );
 
         let mut broken: Value = serde_json::from_slice(&ledger).unwrap();
         broken["records"] = json!([]);
         let broken_ledger = serde_json::to_vec(&broken).unwrap();
-        assert!(audit_lineage_overlap(
-            &set, &broken_ledger, &task_set("dev-g1", "dev-1", 1, 2),
-            &ledger_for(&task_set("dev-g1", "dev-1", 1, 2), "development:g1", &sha256_hex(b"world-a"), "public_development")
-        ).is_err());
+        assert!(
+            audit_lineage_overlap(
+                &set,
+                &broken_ledger,
+                &task_set("dev-g1", "dev-1", 1, 2),
+                &ledger_for(
+                    &task_set("dev-g1", "dev-1", 1, 2),
+                    "development:g1",
+                    &sha256_hex(b"world-a"),
+                    "public_development"
+                )
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -520,17 +552,21 @@ mod tests {
         let left_set = task_set("dev-g1", "dev-1", 1, 2);
         let right_set = task_set("refresh-g2", "refresh-9", 7, 14);
         let left_ledger = ledger_for(
-            &left_set, "development:g1", &sha256_hex(b"world-a"), "public_development"
+            &left_set,
+            "development:g1",
+            &sha256_hex(b"world-a"),
+            "public_development",
         );
         let right_ledger = ledger_for(
-            &right_set, "refresh:g2", &sha256_hex(b"world-b"), "never_exposed"
+            &right_set,
+            "refresh:g2",
+            &sha256_hex(b"world-b"),
+            "never_exposed",
         );
-        let first = audit_lineage_overlap(
-            &left_set, &left_ledger, &right_set, &right_ledger
-        ).unwrap();
-        let second = audit_lineage_overlap(
-            &left_set, &left_ledger, &right_set, &right_ledger
-        ).unwrap();
+        let first =
+            audit_lineage_overlap(&left_set, &left_ledger, &right_set, &right_ledger).unwrap();
+        let second =
+            audit_lineage_overlap(&left_set, &left_ledger, &right_set, &right_ledger).unwrap();
         assert_eq!(
             serde_json::to_vec(&first).unwrap(),
             serde_json::to_vec(&second).unwrap()
