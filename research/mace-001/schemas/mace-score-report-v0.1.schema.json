@@ -25,6 +25,7 @@
     "mean_tokens",
     "mean_model_calls",
     "hard_gate_pass",
+    "full_conformance_pass",
     "agent_input_sha256",
     "oracle_sha256",
     "candidate_sha256",
@@ -105,6 +106,9 @@
       "minimum": 0
     },
     "hard_gate_pass": {
+      "type": "boolean"
+    },
+    "full_conformance_pass": {
       "type": "boolean"
     },
     "agent_input_sha256": {
