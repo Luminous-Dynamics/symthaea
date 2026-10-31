@@ -1,0 +1,143 @@
+{
+  "schema_version": "cmaq-011-task-manifest-v0.1",
+  "benchmark_id": "cmaq-011",
+  "track": "vector_control",
+  "status": "example_template_not_a_locked_environment",
+  "task": {
+    "suite": "gymnasium-mujoco",
+    "environment_id": "HalfCheetah-v4",
+    "environment_package_version": null,
+    "physics_engine_version": null,
+    "source_revision": null,
+    "wrapper_stack": [],
+    "reward_definition_digest": null,
+    "observation_transform_digest": null,
+    "action_transform_digest": null,
+    "episode_horizon": null,
+    "reset_distribution_digest": null,
+    "episode_horizon_base_simulator_steps": null,
+    "simulator_steps_per_action": null,
+    "reward_aggregation": "unknown"
+  },
+  "split": {
+    "name": "qualification",
+    "task_parameter_family_ids": [],
+    "seed_manifest_sha256": null,
+    "hidden_from_tuning": false
+  },
+  "budget": {
+    "max_candidate_action_sequences_per_decision": null,
+    "max_rollout_horizon": null,
+    "max_environment_queries_per_decision": null,
+    "max_model_queries_per_decision": null,
+    "wallclock_budget_ms_per_decision": null,
+    "peak_memory_bytes": null,
+    "training_compute_excluded": true
+  },
+  "baselines": [
+    {
+      "id": "direct_policy",
+      "kind": "no_world_model_direct_policy"
+    },
+    {
+      "id": "direct_compute_matched",
+      "kind": "compute_matched_no_world_model"
+    },
+    {
+      "id": "mpc_cem",
+      "kind": "model_based_search"
+    },
+    {
+      "id": "mrsq",
+      "kind": "search_based_model_based_rl_external"
+    },
+    {
+      "id": "wimle",
+      "kind": "uncertainty_aware_stochastic_world_model_rl_external"
+    },
+    {
+      "id": "drq",
+      "kind": "sample_efficient_model_based_representation_rl_external"
+    },
+    {
+      "id": "tdmpc2",
+      "kind": "model_based_rl_external"
+    },
+    {
+      "id": "td7",
+      "kind": "model_free_rl_external"
+    },
+    {
+      "id": "symthaea_learned_wm",
+      "kind": "candidate_world_model"
+    },
+    {
+      "id": "symthaea_shuffled_future",
+      "kind": "negative_control_action_future_correspondence"
+    },
+    {
+      "id": "oracle_dynamics",
+      "kind": "simulator_upper_bound"
+    }
+  ],
+  "metrics_required": [
+    "normalized_state_rmse",
+    "reward_mae",
+    "spearman_action_rank_correlation",
+    "kendall_action_rank_correlation",
+    "top1_action_agreement",
+    "topk_oracle_regret",
+    "closed_loop_return_mean",
+    "closed_loop_return_median",
+    "closed_loop_cvar95_loss",
+    "task_success_rate",
+    "failure_rate",
+    "search_optimism_gap",
+    "unsupported_action_rate",
+    "latency_p50_ms",
+    "latency_p95_ms",
+    "peak_memory_bytes",
+    "model_queries_per_decision",
+    "environment_queries_per_decision",
+    "probe_count",
+    "advantage_of_prediction_vs_compute_matched_direct",
+    "prediction_mediation_vs_shuffled_future",
+    "compute_only_gain_vs_direct",
+    "oracle_gap",
+    "capability_coverage_fraction",
+    "action_following_fidelity",
+    "physics_adherence_violation_rate",
+    "optimism_bias_detection_rate",
+    "joint_candidate_set_coverage",
+    "selected_action_error_coverage",
+    "verified_task_success_rate",
+    "evaluation_shortcut_attempt_rate",
+    "probe_value_of_information",
+    "base_simulator_transitions_per_episode",
+    "controller_decision_steps_per_episode"
+  ],
+  "claim_ceiling": "schema_template_only_no_results",
+  "integrity": {
+    "network_access": "disabled",
+    "allowed_network_domains": [],
+    "available_agent_tools": [
+      "environment_observation",
+      "environment_action"
+    ],
+    "hidden_qualification": false,
+    "agent_can_access_hidden_targets": false,
+    "agent_can_write_scoring_artifacts": false,
+    "task_prompt_sha256": null,
+    "evaluator_source_sha256": null,
+    "scoring_verifier_sha256": null,
+    "independent_verifier_id": null,
+    "outcome_verification": "environment_side",
+    "transcript_audit": "all",
+    "negative_controls": [
+      "shuffled_future",
+      "action_observation_mismatch",
+      "scoring_artifact_write_attempt",
+      "hidden_target_access_attempt"
+    ]
+  }
+}
