@@ -29,7 +29,7 @@ struct Window {
     window_sha256: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Origin {
     Original,
     Replayed,
@@ -502,6 +502,7 @@ fn audit_values(manifest: &Value, manifest_bytes: &[u8]) -> Result<Value, String
     let duplicate_content_occurrences = window_hashes.values()
         .map(|count| count.saturating_sub(1))
         .sum::<usize>();
+    let duplicate_content_hash_group_count = duplicate_content_groups.len();
     let original_trace_count = traces.iter().filter(|t| t.origin == Origin::Original).count();
 
     Ok(json!({
@@ -526,7 +527,7 @@ fn audit_values(manifest: &Value, manifest_bytes: &[u8]) -> Result<Value, String
             "replayed_window_count":replayed_window_count,
             "unknown_origin_window_count":unknown_window_count,
             "duplicate_content_hash_groups":duplicate_content_groups,
-            "duplicate_content_hash_group_count":duplicate_content_groups.len(),
+            "duplicate_content_hash_group_count":duplicate_content_hash_group_count,
             "duplicate_content_extra_occurrences":duplicate_content_occurrences,
             "split_window_counts":split_window_counts
         },
