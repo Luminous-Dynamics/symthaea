@@ -1,3 +1,4 @@
+import json
 import unittest
 from fractions import Fraction
 
@@ -26,6 +27,8 @@ class OnlineEclosureCapacityTests(unittest.TestCase):
         self.assertLessEqual(decisions[0]["cumulative_cost"], 1)
         self.assertLessEqual(decisions[1]["cumulative_cost"], 2)
         self.assertTrue(result["verification"]["valid"])
+        # The receipt is canonical-JSON-friendly for immutable replay.
+        json.dumps(result, sort_keys=True, separators=(",", ":"))
 
     def test_invalid_new_hypothesis_is_not_added_even_with_capacity(self):
         result = select_capacity_aware_sequence(
