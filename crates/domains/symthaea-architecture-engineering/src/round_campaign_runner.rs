@@ -173,7 +173,7 @@ pub fn compare_four_seat_campaign_runs(
             })
             .collect();
         if candidate_runs.is_empty() {
-            continue;
+            return Err(format!("candidate policy has no runs for {landscape:?}"));
         }
         let candidate_seeds: BTreeSet<u64> = candidate_runs.keys().copied().collect();
         for baseline_policy in policies.iter().copied() {
