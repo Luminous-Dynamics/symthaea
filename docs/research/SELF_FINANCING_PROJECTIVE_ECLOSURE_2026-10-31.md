@@ -38,7 +38,11 @@ p_{i,t}=\frac{s_{i,t}}{\sum_{j\in I_t}s_{j,t}}
 
 with all-zero scores interpreted as holding cash.
 
-**Prior art:** Ek, Stark, Stuckey and Vukcevic's AWAIRE (2023) already constructs intersection test supermartingales by multiplying predictable convex combinations of component test-supermartingale factors, and studies linear, quadratic and largest-past-wealth weighting. Thus this PR does not claim to invent adaptive self-financing mixtures. The narrower question is whether a single global, intersection-independent predictable portfolio schedule, combined with neutral dormant padding, yields a projective family across an expanding horizon and can support dynamic e-closure plus capacity-aware selection. AWAIRE must be an explicit comparator.
+**Prior art:** Ek, Stark, Stuckey and Vukcevic's AWAIRE (2023) already constructs intersection test supermartingales by multiplying predictable convex combinations of component test-supermartingale factors, and studies linear, quadratic and largest-past-wealth weighting. Thus this PR does not claim to invent adaptive self-financing mixtures. The narrower question is how portfolio scope affects future-extension coherence and capacity-aware selection as the hypothesis universe expands.
+
+A separate intersection-local AWAIRE comparator is now implemented in `validation/awaire_dynamic_projective_baseline.py`. For each (S), it normalizes predictable weights over (S\cap I_t), rather than over the whole active universe. Because its weights depend only on the currently active intersection and its past coordinate wealth, it also satisfies the neutral-padding projectivity check. On the two-coordinate fixture, local equal weighting gives (E^{\{1\}}=(1,8,8)), (E^{\{2\}}=(1,1,16)), and (E^{\{1,2\}}=(1,9/2,153/4)). Local past-wealth weighting gives (E^{\{1,2\}}=(1,9/2,12)). These are explicit comparator paths, not a general power ranking.
+
+The comparison must include AWAIRE local linear / quadratic / largest-past-wealth, global static-priority / equal / wealth-adaptive shares, fixed globally summable projective mergers, and the no-capacity dynamic closure menu.
 
 For every finite intersection \(S\), define the self-financing wealth process
 
@@ -150,6 +154,17 @@ With utilities (10,8) and costs (1,1), exhaustive selection returns \(\varnothin
 The all-success path has positive probability under the stated one-step martingale construction. This fixture illustrates the algebra; it does not estimate SupFDR or prove the upstream conditional e-value contracts from data.
 
 ## Implementation
+
+- `validation/awaire_dynamic_projective_baseline.py`
+  - intersection-local predictable mixtures;
+  - AWAIRE-style linear, quadratic, and largest-past-wealth policies;
+  - independent pathwise future-extension coherence and time-monotonicity checks.
+- `validation/test_awaire_dynamic_projective_baseline.py`
+  - exact singleton and joint-intersection wealth paths;
+  - equal and past-wealth local policies;
+  - projectivity, dormant-coordinate, nonnested-activation, and negative-increment checks;
+  - a correlated null-increment fixture with exact conditional expectation one for every tested predictable convex combination.
+
 
 - validation/self_financing_projective_eclosure.py
   - predictable active-set-normalized shares;
