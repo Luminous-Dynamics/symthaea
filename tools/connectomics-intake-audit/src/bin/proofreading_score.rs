@@ -103,13 +103,10 @@ struct Args {
     #[arg(long)]
     ood_detector_profile_sha256: Option<String>,
 
-    /// Frozen OOD novelty threshold selected on development, then applied to confirmatory/lockbox rows.
+    /// Separate development-partition prediction JSONL used to select the OOD operating threshold.
+    /// The file is checked against the same frozen split manifest and detector provenance.
     #[arg(long)]
-    ood_score_threshold: Option<f64>,
-
-    /// Partition on which the OOD threshold was selected; must be development.
-    #[arg(long, value_enum)]
-    ood_threshold_selection_partition: Option<EvaluationPartition>,
+    ood_threshold_selection_input: Option<PathBuf>,
 
     /// Write report to this JSON file (stdout if omitted).
     #[arg(long)]
@@ -335,6 +332,22 @@ struct OodDetectionMetrics {
 }
 
 #[derive(Debug, Serialize)]
+struct OodThresholdSelection {
+    status: &'static str,
+    selection_partition: EvaluationPartition,
+    selection_input_sha256: String,
+    target_false_ood_rate: f64,
+    development_row_count: usize,
+    development_in_domain_count: usize,
+    development_held_out_domain_count: usize,
+    false_ood_count: Option<usize>,
+    false_ood_rate_on_in_domain: Option<f64>,
+    missed_ood_count: Option<usize>,
+    held_out_domain_recall: Option<f64>,
+    selected_threshold: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
 struct Report {
     schema_version: u32,
     scorer: &'static str,
@@ -371,7 +384,7 @@ struct Report {
     per_domain: Option<BTreeMap<String, DomainEvaluation>>,
     ood_detector_id: Option<String>,
     ood_detector_profile_sha256: Option<String>,
-    ood_threshold_selection_partition: Option<EvaluationPartition>,
+    ood_threshold_selection: Option<OodThresholdSelection>,
     ood_detection: Option<OodDetectionMetrics>,
     scope_note: &'static str,
 }
@@ -1916,21 +1929,115 @@ fn validate_domain_split_provenance(
     Ok(Some(sha256(manifest_bytes)))
 }
 
-fn validate_ood_threshold_provenance(
-    threshold: Option<f64>,
-    selection_partition: Option<EvaluationPartition>,
+fn validate_threshold_selection_input_partition(
+    selection_input_supplied: bool,
     evaluation_partition: EvaluationPartition,
 ) -> Result<(), String> {
-    match (threshold, selection_partition) {
-        (Some(_), Some(EvaluationPartition::Development))
-            if evaluation_partition != EvaluationPartition::Development => Ok(()),
-        (Some(_), Some(EvaluationPartition::Development)) => Err(
-            "a threshold selected on development data must be evaluated on confirmatory or lockbox data, not the same development partition".into()
-        ),
-        (Some(_), Some(_)) => Err("OOD threshold selection partition must be development".into()),
-        (Some(_), None) => Err("an OOD threshold requires --ood-threshold-selection-partition development".into()),
-        (None, Some(_)) => Err("--ood-threshold-selection-partition requires --ood-score-threshold".into()),
-        (None, None) => Ok(()),
+    if selection_input_supplied && evaluation_partition == EvaluationPartition::Development {
+        return Err("OOD threshold selection input must be development and cannot be reused as the evaluation partition".into());
+    }
+    Ok(())
+}
+
+fn select_ood_threshold_from_development(
+    rows: &[Prediction],
+    selection_input_sha256: String,
+    target_false_ood_rate: f64,
+) -> Result<OodThresholdSelection, String> {
+    if !target_false_ood_rate.is_finite() || !(0.0..=1.0).contains(&target_false_ood_rate) {
+        return Err("target_false_ood_rate must be finite and in [0,1]".into());
+    }
+    if rows.is_empty() || rows.iter().any(|row| row.ood_score.is_none()) {
+        return Err("development threshold selection requires a complete ood_score column".into());
+    }
+    let in_domain_count = rows.iter().filter(|row| row.is_ood_domain == Some(false)).count();
+    let held_out_count = rows.iter().filter(|row| row.is_ood_domain == Some(true)).count();
+    if in_domain_count == 0 || held_out_count == 0 {
+        return Ok(OodThresholdSelection {
+            status: "NOT_ESTIMABLE",
+            selection_partition: EvaluationPartition::Development,
+            selection_input_sha256,
+            target_false_ood_rate,
+            development_row_count: rows.len(),
+            development_in_domain_count: in_domain_count,
+            development_held_out_domain_count: held_out_count,
+            false_ood_count: None,
+            false_ood_rate_on_in_domain: None,
+            missed_ood_count: None,
+            held_out_domain_recall: None,
+            selected_threshold: None,
+        });
+    }
+
+    let mut candidates = rows.iter().filter_map(|row| row.ood_score).collect::<Vec<_>>();
+    candidates.sort_by(f64::total_cmp);
+    candidates.dedup_by(|a, b| a.total_cmp(b).is_eq());
+
+    let mut selected: Option<(f64, usize, usize, f64, f64)> = None;
+    for threshold in candidates {
+        let false_ood_count = rows.iter().filter(|row| {
+            row.is_ood_domain == Some(false) && row.ood_score.unwrap_or(0.0) >= threshold
+        }).count();
+        let detected_ood_count = rows.iter().filter(|row| {
+            row.is_ood_domain == Some(true) && row.ood_score.unwrap_or(0.0) >= threshold
+        }).count();
+        let false_ood_rate = false_ood_count as f64 / in_domain_count as f64;
+        if false_ood_rate > target_false_ood_rate {
+            continue;
+        }
+        let recall = detected_ood_count as f64 / held_out_count as f64;
+        let replace = match selected {
+            None => true,
+            Some((best_threshold, _, _, best_fpr, best_recall)) => {
+                recall > best_recall
+                    || (recall.total_cmp(&best_recall).is_eq()
+                        && (false_ood_rate < best_fpr
+                            || (false_ood_rate.total_cmp(&best_fpr).is_eq()
+                                && threshold > best_threshold)))
+            }
+        };
+        if replace {
+            selected = Some((
+                threshold,
+                false_ood_count,
+                held_out_count - detected_ood_count,
+                false_ood_rate,
+                recall,
+            ));
+        }
+    }
+
+    match selected {
+        Some((threshold, false_ood_count, missed_ood_count, false_ood_rate, recall)) => {
+            Ok(OodThresholdSelection {
+                status: "SELECTED",
+                selection_partition: EvaluationPartition::Development,
+                selection_input_sha256,
+                target_false_ood_rate,
+                development_row_count: rows.len(),
+                development_in_domain_count: in_domain_count,
+                development_held_out_domain_count: held_out_count,
+                false_ood_count: Some(false_ood_count),
+                false_ood_rate_on_in_domain: Some(false_ood_rate),
+                missed_ood_count: Some(missed_ood_count),
+                held_out_domain_recall: Some(recall),
+                selected_threshold: Some(threshold),
+            })
+        }
+        None => Ok(OodThresholdSelection {
+            status: "NO_FEASIBLE_THRESHOLD",
+            selection_partition: EvaluationPartition::Development,
+            selection_input_sha256,
+            target_false_ood_rate,
+            development_row_count: rows.len(),
+            development_in_domain_count: in_domain_count,
+            development_held_out_domain_count: held_out_count,
+            false_ood_count: None,
+            false_ood_rate_on_in_domain: None,
+            missed_ood_count: None,
+            held_out_domain_recall: None,
+            selected_threshold: None,
+        }),
     }
 }
 
@@ -1973,14 +2080,8 @@ fn run() -> Result<i32, String> {
     if args.calibration_null_replicates < 100 {
         return Err("--calibration-null-replicates must be at least 100".into());
     }
-    if let Some(threshold) = args.ood_score_threshold {
-        if !threshold.is_finite() || !(0.0..=1.0).contains(&threshold) {
-            return Err("--ood-score-threshold must be finite and in [0,1]".into());
-        }
-    }
-    validate_ood_threshold_provenance(
-        args.ood_score_threshold,
-        args.ood_threshold_selection_partition,
+    validate_threshold_selection_input_partition(
+        args.ood_threshold_selection_input.is_some(),
         args.evaluation_partition,
     )?;
     if !is_lower_hex(&args.dataset_revision_commit_sha, 40) {
@@ -2015,6 +2116,36 @@ fn run() -> Result<i32, String> {
         args.ood_detector_id.as_deref(),
         args.ood_detector_profile_sha256.as_deref(),
     )?;
+    const DEVELOPMENT_FALSE_OOD_RATE_TARGET: f64 = 0.05;
+    let ood_threshold_selection = if let Some(selection_path) = &args.ood_threshold_selection_input {
+        let selection_bytes = fs::read(selection_path).map_err(|error| {
+            format!("failed to read OOD threshold selection input {}: {error}", selection_path.display())
+        })?;
+        let selection_records = parse_jsonl(&selection_bytes)?;
+        let selection_manifest_digest = validate_domain_split_provenance(
+            &selection_records,
+            domain_split_manifest_bytes.as_deref(),
+            &args.dataset_revision_commit_sha,
+            EvaluationPartition::Development,
+        )?;
+        if selection_manifest_digest != domain_split_manifest_sha256 {
+            return Err("development threshold selection and evaluation inputs do not share the same domain split manifest".into());
+        }
+        validate_ood_detector_provenance(
+            &selection_records,
+            args.ood_detector_id.as_deref(),
+            args.ood_detector_profile_sha256.as_deref(),
+        )?;
+        Some(select_ood_threshold_from_development(
+            &selection_records,
+            sha256(&selection_bytes),
+            DEVELOPMENT_FALSE_OOD_RATE_TARGET,
+        )?)
+    } else {
+        None
+    };
+    let selected_ood_threshold = ood_threshold_selection.as_ref()
+        .and_then(|selection| selection.selected_threshold);
     let (
         domain_shift_audit_status,
         domain_shift_axis,
@@ -2025,7 +2156,7 @@ fn run() -> Result<i32, String> {
     ) = domain_shift_evaluation(
         &records,
         args.require_domain_shift_audit,
-        args.ood_score_threshold,
+        selected_ood_threshold,
         args.bootstrap_replicates,
         args.calibration_null_replicates,
         &input_hash,
@@ -2113,7 +2244,7 @@ fn run() -> Result<i32, String> {
         per_domain,
         ood_detector_id: args.ood_detector_id.clone(),
         ood_detector_profile_sha256: args.ood_detector_profile_sha256.clone(),
-        ood_threshold_selection_partition: args.ood_threshold_selection_partition,
+        ood_threshold_selection,
         ood_detection,
         scope_note: "Metrics describe this frozen prediction file only. Cluster-bootstrap intervals resample the caller-declared cluster_id; they do not prove that the chosen cluster unit is independent. This scorer does not validate dataset labels/mapping truth or establish prospective review-time savings. Use a locked evaluation protocol before claims.",
     };
@@ -2528,13 +2659,56 @@ mod tests {
     }
 
     #[test]
-    fn ood_threshold_must_be_selected_on_development_and_applied_out_of_sample() {
-        assert!(validate_ood_threshold_provenance(Some(0.5), Some(EvaluationPartition::Development), EvaluationPartition::Confirmatory).is_ok());
-        assert!(validate_ood_threshold_provenance(Some(0.5), Some(EvaluationPartition::Development), EvaluationPartition::Lockbox).is_ok());
-        assert!(validate_ood_threshold_provenance(Some(0.5), Some(EvaluationPartition::Development), EvaluationPartition::Development).is_err());
-        assert!(validate_ood_threshold_provenance(Some(0.5), Some(EvaluationPartition::Confirmatory), EvaluationPartition::Lockbox).is_err());
-        assert!(validate_ood_threshold_provenance(Some(0.5), None, EvaluationPartition::Lockbox).is_err());
-        assert!(validate_ood_threshold_provenance(None, Some(EvaluationPartition::Development), EvaluationPartition::Lockbox).is_err());
+    fn threshold_selection_input_must_be_out_of_sample() {
+        assert!(validate_threshold_selection_input_partition(true, EvaluationPartition::Confirmatory).is_ok());
+        assert!(validate_threshold_selection_input_partition(true, EvaluationPartition::Lockbox).is_ok());
+        assert!(validate_threshold_selection_input_partition(true, EvaluationPartition::Development).is_err());
+        assert!(validate_threshold_selection_input_partition(false, EvaluationPartition::Development).is_ok());
+    }
+
+    #[test]
+    fn development_threshold_selection_maximizes_recall_under_five_percent_false_ood_rate() {
+        let rows = vec![
+            tagged_row("dev-in-1", false, 0.1, "mouse", false, 0.1),
+            tagged_row("dev-in-2", false, 0.1, "mouse", false, 0.2),
+            tagged_row("dev-in-3", false, 0.1, "mouse", false, 0.3),
+            tagged_row("dev-in-4", false, 0.1, "mouse", false, 0.4),
+            tagged_row("dev-ood-1", true, 0.9, "zebrafish", true, 0.9),
+            tagged_row("dev-ood-2", true, 0.9, "zebrafish", true, 0.8),
+            tagged_row("dev-ood-3", true, 0.9, "zebrafish", true, 0.7),
+            tagged_row("dev-ood-4", true, 0.9, "zebrafish", true, 0.6),
+        ];
+        let result = select_ood_threshold_from_development(&rows, "a".repeat(64), 0.05).unwrap();
+        assert_eq!(result.status, "SELECTED");
+        assert_eq!(result.selected_threshold, Some(0.6));
+        assert_eq!(result.false_ood_rate_on_in_domain, Some(0.0));
+        assert_eq!(result.held_out_domain_recall, Some(1.0));
+    }
+
+    #[test]
+    fn development_threshold_selection_refuses_five_percent_fpr_if_no_threshold_is_feasible() {
+        let rows = vec![
+            tagged_row("dev-in-1", false, 0.1, "mouse", false, 0.9),
+            tagged_row("dev-in-2", false, 0.1, "mouse", false, 0.8),
+            tagged_row("dev-in-3", false, 0.1, "mouse", false, 0.7),
+            tagged_row("dev-in-4", false, 0.1, "mouse", false, 0.6),
+            tagged_row("dev-ood-1", true, 0.9, "zebrafish", true, 0.5),
+            tagged_row("dev-ood-2", true, 0.9, "zebrafish", true, 0.4),
+        ];
+        let result = select_ood_threshold_from_development(&rows, "b".repeat(64), 0.05).unwrap();
+        assert_eq!(result.status, "NO_FEASIBLE_THRESHOLD");
+        assert_eq!(result.selected_threshold, None);
+    }
+
+    #[test]
+    fn development_threshold_selection_is_not_estimable_without_both_domain_classes() {
+        let rows = vec![
+            tagged_row("dev-only-1", false, 0.1, "mouse", false, 0.1),
+            tagged_row("dev-only-2", false, 0.2, "mouse", false, 0.2),
+        ];
+        let result = select_ood_threshold_from_development(&rows, "c".repeat(64), 0.05).unwrap();
+        assert_eq!(result.status, "NOT_ESTIMABLE");
+        assert_eq!(result.selected_threshold, None);
     }
 
     #[test]
