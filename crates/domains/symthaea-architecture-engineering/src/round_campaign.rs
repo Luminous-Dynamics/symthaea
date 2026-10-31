@@ -823,6 +823,7 @@ mod tests {
     #[test]
     fn per_direction_claim_cap_is_enforced_before_execution() {
         let mut plan = plan();
+        plan.seats[1].action = RoundAction::EvaluateDirection("A".to_owned());
         plan.seats[3].action = RoundAction::EvaluateDirection("A".to_owned());
         plan.plan_sha256 = plan.compute_digest().unwrap();
         assert!(plan.validate_integrity().is_err());
