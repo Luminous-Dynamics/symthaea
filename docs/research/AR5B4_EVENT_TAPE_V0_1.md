@@ -26,7 +26,7 @@ Direction proposals bind a descriptor digest and semantic delta. Only the verifi
 
 ## Resource accounting
 
-Each action records host CPU milliseconds, accelerator milliseconds, peak memory bytes, energy millijoules, input/output tokens, tool calls, evaluator calls, verifier calls, and normalized budget charge in microunits.
+Each action records host CPU milliseconds, wall milliseconds, accelerator milliseconds, peak memory bytes, energy millijoules, input/output tokens, tool calls, evaluator calls, verifier calls, and normalized budget charge in microunits.
 
 A reading is either `Measured(value)` or `Unknown(reason)`. Measured zero is valid; unknown is never converted to zero. `validate_integrity` preserves structurally valid but unmetered tapes for diagnosis. `validate` is the qualification gate and rejects any unknown measurement or unknown charge. Retries are separate events and consume separate charges. The running normalized charge may not exceed the header budget ceiling.
 
@@ -38,9 +38,9 @@ Batched events use a common batch ID and round. All events in the batch must hav
 
 ## Integrity and replay
 
-The tape is append-only at the API boundary. Each event hash binds its sequence, prior event hash, and serialized payload. Validation checks sequence continuity, the hash chain, the policy/config identity, visible-prefix digest, action/outcome agreement, canonical direction registration, retry identity, resource receipts, worker/batch semantics, claim caps, and budget ceiling.
+The tape is append-only at the API boundary. The first event's prior hash is the deterministic digest of the frozen header; each later event hash binds its sequence, prior event hash, and serialized payload. The header itself is read-only through the API. Validation checks sequence continuity, the hash chain, the policy/config identity, visible-prefix digest, action/outcome agreement, canonical direction registration, retry identity, resource receipts, worker/batch semantics, claim caps, and budget ceiling.
 
-A `PolicyReplay` adapter receives only the event prefix declared visible for a decision plus that decision's worker/round context. It must reproduce whether the policy selected a registered direction or requested a new direction. Candidate-generation and evaluator correctness remain separate responsibilities.
+A `PolicyReplay` adapter must identify the same policy ID and frozen config digest, then receives only the event prefix declared visible for a decision plus that decision's worker/round context. It must reproduce whether the policy selected a registered direction or requested a new direction. Candidate-generation and evaluator correctness remain separate responsibilities.
 
 The SHA-256 chain is tamper-evident only when the tape is retained and compared against a trusted digest. It does not authenticate who produced the tape. Signing, remote append-only storage, independent evaluator deployment, and cross-policy campaign reconciliation remain follow-on work.
 
