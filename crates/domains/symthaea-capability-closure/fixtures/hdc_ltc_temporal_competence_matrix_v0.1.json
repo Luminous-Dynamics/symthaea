@@ -62,7 +62,7 @@
     "benchmark_executed": false,
     "hardware_energy_measured": false,
     "result_values_present": false,
-    "generator_scope": "Implemented Rust task generators: T1 always-on sparse event/quiet idle; T2 delayed cue; T3/T4 multi-timescale forecasting/change-point; T5 irregular/missingness plus sampling-aware CSE/CAE; T6 selective retention/invalidation; T7 phase prediction; T8 BrainTrace DMS task semantics; T9 BrainTrace evidence accumulation; T10 bitemporal continual-knowledge plus repeated-checkpoint Temporal Error Debt. Runner, OS-level oracle isolation, signed receipts, real-dataset adapter, baseline training and system measurements remain unimplemented.",
+    "generator_scope": "Implemented Rust task generators: T1 always-on sparse event/quiet idle; T2 delayed cue; T3/T4 multi-timescale forecasting/change-point; T5 irregular/missingness plus CSE/CAE; T6 selective retention/invalidation; T7 phase prediction; T8 BrainTrace DMS task semantics; T9 BrainTrace evidence accumulation; T10 bitemporal stream plus repeated-checkpoint current/historical trajectories and Temporal Error Debt scoring. Runner, OS-level oracle isolation, signed receipts, real-dataset adapter, baseline training and system measurements remain unimplemented.",
     "rust_tests_authored": true,
     "oracle_trace_verifier_implemented": true,
     "oracle_process_isolation_implemented": false,
@@ -135,7 +135,13 @@
     "canonical_encoding": "Versioned little-endian encoding with domain separation; SHA-256 produced by the sha2 crate.",
     "canonical_public_stream_digest_implemented": true,
     "canonical_oracle_digest_implemented": true,
-    "signed_evaluator_receipt_implemented": false
+    "signed_evaluator_receipt_implemented": false,
+    "cse_method": "Self-normalized inverse-density CSE/CAE estimates based on leave-one-out Gaussian KDE over observed timestamps; report MSE/MAE in parallel, preregister the bandwidth, and report effective sample size.",
+    "cse_is_exact_integral": false,
+    "temporal_error_debt_checkpoint_schedule": "gcd(update_interval, max(1, floor(update_interval/4))) so the checkpoint cadence exactly divides update intervals; final checkpoint is held for one stride.",
+    "temporal_error_debt_window_generator_implemented": true,
+    "temporal_error_debt_scorer_implemented": true,
+    "temporal_error_debt_oracle_isolation": false
   },
   "temporal_axes": {
     "delayed_cue_steps": [
@@ -345,7 +351,7 @@
           "do_not_call_estimated_CSE_an_exact_time_integral",
           "evaluate_bandwidth_sensitivity_on_development_data_only"
         ],
-        "status": "Rust scorer and seven tests authored; not compiled or executed"
+        "status": "Implemented Rust metric scorer and seven tests authored; not compiled or executed."
       }
     },
     {
@@ -578,7 +584,7 @@
       "proposed_extensions": {
         "temporal_error_debt": {
           "tracking_issue": 9492,
-          "status": "repeated_checkpoint_generator_and_scorer_authored_not_run",
+          "status": "Repeated-checkpoint generator and scorer authored but not run.",
           "required_query_stream": "Two lanes (current valid-time and historical-as-known) queried at every deterministic checkpoint. Checkpoint stride exactly divides source update interval and targets approximately four checkpoints per update interval.",
           "measures": [
             "wrong_belief_exposure",
@@ -614,7 +620,7 @@
           "retraction_latency",
           "answer_oscillations"
         ],
-        "status": "Implemented and authored with eight tests; not compiled or executed",
+        "status": "Repeated-checkpoint task generator, two query lanes, canonical digests, semantic verification, evaluator-held seed replay, and eight tests authored; not compiled or executed.",
         "preserves_original_five_anchor_queries": true
       }
     }
