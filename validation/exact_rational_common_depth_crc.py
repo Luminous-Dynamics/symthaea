@@ -221,14 +221,16 @@ class ExactCommonDepthCRC:
         table = self.baseline(kind)
         totals = self.augmented_totals(table)
         snapshots = []
-        validation_table_count = 1
+        validation_table_count = 1  # baseline() performs one exact verification
         if 0 in requested:
             snapshots.append(self._snapshot(0, table, totals))
+            validation_table_count += 1
         for round_number in range(1, rounds + 1):
             table, totals = self.recertify_round(table, totals)
-            validation_table_count += 1
+            validation_table_count += 2  # input and output table, both exhaustively checked
             if round_number in requested:
                 snapshots.append(self._snapshot(round_number, table, totals))
+                validation_table_count += 1
         return {
             "n_calibration": self.n,
             "alpha": fraction_text(self.alpha),
