@@ -638,3 +638,67 @@ cargo run --locked -- verify-fresh-score \
   /secure/evaluator/fresh-score-report.json
 ~~~
 
+
+
+## Monte Carlo power planning for replicated model-pair causal studies
+
+The module src/causal_power.rs replaces a convention-based training-pair count with a preregistered simulation-based design calculation.
+
+### Independent unit and outcome model
+
+Each independent training replicate is a treatment/placebo model pair. The simulator creates one paired global outcome summary per pair after drawing:
+- a between-model-pair random training effect;
+- a shared shock for clusters within each task family;
+- cluster-level residual noise governed by a within-family ICC;
+- an incremental direct effect for exposed clusters;
+- a global spillover effect for unexposed clusters;
+- an MCAR pair failure indicator.
+
+Exposure is balanced within each family with the same treatment count. The expected primary all-cluster effect is:
+
+spillover effect + actual balanced exposure fraction × direct exposure effect
+
+Questions and clusters are nested measurements contributing to a model-pair mean; they do not inflate the independent replicate count.
+
+### Null and alternative simulation
+
+For every candidate number of independent model pairs, the planner simulates:
+- a sharp global null with zero direct and spillover effects to estimate type-I error;
+- the declared alternative to estimate power;
+- 95% Student-t confidence-interval coverage for the expected global effect;
+- failed/inconclusive studies where fewer than two pairs survive.
+
+It reports Monte Carlo standard errors for type-I error, power and interval coverage, plus mean surviving pairs, effect SD and SE. A candidate qualifies only when type-I error, power, coverage and inconclusive-rate tolerances all pass. The report returns the smallest qualifying candidate or null when no candidate qualifies.
+
+### V1 assumptions
+
+The planner is deliberately explicit about its assumptions:
+- independent model-pair random effects;
+- Gaussian between-pair and family/cluster noise;
+- fixed balanced source-cluster allocation within each task family;
+- homogeneous direct and spillover effects;
+- MCAR pair failure;
+- Student-t inference across surviving independent model-pair summaries.
+
+Real pilot data should replace assumed SD/ICC/failure inputs. Sensitivity analyses should vary the effect size, pair-level SD, ICC, spillover and failure probability. The output is a design simulation, not evidence that actual training variance follows the assumed distribution.
+
+### CLI
+
+~~~sh
+cargo run --locked -- plan-causal-power \
+  research/contamination-panel-001/fixtures/causal-power-planning-config.json \
+  /secure/evaluator/causal-power-plan.json
+
+cargo run --locked -- verify-causal-power \
+  /secure/evaluator/causal-power-plan.json
+~~~
+
+Schemas:
+- schema/causal-power-config.schema.json
+- schema/causal-power-report.schema.json
+
+Fixture:
+- fixtures/causal-power-planning-config.json
+
+The checked-in fixture is a software smoke configuration with a deliberately large effect. It is not an empirical effect estimate or a recommended universal sample size.
+
