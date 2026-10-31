@@ -11,6 +11,7 @@
     "epoch_id",
     "partition_id",
     "ledger_reconciled",
+    "ledger_loss_free",
     "seal_well_formed",
     "ledger_binding_matches",
     "event_chain_matches",
@@ -126,6 +127,9 @@
           }
         }
       }
+    },
+    "ledger_loss_free": {
+      "type": "boolean"
     }
   }
 }
