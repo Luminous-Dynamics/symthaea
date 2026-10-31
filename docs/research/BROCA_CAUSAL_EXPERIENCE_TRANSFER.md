@@ -225,10 +225,12 @@ The branch now contains a dependency-free Rust evaluator package at `research/ma
 - `score` separately reports causal-status, transfer, action and completion agreement; it also counts false causal claims, unsafe transition reuse, unsupported completion claims, pair-invariance failures and missing pre-action prediction records.
 - The output receipt binds the exact input/oracle/candidate bytes with SHA-256.
 - Non-compensatory gates cannot be passed by a high average on the other dimensions.
+- `src/scm_oracle.rs` supplies an independent deterministic reference mechanism for the four smoke families: common-cause confounding, pump-fixed valve intervention, cooling regime shift and accepted-but-unrealized relay action. Audit rejects evaluator labels that disagree with this model.
+- The controlled-intervention fixture includes four deterministic repetitions per arm. This is a noiseless simulator contract, not a statistical estimate for a real physical system.
 - A synthetic perfect-control trace validates the scorer's positive path; it is not a Broca output or a benchmark result.
 - A path-filtered GitHub Actions workflow runs unit tests, audit and the synthetic score control.
 
-The Rust unit suite includes mutation tests for false causal claims, invalid transfer, outcome overclaim, anchor/control inconsistency, missing/duplicate/unknown rows, label leakage, prompt mismatch, malformed candidate data and SHA-256 standard test vectors.
+The Rust unit suite includes 15 main-evaluator tests and four independent SCM tests, including mutations for false causal claims, invalid transfer, outcome overclaim, anchor/control inconsistency, missing/duplicate/unknown rows, label leakage, prompt mismatch, answer-key/SCM disagreement, malformed candidate data and SHA-256 standard test vectors.
 
 **Verification boundary:** code, workflow and tests are committed, but the Rust suite has not been compiled or executed in this session. The GitHub Actions workflow is an exact-head validation path; until a completed non-skipped run is observed, no Rust test pass is claimed. The v0.1 parser validates the compact TSV/payload contract but does not run a general JSON Schema validator. The candidate's prediction-before-action flag and record ID are assertions; they are not authenticated timestamps or signed receipts.
 
