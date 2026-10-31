@@ -150,14 +150,15 @@
     "confidence_level": 0.95,
     "independence_unit": "host_kernel_boot_mount_namespace_privilege_context",
     "stratification": [
-      "kernel_release_and_build",
-      "architecture",
+      "kernel_release",
+      "kernel_machine_architecture",
       "container_or_host",
       "mount_namespace",
       "effective_capabilities",
       "seccomp_mode",
       "Landlock_boot_state",
-      "fanotify_privilege_context"
+      "fanotify_privilege_context",
+      "userspace_build_architecture"
     ],
     "controls": [
       "known_supported_api",
