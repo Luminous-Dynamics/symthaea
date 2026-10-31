@@ -14,7 +14,10 @@ use anyhow::{Context, bail};
 use serde::Serialize;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
+#[cfg(target_os = "linux")]
 use std::os::fd::{FromRawFd, IntoRawFd, OwnedFd};
+#[cfg(target_os = "linux")]
+use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
