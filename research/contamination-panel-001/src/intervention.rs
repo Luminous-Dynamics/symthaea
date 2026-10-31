@@ -721,6 +721,9 @@ mod tests {
         let manifest_schema: Value = serde_json::from_str(include_str!(
             "../schema/randomized-intervention-manifest.schema.json"
         )).unwrap();
+        let audit_schema: Value = serde_json::from_str(include_str!(
+            "../schema/randomized-intervention-audit.schema.json"
+        )).unwrap();
         let fixture: RandomizedInterventionDesignV1 = serde_json::from_str(include_str!(
             "../fixtures/intervention-semantic-variant-design.json"
         )).unwrap();
@@ -745,9 +748,24 @@ mod tests {
             .keys().cloned().collect();
         assert_eq!(manifest_required, manifest_properties);
 
+        let audit_required: BTreeSet<String> = audit_schema["required"].as_array().unwrap()
+            .iter().map(|value| value.as_str().unwrap().to_owned()).collect();
+        let audit_properties: BTreeSet<String> = audit_schema["properties"].as_object().unwrap()
+            .keys().cloned().collect();
+        assert_eq!(audit_required, audit_properties);
+        assert_eq!(
+            audit_schema["properties"]["schema"]["const"].as_str(),
+            Some(INTERVENTION_AUDIT_SCHEMA)
+        );
+
         let manifest = randomize_intervention(&fixture, &seed()).unwrap();
         let manifest_json: Value = serde_json::to_value(&manifest).unwrap();
         assert_eq!(manifest_json["schema"].as_str(), Some(INTERVENTION_MANIFEST_SCHEMA));
+        let audit = audit_intervention(&fixture, &manifest, &seed()).unwrap();
+        assert_eq!(
+            serde_json::to_value(&audit).unwrap()["schema"].as_str(),
+            Some(INTERVENTION_AUDIT_SCHEMA)
+        );
         assert_eq!(manifest.exposed_training_token_count, 8_000);
         assert_eq!(manifest.shared_training_token_count, 92_000);
         assert_eq!(manifest.total_training_token_budget, 100_000);
