@@ -524,37 +524,81 @@ struct EventDigestPayload<'a> {
     previous_event_sha256: &'a str,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AnytimeHistory {
-    pub header: AnytimeHistoryHeader,
-    pub header_sha256: String,
-    pub events: Vec<AnytimeEvent>,
+    header: AnytimeHistoryHeader,
+    header_sha256: String,
+    events: Vec<AnytimeEvent>,
+    /// Rebuilt by full replay after deserialization; skipped from serialized history.
+    #[serde(skip)]
+    validation_state: Option<HistoryValidationState>,
+}
+
+impl PartialEq for AnytimeHistory {
+    fn eq(&self, other: &Self) -> bool {
+        self.header == other.header
+            && self.header_sha256 == other.header_sha256
+            && self.events == other.events
+    }
 }
 
 impl AnytimeHistory {
     pub fn new(header: AnytimeHistoryHeader) -> Result<Self, AnytimeError> {
         let header_sha256 = header.header_sha256()?;
-        Ok(Self { header, header_sha256, events: Vec::new() })
+        let validation_state = Some(HistoryValidationState::new(header_sha256.clone()));
+        Ok(Self {
+            header,
+            header_sha256,
+            events: Vec::new(),
+            validation_state,
+        })
     }
 
+    pub fn header(&self) -> &AnytimeHistoryHeader {
+        &self.header
+    }
+
+    pub fn header_sha256(&self) -> &str {
+        &self.header_sha256
+    }
+
+    pub fn events(&self) -> &[AnytimeEvent] {
+        &self.events
+    }
+
+    /// Append is incremental: it validates the new transition against cached state rather
+    /// than replaying every prior event. A deserialized history rebuilds that state once.
+    /// Full independent replay remains available through validate()/analyze_anytime_history().
     pub fn append(&mut self, draft: AnytimeEventDraft) -> Result<String, AnytimeError> {
-        self.validate()?;
+        self.header.validate()?;
+        if self.header_sha256 != self.header.header_sha256()? {
+            return Err(AnytimeError::new("history.header_sha256", "header digest mismatch"));
+        }
+        if self.validation_state.is_none() {
+            self.validation_state = Some(self.replay_state()?);
+        }
         if draft.completed_elapsed_millis < draft.started_elapsed_millis {
             return Err(AnytimeError::new("event.time", "completion precedes event start"));
         }
-        let ordinal = u64::try_from(self.events.len()).ok()
+
+        let ordinal = u64::try_from(self.events.len())
+            .ok()
             .and_then(|value| value.checked_add(1))
             .ok_or_else(|| AnytimeError::new("event.ordinal", "event ordinal overflowed u64"))?;
-        let previous_event_sha256 = self.events.last()
-            .map(|event| event.event_sha256.clone())
-            .unwrap_or_else(|| self.header_sha256.clone());
+        let state = self.validation_state.as_mut()
+            .ok_or_else(|| AnytimeError::new("history.validation_state", "incremental state unavailable"))?;
+        let previous_event_sha256 = state.previous_digest.clone();
         let event_sha256 = event_digest(
-            &self.header_sha256, ordinal, draft.started_elapsed_millis,
-            draft.completed_elapsed_millis, &draft.resources, &draft.action,
+            &self.header_sha256,
+            ordinal,
+            draft.started_elapsed_millis,
+            draft.completed_elapsed_millis,
+            &draft.resources,
+            &draft.action,
             &previous_event_sha256,
         )?;
-        self.events.push(AnytimeEvent {
+        let event = AnytimeEvent {
             ordinal,
             started_elapsed_millis: draft.started_elapsed_millis,
             completed_elapsed_millis: draft.completed_elapsed_millis,
@@ -562,194 +606,400 @@ impl AnytimeHistory {
             action: draft.action,
             previous_event_sha256,
             event_sha256: event_sha256.clone(),
-        });
-        if let Err(error) = self.validate() {
-            self.events.pop();
-            return Err(error);
-        }
+        };
+
+        validate_and_apply_event(
+            &self.header,
+            &self.header_sha256,
+            state,
+            &event,
+            ordinal,
+        )?;
+        self.events.push(event);
         Ok(event_sha256)
     }
 
     pub fn validate(&self) -> Result<(), AnytimeError> {
+        self.replay_state().map(|_| ())
+    }
+
+    fn replay_state(&self) -> Result<HistoryValidationState, AnytimeError> {
         self.header.validate()?;
         if self.header_sha256 != self.header.header_sha256()? {
             return Err(AnytimeError::new("history.header_sha256", "header digest mismatch"));
         }
-
-        let mut previous_digest = self.header_sha256.clone();
-        let mut previous_completion = 0u64;
-        let mut evaluation_ids = BTreeSet::new();
-        let mut auxiliary_ids = BTreeSet::new();
-        let mut attempts = BTreeMap::<String, u32>::new();
-        let mut decisions = BTreeMap::<String, String>::new();
-        let mut decision_owners = BTreeMap::<String, String>::new();
-        let mut successful = BTreeMap::<String, CandidateState>::new();
-        let mut objective_attempts = 0u64;
-
+        let mut state = HistoryValidationState::new(self.header_sha256.clone());
         for (index, event) in self.events.iter().enumerate() {
-            let path = format!("history.events[{index}]");
-            let expected_ordinal = u64::try_from(index).ok()
+            let ordinal = u64::try_from(index)
+                .ok()
                 .and_then(|value| value.checked_add(1))
-                .ok_or_else(|| AnytimeError::new(path.clone(), "event count overflowed u64"))?;
-            if event.ordinal != expected_ordinal {
-                return Err(AnytimeError::new(format!("{path}.ordinal"), "ordinals must be contiguous and one-based"));
-            }
-            if (index == 0 && event.started_elapsed_millis != 0)
-                || event.started_elapsed_millis < previous_completion
-                || event.completed_elapsed_millis < event.started_elapsed_millis
-            {
-                return Err(AnytimeError::new(format!("{path}.time"), "v0.1 sequential events must be monotonic and non-overlapping"));
-            }
-            if event.previous_event_sha256 != previous_digest {
-                return Err(AnytimeError::new(format!("{path}.previous_event_sha256"), "event-chain predecessor mismatch"));
-            }
-            let expected_digest = event_digest(
-                &self.header_sha256, event.ordinal, event.started_elapsed_millis,
-                event.completed_elapsed_millis, &event.resources, &event.action,
-                &event.previous_event_sha256,
+                .ok_or_else(|| AnytimeError::new("history.events", "event count overflowed u64"))?;
+            validate_and_apply_event(
+                &self.header,
+                &self.header_sha256,
+                &mut state,
+                event,
+                ordinal,
             )?;
-            if event.event_sha256 != expected_digest {
-                return Err(AnytimeError::new(format!("{path}.event_sha256"), "event digest mismatch"));
-            }
-
-            match &event.action {
-                AnytimeAction::CandidateEvaluation {
-                    evaluation_id, candidate_id, attempt, decision_sha256, outcome,
-                    objective_values, feasible, constraint_violations, evidence_sha256,
-                    failure_reason,
-                } => {
-                    objective_attempts = objective_attempts.checked_add(1)
-                        .ok_or_else(|| AnytimeError::new(path.clone(), "objective-attempt counter overflow"))?;
-                    if objective_attempts > self.header.max_objective_evaluation_attempts {
-                        return Err(AnytimeError::new(path.clone(), "objective-evaluation attempt budget exceeded"));
-                    }
-                    if evaluation_id.trim().is_empty() || !evaluation_ids.insert(evaluation_id.as_str()) {
-                        return Err(AnytimeError::new(format!("{path}.evaluation_id"), "evaluation IDs must be non-empty and unique"));
-                    }
-                    if candidate_id.trim().is_empty() {
-                        return Err(AnytimeError::new(format!("{path}.candidate_id"), "candidate ID must be non-empty"));
-                    }
-                    validate_sha256(decision_sha256, &format!("{path}.decision_sha256"))?;
-                    let expected_attempt = attempts.get(candidate_id).copied().unwrap_or(0)
-                        .checked_add(1)
-                        .ok_or_else(|| AnytimeError::new(format!("{path}.attempt"), "attempt counter overflow"))?;
-                    if *attempt != expected_attempt {
-                        return Err(AnytimeError::new(format!("{path}.attempt"), "attempts must be contiguous and begin at one"));
-                    }
-                    attempts.insert(candidate_id.clone(), *attempt);
-                    if decisions.get(candidate_id).is_some_and(|previous| previous != decision_sha256) {
-                        return Err(AnytimeError::new(format!("{path}.decision_sha256"), "decision digest changed across retries"));
-                    }
-                    if decision_owners.get(decision_sha256).is_some_and(|owner| owner != candidate_id) {
-                        return Err(AnytimeError::new(format!("{path}.decision_sha256"), "identical decision bytes must share one canonical candidate ID"));
-                    }
-                    decision_owners.entry(decision_sha256.clone()).or_insert_with(|| candidate_id.clone());
-                    decisions.entry(candidate_id.clone()).or_insert_with(|| decision_sha256.clone());
-                    if successful.contains_key(candidate_id) {
-                        return Err(AnytimeError::new(format!("{path}.candidate_id"), "candidate can be admitted successfully only once in v0.1"));
-                    }
-
-                    match outcome {
-                        EvaluationOutcome::Succeeded => {
-                            let values = objective_values.as_ref().ok_or_else(|| AnytimeError::new(format!("{path}.objective_values"), "success requires objective values"))?;
-                            if values.len() != self.header.objective_specs.len() || values.iter().any(|v| !v.is_finite()) {
-                                return Err(AnytimeError::new(format!("{path}.objective_values"), "objective vector has wrong dimension or non-finite values"));
-                            }
-                            let is_feasible = feasible.ok_or_else(|| AnytimeError::new(format!("{path}.feasible"), "success requires an explicit feasibility result"))?;
-                            let evidence = evidence_sha256.as_ref().ok_or_else(|| AnytimeError::new(format!("{path}.evidence_sha256"), "success requires evidence digest"))?;
-                            validate_sha256(evidence, &format!("{path}.evidence_sha256"))?;
-                            if (*is_feasible && !constraint_violations.is_empty())
-                                || (!*is_feasible && (constraint_violations.is_empty() || constraint_violations.iter().any(|v| v.trim().is_empty())))
-                            {
-                                return Err(AnytimeError::new(format!("{path}.constraint_violations"), "feasibility and explicit constraint violations disagree"));
-                            }
-                            if failure_reason.is_some() {
-                                return Err(AnytimeError::new(format!("{path}.failure_reason"), "successful event cannot carry failure reason"));
-                            }
-                            successful.insert(candidate_id.clone(), CandidateState {
-                                candidate: ParetoCandidate {
-                                    candidate_id: candidate_id.clone(),
-                                    objective_values: values.clone(),
-                                    feasible: *is_feasible,
-                                    constraint_violations: constraint_violations.clone(),
-                                    evidence_sha256: evidence.clone(),
-                                },
-                                decision_sha256: decision_sha256.clone(),
-                                evidence_level: EvidenceLevel::Recorded,
-                                verification_rejected: false,
-                            });
-                        }
-                        _ => {
-                            if objective_values.is_some() || feasible.is_some() || !constraint_violations.is_empty() || evidence_sha256.is_some() {
-                                return Err(AnytimeError::new(path.clone(), "failed/invalid/timed-out evaluation cannot enter the objective archive"));
-                            }
-                            if failure_reason.as_ref().is_none_or(|reason| reason.trim().is_empty()) {
-                                return Err(AnytimeError::new(format!("{path}.failure_reason"), "failed attempt requires a reason"));
-                            }
-                        }
-                    }
-                }
-                AnytimeAction::CandidateVerification { candidate_id, evidence_sha256, level, verifier_receipt_sha256 } => {
-                    if candidate_id.trim().is_empty() {
-                        return Err(AnytimeError::new(format!("{path}.candidate_id"), "verification candidate ID must be non-empty"));
-                    }
-                    validate_sha256(evidence_sha256, &format!("{path}.evidence_sha256"))?;
-                    validate_sha256(verifier_receipt_sha256, &format!("{path}.verifier_receipt_sha256"))?;
-                    if !matches!(level, EvidenceLevel::ReplayVerified | EvidenceLevel::ArtifactVerified | EvidenceLevel::HeldOutVerified | EvidenceLevel::Confirmatory) {
-                        return Err(AnytimeError::new(format!("{path}.level"), "verification must advance beyond Recorded"));
-                    }
-                    let state = successful.get_mut(candidate_id).ok_or_else(|| AnytimeError::new(format!("{path}.candidate_id"), "verification must follow successful evaluation"))?;
-                    if state.verification_rejected {
-                        return Err(AnytimeError::new(format!("{path}.candidate_id"), "a rejected candidate cannot be promoted later in the same run"));
-                    }
-                    if &state.candidate.evidence_sha256 != evidence_sha256 {
-                        return Err(AnytimeError::new(format!("{path}.evidence_sha256"), "verifier receipt refers to different evidence digest"));
-                    }
-                    if level.rank() <= state.evidence_level.rank() {
-                        return Err(AnytimeError::new(format!("{path}.level"), "verification level must strictly advance"));
-                    }
-                    state.evidence_level = *level;
-                }
-                AnytimeAction::CandidateVerificationRejected { candidate_id, evidence_sha256, verifier_receipt_sha256, rejection_reason } => {
-                    validate_sha256(evidence_sha256, &format!("{path}.evidence_sha256"))?;
-                    validate_sha256(verifier_receipt_sha256, &format!("{path}.verifier_receipt_sha256"))?;
-                    if rejection_reason.trim().is_empty() {
-                        return Err(AnytimeError::new(format!("{path}.rejection_reason"), "verifier rejection requires a reason"));
-                    }
-                    let state = successful.get_mut(candidate_id).ok_or_else(|| AnytimeError::new(format!("{path}.candidate_id"), "rejection must follow successful candidate evaluation"))?;
-                    if state.verification_rejected {
-                        return Err(AnytimeError::new(format!("{path}.candidate_id"), "candidate verification may be rejected only once per run"));
-                    }
-                    if state.evidence_level != EvidenceLevel::Recorded {
-                        return Err(AnytimeError::new(format!("{path}.candidate_id"), "a candidate cannot be rejected after a verification promotion; contradictory verifier outcomes invalidate the run"));
-                    }
-                    if &state.candidate.evidence_sha256 != evidence_sha256 {
-                        return Err(AnytimeError::new(format!("{path}.evidence_sha256"), "rejection receipt refers to different evidence digest"));
-                    }
-                    state.verification_rejected = true;
-                }
-                AnytimeAction::AuxiliaryAction { action_id, action_kind } => {
-                    if action_id.trim().is_empty() || !auxiliary_ids.insert(action_id.as_str()) {
-                        return Err(AnytimeError::new(format!("{path}.action_id"), "auxiliary action IDs must be non-empty and unique"));
-                    }
-                    if action_kind.trim().is_empty() {
-                        return Err(AnytimeError::new(format!("{path}.action_kind"), "action kind must be non-empty"));
-                    }
-                }
-            }
-
-            previous_completion = event.completed_elapsed_millis;
-            previous_digest = event.event_sha256.clone();
         }
-        Ok(())
+        Ok(state)
     }
 
     pub fn history_tip_sha256(&self) -> String {
-        self.events.last().map(|event| event.event_sha256.clone())
+        self.events.last()
+            .map(|event| event.event_sha256.clone())
             .unwrap_or_else(|| self.header_sha256.clone())
     }
 }
 
+#[derive(Debug, Clone)]
+struct HistoryValidationState {
+    previous_digest: String,
+    previous_completion: u64,
+    evaluation_ids: BTreeSet<String>,
+    auxiliary_ids: BTreeSet<String>,
+    attempts: BTreeMap<String, u32>,
+    decisions: BTreeMap<String, String>,
+    decision_owners: BTreeMap<String, String>,
+    successful: BTreeMap<String, CandidateState>,
+    objective_attempts: u64,
+}
+
+impl HistoryValidationState {
+    fn new(header_sha256: String) -> Self {
+        Self {
+            previous_digest: header_sha256,
+            previous_completion: 0,
+            evaluation_ids: BTreeSet::new(),
+            auxiliary_ids: BTreeSet::new(),
+            attempts: BTreeMap::new(),
+            decisions: BTreeMap::new(),
+            decision_owners: BTreeMap::new(),
+            successful: BTreeMap::new(),
+            objective_attempts: 0,
+        }
+    }
+}
+
+/// Validate one event transition. All checks happen before state mutation, so append failure
+/// leaves both the history and its incremental validation state unchanged.
+fn validate_and_apply_event(
+    header: &AnytimeHistoryHeader,
+    header_sha256: &str,
+    state: &mut HistoryValidationState,
+    event: &AnytimeEvent,
+    expected_ordinal: u64,
+) -> Result<(), AnytimeError> {
+    let path = format!("history.events[{}]", expected_ordinal - 1);
+    if event.ordinal != expected_ordinal {
+        return Err(AnytimeError::new(
+            format!("{path}.ordinal"),
+            "event ordinals must be contiguous and one-based",
+        ));
+    }
+    if (expected_ordinal == 1 && event.started_elapsed_millis != 0)
+        || event.started_elapsed_millis < state.previous_completion
+        || event.completed_elapsed_millis < event.started_elapsed_millis
+    {
+        return Err(AnytimeError::new(
+            format!("{path}.time"),
+            "v0.1 sequential events must start at zero and remain monotonic/non-overlapping",
+        ));
+    }
+    if event.previous_event_sha256 != state.previous_digest {
+        return Err(AnytimeError::new(
+            format!("{path}.previous_event_sha256"),
+            "event-chain predecessor mismatch",
+        ));
+    }
+    let expected_digest = event_digest(
+        header_sha256,
+        event.ordinal,
+        event.started_elapsed_millis,
+        event.completed_elapsed_millis,
+        &event.resources,
+        &event.action,
+        &event.previous_event_sha256,
+    )?;
+    if event.event_sha256 != expected_digest {
+        return Err(AnytimeError::new(
+            format!("{path}.event_sha256"),
+            "event digest mismatch",
+        ));
+    }
+
+    match &event.action {
+        AnytimeAction::CandidateEvaluation {
+            evaluation_id,
+            candidate_id,
+            attempt,
+            decision_sha256,
+            outcome,
+            objective_values,
+            feasible,
+            constraint_violations,
+            evidence_sha256,
+            failure_reason,
+        } => {
+            let next_objective_attempts = state.objective_attempts.checked_add(1)
+                .ok_or_else(|| AnytimeError::new(
+                    format!("{path}.objective_attempts"),
+                    "objective-attempt counter overflow",
+                ))?;
+            if next_objective_attempts > header.max_objective_evaluation_attempts {
+                return Err(AnytimeError::new(
+                    format!("{path}.objective_attempts"),
+                    "objective-evaluation attempt budget exceeded",
+                ));
+            }
+            if evaluation_id.trim().is_empty() || state.evaluation_ids.contains(evaluation_id) {
+                return Err(AnytimeError::new(
+                    format!("{path}.evaluation_id"),
+                    "evaluation IDs must be non-empty and unique",
+                ));
+            }
+            if candidate_id.trim().is_empty() {
+                return Err(AnytimeError::new(
+                    format!("{path}.candidate_id"),
+                    "candidate ID must be non-empty",
+                ));
+            }
+            validate_sha256(decision_sha256, &format!("{path}.decision_sha256"))?;
+            let expected_attempt = state.attempts.get(candidate_id).copied().unwrap_or(0)
+                .checked_add(1)
+                .ok_or_else(|| AnytimeError::new(
+                    format!("{path}.attempt"),
+                    "candidate attempt counter overflow",
+                ))?;
+            if *attempt != expected_attempt {
+                return Err(AnytimeError::new(
+                    format!("{path}.attempt"),
+                    "attempts must be contiguous and begin at one",
+                ));
+            }
+            if state.decisions.get(candidate_id).is_some_and(|previous| previous != decision_sha256) {
+                return Err(AnytimeError::new(
+                    format!("{path}.decision_sha256"),
+                    "decision digest changed across retries",
+                ));
+            }
+            if state.decision_owners.get(decision_sha256).is_some_and(|owner| owner != candidate_id) {
+                return Err(AnytimeError::new(
+                    format!("{path}.decision_sha256"),
+                    "identical decision bytes must share one canonical candidate ID",
+                ));
+            }
+            if state.successful.contains_key(candidate_id) {
+                return Err(AnytimeError::new(
+                    format!("{path}.candidate_id"),
+                    "candidate can be admitted successfully only once in v0.1",
+                ));
+            }
+
+            let new_candidate = match outcome {
+                EvaluationOutcome::Succeeded => {
+                    let values = objective_values.as_ref().ok_or_else(|| AnytimeError::new(
+                        format!("{path}.objective_values"),
+                        "success requires objective values",
+                    ))?;
+                    if values.len() != header.objective_specs.len()
+                        || values.iter().any(|value| !value.is_finite())
+                    {
+                        return Err(AnytimeError::new(
+                            format!("{path}.objective_values"),
+                            "objective vector has wrong dimension or non-finite values",
+                        ));
+                    }
+                    let is_feasible = feasible.ok_or_else(|| AnytimeError::new(
+                        format!("{path}.feasible"),
+                        "success requires an explicit feasibility result",
+                    ))?;
+                    let evidence = evidence_sha256.as_ref().ok_or_else(|| AnytimeError::new(
+                        format!("{path}.evidence_sha256"),
+                        "success requires evidence digest",
+                    ))?;
+                    validate_sha256(evidence, &format!("{path}.evidence_sha256"))?;
+                    if (*is_feasible && !constraint_violations.is_empty())
+                        || (!*is_feasible && (
+                            constraint_violations.is_empty()
+                                || constraint_violations.iter().any(|reason| reason.trim().is_empty())
+                        ))
+                    {
+                        return Err(AnytimeError::new(
+                            format!("{path}.constraint_violations"),
+                            "feasibility and explicit constraint violations disagree",
+                        ));
+                    }
+                    if failure_reason.is_some() {
+                        return Err(AnytimeError::new(
+                            format!("{path}.failure_reason"),
+                            "successful event cannot carry failure reason",
+                        ));
+                    }
+                    Some(CandidateState {
+                        candidate: ParetoCandidate {
+                            candidate_id: candidate_id.clone(),
+                            objective_values: values.clone(),
+                            feasible: *is_feasible,
+                            constraint_violations: constraint_violations.clone(),
+                            evidence_sha256: evidence.clone(),
+                        },
+                        decision_sha256: decision_sha256.clone(),
+                        evidence_level: EvidenceLevel::Recorded,
+                        verification_rejected: false,
+                    })
+                }
+                _ => {
+                    if objective_values.is_some()
+                        || feasible.is_some()
+                        || !constraint_violations.is_empty()
+                        || evidence_sha256.is_some()
+                    {
+                        return Err(AnytimeError::new(
+                            path.clone(),
+                            "failed/invalid/timed-out evaluation cannot enter the objective archive",
+                        ));
+                    }
+                    if failure_reason.as_ref().is_none_or(|reason| reason.trim().is_empty()) {
+                        return Err(AnytimeError::new(
+                            format!("{path}.failure_reason"),
+                            "failed attempt requires a reason",
+                        ));
+                    }
+                    None
+                }
+            };
+
+            state.objective_attempts = next_objective_attempts;
+            state.evaluation_ids.insert(evaluation_id.clone());
+            state.attempts.insert(candidate_id.clone(), *attempt);
+            state.decisions.entry(candidate_id.clone())
+                .or_insert_with(|| decision_sha256.clone());
+            state.decision_owners.entry(decision_sha256.clone())
+                .or_insert_with(|| candidate_id.clone());
+            if let Some(candidate) = new_candidate {
+                state.successful.insert(candidate_id.clone(), candidate);
+            }
+        }
+        AnytimeAction::CandidateVerification {
+            candidate_id,
+            evidence_sha256,
+            level,
+            verifier_receipt_sha256,
+        } => {
+            if candidate_id.trim().is_empty() {
+                return Err(AnytimeError::new(
+                    format!("{path}.candidate_id"),
+                    "verification candidate ID must be non-empty",
+                ));
+            }
+            validate_sha256(evidence_sha256, &format!("{path}.evidence_sha256"))?;
+            validate_sha256(verifier_receipt_sha256, &format!("{path}.verifier_receipt_sha256"))?;
+            if !matches!(
+                level,
+                EvidenceLevel::ReplayVerified
+                    | EvidenceLevel::ArtifactVerified
+                    | EvidenceLevel::HeldOutVerified
+                    | EvidenceLevel::Confirmatory
+            ) {
+                return Err(AnytimeError::new(
+                    format!("{path}.level"),
+                    "verification must advance beyond Recorded",
+                ));
+            }
+            let current = state.successful.get(candidate_id).ok_or_else(|| AnytimeError::new(
+                format!("{path}.candidate_id"),
+                "verification must follow successful evaluation",
+            ))?;
+            if current.verification_rejected {
+                return Err(AnytimeError::new(
+                    format!("{path}.candidate_id"),
+                    "a rejected candidate cannot be promoted later in the same run",
+                ));
+            }
+            if &current.candidate.evidence_sha256 != evidence_sha256 {
+                return Err(AnytimeError::new(
+                    format!("{path}.evidence_sha256"),
+                    "verifier receipt refers to different evidence digest",
+                ));
+            }
+            if level.rank() <= current.evidence_level.rank() {
+                return Err(AnytimeError::new(
+                    format!("{path}.level"),
+                    "verification level must strictly advance",
+                ));
+            }
+            state.successful.get_mut(candidate_id)
+                .ok_or_else(|| AnytimeError::new(format!("{path}.candidate_id"), "candidate state disappeared"))?
+                .evidence_level = *level;
+        }
+        AnytimeAction::CandidateVerificationRejected {
+            candidate_id,
+            evidence_sha256,
+            verifier_receipt_sha256,
+            rejection_reason,
+        } => {
+            if candidate_id.trim().is_empty() {
+                return Err(AnytimeError::new(
+                    format!("{path}.candidate_id"),
+                    "rejection candidate ID must be non-empty",
+                ));
+            }
+            validate_sha256(evidence_sha256, &format!("{path}.evidence_sha256"))?;
+            validate_sha256(verifier_receipt_sha256, &format!("{path}.verifier_receipt_sha256"))?;
+            if rejection_reason.trim().is_empty() {
+                return Err(AnytimeError::new(
+                    format!("{path}.rejection_reason"),
+                    "verifier rejection requires a reason",
+                ));
+            }
+            let current = state.successful.get(candidate_id).ok_or_else(|| AnytimeError::new(
+                format!("{path}.candidate_id"),
+                "rejection must follow successful candidate evaluation",
+            ))?;
+            if current.verification_rejected {
+                return Err(AnytimeError::new(
+                    format!("{path}.candidate_id"),
+                    "candidate verification may be rejected only once per run",
+                ));
+            }
+            if current.evidence_level != EvidenceLevel::Recorded {
+                return Err(AnytimeError::new(
+                    format!("{path}.candidate_id"),
+                    "a candidate cannot be rejected after a verification promotion; contradictory outcomes invalidate the run",
+                ));
+            }
+            if &current.candidate.evidence_sha256 != evidence_sha256 {
+                return Err(AnytimeError::new(
+                    format!("{path}.evidence_sha256"),
+                    "rejection receipt refers to different evidence digest",
+                ));
+            }
+            state.successful.get_mut(candidate_id)
+                .ok_or_else(|| AnytimeError::new(format!("{path}.candidate_id"), "candidate state disappeared"))?
+                .verification_rejected = true;
+        }
+        AnytimeAction::AuxiliaryAction { action_id, action_kind } => {
+            if action_id.trim().is_empty() || state.auxiliary_ids.contains(action_id) {
+                return Err(AnytimeError::new(
+                    format!("{path}.action_id"),
+                    "auxiliary action IDs must be non-empty and unique",
+                ));
+            }
+            if action_kind.trim().is_empty() {
+                return Err(AnytimeError::new(
+                    format!("{path}.action_kind"),
+                    "auxiliary action kind must be non-empty",
+                ));
+            }
+            state.auxiliary_ids.insert(action_id.clone());
+        }
+    }
+
+    state.previous_completion = event.completed_elapsed_millis;
+    state.previous_digest = event.event_sha256.clone();
+    Ok(())
+}
 #[derive(Debug, Clone, PartialEq)]
 struct CandidateState {
     candidate: ParetoCandidate,
