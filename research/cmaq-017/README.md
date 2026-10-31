@@ -79,6 +79,13 @@ The focused workflow runs formatting, tests, Clippy, report generation, and stru
 - The benchmark emits each error-family/horizon/execution-block slice separately. A strong mean cannot hide a failed slice.
 - The benchmark is synthetic and does not include a trained Symthaea model, a real simulator, hardware timing, a robot, or an external baseline reproduction.
 
+
+## Denoised best-of-N / continuation-noise extension
+
+The additive protocol and metric kernel in SELECTION_NOISE.md and src/selection_noise.rs distinguish candidate quality from continuation noise and candidate-by-continuation interaction. The diagnostic compares naive same-continuation best-of-N with leave-one-continuation-out held-out selection, and records the optimism gap.
+
+**Status:** analytical metric primitive and future report contract only. The current deterministic episode runner and v0.1 report are unchanged; no repeated-continuation simulator result, true D1 comparison, hardware cost match or decision lift is claimed. See SELECTION_NOISE.md for the proposed continuation-seed integration and evaluator boundaries.
+
 ## Claim ceiling
 
 A passing synthetic run can establish that this controlled generator, scorer, metrics, and negative controls behave as specified. It cannot establish physical safety, world-model superiority, generalization, industry leadership, or SOTA.
