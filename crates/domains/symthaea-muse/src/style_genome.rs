@@ -2040,6 +2040,10 @@ impl GenomeEvaluation {
                 &self.trials,
                 &self.gene_effect_audits,
             )
+            && (!self.eligible_for_archive
+                || self.gene_effect_audits.iter().all(|audit| {
+                    audit.status == GeneEffectStatus::Observed
+                }))
             && self.trials.iter().all(|trial| {
                 is_sha256_hex(&trial.score_sha256)
                     && grammar_plan_name(&trial.grammar_plan) == trial.grammar_plan_kind
@@ -2282,6 +2286,63 @@ mod tests {
             jaccard_distance(&["inversion".into()], &["inversion".into()]),
             0.0
         );
+    }
+
+    #[test]
+    fn same_seed_gene_ablations_are_recorded_and_tamper_evident() {
+        let genome = classical_genome();
+        let config = GenomeEvaluationConfig {
+            seeds: vec![1, 7, 19],
+            ..GenomeEvaluationConfig::default()
+        };
+        let evaluation =
+            evaluate_genome(&genome, &MusicalIntent::default(), &config, &[]).unwrap();
+
+        assert_eq!(evaluation.gene_effect_audits.len(), 2);
+        assert!(evaluation.gene_effect_audits.iter().all(|audit| {
+            audit.layer == GeneEffectLayer::Symbolic
+                && audit.status == GeneEffectStatus::Observed
+                && audit.seed_count == config.seeds.len()
+                && audit.paired_trials.len() == config.seeds.len()
+                && audit.changed_seed_count > 0
+        }));
+        assert!(evaluation.verify_digest());
+
+        let mut corrupted = evaluation.clone();
+        corrupted.gene_effect_audits[0].paired_trials[0]
+            .changed_dimensions
+            .clear();
+        assert!(!corrupted.verify_digest());
+    }
+
+    #[test]
+    fn renderer_layer_gene_is_recorded_pending_and_blocks_archive_admission() {
+        let base = classical_genome();
+        let ensemble_id = (1..=152)
+            .find(|id| {
+                symthaea_muse_protocol::catalog::catalog_entry(*id)
+                    .is_some_and(|entry| entry.composer_style == Some("JazzBallad"))
+            })
+            .expect("JazzBallad catalogue identity must exist");
+        let genome = base.replace_gene(GenomeAxis::Ensemble, Some(ensemble_id)).unwrap();
+        let config = GenomeEvaluationConfig {
+            seeds: vec![1, 7],
+            ..GenomeEvaluationConfig::default()
+        };
+        let evaluation =
+            evaluate_genome(&genome, &MusicalIntent::default(), &config, &[]).unwrap();
+        assert!(!evaluation.eligible_for_archive);
+        assert!(evaluation.gene_effect_audits.iter().any(|audit| {
+            audit.axis == GenomeAxis::Ensemble
+                && audit.layer == GeneEffectLayer::Renderer
+                && audit.status == GeneEffectStatus::RendererPending
+                && audit.paired_trials.is_empty()
+        }));
+        assert!(evaluation.verify_digest());
+
+        let mut forged = evaluation.clone();
+        forged.eligible_for_archive = true;
+        assert!(!forged.verify_digest());
     }
 
     #[test]
