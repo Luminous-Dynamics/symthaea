@@ -11,6 +11,8 @@
     "checkpoint_freeze_precedes_generation",
     "public_packet_contains_no_seed_or_oracle_answers",
     "all_matrices_are_nonsingular",
+    "all_matrices_meet_stability_margin",
+    "minimum_observed_stability_margin_permille",
     "all_answers_recompute_exactly",
     "item_count",
     "batch_id",
@@ -70,6 +72,14 @@
       "items": {
         "type": "string"
       }
+    },
+    "all_matrices_meet_stability_margin": {
+      "type": "boolean"
+    },
+    "minimum_observed_stability_margin_permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
     }
   }
 }
