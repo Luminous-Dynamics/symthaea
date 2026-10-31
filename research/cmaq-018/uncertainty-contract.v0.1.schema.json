@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-018-uncertainty-contract-v0.1.json",
+  "title": "CMAQ-018 Selection-Aware Uncertainty Contract",
+  "description": "Design contract for a future uncertainty-capable predictor adapter. The current CMAQ-018 v0.1 predictor still returns point forecasts or abstention; this schema does not assert that the adapter or any model already implements calibrated uncertainty.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "claim_ceiling",
+    "forecast_interval",
+    "paired_effect_interval",
+    "action_set",
+    "memory_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-018-uncertainty-contract-v0.1"
+    },
+    "claim_ceiling": {
+      "const": "design_contract_only_no_model_calibration_result"
+    },
+    "forecast_interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper",
+        "nominal_coverage",
+        "horizon_steps",
+        "uncertainty_source"
+      ],
+      "properties": {
+        "lower": { "type": "number" },
+        "upper": { "type": "number" },
+        "nominal_coverage": {
+          "type": "number",
+          "exclusiveMinimum": 0.0,
+          "exclusiveMaximum": 1.0
+        },
+        "horizon_steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "uncertainty_source": {
+          "enum": [
+            "aleatoric",
+            "epistemic",
+            "combined",
+            "conformalized_total"
+          ]
+        },
+        "calibration_stratum": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "paired_effect_interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "left_action_id",
+        "right_action_id",
+        "lower",
+        "upper",
+        "nominal_coverage",
+        "horizon_steps",
+        "construction",
+        "marginal_interval_subtraction"
+      ],
+      "properties": {
+        "left_action_id": { "type": "integer", "minimum": 0 },
+        "right_action_id": { "type": "integer", "minimum": 0 },
+        "lower": { "type": "number" },
+        "upper": { "type": "number" },
+        "nominal_coverage": {
+          "type": "number",
+          "exclusiveMinimum": 0.0,
+          "exclusiveMaximum": 1.0
+        },
+        "horizon_steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "construction": {
+          "enum": [
+            "direct_effect_distribution",
+            "paired_joint_samples"
+          ]
+        },
+        "paired_sample_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "pairing_semantics": {
+          "const": "same_history_same_joint_draw_index"
+        },
+        "marginal_interval_subtraction": {
+          "const": "prohibited"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "construction": { "const": "paired_joint_samples" }
+            },
+            "required": ["construction"]
+          },
+          "then": {
+            "required": ["paired_sample_count", "pairing_semantics"]
+          }
+        }
+      ]
+    },
+    "action_set": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_ids",
+        "joint_uncertainty_method",
+        "familywise_nominal_coverage",
+        "selected_action_id",
+        "selected_action_regret_upper_bound",
+        "certificate_requires_simultaneous_coverage"
+      ],
+      "properties": {
+        "action_ids": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "joint_uncertainty_method": {
+          "enum": [
+            "paired_joint_predictive_samples",
+            "covariance_preserving_ensemble",
+            "max_score_conformal_set"
+          ]
+        },
+        "familywise_nominal_coverage": {
+          "type": "number",
+          "exclusiveMinimum": 0.0,
+          "exclusiveMaximum": 1.0
+        },
+        "selected_action_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "selected_action_regret_upper_bound": {
+          "type": "number",
+          "minimum": 0.0
+        },
+        "certificate_requires_simultaneous_coverage": {
+          "const": true
+        }
+      }
+    },
+    "memory_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "forecast_is_observation",
+        "prediction_promoted_to_observation"
+      ],
+      "properties": {
+        "forecast_is_observation": { "const": false },
+        "prediction_promoted_to_observation": { "const": false }
+      }
+    }
+  }
+}
