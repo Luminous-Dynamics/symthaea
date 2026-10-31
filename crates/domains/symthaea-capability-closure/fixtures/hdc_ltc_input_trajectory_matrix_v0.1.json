@@ -1,0 +1,252 @@
+{
+  "schema_version": "symthaea.research.hdc_ltc_input_trajectory_matrix.v0.1",
+  "matrix_id": "HDC-LTC-INPUT-PATH-001",
+  "title": "Input-trajectory integration and irregular-time HDC-LTC bake-off",
+  "status": "preregistered_not_executed",
+  "coordinating_issue": 9371,
+  "parent_fast_slow_issue": 9369,
+  "parent_preregistration_pr": 9370,
+  "canonical_source": {
+    "path": "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs",
+    "sha": "40c3b0e75845a20b3ef2dbbe0ea3a0af0068f4b7",
+    "incumbent": "evolve_closed_form uses one supplied input vector for the whole dt",
+    "rk4": "evolve_rk4 calls compute_derivative with the same input at all four stages",
+    "iterative": "evolve_closed_form_iterative recomputes equilibrium/tau, but still uses constant input at all substeps",
+    "fourier_reference_caveat": "compute_equilibrium includes optional Fourier basis; compute_derivative currently does not. The current RK4 path is not a same-equation reference for Fourier-enabled runs until this is resolved.",
+    "production_change_authorized": false
+  },
+  "methods": [
+    {
+      "id": "U0",
+      "name": "incumbent_right_endpoint_zoh",
+      "input_path": "u_n",
+      "substeps": 1,
+      "role": "exact_incumbent"
+    },
+    {
+      "id": "U1",
+      "name": "left_endpoint_zoh",
+      "input_path": "u_(n-1)",
+      "substeps": 1,
+      "role": "endpoint_bias_control"
+    },
+    {
+      "id": "U2",
+      "name": "midpoint_hold",
+      "input_path": "lerp(u_(n-1),u_n,0.5)",
+      "substeps": 1,
+      "role": "midpoint_control"
+    },
+    {
+      "id": "U3",
+      "name": "piecewise_linear_hv_2",
+      "input_path": "linear interpolation in ContinuousHV space",
+      "substeps": 2,
+      "role": "minimal_hv_path"
+    },
+    {
+      "id": "U4",
+      "name": "piecewise_linear_hv_refinement",
+      "input_path": "linear interpolation in ContinuousHV space",
+      "substeps": [
+        4,
+        8,
+        16
+      ],
+      "role": "refinement_surface"
+    },
+    {
+      "id": "U5",
+      "name": "raw_feature_interpolate_then_encode",
+      "input_path": "interpolate raw feature endpoints then encode each stage",
+      "substeps": [
+        2,
+        4,
+        8
+      ],
+      "role": "compare_encoder_non_linearity"
+    },
+    {
+      "id": "U6",
+      "name": "causal_lagrange_degree_2",
+      "input_path": "causal polynomial through current and historical input endpoints",
+      "substeps": [
+        2,
+        4,
+        8
+      ],
+      "role": "curvature_candidate"
+    },
+    {
+      "id": "U7",
+      "name": "causal_lagrange_degree_3",
+      "input_path": "causal cubic interpolation from current and historical points",
+      "substeps": [
+        2,
+        4,
+        8
+      ],
+      "role": "higher_order_candidate"
+    },
+    {
+      "id": "U8",
+      "name": "adaptive_curvature_or_innovation",
+      "input_path": "adaptive quadrature/substeps with deterministic evaluation budget",
+      "substeps": "adaptive_bounded",
+      "role": "resource_aware_candidate"
+    },
+    {
+      "id": "U9",
+      "name": "event_discontinuity_aware_hold",
+      "input_path": "declared hold/reset behavior; no interpolation across discontinuity",
+      "substeps": 1,
+      "role": "event_semantics_control"
+    }
+  ],
+  "input_path_equations": {
+    "normalized_time": "alpha = (t - t[n-1]) / (t[n] - t[n-1])",
+    "linear_candidate": "u(t) = (1 - alpha) * u[n-1] + alpha * u[n]",
+    "causality": "u[n] is used only after it arrives; no sample after t[n] may affect the interval",
+    "raw_vs_hv": "raw feature interpolation and ContinuousHV interpolation are distinct candidates",
+    "normalization": "do not normalize interpolated HVs unless separately versioned and tested"
+  },
+  "numerical_contracts": {
+    "underlying_ode": {
+      "equation": "dx/dt = (x_inf(x,u(t)) - x) / tau(x,u(t))",
+      "reference": "variable-input RK4 with u evaluated at each RK stage; refine until successive trajectories meet predeclared tolerance",
+      "stage_inputs": "k1 at alpha=0; k2 and k3 at alpha=0.5; k4 at alpha=1",
+      "note": "ODE reference is not assumed to be identical to the learned-gating closed-form update."
+    },
+    "learned_gating": {
+      "incumbent": "preserve evolve_closed_form exactly on U0",
+      "candidates": "evaluate the same gate/equilibrium rule at each input-path substep; do not alter sigma_base law",
+      "statistics": "separate internal substeps from external observation intervals; update running statistics according to an explicit fixed policy"
+    },
+    "fourier_gate": "compute_equilibrium includes optional Fourier basis computed from self.total_time; compute_derivative does not. Since update_stats(dt) advances total_time after the RK4 call, true time-varying Fourier forcing requires basis evaluation at each RK stage time t0, t0+dt/2, t0+dt/2, t0+dt. Otherwise label it interval-held Fourier snapshot. See issue #9373."
+  },
+  "time_and_event_contract": {
+    "dt_source": "monotonic input timestamps",
+    "forbid_wall_clock": true,
+    "forbid_call_count_as_time": true,
+    "reject_nonfinite_timestamp": true,
+    "reject_nonpositive_dt": true,
+    "preserve_missingness_and_elapsed_time": true,
+    "no_interpolation_across_marked_discontinuity": true,
+    "maximum_adaptive_evaluations_per_interval": 16,
+    "budget_exhaustion": "explicit incomplete/fallback status; no partial-success status"
+  },
+  "task_conditions": [
+    {
+      "id": "constant_input",
+      "regime": "constant",
+      "expected_control": "right-endpoint ZOH should be competitive"
+    },
+    {
+      "id": "linear_ramp",
+      "regime": "smooth_low_curvature",
+      "expected_control": "linear input path is the matched path"
+    },
+    {
+      "id": "sinusoid_chirp",
+      "regime": "smooth_variable",
+      "expected_control": "measure phase and trajectory error"
+    },
+    {
+      "id": "high_curvature_smooth",
+      "regime": "smooth_high_curvature",
+      "expected_control": "test higher-order/adaptive path"
+    },
+    {
+      "id": "abrupt_step",
+      "regime": "discontinuous",
+      "expected_control": "do not smooth across marked event"
+    },
+    {
+      "id": "impulse",
+      "regime": "event_driven",
+      "expected_control": "preserve impulse timing"
+    },
+    {
+      "id": "event_bursts",
+      "regime": "irregular_bursty",
+      "expected_control": "event boundaries and timestamp semantics"
+    },
+    {
+      "id": "missing_intervals",
+      "regime": "missing_data",
+      "expected_control": "no fabricated input values"
+    },
+    {
+      "id": "large_unobserved_gap",
+      "regime": "sparse_sampling",
+      "expected_control": "interpolation not presumed smooth"
+    },
+    {
+      "id": "invalid_timestamps",
+      "regime": "invalid_input",
+      "expected_control": "fail closed for zero/negative/duplicate/out-of-order/NaN/Inf dt"
+    }
+  ],
+  "workload_families": [
+    "S-MNIST",
+    "PS-MNIST",
+    "SHD",
+    "SSC",
+    "DVS Gesture",
+    "Symthaea temporal associative recall (pinned oracle required)",
+    "Symthaea streaming sequence classification (pinned oracle required)",
+    "Symthaea temporal prediction/control (pinned oracle required)",
+    "Symthaea edge-state update (pinned oracle required)",
+    "DFA-CfN original task families only after original split/preprocessing and code audit"
+  ],
+  "metrics": [
+    "trajectory_error_vs_refined_variable_input_rk4",
+    "trajectory_error_vs_constant_input_rk4_diagnostic_only",
+    "exact_incumbent_identity_on_U0",
+    "task_quality",
+    "state_bounds_and_nonfinite_count",
+    "event_timing_and_regime_recovery",
+    "equilibrium_tau_gate_evaluations_per_observation",
+    "substeps_per_interval",
+    "input_encoding_and_interpolation_work",
+    "persistent_and_temporary_memory_bytes",
+    "bytes_moved_per_interval",
+    "p50_p95_p99_end_to_end_latency",
+    "deadline_miss_rate",
+    "direct_metered_energy_per_correct_outcome"
+  ],
+  "proposed_targets": {
+    "trajectory_error_reduction_vs_right_endpoint_zoh_on_heldout_smooth_irregular_tasks": 0.2,
+    "p95_latency_regression_limit_fraction": 0.1,
+    "end_to_end_throughput_improvement_target": 2,
+    "whole_system_energy_reduction_target_fraction": 0.3,
+    "constant_input_and_discontinuity_regressions": "within preregistered task/trajectory tolerances",
+    "all_values_are_targets_not_results": true
+  },
+  "holdout_policy": {
+    "hold_out_subjects_or_original_recordings_before_windowing": true,
+    "no_overlapping_windows_across_partitions": true,
+    "separate_train_development_confirmatory_test": true,
+    "confirmatory_test_one_shot": true,
+    "interpolation_or_adaptive_thresholds_fit_on_training_or_development_only": true
+  },
+  "evidence": {
+    "source_revision": "40c3b0e75845a20b3ef2dbbe0ea3a0af0068f4b7",
+    "preregistered_not_executed": true,
+    "no_results": true,
+    "no_hardware_or_energy_measurements": true,
+    "external_nialim_paper_match_not_yet_reproduced": true
+  },
+  "external_reference": {
+    "paper": "IEEE TNNLS 37(9), 2026, DOI 10.1109/TNNLS.2026.3669345",
+    "ieee": "https://ieeexplore.ieee.org/document/11424014/",
+    "pubmed": "https://pubmed.ncbi.nlm.nih.gov/41790819/"
+  },
+  "non_claims": [
+    "Input interpolation has not been shown to improve Symthaea HDC-LTC.",
+    "The existing RK4 implementation is not a same-equation oracle for Fourier-enabled runs until the source mismatch is resolved.",
+    "A linear or polynomial input path is not assumed valid for discontinuous event streams.",
+    "No NIALIM result or SOTA claim has been reproduced.",
+    "No production default or hardware performance claim is authorized."
+  ]
+}
