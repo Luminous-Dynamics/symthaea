@@ -243,7 +243,7 @@ pub struct CorpusEligibility {
 pub fn required_rights_layers(modality: ArtifactModality) -> Vec<RightsLayer> {
     use ArtifactModality as M;
     use RightsLayer as R;
-    match modality {
+    let mut layers = match modality {
         M::ScoreImage | M::ScorePdf | M::MusicXml | M::Mei | M::SymbolicMidi => {
             vec![R::UnderlyingComposition, R::ScoreEdition]
         }
@@ -259,9 +259,16 @@ pub fn required_rights_layers(modality: ArtifactModality) -> Vec<RightsLayer> {
             R::SoundRecording,
             R::AudiovisualRecording,
         ],
-        M::ScholarlyAnnotation => vec![R::Annotation, R::Metadata],
-        M::Metadata => vec![R::Metadata],
+        M::ScholarlyAnnotation => vec![R::Annotation],
+        M::Metadata => Vec::new(),
+    };
+    // Catalogue metadata (labels, provenance, counts and descriptive fields)
+    // is itself a rights-bearing layer and must not be swept in with the
+    // underlying score or recording.
+    if !layers.contains(&R::Metadata) {
+        layers.push(R::Metadata);
     }
+    layers
 }
 
 pub fn validate_artifact_record(record: &CorpusArtifactRecord) -> Vec<EligibilityIssue> {
@@ -400,11 +407,13 @@ pub fn validate_artifact_record(record: &CorpusArtifactRecord) -> Vec<Eligibilit
                 "rights layer must have one consolidated grant record per artifact".into(),
             ));
         }
-        if grant.jurisdictions.is_empty() {
+        if grant.jurisdictions.is_empty()
+            || grant.jurisdictions.iter().any(|jurisdiction| jurisdiction.trim().is_empty())
+        {
             issues.push(issue(
                 "rights_jurisdiction_missing",
                 Some(grant.layer),
-                "rights grants require at least one jurisdiction".into(),
+                "rights grants require non-empty explicit jurisdiction(s)".into(),
             ));
         }
         if grant.disposition != RightsDisposition::Unknown {
@@ -450,6 +459,13 @@ pub fn evaluate_eligibility(
     request: &EligibilityRequest,
 ) -> CorpusEligibility {
     let mut issues = validate_artifact_record(record);
+    if request.jurisdiction.trim().is_empty() {
+        issues.push(issue(
+            "requested_jurisdiction_missing",
+            None,
+            "eligibility requires an explicit jurisdiction".into(),
+        ));
+    }
     if record.ingest_stage == IngestStage::Excluded {
         issues.push(issue(
             "artifact_excluded",
@@ -642,6 +658,10 @@ mod tests {
                     RightsLayer::SoundRecording,
                     vec![IntendedUse::NonCommercialResearch, IntendedUse::InternalAnalysis],
                 ),
+                grant(
+                    RightsLayer::Metadata,
+                    vec![IntendedUse::NonCommercialResearch, IntendedUse::InternalAnalysis],
+                ),
             ],
             cultural_protocol: CulturalProtocolEvidence {
                 requirement: ConsentRequirement::NotRequired,
@@ -672,7 +692,8 @@ mod tests {
             vec![
                 RightsLayer::UnderlyingComposition,
                 RightsLayer::Performance,
-                RightsLayer::SoundRecording
+                RightsLayer::SoundRecording,
+                RightsLayer::Metadata
             ]
         );
         assert!(evaluate_eligibility(&record, &research_request()).eligible);
@@ -706,6 +727,18 @@ mod tests {
         let unknown = evaluate_eligibility(&record, &research_request());
         assert!(!unknown.eligible);
         assert!(unknown.issues.iter().any(|issue| issue.code == "rights_unknown"));
+    }
+
+    #[test]
+    fn catalog_metadata_rights_are_required_even_when_audio_rights_are_clear() {
+        let mut record = audio_record();
+        record.rights.retain(|grant| grant.layer != RightsLayer::Metadata);
+        let result = evaluate_eligibility(&record, &research_request());
+        assert!(!result.eligible);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == "required_rights_layer_missing"
+                && issue.layer == Some(RightsLayer::Metadata)
+        }));
     }
 
     #[test]
@@ -756,7 +789,11 @@ mod tests {
     fn score_and_annotation_modalities_require_their_own_rights_layers() {
         assert_eq!(
             required_rights_layers(ArtifactModality::ScorePdf),
-            vec![RightsLayer::UnderlyingComposition, RightsLayer::ScoreEdition]
+            vec![
+                RightsLayer::UnderlyingComposition,
+                RightsLayer::ScoreEdition,
+                RightsLayer::Metadata
+            ]
         );
         assert_eq!(
             required_rights_layers(ArtifactModality::ScholarlyAnnotation),
