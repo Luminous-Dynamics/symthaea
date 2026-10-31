@@ -104,6 +104,21 @@ pub struct OracleRecord {
     pub stream_id: u64,
     pub target_key: u64,
     pub expected_value: u64,
+    /// SHA-256 over the versioned canonical oracle record.
+    pub content_sha256: [u8; 32],
+}
+
+/// Domain-separated canonical SHA-256 of a delayed-cue oracle record.
+pub fn delayed_cue_oracle_digest(oracle: &OracleRecord) -> [u8; 32] {
+    let mut hash = CanonicalHasher::new(b"symthaea.temporal.delayed-cue.oracle.v1");
+    hash.u64(oracle.stream_id);
+    hash.u64(oracle.target_key);
+    hash.u64(oracle.expected_value);
+    hash.finish()
+}
+
+pub fn delayed_cue_oracle_digest_valid(oracle: &OracleRecord) -> bool {
+    oracle.content_sha256 == delayed_cue_oracle_digest(oracle)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -199,14 +214,15 @@ pub fn generate_delayed_cue(
     };
     public_task.content_sha256 = delayed_cue_content_digest(&public_task);
 
-    Ok((
-        public_task,
-        OracleRecord {
-            stream_id,
-            target_key,
-            expected_value: target_value,
-        },
-    ))
+    let mut oracle = OracleRecord {
+        stream_id,
+        target_key,
+        expected_value: target_value,
+        content_sha256: [0; 32],
+    };
+    oracle.content_sha256 = delayed_cue_oracle_digest(&oracle);
+
+    Ok((public_task, oracle))
 }
 
 fn distractor_step(index: usize, count: usize, delay_steps: u64) -> u64 {
@@ -326,6 +342,19 @@ mod tests {
         let first = generate_delayed_cue(config(DistractorSimilarity::High)).unwrap();
         let second = generate_delayed_cue(config(DistractorSimilarity::High)).unwrap();
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn oracle_record_has_a_stable_sha256_digest() {
+        let (_, oracle) = generate_delayed_cue(config(DistractorSimilarity::High)).unwrap();
+        assert!(delayed_cue_oracle_digest_valid(&oracle));
+    }
+
+    #[test]
+    fn oracle_digest_detects_target_value_mutation() {
+        let (_, mut oracle) = generate_delayed_cue(config(DistractorSimilarity::High)).unwrap();
+        oracle.expected_value ^= 1;
+        assert!(!delayed_cue_oracle_digest_valid(&oracle));
     }
 
     #[test]
