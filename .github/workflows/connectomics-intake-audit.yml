@@ -36,6 +36,9 @@ on:
       - "docs/neuroscience/examples/CONNECTOMEBENCH2_V2_METADATA_LINEAGE.example.jsonl"
       - "docs/neuroscience/examples/CONNECTOME_QUERY_IMPACT_SYNTHETIC.example.json"
       - "docs/neuroscience/CONNECTOME_CORRECTION_PORTFOLIO.schema.json"
+      - "docs/neuroscience/CONNECTOME_QUERY_ENSEMBLE_AUDIT.schema.json"
+      - "docs/neuroscience/CONNECTOME_QUERY_ENSEMBLE_AUDIT_PROTOCOL_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_ENSEMBLE_AUDIT.example.json"
       - "docs/neuroscience/CONNECTOME_CORRECTION_PORTFOLIO_AUDIT_PROTOCOL_V1.md"
       - "docs/neuroscience/CONNECTOME_COLINEAR_PROFILE_INPUT.schema.json"
       - "docs/neuroscience/CONNECTOME_COLINEAR_BOUNDARY_TRUTH.schema.json"
@@ -107,5 +110,5 @@ jobs:
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Test intake, dataset lineage, frozen-prediction scoring, query-impact, stopping, reviewer outcome, multi-rater, spatial-frame/mask, candidate-pool sampling, candidate-generation coverage, query-certificate, correction-portfolio, and co-linear-boundary audits
+      - name: Test intake, dataset lineage, frozen-prediction scoring, query-impact, stopping, reviewer outcome, multi-rater, spatial-frame/mask, candidate-pool sampling, candidate-generation coverage, query-certificate, correction-portfolio, and co-linear-boundary and finite query-ensemble audits
         run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml
