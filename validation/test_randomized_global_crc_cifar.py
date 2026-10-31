@@ -148,6 +148,19 @@ class RandomizedGlobalCommonDepthTests(unittest.TestCase):
         self.assertFalse(verified["valid"])
         self.assertEqual(verified["reason"],"LP dual witness failed KKT checks")
 
+
+    def test_certificate_fails_closed_on_assumption_or_verifier_receipt_tampering(self):
+        import copy
+        engine=RandomizedCommonDepthCRC(5,.2,(70,20,10))
+        result=engine.solve()
+        probabilities=np.asarray(result["probabilities"])
+        altered_assumption=copy.deepcopy(result["certificate"])
+        altered_assumption["assumption_contract"]["finite_exchangeability"]=False
+        self.assertFalse(engine.verify_certificate(altered_assumption,probabilities)["valid"])
+        altered_receipt=copy.deepcopy(result["certificate"])
+        altered_receipt["verifier_receipt"]["states_checked"]-=1
+        self.assertFalse(engine.verify_certificate(altered_receipt,probabilities)["valid"])
+
     def test_invalid_population_and_action_grid_fail_closed(self):
         with self.assertRaises(ValueError):
             RandomizedCommonDepthCRC(50,.1,(10,10,10))
