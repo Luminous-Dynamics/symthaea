@@ -6,6 +6,7 @@
   "additionalProperties": false,
   "required": [
     "schema_version",
+    "source_artifact_sha256",
     "nodes",
     "edges"
   ],
@@ -48,7 +49,12 @@
           }
         }
       }
+    },
+    "source_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 of the original source design/netlist bytes from which this graph was extracted."
     }
   },
-  "$comment": "Node/edge existence and unique edge IDs are checked by the semantic auditor; JSON Schema does not establish graph integrity."
+  "$comment": "source_artifact_sha256 binds the graph representation to the original netlist/design bytes; hash of this JSON graph file is a separate receipt input, and the canonical node/edge-map digest is another distinct identity."
 }
