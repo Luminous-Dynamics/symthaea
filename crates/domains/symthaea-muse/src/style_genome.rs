@@ -1093,7 +1093,7 @@ fn evaluation_digest(evaluation: &GenomeEvaluation) -> Result<String, Vec<Genome
     Ok(domain_sha256(b"symthaea:muse-style-genome-evaluation:v1\n", &bytes))
 }
 
-fn reference_population_digest(
+pub fn reference_population_digest(
     reference_population: &[[f64; fingerprint::STRUCT_DIMS]],
 ) -> Result<Option<String>, Vec<GenomeIssue>> {
     if reference_population.is_empty() {
