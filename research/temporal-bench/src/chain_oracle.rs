@@ -331,6 +331,92 @@ pub fn gradient_with_temporal_detachment(
     Ok(gradient)
 }
 
+/// Evaluate the local auxiliary objective at the final activation of a boundary module.
+pub fn local_auxiliary_loss(
+    config: &ScalarChainConfig,
+    boundary_module: usize,
+    auxiliary_readout_weight: f64,
+) -> Result<f64, ChainOracleError> {
+    validate(config)?;
+    if boundary_module >= config.module_count() - 1 {
+        return Err(ChainOracleError::InvalidSpatialBoundary {
+            requested: boundary_module,
+            maximum: config.module_count() - 2,
+        });
+    }
+    if !auxiliary_readout_weight.is_finite() {
+        return Err(ChainOracleError::InvalidAuxiliaryScale);
+    }
+    let trace = forward(config)?;
+    let local_state = trace.states[config.inputs.len() - 1][boundary_module];
+    let residual = auxiliary_readout_weight * local_state - config.target;
+    Ok(0.5 * residual * residual)
+}
+
+/// Finite-difference reference for the isolated local auxiliary objective.
+///
+/// Only parameters in modules <= boundary_module and the auxiliary readout
+/// should receive local-objective credit. Downstream module parameters and the
+/// global readout must have zero derivative under this objective.
+pub fn centered_finite_difference_local_auxiliary(
+    config: &ScalarChainConfig,
+    boundary_module: usize,
+    auxiliary_readout_weight: f64,
+) -> Result<ScalarChainGradient, ChainOracleError> {
+    validate(config)?;
+    if boundary_module >= config.module_count() - 1 {
+        return Err(ChainOracleError::InvalidSpatialBoundary {
+            requested: boundary_module,
+            maximum: config.module_count() - 2,
+        });
+    }
+    if !auxiliary_readout_weight.is_finite() {
+        return Err(ChainOracleError::InvalidAuxiliaryScale);
+    }
+
+    let mut gradient = ScalarChainGradient {
+        recurrent_weights: vec![0.0; config.module_count()],
+        feedforward_weights: vec![0.0; config.module_count()],
+        readout_weight: 0.0,
+        auxiliary_readout_weight: Some(0.0),
+    };
+
+    for index in 0..=boundary_module {
+        let mut plus = config.clone();
+        let mut minus = config.clone();
+        plus.recurrent_weights[index] += FD_EPSILON;
+        minus.recurrent_weights[index] -= FD_EPSILON;
+        gradient.recurrent_weights[index] = (
+            local_auxiliary_loss(&plus, boundary_module, auxiliary_readout_weight)?
+                - local_auxiliary_loss(&minus, boundary_module, auxiliary_readout_weight)?
+        ) / (2.0 * FD_EPSILON);
+
+        let mut plus = config.clone();
+        let mut minus = config.clone();
+        plus.feedforward_weights[index] += FD_EPSILON;
+        minus.feedforward_weights[index] -= FD_EPSILON;
+        gradient.feedforward_weights[index] = (
+            local_auxiliary_loss(&plus, boundary_module, auxiliary_readout_weight)?
+                - local_auxiliary_loss(&minus, boundary_module, auxiliary_readout_weight)?
+        ) / (2.0 * FD_EPSILON);
+    }
+
+    let plus = local_auxiliary_loss(
+        config,
+        boundary_module,
+        auxiliary_readout_weight + FD_EPSILON,
+    )?;
+    let minus = local_auxiliary_loss(
+        config,
+        boundary_module,
+        auxiliary_readout_weight - FD_EPSILON,
+    )?;
+    gradient.auxiliary_readout_weight = Some(
+        (plus - minus) / (2.0 * FD_EPSILON),
+    );
+    Ok(gradient)
+}
+
 /// STDL-style spatial cut with a separate local auxiliary objective.
 ///
 /// The global loss gradient stops at the selected boundary when entering the
@@ -536,6 +622,57 @@ mod tests {
         let cut_with_aux = spatial_cut_with_auxiliary(&config, 1, 0.9, 1.0).unwrap();
         close(cut_only.gradient.feedforward_weights[0], 0.0, 1.0e-12);
         assert!(cut_with_aux.gradient.feedforward_weights[0].abs() > 1.0e-8);
+    }
+
+    #[test]
+    fn spatial_cut_local_gradient_matches_independent_auxiliary_finite_difference() {
+        let config = ScalarChainConfig::four_module_reference();
+        let boundary = 1;
+        let auxiliary_weight = 0.9;
+        let without_aux =
+            spatial_cut_with_auxiliary(&config, boundary, auxiliary_weight, 0.0).unwrap();
+        let with_aux =
+            spatial_cut_with_auxiliary(&config, boundary, auxiliary_weight, 1.0).unwrap();
+        let finite =
+            centered_finite_difference_local_auxiliary(&config, boundary, auxiliary_weight)
+                .unwrap();
+
+        for module in 0..config.module_count() {
+            let recurrent_delta =
+                with_aux.gradient.recurrent_weights[module]
+                    - without_aux.gradient.recurrent_weights[module];
+            let feedforward_delta =
+                with_aux.gradient.feedforward_weights[module]
+                    - without_aux.gradient.feedforward_weights[module];
+            close(recurrent_delta, finite.recurrent_weights[module], 2.0e-7);
+            close(feedforward_delta, finite.feedforward_weights[module], 2.0e-7);
+        }
+        close(
+            with_aux.gradient.auxiliary_readout_weight.unwrap(),
+            finite.auxiliary_readout_weight.unwrap(),
+            2.0e-7,
+        );
+    }
+
+    #[test]
+    fn spatial_cut_preserves_global_gradient_on_downstream_parameters() {
+        let config = ScalarChainConfig::four_module_reference();
+        let boundary = 1;
+        let full = full_bptt_gradient(&config).unwrap();
+        let cut = spatial_cut_with_auxiliary(&config, boundary, 0.9, 0.0).unwrap();
+        for module in (boundary + 1)..config.module_count() {
+            close(
+                cut.gradient.recurrent_weights[module],
+                full.recurrent_weights[module],
+                1.0e-12,
+            );
+            close(
+                cut.gradient.feedforward_weights[module],
+                full.feedforward_weights[module],
+                1.0e-12,
+            );
+        }
+        close(cut.gradient.readout_weight, full.readout_weight, 1.0e-12);
     }
 
     #[test]
