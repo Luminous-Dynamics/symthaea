@@ -169,3 +169,5 @@ The next version should report:
 - tail resource use and worst-case regressions, not only means.
 
 A claim should not be called equivalent merely because confidence intervals overlap. Freeze the uncertainty model, practical effect margin, chance constraints and multiplicity treatment before confirmatory outcomes are examined. Point-estimate and robust fronts should be shown side by side.
+
+The research branch now includes a deterministic Rust NSGA-II reference baseline for ZDT1 and three-objective DTLZ2. Its full report is replay-verifiable and its final archive can be converted to the same Pareto indicator implementation used for Symthaea. The baseline remains an implementation candidate until its tests are run and its outputs are cross-checked against a pinned external NSGA-II/PlatEMO implementation.
