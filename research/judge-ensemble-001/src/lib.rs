@@ -95,12 +95,30 @@ pub struct PairwiseDependence {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnsemblePolicy {
-    pub calibration_trial_count: u64,
+    calibration_trial_count: u64,
     /// Exact calibration item IDs, used to reject calibration/evaluation leakage.
-    pub calibration_trial_ids: BTreeSet<String>,
-    pub profiles: Vec<JudgeProfile>,
-    pub pairwise_dependence: Vec<PairwiseDependence>,
-    pub best_single_judge_id: String,
+    calibration_trial_ids: BTreeSet<String>,
+    profiles: Vec<JudgeProfile>,
+    pairwise_dependence: Vec<PairwiseDependence>,
+    best_single_judge_id: String,
+}
+
+impl EnsemblePolicy {
+    pub fn calibration_trial_count(&self) -> u64 {
+        self.calibration_trial_count
+    }
+
+    pub fn profiles(&self) -> &[JudgeProfile] {
+        &self.profiles
+    }
+
+    pub fn pairwise_dependence(&self) -> &[PairwiseDependence] {
+        &self.pairwise_dependence
+    }
+
+    pub fn best_single_judge_id(&self) -> &str {
+        &self.best_single_judge_id
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
