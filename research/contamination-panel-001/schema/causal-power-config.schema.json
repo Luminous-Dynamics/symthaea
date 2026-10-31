@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/causal-power-config-v1.json",
+  "title": "Replicated causal power planning config v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "study_id",
+    "primary_metric_id",
+    "candidate_model_pair_counts",
+    "clusters_per_model_pair",
+    "task_family_count",
+    "exposure_fraction_permille",
+    "direct_exposure_effect_permille",
+    "spillover_effect_permille",
+    "between_model_pair_sd_permille",
+    "within_cluster_sd_permille",
+    "within_family_icc_permille",
+    "pair_failure_probability_permille",
+    "simulation_replicates",
+    "alpha_permille",
+    "target_power_permille",
+    "calibration_tolerance_permille",
+    "maximum_inconclusive_fraction_permille",
+    "simulation_seed_hex"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.contamination_causal_power_config.v1"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "primary_metric_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidate_model_pair_counts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 2,
+        "maximum": 1000
+      }
+    },
+    "clusters_per_model_pair": {
+      "type": "integer",
+      "minimum": 4
+    },
+    "task_family_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "exposure_fraction_permille": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 999
+    },
+    "direct_exposure_effect_permille": {
+      "type": "number",
+      "minimum": -1000,
+      "maximum": 1000
+    },
+    "spillover_effect_permille": {
+      "type": "number",
+      "minimum": -1000,
+      "maximum": 1000
+    },
+    "between_model_pair_sd_permille": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "within_cluster_sd_permille": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "within_family_icc_permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 900
+    },
+    "pair_failure_probability_permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 900
+    },
+    "simulation_replicates": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 100000
+    },
+    "alpha_permille": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 200
+    },
+    "target_power_permille": {
+      "type": "integer",
+      "minimum": 500,
+      "maximum": 990
+    },
+    "calibration_tolerance_permille": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 100
+    },
+    "maximum_inconclusive_fraction_permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 500
+    },
+    "simulation_seed_hex": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{2}){32,}$"
+    }
+  }
+}
