@@ -915,7 +915,12 @@ mod tests {
         let budget_model = BudgetModel::ActionUnit {
             charge_per_action_microunits: 1_000_000,
         };
-        let budget_model_sha256 = digest(&serde_json::to_value(&budget_model).unwrap());
+        let budget_model_bytes = serde_json::to_vec(&budget_model).unwrap();
+        let budget_model_hash = Sha256::digest(&budget_model_bytes);
+        let budget_model_sha256 = budget_model_hash
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
         let header = EventTapeHeader {
             schema: "symthaea.ar5b4.event-tape".to_owned(),
             version: "0.1.0".to_owned(),
