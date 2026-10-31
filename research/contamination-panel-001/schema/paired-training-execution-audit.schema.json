@@ -32,6 +32,7 @@
     "placebo_run_id",
     "treatment_checkpoint_sha256",
     "placebo_checkpoint_sha256",
+    "training_rng_seed_commitment_sha256",
     "treatment_observed_tokens",
     "placebo_observed_tokens",
     "treatment_observed_steps",
@@ -155,6 +156,9 @@
       "items": {
         "type": "string"
       }
+    },
+    "training_rng_seed_commitment_sha256": {
+      "$ref": "#/$defs/sha256"
     }
   }
 }

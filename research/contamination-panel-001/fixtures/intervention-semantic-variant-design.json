@@ -469,5 +469,6 @@
   "shared_training_token_count": 92000,
   "training_code_sha256": "abababababababababababababababababababababababababababababababab",
   "runtime_image_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
-  "tokenization_pipeline_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef"
+  "tokenization_pipeline_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+  "training_rng_seed_commitment_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef"
 }

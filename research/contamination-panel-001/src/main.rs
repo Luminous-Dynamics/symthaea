@@ -1,5 +1,6 @@
 use contamination_panel_bench::{
     ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, DetectorRunV1,
+    causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
     DetectorSpecV1, PublicChallengePacketV1, SealedChallengeKeyV1,
     audit_blinded_adjudications, detectors::{evaluate_detector_run, score_public_packet},
     ftd::{
@@ -252,6 +253,28 @@ fn audit_intervention_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn analyze_causal_study_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench analyze-causal-study <replicated-causal-study.json> <analysis-report.json>"
+                .into(),
+        );
+    }
+    let study: ReplicatedCausalStudyV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
+    let report = analyze_replicated_causal_study(&study).map_err(io::Error::other)?;
+    write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "replicates={} primary_cluster_effect={:.3}pp localization_p={:.5} confirmatory_eligible={} status={}",
+        report.independent_model_pair_replicate_count,
+        report.primary_cluster_weighted_effect_permille.mean / 10.0,
+        report.localization_randomization_p_value,
+        report.confirmatory_eligible,
+        report.analysis_status
+    );
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
+}
+
 fn audit_training_receipt_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 6 {
         return Err(
@@ -334,9 +357,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("randomize-intervention") => randomize_intervention_cli(&args),
         Some("audit-intervention") => audit_intervention_cli(&args),
         Some("audit-training-receipt") => audit_training_receipt_cli(&args),
+        Some("analyze-causal-study") => analyze_causal_study_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }

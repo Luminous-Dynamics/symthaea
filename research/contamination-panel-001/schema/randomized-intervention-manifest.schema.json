@@ -15,6 +15,7 @@
     "shared_training_corpus_sha256",
     "shared_training_token_count",
     "total_training_token_budget",
+    "training_rng_seed_commitment_sha256",
     "randomization_seed_commitment_sha256",
     "assignment_sha256",
     "exposed_cluster_count",
@@ -143,6 +144,9 @@
     "total_training_token_budget": {
       "type": "integer",
       "minimum": 1
+    },
+    "training_rng_seed_commitment_sha256": {
+      "$ref": "#/$defs/sha256"
     }
   },
   "$defs": {

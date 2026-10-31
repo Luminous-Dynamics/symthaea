@@ -394,3 +394,78 @@ Runner-attestation and checkpoint-custody receipt digests are explicitly nullabl
 
 When those external digests are present, this still proves only their format and binding—not their signature validity or issuer identity. Missing evidence blocks readiness; present-but-unverified evidence does not become trusted automatically.
 
+
+
+## Replicated model-pair causal analysis
+
+The module src/causal_analysis.rs analyzes independently trained treatment/placebo model pairs. The **model pair is the independent training replicate**. The randomized source/task clusters are assignment units, and benchmark questions are nested measurements. Repeated decoding from one checkpoint or hundreds of questions from one model pair do not create hundreds of independent training replicates.
+
+### Paired training randomness
+
+Each intervention design carries a training RNG seed commitment. Treatment and placebo runs inside one pair must use that same committed RNG schedule (paired initialization/dropout/randomness), while each independently trained model-pair replicate must have a unique training RNG commitment. The commitment is bound into the design digest, manifest and both arm receipts.
+
+This reduces avoidable variance from different initialization/random streams. It does not remove all training stochasticity or prove the training backend honored the seed.
+
+### Outcomes and evaluation evidence
+
+Each replicate contains:
+- the exact design, randomized assignment manifest and original randomization seed;
+- the paired training execution audit and its content digest;
+- distinct base/treatment/placebo evaluation receipt digests;
+- common checkpoint, oracle/adjudication, metric, evaluation harness and prompt/decoding bindings;
+- one cluster outcome for every source cluster, with base, treatment and placebo success counts on the exact same item set.
+
+The validator replays the original assignment, checks the training audit digest, checks output checkpoint bindings and requires complete, identical evaluation denominators. Missing clusters, incomplete item coverage, receipt reuse, duplicate output checkpoints or altered assignments fail closed.
+
+### Primary estimand
+
+For each independently trained model pair, compute the cluster-weighted mean of:
+
+treatment-checkpoint score minus placebo-checkpoint score
+
+over the full benchmark cluster universe. The overall estimate is the mean of those pair-level effects. Its standard deviation, standard error and 95% Student-t interval are calculated across independent model-pair replicates—not across individual questions or clusters.
+
+The report separately shows:
+- treatment minus common base-checkpoint score;
+- placebo minus common base-checkpoint score;
+- cluster-weighted and item-weighted treatment/placebo effects;
+- average paired advantage on exposed clusters;
+- average paired advantage on unexposed clusters (spillover diagnostic);
+- a task-family-stratified exposed-minus-unexposed localization contrast;
+- family-level means and every replicate-level effect.
+
+This decomposition matters: a positive treatment-minus-placebo difference can reflect treatment gains, placebo degradation, or both. The base model reference shows which occurred.
+
+### Interference and randomization inference
+
+Training changes global model parameters. Exposure to one source cluster can influence scores on other clusters. Therefore the exposed-minus-unexposed localization contrast is a diagnostic, not automatically a pure direct causal effect.
+
+The Monte Carlo randomization test reassigns cluster exposure within the original task-family / size strata while preserving each stratum's exposed count. It tests the Fisher sharp null that assignment has no effect on any cluster's paired-advantage outcome, including spillover. It is not a confidence interval for a direct effect under arbitrary global interference.
+
+The t interval's independent unit is still the model-pair replicate. A minimum of 20 pairs is set as an initial operational floor for confirmatory planning, not as a universal power guarantee. The true required count must be chosen by preregistered power simulations that include model-pair stochasticity, source-family dependence, size imbalance, spillover, heterogeneity and missing runs.
+
+### Exploratory-only trust boundary
+
+The current paired execution audit validates digest/field consistency and can be marked ready for external attestation verification, but it does not cryptographically authenticate signatures or trust roots. This analysis module rejects a self-asserted independently_verified=true flag and always sets confirmatory_eligible=false. Results remain exploratory until a separate pinned trust-root verifier authenticates trainer and checkpoint attestations.
+
+### CLI
+
+~~~sh
+cargo run --locked -- analyze-causal-study \
+  /secure/evaluator/replicated-causal-study.json \
+  /secure/evaluator/replicated-causal-report.json
+~~~
+
+Schemas:
+- schema/replicated-causal-study.schema.json
+- schema/replicated-causal-report.schema.json
+
+The Rust tests include a synthetic two-pair end-to-end fixture, but no real training has been performed and no causal effect or benchmark improvement is claimed by that fixture.
+
+
+
+The analysis report includes a SHA-256 digest of the exact serialized study input and a commitment to the Monte Carlo randomization-test seed. Keep the original study JSON, evaluator-only seeds, paired training audit records, manifests and final report together as the reproducibility bundle. The report's study digest must match byte-for-byte canonical serde JSON serialization under the declared hash domain.
+
+
+
+The intervention design also binds a per-replicate training RNG commitment: treatment and placebo use the same committed RNG schedule within a pair, while independent model-pair replicates must use distinct training RNG commitments. This is checked by the paired receipt validator and repeated-replicate analysis.

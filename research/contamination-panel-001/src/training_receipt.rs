@@ -62,6 +62,7 @@ pub struct TrainingArmExecutionReceiptV1 {
     pub requested_total_training_token_budget: u64,
     pub requested_training_steps: u64,
     pub observed_training_steps: u64,
+    pub training_rng_seed_commitment_sha256: String,
     pub training_code_sha256: String,
     pub runtime_image_sha256: String,
     pub tokenization_pipeline_sha256: String,
@@ -123,6 +124,7 @@ pub struct PairedTrainingExecutionAuditV1 {
     pub placebo_run_id: String,
     pub treatment_checkpoint_sha256: String,
     pub placebo_checkpoint_sha256: String,
+    pub training_rng_seed_commitment_sha256: String,
     pub treatment_observed_tokens: u64,
     pub placebo_observed_tokens: u64,
     pub treatment_observed_steps: u64,
@@ -262,6 +264,7 @@ fn validate_arm_common(
         (&arm.intervention_manifest_sha256, "intervention_manifest_sha256"),
         (&arm.intervention_assignment_sha256, "intervention_assignment_sha256"),
         (&arm.intervention_payload_sha256, "intervention_payload_sha256"),
+        (&arm.training_rng_seed_commitment_sha256, "training_rng_seed_commitment_sha256"),
         (&arm.training_code_sha256, "training_code_sha256"),
         (&arm.runtime_image_sha256, "runtime_image_sha256"),
         (&arm.tokenization_pipeline_sha256, "tokenization_pipeline_sha256"),
@@ -321,7 +324,8 @@ fn validate_arm_common(
     {
         return Err(format!("{expected_arm:?} requested training budget/steps do not match design"));
     }
-    if arm.training_code_sha256 != design.training_code_sha256
+    if arm.training_rng_seed_commitment_sha256 != design.training_rng_seed_commitment_sha256
+        || arm.training_code_sha256 != design.training_code_sha256
         || arm.runtime_image_sha256 != design.runtime_image_sha256
         || arm.tokenization_pipeline_sha256 != design.tokenization_pipeline_sha256
         || arm.training_hyperparameters_sha256 != design.training_hyperparameters_sha256
@@ -447,6 +451,7 @@ pub fn validate_paired_training_execution_receipt(
         && receipt.treatment.tokenization_pipeline_sha256 == receipt.placebo.tokenization_pipeline_sha256
         && receipt.treatment.training_hyperparameters_sha256 == receipt.placebo.training_hyperparameters_sha256
         && receipt.treatment.optimizer_schedule_sha256 == receipt.placebo.optimizer_schedule_sha256
+        && receipt.treatment.training_rng_seed_commitment_sha256 == receipt.placebo.training_rng_seed_commitment_sha256
         && receipt.treatment.requested_training_steps == receipt.placebo.requested_training_steps
         && receipt.treatment.requested_total_training_token_budget == receipt.placebo.requested_total_training_token_budget;
     let base_checkpoint_matched =
@@ -514,6 +519,7 @@ pub fn validate_paired_training_execution_receipt(
         placebo_run_id: receipt.placebo.run_id.clone(),
         treatment_checkpoint_sha256: receipt.treatment.output_checkpoint_sha256.clone(),
         placebo_checkpoint_sha256: receipt.placebo.output_checkpoint_sha256.clone(),
+        training_rng_seed_commitment_sha256: receipt.treatment.training_rng_seed_commitment_sha256.clone(),
         treatment_observed_tokens: receipt.treatment.observed_total_training_token_count,
         placebo_observed_tokens: receipt.placebo.observed_total_training_token_count,
         treatment_observed_steps: receipt.treatment.observed_training_steps,
@@ -569,6 +575,7 @@ mod tests {
             shared_training_token_count: 1_992_000,
             total_training_token_budget: 2_000_000,
             training_steps: 5_000,
+            training_rng_seed_commitment_sha256: digest("training-rng-seed"),
             training_code_sha256: digest("training-code"),
             runtime_image_sha256: digest("runtime"),
             tokenization_pipeline_sha256: digest("tokenizer"),
@@ -622,6 +629,7 @@ mod tests {
             requested_total_training_token_budget: design.total_training_token_budget,
             requested_training_steps: design.training_steps,
             observed_training_steps: design.training_steps,
+            training_rng_seed_commitment_sha256: design.training_rng_seed_commitment_sha256.clone(),
             training_code_sha256: design.training_code_sha256.clone(),
             runtime_image_sha256: design.runtime_image_sha256.clone(),
             tokenization_pipeline_sha256: design.tokenization_pipeline_sha256.clone(),
@@ -799,6 +807,10 @@ mod tests {
             report.design_sha256,
             expected_design_sha256(&design()).unwrap()
         );
+        assert_eq!(
+            report.training_rng_seed_commitment_sha256,
+            design().training_rng_seed_commitment_sha256
+        );
         assert!(report.execution_consistent);
         assert!(report.treatment_completed && report.placebo_completed);
         assert!(report.paired_checkpoints_distinct);
@@ -859,6 +871,21 @@ mod tests {
         assert!(!report.execution_consistent);
         assert!(!report.ready_for_independent_attestation_verification);
         assert!(report.issues.iter().any(|issue| issue.contains("Partial")));
+    }
+
+    #[test]
+    fn treatment_and_placebo_must_share_the_preregistered_training_rng_commitment() {
+        let design = design();
+        let manifest = randomize_intervention(&design, &seed()).unwrap();
+        let mut receipt = paired_receipt(&design, &manifest);
+        receipt.placebo.training_rng_seed_commitment_sha256 = digest("different-training-seed");
+        receipt.pair_receipt_sha256.clear();
+        let bytes0 = serde_json::to_vec(&receipt).unwrap();
+        receipt.pair_receipt_sha256 =
+            hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
+        assert!(validate_paired_training_execution_receipt(
+            &design, &manifest, &seed(), &serde_json::to_vec(&receipt).unwrap()
+        ).unwrap_err().contains("trainer code/runtime/tokenizer/configuration"));
     }
 
     #[test]
