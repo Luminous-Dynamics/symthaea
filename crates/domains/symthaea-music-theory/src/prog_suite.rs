@@ -53,6 +53,7 @@ use crate::phrase::Period;
 use crate::pitch::Pitch;
 use crate::rhythm::Duration;
 use crate::score::Score;
+use serde::{Deserialize, Serialize};
 
 /// One section's plan: which key, which meter, and which motif
 /// transformation (`None` = the theme unaltered).
@@ -61,6 +62,35 @@ struct SectionPlan {
     key_fn: fn(Key) -> Key,
     meter: f64,
     transform: Option<u64>,
+}
+
+/// Public section receipt bound to the actual realized score timeline.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProgSuiteSectionEvidence {
+    pub role: SectionRole,
+    pub key: Key,
+    pub meter: u8,
+    /// Choice 0/1/2 means inversion/retrograde/retrograde-inversion.
+    /// None means the theme is restated without transformation.
+    pub transform: Option<u64>,
+    pub start: Duration,
+    pub end: Duration,
+}
+
+/// The exact mixed-meter structure consumed by the ProgSuite realization.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProgSuitePlan {
+    pub sections: Vec<ProgSuiteSectionEvidence>,
+    pub opening_meter: u8,
+    pub bars_per_section_phrase: u8,
+    pub expected_total_beats: f64,
+}
+
+/// A ProgSuite score paired with the plan from the same realization pass.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProgSuiteRealization {
+    pub score: Score,
+    pub plan: ProgSuitePlan,
 }
 
 fn identity_key(k: Key) -> Key {
@@ -75,6 +105,20 @@ pub(crate) fn realize_prog_suite(
     intent: &MusicalIntent,
     spec: &crate::spec::CompositionSpec,
 ) -> Score {
+    realize_prog_suite_with_plan(home_key, tempo, motif, seed, intent, spec).score
+}
+
+/// Plan-preserving counterpart to the canonical ProgSuite realizer. The plan
+/// boundaries are recorded from the actual spliced sub-score lengths, not
+/// recomputed from a second estimate.
+pub(crate) fn realize_prog_suite_with_plan(
+    home_key: Key,
+    tempo: f32,
+    motif: &Motif,
+    seed: u64,
+    intent: &MusicalIntent,
+    spec: &crate::spec::CompositionSpec,
+) -> ProgSuiteRealization {
     let pivot = motif.notes.iter().find_map(|x| x.degree).unwrap_or(1);
     let b_choice = seed % 3;
     let c_choice = (b_choice + 1) % 3;
@@ -111,6 +155,7 @@ pub(crate) fn realize_prog_suite(
     let mut prev_upper: Vec<Pitch> = Vec::new();
     let mut prev_bass: Option<Pitch> = None;
     let mut cursor = Duration::zero();
+    let mut section_evidence = Vec::with_capacity(plan.len());
     let bars = 4usize;
     let pattern = crate::accompaniment::Accompaniment::Comp; // driving, active — a prog rhythm section
 
@@ -175,15 +220,30 @@ pub(crate) fn realize_prog_suite(
             false,
         );
 
+        let section_start = cursor;
         for n in &phrase_score.notes {
             let mut shifted = *n;
             shifted.onset = shifted.onset + cursor;
             score.push(shifted);
         }
         cursor = cursor + phrase_score.total_beats;
+        section_evidence.push(ProgSuiteSectionEvidence {
+            role: sec.role,
+            key,
+            meter: sec.meter as u8,
+            transform: sec.transform,
+            start: section_start,
+            end: cursor,
+        });
     }
 
-    score
+    let plan = ProgSuitePlan {
+        sections: section_evidence,
+        opening_meter,
+        bars_per_section_phrase: bars as u8,
+        expected_total_beats: cursor.beats(),
+    };
+    ProgSuiteRealization { score, plan }
 }
 
 #[cfg(test)]
