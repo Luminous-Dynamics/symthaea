@@ -33,7 +33,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo run --quiet --locked -- --input fixtures/qualification-smoke.tsv --replicates 500 --bootstrap-seed 42 > /tmp/cmaq-012-report.json
+          cargo run --quiet --locked -- --input fixtures/qualification-smoke.tsv --replicates 500 --bootstrap-seed 42 --artifacts-dir fixtures/artifacts --allow-fixtures > /tmp/cmaq-012-report.json
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -57,11 +57,19 @@ jobs:
           )
           assert receipt_example["resource_profile_sha256"] == "a" * 64
           assert receipt_example["claim_ceiling"] == (
-              "digest_bound_run_record_not_independently_verified_by_v0_2_cli"
+              "artifact_content_integrity_verified_profiler_and_hardware_origin_unattested"
           )
           validate(instance=report, schema=schema)
-          assert report["schema_version"] == "cmaq-012-paired-aop-report-v0.2"
-          assert report["auditor_version"] == "0.2.0"
+          assert report["schema_version"] == "cmaq-012-paired-aop-report-v0.3"
+          assert report["auditor_version"] == "0.3.0"
+          artifact_verification = report["artifact_verification"]
+          assert artifact_verification["status"] == "synthetic_fixture_content_verified_origin_unattested"
+          assert artifact_verification["profiles_verified"] == 1
+          assert artifact_verification["receipts_verified"] == 20
+          assert artifact_verification["fixture_only"] is True
+          assert artifact_verification["claim_ceiling"] == (
+              "synthetic_fixture_content_integrity_verified_no_hardware_claim"
+          )
           assert len(report["input_sha256"]) == 64
           assert report["bootstrap_replicates"] == 500
           assert report["bootstrap_seed"] == 42
@@ -76,7 +84,7 @@ jobs:
           match = group["resource_match"]
           assert match["status"] == "budget_matched"
           assert match["resource_measurement_method"] == "operator_trace"
-          assert match["receipt_verification_status"] == "digest_only_not_independently_verified"
+          assert match["receipt_verification_status"] == "synthetic_fixture_content_verified_origin_unattested"
           assert match["d1_role_valid"] is True
           assert match["learned_model_role_valid"] is True
           assert match["w2_workload_match_valid"] is True
@@ -99,5 +107,5 @@ jobs:
           assert abs(contrasts["advantage_of_prediction"]["return_mean_delta"] - 1.75) < 1e-8
           assert abs(contrasts["prediction_mediation"]["return_mean_delta"] - 1.75) < 1e-8
           assert abs(contrasts["compute_only_gain"]["return_mean_delta"] - 1.0) < 1e-8
-          print("CMAQ-012 v0.2 report/resource schemas, pairing, D1 role, W1/W2 workload, resource tolerances, contrasts, timeout retention and receipt claim ceiling validated")
+          print("CMAQ-012 v0.3 report/resource schemas, exact profile/receipt SHA-256 verification, row-to-receipt binding, D1 role, W1/W2 workload, paired resource tolerances, contrasts and timeout retention validated")
           PY
