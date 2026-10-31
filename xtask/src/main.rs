@@ -6,6 +6,7 @@ mod basalt_observer;
 mod basalt_observer_result;
 mod basalt_fixture;
 mod basalt_cargo_fixture;
+mod basalt_cargo_mtime_fixture;
 mod basalt_validate;
 mod crate_status;
 mod duplicate_scan;
@@ -58,6 +59,13 @@ enum Commands {
     },
     /// Run a real Cargo build-script challenge with an intentionally undeclared input.
     BasaltCargoBuildScriptFixtureRun {
+        #[arg(long)]
+        catalog: PathBuf,
+        #[arg(long)]
+        out_dir: PathBuf,
+    },
+    /// Run a Cargo mtime-preserving build-script input challenge.
+    BasaltCargoMtimeFixtureRun {
         #[arg(long)]
         catalog: PathBuf,
         #[arg(long)]
@@ -167,6 +175,10 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::BasaltCargoBuildScriptFixtureRun { catalog, out_dir } => {
             let report = basalt_cargo_fixture::run(&catalog, &out_dir)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Commands::BasaltCargoMtimeFixtureRun { catalog, out_dir } => {
+            let report = basalt_cargo_mtime_fixture::run(&catalog, &out_dir)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
         Commands::BasaltValidate { input, manifest, spec_root } => {

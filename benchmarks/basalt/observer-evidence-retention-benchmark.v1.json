@@ -177,6 +177,18 @@
         "value": 1
       },
       "unit": "proportion"
+    },
+    {
+      "metric_id": "mtime_preserving_build_script_mutation_detection",
+      "phase": "safety",
+      "definition": "Fraction of correctly declared build-script inputs whose bytes change while mtime is held constant that the independent observer still records as changed dependencies.",
+      "numerator": "mtime-preserving input mutations with a matching changed-content digest in the observer receipt and stale evidence rejected",
+      "denominator": "all independently adjudicated mtime-preserving build-script mutation scenarios in the supported profile",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
     }
   ],
   "gates": {
@@ -186,7 +198,8 @@
       "unsupported_channel_disclosure",
       "integrity_loss_fail_closed",
       "semantic_access_retention",
-      "undeclared_build_script_stale_replay_detection"
+      "undeclared_build_script_stale_replay_detection",
+      "mtime_preserving_build_script_mutation_detection"
     ],
     "selectivity": [
       "false_invalidation_rate",
@@ -219,7 +232,8 @@
       "kernel_profile",
       "observer_profile",
       "semantic_effect_class",
-      "build_system"
+      "build_system",
+      "mutation_timestamp_mode"
     ],
     "required_costs": [
       "wall_time",

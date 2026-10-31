@@ -604,6 +604,23 @@
       ],
       "description": "Read the same mutated resource and fold its bytes into the declared task output as the matched influence-positive control.",
       "safety_property": "The positive control must change the task output while the read-but-discard control does not; both accesses remain dependencies."
+    },
+    {
+      "case_id": "cargo-mtime-preserving-input",
+      "family": "generated_artifact",
+      "channel": "process",
+      "mutation_kind": "build_script_input",
+      "ground_truth_resource_id": "fixture:build.rs-input-mtime-preserved.txt",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "process_lineage",
+        "argv_cwd",
+        "resource_identity",
+        "content_digest"
+      ],
+      "paired_case_ids": [],
+      "description": "A Rust build script reads and correctly declares a file with rerun-if-changed, but the file bytes mutate while its modification timestamp is restored exactly.",
+      "safety_property": "Dependency observation must detect content mutation even when Cargo's mtime-based rerun detector does not invalidate the build script."
     }
   ]
 }
