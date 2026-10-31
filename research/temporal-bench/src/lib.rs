@@ -14,6 +14,7 @@ pub mod digest;
 pub mod dms;
 pub mod evidence;
 pub mod irregular;
+pub mod retention;
 pub mod temporal;
 
 const MAX_DISTRACTORS: usize = 10_000;
