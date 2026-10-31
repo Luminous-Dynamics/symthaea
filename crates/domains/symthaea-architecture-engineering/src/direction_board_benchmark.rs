@@ -1361,7 +1361,7 @@ fn meter_value(value: u64) -> MeterValue {
 mod tests {
     use super::*;
 
-    const POLICIES: [DirectionCampaignPolicy; 6] = [
+    const POLICIES: [DirectionCampaignPolicy; 8] = [
         DirectionCampaignPolicy::ScoreOnlyWinnerTakesAll,
         DirectionCampaignPolicy::FixedRoundRobin,
         DirectionCampaignPolicy::Random,
