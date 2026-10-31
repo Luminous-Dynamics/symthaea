@@ -277,6 +277,12 @@ impl ProofObligation {
         if required_ids.len() != enumeration.matches.len() {
             return Err("exact enumeration contains duplicate evidence IDs".into());
         }
+        if enumeration.receipt.required_speaker_role == Some(EvidenceSpeakerRole::User) {
+            let required_user_matches = u32::try_from(required_ids.len())
+                .map_err(|_| "user-authored enumeration match count exceeds u32".to_string())?;
+            self.minimum_user_authored_evidence =
+                self.minimum_user_authored_evidence.max(required_user_matches);
+        }
         self.required_complete_evidence_ids = required_ids.clone();
         self.enumeration_receipt_sha256 =
             Some(enumeration.receipt.receipt_sha256.clone());
