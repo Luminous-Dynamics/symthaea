@@ -164,6 +164,18 @@ impl GraphEvaluationReport {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EvidenceMutation {
+    Retract,
+    FlipAssertedPolarity,
+    SetKnownFrom(u64),
+    SetValidFrom(u64),
+    SetScope(String),
+    SetAuthority(String),
+    SetIntegrity(SourceIntegrity),
+    SetIndependenceGroup(String),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HiddenTruth { SupportsAssertion, RefutesAssertion, Irrelevant }
 
@@ -208,13 +220,37 @@ impl GraphSuite {
     pub fn planner_cases(&self) -> &[PlannerCase] { &self.planner_cases }
     pub fn case_count(&self) -> usize { self.planner_cases.len() }
 
-    /// Mutate an evidence revision to Retracted without revealing or changing
-    /// its sealed source-truth label. Used for dependency-retraction controls.
-    pub fn retract_evidence(&mut self, case_id: &str, evidence_id: &str) -> bool {
+    /// Apply a controlled mutation to planner-facing evidence metadata.
+    /// The private oracle label is never changed, so the mutation can be scored.
+    pub fn mutate_evidence(
+        &mut self,
+        case_id: &str,
+        evidence_id: &str,
+        mutation: EvidenceMutation,
+    ) -> bool {
         let Some(case) = self.planner_cases.iter_mut().find(|c| c.id == case_id) else { return false; };
         let Some(evidence) = case.evidence.iter_mut().find(|e| e.id == evidence_id) else { return false; };
-        evidence.lifecycle = EvidenceLifecycle::Retracted;
+        match mutation {
+            EvidenceMutation::Retract => evidence.lifecycle = EvidenceLifecycle::Retracted,
+            EvidenceMutation::FlipAssertedPolarity => {
+                evidence.asserted_polarity = match evidence.asserted_polarity {
+                    Polarity::Supports => Polarity::Refutes,
+                    Polarity::Refutes => Polarity::Supports,
+                };
+            }
+            EvidenceMutation::SetKnownFrom(value) => evidence.known_from = value,
+            EvidenceMutation::SetValidFrom(value) => evidence.valid_from = value,
+            EvidenceMutation::SetScope(value) => evidence.scope_id = value,
+            EvidenceMutation::SetAuthority(value) => evidence.authority_id = value,
+            EvidenceMutation::SetIntegrity(value) => evidence.integrity = value,
+            EvidenceMutation::SetIndependenceGroup(value) => evidence.independence_group_id = value,
+        }
         true
+    }
+
+    /// Convenience wrapper for the common retraction mutation.
+    pub fn retract_evidence(&mut self, case_id: &str, evidence_id: &str) -> bool {
+        self.mutate_evidence(case_id, evidence_id, EvidenceMutation::Retract)
     }
 
     /// Score public predictions using the private recursive oracle.
@@ -564,6 +600,17 @@ pub fn generate_poar_graph_suite(seed: u64, split: DatasetSplit) -> GraphSuite {
             vec![ProofRequirement::Evidence("e-unverified".into())],1)]),
     ],vec![unverified],&[("e-unverified",HiddenTruth::SupportsAssertion)]);
 
+    // Independent pair is a mutation baseline for a later source-correlation merge.
+    add(&mut suite,seed,split,"independent-pair",q(t+5,t+5),&["claim"],vec![
+        claim("claim",vec![alt("independent-path",Polarity::Supports,vec![
+            ProofRequirement::Evidence("e-independent-a".into()),
+            ProofRequirement::Evidence("e-independent-b".into()),
+        ],2)]),
+    ],vec![
+        ev(split,"independent","e-independent-a","claim",Polarity::Supports,"g-independent-a",(t,None),(t,None),"scope-a","authority-a"),
+        ev(split,"independent","e-independent-b","claim",Polarity::Supports,"g-independent-b",(t,None),(t,None),"scope-a","authority-a"),
+    ],&[("e-independent-a",HiddenTruth::SupportsAssertion),("e-independent-b",HiddenTruth::SupportsAssertion)]);
+
     suite
 }
 
@@ -725,6 +772,50 @@ mod tests {
         assert_eq!(score.false_supported_claims,1);
         assert_eq!(score.integrity_violations,1);
         assert_eq!(score.invalid_citations,1);
+    }
+
+    #[test]
+    fn mutation_time_polarity_integrity_and_independence_are_detected() {
+        // Move a current record beyond known_at: the formerly valid proof must fail.
+        let mut temporal_suite=generate_poar_graph_suite(7,DatasetSplit::Test);
+        let temporal_case=find(&temporal_suite,"or-current-alternative");
+        let temporal_id=temporal_case.id.clone();
+        let temporal_packet=packet(temporal_case,"claim",ClaimDisposition::Supported{alternative_id:"current-path".into()},&["e-current"]);
+        assert!(temporal_suite.mutate_evidence(&temporal_id,"e-current",EvidenceMutation::SetKnownFrom(9_999)));
+        let temporal_score=temporal_suite.evaluate(&[temporal_packet]);
+        assert_eq!(temporal_score.case_scores[1].temporal_violations,1);
+        assert_eq!(temporal_score.case_scores[1].false_supported_claims,1);
+
+        // A metadata polarity flip does not rewrite the hidden source-truth label.
+        let mut polarity_suite=generate_poar_graph_suite(7,DatasetSplit::Test);
+        let polarity_case=find(&polarity_suite,"and-chain");
+        let polarity_id=polarity_case.id.clone();
+        let polarity_packet=packet(polarity_case,"root",ClaimDisposition::Supported{alternative_id:"and-path".into()},&["e-leaf","e-root"]);
+        assert!(polarity_suite.mutate_evidence(&polarity_id,"e-root",EvidenceMutation::FlipAssertedPolarity));
+        let polarity_score=polarity_suite.evaluate(&[polarity_packet]);
+        assert_eq!(polarity_score.case_scores[0].false_supported_claims,1);
+        assert_eq!(polarity_score.case_scores[0].invalid_citations,1);
+
+        // Integrity downgrade keeps content truth fixed but removes admissibility.
+        let mut integrity_suite=generate_poar_graph_suite(7,DatasetSplit::Test);
+        let integrity_case=find(&integrity_suite,"and-chain");
+        let integrity_id=integrity_case.id.clone();
+        let integrity_packet=packet(integrity_case,"root",ClaimDisposition::Supported{alternative_id:"and-path".into()},&["e-leaf","e-root"]);
+        assert!(integrity_suite.mutate_evidence(&integrity_id,"e-root",EvidenceMutation::SetIntegrity(SourceIntegrity::Invalid)));
+        let integrity_score=integrity_suite.evaluate(&[integrity_packet]);
+        assert_eq!(integrity_score.case_scores[0].integrity_violations,1);
+        assert_eq!(integrity_score.case_scores[0].false_supported_claims,1);
+
+        // Two genuinely independent sources collapse to one group after mutation.
+        let mut correlation_suite=generate_poar_graph_suite(7,DatasetSplit::Test);
+        let correlation_case=find(&correlation_suite,"independent-pair");
+        let correlation_id=correlation_case.id.clone();
+        let correlation_packet=packet(correlation_case,"claim",ClaimDisposition::Supported{alternative_id:"independent-path".into()},&["e-independent-a","e-independent-b"]);
+        assert_eq!(correlation_suite.evaluate(&[correlation_packet.clone()]).case_scores[14].correct_dispositions,1);
+        assert!(correlation_suite.mutate_evidence(&correlation_id,"e-independent-b",EvidenceMutation::SetIndependenceGroup("g-independent-a".into())));
+        let correlation_score=correlation_suite.evaluate(&[correlation_packet]);
+        assert_eq!(correlation_score.case_scores[14].correlation_violations,1);
+        assert_eq!(correlation_score.case_scores[14].false_supported_claims,1);
     }
 
     #[test]
