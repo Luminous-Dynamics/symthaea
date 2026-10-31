@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace-case-v0.1.schema.json",
+  "title": "MACE Case v0.1",
+  "description": "Agent-visible trajectory plus evaluator-only causal and transfer oracle. Oracle fields must never enter agent prompts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace-cases-v0.1"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "family",
+        "pair",
+        "agent_view",
+        "evaluator_oracle"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^MACE-[A-Z][0-9]{2}$"
+        },
+        "family": {
+          "enum": [
+            "observational_confounding",
+            "controlled_intervention",
+            "regime_shift",
+            "outcome_misattribution"
+          ]
+        },
+        "pair": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pair_id",
+            "role"
+          ],
+          "properties": {
+            "pair_id": {
+              "type": "string"
+            },
+            "role": {
+              "enum": [
+                "anchor",
+                "irrelevant_control"
+              ]
+            }
+          }
+        },
+        "agent_view": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scenario_context",
+            "historical_events",
+            "current_state",
+            "objective",
+            "current_task",
+            "resource_budget"
+          ],
+          "properties": {
+            "scenario_context": {
+              "type": "object"
+            },
+            "historical_events": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "event_id",
+                  "session_id",
+                  "event_kind",
+                  "payload"
+                ],
+                "properties": {
+                  "event_id": {
+                    "type": "string"
+                  },
+                  "session_id": {
+                    "type": "string"
+                  },
+                  "event_kind": {
+                    "type": "string"
+                  },
+                  "payload": {
+                    "type": "object"
+                  }
+                }
+              }
+            },
+            "current_state": {
+              "type": "object"
+            },
+            "objective": {
+              "type": "object",
+              "required": [
+                "objective_id",
+                "description",
+                "hard_constraints"
+              ],
+              "properties": {
+                "objective_id": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "hard_constraints": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "current_task": {
+              "type": "string"
+            },
+            "resource_budget": {
+              "type": "object",
+              "required": [
+                "memory_tokens",
+                "action_calls",
+                "observation_calls"
+              ],
+              "properties": {
+                "memory_tokens": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "action_calls": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "observation_calls": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "evaluator_oracle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "causal_status",
+            "expected_transfer",
+            "expected_action",
+            "expected_completion_state",
+            "reason_codes"
+          ],
+          "properties": {
+            "causal_status": {
+              "enum": [
+                "not_identified",
+                "identified",
+                "regime_shifted",
+                "outcome_unverified"
+              ]
+            },
+            "expected_transfer": {
+              "enum": [
+                "record_association_only",
+                "reuse_qualified_transition",
+                "requalify_before_reuse",
+                "mark_outcome_unknown"
+              ]
+            },
+            "expected_action": {
+              "type": "string"
+            },
+            "expected_completion_state": {
+              "enum": [
+                "not_applicable",
+                "verified_effect",
+                "not_effect_verified",
+                "unknown_pending_reconciliation"
+              ]
+            },
+            "reason_codes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "identified_effect": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "properties": {
+                "variable": {
+                  "type": "string"
+                },
+                "direction": {
+                  "enum": [
+                    "positive",
+                    "negative",
+                    "zero",
+                    "non_monotone",
+                    "unknown"
+                  ]
+                },
+                "preconditions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
