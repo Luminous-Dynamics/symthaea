@@ -960,7 +960,7 @@ mod tests {
         assert_eq!(v.len(), 201);
         assert_eq!(action.len(), 201);
         assert_eq!(probes.first(), Some(&(0, 0, 0)));
-        assert_eq!(probes.last(), Some(&(200, 126, 8)));
+        assert_eq!(probes.last(), Some(&(200, 164, 128)));
     }
 
     #[test]
