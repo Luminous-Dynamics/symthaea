@@ -151,6 +151,15 @@ status before emitting latency. Its work counters also show the expected
 reduction in baseline preparations, partition-repertoire preparations, and
 nested Eq. 4 receipt hashes.
 
+The full-search sweep now covers 8, 16, 32, 64, 128, 256, 512, 1,024, and
+2,048 substrate units while holding the candidate system at four units. The
+largest cases exercise the *complete bounded system analyzer* (intrinsic state
+selection, all 150 canonical candidate cuts, all eligible state-pair scores,
+tie handling, and result qualification) over sparse ring substrates—not only
+the Eq. 4 primitive. This is a substrate-scaling experiment with fixed candidate
+size and bounded induced width, not a claim that arbitrary 2,048-unit systems
+are tractable or a PyPhi speed comparison.
+
 Every CSV row also binds the exact sparse model SHA-256, system-search request
 SHA-256, algorithm identifier, decimal precision, factor-entry ceiling, and
 partition/state-pair/score budgets. This lets a reported timing row be tied to
@@ -159,7 +168,7 @@ the exact mathematical input and search policy that was validated.
 Run:
 
     cargo run --release --locked -p symthaea-iit --example sparse_system_search_reuse_sweep
-    cargo run --release --locked -p symthaea-iit --example sparse_system_search_reuse_sweep -- --repeats 7
+    cargo run --release --locked -p symthaea-iit --example sparse_system_search_reuse_sweep -- --repeats 7 --max-units 2048
 
 This measures the effect of scoped reuse inside Symthaea's sparse backend. It
 is not a PyPhi speed comparison; use the benchmark policy below for any
