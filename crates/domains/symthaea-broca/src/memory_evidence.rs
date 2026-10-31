@@ -1407,4 +1407,142 @@ mod tests {
         tampered.content_sha256 = hash(b"different bytes");
         assert!(tampered.context_item(root.path()).is_err());
     }
+
+    fn insert_attributed(
+        index: &mut EvidenceIndex,
+        id: u64,
+        evidence_id: &str,
+        trajectory_id: &str,
+        step_id: &str,
+        text: &str,
+    ) {
+        let mut record = text_record(id, evidence_id, "web", text);
+        record.source.trajectory_id = trajectory_id.into();
+        record.source.step_id = Some(step_id.into());
+        record.source.step_index = step_id
+            .rsplit('-')
+            .next()
+            .and_then(|suffix| suffix.parse::<u64>().ok());
+        index
+            .insert(record, &source_bytes_for_text(text))
+            .unwrap();
+    }
+
+    #[test]
+    fn exact_enumeration_finds_all_matches_beyond_bm25_top_k_and_pins_speakers() {
+        let mut index = EvidenceIndex::new();
+        insert_attributed(&mut index, 1, "user-1-a", "session-1", "user-0", "invoice paid in March");
+        insert_attributed(&mut index, 2, "assistant-1-a", "session-1", "assistant-1", "invoice paid suggestion from assistant");
+        insert_attributed(&mut index, 3, "user-2-a", "session-2", "user-0", "invoice paid in April");
+        insert_attributed(&mut index, 4, "legacy-a", "session-3", "turn-0", "invoice paid in legacy source");
+        insert_attributed(&mut index, 5, "user-3-b", "session-4", "user-2", "credit issued in May");
+
+        let top_k = index.search_bm25(
+            "invoice paid",
+            "web",
+            200,
+            Path::new("."),
+            Bm25Config { max_items: 1, ..Bm25Config::default() },
+        ).unwrap();
+        assert_eq!(top_k.len(), 1);
+
+        let all = index.enumerate_exact_lexical_all_terms_at_snapshot(
+            "invoice paid",
+            "web",
+            200,
+            300,
+            None,
+        ).unwrap();
+        assert_eq!(all.receipt.scanned_record_count, 5);
+        assert_eq!(all.receipt.eligible_text_record_count, 5);
+        assert_eq!(all.receipt.matching_record_count, 4);
+        assert_eq!(all.receipt.distinct_session_count, 3);
+        assert_eq!(all.receipt.user_authored_match_count, 2);
+        assert_eq!(all.receipt.assistant_authored_match_count, 1);
+        assert_eq!(all.receipt.unknown_speaker_match_count, 1);
+        assert_eq!(all.matches.len(), 4);
+        assert_eq!(
+            all.matches.iter().map(|item| item.evidence_id.as_str()).collect::<Vec<_>>(),
+            vec!["assistant-1-a", "legacy-a", "user-1-a", "user-2-a"]
+        );
+        index.verify_exact_lexical_enumeration(&all).unwrap();
+
+        let user_only = index.enumerate_exact_lexical_all_terms_at_snapshot(
+            "invoice paid",
+            "web",
+            200,
+            300,
+            Some(EvidenceSpeakerRole::User),
+        ).unwrap();
+        assert_eq!(user_only.receipt.matching_record_count, 2);
+        assert_eq!(user_only.receipt.distinct_session_count, 2);
+        assert_eq!(user_only.receipt.user_authored_match_count, 2);
+        assert_eq!(user_only.receipt.assistant_authored_match_count, 0);
+        assert_eq!(user_only.receipt.unknown_speaker_match_count, 0);
+        assert!(user_only.matches.iter().all(|item| {
+            item.speaker_role == Some(EvidenceSpeakerRole::User)
+        }));
+        index.verify_exact_lexical_enumeration(&user_only).unwrap();
+    }
+
+    #[test]
+    fn exact_enumeration_rejects_omitted_injected_and_mutated_receipts() {
+        let mut index = EvidenceIndex::new();
+        insert_attributed(&mut index, 1, "u1", "session-1", "user-0", "invoice paid");
+        insert_attributed(&mut index, 2, "u2", "session-2", "user-0", "invoice paid");
+        let result = index.enumerate_exact_lexical_all_terms_at_snapshot(
+            "invoice paid", "web", 200, 300, Some(EvidenceSpeakerRole::User),
+        ).unwrap();
+        index.verify_exact_lexical_enumeration(&result).unwrap();
+
+        let mut omitted = result.clone();
+        omitted.matches.pop();
+        assert!(index.verify_exact_lexical_enumeration(&omitted).is_err());
+
+        let mut injected = result.clone();
+        injected.matches[0].trajectory_id = "forged-session".into();
+        assert!(index.verify_exact_lexical_enumeration(&injected).is_err());
+
+        let mut mutated_receipt = result.clone();
+        mutated_receipt.receipt.matching_record_count += 1;
+        assert!(index.verify_exact_lexical_enumeration(&mutated_receipt).is_err());
+
+        insert_attributed(&mut index, 3, "u3", "session-3", "user-0", "invoice paid");
+        assert!(index.verify_exact_lexical_enumeration(&result).is_err());
+    }
+
+    #[test]
+    fn speaker_role_parser_fails_closed_for_untrusted_step_id_shapes() {
+        assert_eq!(
+            evidence_speaker_role_from_step_id(Some("user-0")),
+            Some(EvidenceSpeakerRole::User)
+        );
+        assert_eq!(
+            evidence_speaker_role_from_step_id(Some("assistant-12")),
+            Some(EvidenceSpeakerRole::Assistant)
+        );
+        for unknown in [None, Some("turn-0"), Some("user-x"), Some("USER-0"), Some("assistant-")] {
+            assert_eq!(evidence_speaker_role_from_step_id(unknown), None);
+        }
+    }
+
+    #[test]
+    fn exact_enumeration_rejects_empty_predicates_and_does_not_cross_scope() {
+        let mut index = EvidenceIndex::new();
+        insert_attributed(&mut index, 1, "web-1", "session-1", "user-0", "invoice paid");
+        let mut private = text_record(2, "private-1", "private", "invoice paid");
+        private.source.trajectory_id = "private-session".into();
+        private.source.step_id = Some("user-0".into());
+        index.insert(private, &source_bytes_for_text("invoice paid")).unwrap();
+
+        assert!(index.enumerate_exact_lexical_all_terms_at_snapshot(
+            "!!!", "web", 200, 300, None,
+        ).unwrap_err().contains("requires at least one query term"));
+        let result = index.enumerate_exact_lexical_all_terms_at_snapshot(
+            "invoice paid", "web", 200, 300, None,
+        ).unwrap();
+        assert_eq!(result.receipt.matching_record_count, 1);
+        assert_eq!(result.matches[0].evidence_id, "web-1");
+    }
+
 }
