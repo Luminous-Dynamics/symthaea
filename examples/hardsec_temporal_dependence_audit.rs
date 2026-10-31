@@ -173,7 +173,7 @@ fn parse_fdm(value: &Value) -> Result<FdmContract, String> {
             }
             let amplitude = f64_field(value, "amplitude", "model.dependence_bound")?;
             let rho = f64_field(value, "rho", "model.dependence_bound")?;
-            if amplitude <= 0.0 || !(0.0..1.0).contains(&rho) {
+            if amplitude <= 0.0 || rho <= 0.0 || rho >= 1.0 {
                 return Err("geometric FDM requires amplitude > 0 and rho in (0,1)".to_owned());
             }
             let proof_artifact_sha256 = string_field(value, "proof_artifact_sha256", "model.dependence_bound")?.to_owned();
