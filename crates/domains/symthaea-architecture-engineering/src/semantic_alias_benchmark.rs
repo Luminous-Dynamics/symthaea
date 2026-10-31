@@ -478,13 +478,14 @@ pub fn evaluate_alias_trial(
 
     let challenge_sha256 = challenge.challenge_sha256()?;
     let trial_sha256 = digest_serializable(trial)?;
+    let adjudication_sha256 = adjudication.adjudication_sha256()?;
     let receipt_sha256 = digest_serializable(&SemanticAliasReceiptPayload {
         schema: SCHEMA,
         version: VERSION,
         challenge_id: &challenge.challenge_id,
         challenge_sha256: &challenge_sha256,
         trial_sha256: &trial_sha256,
-        adjudication_sha256: &adjudication.adjudication_sha256()?,
+        adjudication_sha256: &adjudication_sha256,
         proposal_count: challenge.proposals.len(),
         admitted_decision_count,
         duplicate_decision_count,
@@ -508,7 +509,7 @@ pub fn evaluate_alias_trial(
         challenge_id: challenge.challenge_id.clone(),
         challenge_sha256,
         trial_sha256,
-        adjudication_sha256: adjudication.adjudication_sha256()?,
+        adjudication_sha256,
         proposal_count: challenge.proposals.len(),
         admitted_decision_count,
         duplicate_decision_count,
