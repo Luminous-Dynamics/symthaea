@@ -20,7 +20,7 @@ midly = "0.5"
 roxmltree = "0.20"
 serde_json = { workspace = true }
 sha2 = "0.10"
-ed25519-dalek = { workspace = true }
+ed25519-dalek = { workspace = true, optional = true }
 bevy = { version = "0.18", default-features = false, optional = true }
 symthaea-vocal-tract = { path = "../symthaea-vocal-tract", optional = true }
 symthaea-broca = { path = "../symthaea-broca", optional = true }
@@ -79,7 +79,7 @@ voice-broca = ["voice-kokoro", "broca"]
 # it, so `theory` alone (without `studio`) failed to compile -- found
 # 2026-07-23 building an unrelated Kokoro singing eval that transitively
 # needs `theory` via `singing`.
-theory = ["dep:symthaea-music-theory", "dep:symthaea-muse-protocol"]
+theory = ["dep:symthaea-music-theory", "dep:symthaea-muse-protocol", "dep:ed25519-dalek"]
 # Real Fréchet Audio Distance via a pretrained CLAP audio-tower ONNX model.
 clap-fad = ["dep:ort", "dep:hf-hub", "dep:anyhow", "dep:tokenizers"]
 # Muse Studio: the local sketch-partner web app (src/bin/muse_studio.rs).
