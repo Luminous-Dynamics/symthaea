@@ -265,7 +265,8 @@
           }
         },
         "occupancy_bytes": {
-          "$ref": "#/$defs/byte_interval"
+          "$ref": "#/$defs/byte_interval",
+          "description": "Existing reserved/background occupancy and allocations in this region, excluding all state_placements in this topology record. This is added to placement live-byte bounds when proving guaranteed capacity."
         },
         "read_latency_seconds": {
           "$ref": "#/$defs/positive_interval"
@@ -356,7 +357,8 @@
         },
         "communication_boundary_id": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Identity of the QARCH-021 physical accounting boundary. May be shared by exactly one read and one reverse-direction write edge for a full-duplex pair; any other reuse is duplicate accounting."
         },
         "conversion_latency_seconds": {
           "$ref": "#/$defs/positive_interval"
