@@ -527,14 +527,53 @@ pub fn verify_causal_power_report(report: &CausalPowerPlanningReportV1) -> Resul
     if report.schema != CAUSAL_POWER_REPORT_SCHEMA {
         return Err(format!("power report schema must be {CAUSAL_POWER_REPORT_SCHEMA}"));
     }
-    if !report
-        .report_sha256
-        .bytes()
-        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        || report.report_sha256.len() != 64
-    {
-        return Err("report_sha256 must be a lowercase SHA-256 digest".to_owned());
+    for (value, label) in [
+        (&report.config_sha256, "config_sha256"),
+        (&report.simulation_seed_commitment_sha256, "simulation_seed_commitment_sha256"),
+        (&report.report_sha256, "report_sha256"),
+    ] {
+        if value.len() != 64
+            || !value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            return Err(format!("{label} must be a lowercase SHA-256 digest"));
+        }
     }
+    if !(CAUSAL_POWER_MIN_SIMULATIONS..=CAUSAL_POWER_MAX_SIMULATIONS)
+        .contains(&report.simulation_replicates)
+        || !(10..=200).contains(&report.nominal_alpha_permille)
+        || !(500..=990).contains(&report.target_power_permille)
+        || report.target_interval_coverage_permille != CAUSAL_POWER_COVERAGE_TARGET_PERMILLE
+        || !(5..=100).contains(&report.calibration_tolerance_permille)
+        || report.clusters_per_model_pair < report.task_family_count.saturating_mul(4)
+        || report.task_family_count == 0
+        || report.clusters_per_model_pair % report.task_family_count != 0
+    {
+        return Err("power report design parameters are invalid".to_owned());
+    }
+    if !report.actual_balanced_exposure_fraction_permille.is_finite()
+        || !(0.0..=1_000.0).contains(&report.actual_balanced_exposure_fraction_permille)
+        || !report.expected_primary_global_effect_permille.is_finite()
+        || !report.expected_direct_exposure_effect_permille.is_finite()
+        || !report.expected_global_spillover_effect_permille.is_finite()
+        || !report.between_model_pair_sd_permille.is_finite()
+        || !report.within_cluster_sd_permille.is_finite()
+        || !(-1_000.0..=1_000.0).contains(&report.expected_direct_exposure_effect_permille)
+        || !(-1_000.0..=1_000.0).contains(&report.expected_global_spillover_effect_permille)
+        || !(0.0..=1_000.0).contains(&report.between_model_pair_sd_permille)
+        || !(0.0..=1_000.0).contains(&report.within_cluster_sd_permille)
+        || report.within_family_icc_permille > 900
+        || report.pair_failure_probability_permille > 900
+        || report.maximum_inconclusive_fraction_permille > 500
+    {
+        return Err("power report contains invalid design values".to_owned());
+    }
+    let expected_effect = report.expected_global_spillover_effect_permille
+        + report.actual_balanced_exposure_fraction_permille / 1_000.0
+            * report.expected_direct_exposure_effect_permille;
+    if (expected_effect - report.expected_primary_global_effect_permille).abs() > 1.0e-9 {
+        return Err("power report primary effect does not equal spillover plus exposure-weighted direct effect".to_owned());
+    }
+
     let mut normalized = report.clone();
     normalized.report_sha256.clear();
     let bytes = serde_json::to_vec(&normalized)
@@ -548,13 +587,77 @@ pub fn verify_causal_power_report(report: &CausalPowerPlanningReportV1) -> Resul
     {
         return Err("power report candidate counts must be nonempty and strictly increasing".to_owned());
     }
-    let expected_smallest = report.candidate_estimates.iter()
-        .find(|candidate| candidate.meets_preregistered_targets)
-        .map(|candidate| candidate.model_pair_count);
-    if expected_smallest != report.smallest_qualifying_model_pair_count {
-        return Err("smallest qualifying model-pair count does not match candidate results".to_owned());
-    }
+
+    let mut expected_smallest = None;
     for candidate in &report.candidate_estimates {
+        if !(2..=1_000).contains(&candidate.model_pair_count)
+            || candidate.null_evaluable_simulations
+                .checked_add(candidate.null_inconclusive_simulations)
+                != Some(report.simulation_replicates)
+            || candidate.alternative_evaluable_simulations
+                .checked_add(candidate.alternative_inconclusive_simulations)
+                != Some(report.simulation_replicates)
+        {
+            return Err("power candidate simulation counts do not partition the configured trials".to_owned());
+        }
+        let null_inconclusive = f64::from(candidate.null_inconclusive_simulations)
+            * 1_000.0 / f64::from(report.simulation_replicates);
+        let alternative_inconclusive = f64::from(candidate.alternative_inconclusive_simulations)
+            * 1_000.0 / f64::from(report.simulation_replicates);
+        let rate_close = |actual: f64, expected: f64| {
+            actual.is_finite() && (actual - expected).abs() <= 1.0e-8
+        };
+        if !rate_close(candidate.null_inconclusive_fraction_permille, null_inconclusive)
+            || !rate_close(candidate.alternative_inconclusive_fraction_permille, alternative_inconclusive)
+            || !candidate.mean_surviving_model_pairs.is_finite()
+            || !(0.0..=f64::from(candidate.model_pair_count)).contains(&candidate.mean_surviving_model_pairs)
+        {
+            return Err("power candidate inconclusive rates or surviving-pair mean are inconsistent".to_owned());
+        }
+        let (expected_type_i, expected_type_i_se) =
+            proportion_and_se(0, 0);
+        let _ = (expected_type_i, expected_type_i_se);
+        let verify_rate = |observed: Option<f64>, observed_se: Option<f64>, successes: u32, trials: u32| {
+            let (expected, expected_se) = proportion_and_se(successes, trials);
+            match (observed, expected, observed_se, expected_se) {
+                (None, None, None, None) => true,
+                (Some(a), Some(e), Some(se_a), Some(se_e)) => {
+                    a.is_finite() && se_a.is_finite()
+                        && (a - e).abs() <= 1.0e-8
+                        && (se_a - se_e).abs() <= 1.0e-8
+                }
+                _ => false,
+            }
+        };
+        if !verify_rate(
+            candidate.type_i_error_permille,
+            candidate.type_i_error_monte_carlo_se_permille,
+            // A candidate report stores rejections, not a second raw null count.
+            // The inferred count must be an integer consistent with the rate.
+            candidate.type_i_error_permille
+                .map(|rate| (rate * f64::from(candidate.null_evaluable_simulations) / 1_000.0).round() as u32)
+                .unwrap_or(0),
+            candidate.null_evaluable_simulations,
+        ) {
+            return Err("power candidate type-I error estimate or Monte Carlo SE is invalid".to_owned());
+        }
+        if !verify_rate(
+            candidate.estimated_power_permille,
+            candidate.power_monte_carlo_se_permille,
+            candidate.estimated_power_permille
+                .map(|rate| (rate * f64::from(candidate.alternative_evaluable_simulations) / 1_000.0).round() as u32)
+                .unwrap_or(0),
+            candidate.alternative_evaluable_simulations,
+        ) || !verify_rate(
+            candidate.interval_coverage_permille,
+            candidate.interval_coverage_monte_carlo_se_permille,
+            candidate.interval_coverage_permille
+                .map(|rate| (rate * f64::from(candidate.alternative_evaluable_simulations) / 1_000.0).round() as u32)
+                .unwrap_or(0),
+            candidate.alternative_evaluable_simulations,
+        ) {
+            return Err("power/coverage estimate or Monte Carlo SE is invalid".to_owned());
+        }
         for rate in [
             candidate.type_i_error_permille,
             candidate.type_i_error_monte_carlo_se_permille,
@@ -569,6 +672,28 @@ pub fn verify_causal_power_report(report: &CausalPowerPlanningReportV1) -> Resul
                 return Err("power report contains a non-finite or out-of-range rate".to_owned());
             }
         }
+        let qualifies = candidate.type_i_error_permille
+            .is_some_and(|value| value <= f64::from(report.nominal_alpha_permille + report.calibration_tolerance_permille))
+            && candidate.estimated_power_permille
+                .is_some_and(|value| value >= f64::from(report.target_power_permille))
+            && candidate.interval_coverage_permille
+                .is_some_and(|value| {
+                    (value - f64::from(report.target_interval_coverage_permille)).abs()
+                        <= f64::from(report.calibration_tolerance_permille)
+                })
+            && candidate.null_inconclusive_fraction_permille
+                <= f64::from(report.maximum_inconclusive_fraction_permille)
+            && candidate.alternative_inconclusive_fraction_permille
+                <= f64::from(report.maximum_inconclusive_fraction_permille);
+        if candidate.meets_preregistered_targets != qualifies {
+            return Err("power candidate qualification flag does not match its estimates".to_owned());
+        }
+        if qualifies && expected_smallest.is_none() {
+            expected_smallest = Some(candidate.model_pair_count);
+        }
+    }
+    if expected_smallest != report.smallest_qualifying_model_pair_count {
+        return Err("smallest qualifying model-pair count does not match candidate results".to_owned());
     }
     Ok(())
 }
