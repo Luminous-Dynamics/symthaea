@@ -666,7 +666,36 @@ pub fn validate_score_validity_disclosure(
         count_status(disclosure.run_status, &mut controlled_count, &mut not_controlled_count, &mut not_applicable_count)?;
     }
 
+    let identity_bound = [
+        disclosure.identity.model_provider.status,
+        disclosure.identity.model_name.status,
+        disclosure.identity.model_version.status,
+        disclosure.identity.model_access_mode.status,
+        disclosure.identity.harness_revision.status,
+        disclosure.identity.prompt_digest.status,
+        disclosure.identity.tool_manifest_digest.status,
+        disclosure.identity.environment_digest.status,
+    ].iter().all(|status| *status == DisclosureStatusV1::Controlled);
+    let benchmark_bound = [
+        disclosure.benchmark.cohort_created_at_utc.status,
+        disclosure.benchmark.task_set_digest.status,
+        disclosure.benchmark.benchmark_manifest_digest.status,
+        disclosure.benchmark.score_artifact_digest.status,
+    ].iter().all(|status| *status == DisclosureStatusV1::Controlled);
+    let report_artifacts_bound = artifacts.transcript_digest.status == DisclosureStatusV1::Controlled
+        && artifacts.tool_trace_digest.status == DisclosureStatusV1::Controlled
+        && artifacts.output_sanitization == DisclosureStatusV1::Controlled
+        && artifacts.hidden_oracle_separation == DisclosureStatusV1::Controlled
+        && artifacts.external_receipt_anchor.status == DisclosureStatusV1::Controlled;
+    let metric_definitions_bound = disclosure.metrics
+        .iter()
+        .all(|metric| metric.metric_definition_digest.status == DisclosureStatusV1::Controlled);
+
     let confirmatory_eligible = disclosure.run_status == DisclosureStatusV1::Controlled
+        && identity_bound
+        && benchmark_bound
+        && metric_definitions_bound
+        && report_artifacts_bound
         && dataset_threat_controls_complete
         && acquired.status == DisclosureStatusV1::Controlled
         && acquired_exposure_independently_monitored
@@ -919,6 +948,35 @@ mod tests {
         let mut disclosure = valid_disclosure();
         disclosure.dataset_threat_controls.pop();
         assert!(validate(&disclosure).unwrap_err().contains("exactly one direct, derivative, temporal and distributional"));
+    }
+
+    #[test]
+    fn not_applicable_model_identity_is_not_confirmatory_eligible() {
+        let mut disclosure = valid_disclosure();
+        disclosure.identity.model_version = StringDisclosureV1 {
+            status: DisclosureStatusV1::NotApplicable,
+            value: None,
+        };
+        let report = validate(&disclosure).unwrap();
+        assert!(report.publication_ready);
+        assert!(!report.confirmatory_eligible);
+    }
+
+    #[test]
+    fn disclosure_schema_document_matches_version_and_required_fields() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../schema/score-validity-disclosure.schema.json"
+        )).unwrap();
+        assert_eq!(
+            schema["properties"]["schema"]["const"].as_str(),
+            Some(DISCLOSURE_SCHEMA)
+        );
+        let required: BTreeSet<String> = schema["required"]
+            .as_array().unwrap().iter()
+            .map(|value| value.as_str().unwrap().to_owned()).collect();
+        let properties: BTreeSet<String> = schema["properties"]
+            .as_object().unwrap().keys().cloned().collect();
+        assert_eq!(required, properties);
     }
 
     #[test]
