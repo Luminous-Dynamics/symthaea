@@ -1,14 +1,14 @@
 use std::env;
 use std::process::ExitCode;
 
-use connectome_perturbation_oracle::reference_suite;
+use connectome_perturbation_oracle::{interaction_suite, reference_suite};
 
 fn main() -> ExitCode {
     let args = env::args().skip(1).collect::<Vec<_>>();
     let mode = args.first().map(String::as_str).unwrap_or("--json");
 
-    if args.len() > 1 || !matches!(mode, "--json" | "--text" | "--help") {
-        eprintln!("usage: connectome-perturbation-oracle [--json|--text|--help]");
+    if args.len() > 1 || !matches!(mode, "--json" | "--text" | "--interaction-json" | "--help") {
+        eprintln!("usage: connectome-perturbation-oracle [--json|--text|--interaction-json|--help]");
         return ExitCode::from(2);
     }
 
@@ -16,10 +16,33 @@ fn main() -> ExitCode {
         println!(
             "connectome-perturbation-oracle\n\
              Deterministic synthetic known-answer suite; not a biological simulator.\n\n\
-             USAGE:\n    connectome-perturbation-oracle [--json|--text|--help]\n\n\
+             USAGE:\n    connectome-perturbation-oracle [--json|--text|--interaction-json|--help]\n\n\
              DEFAULT:\n    --json"
         );
         return ExitCode::SUCCESS;
+    }
+
+
+    if mode == "--interaction-json" {
+        let cases = match interaction_suite() {
+            Ok(cases) => cases,
+            Err(error) => {
+                eprintln!("interaction oracle failed closed: {error}");
+                return ExitCode::FAILURE;
+            }
+        };
+        match connectome_perturbation_oracle::interaction_suite_json() {
+            Ok(json) => print!("{json}"),
+            Err(error) => {
+                eprintln!("interaction report failed closed: {error}");
+                return ExitCode::FAILURE;
+            }
+        }
+        return if cases.iter().all(|case| case.passed) {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::FAILURE
+        };
     }
 
     let cases = match reference_suite() {
