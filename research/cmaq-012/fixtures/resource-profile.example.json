@@ -1,0 +1,65 @@
+{
+  "schema_version": "cmaq-012-resource-profile-v0.1",
+  "resource_measurement_method": "operator_trace",
+  "hardware": {
+    "os_arch": "synthetic-fixture-only",
+    "cpu_model": "not-a-real-hardware-claim",
+    "logical_cpu_count": 1,
+    "accelerator_model": null,
+    "accelerator_driver": null,
+    "memory_bytes": 1,
+    "device_clock_policy": "fixture-only-no-real-clock-measurement"
+  },
+  "software": {
+    "source_commit": "fixture-only",
+    "binary_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "compiler": "not-measured",
+    "runtime": "synthetic-fixture",
+    "dependency_lock_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "instrumentation": {
+    "profiler_name": "synthetic-fixture-counter",
+    "profiler_version": "0.1",
+    "profiler_binary_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "measurement_scope": "synthetic-unit-test-values-only",
+    "synchronization_policy": "none-fixture-only",
+    "warmup_iterations": 0,
+    "measured_repetitions": 1,
+    "instrumentation_overhead_policy": "not-measured"
+  },
+  "compute_work_unit_definition": {
+    "unit_name": "normalized_compute_work_unit",
+    "counting_semantics": "synthetic integer values used only to exercise parser and resource matching",
+    "accepted_methods": [
+      "operator_trace"
+    ],
+    "not_counted": [
+      "wall-clock energy inference",
+      "training compute"
+    ]
+  },
+  "latency_measurement": {
+    "clock_source": "synthetic-fixture",
+    "start_event": "fixture-start",
+    "end_event": "fixture-end",
+    "includes_synchronization": false,
+    "unit": "milliseconds"
+  },
+  "memory_measurement": {
+    "scope": "synthetic-fixture-only",
+    "unit": "bytes",
+    "peak_policy": "fixed example value; no real memory measurement"
+  },
+  "energy_measurement": {
+    "source": "unavailable",
+    "sampling_policy": "not measured",
+    "unit": "millijoules",
+    "calibration": "not measured"
+  },
+  "tolerances": {
+    "compute_work_relative": 0.05,
+    "latency_relative": 0.05,
+    "peak_memory_relative": 0.1
+  },
+  "claim_ceiling": "synthetic_fixture_only_no_hardware_or_profiler_measurement_claim"
+}
