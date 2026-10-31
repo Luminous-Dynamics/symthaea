@@ -117,3 +117,5 @@ Use multiple problem instances and seeds. Compare fixed-target attainment curves
 No performance or SOTA claim is made.
 
 The implementation caps population size at 2,048 because exact pairwise weight-neighborhood construction is quadratic in population size. This is an implementation guard, not a theoretical MOEA/D limit.
+
+The comparison harness uses a reference point below the normalized feasible utility range (for example -0.1 per objective). This preserves contributions from Pareto solutions that lie on the normalized boundary; the point is frozen identically for every algorithm and is included in the comparison receipt.
