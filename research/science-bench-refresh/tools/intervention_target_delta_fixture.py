@@ -119,8 +119,8 @@ def generate(output_dir: Path) -> dict[str, Any]:
             # ambiguous for this candidate; neither ambiguity is promoted.
             panels = [
                 reviewer_panel(candidate_id, "unchanged", [], "none_observed")[0],
-                reviewer_panel(candidate_id, "other_declared_change", [digest(b"unexpected claim")], "ambiguous")[1],
-                reviewer_panel(candidate_id, "support_increased", [digest(b"other claim")], "none_observed")[2],
+                reviewer_panel(candidate_id, "unchanged", [digest(b"unexpected claim one")], "none_observed")[1],
+                reviewer_panel(candidate_id, "unchanged", [digest(b"unexpected claim two")], "none_observed")[2],
             ]
         else:
             observed_change = relation
