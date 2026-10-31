@@ -312,10 +312,18 @@ impl fmt::Display for DmsVerificationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::StreamIdMismatch => write!(f, "DMS public task and oracle stream IDs differ"),
-            Self::ContentDigestMismatch => write!(f, "DMS public task SHA-256 digest does not match its contents"),
-            Self::OracleDigestMismatch => write!(f, "DMS oracle SHA-256 digest does not match its contents"),
-            Self::ReproducibilityMismatch => write!(f, "DMS public stream does not match the seeded generator"),
-            Self::InvalidDecisionWindow => write!(f, "DMS decision window or observation length is invalid"),
+            Self::ContentDigestMismatch => {
+                write!(f, "DMS public task SHA-256 digest does not match its contents")
+            }
+            Self::OracleDigestMismatch => {
+                write!(f, "DMS oracle SHA-256 digest does not match its contents")
+            }
+            Self::ReproducibilityMismatch => {
+                write!(f, "DMS public stream does not match the seeded generator")
+            }
+            Self::InvalidDecisionWindow => {
+                write!(f, "DMS decision window or observation length is invalid")
+            }
             Self::InvalidOracle => write!(f, "DMS oracle direction or match relation is invalid"),
             Self::InvalidObservation { expected_step } => {
                 write!(f, "DMS observation is missing or reordered at step {expected_step}")
@@ -624,7 +632,11 @@ mod tests {
     fn verifier_rejects_post_generation_stream_mutation() {
         let config = DmsConfig::braintrace_reference(93);
         let (mut task, oracle) = generate_dms_task(config).unwrap();
-        if let Some(observation) = task.observations.iter_mut().find(|row| !row.active_channels.is_empty()) {
+        if let Some(observation) = task
+            .observations
+            .iter_mut()
+            .find(|row| !row.active_channels.is_empty())
+        {
             observation.active_channels.pop();
         }
         assert_eq!(
