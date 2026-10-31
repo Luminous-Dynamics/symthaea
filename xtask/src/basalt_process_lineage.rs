@@ -1003,9 +1003,11 @@ mod tests {
 
     #[test]
     fn clone_flags_are_part_of_event_identity() {
-        let (oracle, mut receipt) = fixtures();
+        let (mut oracle, mut receipt) = fixtures();
+        oracle["events"][2]["kind"] = json!("clone");
+        oracle["events"][2]["clone_flags"] = json!(0x0000_0100u64);
         receipt["events"][2]["kind"] = json!("clone");
-        receipt["events"][2]["clone_flags"] = json!(0x0000_0100u64);
+        receipt["events"][2]["clone_flags"] = json!(0x0000_0200u64);
         let report = audit(&oracle, &receipt);
         assert!(!report.event_set_reconciled);
         assert!(report.counts.missing_events > 0);
@@ -1022,6 +1024,28 @@ mod tests {
         let report = audit(&oracle, &receipt);
         assert!(!report.lineage_audit_passed);
         assert!(report.errors.iter().any(|e| e.code == "E_THREAD_CLONE_UNSUPPORTED"));
+    }
+
+
+    #[test]
+    fn duplicate_exec_ordinal_is_rejected_even_with_two_exec_occurrences() {
+        let (mut oracle, mut receipt) = fixtures();
+        oracle["events"].as_array_mut().unwrap().push(json!({
+            "kind":"exec","process":{"pid":100,"start_time_ticks":1000},
+            "observed_at_monotonic_ns":125,"exec_ordinal":1,
+            "exec_image_digest":digest(21),"clone_flags":0
+        }));
+        receipt["events"].as_array_mut().unwrap().push(json!({
+            "source_id":"exec-extra","sequence":1,"kind":"exec",
+            "process":{"pid":100,"start_time_ticks":1000},
+            "observed_at_monotonic_ns":126,"evidence_digest":digest(22),
+            "exec_ordinal":1,"exec_image_digest":digest(21),"clone_flags":0
+        }));
+        receipt["health"]["event_count"]=json!(7);
+        let report=audit(&oracle,&receipt);
+        assert!(!report.lineage_audit_passed);
+        assert!(report.errors.iter().any(|e|e.code=="E_ORACLE_EXEC_ORDINAL_DUPLICATE"));
+        assert!(report.errors.iter().any(|e|e.code=="E_RECEIPT_EXEC_ORDINAL_DUPLICATE"));
     }
 
     #[test]
