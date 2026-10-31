@@ -919,22 +919,57 @@ fn objective_dominates(left: &GenomeObjectives, right: &GenomeObjectives) -> boo
     strictly_better
 }
 
-fn evaluation_digest(
-    evaluation: &GenomeEvaluation,
-    config: &GenomeEvaluationConfig,
-) -> Result<String, Vec<GenomeIssue>> {
-    #[derive(Serialize)]
-    struct Commitment<'a> {
-        evaluation: &'a GenomeEvaluation,
-        config: &'a GenomeEvaluationConfig,
-    }
+fn evaluation_digest(evaluation: &GenomeEvaluation) -> Result<String, Vec<GenomeIssue>> {
     let mut copy = evaluation.clone();
     copy.evaluation_sha256.clear();
-    let bytes = serde_json::to_vec(&Commitment {
-        evaluation: &copy,
-        config,
-    }).map_err(|error| vec![GenomeIssue::new("evaluation_serialization_failed", error.to_string())])?;
+    let bytes = serde_json::to_vec(&copy)
+        .map_err(|error| vec![GenomeIssue::new("evaluation_serialization_failed", error.to_string())])?;
     Ok(domain_sha256(b"symthaea:muse-style-genome-evaluation:v1\n", &bytes))
+}
+
+fn reference_population_digest(
+    reference_population: &[[f64; fingerprint::STRUCT_DIMS]],
+) -> Result<Option<String>, Vec<GenomeIssue>> {
+    if reference_population.is_empty() {
+        return Ok(None);
+    }
+    let mut members = Vec::with_capacity(reference_population.len());
+    for vector in reference_population {
+        if vector.iter().any(|value| !value.is_finite()) {
+            return Err(vec![GenomeIssue::new(
+                "invalid_reference_population",
+                "reference fingerprints must contain only finite values",
+            )]);
+        }
+        let bytes = serde_json::to_vec(vector).map_err(|error| {
+            vec![GenomeIssue::new("reference_population_serialization_failed", error.to_string())]
+        })?;
+        members.push(domain_sha256(
+            b"symthaea:muse-style-genome-reference-member:v1\n",
+            &bytes,
+        ));
+    }
+    members.sort();
+    let bytes = serde_json::to_vec(&members).map_err(|error| {
+        vec![GenomeIssue::new("reference_population_serialization_failed", error.to_string())]
+    })?;
+    Ok(Some(domain_sha256(
+        b"symthaea:muse-style-genome-reference-population:v1\n",
+        &bytes,
+    )))
+}
+
+impl GenomeEvaluation {
+    pub fn verify_digest(&self) -> bool {
+        self.schema == STYLE_GENOME_EVALUATION_SCHEMA
+            && self.genome.verify_id()
+            && self.evaluation_config_sha256.len() == 64
+            && self.evaluation_config_sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+            && self.reference_population_sha256.as_ref().is_none_or(|digest| {
+                digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+            })
+            && evaluation_digest(self).is_ok_and(|expected| expected == self.evaluation_sha256)
+    }
 }
 
 fn domain_sha256(domain: &[u8], bytes: &[u8]) -> String {
