@@ -96,4 +96,7 @@ jobs:
           assert plan["claim_rules"]["episode_independence_is_assumption_not_proven"] is True
           assert plan["claim_rules"]["randomizer_independence_is_assumption_not_proven"] is True
           assert plan["claim_rules"]["delay_units_are_episodes"] is True
+          assert plan["claim_rules"]["delay_theorem_local_kl_support_unverified"] is True
+          assert plan["claim_rules"]["delay_theorem_score_transform_separation_unverified"] is True
+          assert plan["claim_rules"]["pfa_claim_requires_exchangeable_episode_scores_and_independent_randomizers"] is True
           PY
