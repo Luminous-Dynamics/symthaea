@@ -1,0 +1,505 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/basalt/process-lineage-benchmark.v1.schema.json",
+  "title": "BASALT process lineage benchmark protocol v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "suite_id",
+    "version",
+    "status",
+    "purpose",
+    "unit_of_analysis",
+    "non_goals",
+    "identity_contract",
+    "comparison_arms",
+    "metrics",
+    "gates",
+    "statistical_protocol",
+    "required_disclosures",
+    "forbidden_claims",
+    "targets_are_proposed_not_measured"
+  ],
+  "properties": {
+    "suite_id": {
+      "const": "basalt-process-lineage-benchmark-v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "status": {
+      "const": "protocol"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "unit_of_analysis": {
+      "const": "independent_task_attempt_lineage"
+    },
+    "non_goals": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "identity_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "process_instance_key",
+        "pid_reuse_policy",
+        "namespace_policy",
+        "time_policy",
+        "pidfd_policy"
+      ],
+      "properties": {
+        "scope": {
+          "type": "array",
+          "minItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "process_instance_key": {
+          "const": [
+            "pid",
+            "start_time_ticks"
+          ]
+        },
+        "pid_reuse_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "time_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pidfd_policy": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "comparison_arms": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "arm_id",
+          "role",
+          "description",
+          "promotable"
+        ],
+        "properties": {
+          "arm_id": {
+            "enum": [
+              "pid_only",
+              "procfs_starttime",
+              "pidfd_supervised_oracle",
+              "falco_kernel_event_stream",
+              "tetragon_process_lifecycle",
+              "unreconciled_observer_receipt",
+              "basalt_lineage_oracle_audit"
+            ]
+          },
+          "role": {
+            "enum": [
+              "negative_control",
+              "identity_baseline",
+              "ground_truth_reference",
+              "industry_baseline",
+              "candidate_baseline",
+              "candidate"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "promotable": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 11,
+      "maxItems": 11,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "phase",
+          "definition",
+          "target",
+          "unit"
+        ],
+        "properties": {
+          "metric_id": {
+            "enum": [
+              "process_instance_recall",
+              "parent_edge_precision",
+              "pid_reuse_separation",
+              "lifecycle_event_recall",
+              "sequence_gap_detection",
+              "event_loss_false_acceptances",
+              "closed_tree_false_acceptances",
+              "namespace_cross_join_false_acceptances",
+              "ambiguous_process_identity_acceptances",
+              "p95_audit_latency_ms",
+              "p95_report_bytes"
+            ]
+          },
+          "phase": {
+            "enum": [
+              "safety",
+              "efficiency"
+            ]
+          },
+          "definition": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operator",
+              "value"
+            ],
+            "properties": {
+              "operator": {
+                "enum": [
+                  "=",
+                  "<=",
+                  ">="
+                ]
+              },
+              "value": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          },
+          "unit": {
+            "enum": [
+              "proportion",
+              "scenario_count",
+              "milliseconds",
+              "bytes"
+            ]
+          }
+        }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "safety",
+        "efficiency",
+        "promotion_rule"
+      ],
+      "properties": {
+        "safety": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "process_instance_recall",
+              "parent_edge_precision",
+              "pid_reuse_separation",
+              "lifecycle_event_recall",
+              "sequence_gap_detection",
+              "event_loss_false_acceptances",
+              "closed_tree_false_acceptances",
+              "namespace_cross_join_false_acceptances",
+              "ambiguous_process_identity_acceptances"
+            ]
+          }
+        },
+        "efficiency": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "p95_audit_latency_ms",
+              "p95_report_bytes"
+            ]
+          }
+        },
+        "promotion_rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "statistical_protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "confidence_level",
+        "independence_unit",
+        "clustering",
+        "stratification",
+        "controls",
+        "splits",
+        "stopping"
+      ],
+      "properties": {
+        "confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "independence_unit": {
+          "const": "independent_task_attempt_lineage"
+        },
+        "clustering": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stratification": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "controls": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "splits": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stopping": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "required_disclosures": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "forbidden_claims": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "targets_are_proposed_not_measured": {
+      "const": true
+    }
+  },
+  "allOf": [
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "process_instance_recall"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "parent_edge_precision"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "pid_reuse_separation"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "lifecycle_event_recall"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "sequence_gap_detection"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "event_loss_false_acceptances"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "closed_tree_false_acceptances"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "namespace_cross_join_false_acceptances"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "ambiguous_process_identity_acceptances"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "p95_audit_latency_ms"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "properties": {
+              "metric_id": {
+                "const": "p95_report_bytes"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
