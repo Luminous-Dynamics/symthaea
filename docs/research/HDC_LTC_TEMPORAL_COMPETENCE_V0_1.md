@@ -63,6 +63,8 @@ Use hidden abrupt, gradual, recurring, and false change points. The model receiv
 
 Vary timestamp jitter, inter-observation gaps, bursts, and missingness. Elapsed simulated time—not invocation count—defines physical decay. Reject out-of-order, duplicate, non-finite, and non-monotonic timestamps according to the input contract. Report performance by gap and missingness stratum.
 
+A fixed-point synthetic generator now exists in `research/temporal-bench/src/irregular.rs`: three latent triangle-wave processes with independent periods/phases are observed on a jittered microsecond schedule; a declared fraction of scheduled observations are dropped; bounded integer noise is added to retained samples. The oracle stores exact latent values and the dropped-slot manifest. Its verifier checks both canonical digests, strict timestamp monotonicity, schedule bounds across missing slots, and observed-vs-latent noise limits. This is a synthetic T5 control, not yet a production dataset adapter or model benchmark.
+
 ### T6 — Memory interference and selective retention
 
 Insert distractor traces that compete with a relevant cue. Compare no memory, fixed decay, learned decay, fast/slow state, and event/novelty-triggered refresh. Include explicit invalidation/retraction: a stale trace must not persist as a correct answer after its validity ends.
@@ -190,7 +192,10 @@ These are targets, not measured results:
 
 The repository contains an isolated, dependency-free Rust prototype under research/temporal-bench:
 - a delayed-cue generator with controlled key similarity and distractor interference;
-- a multi-timescale forecasting generator with hidden periods/phases, a hidden middle-third regime boundary, and delayed online feedback;
-- an evaluator-side trace verifier with negative-control tests for altered labels, early feedback, missing feedback, and oracle identity mismatch.
+- a multi-timescale forecasting generator with hidden periods/phases, a hidden middle-third regime boundary, delayed online feedback, and labels recomputed by the verifier from the hidden process;
+- a DMS generator/verifier matching the pinned eight-direction task timing and population-tuned spike input;
+- an evidence-accumulation generator/verifier matching the pinned seven-cue/1,000 ms delay/150 ms recall task structure;
+- an irregular-time/missingness generator with jittered microsecond timestamps, explicit dropped-slot manifests, bounded noise, and latent oracle points;
+- canonical SHA-256 digests for public streams and oracle records, with mutation negative controls.
 
 The generated public event stream and oracle remain returned in one process. The verifier has been implemented, but the confirmatory oracle is **not yet sealed by process or permission isolation**. Rust unit tests are authored but unrun in this environment. The full nine-family generator (including the DMS and evidence-accumulation adapters), streaming runner, real-dataset adapters, separate evaluator service, benchmark execution, model comparison, hardware measurement, and energy result are not yet included. A passing benchmark would establish a result only for the declared tasks, splits, model versions, and hardware. It would not establish consciousness, general intelligence, universal superiority, or neuromorphic hardware efficiency if measured only on conventional CPU/GPU execution.
