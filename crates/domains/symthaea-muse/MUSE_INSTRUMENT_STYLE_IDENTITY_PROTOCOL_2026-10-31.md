@@ -52,7 +52,9 @@ The hypotheses are to be tested, not assumed true.
 
 ### 4.1 Instrument capability profile
 
-Introduce a versioned, serializable `InstrumentCapabilityProfile` whose fields separate *what an instrument is*, *what the model can do*, and *what a renderer supports*.
+Reuse and extend the existing source-backed instrument capability inventory in PR #7464 rather than creating a competing profile schema. Its canonical profile should continue to separate *what an instrument is*, *what the model can do*, *what sample assets are declared*, and *what a renderer actually supports*. This protocol defines the missing measurement/qualification fields and expects them to be added through #7464 / #7554.
+
+The canonical qualification workflow is the four-tier contract in #7554: deterministic parser/receipt tests (Tier A), decoded asset coverage (Tier B), actual render matrices (Tier C), and separate acoustic/perceptual evidence (Tier D). A sample path in the inventory must never be treated as proof of a rendered articulation.
 
 Minimum fields:
 
@@ -305,7 +307,11 @@ Keep source audio private and restricted where licenses or contributor permissio
 - EVAL-034 #9375 / PR #9380 — realized Score contract verification.
 - EVAL-035 #9337 / PR #9352 and #9381 / PR #9383 — topology-specific tail and replayable temporal support.
 - EVAL-036 #9355 — operation-specific symbolic counterfactual validation.
-- MEL-MR-SAMPLES-001 #9406 — sample-bank coverage, per-note replay receipts and sample-backed world percussion.
+- MUSE-STYLE-QUAL-001 #7554 — four-tier qualification of style/sample selection, decoded assets, render cells, and acoustic/perceptual evidence.
+- #7464 / #7551 / #7555 — existing instrument capability inventory, per-note sample plans and SFZ zone inspection; extend these rather than duplicating their schemas.
+- #7422 / PR #7418 — measured, fixed-grid causal response curves for style controls; #9438 adds the constrained register-feasibility follow-up for the Fugue path.
+- #426 — the listening-first preference/quality loop and human observation capture.
+- MEL-MR-PERC-SAMPLES-001 #9406 — dedicated semantic hit-bank qualification for unpitched world percussion.
 - MEL-MR-INSTR-002 #9409 — sample-backed harmonica and a Blues lead option.
 
 MEL-MR-STYLE-001 consumes their verified evidence where relevant and does not weaken their gates.
