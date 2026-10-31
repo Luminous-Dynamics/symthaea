@@ -62,4 +62,13 @@ jobs:
           assert receipt["generalization"]["attack_family_group_count"] == 1
           assert receipt["generalization"]["adaptation_family_level_group_count"] == 3
           assert receipt["generalization"]["adaptation_family_count"] == 2
+          support = receipt["statistical_support"]
+          assert support["method"] == "deterministic_equal_group_percentile_bootstrap_v1"
+          assert support["replicates"] == 10_000
+          assert support["minimum_independent_groups"] == 10
+          assert support["attack_family_macro_recall"]["status"] == "unavailable_insufficient_independent_groups"
+          assert support["adaptation_family_level_macro_recall"]["independent_group_count"] == 3
+          assert support["program_macro_recall"]["independent_group_count"] == 3
+          assert support["benign_program_macro_false_alert_rate"]["independent_group_count"] == 4
+          assert support["benign_program_macro_false_alert_rate"]["lower_95"] is None
           PY
