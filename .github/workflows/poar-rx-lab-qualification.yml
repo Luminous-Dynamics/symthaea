@@ -1,0 +1,48 @@
+name: POAR-RX Lab Qualification
+
+on:
+  push:
+    branches:
+      - research/poar-rx-simulator-2026-10-31
+    paths:
+      - "research/poar-rx-lab/**"
+      - ".github/workflows/poar-rx-lab-qualification.yml"
+  pull_request:
+    paths:
+      - "research/poar-rx-lab/**"
+      - ".github/workflows/poar-rx-lab-qualification.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: poar-rx-lab-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: \${{ github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format
+        run: cargo fmt --manifest-path research/poar-rx-lab/Cargo.toml -- --check
+      - name: Tests
+        run: cargo test --manifest-path research/poar-rx-lab/Cargo.toml
+      - name: Clippy
+        run: cargo clippy --manifest-path research/poar-rx-lab/Cargo.toml --all-targets -- -D warnings
+      - name: Run deterministic matrix
+        run: |
+          set -euo pipefail
+          cargo run --manifest-path research/poar-rx-lab/Cargo.toml > poar-rx-matrix.tsv
+          test "$(wc -l < poar-rx-matrix.tsv)" -eq 25
+          grep -q 'reconcile_first.*commit_then_lose_ack.*non_idempotent.*completed_verified' poar-rx-matrix.tsv
+          grep -q 'blind_retry_once.*commit_then_lose_ack.*non_idempotent.*reported_complete_unverified' poar-rx-matrix.tsv
+          grep -q 'reconcile_first.*commit_then_readback_unavailable.*non_idempotent.*unknown_outcome' poar-rx-matrix.tsv
+          sha256sum poar-rx-matrix.tsv
