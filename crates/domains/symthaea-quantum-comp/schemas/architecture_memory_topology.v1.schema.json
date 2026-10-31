@@ -247,7 +247,22 @@
           ]
         },
         "capacity_bytes": {
-          "$ref": "#/$defs/byte_interval"
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lower_bytes",
+            "upper_bytes"
+          ],
+          "properties": {
+            "lower_bytes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "upper_bytes": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         },
         "occupancy_bytes": {
           "$ref": "#/$defs/byte_interval"
@@ -422,7 +437,23 @@
             "not_applicable"
           ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "residency_mode": {
+                "const": "guaranteed"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "live_bytes"
+            ]
+          }
+        }
+      ]
     },
     "memory_route": {
       "type": "object",
