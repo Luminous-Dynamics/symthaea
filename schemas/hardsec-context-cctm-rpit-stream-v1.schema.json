@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/hardsec-context-cctm-rpit-stream-v1.schema.json",
+  "title": "HARDSEC DKW randomized-PIT context CCTM stream v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_domain",
+    "stream_id",
+    "evaluation_group_id",
+    "scoring_artifact_sha256",
+    "records",
+    "context_assignment_policy_id",
+    "context_assignment_artifact_sha256",
+    "pit_randomizer_source_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-context-cctm-rpit-stream-v1"
+    },
+    "evidence_domain": {
+      "enum": [
+        "synthetic_fixture",
+        "simulator",
+        "physical_hardware"
+      ]
+    },
+    "stream_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_group_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scoring_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence_index",
+          "window_id",
+          "context_id",
+          "anomaly_score",
+          "sensor_state",
+          "pmu_qualification_result",
+          "randomizer_id",
+          "pit_randomizer_uniform"
+        ],
+        "properties": {
+          "sequence_index": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "window_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "context_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "anomaly_score": {
+            "type": "number"
+          },
+          "sensor_state": {
+            "enum": [
+              "valid",
+              "missing",
+              "stale",
+              "misaligned",
+              "multiplexed",
+              "untrusted"
+            ]
+          },
+          "pmu_qualification_result": {
+            "type": "string",
+            "minLength": 1
+          },
+          "randomizer_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pit_randomizer_uniform": {
+            "type": "number",
+            "minimum": 0,
+            "exclusiveMaximum": 1
+          }
+        }
+      }
+    },
+    "context_assignment_policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "context_assignment_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "pit_randomizer_source_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}
