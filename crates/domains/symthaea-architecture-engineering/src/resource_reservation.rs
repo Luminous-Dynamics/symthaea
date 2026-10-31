@@ -149,17 +149,17 @@ impl Error for ResourceReservationError {}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ResourceReservationLedger {
-    pub schema: String,
-    pub version: String,
-    pub run_id: String,
-    pub resource_registry: ResourceRegistry,
-    pub initial_budget: ResourceBudget,
-    pub max_lease_epochs: u64,
-    pub current_epoch: u64,
-    pub genesis_sha256: String,
-    pub reservations: Vec<ResourceReservationRecord>,
-    pub events: Vec<ResourceReservationEvent>,
-    pub ledger_sha256: String,
+    schema: String,
+    version: String,
+    run_id: String,
+    resource_registry: ResourceRegistry,
+    initial_budget: ResourceBudget,
+    max_lease_epochs: u64,
+    current_epoch: u64,
+    genesis_sha256: String,
+    reservations: Vec<ResourceReservationRecord>,
+    events: Vec<ResourceReservationEvent>,
+    ledger_sha256: String,
 }
 
 impl ResourceReservationLedger {
@@ -755,6 +755,14 @@ pub fn verify_resource_reservation_ledger(
                 "record state or latest-event pointer differs from replayed history",
             ));
         }
+        if record.state == ReservationState::Reserved
+            && ledger.current_epoch >= record.expires_at_epoch
+        {
+            return Err(ResourceReservationError::new(
+                format!("reservations[{index}].state"),
+                "a reservation whose lease has elapsed must be transitioned to EXPIRED",
+            ));
+        }
     }
 
     let base_headroom = remaining_resource_headroom(
@@ -811,6 +819,7 @@ fn validate_measurement_proof(
         ));
     }
     if receipt.run_id != ledger.run_id
+        || proof.resource_cost.action_id != receipt.action_id
         || receipt.scope_sha256 != proof.scope_sha256
         || receipt.resource_registry_sha256.as_deref()
             != Some(ledger.resource_registry.registry_sha256.as_str())
@@ -1112,7 +1121,7 @@ mod tests {
             action_kind: NasActionKind::AcquireMeasurement,
             disposition: "PREFLIGHT_ELIGIBLE_NO_RESERVATION_NO_EXECUTION".into(),
             run_id: ledger.run_id.clone(),
-            target_commit_id: "a".repeat(40),
+            target_commit_id: std::iter::repeat_n(receipt_char, 40).collect(),
             action_id: action_id.into(),
             candidate_id: "candidate-A".into(),
             scope_sha256: scope_sha256.into(),
@@ -1301,6 +1310,20 @@ mod tests {
         cost2.resources[1].cost_model_sha256 = sha('f');
         let bad_model = proof(&ledger, "measure-002", &sha('e'), cost2, 'f');
         assert!(ledger.reserve_measurement(ledger.head_sha256(), bad_model, 5).is_err());
+    }
+
+
+    #[test]
+    fn integrity_verifier_rejects_untransitioned_expired_reservation() {
+        let mut ledger = ledger();
+        let (_, _, cost) = fixture();
+        let proof = proof(&ledger, "measure-001", &sha('c'), cost, 'd');
+        ledger
+            .reserve_measurement(ledger.head_sha256(), proof, 2)
+            .unwrap();
+        ledger.current_epoch = 2;
+        ledger.ledger_sha256 = compute_ledger_sha256(&ledger).unwrap();
+        assert!(ledger.verify_integrity().is_err());
     }
 
     #[test]
