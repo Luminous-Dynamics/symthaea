@@ -1544,6 +1544,11 @@ mod tests {
         assert_eq!(r["episode_integrity"]["episode_count"],132);
         assert_eq!(r["episode_integrity"]["accepted_episode_count"],132);
         assert_eq!(r["episode_integrity"]["source_window_count"],528);
+        assert_eq!(r["pmu_qualification"]["result"],"qualified_for_named_acquisition_conditions");
+        assert_eq!(r["pmu_qualification"]["protocol_id"],"hs018-pmu-counterfactual-acquisition-v1");
+        assert_eq!(r["pmu_qualification"]["acquisition_condition_id"],"grouped_co_scheduled");
+        assert_eq!(r["pmu_qualification"]["confirmatory_event_ids"].as_array().unwrap().len(),3);
+        assert_eq!(r["pmu_qualification"]["matched_block_count"],8);
         assert_eq!(r["sequential_monitor"]["overall_first_alarm_sequence_index"],65);
         assert_eq!(r["sequential_monitor"]["overall_first_alarm_context_id"],"compute");
         assert_eq!(r["sequential_monitor"]["context_results"][0]["context_id"],"compute");
@@ -1552,6 +1557,62 @@ mod tests {
         assert_eq!(r["statistical_guarantees"]["randomizer_independence_status"],"assumption_not_verified");
         assert_eq!(r["statistical_guarantees"]["theorem_guarantee_status"],"not_established_from_input_receipts");
         assert_eq!(r["statistical_guarantees"]["effective_sample_size_estimate"],Value::Null);
+    }
+
+
+    #[test]
+    fn rejects_failed_pmu_metrology_receipt_before_monitoring() {
+        let (p,e,c,_,_,_) = fixture();
+        let (pp,po,mut pr,ppb,pob,_) = pmu_fixture();
+        pr["result"] = json!("measurement_quality_gate_failed");
+        let prb = encode(&pr);
+        let pb = encode(&p);
+        let eb = encode(&e);
+        let cb = encode(&c);
+        assert!(audit_values_with_pmu(
+            &p,&e,&c,&pp,&po,&pr,&pb,&eb,&cb,&ppb,&pob,&prb
+        ).unwrap_err().contains("did not qualify the named acquisition conditions"));
+    }
+
+    #[test]
+    fn rejects_pmu_receipt_that_does_not_bind_exact_observation_bytes() {
+        let (p,e,c,_,_,_) = fixture();
+        let (pp,po,mut pr,ppb,pob,_) = pmu_fixture();
+        pr["inputs"]["observations_sha256"] = json!("f".repeat(64));
+        let prb = encode(&pr);
+        let pb = encode(&p);
+        let eb = encode(&e);
+        let cb = encode(&c);
+        assert!(audit_values_with_pmu(
+            &p,&e,&c,&pp,&po,&pr,&pb,&eb,&cb,&ppb,&pob,&prb
+        ).unwrap_err().contains("input digests do not match"));
+    }
+
+    #[test]
+    fn rejects_pmu_event_not_confirmatory_eligible_in_co_scheduled_group() {
+        let (p,e,c,_,_,_) = fixture();
+        let (pp,po,mut pr,ppb,pob,_) = pmu_fixture();
+        let reports = pr["event_qualification"].as_array_mut().unwrap();
+        let instret = reports.iter_mut().find(|entry| entry["event_id"] == "instret").unwrap();
+        instret["co_scheduled"]["status"] = json!("not_qualified_by_declared_thresholds");
+        let prb = encode(&pr);
+        let pb = encode(&p);
+        let eb = encode(&e);
+        let cb = encode(&c);
+        assert!(audit_values_with_pmu(
+            &p,&e,&c,&pp,&po,&pr,&pb,&eb,&cb,&ppb,&pob,&prb
+        ).unwrap_err().contains("not confirmatory-eligible"));
+    }
+
+    #[test]
+    fn rejects_episode_from_different_pmu_platform_or_workload_binary() {
+        let (p,mut e,c,_,_,_) = fixture();
+        e["records"][0]["device_config_id"] = json!("different-cpu-config");
+        assert!(audit(&p,&e,&c).unwrap_err().contains("does not match the PMU-qualified platform"));
+
+        let (p,mut e,c,_,_,_) = fixture();
+        e["records"][0]["program_binary_sha256"] = json!("a".repeat(64));
+        assert!(audit(&p,&e,&c).unwrap_err().contains("does not match the PMU-qualified workload binary"));
     }
 
     #[test]
