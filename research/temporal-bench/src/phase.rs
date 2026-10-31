@@ -173,7 +173,14 @@ pub struct PhasePrediction {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PhaseScore {
+    /// Number of prediction records actually scored.
     pub evaluated_points: usize,
+    /// Fixed denominator: every public observation in the task.
+    pub expected_points: usize,
+    /// Public observations without a prediction; never silently discarded.
+    pub missing_predictions: usize,
+    /// Prediction coverage in parts per million against expected_points.
+    pub prediction_coverage_ppm: u32,
     pub circular_phase_error_permille: Vec<u16>,
     pub next_crossing_absolute_error_us: Vec<u64>,
 }
@@ -486,8 +493,21 @@ pub fn score_phase_predictions(
     predictions: &[PhasePrediction],
 ) -> Result<PhaseScore, PhaseScoringError> {
     verify_phase_trace(task, oracle).map_err(PhaseScoringError::InvalidTrace)?;
+    let expected_points = task.slots;
+    let coverage_ppm = if expected_points == 0 {
+        0
+    } else {
+        u32::try_from(
+            (u128::try_from(predictions.len()).unwrap_or(u128::MAX) * 1_000_000)
+                / u128::try_from(expected_points).unwrap_or(u128::MAX),
+        )
+        .unwrap_or(u32::MAX)
+    };
     let mut score = PhaseScore {
         evaluated_points: predictions.len(),
+        expected_points,
+        missing_predictions: expected_points.saturating_sub(predictions.len()),
+        prediction_coverage_ppm: coverage_ppm,
         circular_phase_error_permille: Vec::with_capacity(predictions.len()),
         next_crossing_absolute_error_us: Vec::with_capacity(predictions.len()),
     };
@@ -537,6 +557,98 @@ pub fn verify_phase_trace_seeded(
         return Err(PhaseVerificationError::SeedReplayMismatch);
     }
     Ok(())
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PhaseDilationError {
+    ZeroRatioComponent,
+    NonIntegralTime { value_us: u64, numerator: u64, denominator: u64 },
+    TimeOverflow,
+    InvalidSource(PhaseVerificationError),
+    InvalidDilatedTrace(PhaseVerificationError),
+}
+
+impl fmt::Display for PhaseDilationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ZeroRatioComponent => write!(f, "time-dilation numerator and denominator must be non-zero"),
+            Self::NonIntegralTime { value_us, numerator, denominator } => write!(
+                f,
+                "time value {value_us} us cannot be represented exactly at dilation {numerator}/{denominator}"
+            ),
+            Self::TimeOverflow => write!(f, "time dilation overflows u64"),
+            Self::InvalidSource(error) => write!(f, "source phase trace is invalid: {error}"),
+            Self::InvalidDilatedTrace(error) => write!(f, "dilated phase trace is invalid: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for PhaseDilationError {}
+
+/// Apply an exact affine change of time units/rate to a complete phase trace.
+///
+/// The physical clock, sample interval, oscillator periods, phase offsets,
+/// phase jump, and crossing deadlines are all scaled by the same rational
+/// factor. Step indices, normalized phase, and signal samples must remain
+/// unchanged. Non-integral microsecond representations fail closed rather
+/// than rounding and silently changing the benchmark task.
+pub fn dilate_phase_trace(
+    task: &PhaseTask,
+    oracle: &PhaseOracle,
+    numerator: u64,
+    denominator: u64,
+) -> Result<(PhaseTask, PhaseOracle), PhaseDilationError> {
+    if numerator == 0 || denominator == 0 {
+        return Err(PhaseDilationError::ZeroRatioComponent);
+    }
+    verify_phase_trace(task, oracle).map_err(PhaseDilationError::InvalidSource)?;
+
+    let mut dilated_task = task.clone();
+    let mut dilated_oracle = oracle.clone();
+    let mut scale = |value_us: u64| -> Result<u64, PhaseDilationError> {
+        let product = u128::from(value_us)
+            .checked_mul(u128::from(numerator))
+            .ok_or(PhaseDilationError::TimeOverflow)?;
+        if product % u128::from(denominator) != 0 {
+            return Err(PhaseDilationError::NonIntegralTime {
+                value_us,
+                numerator,
+                denominator,
+            });
+        }
+        u64::try_from(product / u128::from(denominator))
+            .map_err(|_| PhaseDilationError::TimeOverflow)
+    };
+
+    dilated_task.sample_interval_us = scale(task.sample_interval_us)?;
+    for observation in &mut dilated_task.observations {
+        observation.time_us = scale(observation.time_us)?;
+    }
+
+    dilated_oracle.initial_phase_us = scale(oracle.initial_phase_us)?;
+    dilated_oracle.period_before_us = scale(oracle.period_before_us)?;
+    dilated_oracle.period_after_us = scale(oracle.period_after_us)?;
+    dilated_oracle.phase_jump_us = scale(oracle.phase_jump_us)?;
+    for point in &mut dilated_oracle.points {
+        point.time_us = scale(point.time_us)?;
+        point.period_us = scale(point.period_us)?;
+        point.next_rising_crossing_us = scale(point.next_rising_crossing_us)?;
+    }
+
+    let pair_id = mix64(
+        task.stream_id
+            ^ numerator.rotate_left(13)
+            ^ denominator.rotate_left(37)
+            ^ 0x5449_4D45_5741_5250,
+    );
+    dilated_task.stream_id = pair_id;
+    dilated_oracle.stream_id = pair_id;
+    dilated_task.content_sha256 = phase_content_digest(&dilated_task);
+    dilated_oracle.content_sha256 = phase_oracle_digest(&dilated_oracle);
+
+    verify_phase_trace(&dilated_task, &dilated_oracle)
+        .map_err(PhaseDilationError::InvalidDilatedTrace)?;
+    Ok((dilated_task, dilated_oracle))
 }
 
 fn validate_config(config: PhaseConfig) -> Result<(), PhaseGenerationError> {
@@ -689,6 +801,126 @@ fn nearest_rank<T: Copy + Ord>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn phase_scorer_counts_missing_predictions_against_full_stream() {
+        let config = PhaseConfig::reference(2_031, PhaseMode::Mixed);
+        let (task, oracle) = generate_phase_task(config).unwrap();
+        let predictions = oracle.points.iter().step_by(64).map(|point| {
+            PhasePrediction {
+                step: point.step,
+                phase_permille: point.phase_permille,
+                next_rising_crossing_us: point.next_rising_crossing_us,
+            }
+        }).collect::<Vec<_>>();
+        let score = score_phase_predictions(&task, &oracle, &predictions).unwrap();
+        assert_eq!(score.expected_points, task.slots);
+        assert_eq!(score.evaluated_points, predictions.len());
+        assert_eq!(score.missing_predictions, task.slots - predictions.len());
+        assert_eq!(
+            score.prediction_coverage_ppm,
+            (predictions.len() as u32 * 1_000_000) / task.slots as u32
+        );
+    }
+
+    #[test]
+    fn phase_scorer_reports_zero_coverage_for_no_predictions() {
+        let config = PhaseConfig::reference(2_032, PhaseMode::Stable);
+        let (task, oracle) = generate_phase_task(config).unwrap();
+        let score = score_phase_predictions(&task, &oracle, &[]).unwrap();
+        assert_eq!(score.evaluated_points, 0);
+        assert_eq!(score.expected_points, task.slots);
+        assert_eq!(score.missing_predictions, task.slots);
+        assert_eq!(score.prediction_coverage_ppm, 0);
+    }
+
+    #[test]
+    fn affine_time_dilation_preserves_phase_and_signal_but_scales_clock() {
+        let config = PhaseConfig::reference(2_033, PhaseMode::Mixed);
+        let (task, oracle) = generate_phase_task(config).unwrap();
+        let (dilated_task, dilated_oracle) =
+            dilate_phase_trace(&task, &oracle, 2, 1).unwrap();
+
+        assert_eq!(verify_phase_trace(&dilated_task, &dilated_oracle), Ok(()));
+        assert_ne!(task.stream_id, dilated_task.stream_id);
+        assert_eq!(dilated_task.sample_interval_us, task.sample_interval_us * 2);
+        assert_eq!(dilated_oracle.initial_phase_us, oracle.initial_phase_us * 2);
+        assert_eq!(dilated_oracle.period_before_us, oracle.period_before_us * 2);
+        assert_eq!(dilated_oracle.period_after_us, oracle.period_after_us * 2);
+        assert_eq!(dilated_oracle.phase_jump_us, oracle.phase_jump_us * 2);
+        for (base, dilated) in oracle.points.iter().zip(&dilated_oracle.points) {
+            assert_eq!(dilated.step, base.step);
+            assert_eq!(dilated.time_us, base.time_us * 2);
+            assert_eq!(dilated.phase_permille, base.phase_permille);
+            assert_eq!(dilated.period_us, base.period_us * 2);
+            assert_eq!(dilated.latent_sample, base.latent_sample);
+            assert_eq!(dilated.next_rising_crossing_us, base.next_rising_crossing_us * 2);
+        }
+        for (base, dilated) in task.observations.iter().zip(&dilated_task.observations) {
+            assert_eq!(dilated.step, base.step);
+            assert_eq!(dilated.time_us, base.time_us * 2);
+            assert_eq!(dilated.sample, base.sample);
+        }
+    }
+
+    #[test]
+    fn affine_time_dilation_preserves_phase_error_and_scales_crossing_error() {
+        let config = PhaseConfig::reference(2_034, PhaseMode::FrequencyShift);
+        let (task, oracle) = generate_phase_task(config).unwrap();
+        let (dilated_task, dilated_oracle) =
+            dilate_phase_trace(&task, &oracle, 2, 1).unwrap();
+
+        let base_predictions: Vec<_> = oracle.points.iter().step_by(31).map(|point| {
+            PhasePrediction {
+                step: point.step,
+                phase_permille: (point.phase_permille + 7) % 1_000,
+                next_rising_crossing_us: point.next_rising_crossing_us + 123,
+            }
+        }).collect();
+        let dilated_predictions: Vec<_> = base_predictions.iter().map(|prediction| {
+            PhasePrediction {
+                step: prediction.step,
+                phase_permille: prediction.phase_permille,
+                next_rising_crossing_us: prediction.next_rising_crossing_us * 2,
+            }
+        }).collect();
+        let base_score = score_phase_predictions(&task, &oracle, &base_predictions).unwrap();
+        let dilated_score =
+            score_phase_predictions(&dilated_task, &dilated_oracle, &dilated_predictions).unwrap();
+
+        assert_eq!(
+            dilated_score.circular_phase_error_permille,
+            base_score.circular_phase_error_permille
+        );
+        assert_eq!(
+            dilated_score.next_crossing_absolute_error_us,
+            base_score.next_crossing_absolute_error_us
+                .iter()
+                .map(|error| error * 2)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(dilated_score.prediction_coverage_ppm, base_score.prediction_coverage_ppm);
+    }
+
+    #[test]
+    fn affine_time_dilation_rejects_non_integral_microsecond_scale() {
+        let config = PhaseConfig::reference(2_035, PhaseMode::Stable);
+        let (task, oracle) = generate_phase_task(config).unwrap();
+        assert!(matches!(
+            dilate_phase_trace(&task, &oracle, 1, 3),
+            Err(PhaseDilationError::NonIntegralTime { .. })
+        ));
+    }
+
+    #[test]
+    fn affine_time_dilation_rejects_zero_ratio() {
+        let config = PhaseConfig::reference(2_036, PhaseMode::Stable);
+        let (task, oracle) = generate_phase_task(config).unwrap();
+        assert_eq!(
+            dilate_phase_trace(&task, &oracle, 0, 1),
+            Err(PhaseDilationError::ZeroRatioComponent)
+        );
+    }
 
     #[test]
     fn stable_reference_has_no_hidden_shift() {
