@@ -8,18 +8,18 @@
   "model_version": "1",
   "model_access_mode": "token-logprob",
   "log_probability_semantics": "base_model_conditional_log_probability",
-  "harness_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-  "decoding_config_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-  "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "harness_revision_sha256": "49f756463ad9dcfb9b6ade54d7d6f15476e7214f46a65b4b0c55d46845b12f70",
+  "prompt_sha256": "cf07194ee232eb531e15f690000d19846dea69cf05504782658afcfacb9228a2",
+  "decoding_config_sha256": "713a1417c769dc7584c090ac7ff485481f486a11bb803fbf9ec54289769f2854",
+  "environment_sha256": "ba5285161ba6eed0085fb13784ce5c92f70ebc268b94fd66aa1d68a32884204d",
   "temperature_milli": 800,
   "requested_generation_count": 50,
   "tail_token_count": 20,
-  "generation_seed_schedule_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "generation_seed_schedule_sha256": "ec8045182d1ee303f42e4726f56adfd670de0d7283b27066967c8de088d4e354",
   "generations": [
     {
       "generation_id": "generation-001",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "rng_seed_commitment_sha256": "0c936e153a2e2ac58a8d1aa5adcdff781fd4e65930b1781e7b62db21acea3491",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.4,
@@ -50,7 +50,7 @@
     },
     {
       "generation_id": "generation-002",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "rng_seed_commitment_sha256": "360258cccce2e6f8466bfa981954fe811baa071aaef2b273680723275fb0414f",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.388,
@@ -81,7 +81,7 @@
     },
     {
       "generation_id": "generation-003",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+      "rng_seed_commitment_sha256": "4da20192eab4f9c0b79428b9fa97b5f4d07a0757726114528ab3e7aa9c317d21",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.376,
@@ -112,7 +112,7 @@
     },
     {
       "generation_id": "generation-004",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+      "rng_seed_commitment_sha256": "23f4a4bf447e3beb4a4ac388f96858e19df8515934aca66ed87dcfb9be80f1a7",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.364,
@@ -143,7 +143,7 @@
     },
     {
       "generation_id": "generation-005",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+      "rng_seed_commitment_sha256": "2fc76965bd96616f0d637c349bcbdb921b0cc01e1543c438b59c10a982967c97",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.352,
@@ -174,7 +174,7 @@
     },
     {
       "generation_id": "generation-006",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
+      "rng_seed_commitment_sha256": "70513f1a646466ecc3c450bdff8882c0e5bb5d1303ea65031fe23598b5734008",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.4,
@@ -205,7 +205,7 @@
     },
     {
       "generation_id": "generation-007",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000007",
+      "rng_seed_commitment_sha256": "77182c1db55ad28d70246d441276946fe5984506ca88dfe2fced1519048c3b27",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.388,
@@ -236,7 +236,7 @@
     },
     {
       "generation_id": "generation-008",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000008",
+      "rng_seed_commitment_sha256": "d972d92f3aee386730b9df414b91cba1701db33fbc711fbb06d586eb1d506730",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.376,
@@ -267,7 +267,7 @@
     },
     {
       "generation_id": "generation-009",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000009",
+      "rng_seed_commitment_sha256": "e024589d6f35d776e28519153a307d1a85ddca95cf3c908cd67fca32b1fba440",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.364,
@@ -298,7 +298,7 @@
     },
     {
       "generation_id": "generation-010",
-      "rng_seed_commitment_sha256": "000000000000000000000000000000000000000000000000000000000000000a",
+      "rng_seed_commitment_sha256": "72356d90219bf254ef982cec8d904d9c201863de9e6576d2cd215a2a8bd9766a",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.352,
@@ -329,7 +329,7 @@
     },
     {
       "generation_id": "generation-011",
-      "rng_seed_commitment_sha256": "000000000000000000000000000000000000000000000000000000000000000b",
+      "rng_seed_commitment_sha256": "4aa170222d976147b0fb93c5f813f478c24d00ac0a79f9c18e378501d93a2f16",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.4,
@@ -360,7 +360,7 @@
     },
     {
       "generation_id": "generation-012",
-      "rng_seed_commitment_sha256": "000000000000000000000000000000000000000000000000000000000000000c",
+      "rng_seed_commitment_sha256": "97a0c153d788b5d932d9ac7840282b9badbbeffbc333f6f2d4ea73756561bfd2",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.388,
@@ -391,7 +391,7 @@
     },
     {
       "generation_id": "generation-013",
-      "rng_seed_commitment_sha256": "000000000000000000000000000000000000000000000000000000000000000d",
+      "rng_seed_commitment_sha256": "ec19345a391ebab6c451401739b7a49399644b4675646b09efc75f8b24d2aa8d",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.376,
@@ -422,7 +422,7 @@
     },
     {
       "generation_id": "generation-014",
-      "rng_seed_commitment_sha256": "000000000000000000000000000000000000000000000000000000000000000e",
+      "rng_seed_commitment_sha256": "f9a1be2b4f103c8c638bd18bc624817167062dfb8d7f3fd7e7c4d3ce4974904c",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.364,
@@ -453,7 +453,7 @@
     },
     {
       "generation_id": "generation-015",
-      "rng_seed_commitment_sha256": "000000000000000000000000000000000000000000000000000000000000000f",
+      "rng_seed_commitment_sha256": "f705d57de7dfd30426b63d515e3a5cc59492f894cd2fc26813813f2aff4f57a9",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.352,
@@ -484,7 +484,7 @@
     },
     {
       "generation_id": "generation-016",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000010",
+      "rng_seed_commitment_sha256": "e1ddf4e68d69296200651ad879e7bbfad2d98222a85c0109093228a9f273cf8e",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.4,
@@ -515,7 +515,7 @@
     },
     {
       "generation_id": "generation-017",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000011",
+      "rng_seed_commitment_sha256": "277d88f7c756f9c7b2e2e1c37d3d5057f7e88c3a70d6b390d9f23ed24e6ce88c",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.388,
@@ -546,7 +546,7 @@
     },
     {
       "generation_id": "generation-018",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000012",
+      "rng_seed_commitment_sha256": "64fe88f1fdbe76aefc5a853690c4a1f78678d1b763cf5f2f9c0c73a3b7275a4b",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.376,
@@ -577,7 +577,7 @@
     },
     {
       "generation_id": "generation-019",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000013",
+      "rng_seed_commitment_sha256": "32ab02bca89acc52c40cab775c3f3a6800404dc5f61af53fe97278949b02d446",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.364,
@@ -608,7 +608,7 @@
     },
     {
       "generation_id": "generation-020",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000014",
+      "rng_seed_commitment_sha256": "538698b8c282337ffe357b82f82a9a6ca791bf261fd1bf8c5bac036b088bcf2c",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.352,
@@ -639,7 +639,7 @@
     },
     {
       "generation_id": "generation-021",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000015",
+      "rng_seed_commitment_sha256": "b708c2149057bd14e2f0b3f5803467bac8febdae761c54a427da779f12477067",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.4,
@@ -670,7 +670,7 @@
     },
     {
       "generation_id": "generation-022",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000016",
+      "rng_seed_commitment_sha256": "df953db446bdfbaea8c070871635464395a88ac85a98d49a9751e18f1da66ffd",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.388,
@@ -701,7 +701,7 @@
     },
     {
       "generation_id": "generation-023",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000017",
+      "rng_seed_commitment_sha256": "f9fcb47a41e4ea745583dce816cc9ec184ff99842647e914aa4c0b65319d1007",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.376,
@@ -732,7 +732,7 @@
     },
     {
       "generation_id": "generation-024",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000018",
+      "rng_seed_commitment_sha256": "c186359991cbdaee9c02bb91c20e80c9e2842dcfd7b3f221786beccd4754d12e",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.364,
@@ -763,7 +763,7 @@
     },
     {
       "generation_id": "generation-025",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000019",
+      "rng_seed_commitment_sha256": "9169e10724fd29c793c118600270ed3996ab9dd06adfc019e40a739219166f75",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -2.352,
@@ -794,7 +794,7 @@
     },
     {
       "generation_id": "generation-026",
-      "rng_seed_commitment_sha256": "000000000000000000000000000000000000000000000000000000000000001a",
+      "rng_seed_commitment_sha256": "2618879749228c5e3b70e871d530a2e02adcfd7169dbf92ff1671a4a83967df8",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.92,
@@ -825,7 +825,7 @@
     },
     {
       "generation_id": "generation-027",
-      "rng_seed_commitment_sha256": "000000000000000000000000000000000000000000000000000000000000001b",
+      "rng_seed_commitment_sha256": "da084ff1c75767fb72e7aa898c6d68151421c81faf37eeb4b8d36fbf8efc1d93",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.908,
@@ -856,7 +856,7 @@
     },
     {
       "generation_id": "generation-028",
-      "rng_seed_commitment_sha256": "000000000000000000000000000000000000000000000000000000000000001c",
+      "rng_seed_commitment_sha256": "5664fd0f8f097e9b1eb65b24bf877b45bed7e1e567986b342dc868a7764dea11",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.896,
@@ -887,7 +887,7 @@
     },
     {
       "generation_id": "generation-029",
-      "rng_seed_commitment_sha256": "000000000000000000000000000000000000000000000000000000000000001d",
+      "rng_seed_commitment_sha256": "00725f64012e84a5e07608bb820bd30bd95f18d31487c937cf8bef51d603694b",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.884,
@@ -918,7 +918,7 @@
     },
     {
       "generation_id": "generation-030",
-      "rng_seed_commitment_sha256": "000000000000000000000000000000000000000000000000000000000000001e",
+      "rng_seed_commitment_sha256": "2c7bed887abfa2bab075c812594cbedd81af4bf823e4ac97683ccd50c784a957",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.872,
@@ -949,7 +949,7 @@
     },
     {
       "generation_id": "generation-031",
-      "rng_seed_commitment_sha256": "000000000000000000000000000000000000000000000000000000000000001f",
+      "rng_seed_commitment_sha256": "73638eab846439b5067b06821b316ed508539b5c681de5d8ad1f160816ea30fd",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.92,
@@ -980,7 +980,7 @@
     },
     {
       "generation_id": "generation-032",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000020",
+      "rng_seed_commitment_sha256": "d54ab08004e27e483b057b9c2d4c4a0ff15ff8addca6d2a8189f2ce0bdcd28bf",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.908,
@@ -1011,7 +1011,7 @@
     },
     {
       "generation_id": "generation-033",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000021",
+      "rng_seed_commitment_sha256": "24f9d9031935d98e7d1d8caad6381bacbb29982171ad6a054b222b56e7b8b018",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.896,
@@ -1042,7 +1042,7 @@
     },
     {
       "generation_id": "generation-034",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000022",
+      "rng_seed_commitment_sha256": "2de9aa09b27406dce9714a5a1a509d4aa929dcfb8c64971c8872e5612fbe63ee",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.884,
@@ -1073,7 +1073,7 @@
     },
     {
       "generation_id": "generation-035",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000023",
+      "rng_seed_commitment_sha256": "95b1fffdff3209dc148f8542c53c204d51eb2a84bf0ff356efc4890ff3b90982",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.872,
@@ -1104,7 +1104,7 @@
     },
     {
       "generation_id": "generation-036",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000024",
+      "rng_seed_commitment_sha256": "b58fd7e105c0162fc5f081351bc61737f7151101037112851228150f4dd3caa5",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.92,
@@ -1135,7 +1135,7 @@
     },
     {
       "generation_id": "generation-037",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000025",
+      "rng_seed_commitment_sha256": "1cce00b3f73fbe6a49315e2d58ffd53cab1d69544fd69147972df80233eab356",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.908,
@@ -1166,7 +1166,7 @@
     },
     {
       "generation_id": "generation-038",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000026",
+      "rng_seed_commitment_sha256": "8f245710506be40b12abb563a68df274421c37d9984275bbe9b54cd2820f96ac",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.896,
@@ -1197,7 +1197,7 @@
     },
     {
       "generation_id": "generation-039",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000027",
+      "rng_seed_commitment_sha256": "eee9bdfac2d87da8c01f13c2fffa216465fa6abde6d6d88f2623d88996c30980",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.884,
@@ -1228,7 +1228,7 @@
     },
     {
       "generation_id": "generation-040",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000028",
+      "rng_seed_commitment_sha256": "b4d4d01164fbb54160799ca6936c3a7504c16608a68f7ac0b1727f2bf2a92c2a",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.872,
@@ -1259,7 +1259,7 @@
     },
     {
       "generation_id": "generation-041",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000029",
+      "rng_seed_commitment_sha256": "cb715a4800b318bdc4dad7ca173bfcd8ded40a6f1606f0525fc59b1cc1d8eed7",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.92,
@@ -1290,7 +1290,7 @@
     },
     {
       "generation_id": "generation-042",
-      "rng_seed_commitment_sha256": "000000000000000000000000000000000000000000000000000000000000002a",
+      "rng_seed_commitment_sha256": "4c80c30d28ceee250bebd34843bf951333676b93d61ec8a77f42071e5e79897e",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.908,
@@ -1321,7 +1321,7 @@
     },
     {
       "generation_id": "generation-043",
-      "rng_seed_commitment_sha256": "000000000000000000000000000000000000000000000000000000000000002b",
+      "rng_seed_commitment_sha256": "9d1a42dae53e4e2b404a6e6a55c2dc68581acd16c86714e3bf13bf60dcf54215",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.896,
@@ -1352,7 +1352,7 @@
     },
     {
       "generation_id": "generation-044",
-      "rng_seed_commitment_sha256": "000000000000000000000000000000000000000000000000000000000000002c",
+      "rng_seed_commitment_sha256": "8da2317a1248d26e0c2ab7228efc2151b735dd38a56d2ed0df1d034c6af9ed29",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.884,
@@ -1383,7 +1383,7 @@
     },
     {
       "generation_id": "generation-045",
-      "rng_seed_commitment_sha256": "000000000000000000000000000000000000000000000000000000000000002d",
+      "rng_seed_commitment_sha256": "a997157a0350779a150a22060c688615b364e0feb43f67203ac12fb285dc7849",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.872,
@@ -1414,7 +1414,7 @@
     },
     {
       "generation_id": "generation-046",
-      "rng_seed_commitment_sha256": "000000000000000000000000000000000000000000000000000000000000002e",
+      "rng_seed_commitment_sha256": "0477e118c661e533a2e9b40fe764eefdc4f727c943c720b6fbe44ce4cba0f5fa",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.92,
@@ -1445,7 +1445,7 @@
     },
     {
       "generation_id": "generation-047",
-      "rng_seed_commitment_sha256": "000000000000000000000000000000000000000000000000000000000000002f",
+      "rng_seed_commitment_sha256": "3b8309b547d06b7a202015c06e093fc3d8c9ca35a438a7ccd83f24a0f79fc409",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.908,
@@ -1476,7 +1476,7 @@
     },
     {
       "generation_id": "generation-048",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000030",
+      "rng_seed_commitment_sha256": "41b5c197789905bda6b185e5647121ea15b095bdecab8e75d94e39756dc58a58",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.896,
@@ -1507,7 +1507,7 @@
     },
     {
       "generation_id": "generation-049",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000031",
+      "rng_seed_commitment_sha256": "7049b755430e6701ec51870842a507b17bed8b3bd0e2f97c2cf5e8af2a0b2909",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.884,
@@ -1538,7 +1538,7 @@
     },
     {
       "generation_id": "generation-050",
-      "rng_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000032",
+      "rng_seed_commitment_sha256": "1042645750d5b9025add2f9ee233b950b392301579da490bf8469d7e71c5580d",
       "generated_token_count": 24,
       "response_token_log_probabilities": [
         -0.872,
