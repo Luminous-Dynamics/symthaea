@@ -87,3 +87,59 @@ Aspirational gates, not achieved results:
 - No more than 2 percentage points of worst-target accuracy loss against the per-device oracle unless preregistered otherwise.
 
 Do not collapse all metrics into one leaderboard scalar. Show accuracy/latency/energy/memory and build reliability side by side. A result is only comparable when dataset split, training budget, quantization, compiler, firmware, runtime, target board, acquisition protocol and resource budget are all matched.
+
+
+## 2026 comparator specifics and the actual gap
+
+### NATS-Bench-MCU v2
+
+The authoritative corrected release contains 15,625 topology candidates: 14,281 physically profiled nRF5340 deployments and 1,344 flash-infeasible candidates. The INT8 flatbuffer limit is 746 KiB after the fixed 277.6 KiB firmware overhead within 1,024 KiB application-core flash. The tabular export includes hardware metrics, accuracies, failures, coverage and an INT8/FP32 ranking study. The correction overlay is part of the benchmark contract; do not mix v1 taxonomy or counts with v2.
+
+Source: https://zenodo.org/records/21644470
+
+### ConNAS (ICLR 2026)
+
+ConNAS reports feasible NATS-Bench architectures within 0.14% of the optimal feasible architecture, and up to 1.55 percentage points higher accuracy than handcrafted architectures in one practical constrained deployment. This is the appropriate optimization-quality baseline on a matched single-target problem.
+
+Source: https://proceedings.iclr.cc/paper_files/paper/2026/hash/7c9f851081499ed5c60c51e312d3235f-Abstract-Conference.html
+
+### EdgeVolution (Communications Engineering, 2026)
+
+EdgeVolution is already an end-to-end hardware-in-the-loop pipeline with functional binary deployment. The paper reports 4,600 evaluated architectures per run, with three repeated runs; the physical hardware-in-the-loop step accounts for less than 1% of total runtime, while training accounts for approximately 99%. It reports measurements on nRF5340, nRF52840 and nRF52833, with an STM32H753ZI extension. Its proxy ablation shows operation count can miss the high-accuracy/high-energy region of the Pareto front and fail to distinguish deployability.
+
+This tells us not to position physical measurement itself as novel. The bigger optimization opportunity is reducing training and conversion overhead without letting estimated feasibility become a false deployment guarantee.
+
+Source: https://pmc.ncbi.nlm.nih.gov/articles/PMC13291272/
+
+### ENAS (SuRE 2026 / arXiv 2026)
+
+ENAS reports 636 trained and deployed models across two tasks, eight MCU platforms and nine image resolutions, with zero deployment-pipeline failures in its reported evaluation. It replaces repeated measured feasibility checks with static analytical RAM/flash/MACC estimation, reducing per-candidate evaluation time from approximately 5–10 minutes to approximately 30 seconds. It reports 2.41× and 1.70× search-time speedups over the greedy CPU-only NanoNAS baseline, and about 0.38× peak activation RAM at matched accuracy, with higher flash and MACC. Mean accuracy reductions versus NanoNAS were 0.79 and 1.31 percentage points on the two datasets; selected configurations also showed task- and device-specific gains.
+
+These are paper-reported results, not independently reproduced by this repository. Static estimation is useful for triage, but it is not a substitute for build and physical evidence on a candidate promoted as deployable.
+
+Source: https://arxiv.org/abs/2609.30272
+
+## Proposed synthesis: confidence-bounded staged qualification
+
+The next search policy should use a sequence of progressively more expensive fidelities:
+
+1. Static structural and memory lower/upper bounds.
+2. Cheap analytical resource estimates with calibrated uncertainty.
+3. Partial training or a validated learning-curve forecast.
+4. Exact quantization and compiler build.
+5. Physical flash/deploy plus readback.
+6. Repeated physical latency/energy measurement on the target fleet.
+
+A cheap stage may reject only when a conservative bound proves a hard constraint impossible. An uncertain result escalates; it is not imputed as feasible or infeasible. Build and deployment receipts gate promotion. A success-driven quota should attempt candidates in objective-aware order until it has a preregistered count of fully verified deployable artifacts, rather than assuming the top-k architecture predictions will all build.
+
+Use existing vector-resource budgets, cost-aware value of information, anytime confidence ledger, run-wide pruning risk ledger and CAS reservation foundation as the scheduling substrate. Every stage's acquisition cost must be charged to the same experiment ledger. This should be compared against random search, ENAS-style random/top-K/mutation, ConNAS, and direct EdgeVolution-style hardware-in-the-loop evaluation on matched tasks and targets.
+
+Primary hypotheses to test:
+
+- reduce end-to-end search cost per verified deployable artifact by at least 2× against the strongest matched baseline;
+- reduce worst-target Pareto regret by at least 10% at matched total resource budget;
+- preserve zero accepted false-feasible candidates in adversarial negative controls;
+- keep every physical score bound to the exact artifact, target, firmware/runtime and measurement protocol;
+- show confidence calibration, failure recovery and deployment quota completion rates separately from model accuracy.
+
+These are preregistered targets for future measurement, not results from this PR.
