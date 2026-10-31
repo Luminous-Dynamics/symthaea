@@ -8,6 +8,7 @@ mod basalt_fixture;
 mod basalt_cargo_fixture;
 mod basalt_cargo_mtime_fixture;
 mod basalt_coverage;
+mod basalt_linux_probe;
 mod basalt_validate;
 mod crate_status;
 mod duplicate_scan;
@@ -96,6 +97,12 @@ enum Commands {
         /// Path to the run-level coverage envelope JSON.
         #[arg(long)]
         receipt: PathBuf,
+    },
+    /// Inventory read-only Linux interfaces for selecting a BASALT observer profile.
+    BasaltLinuxCapabilityProbe {
+        /// Create a new JSON inventory report at this path.
+        #[arg(long)]
+        out: PathBuf,
     },
     /// Validate a BASALT versioned run record and its cross-record evidence invariants.
     BasaltValidate {
@@ -221,6 +228,10 @@ fn main() -> anyhow::Result<()> {
             if !report.coverage_claim_consistent {
                 anyhow::bail!("BASALT observer coverage envelope is malformed, unbound or overclaims completeness");
             }
+        }
+        Commands::BasaltLinuxCapabilityProbe { out } => {
+            let report = basalt_linux_probe::run(&out)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
         }
         Commands::BasaltValidate { input, manifest, spec_root } => {
             let report = basalt_validate::validate_file(&input, &manifest, &spec_root)?;
