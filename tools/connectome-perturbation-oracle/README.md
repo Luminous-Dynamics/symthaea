@@ -12,6 +12,7 @@ From the repository root:
 cargo test --locked --manifest-path tools/connectome-perturbation-oracle/Cargo.toml
 cargo run --locked --manifest-path tools/connectome-perturbation-oracle/Cargo.toml -- --json
 cargo run --locked --manifest-path tools/connectome-perturbation-oracle/Cargo.toml -- --text
+cargo run --locked --manifest-path tools/connectome-perturbation-oracle/Cargo.toml -- --interaction-json
 ```
 
 The crate is a standalone workspace under tools/ and has no third-party dependencies. It must not be added to the production workspace dependency graph by accident.
@@ -30,6 +31,19 @@ The scorer compares complete finite-horizon trajectories, not only peak response
 ## Scientific claim ceiling
 
 The report always labels its evidence class `synthetic_known_answer` and claim ceiling `SYNTHETIC_ONLY`. Passing tests establishes only that this small mathematical reference implementation behaves as specified. It does not establish biological validity, model quality, causal identification in an animal, or state-of-the-art performance.
+
+## Nonlinear and state-conditioned interaction oracle
+
+The contextual simulator supports identity, threshold and saturating-clamp node transfers, plus edges declared available in both, resting-only or active-only contexts. It exposes exact two-factor and three-factor finite differences over paired factorial replay arms. The CLI command `--interaction-json` emits six known-answer cases:
+
+- pairwise threshold synergy (+1);
+- pairwise additive null (0);
+- saturation/subadditivity (-1);
+- third-order threshold synergy (+1);
+- state-gated response at rest (0);
+- state-gated response in the active state (+0.75).
+
+These are exact synthetic model semantics. They demonstrate that a pairwise linear model cannot represent every possible multi-input interaction, not that any particular biological circuit has these transfer functions. The contextual edges are explicit model conditions, not claims that anatomy physically changes across states.
 
 ## Edge-criticality oracle
 
