@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/hardsec-context-cctm-rpit-plan-v1.schema.json",
+  "title": "HARDSEC DKW randomized-PIT context CCTM plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "monitor_id",
+    "evidence_domain",
+    "stream_id",
+    "evaluation_group_id",
+    "scoring_artifact_sha256",
+    "anomaly_score_direction",
+    "alpha_budget",
+    "delta_budget",
+    "reference_update_policy",
+    "context_assignment_policy",
+    "minimum_reference_scores",
+    "ons_smoothing_k",
+    "ons_eta_bound",
+    "null_stream_assumption_status",
+    "reference_iid_assumption_status",
+    "context_assignment_assumption_status",
+    "contexts",
+    "context_assignment_policy_id",
+    "context_assignment_artifact_sha256",
+    "pit_randomizer_source_sha256",
+    "pit_randomization_policy",
+    "pit_randomizer_independence_status"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-context-cctm-rpit-plan-v1"
+    },
+    "monitor_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_domain": {
+      "enum": [
+        "synthetic_fixture",
+        "simulator",
+        "physical_hardware"
+      ]
+    },
+    "stream_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_group_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scoring_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "anomaly_score_direction": {
+      "const": "higher_is_more_anomalous"
+    },
+    "alpha_budget": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "delta_budget": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "reference_update_policy": {
+      "const": "immutable_no_test_time_updates"
+    },
+    "context_assignment_policy": {
+      "const": "external_workload_metadata_not_score_derived"
+    },
+    "minimum_reference_scores": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "ons_smoothing_k": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "ons_eta_bound": {
+      "const": 0.5
+    },
+    "null_stream_assumption_status": {
+      "const": "assumption_not_verified"
+    },
+    "reference_iid_assumption_status": {
+      "const": "assumption_not_verified"
+    },
+    "context_assignment_assumption_status": {
+      "const": "assumption_not_verified"
+    },
+    "contexts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "context_id",
+          "reference_id",
+          "reference_group_ids",
+          "reference_scores"
+        ],
+        "properties": {
+          "context_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reference_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reference_group_ids": {
+            "type": "array",
+            "minItems": 2,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "reference_scores": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "context_assignment_policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "context_assignment_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "pit_randomizer_source_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "pit_randomization_policy": {
+      "const": "independent_uniform_after_score_acquisition_v1"
+    },
+    "pit_randomizer_independence_status": {
+      "const": "assumption_not_verified"
+    }
+  }
+}
