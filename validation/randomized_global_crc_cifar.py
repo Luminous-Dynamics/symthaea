@@ -13,6 +13,7 @@ known independently/frozen before calibration for a deployable procedure.
 """
 from __future__ import annotations
 import argparse
+import hashlib
 import json
 import math
 import platform
@@ -22,6 +23,11 @@ from typing import Iterable
 import numpy as np
 from scipy.optimize import linprog
 from scipy.sparse import lil_matrix
+
+
+def canonical_sha256(payload: object) -> str:
+    encoded=json.dumps(payload,sort_keys=True,separators=(",",":"),allow_nan=False).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def count_vectors(total: int, types: int=3) -> list[tuple[int,...]]:
@@ -138,6 +144,176 @@ class RandomizedCommonDepthCRC:
             for i in range(len(self.states))
         ])
 
+    def build_certificate(self, probabilities: np.ndarray,
+                          verification: dict,
+                          dual_certificate: dict,
+                          dual_witness: dict) -> dict:
+        policy_payload={
+            "calibration_states":[list(D) for D in self.states],
+            "action_grid":self.actions.tolist(),
+            "probabilities":np.asarray(probabilities,dtype=np.float64).tolist(),
+        }
+        constraint_payload={
+            "risk_family":"common_depth_hierarchical_crc",
+            "loss_by_type_and_action":self.losses.tolist(),
+            "alpha":self.alpha,
+            "budget":self.budget,
+            "calibration_states":[list(D) for D in self.states],
+            "augmented_states":[list(S) for S in self.augmented],
+        }
+        objective_payload={
+            "reference_pool_counts":self.pool.tolist(),
+            "hypergeometric_calibration_weights":self.weights.tolist(),
+            "conditional_test_type_probabilities":self.conditional_test_probs.tolist(),
+            "specificity_utility_by_state_and_action":self.utility.tolist(),
+        }
+        return {
+            "schema":"symthaea-risk-certificate-v1",
+            "certificate_type":"RandomizedFiniteExchangeabilityCRC",
+            "proof_lane":"ExactFiniteExchangeabilityPlusLPOptimality",
+            "risk_target":{
+                "metric":"expected_hierarchical_loss",
+                "level":self.alpha.tolist(),
+                "guarantee":"expected_risk",
+            },
+            "assumption_contract":{
+                "finite_exchangeability":True,
+                "finite_observation_alphabet":3,
+                "frozen_loss_and_action_domain":True,
+                "randomization_included_in_expectation":True,
+                "distribution_shift_guarantee":False,
+                "objective_weights_must_be_independently_frozen":True,
+            },
+            "scope":{
+                "n_calibration":self.n,
+                "calibration_state_count":len(self.states),
+                "augmented_state_count":len(self.augmented),
+                "type_count":3,
+                "action_grid":self.actions.tolist(),
+            },
+            "evidence_digests":{
+                "decision_output_sha256":canonical_sha256(policy_payload),
+                "constraint_domain_sha256":canonical_sha256(constraint_payload),
+                "objective_reference_sha256":canonical_sha256(objective_payload),
+            },
+            "verifier_receipt":{
+                "status":"pass" if verification["valid"] else "fail",
+                "method":"exhaustive_augmented_multiset_expected_loss",
+                "states_checked":verification["augmented_states_checked"],
+                "max_budget_excess":verification["max_budget_excess"],
+                "tolerance":1e-9,
+                "worst_augmented_count":list(verification["worst_augmented_count"]),
+                "worst_augmented_total":verification["worst_augmented_total"],
+            },
+            "optimization_receipt":{
+                "solver":"HiGHS",
+                "kkt_summary":dual_certificate,
+                "dual_witness":dual_witness,
+                "status":"pass" if dual_certificate["duality_gap_abs"]<=1e-7 else "fail",
+            },
+        }
+
+    def verify_optimality_witness(self, dual_witness: dict,
+                                  probabilities: np.ndarray,
+                                  tolerance: float=1e-7) -> dict:
+        n_states=len(self.states)
+        n_actions=len(self.actions)
+        n_variables=n_states*n_actions
+        A_ub=lil_matrix((len(self.augmented),n_variables),dtype=np.float64)
+        for row,S in enumerate(self.augmented):
+            for z,multiplicity in enumerate(S):
+                if multiplicity:
+                    D=list(S);D[z]-=1
+                    i=self.index[tuple(D)]
+                    start=i*n_actions
+                    A_ub[row,start:start+n_actions]+=multiplicity*self.losses[z]
+        A_eq=lil_matrix((n_states,n_variables),dtype=np.float64)
+        for i in range(n_states):
+            A_eq[i,i*n_actions:(i+1)*n_actions]=1.0
+        A_ub=A_ub.tocsr()
+        A_eq=A_eq.tocsr()
+        b_ub=np.full(len(self.augmented),self.budget)
+        b_eq=np.ones(n_states)
+        lower=np.zeros(n_variables)
+        upper=np.ones(n_variables)
+        P=np.asarray(probabilities,dtype=np.float64)
+        x=P.reshape(-1)
+        c=-(self.weights[:,None]*self.utility).reshape(-1)
+        y_ub=np.asarray(dual_witness.get("inequality_marginals",[]),dtype=np.float64)
+        y_eq=np.asarray(dual_witness.get("equality_marginals",[]),dtype=np.float64)
+        y_lower=np.asarray(dual_witness.get("lower_marginals",[]),dtype=np.float64)
+        y_upper=np.asarray(dual_witness.get("upper_marginals",[]),dtype=np.float64)
+        if (y_ub.shape!=(len(self.augmented),) or y_eq.shape!=(n_states,)
+                or y_lower.shape!=(n_variables,) or y_upper.shape!=(n_variables,)):
+            return {"valid":False,"reason":"dual witness shape mismatch"}
+        inequality_slack=b_ub-A_ub@x
+        equality_residual=A_eq@x-b_eq
+        stationarity=c-A_ub.T@y_ub-A_eq.T@y_eq-y_lower-y_upper
+        dual_objective=float(np.dot(b_ub,y_ub)+np.dot(b_eq,y_eq)
+                             +np.dot(lower,y_lower)+np.dot(upper,y_upper))
+        complementarity=max(
+            float(np.max(np.abs(y_ub*inequality_slack))),
+            float(np.max(np.abs(y_lower*(x-lower)))),
+            float(np.max(np.abs(y_upper*(upper-x)))),
+        )
+        receipt={
+            "primal_inequality_violation":float(np.max(np.maximum(-inequality_slack,0.0))),
+            "primal_equality_residual":float(np.max(np.abs(equality_residual))),
+            "primal_bound_violation":float(max(np.max(np.maximum(lower-x,0.0)),
+                                               np.max(np.maximum(x-upper,0.0)))),
+            "dual_inequality_sign_violation":float(np.max(np.maximum(y_ub,0.0))),
+            "dual_lower_sign_violation":float(np.max(np.maximum(-y_lower,0.0))),
+            "dual_upper_sign_violation":float(np.max(np.maximum(y_upper,0.0))),
+            "stationarity_max_abs":float(np.max(np.abs(stationarity))),
+            "complementarity_max_abs":complementarity,
+            "primal_objective_min":float(np.dot(c,x)),
+            "dual_objective_min":dual_objective,
+            "duality_gap_abs":float(abs(np.dot(c,x)-dual_objective)),
+        }
+        worst=max(receipt[k] for k in receipt
+                  if k.endswith("violation") or k.endswith("residual")
+                  or k.endswith("max_abs") or k=="duality_gap_abs")
+        receipt["valid"]=bool(worst<=tolerance)
+        return receipt
+
+    def verify_certificate(self, certificate: dict,
+                           probabilities: np.ndarray,
+                           tolerance: float=1e-7) -> dict:
+        if certificate.get("schema")!="symthaea-risk-certificate-v1":
+            return {"valid":False,"reason":"unsupported certificate schema"}
+        if certificate.get("certificate_type")!="RandomizedFiniteExchangeabilityCRC":
+            return {"valid":False,"reason":"certificate type mismatch"}
+        if certificate.get("scope",{}).get("n_calibration")!=self.n:
+            return {"valid":False,"reason":"calibration scope mismatch"}
+        if certificate.get("risk_target",{}).get("level")!=self.alpha.tolist():
+            return {"valid":False,"reason":"risk target mismatch"}
+        verification=self.verify(probabilities)
+        if not verification["valid"]:
+            return {"valid":False,"reason":"exact augmented-state verification failed",
+                    "verification":verification}
+        expected=self.build_certificate(
+            probabilities,verification,
+            certificate.get("optimization_receipt",{}).get("kkt_summary",{}),
+            certificate.get("optimization_receipt",{}).get("dual_witness",{})
+        )
+        expected_digests=expected["evidence_digests"]
+        actual_digests=certificate.get("evidence_digests",{})
+        for name,value in expected_digests.items():
+            if actual_digests.get(name)!=value:
+                return {"valid":False,"reason":f"evidence digest mismatch: {name}"}
+        if certificate.get("scope")!=expected["scope"]:
+            return {"valid":False,"reason":"scope/action-domain mismatch"}
+        dual=self.verify_optimality_witness(
+            certificate.get("optimization_receipt",{}).get("dual_witness",{}),
+            probabilities,tolerance
+        )
+        return {
+            "valid":bool(dual.get("valid",False)),
+            "reason":None if dual.get("valid",False) else "LP dual witness failed KKT checks",
+            "exact_validity":verification,
+            "optimality":dual,
+        }
+
     def solve(self) -> dict:
         n_states=len(self.states)
         n_actions=len(self.actions)
@@ -230,11 +406,21 @@ class RandomizedCommonDepthCRC:
             raise ArithmeticError(f"LP solution failed exact augmented-state verification: {report}")
         metrics=self.evaluate(probabilities)
         supports=(probabilities>1e-8).sum(axis=1)
+        dual_witness={
+            "inequality_marginals":y_ub.tolist(),
+            "equality_marginals":y_eq.tolist(),
+            "lower_marginals":y_lower.tolist(),
+            "upper_marginals":y_upper.tolist(),
+        }
+        certificate=self.build_certificate(
+            probabilities,report,dual_certificate,dual_witness
+        )
         return {
             "action_grid":self.actions.tolist(),
             "probabilities":probabilities.tolist(),
             "expected_metrics":metrics,
             "verification":report,
+            "certificate":certificate,
             "solver":{"method":"HiGHS","success":bool(result.success),
                       "status":str(result.message),"runtime_seconds":runtime,
                       "objective_value":float(-result.fun),
