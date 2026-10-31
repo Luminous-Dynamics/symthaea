@@ -60,6 +60,36 @@ pub struct SelectionMetrics {
     pub mean_selected_interval_width: f64,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CostedDecisionOutcome {
+    pub realized_utility: f64,
+    pub inference_cost: f64,
+    pub acquisition_cost: f64,
+    pub failure_recovery_cost: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DecisionValueEpisode {
+    pub world_model: CostedDecisionOutcome,
+    pub direct_d0: CostedDecisionOutcome,
+    pub direct_d1: CostedDecisionOutcome,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct NetDecisionValueMetrics {
+    pub episode_count: usize,
+    pub mean_gross_advantage_vs_d0: f64,
+    pub mean_net_advantage_vs_d0: f64,
+    pub net_win_rate_vs_d0: f64,
+    pub mean_gross_advantage_vs_d1: f64,
+    pub mean_net_advantage_vs_d1: f64,
+    pub net_win_rate_vs_d1: f64,
+    pub mean_world_model_net_utility: f64,
+    pub mean_d0_net_utility: f64,
+    pub mean_d1_net_utility: f64,
+}
+
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AbstainReason {
     NoIntervalDominantAction,
@@ -139,6 +169,7 @@ pub enum IntervalError {
     DuplicateJointDrawId,
     ActionSampleCardinalityMismatch,
     SameActionRequested,
+    NegativeDecisionCost,
 }
 
 /// Construct a central empirical interval from predictive samples.
@@ -572,6 +603,101 @@ pub fn evaluate_simultaneous_sets(
         mean_max_interval_width,
         absolute_coverage_error: (empirical_coverage - familywise_nominal_coverage).abs(),
     }))
+}
+
+fn net_utility(outcome: CostedDecisionOutcome) -> Result<f64, IntervalError> {
+    for cost in [
+        outcome.inference_cost,
+        outcome.acquisition_cost,
+        outcome.failure_recovery_cost,
+    ] {
+        if !cost.is_finite() {
+            return Err(IntervalError::NonFiniteDerivedMetric);
+        }
+        if cost < 0.0 {
+            return Err(IntervalError::NegativeDecisionCost);
+        }
+    }
+    if !outcome.realized_utility.is_finite() {
+        return Err(IntervalError::NonFiniteRealization);
+    }
+    let net = outcome.realized_utility
+        - outcome.inference_cost
+        - outcome.acquisition_cost
+        - outcome.failure_recovery_cost;
+    if net.is_finite() {
+        Ok(net)
+    } else {
+        Err(IntervalError::NonFiniteDerivedMetric)
+    }
+}
+
+/// Compare world-model decisions with D0 and D1 on matched episodes.
+///
+/// All costs must already be converted to the preregistered common utility
+/// scale. Returns paired mean advantages and episode win rates; uncertainty
+/// intervals must be computed over episodes, not over individual cost terms.
+pub fn evaluate_net_decision_value(
+    episodes: &[DecisionValueEpisode],
+) -> Result<Option<NetDecisionValueMetrics>, IntervalError> {
+    if episodes.is_empty() {
+        return Ok(None);
+    }
+    let mut gross_vs_d0 = 0.0;
+    let mut net_vs_d0 = 0.0;
+    let mut wins_vs_d0 = 0usize;
+    let mut gross_vs_d1 = 0.0;
+    let mut net_vs_d1 = 0.0;
+    let mut wins_vs_d1 = 0usize;
+    let mut world_net_total = 0.0;
+    let mut d0_net_total = 0.0;
+    let mut d1_net_total = 0.0;
+
+    for episode in episodes {
+        let world_net = net_utility(episode.world_model)?;
+        let d0_net = net_utility(episode.direct_d0)?;
+        let d1_net = net_utility(episode.direct_d1)?;
+        let world_gross = episode.world_model.realized_utility;
+        let d0_gross = episode.direct_d0.realized_utility;
+        let d1_gross = episode.direct_d1.realized_utility;
+        gross_vs_d0 += world_gross - d0_gross;
+        net_vs_d0 += world_net - d0_net;
+        gross_vs_d1 += world_gross - d1_gross;
+        net_vs_d1 += world_net - d1_net;
+        wins_vs_d0 += usize::from(world_net > d0_net);
+        wins_vs_d1 += usize::from(world_net > d1_net);
+        world_net_total += world_net;
+        d0_net_total += d0_net;
+        d1_net_total += d1_net;
+    }
+
+    let count = episodes.len() as f64;
+    let metrics = NetDecisionValueMetrics {
+        episode_count: episodes.len(),
+        mean_gross_advantage_vs_d0: gross_vs_d0 / count,
+        mean_net_advantage_vs_d0: net_vs_d0 / count,
+        net_win_rate_vs_d0: wins_vs_d0 as f64 / count,
+        mean_gross_advantage_vs_d1: gross_vs_d1 / count,
+        mean_net_advantage_vs_d1: net_vs_d1 / count,
+        net_win_rate_vs_d1: wins_vs_d1 as f64 / count,
+        mean_world_model_net_utility: world_net_total / count,
+        mean_d0_net_utility: d0_net_total / count,
+        mean_d1_net_utility: d1_net_total / count,
+    };
+    if [
+        metrics.mean_gross_advantage_vs_d0,
+        metrics.mean_net_advantage_vs_d0,
+        metrics.net_win_rate_vs_d0,
+        metrics.mean_gross_advantage_vs_d1,
+        metrics.mean_net_advantage_vs_d1,
+        metrics.net_win_rate_vs_d1,
+        metrics.mean_world_model_net_utility,
+        metrics.mean_d0_net_utility,
+        metrics.mean_d1_net_utility,
+    ].iter().any(|value| !value.is_finite()) {
+        return Err(IntervalError::NonFiniteDerivedMetric);
+    }
+    Ok(Some(metrics))
 }
 
 /// Select only a uniquely interval-dominant action; otherwise abstain.
@@ -1101,6 +1227,62 @@ mod tests {
         assert!(!is_interval_dominant(&uncertain, 0).unwrap());
     }
 
+
+
+    fn costed(utility: f64, inference: f64, acquisition: f64, recovery: f64) -> CostedDecisionOutcome {
+        CostedDecisionOutcome {
+            realized_utility: utility,
+            inference_cost: inference,
+            acquisition_cost: acquisition,
+            failure_recovery_cost: recovery,
+        }
+    }
+
+    #[test]
+    fn net_decision_value_charges_inference_acquisition_and_failure_costs() {
+        let episodes = vec![
+            DecisionValueEpisode {
+                world_model: costed(10.0, 2.0, 1.0, 0.0),
+                direct_d0: costed(8.0, 0.0, 0.0, 0.0),
+                direct_d1: costed(9.0, 0.5, 0.0, 0.0),
+            },
+            DecisionValueEpisode {
+                world_model: costed(12.0, 2.0, 0.0, 1.0),
+                direct_d0: costed(9.0, 0.0, 0.0, 0.0),
+                direct_d1: costed(10.0, 0.5, 0.0, 0.0),
+            },
+            DecisionValueEpisode {
+                world_model: costed(7.0, 1.0, 1.0, 0.0),
+                direct_d0: costed(8.0, 0.0, 0.0, 0.0),
+                direct_d1: costed(8.5, 0.5, 0.0, 0.0),
+            },
+        ];
+        let metrics = evaluate_net_decision_value(&episodes).unwrap().unwrap();
+        assert_eq!(metrics.episode_count, 3);
+        assert!((metrics.mean_gross_advantage_vs_d0 - (5.0 / 3.0)).abs() < 1e-12);
+        assert!((metrics.mean_net_advantage_vs_d0 - (1.0 / 3.0)).abs() < 1e-12);
+        assert!((metrics.net_win_rate_vs_d0 - (2.0 / 3.0)).abs() < 1e-12);
+        assert!((metrics.mean_gross_advantage_vs_d1 - (0.5 / 3.0)).abs() < 1e-12);
+        assert!((metrics.mean_net_advantage_vs_d1 - (-1.0 / 3.0)).abs() < 1e-12);
+        assert!((metrics.net_win_rate_vs_d1 - (1.0 / 3.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn net_decision_value_rejects_negative_costs_and_nonfinite_utilities() {
+        let invalid_cost = [DecisionValueEpisode {
+            world_model: costed(1.0, -1.0, 0.0, 0.0),
+            direct_d0: costed(1.0, 0.0, 0.0, 0.0),
+            direct_d1: costed(1.0, 0.0, 0.0, 0.0),
+        }];
+        assert_eq!(evaluate_net_decision_value(&invalid_cost), Err(IntervalError::NegativeDecisionCost));
+        let invalid_utility = [DecisionValueEpisode {
+            world_model: costed(f64::NAN, 0.0, 0.0, 0.0),
+            direct_d0: costed(1.0, 0.0, 0.0, 0.0),
+            direct_d1: costed(1.0, 0.0, 0.0, 0.0),
+        }];
+        assert_eq!(evaluate_net_decision_value(&invalid_utility), Err(IntervalError::NonFiniteRealization));
+        assert_eq!(evaluate_net_decision_value(&[]).unwrap(), None);
+    }
 
     #[test]
     fn selected_action_evaluator_scores_realized_regret_and_certificate_quality() {
