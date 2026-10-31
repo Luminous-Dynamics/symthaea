@@ -674,11 +674,42 @@ fn audit_values_with_context_receipt(
         }));
     }
 
+    let mut test_score_values: BTreeMap<String, Vec<f64>> = BTreeMap::new();
+    for record in &records {
+        test_score_values.entry(record.context_id.clone()).or_default().push(record.anomaly_score);
+    }
+    let test_score_tie_diagnostics: Vec<Value> = test_score_values.iter().map(|(context_id, values)| {
+        let mut sorted = values.clone();
+        sorted.sort_by(f64::total_cmp);
+        let mut groups = 0usize;
+        let mut extra = 0usize;
+        let mut position = 0usize;
+        while position < sorted.len() {
+            let mut next = position + 1;
+            while next < sorted.len() && sorted[next] == sorted[position] {
+                next += 1;
+            }
+            if next - position > 1 {
+                groups += 1;
+                extra += next - position - 1;
+            }
+            position = next;
+        }
+        json!({
+            "context_id":context_id,
+            "stream_score_count":sorted.len(),
+            "test_duplicate_score_group_count":groups,
+            "test_duplicate_score_extra_occurrences":extra
+        })
+    }).collect();
+
     let context_reports: Vec<Value> = plan.contexts.iter().map(|(context_id, state)| json!({
         "context_id":context_id,
         "reference_id":state.reference_id,
         "reference_digest":state.reference_digest,
         "reference_score_count":state.scores.len(),
+        "reference_duplicate_score_group_count":state.reference_duplicate_score_group_count,
+        "reference_duplicate_score_extra_occurrences":state.reference_duplicate_score_extra_occurrences,
         "declared_reference_independent_group_count":state.reference_group_count,
         "alpha_allocation":state.alpha,
         "delta_allocation":state.delta,
@@ -748,6 +779,14 @@ fn audit_values_with_context_receipt(
             "randomized_pit_atom_safe":true,
             "randomizer_source_artifact_sha256":plan.pit_randomizer_source_sha256,
             "randomizer_independence_status":"assumption_not_verified",
+            "reference_and_test_score_tie_diagnostics":{
+                "reference":context_reports.iter().map(|r| json!({
+                    "context_id":r["context_id"],
+                    "duplicate_score_group_count":r["reference_duplicate_score_group_count"],
+                    "duplicate_score_extra_occurrences":r["reference_duplicate_score_extra_occurrences"]
+                })).collect::<Vec<_>>(),
+                "test_stream":test_score_tie_diagnostics
+            },
             "continuous_score_distribution_required":false,
             "reference_cdf_confidence":1.0-plan.delta_budget,
             "conditional_type_i_error_budget_if_all_context_reference_bands_hold":plan.alpha_budget,
@@ -1196,12 +1235,18 @@ mod tests {
     #[test]
     fn reference_atom_diagnostics_are_reported() {
         let (mut p, s, _, _) = fixture();
-        p["contexts"][0]["reference_scores"] = json!([1.0,1.0,1.0,2.0,2.0,3.0]);
-        p["contexts"][0]["reference_group_ids"] = json!(["g1","g2","g3","g4","g5","g6"]);
+        p["contexts"][0]["reference_scores"] = json!([
+            1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,
+            2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0
+        ]);
+        p["contexts"][0]["reference_group_ids"] = json!([
+            "g1","g2","g3","g4","g5","g6","g7","g8","g9","g10",
+            "g11","g12","g13","g14","g15","g16","g17","g18","g19","g20"
+        ]);
         p["minimum_reference_scores"] = json!(2);
         let r = audit(&p, &s).unwrap();
         assert_eq!(r["reference_policy"]["contexts"][0]["reference_duplicate_score_group_count"], 2);
-        assert_eq!(r["reference_policy"]["contexts"][0]["reference_duplicate_score_extra_occurrences"], 3);
+        assert_eq!(r["reference_policy"]["contexts"][0]["reference_duplicate_score_extra_occurrences"], 18);
     }
 
     #[test]
@@ -1220,8 +1265,8 @@ mod tests {
 
     #[test]
     fn randomizer_independence_remains_an_unverified_assumption() {
-        let (p, s, pb, sb) = fixture();
-        let r = audit_values_with_context_receipt_fixture(&p, &s, &pb, &sb).unwrap();
+        let (p, s, _, _) = fixture();
+        let r = audit(&p, &s).unwrap();
         assert_eq!(r["statistical_guarantees"]["randomizer_independence_status"], "assumption_not_verified");
         assert_eq!(r["statistical_guarantees"]["randomized_pit_atom_safe"], true);
     }
