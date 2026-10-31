@@ -250,10 +250,16 @@ fn evaluate_budget(regions: &[Region], edges: &BTreeMap<String, Edge>, positive:
                         }
                     }
                 }
-                selected_edges.extend(region.edges.iter().cloned());
                 if added > 0 {
                     selected_regions.push(region.id.clone());
                     used += added;
+                }
+                for edge_id in &region.edges {
+                    if let Some(edge) = edges.get(edge_id) {
+                        if selected_nodes.contains(&edge.source) && selected_nodes.contains(&edge.target) {
+                            selected_edges.insert(edge_id.clone());
+                        }
+                    }
                 }
             }
             "edges" => {
@@ -518,7 +524,9 @@ fn validate_receipt_location(receipt: &Path, inputs: &[&Path]) -> Result<(), Str
     if receipt.exists() {
         return Err(format!("refusing to overwrite receipt {}", receipt.display()));
     }
-    let parent = receipt.parent().unwrap_or_else(|| Path::new("."));
+    let parent = receipt.parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
     let canonical_parent = fs::canonicalize(parent)
         .map_err(|e| format!("receipt parent must exist: {e}"))?;
     for input in inputs {
