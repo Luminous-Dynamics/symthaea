@@ -1,0 +1,210 @@
+{
+  "schema_version": "hardsec-randomized-pit-benchmark-v1",
+  "benchmark_id": "hs021-atom-safe-cctm-comparison",
+  "status": "planned",
+  "reference_implementations": [
+    {
+      "id": "deterministic_ecdf_dkw_cctm_rust",
+      "status": "authored_candidate",
+      "source": "HARDSEC-019 Rust CCTM"
+    },
+    {
+      "id": "randomized_pit_dkw_cctm_rust",
+      "status": "authored_candidate",
+      "source": "HARDSEC-021 Rust CCTM"
+    },
+    {
+      "id": "authors_official_python_cctm",
+      "status": "source_pinned_not_reproduced",
+      "source": "shaersh/cctm main blob SHAs recorded in HARDSEC-019"
+    },
+    {
+      "id": "static_threshold",
+      "status": "baseline_to_implement",
+      "source": "predeclared validation-frozen score threshold"
+    },
+    {
+      "id": "ewma",
+      "status": "baseline_to_implement",
+      "source": "one-sided EWMA"
+    },
+    {
+      "id": "page_hinkley_cusum",
+      "status": "baseline_to_implement",
+      "source": "predeclared PH/CUSUM implementation"
+    },
+    {
+      "id": "fixed_window_conformal",
+      "status": "baseline_to_implement",
+      "source": "calibration reference not updated online"
+    },
+    {
+      "id": "symthaea_hdc_sequential",
+      "status": "candidate_to_implement",
+      "source": "HDC temporal score front end"
+    },
+    {
+      "id": "symthaea_liquid_sequential",
+      "status": "candidate_to_implement",
+      "source": "CfC/LTC temporal score front end"
+    }
+  ],
+  "score_distributions": [
+    {
+      "id": "continuous_uniform",
+      "atoms": false,
+      "quantization_levels": null
+    },
+    {
+      "id": "continuous_heavy_tailed",
+      "atoms": false,
+      "quantization_levels": null
+    },
+    {
+      "id": "two_level",
+      "atoms": true,
+      "quantization_levels": 2
+    },
+    {
+      "id": "four_level",
+      "atoms": true,
+      "quantization_levels": 4
+    },
+    {
+      "id": "sixteen_level",
+      "atoms": true,
+      "quantization_levels": 16
+    },
+    {
+      "id": "two_hundred_fifty_six_level",
+      "atoms": true,
+      "quantization_levels": 256
+    },
+    {
+      "id": "clipped_rounded",
+      "atoms": true,
+      "quantization_levels": null
+    },
+    {
+      "id": "unequal_atom_masses_50_30_20",
+      "atoms": true,
+      "quantization_levels": 3
+    }
+  ],
+  "randomizer_scenarios": [
+    {
+      "id": "independent_uniform_after_score",
+      "target": true
+    },
+    {
+      "id": "fixed_reused_uniform",
+      "target": false
+    },
+    {
+      "id": "score_dependent_uniform",
+      "target": false
+    },
+    {
+      "id": "non_uniform_beta",
+      "target": false
+    },
+    {
+      "id": "serially_correlated_uniform",
+      "target": false
+    },
+    {
+      "id": "delayed_randomizer",
+      "target": false
+    },
+    {
+      "id": "duplicate_randomizer_id",
+      "target": false
+    },
+    {
+      "id": "missing_randomizer",
+      "target": false
+    },
+    {
+      "id": "randomizer_artifact_mismatch",
+      "target": false
+    }
+  ],
+  "null_dependence_scenarios": [
+    "iid_null",
+    "ar1_autocorrelated_null",
+    "perfectly_repeated_latent_null",
+    "workload_phase_change_null",
+    "context_transition_null",
+    "heavy_tailed_dependent_null"
+  ],
+  "attack_scenarios": [
+    "persistent_attack_effect",
+    "gradual_attack_effect",
+    "intermittent_attack_effect",
+    "context_mimicry",
+    "adaptive_timing",
+    "adaptive_interleaving",
+    "counter_aware_adaptation"
+  ],
+  "holdout_axes": [
+    "reference_execution",
+    "evaluation_execution",
+    "program_binary",
+    "attack_family",
+    "adaptation_family",
+    "device_configuration",
+    "cross_platform"
+  ],
+  "primary_metrics": [
+    "probability_any_false_alarm_by_fixed_horizon",
+    "false_alarms_per_device_hour",
+    "p50_detection_delay",
+    "p95_detection_delay",
+    "attack_effect_conditioned_recall",
+    "worst_context_recall",
+    "worst_attack_family_recall",
+    "atom_mass_and_tie_rate",
+    "randomizer_abstention_rate",
+    "context_abstention_rate",
+    "cpu_time",
+    "resident_memory",
+    "end_to_end_overhead"
+  ],
+  "calibration_frontier": {
+    "total_alpha": 0.04,
+    "total_delta": 0.01,
+    "context_count": 2,
+    "alpha_per_context": 0.02,
+    "delta_per_context": 0.005,
+    "epsilon_formula": "sqrt(ln(2/delta_context)/(2*n_context))",
+    "epsilon_targets": [
+      0.05,
+      0.025,
+      0.01,
+      0.005
+    ],
+    "independent_reference_units_per_context": [
+      1199,
+      4794,
+      29958,
+      119830
+    ],
+    "iid_reference_assumption_required": true,
+    "repeated_windows_do_not_count_as_independent_reference_units": true
+  },
+  "aspirational_targets": {
+    "no_additional_null_calibration_loss_for_atomic_scores_under_assumptions": true,
+    "matched_horizon_false_alarm_probability_not_worse_than_deterministic_cctm": true,
+    "zero_wealth_updates_when_randomizer_missing_invalid_or_unqualified": true,
+    "incremental_randomization_and_decision_layer_p95_overhead_max": 0.01,
+    "p95_detection_delay_reduction_vs_best_reproduced_baseline_min": 0.2
+  },
+  "claim_rules": {
+    "randomizer_independence_must_be_justified": true,
+    "iid_null_and_reference_assumptions_must_be_justified": true,
+    "dependent_null_scenarios_are_negative_controls": true,
+    "reference_and_evaluation_groups_must_be_disjoint": true,
+    "no_sota_claim_without_same_protocol_reproduction": true,
+    "targets_are_not_results": true
+  }
+}
