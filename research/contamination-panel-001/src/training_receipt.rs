@@ -204,9 +204,9 @@ fn intervention_payload_digest(
         .collect();
     let bytes = serde_json::to_vec(&entries)
         .map_err(|error| format!("cannot serialize {arm:?} payload entries: {error}"))?;
-    let domain = match arm {
-        TrainingArmV1::Treatment => b"treatment-intervention-payload.v1".as_slice(),
-        TrainingArmV1::Placebo => b"placebo-intervention-payload.v1".as_slice(),
+    let domain: &[u8] = match arm {
+        TrainingArmV1::Treatment => b"treatment-intervention-payload.v1",
+        TrainingArmV1::Placebo => b"placebo-intervention-payload.v1",
     };
     Ok(hash_domain(domain, &bytes))
 }
