@@ -179,14 +179,13 @@ pub fn run(out_path: &Path, probe_permission_class: bool) -> anyhow::Result<Runt
 }
 
 fn kernel_identity() -> KernelIdentity {
-    let release = std::fs::read_to_string("/proc/sys/kernel/osrelease")
-        .ok()
+    let release = read_bounded_file("/proc/sys/kernel/osrelease", 256)
+        .and_then(|bytes| String::from_utf8(bytes).ok())
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty());
 
-    let boot_id_digest = std::fs::read("/proc/sys/kernel/random/boot_id")
-        .ok()
-        .filter(|bytes| !bytes.is_empty() && bytes.len() <= MAX_BOOT_ID_BYTES)
+    let boot_id_digest = read_bounded_file("/proc/sys/kernel/random/boot_id", MAX_BOOT_ID_BYTES as u64)
+        .filter(|bytes| !bytes.is_empty())
         .map(|bytes| sha256_tagged(&bytes));
 
     KernelIdentity {
@@ -247,15 +246,18 @@ fn process_security_context() -> ProcessSecurityContext {
     }
 }
 
-fn read_process_status() -> Option<String> {
-    const MAX_STATUS_BYTES: u64 = 256 * 1024;
-    let file = File::open("/proc/self/status").ok()?;
+fn read_bounded_file(path: &str, limit: u64) -> Option<Vec<u8>> {
+    let file = File::open(path).ok()?;
     let mut bytes = Vec::new();
-    file.take(MAX_STATUS_BYTES + 1).read_to_end(&mut bytes).ok()?;
-    if bytes.len() as u64 > MAX_STATUS_BYTES {
+    file.take(limit.saturating_add(1)).read_to_end(&mut bytes).ok()?;
+    if bytes.len() as u64 > limit {
         return None;
     }
-    String::from_utf8(bytes).ok()
+    Some(bytes)
+}
+fn read_process_status() -> Option<String> {
+    const MAX_STATUS_BYTES: u64 = 256 * 1024;
+    String::from_utf8(read_bounded_file("/proc/self/status", MAX_STATUS_BYTES)?).ok()
 }
 
 trait LinuxSmokeSyscalls {
