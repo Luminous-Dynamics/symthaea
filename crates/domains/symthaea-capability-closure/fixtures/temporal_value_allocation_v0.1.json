@@ -37,7 +37,7 @@
       "denominator": "bytes * effective_retention_us",
       "effective_retention": "min(expected_retention_us, valid_until_us - now_us) when hard validity deadline exists",
       "fixed_point_score_scale": 1000000000000000000,
-      "arithmetic": "sequential checked u128 PPM scaling and deterministic integer ranking",
+      "arithmetic": "multiply-first checked u128 PPM product, one division by PPM^3, then deterministic fixed-point ratio",
       "selection": "greedy_density_heuristic_not_exact_knapsack",
       "tie_break": "ascending_item_id"
     },
@@ -65,7 +65,7 @@
       "no_retention_lower_reference"
     ],
     "implementation": {
-      "tests_authored": 11,
+      "tests_authored": 12,
       "tests_executed": false,
       "production_hdc_ltc_integration": false,
       "online_value_predictor": false,
@@ -212,8 +212,8 @@
   },
   "validation": {
     "parent_branch_authored_tests_reported": 208,
-    "new_tests_authored": 19,
-    "combined_source_level_test_count_expected": 227,
+    "new_tests_authored": 20,
+    "combined_source_level_test_count_expected": 228,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
