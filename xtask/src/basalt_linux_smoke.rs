@@ -212,6 +212,10 @@ fn proc_status_u8(status: &str, key: &str) -> Option<u8> {
     proc_status_value(status, key)?.parse().ok()
 }
 
+fn proc_status_effective_id(status: &str, key: &str) -> Option<u32> {
+    proc_status_value(status, key)?.split_whitespace().nth(1)?.parse().ok()
+}
+
 #[cfg(target_os = "linux")]
 fn namespace_inode(path: &str) -> Option<u64> {
     std::fs::metadata(path).ok().map(|metadata| metadata.ino())
@@ -219,10 +223,8 @@ fn namespace_inode(path: &str) -> Option<u64> {
 
 fn process_security_context() -> ProcessSecurityContext {
     let status = read_process_status();
-    #[cfg(target_os = "linux")]
-    let (effective_uid, effective_gid) = (Some(unsafe { libc::geteuid() }), Some(unsafe { libc::getegid() }));
-    #[cfg(not(target_os = "linux"))]
-    let (effective_uid, effective_gid) = (None, None);
+    let effective_uid = status.as_deref().and_then(|text| proc_status_effective_id(text, "Uid"));
+    let effective_gid = status.as_deref().and_then(|text| proc_status_effective_id(text, "Gid"));
 
     #[cfg(target_os = "linux")]
     let (mount_namespace_inode, user_namespace_inode, pid_namespace_inode) = (
@@ -713,6 +715,13 @@ mod tests {
         assert_eq!(proc_status_u8(status, "NoSuchField"), None);
     }
 
+    #[test]
+    fn proc_status_effective_ids_are_bound_to_the_same_status_snapshot() {
+        let status = "Uid:\t1000\t1001\t1002\t1003\nGid:\t2000\t2001\t2002\t2003\n";
+        assert_eq!(proc_status_effective_id(status, "Uid"), Some(1001));
+        assert_eq!(proc_status_effective_id(status, "Gid"), Some(2001));
+        assert_eq!(proc_status_effective_id(status, "NoSuchField"), None);
+    }
     #[test]
     fn malformed_proc_status_capability_values_remain_unknown() {
         let status = "CapEff:\t0xnot-hex\nNoNewPrivs:\tunknown\nSeccomp:\t3\n";
