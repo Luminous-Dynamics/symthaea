@@ -104,7 +104,9 @@ impl fmt::Display for IrregularGenerationError {
             Self::InvalidPeriod { index, period_us } => {
                 write!(f, "period {index} is invalid: {period_us} microseconds")
             }
-            Self::DurationExceedsLimit => write!(f, "irregular stream duration exceeds the configured limit"),
+            Self::DurationExceedsLimit => {
+                write!(f, "irregular stream duration exceeds the configured limit")
+            }
             Self::NoObservationsAfterMissingness => {
                 write!(f, "missingness removed every scheduled observation")
             }
@@ -134,15 +136,29 @@ impl fmt::Display for IrregularVerificationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::StreamIdMismatch => write!(f, "irregular task and oracle stream IDs differ"),
-            Self::PublicDigestMismatch => write!(f, "irregular public stream SHA-256 digest mismatch"),
+            Self::PublicDigestMismatch => {
+                write!(f, "irregular public stream SHA-256 digest mismatch")
+            }
             Self::OracleDigestMismatch => write!(f, "irregular oracle SHA-256 digest mismatch"),
-            Self::SeedReplayMismatch => write!(f, "irregular task/oracle do not match the supplied seed and configuration"),
-            Self::LengthMismatch => write!(f, "irregular public/oracle point count is inconsistent"),
+            Self::SeedReplayMismatch => write!(
+                f,
+                "irregular task/oracle do not match the supplied seed and configuration"
+            ),
+            Self::LengthMismatch => {
+                write!(f, "irregular public/oracle point count is inconsistent")
+            }
             Self::DroppedSlotManifestInvalid => write!(f, "dropped-slot manifest is invalid"),
-            Self::InvalidTaskContract => write!(f, "irregular task timing or missingness contract is invalid"),
-            Self::InvalidOracleSchedule => write!(f, "irregular oracle schedule is outside the generator bounds"),
+            Self::InvalidTaskContract => {
+                write!(f, "irregular task timing or missingness contract is invalid")
+            }
+            Self::InvalidOracleSchedule => {
+                write!(f, "irregular oracle schedule is outside the generator bounds")
+            }
             Self::InvalidLatentValue { index } => {
-                write!(f, "irregular latent value at point {index} disagrees with its period and phase")
+                write!(
+                    f,
+                    "irregular latent value at point {index} disagrees with its period and phase"
+                )
             }
             Self::TimeNotStrictlyIncreasing { index } => {
                 write!(f, "observation timestamps are not strictly increasing at index {index}")
