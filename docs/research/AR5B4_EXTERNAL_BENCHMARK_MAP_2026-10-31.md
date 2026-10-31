@@ -185,3 +185,17 @@ Added deterministic Rust `pareto_moead.rs` for ZDT1 and three-objective DTLZ2. I
 The active baseline set is therefore now NSGA-II plus a compact MOEA/D-DE variant on common ZDT1/DTLZ2 fixtures. Neither implementation has been compiled, run or cross-checked against PlatEMO 4.16 yet. They are reference implementations in development, not evidence that either method converges well or that Symthaea beats it.
 
 The two baseline implementations guard population size at 2,048 for their current quadratic sorting/neighborhood operations. This is an implementation safety limit, not an algorithmic limitation.
+
+## Third algorithm baseline and common comparison harness — 2026-10-31
+
+Added the compact Rust SMS-EMOA reference variant, using the same ZDT1/DTLZ2 functions and exact hypervolume primitive. It performs one-offspring iterations and removes the lowest exclusive-HV-contribution point from the worst nondominated front against a frozen utility-space reference point. Its particular tournament/operator choices are documented and must be cross-checked against a pinned external implementation before claiming algorithm equivalence.
+
+Added `pareto_baseline_comparison.rs`, which replay-verifies NSGA-II, MOEA/D-DE and SMS-EMOA, then refuses to compare unless problem ID, seed, objective-evaluation count, objective specs/scale anchors, hypervolume reference point and reference Pareto front match exactly. It reports all three indicators (HV, IGD+, additive epsilon), archive/population size and the SHA-256s of the run, analysis and comparison receipts. A deterministic verifier reconstructs the comparison. The integration fixture gives all three methods exactly 60 objective evaluations on ZDT1 and checks the mismatch gates.
+
+### Critical reference-point rule
+
+The baseline fixtures now use a hypervolume reference point below the normalized feasible utility range (for example -0.1 in every objective). A zero coordinate would give no dominated box volume to a Pareto point lying exactly on that normalized boundary, which can remove endpoints from SMS-EMOA's contribution accounting. The reference point and normalization are shared and receipt-bound; it must never be chosen post hoc to favor a method.
+
+### Claim ceiling
+
+Three algorithms can now be compared on identical synthetic budgets by one shared deterministic analysis harness. This is not yet a benchmark leaderboard: runs have not been executed, methods have not been cross-checked against PlatEMO 4.16, and no wall-clock, energy or hardware telemetry comparison is included. We have not established any algorithm wins.
