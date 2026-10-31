@@ -2207,6 +2207,28 @@ mod tests {
         assert_eq!(restored.enable_jepa, original.enable_jepa);
     }
 
+    #[cfg(feature = "jepa")]
+    #[test]
+    fn jepa_enable_flag_defaults_off_for_older_serialized_configs() {
+        let mut value = serde_json::to_value(CognitiveLoopConfig::default()).unwrap();
+        value
+            .as_object_mut()
+            .expect("config serializes to an object")
+            .remove("enable_jepa");
+        let restored: CognitiveLoopConfig = serde_json::from_value(value).unwrap();
+        assert!(!restored.enable_jepa);
+    }
+
+    #[cfg(feature = "jepa")]
+    #[test]
+    fn jepa_enable_flag_roundtrips_when_explicitly_enabled() {
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_jepa = true;
+        let value = serde_json::to_value(&config).unwrap();
+        let restored: CognitiveLoopConfig = serde_json::from_value(value).unwrap();
+        assert!(restored.enable_jepa);
+    }
+
     #[test]
     fn temporal_backend_serde_roundtrip() {
         for backend in [TemporalBackend::CfC, TemporalBackend::HdcLtcUnified] {
