@@ -167,3 +167,8 @@ The new action-bank structure has a canonical SHA-256 over its exact semantic co
 ### Selection-event evaluation
 
 The selected action is the product of an adaptive choice, so marginal interval coverage is not the end metric. The new `evaluate_selected_action_sets` primitive scores realized regret, the conditional regret bound, bound coverage, complete-set simultaneous coverage, and false dominance certificates at the episode level. A false dominance certificate is a zero-regret interval claim contradicted by evaluator truth. The four-episode fixture intentionally includes one such failure; it is a test vector, not a calibration result. See `selected-action-evaluation.v0.1.schema.json` and `fixtures/selected-action-evaluation.example.json`.
+
+
+### Fail-closed selection and external benchmark comparison
+
+The joint action-bank work now includes a unique interval-dominance selector that abstains when no unique action is certified. The 2026 benchmark matrix defines a P0–P6 ladder and compares direct policies, fixed world-model planning, uncertainty-aware planning and adaptive inference under equal budgets. It also records the current literature gap between open-loop/prediction-level evaluations and prediction-to-action evidence. No external benchmark score is treated as a directly comparable Symthaea result.
