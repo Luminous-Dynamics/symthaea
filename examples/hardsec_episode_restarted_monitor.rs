@@ -1470,6 +1470,72 @@ mod tests {
         assert!(restarted_alarm.unwrap()-1000 < classic_alarm.unwrap()-1000);
     }
 
+
+    #[test]
+    fn dependent_ar1_episode_null_exposes_false_alarm_claim_boundary() {
+        // Deterministic seeded stress experiment: each episode score follows
+        // a stationary AR(1) process with rho=0.8 and approximately Gaussian
+        // innovations (sum of 12 uniforms minus 6). A separate deterministic
+        // PRNG stream supplies tie randomizers. The marginal score law is
+        // stationary, but successive episode scores are dependent.
+        //
+        // This is a dependence negative control, not a Monte Carlo confidence
+        // interval, hardware PFA estimate, or proof about any particular CPU.
+        let family = vec![
+            BettingTerm { theta: 0.15, prior_weight: 0.25 },
+            BettingTerm { theta: 0.30, prior_weight: 0.25 },
+            BettingTerm { theta: 0.50, prior_weight: 0.25 },
+            BettingTerm { theta: 0.75, prior_weight: 0.25 },
+        ];
+        let mut innovation_rng = 111_u64;
+        let mut randomizer_rng = 222_u64;
+        let mut alarms = 0usize;
+        let runs = 500usize;
+        let horizon = 200usize;
+        let rho = 0.8_f64;
+        let innovation_scale = (1.0 - rho * rho).sqrt();
+
+        for _run in 0..runs {
+            let mut score = 0.0_f64;
+            let mut state = ContextState::new(0.025, &family);
+            let mut crossed = false;
+            for episode_index in 1..=horizon {
+                let mut innovation = 0.0_f64;
+                for _ in 0..12 {
+                    innovation_rng = (1_664_525_u64 * innovation_rng
+                        + 1_013_904_223_u64) % 4_294_967_296_u64;
+                    innovation += innovation_rng as f64 / 4_294_967_296.0;
+                    randomizer_rng = if _ == 11 {
+                        randomizer_rng
+                    } else {
+                        randomizer_rng
+                    };
+                }
+                innovation -= 6.0;
+                score = rho * score + innovation_scale * innovation;
+
+                randomizer_rng = (1_664_525_u64 * randomizer_rng
+                    + 1_013_904_223_u64) % 4_294_967_296_u64;
+                let u = (randomizer_rng as f64 / 4_294_967_296.0)
+                    .clamp(1e-9, 1.0 - 1e-9);
+                let (_p, _restarted, _fixed, _threshold, crossing, _fixed_crossing) =
+                    state.update(score, u, episode_index, &family).unwrap();
+                crossed |= crossing;
+                if crossed {
+                    break;
+                }
+            }
+            if crossed {
+                alarms += 1;
+            }
+        }
+        let observed_fraction = alarms as f64 / runs as f64;
+        assert!(
+            observed_fraction > 0.45 && observed_fraction < 0.75,
+            "AR(1) dependent-null alarm fraction was {observed_fraction}"
+        );
+    }
+
     #[test]
     fn weight_schedule_is_summable_and_recent_starts_remain_nonzero() {
         let sum:f64=(1..1_000_000).map(near_harmonic_restart_weight).sum();
