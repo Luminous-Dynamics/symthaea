@@ -252,6 +252,7 @@ fn verify_equal(
         config.max_partition_combinations,
     )
     .map_err(|error| error.to_string())?;
+    let epsilon = 10.0_f64.powi(-(config.decimal_precision as i32));
     let mut maximum_phi = 0.0_f64;
     for (optimized_pair, naive_pair) in optimized
         .state_pair_results
