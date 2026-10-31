@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-012-resource-profile-v0.1.json",
+  "title": "CMAQ-012 resource measurement profile",
+  "description": "Content-addressed definition of the host, runtime and profiler protocol used to measure a paired D0/D1/W1/W2/W3 run.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "resource_measurement_method",
+    "hardware",
+    "software",
+    "instrumentation",
+    "compute_work_unit_definition",
+    "latency_measurement",
+    "memory_measurement",
+    "energy_measurement",
+    "tolerances",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-012-resource-profile-v0.1"
+    },
+    "resource_measurement_method": {
+      "enum": [
+        "operator_trace",
+        "hardware_counter",
+        "static_estimate",
+        "unavailable"
+      ]
+    },
+    "hardware": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "os_arch",
+        "cpu_model",
+        "logical_cpu_count",
+        "accelerator_model",
+        "accelerator_driver",
+        "memory_bytes",
+        "device_clock_policy"
+      ],
+      "properties": {
+        "os_arch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cpu_model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "logical_cpu_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "accelerator_model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "accelerator_driver": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "memory_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "device_clock_policy": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "software": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_commit",
+        "binary_sha256",
+        "compiler",
+        "runtime",
+        "dependency_lock_sha256"
+      ],
+      "properties": {
+        "source_commit": {
+          "type": "string",
+          "minLength": 7
+        },
+        "binary_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "compiler": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runtime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dependency_lock_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "instrumentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profiler_name",
+        "profiler_version",
+        "profiler_binary_sha256",
+        "measurement_scope",
+        "synchronization_policy",
+        "warmup_iterations",
+        "measured_repetitions",
+        "instrumentation_overhead_policy"
+      ],
+      "properties": {
+        "profiler_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profiler_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profiler_binary_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "measurement_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "synchronization_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "warmup_iterations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "measured_repetitions": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "instrumentation_overhead_policy": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "compute_work_unit_definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit_name",
+        "counting_semantics",
+        "accepted_methods",
+        "not_counted"
+      ],
+      "properties": {
+        "unit_name": {
+          "const": "normalized_compute_work_unit"
+        },
+        "counting_semantics": {
+          "type": "string",
+          "minLength": 1
+        },
+        "accepted_methods": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "operator_trace",
+              "hardware_counter",
+              "static_estimate",
+              "unavailable"
+            ]
+          }
+        },
+        "not_counted": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "latency_measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clock_source",
+        "start_event",
+        "end_event",
+        "includes_synchronization",
+        "unit"
+      ],
+      "properties": {
+        "clock_source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_event": {
+          "type": "string",
+          "minLength": 1
+        },
+        "end_event": {
+          "type": "string",
+          "minLength": 1
+        },
+        "includes_synchronization": {
+          "type": "boolean"
+        },
+        "unit": {
+          "const": "milliseconds"
+        }
+      }
+    },
+    "memory_measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "unit",
+        "peak_policy"
+      ],
+      "properties": {
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "const": "bytes"
+        },
+        "peak_policy": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "energy_measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "sampling_policy",
+        "unit",
+        "calibration"
+      ],
+      "properties": {
+        "source": {
+          "enum": [
+            "external_meter",
+            "rapl",
+            "nvml",
+            "unavailable"
+          ]
+        },
+        "sampling_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "const": "millijoules"
+        },
+        "calibration": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "tolerances": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compute_work_relative",
+        "latency_relative",
+        "peak_memory_relative"
+      ],
+      "properties": {
+        "compute_work_relative": {
+          "const": 0.05
+        },
+        "latency_relative": {
+          "const": 0.05
+        },
+        "peak_memory_relative": {
+          "const": 0.1
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "measurement_profile_contract_only_receipt_bytes_must_be_independently_verified"
+    },
+    "fixture_only": {
+      "type": "boolean"
+    }
+  }
+}

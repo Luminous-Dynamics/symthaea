@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-012-profiling-receipt-v0.1.json",
+  "title": "CMAQ-012 per-run profiling receipt",
+  "description": "Per-arm/episode measured resource receipt. The TSV ledger carries SHA-256 of the exact serialized receipt bytes; the receipt does not contain its own digest. The current CLI binds and deduplicates those digests but does not yet ingest or independently verify receipt bytes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "resource_profile_sha256",
+    "task",
+    "capability",
+    "split",
+    "seed",
+    "arm",
+    "measurement_method",
+    "latency_ms",
+    "compute_work_units",
+    "peak_memory_bytes",
+    "energy_millijoules",
+    "direct_value_calls",
+    "world_model_forward_calls",
+    "world_model_transition_calls",
+    "oracle_transition_calls",
+    "environment_transition_calls",
+    "optimizer_iterations",
+    "recorder_id",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-012-profiling-receipt-v0.1"
+    },
+    "resource_profile_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "task": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capability": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split": {
+      "type": "string",
+      "minLength": 1
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "arm": {
+      "enum": [
+        "D0",
+        "D1",
+        "W1",
+        "W2",
+        "W3"
+      ]
+    },
+    "measurement_method": {
+      "enum": [
+        "operator_trace",
+        "hardware_counter",
+        "static_estimate",
+        "unavailable"
+      ]
+    },
+    "latency_ms": {
+      "type": "number",
+      "minimum": 0
+    },
+    "compute_work_units": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "peak_memory_bytes": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "energy_millijoules": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "direct_value_calls": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "world_model_forward_calls": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "world_model_transition_calls": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "oracle_transition_calls": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "environment_transition_calls": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "optimizer_iterations": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "recorder_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_ceiling": {
+      "const": "digest_bound_run_record_not_independently_verified_by_v0_2_cli"
+    },
+    "fixture_only": {
+      "type": "boolean"
+    }
+  }
+}

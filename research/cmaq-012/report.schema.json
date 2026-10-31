@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://luminousdynamics.io/schemas/cmaq-012-paired-aop-report-v0.1.json",
-  "title": "CMAQ-012 paired advantage-of-prediction report",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-012-paired-aop-report-v0.2.json",
+  "title": "CMAQ-012 paired advantage-of-prediction report with resource-vector qualification",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -15,7 +15,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "cmaq-012-paired-aop-report-v0.1"
+      "const": "cmaq-012-paired-aop-report-v0.2"
     },
     "auditor_version": {
       "type": "string"
@@ -47,7 +47,8 @@
           "episode_count",
           "eligibility",
           "arms",
-          "contrasts"
+          "contrasts",
+          "resource_match"
         ],
         "properties": {
           "task": {
@@ -66,7 +67,10 @@
           "eligibility": {
             "enum": [
               "smoke_only",
-              "qualification_candidate"
+              "budget_match_unverified",
+              "qualification_candidate",
+              "budget_unmatched",
+              "resource_unmeasured"
             ]
           },
           "arms": {
@@ -90,7 +94,8 @@
                   "timed_out_count",
                   "mean_latency_ms",
                   "p50_latency_ms",
-                  "p95_latency_ms"
+                  "p95_latency_ms",
+                  "resource_metrics"
                 ],
                 "properties": {
                   "mean_return": {
@@ -124,6 +129,89 @@
                   "p95_latency_ms": {
                     "type": "number",
                     "minimum": 0
+                  },
+                  "resource_metrics": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "mean_compute_work_units",
+                      "p50_compute_work_units",
+                      "p95_compute_work_units",
+                      "p95_peak_memory_bytes",
+                      "mean_energy_millijoules",
+                      "energy_measured_episode_count",
+                      "mean_direct_value_calls",
+                      "mean_world_model_forward_calls",
+                      "mean_world_model_transition_calls",
+                      "mean_oracle_transition_calls",
+                      "mean_environment_transition_calls",
+                      "mean_optimizer_iterations"
+                    ],
+                    "properties": {
+                      "mean_compute_work_units": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "p50_compute_work_units": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "p95_compute_work_units": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "p95_peak_memory_bytes": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "mean_energy_millijoules": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "energy_measured_episode_count": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "mean_direct_value_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_world_model_forward_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_world_model_transition_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_oracle_transition_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_environment_transition_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_optimizer_iterations": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
                   }
                 },
                 "additionalProperties": false
@@ -138,7 +226,8 @@
                   "timed_out_count",
                   "mean_latency_ms",
                   "p50_latency_ms",
-                  "p95_latency_ms"
+                  "p95_latency_ms",
+                  "resource_metrics"
                 ],
                 "properties": {
                   "mean_return": {
@@ -172,6 +261,89 @@
                   "p95_latency_ms": {
                     "type": "number",
                     "minimum": 0
+                  },
+                  "resource_metrics": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "mean_compute_work_units",
+                      "p50_compute_work_units",
+                      "p95_compute_work_units",
+                      "p95_peak_memory_bytes",
+                      "mean_energy_millijoules",
+                      "energy_measured_episode_count",
+                      "mean_direct_value_calls",
+                      "mean_world_model_forward_calls",
+                      "mean_world_model_transition_calls",
+                      "mean_oracle_transition_calls",
+                      "mean_environment_transition_calls",
+                      "mean_optimizer_iterations"
+                    ],
+                    "properties": {
+                      "mean_compute_work_units": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "p50_compute_work_units": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "p95_compute_work_units": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "p95_peak_memory_bytes": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "mean_energy_millijoules": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "energy_measured_episode_count": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "mean_direct_value_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_world_model_forward_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_world_model_transition_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_oracle_transition_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_environment_transition_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_optimizer_iterations": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
                   }
                 },
                 "additionalProperties": false
@@ -186,7 +358,8 @@
                   "timed_out_count",
                   "mean_latency_ms",
                   "p50_latency_ms",
-                  "p95_latency_ms"
+                  "p95_latency_ms",
+                  "resource_metrics"
                 ],
                 "properties": {
                   "mean_return": {
@@ -220,6 +393,89 @@
                   "p95_latency_ms": {
                     "type": "number",
                     "minimum": 0
+                  },
+                  "resource_metrics": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "mean_compute_work_units",
+                      "p50_compute_work_units",
+                      "p95_compute_work_units",
+                      "p95_peak_memory_bytes",
+                      "mean_energy_millijoules",
+                      "energy_measured_episode_count",
+                      "mean_direct_value_calls",
+                      "mean_world_model_forward_calls",
+                      "mean_world_model_transition_calls",
+                      "mean_oracle_transition_calls",
+                      "mean_environment_transition_calls",
+                      "mean_optimizer_iterations"
+                    ],
+                    "properties": {
+                      "mean_compute_work_units": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "p50_compute_work_units": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "p95_compute_work_units": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "p95_peak_memory_bytes": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "mean_energy_millijoules": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "energy_measured_episode_count": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "mean_direct_value_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_world_model_forward_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_world_model_transition_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_oracle_transition_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_environment_transition_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_optimizer_iterations": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
                   }
                 },
                 "additionalProperties": false
@@ -234,7 +490,8 @@
                   "timed_out_count",
                   "mean_latency_ms",
                   "p50_latency_ms",
-                  "p95_latency_ms"
+                  "p95_latency_ms",
+                  "resource_metrics"
                 ],
                 "properties": {
                   "mean_return": {
@@ -268,6 +525,89 @@
                   "p95_latency_ms": {
                     "type": "number",
                     "minimum": 0
+                  },
+                  "resource_metrics": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "mean_compute_work_units",
+                      "p50_compute_work_units",
+                      "p95_compute_work_units",
+                      "p95_peak_memory_bytes",
+                      "mean_energy_millijoules",
+                      "energy_measured_episode_count",
+                      "mean_direct_value_calls",
+                      "mean_world_model_forward_calls",
+                      "mean_world_model_transition_calls",
+                      "mean_oracle_transition_calls",
+                      "mean_environment_transition_calls",
+                      "mean_optimizer_iterations"
+                    ],
+                    "properties": {
+                      "mean_compute_work_units": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "p50_compute_work_units": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "p95_compute_work_units": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "p95_peak_memory_bytes": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "mean_energy_millijoules": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "energy_measured_episode_count": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "mean_direct_value_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_world_model_forward_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_world_model_transition_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_oracle_transition_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_environment_transition_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_optimizer_iterations": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
                   }
                 },
                 "additionalProperties": false
@@ -282,7 +622,8 @@
                   "timed_out_count",
                   "mean_latency_ms",
                   "p50_latency_ms",
-                  "p95_latency_ms"
+                  "p95_latency_ms",
+                  "resource_metrics"
                 ],
                 "properties": {
                   "mean_return": {
@@ -316,6 +657,89 @@
                   "p95_latency_ms": {
                     "type": "number",
                     "minimum": 0
+                  },
+                  "resource_metrics": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "mean_compute_work_units",
+                      "p50_compute_work_units",
+                      "p95_compute_work_units",
+                      "p95_peak_memory_bytes",
+                      "mean_energy_millijoules",
+                      "energy_measured_episode_count",
+                      "mean_direct_value_calls",
+                      "mean_world_model_forward_calls",
+                      "mean_world_model_transition_calls",
+                      "mean_oracle_transition_calls",
+                      "mean_environment_transition_calls",
+                      "mean_optimizer_iterations"
+                    ],
+                    "properties": {
+                      "mean_compute_work_units": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "p50_compute_work_units": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "p95_compute_work_units": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "p95_peak_memory_bytes": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "mean_energy_millijoules": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "energy_measured_episode_count": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "mean_direct_value_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_world_model_forward_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_world_model_transition_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_oracle_transition_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_environment_transition_calls": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "mean_optimizer_iterations": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
                   }
                 },
                 "additionalProperties": false
@@ -387,6 +811,177 @@
                 }
               },
               "additionalProperties": false
+            }
+          },
+          "resource_match": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "resource_measurement_method",
+              "resource_profile_sha256",
+              "receipt_verification_status",
+              "d1_role_valid",
+              "learned_model_role_valid",
+              "w2_workload_match_valid",
+              "energy_status",
+              "compute_work_tolerance_fraction",
+              "latency_tolerance_fraction",
+              "memory_tolerance_fraction",
+              "d1_vs_w1",
+              "w1_vs_w2",
+              "reasons"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "budget_matched",
+                  "budget_unmatched",
+                  "resource_unmeasured"
+                ]
+              },
+              "resource_measurement_method": {
+                "enum": [
+                  "operator_trace",
+                  "hardware_counter",
+                  "static_estimate",
+                  "unavailable"
+                ]
+              },
+              "resource_profile_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "receipt_verification_status": {
+                "const": "digest_only_not_independently_verified"
+              },
+              "d1_role_valid": {
+                "type": "boolean"
+              },
+              "learned_model_role_valid": {
+                "type": "boolean"
+              },
+              "w2_workload_match_valid": {
+                "type": "boolean"
+              },
+              "energy_status": {
+                "enum": [
+                  "unmeasured",
+                  "measured_and_within_10_percent",
+                  "measured_but_outside_10_percent"
+                ]
+              },
+              "compute_work_tolerance_fraction": {
+                "const": 0.05
+              },
+              "latency_tolerance_fraction": {
+                "const": 0.05
+              },
+              "memory_tolerance_fraction": {
+                "const": 0.1
+              },
+              "d1_vs_w1": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "compute_work_p50_relative",
+                  "compute_work_p95_relative",
+                  "latency_p50_relative",
+                  "latency_p95_relative",
+                  "memory_p95_relative"
+                ],
+                "properties": {
+                  "compute_work_p50_relative": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "compute_work_p95_relative": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "latency_p50_relative": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "latency_p95_relative": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "memory_p95_relative": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  }
+                }
+              },
+              "w1_vs_w2": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "compute_work_p50_relative",
+                  "compute_work_p95_relative",
+                  "latency_p50_relative",
+                  "latency_p95_relative",
+                  "memory_p95_relative"
+                ],
+                "properties": {
+                  "compute_work_p50_relative": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "compute_work_p95_relative": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "latency_p50_relative": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "latency_p95_relative": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "memory_p95_relative": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  }
+                }
+              },
+              "reasons": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
             }
           }
         },
