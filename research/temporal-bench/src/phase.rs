@@ -605,7 +605,7 @@ pub fn dilate_phase_trace(
 
     let mut dilated_task = task.clone();
     let mut dilated_oracle = oracle.clone();
-    let mut scale = |value_us: u64| -> Result<u64, PhaseDilationError> {
+    let scale = |value_us: u64| -> Result<u64, PhaseDilationError> {
         let product = u128::from(value_us)
             .checked_mul(u128::from(numerator))
             .ok_or(PhaseDilationError::TimeOverflow)?;
