@@ -606,6 +606,7 @@ impl CampaignTape {
                                         "new admission must create a unique canonical direction",
                                     ));
                                 }
+                                *direction_claims.entry(canonical_direction_id.clone()).or_default() += 1;
                             }
                             DirectionProposalDisposition::Duplicate { existing_direction_id } => {
                                 validate_id("existing_direction_id", existing_direction_id)?;
@@ -617,6 +618,7 @@ impl CampaignTape {
                                         "duplicate must map to an already known or same-round admitted direction",
                                     ));
                                 }
+                                *direction_claims.entry(existing_direction_id.clone()).or_default() += 1;
                             }
                             DirectionProposalDisposition::Rejected { reason_code }
                             | DirectionProposalDisposition::Inconclusive { reason_code } => {
@@ -1336,6 +1338,24 @@ mod tests {
         )).unwrap();
         tape.seal().unwrap();
         assert_eq!(tape.totals().unwrap().action_units, 2);
+    }
+
+    #[test]
+    fn duplicate_novel_candidate_counts_toward_the_existing_direction_claim_cap() {
+        let mut tape = tape("novel-duplicate-cap");
+        tape.append(evaluation_event("e1", 1, "w1", 0, "A")).unwrap();
+        tape.append(evaluation_event("e2", 2, "w1", 1, "A")).unwrap();
+        tape.append(novel_candidate_event(
+            "n3",
+            2,
+            "w2",
+            1,
+            DirectionProposalDisposition::Duplicate {
+                existing_direction_id: "A".to_owned(),
+            },
+            Some(0.78),
+        )).unwrap();
+        assert!(tape.seal().is_err());
     }
 
     #[test]
