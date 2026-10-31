@@ -135,6 +135,7 @@ pub enum FastEventVerificationError {
     StreamIdMismatch,
     PublicDigestMismatch,
     OracleDigestMismatch,
+    SeedReplayMismatch,
     InvalidTaskContract,
     InvalidEventCount,
     InvalidEventSchedule { index: usize },
@@ -150,6 +151,7 @@ impl fmt::Display for FastEventVerificationError {
             Self::StreamIdMismatch => write!(f, "fast-event task and oracle stream IDs differ"),
             Self::PublicDigestMismatch => write!(f, "fast-event public stream SHA-256 digest mismatch"),
             Self::OracleDigestMismatch => write!(f, "fast-event oracle SHA-256 digest mismatch"),
+            Self::SeedReplayMismatch => write!(f, "fast-event task/oracle do not match the supplied seed and configuration"),
             Self::InvalidTaskContract => write!(f, "fast-event timing or task metadata is invalid"),
             Self::InvalidEventCount => write!(f, "fast-event oracle event counts are inconsistent"),
             Self::InvalidEventSchedule { index } => {
@@ -596,6 +598,24 @@ pub fn score_fast_event_predictions(
     Ok(score)
 }
 
+/// Verify the stream against evaluator-held generator seed/configuration.
+///
+/// This replay detects recommitted but seed-inconsistent task/oracle mutations.
+/// The evaluator must protect the seed/configuration independently.
+pub fn verify_fast_event_trace_seeded(
+    task: &FastEventTask,
+    oracle: &FastEventOracle,
+    config: FastEventConfig,
+) -> Result<(), FastEventVerificationError> {
+    verify_fast_event_trace(task, oracle)?;
+    let (expected_task, expected_oracle) = generate_fast_event_task(config)
+        .map_err(|_| FastEventVerificationError::SeedReplayMismatch)?;
+    if task != &expected_task || oracle != &expected_oracle {
+        return Err(FastEventVerificationError::SeedReplayMismatch);
+    }
+    Ok(())
+}
+
 fn validate_config(config: FastEventConfig) -> Result<(), FastEventGenerationError> {
     if config.slots < BLOCK_SIZE {
         return Err(FastEventGenerationError::TooFewSlots {
@@ -742,6 +762,18 @@ mod tests {
         let (task, oracle) = generate_fast_event_task(config).unwrap();
         assert_eq!(task.content_sha256, fast_event_content_digest(&task));
         assert_eq!(oracle.content_sha256, fast_event_oracle_digest(&oracle));
+    }
+
+    #[test]
+    fn seeded_verifier_rejects_recommitted_event_stream_mutation() {
+        let config = FastEventConfig::reference(2_026);
+        let (mut task, oracle) = generate_fast_event_task(config).unwrap();
+        task.observations[0].sample ^= 1;
+        task.content_sha256 = fast_event_content_digest(&task);
+        assert_eq!(
+            verify_fast_event_trace_seeded(&task, &oracle, config),
+            Err(FastEventVerificationError::SeedReplayMismatch)
+        );
     }
 
     #[test]
