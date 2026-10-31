@@ -43,7 +43,7 @@ For every held-out episode, the scorer uses each joint posterior particle to der
 - marginal probability each candidate belongs to the true top-K;
 - posterior predictive distribution for each candidate's final score.
 
-It records top-1 accuracy, multiclass log loss, multiclass Brier score and top-label ECE. Top-K quality is scored with candidate-membership Brier error and empirical coverage of a fixed-threshold credible candidate set. Mean credible-set size is normalized by the candidate count to make the threshold comparable across search spaces.
+It records top-1 accuracy, multiclass log loss, multiclass Brier score and top-label ECE. Top-K quality is scored with candidate-membership Brier error, its Brier skill score relative to the constant-prevalence forecast K/N, and empirical coverage of a fixed-threshold credible candidate set. The skill score is `1 - Brier / ((K/N) * (1 - K/N))`; zero means no improvement over the constant base-rate predictor, negative values are worse, and one is perfect. Requiring K < N avoids a degenerate reference score. This prevents a huge search space with a rare top-K positive class from making a near-zero raw Brier score look good by itself. Mean credible-set size is normalized by the candidate count to make the threshold comparable across search spaces.
 
 The credible-set threshold is a pre-registered empirical rule, not a formal frequentist coverage guarantee. A set that includes every candidate can score perfect coverage; the maximum mean set-size fraction therefore prevents vacuous sets from qualifying.
 
@@ -104,7 +104,7 @@ A benchmark harness should prove that the gate abstains under at least these con
 9. Omit late learners, high-noise cases, failed runs or dormant-candidate reactivations.
 10. Edit a replay episode, threshold or receipt field after scoring.
 
-The current twelve Rust tests cover basic pass/replay, receipt tampering, split leakage, invalid categorical probabilities, likelihood misspecification, ESS degeneration, minimize-is-better semantics, order-invariant replay evidence, consistent action-category semantics, reordered equivalent outcomes, fidelity-order digest binding, and rejection of undeclared evaluation strata. They are test declarations only until compiled and run.
+The current fourteen Rust tests cover basic pass/replay, receipt tampering, split leakage, invalid categorical probabilities, likelihood misspecification, ESS degeneration, minimize-is-better semantics, order-invariant replay evidence, consistent action-category semantics, reordered equivalent outcomes, fidelity-order digest binding, rejection of undeclared evaluation strata, and Brier skill behavior against the K/N baseline. They are test declarations only until compiled and run.
 
 ## 7. Benchmark campaign and competitive baselines
 
