@@ -175,9 +175,12 @@ fn kernel_identity() -> KernelIdentity {
         .filter(|bytes| !bytes.is_empty() && bytes.len() <= MAX_BOOT_ID_BYTES)
         .map(|bytes| sha256_tagged(&bytes));
 
+    #[cfg(target_os = "linux")]
     let mount_namespace_inode = std::fs::metadata("/proc/self/ns/mnt")
         .ok()
         .map(|metadata| metadata.ino());
+    #[cfg(not(target_os = "linux"))]
+    let mount_namespace_inode = None;
 
     KernelIdentity {
         release,
@@ -292,6 +295,7 @@ fn probe_fanotify_group(probe_id: &'static str, class_flag: libc::c_uint) -> Pro
     probe_fanotify_group_with(&SystemLinuxSmokeSyscalls, probe_id, class_flag)
 }
 
+#[cfg(target_os = "linux")]
 fn probe_fanotify_group_with(
     calls: &impl LinuxSmokeSyscalls,
     probe_id: &'static str,
@@ -355,6 +359,7 @@ fn probe_fanotify_group(probe_id: &'static str, _class_flag: u32) -> ProbeObserv
     not_attempted(probe_id, "Linux-only fanotify syscall is unavailable on this target")
 }
 
+#[cfg(target_os = "linux")]
 fn fanotify_init_flags(class_flag: libc::c_uint) -> libc::c_uint {
     // FAN_REPORT_FID is mandatory for restricted unprivileged notification
     // groups, but is invalid with FAN_CLASS_CONTENT and FAN_CLASS_PRE_CONTENT.
@@ -415,7 +420,7 @@ fn write_new(path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     use std::cell::RefCell;
