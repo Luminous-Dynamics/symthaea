@@ -212,6 +212,34 @@ class RandomizedGlobalCommonDepthTests(unittest.TestCase):
         verified=engine.verify_certificate(certificate,np.asarray(result["probabilities"]))
         self.assertTrue(verified["valid"],verified)
 
+
+    def test_certificate_malformed_metadata_fails_closed_without_exception(self):
+        import copy
+        engine=RandomizedCommonDepthCRC(5,.2,(70,20,10))
+        result=engine.solve()
+        probabilities=np.asarray(result["probabilities"])
+        mutations=[
+            ("scope","not-a-map"),
+            ("risk_target",None),
+            ("evidence_digests",[]),
+        ]
+        for field,value in mutations:
+            altered=copy.deepcopy(result["certificate"])
+            altered[field]=value
+            verified=engine.verify_certificate(altered,probabilities)
+            self.assertFalse(verified["valid"],(field,verified))
+
+    def test_certificate_rejects_missing_kkt_summary_fields(self):
+        import copy
+        engine=RandomizedCommonDepthCRC(5,.2,(70,20,10))
+        result=engine.solve()
+        probabilities=np.asarray(result["probabilities"])
+        altered=copy.deepcopy(result["certificate"])
+        altered["optimization_receipt"]["kkt_summary"]={}
+        verified=engine.verify_certificate(altered,probabilities)
+        self.assertFalse(verified["valid"])
+        self.assertIn("KKT summary missing",verified["reason"])
+
     def test_invalid_population_and_action_grid_fail_closed(self):
         with self.assertRaises(ValueError):
             RandomizedCommonDepthCRC(50,.1,(10,10,10))
