@@ -14,9 +14,11 @@ Every reported result must identify which link it measures. Do not pool results 
 ## External reference points
 
 - **MRS.Q (ICML 2026):** an important model-based RL/search baseline. Its paper reports that search can hurt despite high model accuracy and that pessimistic ensemble value aggregation is critical. Its public repo uses Gym, DMC, HumanoidBench, Atari and visual-DMC prefixes. It declares CC BY-NC 4.0; benchmark it as an external dependency and preserve its license, rather than copying its implementation into Symthaea. The source is pinned at commit `b12abaf309833f28619dfd87f4251074abed3ae3` in [`mrsq-baseline.lock.json`](mrsq-baseline.lock.json).
+- **WIMLE (ICLR 2026):** a high-priority world-model comparator. Its official implementation reports 40 continuous-control tasks across DeepMind Control, HumanoidBench and MyoSuite, using multi-modal IMLE transition ensembles and separate uncertainty estimates to weight synthetic training transitions. Its MIT-licensed source is pinned at `be730d6e7cd1538ca5519b8f505feff126b92938` in [`wimle-baseline.lock.json`](wimle-baseline.lock.json). The repository includes author reference arrays/CSV, not local reproductions. Keep WIMLE in an isolated, pinned JAX/CUDA runtime and consume its raw run artifacts through the shared verifier.
 - **MRS.Q upstream reference results:** the pinned commit's checked-in logs contain 10 seeds for Gym-HalfCheetah-v4 at 1,000,000 training steps (mean return **14,649.00**, sample SD **876.97**) and Dmc-quadruped-walk at 500,000 steps (mean return **935.47**, sample SD **79.45**). The lockfile stores all seed values, upstream defaults and exact result files. These are *author-supplied reference artifacts*, not local reproductions by Symthaea. Reward scales are task-specific and must not be compared across environments; reproduce wrappers, reward transforms, physics versions, seeds and evaluation settings before matched-performance claims.
 - **World-In-World (ICLR 2026 Oral):** a separate closed-loop visual/embodied track covering Active Recognition, Active Embodied QA, Image-Goal Navigation and Robotic Manipulation. Its standardized online planning/action interface emphasizes task success and controllability, not visual realism alone. Adapter readiness and exact upstream code/license must still be verified before reproduction.
-- **WorldArena 2.0 (2026 benchmark protocol):** the published [WorldArena 2.0 page](https://world-arena.ai/) extends evaluation across vision-to-visuotactile reasoning, offline metrics to online RL rollouts, and simulation to real-robot deployment. It names RoboTwin 2.0, LIBERO and an AgileX split-type ALOHA platform. This is a high-value manipulation/contact track. However, the linked [WorldArena GitHub repository](https://github.com/tsinghua-fib-lab/WorldArena) has latest inspected commit `2da2ae253b8637ba9de3afc7bea4e087f778ee4d` (2026-07-22), and the GitHub API did not identify a license. We have not established that the published 2.0 protocol, its full code, datasets and reuse terms align. Treat the website as a protocol reference only until a versioned release and reuse terms are confirmed.
+- **WorldArena 2.0:** the [official protocol](https://world-arena.ai/) and [public repository](https://github.com/WorldArena2/WorldArena-2.0) describe three extensions: vision-to-visuotactile evaluation, offline scoring to online RL, and simulator-only tasks to sim-to-real robot evaluation across RoboTwin 2.0, LIBERO and AgileX ALOHA. The inspected public repository is pinned at `5978ce5c81e55b8c8358f4f5966a13ce385ff155` and declares MIT. Its distinct sub-benchmarks still require adapter feasibility, dataset/runtime version pinning and task-level validation; do not infer that every platform or track is ready merely because the top-level repository exists.
+- **RoboWM-Bench (CVPR 2026 Workshop Best Paper):** a separate manipulation-world-model diagnostic that converts generated manipulation videos into executable action sequences and validates the resulting behavior in reconstructed simulation. Its key lesson is that visual realism is not enough: spatial reasoning, contact stability and executable action quality must be measured. Use it as an embodiment-execution track, not as a substitute for a matched state-based control benchmark. [Paper](https://openaccess.thecvf.com/content/CVPR2026W/GigaBrainChallenge/html/Jiang_RoboWM-Bench_A_Benchmark_for_Evaluating_World_Models_in_Robotic_Manipulation_CVPRW_2026_paper.html) · [Benchmark](https://robowm-bench.github.io/RoboWM-Bench/).
 - **MiraBench (May 2026):** [MiraBench](https://arxiv.org/abs/2605.29360) directly tests action-conditioned reliability through Physics Adherence, Action-Following Fidelity and Optimism Bias Detection. Its paper reports more than 16,000 human annotations and 12 representative model configurations. This is an essential *diagnostic* comparator for action-failure optimism, but its survey-coded protocol is open-loop and prediction-level; pair it with closed-loop task success rather than treating it as a complete deployment evaluation.
 - **Evaluator integrity (NIST CAISI):** NIST's [Cheating on AI Agent Evaluations](https://www.nist.gov/caissi/cheating-ai-agent-evaluations) documents both solution contamination and grader gaming, including assertion removal and benchmark-specific shortcuts. CMAQ reports must therefore include hidden qualification tasks, environment-side outcome verification, transcript/tool-use audits where applicable, negative controls, and checks that scoring cannot be satisfied by bypassing the intended task. CMAQ-010's provenance and replay controls are relevant to this evaluator layer.
 - **Decision-risk calibration (CMAQ-012):** compare marginal action uncertainty against joint action-set coverage as candidate counts expand. This is a separate risk-calibration diagnostic, not a replacement for the closed-loop environment tracks. It should be used to stratify the MRS.Q, MiraBench and WorldArena experiments by candidate budget and uncertainty calibration.
@@ -34,9 +36,10 @@ Start with continuous-control tasks for which state snapshots and counterfactual
 
 | Order | Environment | Role |
 |---|---|---|
-| P0 | Gymnasium/MuJoCo, HalfCheetah-v4 if the pinned MRS.Q adapter supports it | Search and model-based RL comparison |
-| P0 | DeepMind Control, quadruped-walk | Cross-suite continuous-control transfer |
-| P1 | HumanoidBench task family | Higher-dimensional contact-rich control |
+| P0 | Gymnasium/MuJoCo, HalfCheetah-v4 | Exact MRS.Q paper-compatible reproduction |
+| P0 | DMC quadruped-walk | MRS.Q reference task; not listed in WIMLE's current DMC training script |
+| P0 | DMC quadruped-run and humanoid-run | Shared MRS.Q/WIMLE task intersection for a multi-baseline comparison |
+| P1 | HumanoidBench H1 task family | Higher-dimensional contact-rich comparison across MRS.Q/WIMLE |
 | P2 | Additional held-out Gym/DMC tasks | Generalization, not leaderboard tuning |
 
 The first two tasks are the minimum useful cross-suite slice. Exact task IDs, package versions, physics versions, wrappers, reward transforms, observation normalization and reset semantics belong in a lockfile generated from the environment adapter—not inferred from a task name.
@@ -51,6 +54,29 @@ Use a staged path rather than trying to reproduce a large vision-model leaderboa
 4. **AgileX ALOHA sim-to-real** only after simulation results are independently reproducible and a robot-specific safety case, action limits and emergency-stop procedure exist.
 
 Do not pool image/video, visuo-tactile, vector-state and physical-robot scores. Where Symthaea cannot supply a compatible observation/action interface, report adapter infeasibility rather than manufacture a proxy score. Do not use privileged simulator state as input to a deployed policy; it is allowed only for oracle scoring and clearly labelled upper bounds.
+
+
+## Environment-semantic parity and two comparison protocols
+
+An identical task name does not establish an identical benchmark. The pinned MRS.Q and WIMLE source adapters currently differ on DMC:
+
+- MRS.Q's DMC wrapper defaults to `action_repeat=2`, sums reward over the two underlying `dm_control` steps, flattens observation fields and sets its action-step horizon to `1000 / action_repeat = 500`.
+- WIMLE's DMC adapter executes one underlying `dm_control` step per policy action, rescales actions to `[-1,1]`, applies `SinglePrecision`, flattens Dict observations and uses a 1,000-action-step episode limit.
+
+These defaults both cover approximately 1,000 underlying DMC transitions per episode, but they do **not** expose the same decision cadence: MRS.Q holds each action for two simulator steps while WIMLE selects an action each simulator step. This changes the effective control problem, model-query opportunities, reward aggregation and planning horizon. It must not be described as a matched head-to-head merely because both runs are labelled `Dmc-quadruped-run`.
+
+Use two separately labelled experiment modes:
+
+1. **Paper-native reproduction.** Reproduce each upstream baseline with its own pinned task wrappers, action repeat, reward aggregation, task horizon, optimizer settings, seed protocol and checkpoint. This tests whether the published result can be reproduced; cross-method scores are contextual, not a perfectly controlled algorithm comparison.
+2. **Wrapper-normalized head-to-head.** Define one canonical DMC adapter and freeze the exact dm_control suite version, base physics step, action-repeat/decision cadence, action scaling, observation key ordering/flattening, dtype, reward summation/discounting, termination and reset semantics, and episode horizon in base simulator steps. Retrain or explicitly re-run each baseline under that adapter. Label these as normalized adaptations, not original paper reproductions.
+
+The initial shared DMC task candidates are `Dmc-quadruped-run`, `Dmc-humanoid-run` and `Dmc-dog-run`; these are present in both inspected task lists. `Dmc-quadruped-walk` remains a MRS.Q-only paper-reference task in this pairing. Preserve it as its own MRS.Q reproduction slice rather than forcing WIMLE to run an unsupported task.
+
+For each run, record both:
+- **decision steps** (number of controller action selections); and
+- **base simulator transitions** (underlying dm_control physics steps).
+
+Training budgets must be reported in both units. Also report reward aggregation and real wall-clock/compute; equal base transitions alone do not equalize the cost of world-model training, CEM search or ensemble inference.
 
 ## Model and policy arms
 
