@@ -131,3 +131,7 @@ Sources:
 - PlatEMO and standard multi-objective algorithm/test-suite coverage: https://link.springer.com/article/10.1007/s42979-020-00265-1
 
 Current implementation boundary: the Pareto evaluator is a batch analysis primitive and accepts a digest reference for each evidence artifact. It does not yet adapt EventTape receipts into per-candidate objective vectors or retrieve and independently verify the candidate artifacts. Those are explicit follow-on tasks in issue #9469.
+
+The current AR-5B5 Pareto primitive now provides three separate indicators: exact hypervolume (2–4 objectives), IGD+, and additive epsilon. IGD+ and epsilon are evaluated in transformed maximization-utility space against a frozen, unique, mutually nondominated reference front. The combined indicator receipt binds the plan, approximation-front digest and canonical reference-front digest. This is not a composite score and does not replace the required per-objective and worst-family reports.
+
+Still outstanding: EventTape resource-to-objective adaptation, artifact-byte resolution, R2/attainment analysis, uncertainty-aware dominance, and inference across independent multi-objective instances.
