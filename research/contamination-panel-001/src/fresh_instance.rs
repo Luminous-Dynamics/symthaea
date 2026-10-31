@@ -224,7 +224,7 @@ fn parse_timestamp(value: &str, label: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn canonical_config_digest(config: &FreshChallengeConfigV1) -> Result<String, String> {
+pub(crate) fn canonical_config_digest(config: &FreshChallengeConfigV1) -> Result<String, String> {
     let mut normalized = config.clone();
     normalized.generator_config_sha256.clear();
     let bytes = serde_json::to_vec(&normalized)
