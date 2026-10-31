@@ -608,6 +608,18 @@ pub fn audit_intervention(
     manifest: &RandomizedInterventionManifestV1,
     seed: &[u8],
 ) -> Result<InterventionAuditReportV1, String> {
+    let supplied_manifest_digest = manifest_digest(manifest)?;
+    if supplied_manifest_digest != manifest.manifest_sha256 {
+        return Err("intervention manifest digest does not match its contents".to_owned());
+    }
+    let assignment_bytes = serde_json::to_vec(&manifest.assignments)
+        .map_err(|error| format!("cannot serialize supplied assignments: {error}"))?;
+    let supplied_assignment_digest =
+        hash_domain(b"randomized-intervention-assignments.v1", &assignment_bytes);
+    if supplied_assignment_digest != manifest.assignment_sha256 {
+        return Err("intervention assignment digest does not match its assignments".to_owned());
+    }
+
     let expected = randomize_intervention(design, seed)?;
     if expected.manifest_sha256 != manifest.manifest_sha256 {
         return Err("intervention manifest digest does not match replayed allocation".to_owned());
@@ -873,13 +885,13 @@ mod tests {
         let first = randomize_intervention(&first_design, &seed()).unwrap();
         first_design.replicate_id = "replicate-002".to_owned();
         let second = randomize_intervention(&first_design, &seed()).unwrap();
-        let first_assignments: BTreeMap<&str, bool> = first.assignments.iter()
-            .map(|assignment| (assignment.cluster_id.as_str(), assignment.assigned_to_exposure))
+        let first_priorities: BTreeMap<&str, &str> = first.assignments.iter()
+            .map(|assignment| (assignment.cluster_id.as_str(), assignment.priority_sha256.as_str()))
             .collect();
-        let second_assignments: BTreeMap<&str, bool> = second.assignments.iter()
-            .map(|assignment| (assignment.cluster_id.as_str(), assignment.assigned_to_exposure))
+        let second_priorities: BTreeMap<&str, &str> = second.assignments.iter()
+            .map(|assignment| (assignment.cluster_id.as_str(), assignment.priority_sha256.as_str()))
             .collect();
-        assert_ne!(first_assignments, second_assignments);
+        assert_ne!(first_priorities, second_priorities);
     }
 
     #[test]
@@ -943,7 +955,21 @@ mod tests {
         manifest.assignments[0].assigned_to_exposure = !manifest.assignments[0].assigned_to_exposure;
         assert!(audit_intervention(&design, &manifest, &seed())
             .unwrap_err()
-            .contains("manifest digest"));
+            .contains("manifest digest does not match its contents"));
+    }
+
+    #[test]
+    fn assignment_payload_with_recomputed_manifest_hash_still_fails_replay() {
+        let design = design();
+        let mut manifest = randomize_intervention(&design, &seed()).unwrap();
+        manifest.assignments[0].assigned_to_exposure = !manifest.assignments[0].assigned_to_exposure;
+        let assignment_bytes = serde_json::to_vec(&manifest.assignments).unwrap();
+        manifest.assignment_sha256 =
+            hash_domain(b"randomized-intervention-assignments.v1", &assignment_bytes);
+        manifest.manifest_sha256 = manifest_digest(&manifest).unwrap();
+        assert!(audit_intervention(&design, &manifest, &seed())
+            .unwrap_err()
+            .contains("differs from deterministic replay"));
     }
 
     #[test]
