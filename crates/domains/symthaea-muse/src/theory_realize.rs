@@ -2441,6 +2441,9 @@ mod tests {
             (Style::Folk, true),
             (Style::Cinematic, true),
             (Style::Playful, true),
+            (Style::AfroCuban, true),
+            (Style::Flamenco, true),
+            (Style::BossaNova, true),
         ] {
             let score = symthaea_music_theory::compose_styled(&MusicalIntent::default(), style);
             let timeline = Timeline {
@@ -2503,6 +2506,83 @@ mod tests {
         );
         assert_eq!(hits.len(), again.len());
         assert!(hits.iter().zip(&again).all(|(a, b)| a.time == b.time));
+    }
+
+    #[test]
+    fn afro_cuban_percussion_keeps_the_two_bar_son_clave_cycle() {
+        let state = MusicalState::default();
+        let style = Style::AfroCuban;
+        let spec = style.spec();
+        let score = symthaea_music_theory::compose_with_spec(&MusicalIntent::default(), &spec);
+        assert_eq!(score.meter, 4, "Afro-Cuban first-wave policy is 4/4 only");
+        let timeline = Timeline {
+            rubato: Rubato::from_score(&score),
+            swing: spec.texture.swing as f64,
+        };
+        let hits = drum_hits(&score, spec.texture.drums, &timeline, &state, 11);
+        let clave: Vec<_> = hits.iter().filter(|h| h.drum == DrumType::Clave).collect();
+        let bars = (score.total_beats.beats() / 4.0).ceil() as usize;
+        assert_eq!(clave.len(), bars.div_ceil(2) * 3 + (bars / 2) * 2);
+
+        // First two bars are the canonical son 3-2 pattern: 1, 2&, 4 | 2, 3.
+        let expected_beats = [0.0, 1.5, 3.0, 5.0, 6.0];
+        for (hit, beat) in clave.iter().take(5).zip(expected_beats) {
+            let expected = timeline.seconds(beat);
+            assert!(
+                (hit.time - expected).abs() < 0.02,
+                "clave onset {} should map to beat {beat} at {expected}",
+                hit.time
+            );
+        }
+        assert!(hits.iter().any(|h| h.drum == DrumType::Conga));
+        assert!(hits.iter().any(|h| h.drum == DrumType::Bongo));
+        assert!(hits.iter().any(|h| h.drum == DrumType::Cowbell));
+    }
+
+    #[test]
+    fn flamenco_palmas_follow_the_twelve_count_compas_anchors() {
+        let state = MusicalState::default();
+        let style = Style::Flamenco;
+        let spec = style.spec();
+        let score = symthaea_music_theory::compose_with_spec(&MusicalIntent::default(), &spec);
+        assert_eq!(score.meter, 12);
+        let timeline = Timeline {
+            rubato: Rubato::from_score(&score),
+            swing: spec.texture.swing as f64,
+        };
+        let hits = drum_hits(&score, spec.texture.drums, &timeline, &state, 12);
+        let palmas: Vec<_> = hits.iter().filter(|h| h.drum == DrumType::HandClap).collect();
+        let bars = (score.total_beats.beats() / 12.0).ceil() as usize;
+        assert_eq!(palmas.len(), bars * 5);
+        for (hit, beat) in palmas.iter().take(5).zip([2.0, 5.0, 7.0, 9.0, 11.0]) {
+            let expected = timeline.seconds(beat);
+            assert!(
+                (hit.time - expected).abs() < 0.02,
+                "palmas onset {} should map to compas beat {beat} at {expected}",
+                hit.time
+            );
+        }
+    }
+
+    #[test]
+    fn bossa_percussion_is_subordinate_and_uses_cabasa_subdivision() {
+        let state = MusicalState::default();
+        let style = Style::BossaNova;
+        let spec = style.spec();
+        let score = symthaea_music_theory::compose_with_spec(&MusicalIntent::default(), &spec);
+        assert_eq!(score.meter, 4);
+        let timeline = Timeline {
+            rubato: Rubato::from_score(&score),
+            swing: spec.texture.swing as f64,
+        };
+        let hits = drum_hits(&score, spec.texture.drums, &timeline, &state, 13);
+        let bars = (score.total_beats.beats() / 4.0).ceil() as usize;
+        let count = |drum| hits.iter().filter(|h| h.drum == drum).count();
+        assert_eq!(count(DrumType::Cabasa), bars * 8);
+        assert_eq!(count(DrumType::Conga), bars * 2);
+        assert_eq!(count(DrumType::Kick), 0);
+        assert_eq!(count(DrumType::Snare), 0);
+        assert_eq!(count(DrumType::Bongo), 0);
     }
 
     #[test]
