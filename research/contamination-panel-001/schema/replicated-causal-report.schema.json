@@ -1,0 +1,513 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/replicated-contamination-causal-report-v1.json",
+  "title": "Replicated contamination causal analysis report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "study_id",
+    "benchmark_id",
+    "benchmark_version",
+    "primary_metric_id",
+    "independent_model_pair_replicate_count",
+    "minimum_confirmatory_replicates",
+    "replicate_count_meets_minimum",
+    "every_replicate_has_consistent_training_receipt",
+    "training_receipts_independently_verified",
+    "execution_evidence_ready_for_external_verification",
+    "primary_cluster_weighted_effect_permille",
+    "secondary_item_weighted_effect_permille",
+    "treatment_minus_base_effect_permille",
+    "placebo_minus_base_effect_permille",
+    "exposed_localization_effect_permille",
+    "unexposed_spillover_effect_permille",
+    "exposure_localization_contrast_permille",
+    "localization_randomization_p_value",
+    "localization_randomization_draws",
+    "randomization_null",
+    "family_effects",
+    "replicate_effects",
+    "confirmatory_eligible",
+    "analysis_status",
+    "issues",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.replicated_contamination_causal_report.v1"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "primary_metric_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "independent_model_pair_replicate_count": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "minimum_confirmatory_replicates": {
+      "type": "integer",
+      "minimum": 20
+    },
+    "replicate_count_meets_minimum": {
+      "type": "boolean"
+    },
+    "every_replicate_has_consistent_training_receipt": {
+      "type": "boolean"
+    },
+    "training_receipts_independently_verified": {
+      "type": "boolean"
+    },
+    "execution_evidence_ready_for_external_verification": {
+      "type": "boolean"
+    },
+    "primary_cluster_weighted_effect_permille": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "standard_deviation_across_replicates",
+        "standard_error",
+        "confidence_level_permille",
+        "lower_95",
+        "upper_95"
+      ],
+      "properties": {
+        "mean": {
+          "type": "number"
+        },
+        "standard_deviation_across_replicates": {
+          "type": "number",
+          "minimum": 0
+        },
+        "standard_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confidence_level_permille": {
+          "const": 950
+        },
+        "lower_95": {
+          "type": "number"
+        },
+        "upper_95": {
+          "type": "number"
+        }
+      }
+    },
+    "secondary_item_weighted_effect_permille": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "standard_deviation_across_replicates",
+        "standard_error",
+        "confidence_level_permille",
+        "lower_95",
+        "upper_95"
+      ],
+      "properties": {
+        "mean": {
+          "type": "number"
+        },
+        "standard_deviation_across_replicates": {
+          "type": "number",
+          "minimum": 0
+        },
+        "standard_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confidence_level_permille": {
+          "const": 950
+        },
+        "lower_95": {
+          "type": "number"
+        },
+        "upper_95": {
+          "type": "number"
+        }
+      }
+    },
+    "treatment_minus_base_effect_permille": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "standard_deviation_across_replicates",
+        "standard_error",
+        "confidence_level_permille",
+        "lower_95",
+        "upper_95"
+      ],
+      "properties": {
+        "mean": {
+          "type": "number"
+        },
+        "standard_deviation_across_replicates": {
+          "type": "number",
+          "minimum": 0
+        },
+        "standard_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confidence_level_permille": {
+          "const": 950
+        },
+        "lower_95": {
+          "type": "number"
+        },
+        "upper_95": {
+          "type": "number"
+        }
+      }
+    },
+    "placebo_minus_base_effect_permille": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "standard_deviation_across_replicates",
+        "standard_error",
+        "confidence_level_permille",
+        "lower_95",
+        "upper_95"
+      ],
+      "properties": {
+        "mean": {
+          "type": "number"
+        },
+        "standard_deviation_across_replicates": {
+          "type": "number",
+          "minimum": 0
+        },
+        "standard_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confidence_level_permille": {
+          "const": 950
+        },
+        "lower_95": {
+          "type": "number"
+        },
+        "upper_95": {
+          "type": "number"
+        }
+      }
+    },
+    "exposed_localization_effect_permille": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "standard_deviation_across_replicates",
+        "standard_error",
+        "confidence_level_permille",
+        "lower_95",
+        "upper_95"
+      ],
+      "properties": {
+        "mean": {
+          "type": "number"
+        },
+        "standard_deviation_across_replicates": {
+          "type": "number",
+          "minimum": 0
+        },
+        "standard_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confidence_level_permille": {
+          "const": 950
+        },
+        "lower_95": {
+          "type": "number"
+        },
+        "upper_95": {
+          "type": "number"
+        }
+      }
+    },
+    "unexposed_spillover_effect_permille": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "standard_deviation_across_replicates",
+        "standard_error",
+        "confidence_level_permille",
+        "lower_95",
+        "upper_95"
+      ],
+      "properties": {
+        "mean": {
+          "type": "number"
+        },
+        "standard_deviation_across_replicates": {
+          "type": "number",
+          "minimum": 0
+        },
+        "standard_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confidence_level_permille": {
+          "const": 950
+        },
+        "lower_95": {
+          "type": "number"
+        },
+        "upper_95": {
+          "type": "number"
+        }
+      }
+    },
+    "exposure_localization_contrast_permille": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "standard_deviation_across_replicates",
+        "standard_error",
+        "confidence_level_permille",
+        "lower_95",
+        "upper_95"
+      ],
+      "properties": {
+        "mean": {
+          "type": "number"
+        },
+        "standard_deviation_across_replicates": {
+          "type": "number",
+          "minimum": 0
+        },
+        "standard_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confidence_level_permille": {
+          "const": 950
+        },
+        "lower_95": {
+          "type": "number"
+        },
+        "upper_95": {
+          "type": "number"
+        }
+      }
+    },
+    "localization_randomization_p_value": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "localization_randomization_draws": {
+      "type": "integer",
+      "minimum": 999,
+      "maximum": 100000
+    },
+    "randomization_null": {
+      "type": "string",
+      "minLength": 1
+    },
+    "family_effects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_family",
+          "cluster_count",
+          "base_score_permille",
+          "treatment_score_permille",
+          "placebo_score_permille",
+          "treatment_minus_placebo_permille"
+        ],
+        "properties": {
+          "task_family": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cluster_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "base_score_permille": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "treatment_score_permille": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "placebo_score_permille": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "treatment_minus_placebo_permille": {
+            "type": "number",
+            "minimum": -1000,
+            "maximum": 1000
+          }
+        }
+      }
+    },
+    "replicate_effects": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "replicate_id",
+          "cluster_count",
+          "item_count",
+          "base_score_cluster_weighted_permille",
+          "treatment_score_cluster_weighted_permille",
+          "placebo_score_cluster_weighted_permille",
+          "treatment_minus_placebo_cluster_weighted_permille",
+          "treatment_minus_base_cluster_weighted_permille",
+          "placebo_minus_base_cluster_weighted_permille",
+          "treatment_score_item_weighted_permille",
+          "placebo_score_item_weighted_permille",
+          "treatment_minus_placebo_item_weighted_permille",
+          "exposed_cluster_advantage_permille",
+          "unexposed_cluster_advantage_permille",
+          "exposure_localization_contrast_permille",
+          "families"
+        ],
+        "properties": {
+          "replicate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cluster_count": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "item_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "base_score_cluster_weighted_permille": {
+            "type": "number"
+          },
+          "treatment_score_cluster_weighted_permille": {
+            "type": "number"
+          },
+          "placebo_score_cluster_weighted_permille": {
+            "type": "number"
+          },
+          "treatment_minus_placebo_cluster_weighted_permille": {
+            "type": "number"
+          },
+          "treatment_minus_base_cluster_weighted_permille": {
+            "type": "number"
+          },
+          "placebo_minus_base_cluster_weighted_permille": {
+            "type": "number"
+          },
+          "treatment_score_item_weighted_permille": {
+            "type": "number"
+          },
+          "placebo_score_item_weighted_permille": {
+            "type": "number"
+          },
+          "treatment_minus_placebo_item_weighted_permille": {
+            "type": "number"
+          },
+          "exposed_cluster_advantage_permille": {
+            "type": "number"
+          },
+          "unexposed_cluster_advantage_permille": {
+            "type": "number"
+          },
+          "exposure_localization_contrast_permille": {
+            "type": "number"
+          },
+          "families": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "task_family",
+                "cluster_count",
+                "base_score_permille",
+                "treatment_score_permille",
+                "placebo_score_permille",
+                "treatment_minus_placebo_permille"
+              ],
+              "properties": {
+                "task_family": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "cluster_count": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "base_score_permille": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "treatment_score_permille": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "placebo_score_permille": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "treatment_minus_placebo_permille": {
+                  "type": "number",
+                  "minimum": -1000,
+                  "maximum": 1000
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "confirmatory_eligible": {
+      "type": "boolean"
+    },
+    "analysis_status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
