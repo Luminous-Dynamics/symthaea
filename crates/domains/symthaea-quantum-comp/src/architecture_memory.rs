@@ -574,7 +574,7 @@ pub fn validate_memory_topology(
     }
 
     let mut edge_ids = HashSet::new();
-    let mut boundary_edges: HashMap<&str, &MemoryTransferEdge> = HashMap::new();
+    let mut boundary_edges: HashMap<&str, Vec<&MemoryTransferEdge>> = HashMap::new();
     let mut edge_by_id = HashMap::new();
     for edge in &topology.transfer_edges {
         for value in [
@@ -590,7 +590,11 @@ pub fn validate_memory_topology(
         if !edge_ids.insert(edge.edge_id.as_str()) {
             return Err(MemoryTopologyError::DuplicateTransferEdgeId);
         }
-        if let Some(existing) = boundary_edges.get(edge.communication_boundary_id.as_str()) {
+        if let Some(existing_edges) = boundary_edges.get_mut(edge.communication_boundary_id.as_str()) {
+            if existing_edges.len() >= 2 {
+                return Err(MemoryTopologyError::DuplicateBoundaryAccounting);
+            }
+            let existing = existing_edges[0];
             let opposite_full_duplex_pair =
                 existing.source_region_id.as_str() == edge.destination_region_id.as_str()
                     && existing.destination_region_id.as_str() == edge.source_region_id.as_str()
@@ -602,8 +606,9 @@ pub fn validate_memory_topology(
             if !opposite_full_duplex_pair {
                 return Err(MemoryTopologyError::DuplicateBoundaryAccounting);
             }
+            existing_edges.push(edge);
         } else {
-            boundary_edges.insert(edge.communication_boundary_id.as_str(), edge);
+            boundary_edges.insert(edge.communication_boundary_id.as_str(), vec![edge]);
         }
         if !region_by_id.contains_key(edge.source_region_id.as_str())
             || !region_by_id.contains_key(edge.destination_region_id.as_str())
@@ -1076,6 +1081,26 @@ mod tests {
             conversion_energy_joules_per_bit: None,
         });
         assert_eq!(validate_memory_topology(&topology), Ok(()));
+    }
+
+    #[test]
+    fn rejects_third_edge_on_full_duplex_boundary() {
+        let mut topology = base_topology();
+        let read = topology.transfer_edges[0].clone();
+        let mut write = read.clone();
+        write.edge_id = "scratch-to-dram".to_owned();
+        write.source_region_id = "scratch".to_owned();
+        write.destination_region_id = "dram".to_owned();
+        write.direction = MemoryTransferDirection::Write;
+        write.communication_boundary_id = read.communication_boundary_id.clone();
+        topology.transfer_edges.push(write.clone());
+        let mut repeated_write = write;
+        repeated_write.edge_id = "scratch-to-dram-duplicate".to_owned();
+        topology.transfer_edges.push(repeated_write);
+        assert_eq!(
+            validate_memory_topology(&topology),
+            Err(MemoryTopologyError::DuplicateBoundaryAccounting)
+        );
     }
 
     #[test]
