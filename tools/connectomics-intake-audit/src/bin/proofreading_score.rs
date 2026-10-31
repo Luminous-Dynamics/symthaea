@@ -2505,13 +2505,29 @@ mod tests {
 
     #[test]
     fn ood_rate_bootstrap_uses_selected_threshold_not_default_half() {
-        let rows = vec![
-            tagged_row("threshold-in", false, 0.1, "mouse", false, 0.8),
-            tagged_row("threshold-out", true, 0.9, "zebrafish", true, 0.7),
-        ];
+        let mut rows = Vec::new();
+        for index in 0..3 {
+            rows.push(tagged_row(
+                &format!("threshold-in-{index}"),
+                false,
+                0.1,
+                "mouse",
+                false,
+                0.8,
+            ));
+            rows.push(tagged_row(
+                &format!("threshold-out-{index}"),
+                true,
+                0.9,
+                "zebrafish",
+                true,
+                0.7,
+            ));
+        }
         let refs = rows.iter().collect::<Vec<_>>();
-        let below_selected = ood_cluster_bootstrap(&refs, Some(0.75), 100, "threshold-cutoff");
-        let above_selected = ood_cluster_bootstrap(&refs, Some(0.85), 100, "threshold-cutoff");
+        let below_selected = ood_cluster_bootstrap(&refs, Some(0.75), 500, "threshold-cutoff");
+        let above_selected = ood_cluster_bootstrap(&refs, Some(0.85), 500, "threshold-cutoff");
+        assert!(below_selected.valid_replicates >= 400);
         assert_eq!(below_selected.false_ood_rate_on_in_domain_95, Some(Interval { lower: 1.0, upper: 1.0 }));
         assert_eq!(below_selected.held_out_domain_recall_95, Some(Interval { lower: 0.0, upper: 0.0 }));
         assert_eq!(above_selected.false_ood_rate_on_in_domain_95, Some(Interval { lower: 0.0, upper: 0.0 }));
