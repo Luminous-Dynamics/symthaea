@@ -18,7 +18,57 @@ use symthaea_iit::{
 
 const FACTOR_ENTRY_BUDGET: usize = 1 << 16;
 const CUTSET_ASSIGNMENT_BUDGET: usize = 1 << 16;
-const GRID_SIDES: [usize; 4] = [4, 5, 6, 8];
+
+#[derive(Debug, Clone, Copy)]
+struct ExpectedFrontier {
+    label: &'static str,
+    branches: usize,
+    residual_width: usize,
+    peak_entries: usize,
+}
+
+struct GridFixture {
+    side: usize,
+    expected_candidates: usize,
+    expected_frontier: &'static [ExpectedFrontier],
+}
+
+// These fixture expectations are independently derived from the grid primal
+// graphs and the deterministic min-fill objective. They pin both the candidate
+// family size and its three-resource nondominated frontier.
+const GRID_FIXTURES: [GridFixture; 4] = [
+    GridFixture {
+        side: 4,
+        expected_candidates: 19,
+        expected_frontier: &[
+            ExpectedFrontier { label: "column-1", branches: 16, residual_width: 2, peak_entries: 8 },
+            ExpectedFrontier { label: "column-band-1-2", branches: 256, residual_width: 1, peak_entries: 4 },
+        ],
+    },
+    GridFixture {
+        side: 5,
+        expected_candidates: 30,
+        expected_frontier: &[
+            ExpectedFrontier { label: "column-2", branches: 32, residual_width: 2, peak_entries: 8 },
+        ],
+    },
+    GridFixture {
+        side: 6,
+        expected_candidates: 43,
+        expected_frontier: &[
+            ExpectedFrontier { label: "column-2", branches: 64, residual_width: 3, peak_entries: 16 },
+            ExpectedFrontier { label: "column-band-2-3", branches: 4_096, residual_width: 2, peak_entries: 8 },
+        ],
+    },
+    GridFixture {
+        side: 8,
+        expected_candidates: 75,
+        expected_frontier: &[
+            ExpectedFrontier { label: "column-3", branches: 256, residual_width: 4, peak_entries: 32 },
+            ExpectedFrontier { label: "column-band-3-4", branches: 65_536, residual_width: 3, peak_entries: 16 },
+        ],
+    },
+];
 
 #[derive(Debug, Clone)]
 struct PlannedCutset {
@@ -225,7 +275,8 @@ fn run() -> Result<(), String> {
         "side,candidate_count,feasible_count,rejected_count,frontier_count,label,cutset_size,cutset_variables,branch_count,residual_induced_width,predicted_peak_factor_entries,on_pareto_frontier"
     );
 
-    for side in GRID_SIDES {
+    for fixture in GRID_FIXTURES {
+        let side = fixture.side;
         let factors = grid_factors(side)?;
         let scopes = factors
             .iter()
@@ -239,6 +290,12 @@ fn run() -> Result<(), String> {
 
         let candidates = candidate_cutsets(side, retained);
         let candidate_count = candidates.len();
+        if candidate_count != fixture.expected_candidates {
+            return Err(format!(
+                "candidate-family count changed for {side}x{side}: expected {}, got {candidate_count}",
+                fixture.expected_candidates
+            ));
+        }
         let mut plans = Vec::new();
         let mut rejected_count = 0usize;
         for (label, variables) in candidates {
@@ -260,6 +317,33 @@ fn run() -> Result<(), String> {
         });
         let frontier = pareto_frontier(&plans);
         validate_frontier(&plans, &frontier)?;
+        if frontier.len() != fixture.expected_frontier.len() {
+            return Err(format!(
+                "Pareto frontier count changed for {side}x{side}: expected {}, got {}",
+                fixture.expected_frontier.len(),
+                frontier.len()
+            ));
+        }
+        for (actual_index, expected) in frontier.iter().zip(fixture.expected_frontier) {
+            let actual = &plans[*actual_index];
+            if actual.label != expected.label
+                || actual.branch_count != expected.branches
+                || actual.residual_induced_width != expected.residual_width
+                || actual.predicted_peak_factor_entries != expected.peak_entries
+            {
+                return Err(format!(
+                    "Pareto frontier regression for {side}x{side}: expected {} ({}, {}, {}), got {} ({}, {}, {})",
+                    expected.label,
+                    expected.branches,
+                    expected.residual_width,
+                    expected.peak_entries,
+                    actual.label,
+                    actual.branch_count,
+                    actual.residual_induced_width,
+                    actual.predicted_peak_factor_entries
+                ));
+            }
+        }
         let frontier_set = frontier.into_iter().collect::<BTreeSet<_>>();
 
         for (index, plan) in plans.iter().enumerate() {
