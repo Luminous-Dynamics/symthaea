@@ -1,0 +1,312 @@
+{
+  "suite_id": "basalt-trusted-state-atomicity-benchmark-v1",
+  "benchmark_version": 1,
+  "claim_ceiling": "Evaluates state-machine, local transaction atomicity, retry recovery, checkpoint monotonicity and explicit anti-rollback unknown classification. Does not qualify a production trust anchor, transparency service, close coordinator or observer.",
+  "independent_unit": "One host/device provisioning lineage × source/profile × boot-transition schedule × storage backend/version. Repeated operations and retries within a lineage are not independent samples.",
+  "scenarios": [
+    {
+      "id": "TSTATE-001",
+      "phase": "baseline",
+      "mutation": "Valid receipt, authorized signer, valid inclusion and consistent newer checkpoint; source generation is the exact successor",
+      "expected": "commit_all_state"
+    },
+    {
+      "id": "TSTATE-002",
+      "phase": "source_cursor",
+      "mutation": "Replay the exact already accepted envelope, seal and generation",
+      "expected": "already_committed_exact_receipt"
+    },
+    {
+      "id": "TSTATE-003",
+      "phase": "source_cursor",
+      "mutation": "Submit a different receipt digest for an already accepted generation",
+      "expected": "reject_source_generation_equivocation"
+    },
+    {
+      "id": "TSTATE-004",
+      "phase": "source_cursor",
+      "mutation": "Skip one or more source generations",
+      "expected": "reject_source_generation_gap"
+    },
+    {
+      "id": "TSTATE-005",
+      "phase": "source_cursor",
+      "mutation": "Supply a predecessor seal digest different from persisted source cursor",
+      "expected": "reject_predecessor_mismatch"
+    },
+    {
+      "id": "TSTATE-006",
+      "phase": "log_cursor",
+      "mutation": "Present a checkpoint with a smaller tree size than the trusted checkpoint",
+      "expected": "reject_stale_checkpoint"
+    },
+    {
+      "id": "TSTATE-007",
+      "phase": "log_cursor",
+      "mutation": "Present same tree size and same root/checkpoint identity",
+      "expected": "idempotent_checkpoint_observation"
+    },
+    {
+      "id": "TSTATE-008",
+      "phase": "log_cursor",
+      "mutation": "Present same tree size with a different root hash",
+      "expected": "reject_checkpoint_fork"
+    },
+    {
+      "id": "TSTATE-009",
+      "phase": "log_cursor",
+      "mutation": "Present larger tree size with valid consistency proof from trusted checkpoint",
+      "expected": "accept_checkpoint_successor"
+    },
+    {
+      "id": "TSTATE-010",
+      "phase": "log_cursor",
+      "mutation": "Present larger tree size with truncated or invalid consistency proof",
+      "expected": "reject_invalid_consistency_proof"
+    },
+    {
+      "id": "TSTATE-011",
+      "phase": "concurrency",
+      "mutation": "Two verifier processes race with the same exact receipt and expected state revision",
+      "expected": "one_commit_one_idempotent_duplicate"
+    },
+    {
+      "id": "TSTATE-012",
+      "phase": "concurrency",
+      "mutation": "Two different receipts race for the same source generation",
+      "expected": "one_winner_other_equivocation_or_conflict"
+    },
+    {
+      "id": "TSTATE-013",
+      "phase": "concurrency",
+      "mutation": "Two independent sources concurrently advance the same log cursor",
+      "expected": "linearizable_checkpoint_advance_no_lost_update"
+    },
+    {
+      "id": "TSTATE-014",
+      "phase": "concurrency",
+      "mutation": "Generation N+1 races ahead of generation N",
+      "expected": "reject_or_recheck_until_predecessor_is_committed"
+    },
+    {
+      "id": "TSTATE-015",
+      "phase": "crash_recovery",
+      "mutation": "Crash before transaction begin",
+      "expected": "no_state_change"
+    },
+    {
+      "id": "TSTATE-016",
+      "phase": "crash_recovery",
+      "mutation": "Crash after source cursor write but before transaction commit",
+      "expected": "no_partial_state_change"
+    },
+    {
+      "id": "TSTATE-017",
+      "phase": "crash_recovery",
+      "mutation": "Crash after log cursor write but before transaction commit",
+      "expected": "no_partial_state_change"
+    },
+    {
+      "id": "TSTATE-018",
+      "phase": "crash_recovery",
+      "mutation": "Crash after accepted-receipt row write but before transaction commit",
+      "expected": "no_partial_state_change"
+    },
+    {
+      "id": "TSTATE-019",
+      "phase": "crash_recovery",
+      "mutation": "Crash during commit at each backend-exposed durable-write boundary",
+      "expected": "recover_exactly_old_or_new_state"
+    },
+    {
+      "id": "TSTATE-020",
+      "phase": "crash_recovery",
+      "mutation": "Crash after durable commit but before success response",
+      "expected": "recover_already_committed_exact_receipt"
+    },
+    {
+      "id": "TSTATE-021",
+      "phase": "crash_recovery",
+      "mutation": "Transparency append succeeds and verifier crashes before local transaction starts",
+      "expected": "lookup_exact_entry_then_retry_local_cas"
+    },
+    {
+      "id": "TSTATE-022",
+      "phase": "crash_recovery",
+      "mutation": "Transparency append succeeds and verifier crashes during local transaction",
+      "expected": "lookup_exact_entry_then_recover_old_or_new_local_state"
+    },
+    {
+      "id": "TSTATE-023",
+      "phase": "crash_recovery",
+      "mutation": "Log adapter cannot perform idempotent append or exact-entry lookup after uncertain response",
+      "expected": "external_append_outcome_unknown"
+    },
+    {
+      "id": "TSTATE-024",
+      "phase": "crash_recovery",
+      "mutation": "Database commit response is ambiguous; receipt and both cursors are recovered from durable state",
+      "expected": "classify_exactly_committed_or_retry_without_partial_advance"
+    },
+    {
+      "id": "TSTATE-025",
+      "phase": "crash_recovery",
+      "mutation": "Disk-full or fsync/sync operation fails before durability is established",
+      "expected": "durability_failed_no_trust_promotion"
+    },
+    {
+      "id": "TSTATE-026",
+      "phase": "crash_recovery",
+      "mutation": "Database file/WAL/journal is truncated or corrupted",
+      "expected": "storage_corrupt_fail_closed"
+    },
+    {
+      "id": "TSTATE-027",
+      "phase": "rollback",
+      "mutation": "Restore an older local snapshot while remote monotonic anchor has advanced",
+      "expected": "rollback_detected"
+    },
+    {
+      "id": "TSTATE-028",
+      "phase": "rollback",
+      "mutation": "Restore an older local snapshot with no external monotonic anchor available",
+      "expected": "anti_rollback_unknown_not_pass"
+    },
+    {
+      "id": "TSTATE-029",
+      "phase": "rollback",
+      "mutation": "Attempt to claim anti-rollback solely from local ACID transaction and hash chain",
+      "expected": "reject_unanchored_rollback_claim"
+    },
+    {
+      "id": "TSTATE-030",
+      "phase": "offline",
+      "mutation": "Use a cached checkpoint while the witness/log freshness service is unavailable",
+      "expected": "signature_may_verify_freshness_unknown"
+    },
+    {
+      "id": "TSTATE-031",
+      "phase": "offline",
+      "mutation": "Witness quorum is unavailable or split across conflicting roots",
+      "expected": "witness_quorum_insufficient_or_equivocation"
+    },
+    {
+      "id": "TSTATE-032",
+      "phase": "policy_lifecycle",
+      "mutation": "Rotate signer key while receipts are queued without changing source generation",
+      "expected": "authorized_policy_transition_no_generation_reset"
+    },
+    {
+      "id": "TSTATE-033",
+      "phase": "policy_lifecycle",
+      "mutation": "Present a stale signer or witness policy version after policy advancement",
+      "expected": "reject_policy_rollback"
+    },
+    {
+      "id": "TSTATE-034",
+      "phase": "boot_lifecycle",
+      "mutation": "Host reboots and monotonic clock resets under an authorized boot transition",
+      "expected": "preserve_generation_do_not_compare_cross_boot_monotonic_time"
+    },
+    {
+      "id": "TSTATE-035",
+      "phase": "boot_lifecycle",
+      "mutation": "Substitute a boot ID without an authorized boot attestation/transition",
+      "expected": "unauthorized_boot_transition_unknown_or_rejected"
+    },
+    {
+      "id": "TSTATE-036",
+      "phase": "boot_lifecycle",
+      "mutation": "Attempt generation reset after observer restart, kernel update or device restore",
+      "expected": "reject_generation_reset"
+    }
+  ],
+  "metrics": [
+    {
+      "id": "partial_state_advances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "conflicting_same_generation_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "stale_checkpoint_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "same_size_fork_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "unanchored_anti_rollback_promotions",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "unknown_freshness_misclassified_as_current",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "exact_retry_recovery_failures",
+      "class": "safety",
+      "unit": "count",
+      "target": "0 when exact-entry lookup/idempotent append is supported"
+    },
+    {
+      "id": "generation_resets_after_boot_or_key_transition",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "local_durable_commit_p95_single_writer",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": "<= 5 ms initial research target; pinned reference NVMe"
+    },
+    {
+      "id": "local_durable_commit_p95_16_verifiers",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": "<= 25 ms initial research target; contention measured separately"
+    },
+    {
+      "id": "exact_retry_recovery_p95",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": "<= 100 ms initial research target when local store is healthy"
+    },
+    {
+      "id": "write_amplification",
+      "class": "efficiency",
+      "unit": "bytes_written_per_accepted_epoch",
+      "target": "measure and report; no safety tradeoff"
+    },
+    {
+      "id": "external_log_witness_latency",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": "measure separately from local durable commit"
+    }
+  ],
+  "benchmark_policy": {
+    "all_safety_gates_before_efficiency": true,
+    "record_every_crash_point": true,
+    "no_event_level_pseudoreplication": true,
+    "local_atomicity_is_not_anti_rollback": true,
+    "unknown_is_not_pass": true,
+    "held_out_confirmatory_lineages": true
+  }
+}
