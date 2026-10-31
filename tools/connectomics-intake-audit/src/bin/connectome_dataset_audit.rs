@@ -1085,6 +1085,25 @@ mod tests {
     }
 
     #[test]
+    fn cohort_membership_digest_changes_when_one_sample_is_reassigned() {
+        let mut rows = valid_dataset();
+        rows[0].row.present_slots.push("em_xy".to_string());
+        rows[0].row.has_em = true;
+        let revision = "a".repeat(40);
+        let source_digest = "b".repeat(64);
+        let original = build_cohort_manifest(&rows, &revision, &source_digest);
+        let original_hash = original.cohorts["paired_geometry_only"].sample_ids_sha256.clone();
+
+        rows[0].row.combined_sample_hash = "e".repeat(32);
+        let changed = build_cohort_manifest(&rows, &revision, &source_digest);
+        assert_ne!(
+            original_hash,
+            changed.cohorts["paired_geometry_only"].sample_ids_sha256
+        );
+        assert_ne!(original.cohort_set_sha256, changed.cohort_set_sha256);
+    }
+
+    #[test]
     fn cohort_manifest_does_not_promote_empty_cohorts_to_zero_coverage() {
         let rows = valid_dataset();
         let manifest = build_cohort_manifest(&rows, &"a".repeat(40), &"b".repeat(64));
