@@ -193,6 +193,12 @@ fn validate_event_reference(
     if event.response_bytes == 0 || event.response_sha256.is_none() {
         return Err(format!("composition event {sequence} has no received response body"));
     }
+    if !valid_digest(event.request_sha256.as_str())
+        || !valid_digest(event.destination_sha256.as_str())
+        || !event.response_sha256.as_deref().is_some_and(valid_digest)
+    {
+        return Err(format!("composition event {sequence} has incomplete request/destination/response digests"));
+    }
     Ok(())
 }
 
@@ -306,6 +312,8 @@ pub fn audit_compositional_exposure(
         || !trace_audit.trace_root_matches
         || !trace_audit.sequence_complete
         || !trace_audit.timestamps_valid_and_monotonic
+        || !trace_audit.request_receipts_complete
+        || !trace_audit.accepted_response_receipts_complete
     {
         return Err("compositional findings require an integrity-valid search-time trace".to_owned());
     }
@@ -419,6 +427,7 @@ pub fn verify_compositional_audit_integrity(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
     use crate::{
         hash_domain,
         search_time::{
@@ -532,6 +541,47 @@ mod tests {
         };
         findings.findings_sha256 = compositional_findings_digest(&findings).unwrap();
         findings
+    }
+
+    #[test]
+    fn strict_composition_schemas_match_rust_struct_fields() {
+        let findings_schema: Value = serde_json::from_str(include_str!(
+            "../schema/compositional-exposure-findings.schema.json"
+        )).unwrap();
+        let audit_schema: Value = serde_json::from_str(include_str!(
+            "../schema/compositional-exposure-audit.schema.json"
+        )).unwrap();
+        let trace = trace();
+        let findings = findings(&trace);
+        let report = audit_compositional_exposure(&trace, &findings).unwrap();
+        for (schema, value, version) in [
+            (&findings_schema, serde_json::to_value(&findings).unwrap(), COMPOSITION_FINDINGS_SCHEMA),
+            (&audit_schema, serde_json::to_value(&report).unwrap(), COMPOSITION_AUDIT_SCHEMA),
+        ] {
+            assert_eq!(schema["properties"]["schema"]["const"].as_str(), Some(version));
+            let required: BTreeSet<String> = schema["required"].as_array().unwrap()
+                .iter().map(|entry| entry.as_str().unwrap().to_owned()).collect();
+            let properties: BTreeSet<String> = schema["properties"].as_object().unwrap()
+                .keys().cloned().collect();
+            let actual: BTreeSet<String> = value.as_object().unwrap()
+                .keys().cloned().collect();
+            assert_eq!(required, properties);
+            assert_eq!(actual, properties);
+        }
+        let finding_properties: BTreeSet<String> =
+            findings_schema["properties"]["findings"]["items"]["properties"]
+                .as_object().unwrap().keys().cloned().collect();
+        let actual_finding: BTreeSet<String> = serde_json::to_value(
+            &findings.findings[0]
+        ).unwrap().as_object().unwrap().keys().cloned().collect();
+        assert_eq!(finding_properties, actual_finding);
+        let leave_properties: BTreeSet<String> =
+            findings_schema["properties"]["findings"]["items"]["properties"]["leave_one_out_insufficiency"]["items"]["properties"]
+                .as_object().unwrap().keys().cloned().collect();
+        let actual_leave: BTreeSet<String> = serde_json::to_value(
+            &findings.findings[0].leave_one_out_insufficiency[0]
+        ).unwrap().as_object().unwrap().keys().cloned().collect();
+        assert_eq!(leave_properties, actual_leave);
     }
 
     #[test]
