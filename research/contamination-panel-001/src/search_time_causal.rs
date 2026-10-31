@@ -340,6 +340,10 @@ fn validate_run(
     run_ids: &mut BTreeSet<String>,
     namespaces: &mut BTreeSet<String>,
     execution_receipts: &mut BTreeSet<String>,
+    submission_digests: &mut BTreeSet<String>,
+    score_report_digests: &mut BTreeSet<String>,
+    trace_roots: &mut BTreeSet<String>,
+    findings_digests: &mut BTreeSet<String>,
     issues: &mut Vec<String>,
 ) -> Result<(), String> {
     if run.status != SearchTrialRunStatusV1::Completed {
@@ -414,7 +418,19 @@ fn validate_run(
         return Err("self-asserted independent score verification cannot be trusted".to_owned());
     }
     verify_fresh_score_report_integrity(&run.score_report)?;
+    if !submission_digests.insert(run.score_report.submission_sha256.clone()) {
+        return Err("fresh answer submission digests must be unique across run conditions and blocks".to_owned());
+    }
+    if !score_report_digests.insert(run.score_report.report_sha256.clone()) {
+        return Err("fresh score report digests must be unique across run conditions and blocks".to_owned());
+    }
+    if !trace_roots.insert(run.trace.trace_root_sha256.clone()) {
+        return Err("search-time trace roots must be unique across run conditions and blocks".to_owned());
+    }
     let finding_audit = audit_search_time_findings(&run.trace, &run.findings)?;
+    if !findings_digests.insert(run.findings.findings_sha256.clone()) {
+        return Err("search-time findings digests must be unique across run conditions and blocks".to_owned());
+    }
     if !finding_audit.valid {
         return Err(format!("run {} search-time findings are not bound to the trace", run.run_id));
     }
@@ -473,6 +489,10 @@ pub fn analyze_search_time_access_trial(
     let mut run_ids = BTreeSet::new();
     let mut namespaces = BTreeSet::new();
     let mut execution_receipts = BTreeSet::new();
+    let mut submission_digests = BTreeSet::new();
+    let mut score_report_digests = BTreeSet::new();
+    let mut trace_roots = BTreeSet::new();
+    let mut findings_digests = BTreeSet::new();
     let mut model_identity: Option<(String, String, String, String)> = None;
     let mut every_run_completed = true;
     let mut every_trace_valid = true;
@@ -524,6 +544,10 @@ pub fn analyze_search_time_access_trial(
                 &mut run_ids,
                 &mut namespaces,
                 &mut execution_receipts,
+                &mut submission_digests,
+                &mut score_report_digests,
+                &mut trace_roots,
+                &mut findings_digests,
                 &mut issues,
             )?;
             let identity = (
@@ -1106,6 +1130,7 @@ mod tests {
                 run.findings.findings_sha256 = hash_domain(b"search-time-findings.v1", &findings_bytes);
                 run.score_report.run_id = run.run_id.clone();
                 run.score_report.run_execution_receipt_sha256 = run.run_execution_receipt_sha256.clone();
+                run.score_report.submission_sha256 = digest(&format!("submission-{suffix}"));
                 run.score_report.report_sha256.clear();
                 let report_bytes = serde_json::to_vec(&run.score_report).unwrap();
                 run.score_report.report_sha256 =
