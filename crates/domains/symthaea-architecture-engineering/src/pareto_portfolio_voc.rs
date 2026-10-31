@@ -49,6 +49,8 @@ pub struct ParetoPortfolioParticle {
 pub struct ParetoPortfolioPosterior {
     /// Strictly sorted, unique candidate IDs bind every objective-vector column.
     pub candidate_ids: Vec<String>,
+    /// Exact architecture configuration SHA-256 for each candidate, in candidate_ids order.
+    pub candidate_config_sha256: Vec<String>,
     /// Device/profile feasibility is a hard state and is not encoded as a numeric objective.
     pub candidate_feasible: Vec<bool>,
     pub particles: Vec<ParetoPortfolioParticle>,
@@ -111,6 +113,8 @@ pub struct PortfolioActionOutcome {
 pub struct PortfolioMeasurementAction {
     pub action_id: String,
     pub candidate_id: String,
+    pub candidate_config_sha256: String,
+    pub objective_registry_sha256: String,
     pub objective_id: String,
     pub hardware_profile_sha256: Option<String>,
     pub measurement_protocol_sha256: String,
@@ -262,7 +266,12 @@ pub fn evaluate_portfolio_class_regret(
     let selected_portfolio = canonical_portfolios
         .iter()
         .find(|portfolio| portfolio.portfolio_id == selected.portfolio_id)
-        .expect("validated portfolio score must have a source portfolio");
+        .ok_or_else(|| {
+            PortfolioVoCError::new(
+                "selected_portfolio_id",
+                "selected portfolio score has no matching source portfolio",
+            )
+        })?;
 
     let all_candidate_indices: Vec<usize> = (0..posterior.candidate_ids.len()).collect();
     let oracle_replicates = expected_hypervolume_replicates(
@@ -438,6 +447,18 @@ fn validate_action(
             "cannot measure a candidate already marked hard-infeasible for this deployment profile",
         ));
     }
+    if action.candidate_config_sha256 != posterior.candidate_config_sha256[candidate_index] {
+        return Err(PortfolioVoCError::new(
+            "candidate_config_sha256",
+            "action configuration digest does not match the exact posterior candidate",
+        ));
+    }
+    if action.objective_registry_sha256 != registry.registry_sha256 {
+        return Err(PortfolioVoCError::new(
+            "objective_registry_sha256",
+            "action was created against a different objective registry or acquisition-cost model",
+        ));
+    }
     if action.incremental_cost_units == 0 {
         return Err(PortfolioVoCError::new(
             "incremental_cost_units",
@@ -545,11 +566,22 @@ fn validate_posterior(
     design: &HypervolumeQmcDesign,
 ) -> Result<(), PortfolioVoCError> {
     let candidate_count = posterior.candidate_ids.len();
-    if candidate_count == 0 || posterior.candidate_feasible.len() != candidate_count {
+    if candidate_count == 0
+        || posterior.candidate_feasible.len() != candidate_count
+        || posterior.candidate_config_sha256.len() != candidate_count
+    {
         return Err(PortfolioVoCError::new(
             "candidate_ids",
-            "candidate IDs and feasibility flags must have the same non-zero length",
+            "candidate IDs, configuration digests and feasibility flags must have the same non-zero length",
         ));
+    }
+    for (index, digest) in posterior.candidate_config_sha256.iter().enumerate() {
+        if !is_sha256(digest) {
+            return Err(PortfolioVoCError::new(
+                format!("candidate_config_sha256[{index}]"),
+                "must be a lowercase hexadecimal SHA-256 digest",
+            ));
+        }
     }
     if posterior
         .candidate_ids
@@ -762,6 +794,13 @@ fn feasible_points_for_indices(
         .collect()
 }
 
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 fn mean(values: &[f64]) -> f64 {
     values.iter().sum::<f64>() / values.len() as f64
 }
@@ -806,6 +845,7 @@ mod tests {
     fn posterior() -> ParetoPortfolioPosterior {
         ParetoPortfolioPosterior {
             candidate_ids: vec!["A".into(), "B".into(), "C".into()],
+            candidate_config_sha256: vec![sha('a'), sha('b'), sha('c')],
             candidate_feasible: vec![true, true, true],
             particles: vec![ParetoPortfolioParticle {
                 particle_id: "p1".into(),
@@ -862,6 +902,8 @@ mod tests {
         let mut value = PortfolioMeasurementAction {
             action_id: "measure-A-accuracy".into(),
             candidate_id: "A".into(),
+            candidate_config_sha256: posterior.candidate_config_sha256[0].clone(),
+            objective_registry_sha256: registry().registry_sha256,
             objective_id: "accuracy".into(),
             hardware_profile_sha256: None,
             measurement_protocol_sha256: sha('a'),
@@ -881,13 +923,13 @@ mod tests {
         };
         value.observation_likelihood_model_sha256 =
             compute_portfolio_action_likelihood_sha256(&value).unwrap();
-        let _ = posterior;
         value
     }
 
     fn two_particle_posterior() -> ParetoPortfolioPosterior {
         ParetoPortfolioPosterior {
             candidate_ids: vec!["A".into(), "B".into(), "C".into()],
+            candidate_config_sha256: vec![sha('a'), sha('b'), sha('c')],
             candidate_feasible: vec![true, true, true],
             particles: vec![
                 ParetoPortfolioParticle {
@@ -1071,6 +1113,48 @@ mod tests {
         let posterior = two_particle_posterior();
         let mut action = action(&posterior);
         action.outcomes[0].likelihood_by_particle = vec![0.5, 0.5];
+        assert!(evaluate_portfolio_measurement_voc(
+            &registry(),
+            &posterior,
+            &two_portfolios(),
+            &ParetoPortfolioConfig {
+                target_k: 1,
+                minimum_feasible_utility: vec![0.0, 0.0],
+            },
+            &design(),
+            &action,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn action_cannot_be_replayed_with_a_different_candidate_configuration() {
+        let posterior = two_particle_posterior();
+        let mut action = action(&posterior);
+        action.candidate_config_sha256 = sha('f');
+        action.observation_likelihood_model_sha256 =
+            compute_portfolio_action_likelihood_sha256(&action).unwrap();
+        assert!(evaluate_portfolio_measurement_voc(
+            &registry(),
+            &posterior,
+            &two_portfolios(),
+            &ParetoPortfolioConfig {
+                target_k: 1,
+                minimum_feasible_utility: vec![0.0, 0.0],
+            },
+            &design(),
+            &action,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn action_cannot_be_replayed_against_a_different_objective_registry() {
+        let posterior = two_particle_posterior();
+        let mut action = action(&posterior);
+        action.objective_registry_sha256 = sha('f');
+        action.observation_likelihood_model_sha256 =
+            compute_portfolio_action_likelihood_sha256(&action).unwrap();
         assert!(evaluate_portfolio_measurement_voc(
             &registry(),
             &posterior,
