@@ -112,6 +112,7 @@ pub enum GrammarPlanEvidence {
     ProgSuite(ProgSuitePlanEvidence),
     Sonata(SonataPlanEvidence),
     Renaissance(RenaissancePlanEvidence),
+    Opera(OperaPlanEvidence),
     Compatibility {
         family: GrammarFamily,
         form_available: bool,
@@ -132,6 +133,13 @@ pub struct SonataPlanEvidence {
     pub plan: crate::sonata::SonataPlan,
     pub resolution: crate::obligation::ObligationLedger,
     pub verification: Vec<crate::sonata::SonataObligationEvidence>,
+}
+
+/// Opera's two-theme dramatic plan paired with score-side checks.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OperaPlanEvidence {
+    pub plan: crate::opera::OperaPlan,
+    pub verification: crate::opera::OperaVerification,
 }
 
 /// Renaissance plan paired with the checks computed from the realized score.
@@ -368,6 +376,19 @@ pub fn compose_with_grammar_plan(
                 trace: Default::default(),
             }
         }
+        GrammarFamily::DramaticAdaptive => {
+            let realized = crate::composer::compose_opera_with_plan(intent, spec)
+                .expect("DramaticAdaptive currently requires the dedicated Opera form");
+            GrammarRealization {
+                score: realized.score,
+                form: None,
+                plan: GrammarPlanEvidence::Opera(OperaPlanEvidence {
+                    plan: realized.plan,
+                    verification: realized.verification,
+                }),
+                trace: Default::default(),
+            }
+        }
         family => {
             let (score, form) = crate::composer::compose_with_spec_and_form_and_grammar(
                 intent,
@@ -387,7 +408,7 @@ pub fn compose_with_grammar_plan(
     };
     // Universal safety net: every dedicated engine (GrooveCycle,
     // ProcessAdditive, RagaModalArc, Blues/Jazz, ProgSuite, Sonata,
-    // Renaissance, Fugue, and the shared period pipeline) receives the same
+    // Renaissance, Opera, Fugue, and the shared period pipeline) receives the same
     // de-overlap/metadata-sync pass used by the canonical composer, so the
     // trace below and the debug gate
     // after it both see the corrected score, not a pre-correction one.
@@ -672,6 +693,36 @@ mod tests {
         assert!(renaissance.trace.obligation_transitions.iter().all(|item| {
             item.to != crate::grammar_trace::AssertedObligationState::Unresolved
         }));
+    }
+
+    #[test]
+    fn opera_emits_typed_dramatic_plan_and_matches_canonical_score() {
+        use crate::style::Style;
+
+        let spec = Style::Opera.spec();
+        let profile = Style::Opera.grammar_profile();
+        assert_eq!(profile.family, GrammarFamily::DramaticAdaptive);
+        for seed in 0..32u64 {
+            let intent = crate::composer::MusicalIntent {
+                bars: 12,
+                seed,
+                ..Default::default()
+            };
+            let realized = compose_with_grammar_plan(profile, &intent, &spec);
+            match &realized.plan {
+                GrammarPlanEvidence::Opera(evidence) => {
+                    assert_eq!(evidence.plan.total_bars, 9);
+                    assert_eq!(evidence.plan.sections.len(), 4);
+                    assert!(evidence.verification.all_verified(), "seed {seed}: {:?}", evidence.verification);
+                }
+                other => panic!("Opera must emit a typed dramatic plan, got {other:?}"),
+            }
+            assert_eq!(realized.score, crate::composer::compose_with_spec(&intent, &spec));
+            assert_eq!(realized.trace.structures.len(), 4);
+            assert!(realized.trace.obligation_transitions.iter().all(|item| {
+                item.to != crate::grammar_trace::AssertedObligationState::Unresolved
+            }));
+        }
     }
 
     #[test]
