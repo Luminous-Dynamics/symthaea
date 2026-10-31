@@ -283,6 +283,14 @@
       "requires_original_split_and_preprocessing": true
     },
     {
+      "id": "dfa_cfcn_imdb_sentiment",
+      "family": "continuous_time_external",
+      "dataset": "IMDb sentiment",
+      "paper_baseline": "DFA-CfN/PRDFA-CfN",
+      "requires_original_sequence_form_and_preprocessing": true,
+      "condition": "Include only if the original paper task's sequential formulation, input order, split and preprocessing can be reproduced."
+    },
+    {
       "id": "dfa_cfcn_multi_energy_forecasting",
       "family": "continuous_time_external",
       "paper_baseline": "DFA-CfN/PRDFA-CfN",
