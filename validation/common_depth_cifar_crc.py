@@ -275,35 +275,6 @@ def run_table(n: int, alpha: float, rounds: tuple[int, ...] = (0, 1, 3, 10, 20, 
     }
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", required=True)
-    parser.add_argument("--n", type=int, default=50)
-    parser.add_argument("--alpha", type=float, nargs="+", default=[.02, .05, .10, .15])
-    args = parser.parse_args()
-    started = time.perf_counter()
-    tables = [run_table(args.n, alpha) for alpha in args.alpha]
-    result = {
-        "schema": SCHEMA,
-        "status": "COMMON_DEPTH_TABLE_REPRODUCTION_ONLY_NOT_CIFAR_RESULT_REPRODUCTION",
-        "reference": "Bai & Ramdas (2026), arXiv:2610.35821, Appendix B.7",
-        "tables": tables,
-        "runtime_seconds": time.perf_counter() - started,
-        "limitations": [
-            "common-depth family only; confidence-adaptive feature-specific family not implemented here",
-            "no cached ResNet-18 predictions or exact split manifest used",
-            "no test metrics computed; paper reference values not reproduced",
-            "finite exchangeability guarantee only; distribution-shift behavior is stress-only"
-        ],
-        "environment": {"python": platform.python_version(), "numpy": np.__version__}
-    }
-    raw=(json.dumps(result,sort_keys=True,separators=(",",":"),allow_nan=False)+"\n").encode()
-    Path(args.output).write_bytes(raw)
-    print(json.dumps({"output":args.output,"bytes":len(raw),
-                      "sha256":hashlib.sha256(raw).hexdigest(),
-                      "tables":tables},indent=2))
-
-
 def _sample_finite_population_splits(
     pool_counts: tuple[int, int, int], n_calibration: int, n_test: int,
     n_splits: int, seed: int
@@ -402,3 +373,45 @@ def run_pool_count_benchmark(
             "finite exchangeability guarantee only; shift experiments are outside the guarantee"
         ]
     }
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", required=True)
+    parser.add_argument("--mode", choices=("table", "pool"), default="pool")
+    parser.add_argument("--n", type=int, default=50)
+    parser.add_argument("--alpha", type=float, nargs="+", default=[.02, .05, .10, .15])
+    parser.add_argument("--splits", type=int, default=300)
+    parser.add_argument("--seed", type=int, default=20261031)
+    args = parser.parse_args()
+    started = time.perf_counter()
+    if args.mode == "table":
+        result = {
+            "schema": SCHEMA,
+            "status": "COMMON_DEPTH_TABLE_REPRODUCTION_ONLY_NOT_CIFAR_RESULT_REPRODUCTION",
+            "reference": "Bai & Ramdas (2026), arXiv:2610.35821, Appendix B.7",
+            "tables": [run_table(args.n, alpha) for alpha in args.alpha],
+        }
+    else:
+        result = {
+            "schema": SCHEMA,
+            "status": "NEW_SEEDED_TYPE_COUNT_REPRODUCTION_NOT_ORIGINAL_SPLIT_MANIFEST",
+            "reference": "Bai & Ramdas (2026), arXiv:2610.35821, Appendix B.7",
+            "benchmark": run_pool_count_benchmark(
+                alphas=tuple(args.alpha), n_calibration=args.n,
+                n_splits=args.splits, seed=args.seed
+            ),
+        }
+    result["runtime_seconds"] = time.perf_counter() - started
+    result["environment"] = {"python": platform.python_version(), "numpy": np.__version__}
+    raw = (json.dumps(result, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n").encode()
+    Path(args.output).write_bytes(raw)
+    print(json.dumps({
+        "output": args.output, "bytes": len(raw),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "runtime_seconds": result["runtime_seconds"],
+        "mode": args.mode,
+    }, indent=2))
+
+
+if __name__ == "__main__":
+    main()
