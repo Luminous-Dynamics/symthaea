@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_STOPPING_SNAPSHOT.schema.json",
   "title": "Connectome proofreading stopping snapshot",
-  "description": "One immutable, versioned observation for evaluating query-specific proofreading convergence. This input schema does not declare a connectome complete or authorize stopping.",
+  "description": "One immutable, versioned observation for evaluating query-specific proofreading convergence. This input schema does not declare a connectome complete or authorize stopping. Optional synaptic_completeness evidence records the separate numerator/denominator for synapses whose pre- and postsynaptic locations both belong to fully proofread cells. It is never inferred from graph invariants.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -228,6 +228,48 @@
         "query_evaluation_profile_sha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "synaptic_completeness": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Optional independent completeness observation. Denominator is every synapse in the declared population; numerator requires both pre- and postsynaptic locations to belong to fully proofread cells.",
+      "additionalProperties": false,
+      "required": [
+        "population_id",
+        "population_definition_sha256",
+        "synapse_population_sha256",
+        "fully_proofread_cell_set_sha256",
+        "total_synapse_count",
+        "synapses_with_both_partners_in_fully_proofread_cells"
+      ],
+      "properties": {
+        "population_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "population_definition_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "synapse_population_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "fully_proofread_cell_set_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "total_synapse_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "synapses_with_both_partners_in_fully_proofread_cells": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     }
