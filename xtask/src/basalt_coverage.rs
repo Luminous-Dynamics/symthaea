@@ -635,6 +635,15 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_candidate_profile_parses_and_remains_unqualified() {
+        let profile_bytes = include_str!("../../benchmarks/basalt/coverage/linux-hermetic-candidate.v1.json").as_bytes();
+        let report = audit_bytes(profile_bytes, br#"{}"#);
+        assert!(report.profile_valid);
+        assert!(!report.profile_qualified);
+        assert!(!report.qualification_eligible);
+    }
+
+    #[test]
     fn accepts_self_consistent_complete_claim_but_never_qualifies_profile() {
         let (profile, receipt) = encoded_pair("complete_within_profile");
         let report = audit_bytes(&profile, &receipt);
