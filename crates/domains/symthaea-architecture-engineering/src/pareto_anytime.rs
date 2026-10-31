@@ -590,7 +590,7 @@ impl AnytimeHistory {
             let path = format!("history.events[{index}]");
             let expected_ordinal = u64::try_from(index).ok()
                 .and_then(|value| value.checked_add(1))
-                .ok_or_else(|| AnytimeError::new(&path, "event count overflowed u64"))?;
+                .ok_or_else(|| AnytimeError::new(path.clone(), "event count overflowed u64"))?;
             if event.ordinal != expected_ordinal {
                 return Err(AnytimeError::new(format!("{path}.ordinal"), "ordinals must be contiguous and one-based"));
             }
@@ -619,9 +619,9 @@ impl AnytimeHistory {
                     failure_reason,
                 } => {
                     objective_attempts = objective_attempts.checked_add(1)
-                        .ok_or_else(|| AnytimeError::new(&path, "objective-attempt counter overflow"))?;
+                        .ok_or_else(|| AnytimeError::new(path.clone(), "objective-attempt counter overflow"))?;
                     if objective_attempts > self.header.max_objective_evaluation_attempts {
-                        return Err(AnytimeError::new(&path, "objective-evaluation attempt budget exceeded"));
+                        return Err(AnytimeError::new(path.clone(), "objective-evaluation attempt budget exceeded"));
                     }
                     if evaluation_id.trim().is_empty() || !evaluation_ids.insert(evaluation_id.as_str()) {
                         return Err(AnytimeError::new(format!("{path}.evaluation_id"), "evaluation IDs must be non-empty and unique"));
@@ -680,7 +680,7 @@ impl AnytimeHistory {
                         }
                         _ => {
                             if objective_values.is_some() || feasible.is_some() || !constraint_violations.is_empty() || evidence_sha256.is_some() {
-                                return Err(AnytimeError::new(&path, "failed/invalid/timed-out evaluation cannot enter the objective archive"));
+                                return Err(AnytimeError::new(path.clone(), "failed/invalid/timed-out evaluation cannot enter the objective archive"));
                             }
                             if failure_reason.as_ref().is_none_or(|reason| reason.trim().is_empty()) {
                                 return Err(AnytimeError::new(format!("{path}.failure_reason"), "failed attempt requires a reason"));
@@ -871,13 +871,9 @@ pub fn analyze_anytime_history(history: &AnytimeHistory) -> Result<AnytimeRunRec
 
     for event in &history.events {
         totals.add_event(&event.resources, "receipt.total_resources")?;
-        match &event.action {
-            AnytimeAction::CandidateEvaluation { outcome, .. } => {
-                objective_attempts = objective_attempts.checked_add(1)
-                    .ok_or_else(|| AnytimeError::new("receipt.objective_evaluation_attempt_count", "counter overflow"))?;
-                let _ = outcome;
-            }
-            _ => {}
+        if matches!(&event.action, AnytimeAction::CandidateEvaluation { .. }) {
+            objective_attempts = objective_attempts.checked_add(1)
+                .ok_or_else(|| AnytimeError::new("receipt.objective_evaluation_attempt_count", "counter overflow"))?;
         }
         match &event.action {
             AnytimeAction::CandidateEvaluation {
