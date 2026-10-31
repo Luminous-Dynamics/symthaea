@@ -2386,6 +2386,77 @@ mod tests {
     }
 
     #[test]
+    fn same_seed_symbolic_gene_ablations_are_recorded_and_tamper_evident() {
+        let genome = classical_genome();
+        let config = GenomeEvaluationConfig {
+            seeds: vec![1, 7, 19],
+            ..GenomeEvaluationConfig::default()
+        };
+        let evaluation =
+            evaluate_genome(&genome, &MusicalIntent::default(), &config, &[]).unwrap();
+
+        assert_eq!(evaluation.gene_effect_audits.len(), 2);
+        assert!(evaluation.gene_effect_audits.iter().all(|audit| {
+            audit.layer == GeneEffectLayer::Symbolic
+                && audit.status == GeneEffectStatus::Observed
+                && audit.seed_count == config.seeds.len()
+                && audit.changed_seed_count > 0
+                && audit.paired_trials.len() == config.seeds.len()
+                && audit.counterfactual_genome_id.as_ref().is_some_and(|id| {
+                    id.strip_prefix("sha256:").is_some_and(is_sha256_hex)
+                })
+                && audit.counterfactual_compiled_spec_sha256
+                    .as_ref()
+                    .is_some_and(is_sha256_hex)
+        }));
+        assert!(evaluation.verify_digest());
+
+        let mut corrupted = evaluation.clone();
+        corrupted.gene_effect_audits[0].paired_trials[0]
+            .changed_dimensions
+            .clear();
+        assert!(!corrupted.verify_digest());
+
+        let mut corrupted = evaluation.clone();
+        corrupted.gene_effect_audits[0].counterfactual_compiled_spec_sha256 =
+            Some("f".repeat(64));
+        assert!(!corrupted.verify_digest());
+    }
+
+    #[test]
+    fn renderer_layer_gene_is_renderer_pending_and_blocks_archive_admission() {
+        let base = classical_genome();
+        let ensemble_id = (1..=152)
+            .find(|id| {
+                symthaea_muse_protocol::catalog::catalog_entry(*id)
+                    .is_some_and(|entry| entry.composer_style == Some("JazzBallad"))
+            })
+            .expect("JazzBallad catalogue identity must exist");
+        let genome = base.replace_gene(GenomeAxis::Ensemble, Some(ensemble_id)).unwrap();
+        let config = GenomeEvaluationConfig {
+            seeds: vec![1, 7],
+            ..GenomeEvaluationConfig::default()
+        };
+        let evaluation =
+            evaluate_genome(&genome, &MusicalIntent::default(), &config, &[]).unwrap();
+
+        assert!(!evaluation.eligible_for_archive);
+        assert!(evaluation.gene_effect_audits.iter().any(|audit| {
+            audit.axis == GenomeAxis::Ensemble
+                && audit.layer == GeneEffectLayer::Renderer
+                && audit.status == GeneEffectStatus::RendererPending
+                && audit.counterfactual_genome_id.is_none()
+                && audit.counterfactual_compiled_spec_sha256.is_none()
+                && audit.paired_trials.is_empty()
+        }));
+        assert!(evaluation.verify_digest());
+
+        let mut forged = evaluation.clone();
+        forged.eligible_for_archive = true;
+        assert!(!forged.verify_digest());
+    }
+
+    #[test]
     fn evaluation_digest_recomputes_native_plan_fingerprint_from_stored_plan() {
         let genome = classical_genome();
         let config = GenomeEvaluationConfig {
