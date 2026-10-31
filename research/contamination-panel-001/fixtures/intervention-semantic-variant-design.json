@@ -466,5 +466,8 @@
     }
   ],
   "shared_training_corpus_sha256": "abababababababababababababababababababababababababababababababab",
-  "shared_training_token_count": 92000
+  "shared_training_token_count": 92000,
+  "training_code_sha256": "abababababababababababababababababababababababababababababababab",
+  "runtime_image_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+  "tokenization_pipeline_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef"
 }
