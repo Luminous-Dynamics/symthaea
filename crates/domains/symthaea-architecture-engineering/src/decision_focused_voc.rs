@@ -366,6 +366,22 @@ pub fn plan_decision_focused_voc(
     })
 }
 
+/// Replay a plan from its frozen inputs and compare every field, including its digest.
+/// This is a deterministic integrity check, not a signature or an independent model-calibration
+/// proof. The evaluator must retain the exact manifest, posterior, action set and config.
+pub fn verify_decision_focused_voc_plan(
+    manifest: &DecisionFocusedVoCModelManifest,
+    posterior: &PosteriorModel,
+    actions: &[VoCAction],
+    config: &DecisionFocusedVoCConfig,
+    recorded_plan: &DecisionFocusedVoCPlan,
+) -> bool {
+    match plan_decision_focused_voc(manifest, posterior, actions, config) {
+        Ok(replayed) => replayed == *recorded_plan,
+        Err(_) => false,
+    }
+}
+
 fn validate_manifest(
     manifest: &DecisionFocusedVoCModelManifest,
 ) -> Result<(), DecisionFocusedVoCError> {
@@ -1468,6 +1484,26 @@ mod tests {
         actions[0].observation_outcomes[0].likelihood_by_particle.pop();
         let manifest = bind_manifest(&p, &mut actions, MetricDirection::Maximize);
         assert!(plan_decision_focused_voc(&manifest, &p, &actions, &config()).is_err());
+    }
+
+    #[test]
+    fn plan_receipt_replays_and_detects_tampering() {
+        let p = posterior();
+        let mut actions = vec![query_action("query", "A", 1)];
+        let manifest = bind_manifest(&p, &mut actions, MetricDirection::Maximize);
+        let cfg = config();
+        let plan = plan_decision_focused_voc(&manifest, &p, &actions, &cfg).unwrap();
+        assert!(verify_decision_focused_voc_plan(&manifest, &p, &actions, &cfg, &plan));
+
+        let mut tampered = plan.clone();
+        tampered.action_evaluations[0].expected_regret_reduction += 0.01;
+        assert!(!verify_decision_focused_voc_plan(
+            &manifest,
+            &p,
+            &actions,
+            &cfg,
+            &tampered,
+        ));
     }
 
     #[test]
