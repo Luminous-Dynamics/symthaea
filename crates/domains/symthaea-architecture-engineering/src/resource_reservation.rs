@@ -1246,6 +1246,13 @@ mod tests {
             .reserve_measurement(&head, changed_head_proof, 5)
             .is_err());
         assert_eq!(ledger.events().len(), events_before);
+        let (_, _, cost_changed_head) = fixture();
+        let mut changed_head_proof = proof(&ledger, "measure-001", &scope, cost_changed_head, 'd');
+        changed_head_proof.reservation_ledger_head_sha256 = sha('f');
+        assert!(ledger
+            .reserve_measurement(&head, changed_head_proof, 5)
+            .is_err());
+        assert_eq!(ledger.events().len(), events_before);
         let (_, _, cost_changed_lease) = fixture();
         let mut conflicting_retry = proof(&ledger, "measure-001", &scope, cost_changed_lease, 'd');
         conflicting_retry.reservation_ledger_head_sha256 = head.clone();
@@ -1409,6 +1416,76 @@ mod tests {
         let decoded: ResourceReservationLedger = serde_json::from_str(&encoded).unwrap();
         assert_eq!(decoded, ledger);
         decoded.verify_integrity().unwrap();
+    }
+
+    #[test]
+    fn deterministic_state_machine_stress_preserves_accounting_and_replay_invariants() {
+        let mut ledger = ledger();
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+
+        for index in 0..128u64 {
+            // Fixed local LCG: deterministic schedule generation, not a security RNG.
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            let action_id = format!("stress-{index:03}");
+            let mut cost = fixture().2;
+            cost.action_id = action_id.clone();
+            cost.resources[0].units = 1 + (state % 12);
+            cost.resources[1].units = 5 + ((state >> 8) % 45);
+
+            let mut hasher = Sha256::new();
+            hasher.update(b"symthaea.nas.reservation-stress-scope.v0.1");
+            hasher.update(index.to_be_bytes());
+            let scope = encode_sha256(hasher.finalize().as_slice());
+            let capability = proof(&ledger, &action_id, &scope, cost, 'd');
+            let expected_head = ledger.head_sha256().to_owned();
+            let expiry = ledger.current_epoch().checked_add(4).unwrap();
+
+            if let Ok(receipt) =
+                ledger.reserve_measurement(&expected_head, capability, expiry)
+            {
+                state ^= state.rotate_left(17);
+                match state % 3 {
+                    0 => {
+                        ledger
+                            .commit_measurement(
+                                ledger.head_sha256(),
+                                &receipt.reservation_id,
+                            )
+                            .unwrap();
+                    }
+                    1 => {
+                        ledger
+                            .release_measurement(
+                                ledger.head_sha256(),
+                                &receipt.reservation_id,
+                                "stress_cancel",
+                            )
+                            .unwrap();
+                    }
+                    _ => {
+                        // Leave RESERVED; later epoch advancement must expire it.
+                    }
+                }
+            }
+
+            if index % 4 == 3 {
+                let next_epoch = ledger.current_epoch().checked_add(1).unwrap();
+                let head = ledger.head_sha256().to_owned();
+                ledger.advance_epoch(&head, next_epoch).unwrap();
+            }
+            ledger.verify_integrity().unwrap();
+            let available = ledger.available_headroom().unwrap();
+            assert_eq!(available.len(), 2);
+            assert!(available[0].available_units <= 70);
+            assert!(available[1].available_units <= 800);
+        }
+
+        let encoded = serde_json::to_vec(&ledger).unwrap();
+        let replayed: ResourceReservationLedger = serde_json::from_slice(&encoded).unwrap();
+        replayed.verify_integrity().unwrap();
+        assert_eq!(replayed, ledger);
     }
 
     #[test]
