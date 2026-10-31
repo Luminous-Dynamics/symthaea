@@ -76,7 +76,7 @@ def largest_piecewise_feasible_depth(
         if a0 < 1:
             return max(Fraction(0), a0)
 
-        # For a >= 1: h1*(a-1) + (h2+1)*a/2 <= budget.
+        # For a >= 1: h1*(a-1)/2 + (h2+1)*a/2 <= budget.
         # Type-1 loss is (a-1)_+ / 2, not (a-1)_+.
         slope1 = Fraction(h1 + h2 + 1, 2)
         if slope1 == 0:
