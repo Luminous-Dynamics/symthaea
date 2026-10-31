@@ -26,6 +26,27 @@ class ExactRationalCommonDepthCRCTests(unittest.TestCase):
         # A nontrivial point on the a>=1 segment.
         self.assertEqual(largest_piecewise_feasible_depth(1, 1, F(3), envelope=True), F(2))
 
+
+    def test_type1_piecewise_slope_keeps_the_loss_factor_one_half(self):
+        # At depth a>=1 the envelope constraint is
+        # h1*(a-1)/2 + (h2+1)*a/2 <= B.
+        # h1=4, h2=3, B=51/10 gives a=(2B+h1)/(h1+h2+1)=71/40.
+        self.assertEqual(
+            largest_piecewise_feasible_depth(4, 3, F(51, 10), envelope=True),
+            F(71, 40)
+        )
+        # Standard CRC adds the constant unseen-point envelope 1.
+        self.assertEqual(
+            largest_piecewise_feasible_depth(4, 3, F(51, 10), envelope=False),
+            F(61, 35)
+        )
+
+    def test_baseline_constraint_is_exact_at_the_returned_depth(self):
+        budget=F(51,10)
+        a=largest_piecewise_feasible_depth(4,3,budget,envelope=True)
+        lhs=F(4,2)*max(a-1,F(0))+F(3,2)*a+a/2
+        self.assertEqual(lhs,budget)
+
     def test_both_baselines_are_exactly_valid_at_all_paper_levels(self):
         for alpha in ("0.02", "0.05", "0.10", "0.15"):
             engine = ExactCommonDepthCRC(50, alpha)
