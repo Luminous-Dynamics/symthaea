@@ -101,19 +101,19 @@ def solve_utility_recertification(evalues,utilities,alpha,tol=1e-10,max_iteratio
     objective=_coefficients(u)
     sums=np.r_[np.cumsum(s[::-1])[::-1],0.]
     beta=alpha*sums[:-1]/np.arange(k,0,-1,dtype=float);beta[0]=min(1.,beta[0])
-    A=[];b=[]
+    A=[];b=[];row_specs=[]
     # Monotone S: S[j+1]-S[j] <= 0.
     for j in range(k-1):
-        row=np.zeros(k);row[j+1]=1.;row[j]=-1.;A.append(row);b.append(0.)
+        row=np.zeros(k);row[j+1]=1.;row[j]=-1.;A.append(row);b.append(0.);row_specs.append({"kind":"monotone","index":j})
     # Convex S, with S[K+1]=0.
     for j in range(k):
         row=np.zeros(k);row[j]=-1.
         if j+1<k:row[j+1]=2.
         if j+2<k:row[j+2]=-1.
-        A.append(row);b.append(0.)
+        A.append(row);b.append(0.);row_specs.append({"kind":"convex","index":j})
     # Initial suffix cuts.
     for j in range(k):
-        row=np.zeros(k);row[j]=1.;A.append(row);b.append(float(beta[j]))
+        row=np.zeros(k);row[j]=1.;A.append(row);b.append(float(beta[j]));row_specs.append({"kind":"suffix","index":j})
     cuts=set()
     def add_cut(idx):
         key=tuple(sorted(int(i) for i in idx))
@@ -122,7 +122,7 @@ def solve_utility_recertification(evalues,utilities,alpha,tol=1e-10,max_iteratio
         for r in key:
             row[r]+=1.
             if r+1<k:row[r+1]-=1.
-        A.append(row);b.append(float(alpha*np.mean(s[list(key)])))
+        A.append(row);b.append(float(alpha*np.mean(s[list(key)])));row_specs.append({"kind":"intersection","subset":list(key)})
         return True
     for t in range(1,k+1):add_cut(range(k-t,k))
     for iteration in range(1,max_iterations+1):
@@ -144,7 +144,17 @@ def solve_utility_recertification(evalues,utilities,alpha,tol=1e-10,max_iteratio
             if np.any(q < -1e-8) or np.any(q>1+1e-8) or np.any(np.diff(q)>1e-8):
                 raise ArithmeticError("LP returned invalid rejection tails")
             p=distribution(q);c=charges(q)
-            return {"tails":q,"probabilities":p,"order":order,"sorted_evalues":s,
+            dual=-np.asarray(res.ineqlin.marginals,dtype=float)
+            primal_objective=float(np.dot(objective,S[:-1]))
+            dual_objective=float(np.dot(np.asarray(b,dtype=float),dual))
+            dual_slack=np.asarray(A,dtype=float).T@dual-objective
+            input_sha256=hashlib.sha256(json.dumps({"evalues":e.tolist(),"utilities":u0.tolist(),"alpha":float(alpha)},sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+            return {"certificate_schema":"symthaea-closed-ebh-primal-dual-v1","input_sha256":input_sha256,
+                    "primal_vector":S[:-1].tolist(),"dual_rows":row_specs,"dual_multipliers":dual.tolist(),
+                    "primal_objective":primal_objective,"dual_objective":dual_objective,
+                    "dual_gap":dual_objective-primal_objective,
+                    "minimum_dual_slack":float(np.min(dual_slack)),
+                    "tails":q,"probabilities":p,"order":order,"sorted_evalues":s,
                     "sorted_utilities":u,"cumulative_charges":S,"per_rank_charges":c,
                     "objective_value":float(np.dot(u,q)),"expected_rejections":float(q.sum()),
                     "iterations":iteration,"number_of_cuts":len(cuts),
