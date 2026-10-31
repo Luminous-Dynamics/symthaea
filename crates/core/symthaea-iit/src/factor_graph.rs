@@ -52,6 +52,9 @@ pub enum FactorGraphError {
     #[error("conditioned cutset branches returned different output scopes")]
     CutsetBranchScopeMismatch,
 
+    #[error("factor scopes do not match the reusable cutset elimination plan")]
+    FactorScopesDoNotMatchCutsetPlan,
+
     #[error("variable {variable} is not present in the factor scope")]
     VariableNotInFactor { variable: usize },
 
@@ -358,12 +361,46 @@ pub struct FactorEliminationPlan {
 /// separators before any conditioned branch is evaluated.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CutsetFactorEliminationPlan {
-    pub cutset_variables: Vec<usize>,
-    pub cutset_assignments: usize,
-    pub max_cutset_assignments: usize,
-    pub largest_input_factor_entries: usize,
-    pub predicted_peak_factor_entries: usize,
-    pub remaining_elimination_plan: FactorEliminationPlan,
+    // The exact factor-scope sequence is the plan's structural identity. Numeric
+    // factor values may change between executions, but scopes and order may not.
+    scope_signature: Vec<Vec<usize>>,
+    cutset_variables: Vec<usize>,
+    cutset_assignments: usize,
+    max_cutset_assignments: usize,
+    max_factor_entries: usize,
+    largest_input_factor_entries: usize,
+    predicted_peak_factor_entries: usize,
+    remaining_elimination_plan: FactorEliminationPlan,
+}
+
+impl CutsetFactorEliminationPlan {
+    pub fn cutset_variables(&self) -> &[usize] {
+        &self.cutset_variables
+    }
+
+    pub fn cutset_assignments(&self) -> usize {
+        self.cutset_assignments
+    }
+
+    pub fn max_cutset_assignments(&self) -> usize {
+        self.max_cutset_assignments
+    }
+
+    pub fn max_factor_entries(&self) -> usize {
+        self.max_factor_entries
+    }
+
+    pub fn largest_input_factor_entries(&self) -> usize {
+        self.largest_input_factor_entries
+    }
+
+    pub fn predicted_peak_factor_entries(&self) -> usize {
+        self.predicted_peak_factor_entries
+    }
+
+    pub fn remaining_elimination_plan(&self) -> &FactorEliminationPlan {
+        &self.remaining_elimination_plan
+    }
 }
 
 /// Plan exact binary-factor elimination without multiplying any factor tables.
@@ -527,9 +564,11 @@ pub fn plan_min_fill_cutset_elimination(
     check_budget(predicted_peak_factor_entries, max_factor_entries)?;
 
     Ok(CutsetFactorEliminationPlan {
+        scope_signature: factor_scopes.to_vec(),
         cutset_variables: canonical_cutset,
         cutset_assignments,
         max_cutset_assignments,
+        max_factor_entries,
         largest_input_factor_entries,
         predicted_peak_factor_entries,
         remaining_elimination_plan,
@@ -848,6 +887,23 @@ pub fn min_fill_log_sum_product_with_cutset(
         max_factor_entries,
         max_cutset_assignments,
     )?;
+    min_fill_log_sum_product_with_cutset_plan(factors, &plan)
+}
+
+/// Reuse a preflighted cutset plan across different numeric factors with identical
+/// ordered scopes. The scope signature is checked before any branch is evaluated.
+pub fn min_fill_log_sum_product_with_cutset_plan(
+    factors: &[BinaryLogFactor],
+    plan: &CutsetFactorEliminationPlan,
+) -> Result<CutsetLogFactorEliminationReport, FactorGraphError> {
+    if factors.len() != plan.scope_signature.len()
+        || factors
+            .iter()
+            .zip(plan.scope_signature.iter())
+            .any(|(factor, scope)| factor.variables != *scope)
+    {
+        return Err(FactorGraphError::FactorScopesDoNotMatchCutsetPlan);
+    }
     let branch_count = plan.cutset_assignments;
     let canonical_cutset = &plan.cutset_variables;
     let residual_plan = &plan.remaining_elimination_plan;
