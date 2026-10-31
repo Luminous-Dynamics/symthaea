@@ -49,8 +49,10 @@ cargo run --locked \
 - Benign false-alert rate and valid-sensor true-negative rate are separate.
 - Conservative effect-confirmed alert precision is reported against all detector alerts; it is not a deployment-prevalence estimate.
 - Calibration (Brier, log loss, 10-bin ECE) is reported only when every test case has a numeric score, and its target is explicitly malicious-attempt versus benign—not successful attack effect.
-- Adaptation-family/level, program-group and execution-group recall are reported separately, with macro and worst-group outcomes.
-- Holdout checks require disjoint program, execution, attack-family and adaptation-family IDs across train/validation/test.
+- Adaptation-family and adaptation-family/level recall are reported separately (avoiding severity-level pseudoreplication), plus program-group and execution-group recall, with macro and worst-group outcomes.
+- Benign false-alert rate is reported overall and on valid-sensor cases; valid-sensor true-negative rate excludes invalid telemetry.
+- Holdout checks require disjoint program, execution, attack-family and adaptation-family IDs across train/validation/test; the sentinel value none is excluded from attack/adaptation-family grouping for benign/no-adaptation cases.
+- Fourteen Rust unit tests are authored, including direct attack-family and adaptation-family leakage mutations.
 - Sensor-invalid cases are counted separately. Any clear response on a missing, stale, misaligned, multiplexed or untrusted sensor is reported as an integrity violation.
 - Acquisition and inference nanoseconds, telemetry bytes and peak memory are summarized only where their required per-case measurements are complete. Energy is not inferred.
 
