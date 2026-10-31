@@ -1561,6 +1561,7 @@ mod tests {
 
     struct AlwaysEvaluateA {
         config_sha256: String,
+        algorithm_id: String,
     }
 
     impl PolicyReplay for AlwaysEvaluateA {
@@ -1569,7 +1570,7 @@ mod tests {
         }
 
         fn algorithm_id(&self) -> &str {
-            "symthaea-direction-board-v0.1"
+            &self.algorithm_id
         }
 
         fn config_sha256(&self) -> &str {
@@ -1597,6 +1598,7 @@ mod tests {
 
         tape.verify_policy_replay(&AlwaysEvaluateA {
             config_sha256: tape.header.policy.config_sha256.clone(),
+            algorithm_id: tape.header.policy.algorithm_id.clone(),
         })
         .unwrap();
     }
@@ -1644,6 +1646,27 @@ mod tests {
         let tape = EventTape::new(header(ExecutionMode::Sequential, 1, 20)).unwrap();
         assert!(tape.validate_integrity().is_ok());
         assert!(tape.validate().is_err());
+    }
+
+    #[test]
+    fn event_chain_binds_the_frozen_header() {
+        let mut tape = EventTape::new(header(ExecutionMode::Sequential, 1, 20)).unwrap();
+        let (intent, outcome) = verified_evaluation("A", H5);
+        tape.append(event("e1", 0, 1, None, 0, intent, outcome, 5)).unwrap();
+        tape.header.budget_limit_microunits = 21;
+        assert!(tape.validate_integrity().is_err());
+    }
+
+    #[test]
+    fn policy_replay_rejects_a_different_algorithm_build() {
+        let mut tape = EventTape::new(header(ExecutionMode::Sequential, 1, 20)).unwrap();
+        let (intent, outcome) = verified_evaluation("A", H5);
+        tape.append(event("e1", 0, 1, None, 0, intent, outcome, 5)).unwrap();
+        let adapter = AlwaysEvaluateA {
+            config_sha256: tape.header.policy.config_sha256.clone(),
+            algorithm_id: "different-build".to_owned(),
+        };
+        assert!(tape.verify_policy_replay(&adapter).is_err());
     }
 
 }
