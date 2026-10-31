@@ -21,7 +21,7 @@ pub const REQUIRED_MANDATORY: u8 = AUTHORITY | PROOF_PATH;
 pub enum Policy {
     FixedDepth,
     GenericVoc,
-    CostMatchedRandom,
+    BudgetMatchedRandom,
     ProofObligationGuided,
     UnverifiedConfidence,
     OracleMinimumCost,
@@ -31,7 +31,7 @@ impl Policy {
     pub const ALL: [Self; 6] = [
         Self::FixedDepth,
         Self::GenericVoc,
-        Self::CostMatchedRandom,
+        Self::BudgetMatchedRandom,
         Self::ProofObligationGuided,
         Self::UnverifiedConfidence,
         Self::OracleMinimumCost,
@@ -41,7 +41,7 @@ impl Policy {
         match self {
             Self::FixedDepth => "fixed_depth",
             Self::GenericVoc => "generic_voc",
-            Self::CostMatchedRandom => "cost_matched_random",
+            Self::BudgetMatchedRandom => "budget_matched_random",
             Self::ProofObligationGuided => "proof_obligation_guided",
             Self::UnverifiedConfidence => "unverified_confidence",
             Self::OracleMinimumCost => "oracle_minimum_cost",
@@ -195,8 +195,8 @@ pub fn build_cases() -> Vec<TaskCase> {
                 op("complete_verified_packet", REQUIRED, REQUIRED, 6, 70, REQUIRED_MANDATORY),
                 op("temporal_lookup", T, T, 3, 20, 0),
                 op("independent_source", I, I, 3, 20, 0),
-                op("authority_check", A, A, 1, 15, A),
-                op("proof_verifier", P, P, 1, 15, P),
+                op("authority_check", A, A, 1, 15, 0),
+                op("proof_verifier", P, P, 1, 15, 0),
                 op("generic_reflection", 0, 0, 4, 90, 0),
                 op("redundant_packet", T | I, 0, 1, 30, 0),
                 op("extra_context", 0, 0, 1, 10, 0),
@@ -358,7 +358,7 @@ fn choose_next(
                     .then_with(|| ob.id.cmp(oa.id))
             })
         }
-        Policy::CostMatchedRandom => {
+        Policy::BudgetMatchedRandom => {
             let mut state = seed
                 .wrapping_add(u64::from(spent).wrapping_mul(6364136223846793005))
                 .wrapping_add(attempted.iter().filter(|x| **x).count() as u64);
@@ -604,8 +604,8 @@ mod tests {
     #[test]
     fn random_policy_is_seed_reproducible() {
         let case = build_cases().remove(0);
-        let a = run_trial(&case, Policy::CostMatchedRandom, 10, 1729);
-        let b = run_trial(&case, Policy::CostMatchedRandom, 10, 1729);
+        let a = run_trial(&case, Policy::BudgetMatchedRandom, 10, 1729);
+        let b = run_trial(&case, Policy::BudgetMatchedRandom, 10, 1729);
         assert_eq!(a, b);
     }
 
