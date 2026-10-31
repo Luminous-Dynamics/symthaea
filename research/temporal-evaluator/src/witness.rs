@@ -198,10 +198,17 @@ pub struct WitnessQuorumPolicy {
 
 impl WitnessQuorumPolicy {
     pub fn validate(self) -> Result<(), CheckpointError> {
-        if self.total_witnesses == 0
-            || self.threshold == 0
-            || self.threshold > self.total_witnesses
-            || self.threshold <= self.total_witnesses / 2
+        let minimum_total = self.max_byzantine_witnesses
+            .checked_mul(3)
+            .and_then(|value| value.checked_add(1))
+            .ok_or(CheckpointError::ArithmeticOverflow)?;
+        let minimum_threshold = self.max_byzantine_witnesses
+            .checked_mul(2)
+            .and_then(|value| value.checked_add(1))
+            .ok_or(CheckpointError::ArithmeticOverflow)?;
+        if self.total_witnesses < minimum_total
+            || self.threshold < minimum_threshold
+            || self.threshold > self.total_witnesses.saturating_sub(self.max_byzantine_witnesses)
         {
             return Err(CheckpointError::InvalidQuorumPolicy);
         }
@@ -245,7 +252,7 @@ impl fmt::Display for CheckpointError {
             Self::InvalidAttestation => write!(f, "witness attestation payload is invalid"),
             Self::InvalidChallenge => write!(f, "evaluator witness challenge must be nonzero"),
             Self::WitnessChallengeMismatch => write!(f, "witness response does not match the fresh evaluator challenge"),
-            Self::InvalidQuorumPolicy => write!(f, "witness quorum must be a strict majority of the configured witness set"),
+            Self::InvalidQuorumPolicy => write!(f, "Byzantine quorum requires n >= 3f+1 and 2f+1 <= threshold <= n-f"),
             Self::DuplicateTrustedWitness => write!(f, "trusted witness registry contains duplicate identities"),
             Self::UnknownWitness => write!(f, "attestation is from an untrusted witness"),
             Self::DuplicateWitnessResponse => write!(f, "multiple responses were supplied for one witness"),
@@ -266,8 +273,10 @@ impl std::error::Error for CheckpointError {}
 /// Verify a locally stored checkpoint against independent witness attestations.
 ///
 /// The witness set and public keys must be provisioned outside the evaluator
-/// rollback domain. A strict-majority threshold is mandatory. A valid
-/// attestation claiming a newer epoch blocks local acceptance; equal-epoch
+/// rollback domain. A Byzantine threshold is required: n >= 3f+1 and
+/// 2f+1 <= q <= n-f. Witness services must durably refuse to sign two
+/// different heads for the same evaluator epoch. A valid attestation claiming
+/// a newer epoch blocks local acceptance; equal-epoch
 /// disagreement fails closed. Older witness responses are counted as stale,
 /// and a current checkpoint is confirmed only when the threshold attests the
 /// exact same signed checkpoint digest and previous-checkpoint hash.
@@ -407,166 +416,172 @@ mod tests {
         checkpoint: &SignedLedgerCheckpoint,
         witness_key: &SigningKey,
         time: u64,
+        challenge: [u8; 32],
     ) -> SignedWitnessAttestation {
-        sign_witness_attestation(checkpoint, [1; 16], [99; 32], time, witness_key).unwrap()
+        sign_witness_attestation(checkpoint, [1; 16], challenge, time, witness_key).unwrap()
     }
 
-    fn witnesses(keys: &[SigningKey]) -> Vec<TrustedWitness> {
+    fn witness_keys(seed: u8) -> [SigningKey; 4] {
+        [
+            SigningKey::from_bytes(&[seed; 32]),
+            SigningKey::from_bytes(&[seed.wrapping_add(1); 32]),
+            SigningKey::from_bytes(&[seed.wrapping_add(2); 32]),
+            SigningKey::from_bytes(&[seed.wrapping_add(3); 32]),
+        ]
+    }
+
+    fn witnesses(keys: &[SigningKey; 4]) -> Vec<TrustedWitness> {
         keys.iter().map(|key| TrustedWitness::from_key(key.verifying_key())).collect()
     }
 
+    fn bft_policy() -> WitnessQuorumPolicy {
+        WitnessQuorumPolicy {
+            total_witnesses: 4,
+            max_byzantine_witnesses: 1,
+            threshold: 3,
+        }
+    }
+
     #[test]
-    fn strict_majority_confirms_exact_current_checkpoint() {
+    fn bft_quorum_confirms_exact_current_checkpoint() {
         let evaluator_key = SigningKey::from_bytes(&[1; 32]);
-        let witness_keys = [
-            SigningKey::from_bytes(&[2; 32]),
-            SigningKey::from_bytes(&[3; 32]),
-            SigningKey::from_bytes(&[4; 32]),
-        ];
+        let witness_keys = witness_keys(2);
         let checkpoint = checkpoint(&evaluator_key, 3, [9; 32]);
+        let challenge = [99; 32];
         let attestations = vec![
-            attest(&checkpoint, &witness_keys[0], 10),
-            attest(&checkpoint, &witness_keys[1], 11),
+            attest(&checkpoint, &witness_keys[0], 10, challenge),
+            attest(&checkpoint, &witness_keys[1], 11, challenge),
+            attest(&checkpoint, &witness_keys[2], 12, challenge),
         ];
         let result = verify_checkpoint_quorum(
             &checkpoint,
             &evaluator_key.verifying_key(),
-            [99; 32],
+            challenge,
             &attestations,
             &witnesses(&witness_keys),
-            WitnessQuorumPolicy { total_witnesses: 3, threshold: 2 },
+            bft_policy(),
         ).unwrap();
-        assert_eq!(result.confirming_witnesses, 2);
+        assert_eq!(result.confirming_witnesses, 3);
         assert_eq!(result.stale_witnesses, 0);
     }
 
     #[test]
-    fn older_witnesses_are_reported_but_current_majority_can_confirm() {
+    fn older_witness_is_reported_but_current_bft_quorum_can_confirm() {
         let evaluator_key = SigningKey::from_bytes(&[5; 32]);
-        let witness_keys = [
-            SigningKey::from_bytes(&[6; 32]),
-            SigningKey::from_bytes(&[7; 32]),
-            SigningKey::from_bytes(&[8; 32]),
-        ];
+        let witness_keys = witness_keys(6);
         let current = checkpoint(&evaluator_key, 4, [9; 32]);
         let old = checkpoint(&evaluator_key, 3, [7; 32]);
+        let challenge = [99; 32];
         let attestations = vec![
-            attest(&current, &witness_keys[0], 20),
-            attest(&current, &witness_keys[1], 21),
-            attest(&old, &witness_keys[2], 22),
+            attest(&current, &witness_keys[0], 20, challenge),
+            attest(&current, &witness_keys[1], 21, challenge),
+            attest(&current, &witness_keys[2], 22, challenge),
+            attest(&old, &witness_keys[3], 23, challenge),
         ];
         let result = verify_checkpoint_quorum(
             &current,
             &evaluator_key.verifying_key(),
-            [99; 32],
+            challenge,
             &attestations,
             &witnesses(&witness_keys),
-            WitnessQuorumPolicy { total_witnesses: 3, threshold: 2 },
+            bft_policy(),
         ).unwrap();
-        assert_eq!(result.confirming_witnesses, 2);
+        assert_eq!(result.confirming_witnesses, 3);
         assert_eq!(result.stale_witnesses, 1);
     }
 
     #[test]
     fn older_local_snapshot_is_rejected_when_witness_has_newer_epoch() {
         let evaluator_key = SigningKey::from_bytes(&[9; 32]);
-        let witness_keys = [
-            SigningKey::from_bytes(&[10; 32]),
-            SigningKey::from_bytes(&[11; 32]),
-            SigningKey::from_bytes(&[12; 32]),
-        ];
+        let witness_keys = witness_keys(10);
         let local = checkpoint(&evaluator_key, 2, [1; 32]);
         let newer = checkpoint(&evaluator_key, 3, [2; 32]);
+        let challenge = [99; 32];
         let attestations = vec![
-            attest(&newer, &witness_keys[0], 30),
-            attest(&newer, &witness_keys[1], 31),
+            attest(&newer, &witness_keys[0], 30, challenge),
+            attest(&newer, &witness_keys[1], 31, challenge),
+            attest(&newer, &witness_keys[2], 32, challenge),
         ];
         assert_eq!(
             verify_checkpoint_quorum(
                 &local,
                 &evaluator_key.verifying_key(),
-                [99; 32],
+                challenge,
                 &attestations,
                 &witnesses(&witness_keys),
-                WitnessQuorumPolicy { total_witnesses: 3, threshold: 2 },
+                bft_policy(),
             ),
-            Err(CheckpointError::LocalLedgerBehindWitness { local_epoch: 2, witnessed_epoch: 3 })
+            Err(CheckpointError::LocalLedgerBehindWitness {
+                local_epoch: 2,
+                witnessed_epoch: 3
+            })
         );
     }
 
     #[test]
     fn equal_epoch_conflicting_checkpoint_fails_closed() {
         let evaluator_key = SigningKey::from_bytes(&[13; 32]);
-        let witness_keys = [
-            SigningKey::from_bytes(&[14; 32]),
-            SigningKey::from_bytes(&[15; 32]),
-            SigningKey::from_bytes(&[16; 32]),
-        ];
+        let witness_keys = witness_keys(14);
         let local = checkpoint(&evaluator_key, 4, [1; 32]);
         let conflicting = checkpoint(&evaluator_key, 4, [2; 32]);
+        let challenge = [99; 32];
         let attestations = vec![
-            attest(&local, &witness_keys[0], 40),
-            attest(&conflicting, &witness_keys[1], 41),
+            attest(&local, &witness_keys[0], 40, challenge),
+            attest(&conflicting, &witness_keys[1], 41, challenge),
         ];
         assert_eq!(
             verify_checkpoint_quorum(
                 &local,
                 &evaluator_key.verifying_key(),
-                [99; 32],
+                challenge,
                 &attestations,
                 &witnesses(&witness_keys),
-                WitnessQuorumPolicy { total_witnesses: 3, threshold: 2 },
+                bft_policy(),
             ),
             Err(CheckpointError::WitnessCheckpointConflict { epoch: 4 })
         );
     }
 
     #[test]
-    fn missing_quorum_and_non_majority_policy_are_rejected() {
+    fn missing_bft_quorum_and_weak_quorum_policy_are_rejected() {
         let evaluator_key = SigningKey::from_bytes(&[17; 32]);
-        let witness_keys = [
-            SigningKey::from_bytes(&[18; 32]),
-            SigningKey::from_bytes(&[19; 32]),
-            SigningKey::from_bytes(&[20; 32]),
-        ];
+        let witness_keys = witness_keys(18);
         let checkpoint = checkpoint(&evaluator_key, 2, [9; 32]);
-        let one_attestation = vec![attest(&checkpoint, &witness_keys[0], 50)];
+        let challenge = [99; 32];
+        let one_attestation = vec![attest(&checkpoint, &witness_keys[0], 50, challenge)];
         assert_eq!(
             verify_checkpoint_quorum(
                 &checkpoint,
                 &evaluator_key.verifying_key(),
-                [99; 32],
+                challenge,
                 &one_attestation,
                 &witnesses(&witness_keys),
-                WitnessQuorumPolicy { total_witnesses: 3, threshold: 2 },
+                bft_policy(),
             ),
-            Err(CheckpointError::InsufficientWitnessQuorum { required: 2, matching: 1, stale: 0 })
+            Err(CheckpointError::InsufficientWitnessQuorum {
+                required: 3,
+                matching: 1,
+                stale: 0
+            })
         );
-        assert_eq!(
-            verify_checkpoint_quorum(
-                &checkpoint,
-                &evaluator_key.verifying_key(),
-                [99; 32],
-                &one_attestation,
-                &witnesses(&witness_keys),
-                WitnessQuorumPolicy { total_witnesses: 3, threshold: 1 },
-            ),
-            Err(CheckpointError::InvalidQuorumPolicy)
-        );
+        let weak_policy = WitnessQuorumPolicy {
+            total_witnesses: 4,
+            max_byzantine_witnesses: 1,
+            threshold: 2,
+        };
+        assert_eq!(weak_policy.validate(), Err(CheckpointError::InvalidQuorumPolicy));
     }
 
     #[test]
     fn stale_attestation_replay_is_rejected_by_fresh_challenge() {
         let evaluator_key = SigningKey::from_bytes(&[26; 32]);
-        let witness_keys = [
-            SigningKey::from_bytes(&[27; 32]),
-            SigningKey::from_bytes(&[28; 32]),
-            SigningKey::from_bytes(&[29; 32]),
-        ];
+        let witness_keys = witness_keys(27);
         let checkpoint = checkpoint(&evaluator_key, 2, [9; 32]);
+        let old_challenge = [99; 32];
         let old_attestations = vec![
-            attest(&checkpoint, &witness_keys[0], 70),
-            attest(&checkpoint, &witness_keys[1], 71),
+            attest(&checkpoint, &witness_keys[0], 70, old_challenge),
+            attest(&checkpoint, &witness_keys[1], 71, old_challenge),
+            attest(&checkpoint, &witness_keys[2], 72, old_challenge),
         ];
         assert_eq!(
             verify_checkpoint_quorum(
@@ -575,7 +590,7 @@ mod tests {
                 [100; 32],
                 &old_attestations,
                 &witnesses(&witness_keys),
-                WitnessQuorumPolicy { total_witnesses: 3, threshold: 2 },
+                bft_policy(),
             ),
             Err(CheckpointError::WitnessChallengeMismatch)
         );
@@ -583,38 +598,35 @@ mod tests {
 
     #[test]
     fn duplicate_unknown_and_invalid_witness_responses_are_rejected() {
-        let evaluator_key = SigningKey::from_bytes(&[21; 32]);
-        let witness_keys = [
-            SigningKey::from_bytes(&[22; 32]),
-            SigningKey::from_bytes(&[23; 32]),
-            SigningKey::from_bytes(&[24; 32]),
-        ];
+        let evaluator_key = SigningKey::from_bytes(&[31; 32]);
+        let witness_keys = witness_keys(32);
         let checkpoint = checkpoint(&evaluator_key, 2, [9; 32]);
+        let challenge = [99; 32];
         let duplicate = vec![
-            attest(&checkpoint, &witness_keys[0], 60),
-            attest(&checkpoint, &witness_keys[0], 61),
+            attest(&checkpoint, &witness_keys[0], 60, challenge),
+            attest(&checkpoint, &witness_keys[0], 61, challenge),
         ];
         assert_eq!(
             verify_checkpoint_quorum(
                 &checkpoint,
                 &evaluator_key.verifying_key(),
-                [99; 32],
+                challenge,
                 &duplicate,
                 &witnesses(&witness_keys),
-                WitnessQuorumPolicy { total_witnesses: 3, threshold: 2 },
+                bft_policy(),
             ),
             Err(CheckpointError::DuplicateWitnessResponse)
         );
-        let unknown = [SigningKey::from_bytes(&[25; 32])];
-        let unknown_response = vec![attest(&checkpoint, &unknown[0], 62)];
+        let unknown = SigningKey::from_bytes(&[36; 32]);
+        let unknown_response = vec![attest(&checkpoint, &unknown, 62, challenge)];
         assert_eq!(
             verify_checkpoint_quorum(
                 &checkpoint,
                 &evaluator_key.verifying_key(),
-                [99; 32],
+                challenge,
                 &unknown_response,
                 &witnesses(&witness_keys),
-                WitnessQuorumPolicy { total_witnesses: 3, threshold: 2 },
+                bft_policy(),
             ),
             Err(CheckpointError::UnknownWitness)
         );
