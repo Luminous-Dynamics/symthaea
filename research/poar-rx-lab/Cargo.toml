@@ -11,3 +11,7 @@ description = "Standalone deterministic fault simulator for POAR-RX"
 
 [dependencies]
 pod-meta-lab = { path = "../pod-meta-lab" }
+
+[[bin]]
+name = "poar-rx-workflow-matrix"
+path = "src/bin/workflow_matrix.rs"
