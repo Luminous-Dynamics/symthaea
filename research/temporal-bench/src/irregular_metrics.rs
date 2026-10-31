@@ -390,17 +390,23 @@ mod tests {
         config.slots = 2;
         config.missing_per_mille = 0;
         config.jitter_per_mille = 0;
-        let (task, oracle) = generate_irregular_task(config).unwrap();
+        let (mut task, mut oracle) = generate_irregular_task(config).unwrap();
+        task.observations.truncate(1);
+        oracle.points.truncate(1);
+        oracle.scheduled_slots = 2;
+        oracle.dropped_slots = vec![1];
+        task.content_sha256 = super::super::irregular::irregular_content_digest(&task);
+        oracle.content_sha256 = super::super::irregular::irregular_oracle_digest(&oracle);
         let predictions = oracle_predictions(&task, &oracle);
-        assert!(matches!(
+        assert_eq!(
             score_irregular_forecasts(
                 &task,
                 &oracle,
                 &predictions,
                 CseKernelConfig { bandwidth_us: 1_000 },
             ),
-            Ok(_) | Err(IrregularMetricError::TooFewSamples { .. })
-        ));
+            Err(IrregularMetricError::TooFewSamples { count: 1, minimum: 2 })
+        );
     }
 
     #[test]
