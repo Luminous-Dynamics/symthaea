@@ -454,6 +454,7 @@ pub fn analyze_search_time_access_trial(
     let mut run_ids = BTreeSet::new();
     let mut namespaces = BTreeSet::new();
     let mut execution_receipts = BTreeSet::new();
+    let mut model_identity: Option<(String, String, String, String)> = None;
     let mut every_run_completed = true;
     let mut every_trace_valid = true;
     let mut every_findings_bound = true;
@@ -506,6 +507,19 @@ pub fn analyze_search_time_access_trial(
                 &mut execution_receipts,
                 &mut issues,
             )?;
+            let identity = (
+                run.score_report.model_provider.clone(),
+                run.score_report.model_name.clone(),
+                run.score_report.model_version.clone(),
+                run.score_report.model_access_mode.clone(),
+            );
+            if let Some(expected_identity) = &model_identity {
+                if &identity != expected_identity {
+                    return Err("model provider/name/version/access mode must be identical across all trial runs".to_owned());
+                }
+            } else {
+                model_identity = Some(identity);
+            }
             if condition_runs.insert(run.condition, run).is_some() {
                 return Err(format!("block {} duplicates condition {:?}", block.block_id, run.condition));
             }
@@ -928,6 +942,35 @@ mod tests {
     }
 
     #[test]
+    fn model_identity_must_be_constant_across_conditions() {
+        let mut study = fixture_study();
+        study.blocks[0].runs[1].score_report.model_name = "different-model".to_owned();
+        study.blocks[0].runs[1].score_report.report_sha256.clear();
+        let bytes = serde_json::to_vec(&study.blocks[0].runs[1].score_report).unwrap();
+        study.blocks[0].runs[1].score_report.report_sha256 =
+            hash_domain(b"fresh-instance-score-report.v1", &bytes);
+        assert!(analyze_search_time_access_trial(&study)
+            .unwrap_err().contains("model provider/name/version/access mode"));
+    }
+
+    #[test]
+    fn incomplete_or_over_budget_run_is_rejected() {
+        let mut study = fixture_study();
+        study.blocks[0].runs[0].status = SearchTrialRunStatusV1::Partial;
+        assert!(analyze_search_time_access_trial(&study)
+            .unwrap_err().contains("is not completed"));
+        let mut study = fixture_study();
+        study.blocks[0].runs[0].score_report.output_token_count =
+            study.budget.max_output_tokens + 1;
+        study.blocks[0].runs[0].score_report.report_sha256.clear();
+        let bytes = serde_json::to_vec(&study.blocks[0].runs[0].score_report).unwrap();
+        study.blocks[0].runs[0].score_report.report_sha256 =
+            hash_domain(b"fresh-instance-score-report.v1", &bytes);
+        assert!(analyze_search_time_access_trial(&study)
+            .unwrap_err().contains("exceeded a declared inference budget"));
+    }
+
+    #[test]
     fn condition_trace_and_score_bindings_are_enforced() {
         let mut study = fixture_study();
         study.blocks[0].runs[0].trace.access_mode = SearchAccessModeV1::Unrestricted;
@@ -969,7 +1012,7 @@ mod tests {
                 run.state_reset_receipt_sha256 = digest(&format!("reset-{suffix}"));
                 run.run_execution_receipt_sha256 = digest(&format!("execution-{suffix}"));
                 run.trace.run_id = run.run_id.clone();
-                run.trace.network_policy_sha256 = digest(&format!("policy-{:?}", run.condition));
+                run.trace.network_policy_sha256 = digest(&format!("policy-{}-{:?}", suffix, run.condition));
                 run.condition_policy_sha256 = run.trace.network_policy_sha256.clone();
                 crate::search_time::seal_search_time_trace(&mut run.trace).unwrap();
                 run.findings.run_id = run.run_id.clone();
