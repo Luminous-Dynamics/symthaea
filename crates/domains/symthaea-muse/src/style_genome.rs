@@ -454,7 +454,7 @@ impl GenomeArchive {
         copy.archive_sha256.clear();
         let bytes = serde_json::to_vec(&copy)
             .map_err(|error| GenomeIssue::new("archive_serialization_failed", error.to_string()))?;
-        Ok(domain_sha256(b"symthaea:muse-style-genome-archive:v1\n", &bytes))
+        Ok(domain_sha256(b"symthaea:muse-style-genome-archive:v2\n", &bytes))
     }
 
     /// Detect tampering, duplicate IDs, changed candidate receipts, mixed
@@ -1082,10 +1082,6 @@ fn audit_trace(score: &Score, trace: &GrammarStructuralTrace) -> TraceIntegrity 
     }
 }
 
-fn period_plan_well_formed(plan: &GrammarPlanEvidence) -> bool {
-    grammar_plan_well_formed(plan)
-}
-
 fn grammar_plan_well_formed(plan: &GrammarPlanEvidence) -> bool {
     use symthaea_music_theory::grammar::GrammarPlanEvidence as G;
     match plan {
@@ -1251,7 +1247,6 @@ fn grammar_plan_signature(plan: &GrammarPlanEvidence) -> Option<String> {
 fn grammar_transformations(plan: &GrammarPlanEvidence) -> Vec<String> {
     use symthaea_music_theory::call_response::ChorusRole;
     use symthaea_music_theory::grammar::GrammarPlanEvidence as G;
-    use symthaea_music_theory::spec::FormKind;
 
     let mut operations = BTreeSet::new();
     match plan {
@@ -1517,7 +1512,7 @@ fn evaluation_digest(evaluation: &GenomeEvaluation) -> Result<String, Vec<Genome
     copy.evaluation_sha256.clear();
     let bytes = serde_json::to_vec(&copy)
         .map_err(|error| vec![GenomeIssue::new("evaluation_serialization_failed", error.to_string())])?;
-    Ok(domain_sha256(b"symthaea:muse-style-genome-evaluation:v1\n", &bytes))
+    Ok(domain_sha256(b"symthaea:muse-style-genome-evaluation:v2\n", &bytes))
 }
 
 pub fn reference_population_digest(
@@ -1577,6 +1572,8 @@ impl GenomeEvaluation {
             && self.seed_count == self.trials.len()
             && self.trials.iter().all(|trial| {
                 is_sha256_hex(&trial.score_sha256)
+                    && (!self.eligible_for_archive
+                        || trial.grammar_plan_signature.as_ref().is_some_and(|value| is_sha256_hex(value)))
                     && trial.structural_fingerprint.len() == fingerprint::STRUCT_DIMS
                     && trial.structural_fingerprint.iter().all(|value| value.is_finite())
                     && trial.score_duration_beats.is_finite()
