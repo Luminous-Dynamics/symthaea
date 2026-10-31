@@ -1,0 +1,750 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_INTERVENTION_BENCHMARK_RUN.schema.json",
+  "title": "Connectome intervention benchmark run manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "status",
+    "evidence_tier",
+    "claim_ceiling",
+    "dataset",
+    "connectome",
+    "observation_model",
+    "split_protocol",
+    "intervention_protocol",
+    "models",
+    "baseline_matrix",
+    "metric_contract",
+    "uncertainty",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128
+    },
+    "status": {
+      "enum": [
+        "PLANNED",
+        "INCOMPLETE_REQUIRES_ARTIFACTS",
+        "EXECUTED_AUDITABLE"
+      ]
+    },
+    "evidence_tier": {
+      "enum": [
+        "T0_SYNTHETIC",
+        "T1_OBSERVATIONAL",
+        "T2_IN_SILICO_INTERVENTION",
+        "T3_MEASURED_BIOLOGICAL_INTERVENTION",
+        "T4_PROSPECTIVE_EXPERIMENT_SELECTION"
+      ]
+    },
+    "claim_ceiling": {
+      "enum": [
+        "SYNTHETIC_ONLY",
+        "OBSERVATIONAL_PREDICTION_ONLY",
+        "MODEL_INTERVENTION_ONLY",
+        "BIOLOGICAL_INTERVENTION_PREDICTION",
+        "PROSPECTIVE_EXPERIMENTAL_VALIDATION"
+      ]
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "source_uri",
+        "dataset_manifest_sha256",
+        "independent_unit",
+        "outcome_type"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "dataset_manifest_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "independent_unit": {
+          "enum": [
+            "animal",
+            "animal_session",
+            "session",
+            "specimen",
+            "subject",
+            "other"
+          ]
+        },
+        "outcome_type": {
+          "enum": [
+            "latent_activity",
+            "calcium_fluorescence",
+            "electrophysiology",
+            "behaviour",
+            "mixed",
+            "other"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "connectome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "source_uri",
+        "structural_digest_sha256",
+        "edge_semantics",
+        "uncertainty_recorded"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "source_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "structural_digest_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "annotation_digest_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "edge_semantics": {
+          "enum": [
+            "chemical_synapse",
+            "gap_junction",
+            "typed_mixed",
+            "anatomical_plus_non_synaptic_channels",
+            "other"
+          ]
+        },
+        "uncertainty_recorded": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "observation_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "separate_from_latent_dynamics",
+        "parameters_sha256",
+        "scoring_space"
+      ],
+      "properties": {
+        "family": {
+          "enum": [
+            "calcium_indicator",
+            "electrophysiology_filter",
+            "behavioural_measurement",
+            "identity",
+            "other"
+          ]
+        },
+        "separate_from_latent_dynamics": {
+          "const": true
+        },
+        "parameters_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "scoring_space": {
+          "enum": [
+            "measured_observation",
+            "latent_activity_with_independent_measurement_model",
+            "both_separately"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "split_protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategies",
+        "split_unit",
+        "split_digest_sha256",
+        "preprocessing_fit_scope",
+        "random_cell_time_split"
+      ],
+      "properties": {
+        "strategies": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "leave_animal_session_out",
+              "leave_target_neuron_out",
+              "leave_perturbation_combination_out",
+              "temporal_forward_holdout",
+              "state_context_holdout",
+              "dose_duration_order_holdout",
+              "cross_species_holdout",
+              "other"
+            ]
+          }
+        },
+        "split_unit": {
+          "enum": [
+            "animal",
+            "animal_session",
+            "session",
+            "target_neuron",
+            "specimen",
+            "other"
+          ]
+        },
+        "split_digest_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "preprocessing_fit_scope": {
+          "const": "train_only"
+        },
+        "random_cell_time_split": {
+          "const": false
+        },
+        "train_ids_artifact_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "test_ids_artifact_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "exclusion_log_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "intervention_protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paired_treatment_control",
+        "control_arm_count",
+        "target_holdout",
+        "factorial_interactions",
+        "pulse_order_holdout",
+        "protocol_digest_sha256"
+      ],
+      "properties": {
+        "paired_treatment_control": {
+          "type": "boolean"
+        },
+        "control_arm_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "target_holdout": {
+          "type": "boolean"
+        },
+        "factorial_interactions": {
+          "type": "boolean"
+        },
+        "pulse_order_holdout": {
+          "type": "boolean"
+        },
+        "protocol_digest_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "control_types": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "sham",
+              "no_stimulation",
+              "vehicle",
+              "wild_type",
+              "actuator_negative",
+              "other"
+            ]
+          }
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "models": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "model_id",
+          "family",
+          "role",
+          "parameter_count",
+          "tuning_budget",
+          "status"
+        ],
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family": {
+            "enum": [
+              "mean_sham_null",
+              "direct_structural_propagation",
+              "non_graph_var_lds_glm",
+              "activity_only_nonlinear_state_space",
+              "fixed_connectome_shared_cell_type_parameters",
+              "candidate_connectome_dynamics",
+              "capacity_matched_activity_only",
+              "degree_type_preserving_rewire",
+              "edge_sign_weight_null",
+              "common_input_latent_confound",
+              "other"
+            ]
+          },
+          "role": {
+            "enum": [
+              "candidate",
+              "baseline",
+              "negative_control"
+            ]
+          },
+          "parameter_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "tuning_budget": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "PLANNED",
+              "NOT_RUN",
+              "RUN_COMPLETE",
+              "FAILED",
+              "NOT_APPLICABLE"
+            ]
+          },
+          "not_applicable_reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "baseline_matrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sham_mean",
+        "non_graph_linear",
+        "activity_only_nonlinear",
+        "cell_type_tied_connectome",
+        "capacity_matched_activity_only",
+        "degree_type_preserving_rewire",
+        "edge_sign_weight_null",
+        "common_input_confound"
+      ],
+      "properties": {
+        "sham_mean": {
+          "const": true
+        },
+        "non_graph_linear": {
+          "const": true
+        },
+        "activity_only_nonlinear": {
+          "const": true
+        },
+        "cell_type_tied_connectome": {
+          "const": true
+        },
+        "capacity_matched_activity_only": {
+          "const": true
+        },
+        "degree_type_preserving_rewire": {
+          "const": true
+        },
+        "edge_sign_weight_null": {
+          "const": true
+        },
+        "common_input_confound": {
+          "const": true
+        }
+      }
+    },
+    "metric_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_ids",
+        "definitions_sha256",
+        "primary_metric_ids"
+      ],
+      "properties": {
+        "metric_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "trajectory_rmse",
+              "trajectory_mae",
+              "trajectory_crps",
+              "predictive_log_score",
+              "treatment_control_effect_rmse",
+              "response_sign_accuracy",
+              "false_response_rate",
+              "onset_latency_error",
+              "peak_amplitude_error",
+              "recovery_time_error",
+              "interaction_trace_error",
+              "mechanism_macro_f1",
+              "mechanism_abstention_rate",
+              "interval_coverage_50",
+              "interval_coverage_80",
+              "interval_coverage_95",
+              "interval_width",
+              "anatomy_incremental_gain",
+              "eig_per_experiment",
+              "decision_regret",
+              "sample_efficiency",
+              "missingness_degradation",
+              "inference_latency",
+              "training_wall_time",
+              "peak_memory"
+            ]
+          }
+        },
+        "definitions_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "primary_metric_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "independent_unit",
+        "interval_method",
+        "bootstrap_replicates",
+        "coverage_levels"
+      ],
+      "properties": {
+        "independent_unit": {
+          "enum": [
+            "animal",
+            "animal_session",
+            "session",
+            "specimen",
+            "subject",
+            "other"
+          ]
+        },
+        "interval_method": {
+          "enum": [
+            "cluster_bootstrap",
+            "hierarchical_model",
+            "randomization_inference",
+            "other"
+          ]
+        },
+        "bootstrap_replicates": {
+          "type": "integer",
+          "minimum": 100
+        },
+        "coverage_levels": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              0.5,
+              0.8,
+              0.95
+            ]
+          }
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_manifest_sha256",
+        "connectome_sha256",
+        "split_manifest_sha256",
+        "model_predictions_sha256",
+        "metric_report_sha256",
+        "evaluator_sha256"
+      ],
+      "properties": {
+        "dataset_manifest_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "connectome_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "split_manifest_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "model_predictions_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "sealed_outcomes_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "metric_report_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "evaluator_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "environment_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "reproduction_config_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "nullableSha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "T0_SYNTHETIC"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "SYNTHETIC_ONLY"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "T1_OBSERVATIONAL"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "OBSERVATIONAL_PREDICTION_ONLY"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "T2_IN_SILICO_INTERVENTION"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "MODEL_INTERVENTION_ONLY"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "T3_MEASURED_BIOLOGICAL_INTERVENTION"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "BIOLOGICAL_INTERVENTION_PREDICTION"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "T4_PROSPECTIVE_EXPERIMENT_SELECTION"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "PROSPECTIVE_EXPERIMENTAL_VALIDATION"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "enum": [
+              "T3_MEASURED_BIOLOGICAL_INTERVENTION",
+              "T4_PROSPECTIVE_EXPERIMENT_SELECTION"
+            ]
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "intervention_protocol": {
+            "properties": {
+              "control_arm_count": {
+                "minimum": 1
+              },
+              "paired_treatment_control": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "EXECUTED_AUDITABLE"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "artifacts": {
+            "properties": {
+              "dataset_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "connectome_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "split_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "model_predictions_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "sealed_outcomes_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "metric_report_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "evaluator_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "environment_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            },
+            "required": [
+              "sealed_outcomes_sha256",
+              "environment_sha256"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
