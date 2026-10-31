@@ -135,7 +135,7 @@ Preregister separate strata:
 For each schedule, retain a fixed underlying continuous path and sample it under multiple observation distributions. Report:
 
 - MSE and MAE over observed timestamps;
-- CSE and CAE with bandwidth and estimator details;
+- CSE and CAE with bandwidth and estimator details (CAE is a local L1 companion, not attributed to the CSE paper);
 - exact piecewise-linear interpolant risk;
 - effective sample size and weight distribution;
 - relative bias/error against the interpolant reference;
@@ -226,7 +226,7 @@ Authored in this branch:
 - `irregular_metrics.rs`: exposes exact piecewise-linear reference beside MSE/MAE/CSE/CAE;
 - `lib.rs`: exports both new modules.
 
-This adds 19 authored tests to the 208-test parent branch description (227 authored test functions expected across the combined branch). The sources have not been compiled, formatted, linted or executed: this environment has no `cargo`, `rustc` or `rustfmt`. The counts are source-level authored tests, not passing tests.
+This adds 20 authored tests to the 208-test parent branch description (228 authored test functions expected across the combined branch). The sources have not been compiled, formatted, linted or executed: this environment has no `cargo`, `rustc` or `rustfmt`. The counts are source-level authored tests, not passing tests.
 
 No temporal-value predictor, HDC-LTC production integration, baseline training, data adapter, confirmatory evaluation, hardware measurement or energy result is claimed.
 
