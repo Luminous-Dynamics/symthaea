@@ -786,7 +786,11 @@ mod tests {
             .collect();
         assert!(branches.iter().all(|branch| branch.history_id == case.history.id));
         assert_eq!(
-            branches.iter().map(|branch| branch.action_id).collect::<std::collections::BTreeSet<_>>().len(),
+            branches
+                .iter()
+                .map(|branch| branch.action_id)
+                .collect::<std::collections::BTreeSet<_>>()
+                .len(),
             ACTION_COUNT
         );
     }
