@@ -129,7 +129,7 @@
             "passed",
             "not_supported",
             "invalid_request",
-            "disabled",
+            "operation_not_supported",
             "permission_denied",
             "not_attempted",
             "failed"
