@@ -2170,6 +2170,8 @@ mod tests {
     #[test]
     fn dependency_default_no_warnings() {
         let c = CognitiveLoopConfig::default();
+        #[cfg(feature = "jepa")]
+        assert!(!c.enable_jepa, "JEPA must remain opt-in by default");
         let warnings = c.validate_dependencies();
         assert!(
             warnings.is_empty(),
@@ -2201,6 +2203,8 @@ mod tests {
         assert_eq!(restored.temporal_backend, original.temporal_backend);
         assert_eq!(restored.enable_gwt, original.enable_gwt);
         assert_eq!(restored.enable_prefrontal, original.enable_prefrontal);
+        #[cfg(feature = "jepa")]
+        assert_eq!(restored.enable_jepa, original.enable_jepa);
     }
 
     #[test]
