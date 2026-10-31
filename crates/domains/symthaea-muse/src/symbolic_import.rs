@@ -54,12 +54,12 @@ fn quarter_note_meter(numerator: u8, denominator: u32, source: &str) -> Result<u
         })
 }
 
-fn advance_midi_tick(current: u64, delta: u32) -> Result<u64, String> {
+fn advance_midi_tick(current: u64, delta: u32, max_tick: u64) -> Result<u64, String> {
     current
         .checked_add(u64::from(delta))
-        .filter(|value| *value <= i64::MAX as u64)
+        .filter(|value| *value <= max_tick)
         .ok_or_else(|| {
-            "MIDI track event timeline exceeds the supported signed rational duration range"
+            "MIDI track event timeline exceeds the safe signed rational duration arithmetic range"
                 .to_string()
         })
 }
@@ -170,6 +170,10 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
     if ticks_per_beat == 0 {
         return Err("MIDI metrical timing declares zero ticks per beat".into());
     }
+    // Score::push adds rational onset and duration by cross-multiplication.
+    // Bound the complete tick timeline so that those products remain within
+    // i64, not merely the raw onset/duration casts.
+    let max_supported_tick = (i64::MAX as u64) / ticks_per_beat;
     let mut tempo_microseconds_per_beat = None::<u32>;
     let mut meter = 4_u8;
     let mut midi_time_signature = None::<(u8, u8)>;
@@ -183,7 +187,7 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
         // Preserve overlapping repeated pitches and pair releases FIFO.
         let mut pending = BTreeMap::<(u8, u8), VecDeque<(u64, u8)>>::new();
         for event in track {
-            tick = advance_midi_tick(tick, event.delta.as_int())?;
+            tick = advance_midi_tick(tick, event.delta.as_int(), max_supported_tick)?;
             match event.kind {
                 TrackEventKind::Meta(MetaMessage::Tempo(value)) => {
                     let microseconds_per_beat = value.as_int();
@@ -623,11 +627,11 @@ mod tests {
     }
 
     #[test]
-    fn rejects_midi_tick_advance_beyond_signed_duration_range() {
-        let max_tick = i64::MAX as u64;
-        assert_eq!(advance_midi_tick(max_tick - 1, 1).unwrap(), max_tick);
-        assert!(advance_midi_tick(max_tick, 1).is_err());
-        assert!(advance_midi_tick(u64::MAX, 1).is_err());
+    fn rejects_midi_tick_advance_beyond_safe_rational_arithmetic_range() {
+        let max_tick = (i64::MAX as u64) / 96;
+        assert_eq!(advance_midi_tick(max_tick - 1, 1, max_tick).unwrap(), max_tick);
+        assert!(advance_midi_tick(max_tick, 1, max_tick).is_err());
+        assert!(advance_midi_tick(u64::MAX, 1, max_tick).is_err());
     }
 
     #[test]
