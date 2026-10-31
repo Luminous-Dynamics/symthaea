@@ -200,6 +200,18 @@ These are target gates, not achieved results. The final CSE tolerance and minimu
 - **TEMPO:** a stochastic temporal-robustness benchmark using Morse timing derived from 44 recordings; the published proof-of-concept reports a 75.7% baseline and a spike-order randomization control. This is a valuable external timing-only task to investigate and reproduce under its licence and exact protocol. DOI 10.1088/2634-4386/ae84f7. https://doi.org/10.1088/2634-4386/ae84f7
 - **BITS:** an irregular-time benchmark proposal covering 11 datasets across nine domains and multiple irregularity dimensions. Use it as an external parity/adapter target after licensing, manifests and evaluation protocol are pinned; do not mix its metrics into synthetic CSE calibration. https://arxiv.org/abs/2609.33303
 - **CSE:** Li et al. (18 August 2026), arXiv:2608.17293, motivates separating sample-density effects from continuous-time predictive risk. The exact interpolant reference here is a local calibration oracle for a declared prediction path, not a replacement for the paper's statistical estimator. https://arxiv.org/abs/2608.17293
+
+### Named irregular-time forecasting competitors
+
+The initial GRU-D / Latent-ODE list is not a sufficient contemporary baseline. On compatible forecasting tasks, include:
+
+- **WrapFlow** (arXiv:2607.28035, 30 July 2026): continuous-time tokenization with gap-aware tokens plus simulation-free residual flow matching. It directly targets nonuniform event times and long gaps. Treat its paper-reported SOTA claim as an external reference until reproduced under the same data, split, input, horizon and metric. https://arxiv.org/abs/2607.28035
+- **QuITE / QuITE++** (ICML 2026): query-based irregular-time embeddings paired with multiple regular MTS backbones. The authors' benchmark page reports QuITE++ leading 20 of 24 settings across four datasets, three horizons and MSE/MAE; reproduce only after pinning the exact released configuration and dataset manifest. https://meaningfull9502.github.io/QuITE/
+- **HyperIMTS, GraFITi, tPatchGNN, Warpformer, Hi-Patch, mTAND and NeuralFlow:** include as named irregular-time baselines in the BITS-compatible benchmark track, rather than relying on a single GRU-D/ODE comparison. BITS reports that rankings change across irregularity strata and metric families. https://arxiv.org/abs/2609.33303
+- **DyH2-STGraph** (IJCAI 2026): a hierarchical heterogeneous spatiotemporal graph method for irregular multivariate time series. Its proceedings paper reports strong MIMIC-III results and an efficiency comparison against heavier methods; pin model/data/hardware details before using those figures as a reference. https://ijcai.org/proceedings/2026/573
+
+These methods are not all drop-in controls for the synthetic TED tasks. Compare them on matched irregular forecasting workloads; compare their state retention and decision-update trajectories separately where the interfaces support it. Report forecast risk, TED, memory and energy as separate axes.
+
 - **NeuroBench:** maintain the distinction between its hardware-independent algorithm track and system-aware deployment track. Its maintained leaderboards include few-shot class-incremental learning, event-camera object detection, non-human-primate motor prediction and chaotic-function prediction. https://neurobench.ai/ and https://github.com/NeuroBench/neurobench/blob/main/leaderboard.rst
 - **MLPerf Tiny v1.4:** use closed/open divisions and fixed workload/quality targets for edge-system comparisons. Its streaming wake-word task includes idle listening; energy must use a calibrated measurement boundary. https://mlcommons.org/2026/07/mlperf-tiny-v1-4-results/
 
