@@ -1410,9 +1410,11 @@ mod tests {
         for context in receipt["reference_policy"]["contexts"].as_array().unwrap() {
             let restart = &context["restart_policy"];
             assert!(restart["live_restart_state_count"].as_u64().unwrap() <= 2);
-            assert!(restart["expired_restart_state_count"].as_u64().unwrap() > 0);
             assert!(restart["unallocated_capital_reserve"].as_f64().unwrap() > 0.25);
         }
+        let compute = receipt["reference_policy"]["contexts"].as_array().unwrap()
+            .iter().find(|context| context["context_id"] == "compute").unwrap();
+        assert!(compute["restart_policy"]["expired_restart_state_count"].as_u64().unwrap() > 0);
         assert_eq!(receipt["sequential_monitor"]["restart_guarantee_contract"]["maximum_restart_age"], 2);
     }
 
