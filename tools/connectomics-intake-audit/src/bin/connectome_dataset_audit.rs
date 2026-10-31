@@ -877,6 +877,10 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
     }
 }
 
+fn output_paths_conflict(report: Option<&PathBuf>, cohort_manifest: Option<&PathBuf>) -> bool {
+    matches!((report, cohort_manifest), (Some(report), Some(cohort)) if report == cohort)
+}
+
 fn run() -> Result<i32, String> {
     let args = Args::parse();
     if !is_lower_hex(&args.dataset_revision_commit_sha, 40) {
@@ -884,6 +888,9 @@ fn run() -> Result<i32, String> {
     }
     if !args.cube_edge_nm.is_finite() || args.cube_edge_nm <= 0.0 {
         return Err("--cube-edge-nm must be finite and positive".to_string());
+    }
+    if output_paths_conflict(args.output.as_ref(), args.cohort_manifest_output.as_ref()) {
+        return Err("--output and --cohort-manifest-output must name different files".to_string());
     }
     let bytes = fs::read(&args.input)
         .map_err(|error| format!("failed to read {}: {error}", args.input.display()))?;
@@ -1031,6 +1038,68 @@ mod tests {
 
     fn report(rows: &[ParsedRow]) -> Report {
         audit_rows(rows, "0".repeat(64), CUBE_EDGE_NM, "1".repeat(40))
+    }
+
+    #[test]
+    fn paired_modality_cohorts_have_exactly_identical_sample_ids() {
+        let mut rows = valid_dataset();
+        rows[0].row.present_slots.push("em_xy".to_string());
+        rows[0].row.has_em = true;
+        rows[1].row.present_slots.push("em_best".to_string());
+        rows[1].row.has_em = true;
+
+        let manifest = build_cohort_manifest(&rows, &"a".repeat(40), &"b".repeat(64));
+        let cohorts = &manifest.cohorts;
+        let fused = &cohorts["fused_geometry_legal_em"];
+        let paired_geometry = &cohorts["paired_geometry_only"];
+        let paired_em = &cohorts["paired_em_legal_views"];
+        assert_eq!(fused.sample_count, 1);
+        assert_eq!(fused.sample_ids, paired_geometry.sample_ids);
+        assert_eq!(fused.sample_ids, paired_em.sample_ids);
+        assert_eq!(paired_geometry.sample_ids_sha256, paired_em.sample_ids_sha256);
+        assert_eq!(cohorts["em_legal_any_view"].sample_ids, fused.sample_ids);
+        assert!(cohorts["em_best_only_excluded"].sample_ids.contains(&rows[1].row.combined_sample_hash));
+        assert!(!cohorts["em_legal_any_view"].sample_ids.contains(&rows[1].row.combined_sample_hash));
+        assert_eq!(cohorts["em_legal_full_triplet"].membership_status, "NOT_ESTIMABLE");
+    }
+
+    #[test]
+    fn cohort_membership_and_set_digests_are_order_stable_but_source_bound() {
+        let mut rows = valid_dataset();
+        rows[0].row.present_slots.push("em_xy".to_string());
+        rows[0].row.has_em = true;
+        rows[1].row.present_slots.push("em_xz".to_string());
+        rows[1].row.has_em = true;
+        let revision = "a".repeat(40);
+        let source_digest = "b".repeat(64);
+        let first = build_cohort_manifest(&rows, &revision, &source_digest);
+        rows.reverse();
+        let second = build_cohort_manifest(&rows, &revision, &source_digest);
+        assert_eq!(first.cohort_set_sha256, second.cohort_set_sha256);
+        assert_eq!(
+            first.cohorts["paired_geometry_only"].sample_ids_sha256,
+            second.cohorts["paired_geometry_only"].sample_ids_sha256
+        );
+        let different_source = build_cohort_manifest(&rows, &revision, &"c".repeat(64));
+        assert_ne!(first.cohort_set_sha256, different_source.cohort_set_sha256);
+    }
+
+    #[test]
+    fn cohort_manifest_does_not_promote_empty_cohorts_to_zero_coverage() {
+        let rows = valid_dataset();
+        let manifest = build_cohort_manifest(&rows, &"a".repeat(40), &"b".repeat(64));
+        let em = &manifest.cohorts["em_legal_any_view"];
+        assert_eq!(em.sample_count, 0);
+        assert_eq!(em.membership_status, "NOT_ESTIMABLE");
+    }
+
+    #[test]
+    fn report_and_cohort_manifest_output_paths_must_not_alias() {
+        let report = PathBuf::from("report.json");
+        let cohort = PathBuf::from("cohort.json");
+        assert!(!output_paths_conflict(Some(&report), Some(&cohort)));
+        assert!(output_paths_conflict(Some(&report), Some(&report)));
+        assert!(!output_paths_conflict(Some(&report), None));
     }
 
     #[test]
