@@ -655,7 +655,7 @@ mod tests {
     fn joint_action_effects_are_invariant_to_action_row_permutation() {
         let original = joint_bank_fixture();
         let original_effect = joint_action_effect_interval(&original, 17, 9, 0.8).unwrap();
-        let permuted = JointActionSetSamples {
+        let mut permuted = JointActionSetSamples {
             action_ids: vec![9, 17, 3],
             outcome_samples: vec![
                 original.outcome_samples[2].clone(),
@@ -664,6 +664,7 @@ mod tests {
             ],
             ..original.clone()
         };
+        permuted.joint_draw_bank_sha256 = compute_joint_draw_bank_sha256(&permuted).unwrap();
         let permuted_effect = joint_action_effect_interval(&permuted, 17, 9, 0.8).unwrap();
         assert_eq!(original_effect, permuted_effect);
         let all = all_joint_action_effect_intervals(&permuted, 0.8).unwrap();
