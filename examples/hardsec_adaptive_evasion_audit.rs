@@ -629,6 +629,10 @@ fn paired_model_comparison(
     let baseline_model = str_field(baseline_campaign, "model_id", "baseline.campaign")?;
     let candidate_domain = str_field(candidate_campaign, "evidence_domain", "candidate.campaign")?;
     let baseline_domain = str_field(baseline_campaign, "evidence_domain", "baseline.campaign")?;
+    let candidate_model_sha256 = str_field(candidate_campaign, "model_sha256", "candidate.campaign")?;
+    let baseline_model_sha256 = str_field(baseline_campaign, "model_sha256", "baseline.campaign")?;
+    let candidate_threshold_sha256 = str_field(candidate_campaign, "threshold_profile_sha256", "candidate.campaign")?;
+    let baseline_threshold_sha256 = str_field(baseline_campaign, "threshold_profile_sha256", "baseline.campaign")?;
     if candidate_domain != baseline_domain {
         return Err("paired candidate/baseline evidence domains must match".to_owned());
     }
@@ -703,9 +707,21 @@ fn paired_model_comparison(
         "campaign_id": campaign_id,
         "evidence_domain": candidate_domain,
         "candidate_model_id": candidate_model,
+        "candidate_model_sha256": candidate_model_sha256,
         "baseline_model_id": baseline_model,
+        "baseline_model_sha256": baseline_model_sha256,
+        "candidate_predictions_sha256": candidate_receipt.get("inputs").and_then(|v| v.get("predictions_sha256")),
         "baseline_predictions_sha256": baseline_predictions_sha256,
+        "candidate_threshold_profile_sha256": candidate_threshold_sha256,
+        "baseline_threshold_profile_sha256": baseline_threshold_sha256,
+        "threshold_profile_digests_equal": candidate_threshold_sha256 == baseline_threshold_sha256,
+        "operating_point_comparability": {
+            "status": "not_verified_by_paired_ledger",
+            "matched_false_alert_budget_verified": false,
+            "required_before_superiority_claim": "Freeze both thresholds using validation groups only; predeclare an alert budget; verify that both candidate and baseline are evaluated at the same operating constraint on held-out groups. Matching threshold digests alone is not proof of matched false-alert burden."
+        },
         "pairing_rule": "same manifest, oracle, test case IDs and exact ordered independent group IDs for each metric",
+        "decision": "descriptive_paired_comparison_no_superiority_claim",
         "group_metrics": group_metrics,
         "limitations": [
             "This compares the supplied prediction ledgers on the same cases and group IDs; it does not authenticate either model or its threshold selection.",
@@ -1655,6 +1671,9 @@ mod tests {
             &sha256(&baseline_bytes),
         ).unwrap();
 
+        assert_eq!(comparison["decision"], "descriptive_paired_comparison_no_superiority_claim");
+        assert_eq!(comparison["operating_point_comparability"]["status"], "not_verified_by_paired_ledger");
+        assert_eq!(comparison["operating_point_comparability"]["matched_false_alert_budget_verified"], false);
         let groups = &comparison["group_metrics"];
         let program = &groups["program_group_level"];
         assert_eq!(program["independent_group_count"], 3);
