@@ -639,6 +639,24 @@ pub fn event_tape_to_pareto(
     })
 }
 
+/// Recompute the complete adapter report from the exact tape and frozen config.
+/// This verifies event-tape identity, all candidate evidence manifests, resource summaries,
+/// Pareto plan and analysis receipt rather than trusting the report's stored digest.
+pub fn verify_event_tape_pareto_report(
+    tape: &EventTape,
+    config: &EventTapeParetoConfig,
+    report: &EventTapeParetoReport,
+) -> Result<(), EventTapeParetoError> {
+    let recomputed = event_tape_to_pareto(tape, config)?;
+    if &recomputed != report {
+        return Err(EventTapeParetoError::new(
+            "report",
+            "stored EventTape-to-Pareto report differs from deterministic reconstruction",
+        ));
+    }
+    Ok(())
+}
+
 fn read_meter(meter: &MeterValue, path: &str) -> Result<u64, EventTapeParetoError> {
     match meter {
         MeterValue::Measured { value } => Ok(*value),
@@ -906,6 +924,20 @@ mod tests {
         assert_eq!(candidate_a.resources.max_action_peak_memory_bytes, 2048);
         assert_eq!(report.pareto_analysis.nondominated_candidate_ids.len(), 2);
         assert_eq!(report.report_sha256.len(), 64);
+    }
+
+    #[test]
+    fn report_verification_rejects_tampered_candidate_or_resource_summary() {
+        let mut tape = EventTape::new(header("direction-board", 100)).unwrap();
+        candidate_event(&mut tape, "a1", H2, "A", CandidateDisposition::Verified, Some(0.9), Some(H3), None, 10, 2, 2, 1024);
+        candidate_event(&mut tape, "b1", H5, "B", CandidateDisposition::Verified, Some(0.75), Some(H4), None, 8, 3, 1, 1536);
+
+        let report = event_tape_to_pareto(&tape, &config()).unwrap();
+        verify_event_tape_pareto_report(&tape, &config(), &report).unwrap();
+
+        let mut tampered = report.clone();
+        tampered.campaign_resources.energy_millijoules += 1;
+        assert!(verify_event_tape_pareto_report(&tape, &config(), &tampered).is_err());
     }
 
     #[test]
