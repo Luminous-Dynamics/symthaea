@@ -3,59 +3,11 @@
   "evidence_class": "synthetic_known_answer",
   "claim_ceiling": "SYNTHETIC_ONLY",
   "cases": [
-    {
-      "id": "direct_one_step",
-      "target_node": 1,
-      "reference_effect": [0.0, 1.0, 0.0, 0.0],
-      "candidate_effect": [0.0, 1.0, 0.0, 0.0],
-      "target_rmse": 0.0,
-      "control": "exact_replay",
-      "status": "PASS"
-    },
-    {
-      "id": "indirect_two_hop_sign",
-      "target_node": 2,
-      "reference_effect": [0.0, 0.0, -0.25, 0.0],
-      "candidate_effect": [0.0, 0.0, -0.25, 0.0],
-      "target_rmse": 0.0,
-      "control": "exact_replay",
-      "status": "PASS"
-    },
-    {
-      "id": "explicit_two_epoch_delay",
-      "target_node": 1,
-      "reference_effect": [0.0, 0.0, 1.6, 0.0, 0.0],
-      "candidate_effect": [0.0, 0.0, 1.6, 0.0, 0.0],
-      "target_rmse": 0.0,
-      "control": "exact_replay",
-      "status": "PASS"
-    },
-    {
-      "id": "recurrent_feedback",
-      "target_node": 0,
-      "reference_effect": [2.0, 0.0, 1.0, 0.0, 0.5],
-      "candidate_effect": [2.0, 0.0, 1.0, 0.0, 0.5],
-      "target_rmse": 0.0,
-      "control": "exact_replay",
-      "status": "PASS"
-    },
-    {
-      "id": "shared_input_not_direct_causation",
-      "target_node": 1,
-      "reference_effect": [0.0, 0.0, 0.0, 0.0],
-      "candidate_effect": [0.0, 0.0, 0.0, 0.0],
-      "target_rmse": 0.0,
-      "control": "exact_replay",
-      "status": "PASS"
-    },
-    {
-      "id": "rewired_topology_negative_control",
-      "target_node": 1,
-      "reference_effect": [0.0, 0.9, 0.0, 0.0],
-      "candidate_effect": [0.0, 0.0, 0.0, 0.0],
-      "target_rmse": 0.45,
-      "control": "rewired_topology_negative_control",
-      "status": "PASS"
-    }
+    {"id":"direct_one_step","target_node":1,"reference_effect":[0.000000000000,1.000000000000,0.000000000000,0.000000000000],"candidate_effect":[0.000000000000,1.000000000000,0.000000000000,0.000000000000],"target_rmse":0.000000000000,"control":"exact_replay","status":"PASS"},
+    {"id":"indirect_two_hop_sign","target_node":2,"reference_effect":[0.000000000000,0.000000000000,-0.250000000000,0.000000000000],"candidate_effect":[0.000000000000,0.000000000000,-0.250000000000,0.000000000000],"target_rmse":0.000000000000,"control":"exact_replay","status":"PASS"},
+    {"id":"explicit_two_epoch_delay","target_node":1,"reference_effect":[0.000000000000,0.000000000000,1.600000000000,0.000000000000,0.000000000000],"candidate_effect":[0.000000000000,0.000000000000,1.600000000000,0.000000000000,0.000000000000],"target_rmse":0.000000000000,"control":"exact_replay","status":"PASS"},
+    {"id":"recurrent_feedback","target_node":0,"reference_effect":[2.000000000000,0.000000000000,1.000000000000,0.000000000000,0.500000000000],"candidate_effect":[2.000000000000,0.000000000000,1.000000000000,0.000000000000,0.500000000000],"target_rmse":0.000000000000,"control":"exact_replay","status":"PASS"},
+    {"id":"shared_input_not_direct_causation","target_node":1,"reference_effect":[0.000000000000,0.000000000000,0.000000000000,0.000000000000],"candidate_effect":[0.000000000000,0.000000000000,0.000000000000,0.000000000000],"target_rmse":0.000000000000,"control":"exact_replay","status":"PASS"},
+    {"id":"rewired_topology_negative_control","target_node":1,"reference_effect":[0.000000000000,0.900000000000,0.000000000000,0.000000000000],"candidate_effect":[0.000000000000,0.000000000000,0.000000000000,0.000000000000],"target_rmse":0.450000000000,"control":"rewired_topology_negative_control","status":"PASS"}
   ]
 }
