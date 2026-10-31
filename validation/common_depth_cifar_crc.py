@@ -248,8 +248,12 @@ def run_table(n: int, alpha: float, rounds: tuple[int, ...] = (0, 1, 3, 10, 20, 
     snapshots = {}
     if 0 in wanted:
         snapshots[0] = dict(current)
+    previous = dict(current)
+    last_step_change = 0.0
     for k in range(1, max(rounds) + 1):
         current = engine.equal_share_round(current)
+        last_step_change = max(abs(current[h] - previous[h]) for h in engine.states)
+        previous = dict(current)
         if k in wanted:
             snapshots[k] = dict(current)
     summaries = {}
@@ -266,8 +270,7 @@ def run_table(n: int, alpha: float, rounds: tuple[int, ...] = (0, 1, 3, 10, 20, 
         "calibration_states": len(engine.states),
         "augmented_states": len(engine.augmented),
         "rounds": summaries,
-        "final_change": float(max(abs(current[h] - snapshots[max(rounds)][h]) for h in engine.states))
-        if max(rounds) in snapshots else None,
+        "last_step_max_abs_change": float(last_step_change),
         "validity_all_rounds": True,
     }
 
