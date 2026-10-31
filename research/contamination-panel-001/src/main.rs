@@ -5,6 +5,10 @@ use contamination_panel_bench::{
         CausalPowerPlanningConfigV1, CausalPowerPlanningReportV1,
         plan_causal_power, verify_causal_power_report,
     },
+    causal_power::{
+        CausalPowerPlanningConfigV1, CausalPowerPlanningReportV1,
+        plan_causal_power, verify_causal_power_report,
+    },
     fresh_instance::{
         FreshChallengeBundleV1, FreshChallengeConfigV1, FreshChallengeManifestV1,
         FreshPublicChallengePacketV1, SealedFreshOraclePacketV1,
@@ -302,6 +306,45 @@ fn verify_causal_power_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn plan_causal_power_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench plan-causal-power <power-config.json> <power-report.json>"
+                .into(),
+        );
+    }
+    let config: CausalPowerPlanningConfigV1 =
+        serde_json::from_slice(&fs::read(&args[1])?)?;
+    let report = plan_causal_power(&config).map_err(io::Error::other)?;
+    write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "candidate_count={} smallest_qualifying_pairs={:?} expected_global_effect={:.2} type-I/power/coverage MCSE reported=true",
+        report.candidate_estimates.len(),
+        report.smallest_qualifying_model_pair_count,
+        report.expected_primary_global_effect_permille
+    );
+    println!("assumptions: {}", report.assumption_summary);
+    Ok(())
+}
+
+fn verify_causal_power_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 2 {
+        return Err(
+            "usage: contamination-panel-bench verify-causal-power <power-report.json>"
+                .into(),
+        );
+    }
+    let report: CausalPowerPlanningReportV1 =
+        serde_json::from_slice(&fs::read(&args[1])?)?;
+    verify_causal_power_report(&report).map_err(io::Error::other)?;
+    println!(
+        "report_valid=true candidates={} smallest_qualifying_pairs={:?}",
+        report.candidate_estimates.len(),
+        report.smallest_qualifying_model_pair_count
+    );
+    Ok(())
+}
+
 fn verify_fresh_score_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 2 {
         return Err(
@@ -514,6 +557,8 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("audit-fresh") => audit_fresh_cli(&args),
         Some("score-fresh") => score_fresh_cli(&args),
         Some("verify-fresh-score") => verify_fresh_score_cli(&args),
+        Some("plan-causal-power") => plan_causal_power_cli(&args),
+        Some("verify-causal-power") => verify_causal_power_cli(&args),
         Some("plan-causal-power") => plan_causal_power_cli(&args),
         Some("verify-causal-power") => verify_causal_power_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
