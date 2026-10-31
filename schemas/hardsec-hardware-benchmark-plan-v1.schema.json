@@ -362,11 +362,7 @@
             ]
           },
           "availability_status": {
-            "enum": [
-              "metadata_discovered_archive_unverified",
-              "archive_bytes_verified",
-              "provenance_verified"
-            ]
+            "const": "metadata_discovered_archive_unverified"
           }
         }
       }
