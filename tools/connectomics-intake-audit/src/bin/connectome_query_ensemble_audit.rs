@@ -670,8 +670,8 @@ mod tests {
     fn sampled_sensitivity_set_never_claims_exhaustive_space() {
         let mut input = fixture();
         input.scope_coverage = "sampled_sensitivity_set".into();
-        let bytes = serde_json::to_vec(&input).unwrap();
-        let report = run(&input, &bytes).unwrap();
+        let bytes = b"synthetic-input";
+        let report = run(&input, bytes).unwrap();
         assert!(report.scope_note.contains("not evidence of robustness over all plausible"));
     }
 }
