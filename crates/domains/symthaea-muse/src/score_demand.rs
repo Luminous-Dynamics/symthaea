@@ -55,6 +55,10 @@ pub struct ScoreDemandProfile {
     pub analyzed_span_beats: f64,
     pub has_complete_part_identity: bool,
     pub assigned_part_note_fraction: f64,
+    /// With complete PartIds this includes both independent part rows and
+    /// role rollups. RoleAggregateSummary rows are summaries, not extra
+    /// parts, and must not be counted as additional performers. Without
+    /// complete identity, only role aggregates are emitted.
     pub voice_demands: Vec<VoiceDemand>,
 }
 
