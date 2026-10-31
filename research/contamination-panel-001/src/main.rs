@@ -7,6 +7,10 @@ use contamination_panel_bench::{
         audit_fresh_challenge_bundle, generate_fresh_challenge_bundle,
     },
     fresh_scoring::{FreshScoreReportV1, score_fresh_submission, verify_fresh_score_report_integrity},
+    search_time::{
+        SearchTimeExposureTraceV1, SearchTimeExposureFindingsV1,
+        audit_search_time_trace, audit_search_time_findings,
+    },
     DetectorSpecV1, PublicChallengePacketV1, SealedChallengeKeyV1,
     audit_blinded_adjudications, detectors::{evaluate_detector_run, score_public_packet},
     ftd::{
@@ -278,6 +282,56 @@ fn verify_fresh_score_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn audit_search_time_trace_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench audit-search-time-trace <trace.json> <audit-report.json>"
+                .into(),
+        );
+    }
+    let trace: SearchTimeExposureTraceV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
+    let report = audit_search_time_trace(&trace).map_err(io::Error::other)?;
+    write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "valid={} events={} allowed={} blocked={} coverage={} complete_mediation_verified={}",
+        report.valid,
+        report.event_count,
+        report.allowed_event_count,
+        report.blocked_event_count,
+        report.coverage_status,
+        report.complete_mediation_verified
+    );
+    Ok(())
+}
+
+fn audit_search_time_findings_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 4 {
+        return Err(
+            "usage: contamination-panel-bench audit-search-time-findings <trace.json> <findings.json> <audit-report.json>"
+                .into(),
+        );
+    }
+    let trace: SearchTimeExposureTraceV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
+    let trace_audit = audit_search_time_trace(&trace).map_err(io::Error::other)?;
+    if !trace_audit.valid {
+        return Err("search-time trace failed integrity audit".into());
+    }
+    let findings: SearchTimeExposureFindingsV1 =
+        serde_json::from_slice(&fs::read(&args[2])?)?;
+    let report = audit_search_time_findings(&trace, &findings).map_err(io::Error::other)?;
+    write_bytes(&args[3], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "valid={} metadata={} context={} answer={} unknown={}",
+        report.valid,
+        report.metadata_only_count,
+        report.context_bearing_count,
+        report.answer_bearing_count,
+        report.unknown_count
+    );
+    println!("Classification evidence is evaluator-supplied; causal influence is not established.");
+    Ok(())
+}
+
 fn score_fresh_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 6 {
         return Err(
@@ -471,9 +525,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("audit-fresh") => audit_fresh_cli(&args),
         Some("score-fresh") => score_fresh_cli(&args),
         Some("verify-fresh-score") => verify_fresh_score_cli(&args),
+        Some("audit-search-time-trace") => audit_search_time_trace_cli(&args),
+        Some("audit-search-time-findings") => audit_search_time_findings_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | verify-fresh-score | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | verify-fresh-score | audit-search-time-trace | audit-search-time-findings | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
