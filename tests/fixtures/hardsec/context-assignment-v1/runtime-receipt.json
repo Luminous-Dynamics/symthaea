@@ -1,0 +1,155 @@
+{
+  "schema_version": "hardsec-context-assignment-receipt-v1",
+  "result": "audited",
+  "claim_scope": "declared_context_assignment_gate_and_heldout_label_evaluation_only",
+  "policy_id": "hs020-frozen-workload-context-v1",
+  "stream_id": "stream-cctm-demo-01",
+  "evaluation_group_id": "heldout-execution-cctm-01",
+  "evidence_domain": "synthetic_fixture",
+  "assignment_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "inputs": {
+    "policy_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "assignments_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "truth_oracle_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "runtime_mapping": {
+    "mapping_schema_version": "hardsec-context-assignment-runtime-map-v1",
+    "assignments": [
+      {
+        "sequence_index": 1,
+        "window_id": "cctm-window-001",
+        "decision_status": "accepted",
+        "decision_reason": "accepted",
+        "selected_context_id": "compute"
+      },
+      {
+        "sequence_index": 2,
+        "window_id": "cctm-window-002",
+        "decision_status": "accepted",
+        "decision_reason": "accepted",
+        "selected_context_id": "memory"
+      },
+      {
+        "sequence_index": 3,
+        "window_id": "cctm-window-003",
+        "decision_status": "accepted",
+        "decision_reason": "accepted",
+        "selected_context_id": "compute"
+      },
+      {
+        "sequence_index": 4,
+        "window_id": "cctm-window-004",
+        "decision_status": "accepted",
+        "decision_reason": "accepted",
+        "selected_context_id": "compute"
+      },
+      {
+        "sequence_index": 5,
+        "window_id": "cctm-window-005",
+        "decision_status": "accepted",
+        "decision_reason": "accepted",
+        "selected_context_id": "compute"
+      },
+      {
+        "sequence_index": 6,
+        "window_id": "cctm-window-006",
+        "decision_status": "accepted",
+        "decision_reason": "accepted",
+        "selected_context_id": "compute"
+      },
+      {
+        "sequence_index": 7,
+        "window_id": "cctm-window-007",
+        "decision_status": "accepted",
+        "decision_reason": "accepted",
+        "selected_context_id": "compute"
+      },
+      {
+        "sequence_index": 8,
+        "window_id": "cctm-window-008",
+        "decision_status": "accepted",
+        "decision_reason": "accepted",
+        "selected_context_id": "compute"
+      },
+      {
+        "sequence_index": 9,
+        "window_id": "cctm-window-009",
+        "decision_status": "accepted",
+        "decision_reason": "accepted",
+        "selected_context_id": "compute"
+      },
+      {
+        "sequence_index": 10,
+        "window_id": "cctm-window-010",
+        "decision_status": "accepted",
+        "decision_reason": "accepted",
+        "selected_context_id": "compute"
+      },
+      {
+        "sequence_index": 11,
+        "window_id": "cctm-window-011",
+        "decision_status": "accepted",
+        "decision_reason": "accepted",
+        "selected_context_id": "compute"
+      },
+      {
+        "sequence_index": 12,
+        "window_id": "cctm-window-012",
+        "decision_status": "accepted",
+        "decision_reason": "accepted",
+        "selected_context_id": "compute"
+      },
+      {
+        "sequence_index": 13,
+        "window_id": "cctm-window-013",
+        "decision_status": "accepted",
+        "decision_reason": "accepted",
+        "selected_context_id": "compute"
+      },
+      {
+        "sequence_index": 14,
+        "window_id": "cctm-window-014",
+        "decision_status": "accepted",
+        "decision_reason": "accepted",
+        "selected_context_id": "compute"
+      },
+      {
+        "sequence_index": 15,
+        "window_id": "cctm-window-015",
+        "decision_status": "accepted",
+        "decision_reason": "accepted",
+        "selected_context_id": "compute"
+      },
+      {
+        "sequence_index": 16,
+        "window_id": "cctm-window-016",
+        "decision_status": "accepted",
+        "decision_reason": "accepted",
+        "selected_context_id": "compute"
+      },
+      {
+        "sequence_index": 17,
+        "window_id": "cctm-window-017",
+        "decision_status": "abstained",
+        "decision_reason": "invalid_sensor",
+        "selected_context_id": null
+      },
+      {
+        "sequence_index": 18,
+        "window_id": "cctm-window-018",
+        "decision_status": "abstained",
+        "decision_reason": "unknown_context",
+        "selected_context_id": null
+      },
+      {
+        "sequence_index": 19,
+        "window_id": "cctm-window-019",
+        "decision_status": "abstained",
+        "decision_reason": "invalid_sensor",
+        "selected_context_id": null
+      }
+    ],
+    "contains_truth_labels": false,
+    "mapping_digest_bound_to_assignment_input": true
+  }
+}
