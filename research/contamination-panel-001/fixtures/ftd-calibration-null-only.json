@@ -12,5 +12,6 @@
   "tail_direction": "greater",
   "weight_policy": "paper_normalized_rejection_counts",
   "softmax_temperature_milli": null,
-  "alpha_permille": 50
+  "alpha_permille": 50,
+  "final_multiple_testing": "benjamini_yekutieli"
 }
