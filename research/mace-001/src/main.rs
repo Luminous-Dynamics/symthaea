@@ -879,6 +879,12 @@ mod tests {
     }
 
     #[test]
+    fn missing_controlled_intervention_replicate_fails_closed() {
+        let changed = AGENT_INPUT.replace("\"event_id\":\"E18\"", "\"event_id\":\"E99\"");
+        assert!(audit_texts(&changed, ORACLE_INPUT, ("a", "o")).is_err());
+    }
+
+    #[test]
     fn false_causal_claim_is_non_compensatory() {
         let trace = REFERENCE_TRACE.replace(
             "MACE-104\tnot_identified",
