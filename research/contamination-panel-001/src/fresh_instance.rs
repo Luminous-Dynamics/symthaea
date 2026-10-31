@@ -572,19 +572,57 @@ pub fn audit_fresh_challenge_bundle(
         all_nonsingular &= determinant.abs() >= config.minimum_absolute_determinant;
         let (b1, b2) = compute_rhs(&entry.parameters, &entry.solution)?;
         all_answers_exact &= b1 == entry.parameters.b1 && b2 == entry.parameters.b2;
+        let parameter_bytes = serde_json::to_vec(&entry.parameters)
+            .map_err(|error| format!("cannot serialize hidden parameters: {error}"))?;
+        all_answers_exact &= hash_domain(b"fresh-task-parameters.v1", &parameter_bytes)
+            == entry.parameter_sha256;
         let answer_bytes = serde_json::to_vec(&entry.solution)
             .map_err(|error| format!("cannot serialize exact solution: {error}"))?;
         all_answers_exact &= hash_domain(b"fresh-task-answer.v1", &answer_bytes)
             == entry.answer_sha256;
     }
+    let public_value = serde_json::to_value(&bundle.public_packet)
+        .map_err(|error| format!("cannot serialize public packet: {error}"))?;
+    let public_keys: BTreeSet<String> = public_value.as_object()
+        .ok_or_else(|| "public packet must serialize to an object".to_owned())?
+        .keys().cloned().collect();
+    let expected_public_keys: BTreeSet<String> = [
+        "schema",
+        "batch_id",
+        "benchmark_id",
+        "benchmark_version",
+        "task_family",
+        "model_checkpoint_sha256",
+        "generator_source_sha256",
+        "generator_binary_sha256",
+        "runtime_image_sha256",
+        "generator_config_sha256",
+        "checkpoint_frozen_at_utc",
+        "challenge_generated_at_utc",
+        "item_count",
+        "tasks",
+        "public_packet_sha256",
+        "claim_boundary",
+    ].iter().map(|value| (*value).to_owned()).collect();
+    let tasks_have_only_public_fields = bundle.public_packet.tasks.iter().all(|task| {
+        serde_json::to_value(task).ok().and_then(|value| {
+            let keys: BTreeSet<String> = value.as_object()?.keys().cloned().collect();
+            let expected: BTreeSet<String> =
+                ["item_id", "task_text", "task_text_sha256"]
+                    .iter().map(|value| (*value).to_owned()).collect();
+            Some(keys == expected)
+        }).unwrap_or(false)
+    });
     let public_serialized = serde_json::to_string(&bundle.public_packet)
         .map_err(|error| format!("cannot serialize public packet: {error}"))?;
-    let public_contains_no_seed_or_answers = !public_serialized.contains(
-        &bundle.sealed_oracle_packet.generation_seed_hex
-    ) && bundle.sealed_oracle_packet.entries.iter().all(|entry| {
-        !public_serialized.contains(&format!("\"x\":{}", entry.solution.x))
-            || !public_serialized.contains(&format!("\"y\":{}", entry.solution.y))
-    });
+    let public_contains_no_seed_or_answers =
+        public_keys == expected_public_keys
+            && tasks_have_only_public_fields
+            && !public_serialized.contains(&bundle.sealed_oracle_packet.generation_seed_hex)
+            && !public_serialized.contains("generation_seed_hex")
+            && !public_serialized.contains("solution")
+            && !public_serialized.contains("parameters")
+            && !public_serialized.contains("answer_sha256");
     if !all_nonsingular || !all_answers_exact || !public_contains_no_seed_or_answers {
         return Err("fresh challenge public/oracle separation or exact answer validation failed".to_owned());
     }
@@ -672,6 +710,25 @@ mod tests {
             first.manifest.generation_seed_commitment_sha256,
             second.manifest.generation_seed_commitment_sha256
         );
+    }
+
+    #[test]
+    fn public_packet_key_set_contains_only_inference_time_task_fields() {
+        let bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
+        let value: serde_json::Value = serde_json::to_value(&bundle.public_packet).unwrap();
+        let keys: BTreeSet<String> = value.as_object().unwrap().keys().cloned().collect();
+        assert!(keys.contains("tasks"));
+        assert!(!keys.contains("generation_seed_hex"));
+        assert!(!keys.contains("sealed_oracle_packet"));
+        for task in &bundle.public_packet.tasks {
+            let task_value: serde_json::Value = serde_json::to_value(task).unwrap();
+            let task_keys: BTreeSet<String> = task_value.as_object().unwrap().keys().cloned().collect();
+            assert_eq!(
+                task_keys,
+                ["item_id", "task_text", "task_text_sha256"]
+                    .iter().map(|value| (*value).to_owned()).collect()
+            );
+        }
     }
 
     #[test]
