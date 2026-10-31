@@ -879,6 +879,24 @@ fn encode_sha256(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
     use crate::pruning_audit::{prepare_pruning_audit_sample, AuditScore};
+    use crate::anytime_confidence_ledger::{
+        append_anytime_confidence_look, create_anytime_confidence_family_manifest,
+        create_anytime_confidence_ledger, AnytimeStreamDeclaration,
+    };
+    use crate::hardware_objectives::{
+        compute_objective_registry_sha256, HardwareProfileManifest, ObjectiveDefinition,
+        ObjectiveDirection, ObjectiveNormalization,
+    };
+    use crate::multi_resource_budget::{
+        compute_resource_registry_sha256, ResourceBudgetAction, ResourceBudgetLimit,
+        ResourceClass, ResourceCostVector, ResourceDefinition, ResourceQuantity,
+    };
+    use crate::pareto_hypervolume_qmc::HypervolumeQmcConfig;
+    use crate::pareto_portfolio_voc::{
+        compute_portfolio_action_likelihood_sha256, CandidatePortfolio,
+        ParetoPortfolioParticle, ParetoPortfolioPosterior, PortfolioActionOutcome,
+        PortfolioMeasurementAction,
+    };
     use crate::run_wide_pruning_risk::RunWidePruningRiskConfig;
 
     fn sha(byte: char) -> String {
@@ -1153,6 +1171,302 @@ mod tests {
         let second = compute_objective_order_sha256(&reordered).unwrap();
         assert_ne!(first, second);
         assert_eq!(first, compute_objective_order_sha256(&ids).unwrap());
+    }
+
+    #[test]
+    fn measurement_preflight_recomputes_and_binds_the_complete_evidence_chain() {
+        let mut profile = HardwareProfileManifest {
+            profile_id: "nrf5340-ppk2".into(),
+            device_model: "Nordic nRF5340".into(),
+            board_id: "board-01".into(),
+            board_revision: "rev-a".into(),
+            firmware_sha256: sha('1'),
+            runtime_sha256: sha('2'),
+            compiler_toolchain_sha256: sha('3'),
+            quantization_spec_sha256: sha('4'),
+            measurement_protocol_sha256: sha('5'),
+            instrument_model: "Power Profiler Kit II".into(),
+            instrument_id: "ppk2-001".into(),
+            sampling_frequency_hz: 100_000,
+            profile_sha256: String::new(),
+        };
+        profile.profile_sha256 = compute_hardware_profile_sha256(&profile).unwrap();
+
+        let mut objective_registry = ObjectiveRegistry {
+            schema: "symthaea.nas.objective-registry".into(),
+            version: "0.1.0".into(),
+            benchmark_id: "nats-bench-mcu-v2-preflight-fixture".into(),
+            objectives: vec![
+                ObjectiveDefinition {
+                    objective_id: "accuracy".into(),
+                    value_unit: "fraction".into(),
+                    direction: ObjectiveDirection::Maximize,
+                    source: ObjectiveSource::TrainedEvaluation,
+                    normalization: ObjectiveNormalization {
+                        raw_min: 0.0,
+                        raw_max: 1.0,
+                    },
+                    measurement_protocol_sha256: sha('6'),
+                    hardware_profile_sha256: None,
+                    measurement_cost_unit: "objective-query".into(),
+                    measurement_cost_model_sha256: sha('7'),
+                },
+                ObjectiveDefinition {
+                    objective_id: "latency".into(),
+                    value_unit: "milliseconds".into(),
+                    direction: ObjectiveDirection::Minimize,
+                    source: ObjectiveSource::PhysicalDeviceMeasurement,
+                    normalization: ObjectiveNormalization {
+                        raw_min: 0.0,
+                        raw_max: 100.0,
+                    },
+                    measurement_protocol_sha256: sha('5'),
+                    hardware_profile_sha256: Some(profile.profile_sha256.clone()),
+                    measurement_cost_unit: "objective-query".into(),
+                    measurement_cost_model_sha256: sha('8'),
+                },
+            ],
+            hardware_profiles: vec![profile.clone()],
+            registry_sha256: String::new(),
+        };
+        objective_registry.registry_sha256 =
+            compute_objective_registry_sha256(&objective_registry).unwrap();
+
+        let posterior = ParetoPortfolioPosterior {
+            candidate_ids: vec!["A".into(), "B".into(), "C".into()],
+            objective_ids: vec!["accuracy".into(), "latency".into()],
+            objective_registry_sha256: objective_registry.registry_sha256.clone(),
+            candidate_config_sha256: vec![sha('a'), sha('b'), sha('c')],
+            candidate_feasible: vec![true, true, true],
+            particles: vec![
+                ParetoPortfolioParticle {
+                    particle_id: "p1".into(),
+                    probability: 0.5,
+                    objective_values: vec![
+                        Some(vec![0.95, 0.95]),
+                        Some(vec![0.2, 0.2]),
+                        Some(vec![0.4, 0.4]),
+                    ],
+                },
+                ParetoPortfolioParticle {
+                    particle_id: "p2".into(),
+                    probability: 0.5,
+                    objective_values: vec![
+                        Some(vec![0.2, 0.2]),
+                        Some(vec![0.95, 0.95]),
+                        Some(vec![0.4, 0.4]),
+                    ],
+                },
+            ],
+        };
+        let portfolios = vec![
+            CandidatePortfolio {
+                portfolio_id: "A-only".into(),
+                candidate_indices: vec![0],
+            },
+            CandidatePortfolio {
+                portfolio_id: "B-only".into(),
+                candidate_indices: vec![1],
+            },
+        ];
+        let portfolio_config = ParetoPortfolioConfig {
+            target_k: 1,
+            minimum_feasible_utility: vec![0.0, 0.0],
+        };
+        let qmc_design = HypervolumeQmcDesign::new(
+            &[0.0, 0.0],
+            &HypervolumeQmcConfig {
+                samples_per_replicate: 4096,
+                scramble_replicates: 16,
+                seed: 19,
+            },
+        )
+        .unwrap();
+        let mut action = PortfolioMeasurementAction {
+            action_id: "measure-A-latency".into(),
+            candidate_id: "A".into(),
+            candidate_config_sha256: sha('a'),
+            objective_registry_sha256: objective_registry.registry_sha256.clone(),
+            objective_id: "latency".into(),
+            hardware_profile_sha256: Some(profile.profile_sha256.clone()),
+            measurement_protocol_sha256: sha('5'),
+            resource_unit: "objective-query".into(),
+            incremental_cost_units: 2,
+            observation_likelihood_model_sha256: String::new(),
+            outcomes: vec![
+                PortfolioActionOutcome {
+                    outcome_id: "latency-low".into(),
+                    likelihood_by_particle: vec![0.99, 0.01],
+                },
+                PortfolioActionOutcome {
+                    outcome_id: "latency-high".into(),
+                    likelihood_by_particle: vec![0.01, 0.99],
+                },
+            ],
+        };
+        action.observation_likelihood_model_sha256 =
+            compute_portfolio_action_likelihood_sha256(&action).unwrap();
+        let voc = evaluate_portfolio_measurement_voc(
+            &objective_registry,
+            &posterior,
+            &portfolios,
+            &portfolio_config,
+            &qmc_design,
+            &action,
+        )
+        .unwrap();
+        assert!(voc.estimated_regret_reduction > 0.05);
+
+        let mut resource_registry = ResourceRegistry {
+            schema: "symthaea.nas.resource-registry".into(),
+            version: "0.1.0".into(),
+            resources: vec![
+                ResourceDefinition {
+                    resource_id: "device_measurement_queries".into(),
+                    unit: "objective-query".into(),
+                    class: ResourceClass::Custom,
+                    cost_model_sha256: sha('8'),
+                },
+                ResourceDefinition {
+                    resource_id: "instrument_time".into(),
+                    unit: "milliseconds".into(),
+                    class: ResourceClass::InstrumentTime,
+                    cost_model_sha256: sha('9'),
+                },
+            ],
+            registry_sha256: String::new(),
+        };
+        resource_registry.registry_sha256 =
+            compute_resource_registry_sha256(&resource_registry).unwrap();
+        let cost_vector = ResourceCostVector {
+            action_id: action.action_id.clone(),
+            resource_registry_sha256: resource_registry.registry_sha256.clone(),
+            resources: vec![
+                ResourceQuantity {
+                    resource_id: "device_measurement_queries".into(),
+                    unit: "objective-query".into(),
+                    units: action.incremental_cost_units,
+                    cost_model_sha256: sha('8'),
+                },
+                ResourceQuantity {
+                    resource_id: "instrument_time".into(),
+                    unit: "milliseconds".into(),
+                    units: 1500,
+                    cost_model_sha256: sha('9'),
+                },
+            ],
+        };
+        let resource_budget = ResourceBudget {
+            resource_registry_sha256: resource_registry.registry_sha256.clone(),
+            limits: vec![
+                ResourceBudgetLimit {
+                    resource_id: "device_measurement_queries".into(),
+                    unit: "objective-query".into(),
+                    total_units: 100,
+                    already_spent_units: 10,
+                    protected_reserve_units: 10,
+                },
+                ResourceBudgetLimit {
+                    resource_id: "instrument_time".into(),
+                    unit: "milliseconds".into(),
+                    total_units: 100_000,
+                    already_spent_units: 1_000,
+                    protected_reserve_units: 5_000,
+                },
+            ],
+        };
+        let resource_action = ResourceBudgetAction {
+            action_id: action.action_id.clone(),
+            expected_regret_reduction: voc.estimated_regret_reduction,
+            numerical_standard_error: voc.estimated_regret_reduction_standard_error,
+            resource_cost: cost_vector.clone(),
+        };
+        let resource_actions = vec![resource_action];
+
+        let mut scope = NasMeasurementActionScope {
+            run_id: "run-authz-measurement-001".into(),
+            target_commit_id: "a".repeat(40),
+            action_id: action.action_id.clone(),
+            candidate_id: action.candidate_id.clone(),
+            candidate_config_sha256: action.candidate_config_sha256.clone(),
+            objective_id: action.objective_id.clone(),
+            objective_ids: vec!["accuracy".into(), "latency".into()],
+            objective_registry_sha256: objective_registry.registry_sha256.clone(),
+            objective_order_sha256: compute_objective_order_sha256(&[
+                "accuracy".into(),
+                "latency".into(),
+            ])
+            .unwrap(),
+            posterior_sha256: voc.current_decision.posterior_sha256.clone(),
+            portfolio_family_sha256: voc.current_decision.portfolio_family_sha256.clone(),
+            qmc_sampling_design_sha256: voc.current_decision.qmc_sampling_design_sha256.clone(),
+            selection_replicates_sha256: voc.current_decision.selection_replicates_sha256.clone(),
+            validation_replicates_sha256: voc.current_decision.validation_replicates_sha256.clone(),
+            hardware_profile_sha256: profile.profile_sha256.clone(),
+            measurement_protocol_sha256: action.measurement_protocol_sha256.clone(),
+            instrument_identity_sha256: compute_instrument_identity_sha256(&profile).unwrap(),
+            observation_likelihood_model_sha256: action
+                .observation_likelihood_model_sha256
+                .clone(),
+            resource_registry_sha256: resource_registry.registry_sha256.clone(),
+            resource_budget_sha256: digest_serde(
+                b"symthaea.nas.resource-budget.v0.1",
+                &resource_budget,
+            )
+            .unwrap(),
+            resource_cost_sha256: digest_serde(
+                b"symthaea.nas.resource-cost-vector.v0.1",
+                &cost_vector,
+            )
+            .unwrap(),
+        };
+
+        let stream_id = measurement_confidence_stream_id(&scope).unwrap();
+        let manifest = create_anytime_confidence_family_manifest(
+            scope.run_id.clone(),
+            0.05,
+            vec![AnytimeStreamDeclaration {
+                stream_id,
+                range_min: -1.0,
+                range_max: 1.0,
+                threshold: 0.0,
+            }],
+        )
+        .unwrap();
+        let mut confidence_ledger = create_anytime_confidence_ledger(manifest).unwrap();
+        append_anytime_confidence_look(
+            &mut confidence_ledger,
+            &measurement_confidence_stream_id(&scope).unwrap(),
+            &vec![voc.estimated_regret_reduction; 50_000],
+        )
+        .unwrap();
+
+        let receipt = verify_measurement_preflight(&MeasurementPreflightRequest {
+            scope: &scope,
+            confidence_ledger: &confidence_ledger,
+            objective_registry: &objective_registry,
+            posterior: &posterior,
+            portfolios: &portfolios,
+            portfolio_config: &portfolio_config,
+            qmc_design: &qmc_design,
+            measurement_action: &action,
+            resource_registry: &resource_registry,
+            resource_budget: &resource_budget,
+            resource_actions: &resource_actions,
+        })
+        .unwrap();
+        assert_eq!(receipt.action_kind, NasActionKind::AcquireMeasurement);
+        assert_eq!(
+            receipt.disposition,
+            "PREFLIGHT_ELIGIBLE_NO_RESERVATION_NO_EXECUTION"
+        );
+        verify_action_preflight_receipt_digest(&receipt).unwrap();
+
+        scope.target_commit_id = "b".repeat(40);
+        assert_ne!(
+            receipt.scope_sha256,
+            compute_measurement_scope_sha256(&scope).unwrap()
+        );
     }
 
     #[test]
