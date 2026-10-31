@@ -257,9 +257,9 @@
     "dependency_issue": 9437
   },
   "validation": {
-    "parent_branch_authored_tests_reported": 208,
+    "parent_branch_authored_tests_reported": 209,
     "new_tests_authored": 21,
-    "combined_source_level_test_count_expected": 229,
+    "combined_source_level_test_count_expected": 230,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
@@ -268,6 +268,8 @@
     "benchmark_executed": false,
     "baseline_training_executed": false,
     "hardware_measurement_executed": false,
-    "energy_measurement_executed": false
+    "energy_measurement_executed": false,
+    "parent_branch_source_count": 209,
+    "parent_count_source_note": "Counted directly from all 13 Rust source modules at exact parent commit 05220001fc9dda9cf0570506bd2f06e89c8f08b4; the #9529 PR description says 208, but source count is 209."
   }
 }
