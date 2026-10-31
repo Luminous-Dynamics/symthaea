@@ -177,3 +177,11 @@ Sources:
 - NSGA-II algorithm lifecycle and elitist parent/offspring selection: https://link.springer.com/article/10.1007/s42979-020-00265-1
 
 **Claim ceiling:** the new Rust NSGA-II implementation is not yet cross-checked against PlatEMO or original reference code; the synthetic alias fixture is not yet a large semantic benchmark; and all new Rust tests remain unexecuted. No algorithm is reported as outperforming SOTA.
+
+### Second evolutionary reference: MOEA/D-DE
+
+Added deterministic Rust `pareto_moead.rs` for ZDT1 and three-objective DTLZ2. It uses uniform 2D or simplex-lattice 3D weights, nearest-weight neighborhoods, neighborhood/global mating, DE/rand/1/bin, Tchebycheff scalarization, ideal-point updates and bounded neighborhood replacement. The report preserves weight-vector/subproblem order, exact objective-evaluation count and a replayable digest; `analyze_moead_report` converts the verified archive into the shared Pareto indicators.
+
+The active baseline set is therefore now NSGA-II plus a compact MOEA/D-DE variant on common ZDT1/DTLZ2 fixtures. Neither implementation has been compiled, run or cross-checked against PlatEMO 4.16 yet. They are reference implementations in development, not evidence that either method converges well or that Symthaea beats it.
+
+The two baseline implementations guard population size at 2,048 for their current quadratic sorting/neighborhood operations. This is an implementation safety limit, not an algorithmic limitation.
