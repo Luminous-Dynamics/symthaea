@@ -1,0 +1,97 @@
+{
+  "schema_version": "1.0.0",
+  "evidence_class": "synthetic_known_answer",
+  "claim_ceiling": "SYNTHETIC_ONLY",
+  "sampling_model": {
+    "fixed_design": true,
+    "conditional_gaussian": true,
+    "homoskedastic": true,
+    "independent_rows": true,
+    "intercept_only": true,
+    "instrument_count": 1,
+    "endogenous_regressor_count": 1,
+    "sample_size": 20,
+    "residual_degrees_of_freedom": 18,
+    "f_critical_95_percent": 4.413873419170566
+  },
+  "data_generating_process": {
+    "structural_effect": 3,
+    "direct_instrument_effect": 0.6,
+    "outcome_noise_pattern": "fixed symmetric known-answer perturbations",
+    "weak_first_stage_slope": 0.05,
+    "strong_first_stage_slope": 2
+  },
+  "known_answers": [
+    {
+      "id": "strong_first_stage_diagnostics",
+      "first_stage_slope": 2,
+      "first_stage_f": 1210.3134479271994,
+      "reduced_form_slope": 6.6,
+      "conventional_wald_ratio": 3.3
+    },
+    {
+      "id": "strong_pAR_bound_covers_direct_effect",
+      "candidate_effect": 3,
+      "direct_effect_rms_bound": 0.35,
+      "implied_direct_effect_coefficient": 0.6,
+      "implied_direct_effect_rms": 0.3459768778401237,
+      "exact_exclusion_ar_f": 253.48235294117637,
+      "profiled_ar_f": 0,
+      "accepted": true
+    },
+    {
+      "id": "strong_pAR_bound_near_direct_effect",
+      "candidate_effect": 3,
+      "direct_effect_rms_bound": 0.31,
+      "implied_direct_effect_rms": 0.3459768778401237,
+      "profiled_ar_f": 2.740946271084397,
+      "f_critical": 4.413873419170566,
+      "accepted": true
+    },
+    {
+      "id": "strong_pAR_tight_bound_rejects",
+      "candidate_effect": 3,
+      "direct_effect_rms_bound": 0.1,
+      "profiled_ar_f": 128.1274399735945,
+      "f_critical": 4.413873419170566,
+      "accepted": false
+    },
+    {
+      "id": "weak_instrument_diagnostics",
+      "first_stage_slope": 0.05,
+      "first_stage_f": 0.7564459049544999,
+      "reduced_form_slope": 0.75,
+      "conventional_wald_ratio": 15
+    },
+    {
+      "id": "weak_first_stage_far_candidate_not_rejected",
+      "candidate_effect": 10,
+      "direct_effect_rms_bound": 0.35,
+      "implied_direct_effect_coefficient": 0.25,
+      "implied_direct_effect_rms": 0.144157032433385,
+      "profiled_ar_f": 0,
+      "accepted": true
+    },
+    {
+      "id": "same_far_candidate_rejected_with_strong_first_stage",
+      "candidate_effect": 10,
+      "direct_effect_rms_bound": 0.35,
+      "profiled_ar_f": 1230.1121547392736,
+      "accepted": false,
+      "note": "Independently recalculated from the exact fixed design and pAR formula; the test asserts rejection and pAR > 1000."
+    },
+    {
+      "id": "zero_relevance_nonidentification",
+      "first_stage_slope": 0,
+      "first_stage_f": 0,
+      "candidate_effects_tested": [
+        3,
+        10
+      ],
+      "direct_effect_rms_bound": 0.35,
+      "both_accepted": true,
+      "interpretation": "The candidate effect is not identified from this instrument when the bounded direct effect can absorb the reduced form."
+    }
+  ],
+  "notes": "All values are synthetic known answers. The critical F value is supplied by the test harness; the crate does not calculate distribution quantiles."
+}
