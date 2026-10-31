@@ -76,6 +76,7 @@ pub struct JepaTelemetry {
     /// Current variance regularization penalty.
     pub variance_penalty: f32,
     /// Pending transitions discarded because no FEP action was bound.
+    #[serde(default)]
     pub dropped_pending_transitions: u64,
 }
 
@@ -490,6 +491,85 @@ mod tests {
             last_loss < initial_loss,
             "loss should decrease after training: initial={initial_loss}, final={last_loss}"
         );
+    }
+
+
+    #[test]
+    fn observed_transition_uses_actual_next_observation_and_action_bound_before_it() {
+        let mut engine = make_engine();
+        let source = random_hv(900);
+        let actual_next = random_hv(901);
+
+        engine.stage_transition_source(&source).unwrap();
+        assert!(engine.condition_pending_transition(3).unwrap());
+        let prediction_before_observation = engine.pending_prediction().unwrap().to_vec();
+        assert_eq!(prediction_before_observation.len(), engine.config.latent_dim);
+        assert_eq!(engine.telemetry().steps, 0);
+        assert!(engine.energy_spent() > 0.0);
+
+        let loss = engine.resolve_pending_transition(&actual_next, 0.001).unwrap().unwrap();
+        assert!(loss.is_finite());
+        assert_eq!(engine.telemetry().steps, 1);
+        assert_eq!(engine.telemetry().dropped_pending_transitions, 0);
+        assert!(engine.pending_prediction().is_none());
+        assert!(engine.resolve_pending_transition(&random_hv(902), 0.001).unwrap().is_none());
+    }
+
+    #[test]
+    fn staged_prediction_is_action_conditioned_before_the_target_is_available() {
+        let source = random_hv(910);
+        let mut action_zero = make_engine();
+        let mut action_one = make_engine();
+
+        action_zero.stage_transition_source(&source).unwrap();
+        action_one.stage_transition_source(&source).unwrap();
+        action_zero.condition_pending_transition(0).unwrap();
+        action_one.condition_pending_transition(1).unwrap();
+
+        let zero_prediction = action_zero.pending_prediction().unwrap();
+        let one_prediction = action_one.pending_prediction().unwrap();
+        assert_ne!(zero_prediction, one_prediction);
+    }
+
+    #[test]
+    fn missing_action_is_counted_as_a_dropped_transition_not_trained() {
+        let mut engine = make_engine();
+        engine.stage_transition_source(&random_hv(920)).unwrap();
+
+        assert!(engine.resolve_pending_transition(&random_hv(921), 0.001).unwrap().is_none());
+        assert_eq!(engine.telemetry().steps, 0);
+        assert_eq!(engine.telemetry().dropped_pending_transitions, 1);
+        engine.stage_transition_source(&random_hv(922)).unwrap();
+    }
+
+    #[test]
+    fn invalid_action_and_target_do_not_consume_a_valid_pending_transition() {
+        let mut engine = make_engine();
+        engine.stage_transition_source(&random_hv(930)).unwrap();
+
+        assert!(engine.condition_pending_transition(8).is_err());
+        assert!(engine.pending_prediction().is_none());
+        engine.condition_pending_transition(2).unwrap();
+
+        let wrong_dim = ContinuousHV::random(HDC_DIMENSION - 1, 931);
+        assert!(engine.resolve_pending_transition(&wrong_dim, 0.001).is_err());
+        assert!(engine.pending_prediction().is_some());
+
+        engine.resolve_pending_transition(&random_hv(932), 0.001).unwrap().unwrap();
+        assert!(engine.pending_prediction().is_none());
+    }
+
+    #[test]
+    fn pending_transition_cannot_be_overwritten_or_reconditioned() {
+        let mut engine = make_engine();
+        let source = random_hv(940);
+        engine.stage_transition_source(&source).unwrap();
+        engine.condition_pending_transition(1).unwrap();
+
+        assert!(engine.stage_transition_source(&random_hv(941)).is_err());
+        assert!(engine.condition_pending_transition(2).is_err());
+        engine.resolve_pending_transition(&random_hv(942), 0.001).unwrap().unwrap();
+        engine.stage_transition_source(&random_hv(943)).unwrap();
     }
 
     #[test]
