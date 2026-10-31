@@ -54,6 +54,12 @@ struct Plan {
     context_assignment_policy_id: String,
     context_assignment_artifact_sha256: String,
     randomizer_source_sha256: String,
+    pmu_metrology_protocol_id: String,
+    pmu_platform_id: String,
+    pmu_workload_id: String,
+    pmu_workload_binary_sha256: String,
+    pmu_acquisition_condition_id: String,
+    pmu_event_ids: BTreeSet<String>,
     windows_per_episode: usize,
     alpha_total: f64,
     contexts: BTreeSet<String>,
@@ -83,6 +89,7 @@ struct Episode {
     source_trace_sha256: String,
     program_binary_sha256: String,
     device_config_id: String,
+    pmu_acquisition_condition_id: String,
     randomizer_u: f64,
     windows: Vec<Window>,
 }
@@ -94,6 +101,20 @@ struct Assignment {
     decision_status: String,
     decision_reason: String,
     selected_context_id: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct PmuQualification {
+    protocol_id: String,
+    platform_id: String,
+    workload_id: String,
+    acquisition_condition_id: String,
+    event_ids: BTreeSet<String>,
+    receipt_sha256: String,
+    plan_sha256: String,
+    observations_sha256: String,
+    matched_block_count: usize,
+    trial_count: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -130,6 +151,9 @@ struct Args {
     plan: PathBuf,
     episodes: PathBuf,
     context_receipt: PathBuf,
+    pmu_plan: PathBuf,
+    pmu_observations: PathBuf,
+    pmu_receipt: PathBuf,
     receipt: PathBuf,
 }
 
@@ -228,6 +252,19 @@ fn parse_plan(value: &Value) -> Result<Plan, String> {
     valid_sha(&score_artifact_sha256, "plan.score_artifact_sha256")?;
     valid_sha(&context_assignment_artifact_sha256, "plan.context_assignment_artifact_sha256")?;
     valid_sha(&randomizer_source_sha256, "plan.randomizer_source_sha256")?;
+    let pmu_metrology_protocol_id = string_field(value, "pmu_metrology_protocol_id", "plan")?.to_owned();
+    let pmu_platform_id = string_field(value, "pmu_platform_id", "plan")?.to_owned();
+    let pmu_workload_id = string_field(value, "pmu_workload_id", "plan")?.to_owned();
+    let pmu_workload_binary_sha256 = string_field(value, "pmu_workload_binary_sha256", "plan")?.to_owned();
+    valid_sha(&pmu_workload_binary_sha256, "plan.pmu_workload_binary_sha256")?;
+    let pmu_acquisition_condition_id = string_field(value, "pmu_acquisition_condition_id", "plan")?.to_owned();
+    if pmu_acquisition_condition_id != "grouped_co_scheduled" {
+        return Err("v1 requires a qualified co-scheduled PMU acquisition condition".to_owned());
+    }
+    let pmu_event_ids = unique_string_set(value, "pmu_event_ids", "plan")?;
+    if pmu_event_ids.is_empty() {
+        return Err("plan.pmu_event_ids must not be empty".to_owned());
+    }
     if score_artifact_sha256 == context_assignment_artifact_sha256
         || score_artifact_sha256 == randomizer_source_sha256
         || context_assignment_artifact_sha256 == randomizer_source_sha256 {
@@ -293,6 +330,12 @@ fn parse_plan(value: &Value) -> Result<Plan, String> {
         context_assignment_policy_id: string_field(value, "context_assignment_policy_id", "plan")?.to_owned(),
         context_assignment_artifact_sha256,
         randomizer_source_sha256,
+        pmu_metrology_protocol_id,
+        pmu_platform_id,
+        pmu_workload_id,
+        pmu_workload_binary_sha256,
+        pmu_acquisition_condition_id,
+        pmu_event_ids,
         windows_per_episode,
         alpha_total,
         contexts,
@@ -315,10 +358,19 @@ fn parse_episodes(value: &Value, plan: &Plan) -> Result<Vec<Episode>, String> {
         ("context_assignment_policy_id", plan.context_assignment_policy_id.as_str()),
         ("context_assignment_artifact_sha256", plan.context_assignment_artifact_sha256.as_str()),
         ("randomizer_source_sha256", plan.randomizer_source_sha256.as_str()),
+        ("pmu_metrology_protocol_id", plan.pmu_metrology_protocol_id.as_str()),
+        ("pmu_platform_id", plan.pmu_platform_id.as_str()),
+        ("pmu_workload_id", plan.pmu_workload_id.as_str()),
+        ("pmu_workload_binary_sha256", plan.pmu_workload_binary_sha256.as_str()),
+        ("pmu_acquisition_condition_id", plan.pmu_acquisition_condition_id.as_str()),
     ] {
         if string_field(value, field, "episodes")? != expected {
             return Err(format!("episodes.{field} does not match the preregistered plan"));
         }
+    }
+    let episode_event_ids = unique_string_set(value, "pmu_event_ids", "episodes")?;
+    if episode_event_ids != plan.pmu_event_ids {
+        return Err("episodes.pmu_event_ids do not match the PMU metrology plan".to_owned());
     }
     let records = value.get("records").and_then(Value::as_array)
         .ok_or("episodes.records must be an array")?;
@@ -362,6 +414,16 @@ fn parse_episodes(value: &Value, plan: &Plan) -> Result<Vec<Episode>, String> {
         let program_binary_sha256 = string_field(item, "program_binary_sha256", &context)?.to_owned();
         valid_sha(&program_binary_sha256, &format!("{context}.program_binary_sha256"))?;
         let device_config_id = string_field(item, "device_config_id", &context)?.to_owned();
+        if device_config_id != plan.pmu_platform_id {
+            return Err(format!("{context}.device_config_id does not match the PMU-qualified platform"));
+        }
+        if program_binary_sha256 != plan.pmu_workload_binary_sha256 {
+            return Err(format!("{context}.program_binary_sha256 does not match the PMU-qualified workload binary"));
+        }
+        let pmu_acquisition_condition_id = string_field(item, "pmu_acquisition_condition_id", &context)?.to_owned();
+        if pmu_acquisition_condition_id != plan.pmu_acquisition_condition_id {
+            return Err(format!("{context}.pmu_acquisition_condition_id does not match the PMU-qualified co-scheduled condition"));
+        }
         let randomizer_u = number_field(item, "randomizer_u", &context)?;
         if !(0.0..1.0).contains(&randomizer_u) {
             return Err(format!("{context}.randomizer_u must be strictly between zero and one"));
@@ -441,6 +503,7 @@ fn parse_episodes(value: &Value, plan: &Plan) -> Result<Vec<Episode>, String> {
             source_trace_sha256,
             program_binary_sha256,
             device_config_id,
+            pmu_acquisition_condition_id,
             randomizer_u,
             windows,
         });
