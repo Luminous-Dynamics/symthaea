@@ -14,6 +14,8 @@ pub mod digest;
 pub mod dms;
 pub mod evidence;
 pub mod fast_event;
+pub mod gradient_oracle;
+pub mod chain_oracle;
 pub mod irregular;
 pub mod knowledge_stream;
 pub mod phase;
