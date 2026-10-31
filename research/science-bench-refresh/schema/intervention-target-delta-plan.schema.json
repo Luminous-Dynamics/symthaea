@@ -92,6 +92,8 @@
       "required": [
         "candidate_id",
         "target_identity_sha256",
+        "baseline_artifact_sha256",
+        "variant_artifact_sha256",
         "baseline_target_state_sha256",
         "variant_target_state_sha256",
         "expected_target_change",
@@ -131,6 +133,12 @@
           "items": {
             "$ref": "#/$defs/digest"
           }
+        },
+        "baseline_artifact_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "variant_artifact_sha256": {
+          "$ref": "#/$defs/digest"
         }
       }
     }
@@ -178,6 +186,16 @@
                   }
                 },
                 "variant_target_state_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "baseline_artifact_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "variant_artifact_sha256": {
                   "not": {
                     "pattern": "^0{64}$"
                   }
