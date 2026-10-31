@@ -40,6 +40,41 @@ pub struct SimultaneousMetrics {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum JointDrawCoupling {
+    SharedPosteriorAndWorldNoise,
+    PairedExogenousDisturbance,
+    DeterministicSharedLatent,
+}
+
+/// All action outcomes predicted from one exact observed history and one
+/// shared joint-draw bank. The sample matrix is [action][joint_draw]; column
+/// j must denote the same posterior/latent/disturbance draw for every action.
+#[derive(Clone, Debug, PartialEq)]
+pub struct JointActionSetSamples {
+    pub history_sha256: String,
+    pub horizon_steps: usize,
+    pub action_ids: Vec<u64>,
+    pub joint_draw_ids: Vec<u64>,
+    pub joint_draw_bank_sha256: String,
+    pub coupling: JointDrawCoupling,
+    pub outcome_samples: Vec<Vec<f64>>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ActionPredictionInterval {
+    pub action_id: u64,
+    pub interval: PredictiveInterval,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ActionEffectInterval {
+    pub left_action_id: u64,
+    pub right_action_id: u64,
+    pub paired_draw_count: usize,
+    pub interval: PredictiveInterval,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IntervalError {
     InvalidNominalCoverage,
     NonFiniteLowerBound,
@@ -57,6 +92,14 @@ pub enum IntervalError {
     UnequalActionSetCardinality,
     InsufficientActions,
     InvalidSelectedIndex,
+    InvalidHorizon,
+    InvalidHistoryDigest,
+    InvalidJointDrawDigest,
+    InsufficientJointDraws,
+    DuplicateActionId,
+    DuplicateJointDrawId,
+    ActionSampleCardinalityMismatch,
+    SameActionRequested,
 }
 
 /// Construct a central empirical interval from predictive samples.
@@ -128,6 +171,130 @@ pub fn paired_effect_interval(
         paired_differences.push(difference);
     }
     central_interval(&paired_differences, nominal_coverage)
+}
+
+
+/// Validate the shape and provenance bindings of one same-history action bank.
+///
+/// This checks that an adapter supplies a shared draw axis. It cannot prove
+/// that the producer honestly generated the values using the declared
+/// coupling; the source/recorder and draw-bank bytes must be independently
+/// retained and verified by the adapter's evidence layer.
+pub fn validate_joint_action_set(
+    bank: &JointActionSetSamples,
+) -> Result<(), IntervalError> {
+    if bank.horizon_steps == 0 {
+        return Err(IntervalError::InvalidHorizon);
+    }
+    if !is_lower_hex_sha256(&bank.history_sha256) {
+        return Err(IntervalError::InvalidHistoryDigest);
+    }
+    if !is_lower_hex_sha256(&bank.joint_draw_bank_sha256) {
+        return Err(IntervalError::InvalidJointDrawDigest);
+    }
+    if bank.action_ids.len() < 2 || bank.outcome_samples.len() != bank.action_ids.len() {
+        return Err(IntervalError::UnequalActionSetCardinality);
+    }
+    if bank.joint_draw_ids.len() < 2 {
+        return Err(IntervalError::InsufficientJointDraws);
+    }
+
+    let mut action_ids = bank.action_ids.clone();
+    action_ids.sort_unstable();
+    if action_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(IntervalError::DuplicateActionId);
+    }
+
+    let mut draw_ids = bank.joint_draw_ids.clone();
+    draw_ids.sort_unstable();
+    if draw_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(IntervalError::DuplicateJointDrawId);
+    }
+
+    for samples in &bank.outcome_samples {
+        if samples.len() != bank.joint_draw_ids.len() {
+            return Err(IntervalError::ActionSampleCardinalityMismatch);
+        }
+        if samples.iter().any(|sample| !sample.is_finite()) {
+            return Err(IntervalError::NonFiniteDerivedMetric);
+        }
+    }
+    Ok(())
+}
+
+fn is_lower_hex_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+/// Produce a predictive interval for each action in the original action-id
+/// order. Every interval is derived from the same declared joint draw bank.
+pub fn joint_action_prediction_intervals(
+    bank: &JointActionSetSamples,
+    nominal_coverage: f64,
+) -> Result<Vec<ActionPredictionInterval>, IntervalError> {
+    validate_joint_action_set(bank)?;
+    validate_nominal_coverage(nominal_coverage)?;
+    bank.action_ids
+        .iter()
+        .copied()
+        .zip(&bank.outcome_samples)
+        .map(|(action_id, samples)| {
+            Ok(ActionPredictionInterval {
+                action_id,
+                interval: central_interval(samples, nominal_coverage)?,
+            })
+        })
+        .collect()
+}
+
+/// Construct the paired effect distribution for two action identities from
+/// the shared draw axis. Action order is semantic by ID, not row position.
+pub fn joint_action_effect_interval(
+    bank: &JointActionSetSamples,
+    left_action_id: u64,
+    right_action_id: u64,
+    nominal_coverage: f64,
+) -> Result<ActionEffectInterval, IntervalError> {
+    validate_joint_action_set(bank)?;
+    if left_action_id == right_action_id {
+        return Err(IntervalError::SameActionRequested);
+    }
+    let left_index = bank.action_ids.iter().position(|id| *id == left_action_id)
+        .ok_or(IntervalError::InvalidSelectedIndex)?;
+    let right_index = bank.action_ids.iter().position(|id| *id == right_action_id)
+        .ok_or(IntervalError::InvalidSelectedIndex)?;
+    let interval = paired_effect_interval(
+        &bank.outcome_samples[left_index],
+        &bank.outcome_samples[right_index],
+        nominal_coverage,
+    )?;
+    Ok(ActionEffectInterval {
+        left_action_id,
+        right_action_id,
+        paired_draw_count: bank.joint_draw_ids.len(),
+        interval,
+    })
+}
+
+/// Calculate all unordered action-pair effect intervals, in lexicographic
+/// action-id order, independent of the input action-row order.
+pub fn all_joint_action_effect_intervals(
+    bank: &JointActionSetSamples,
+    nominal_coverage: f64,
+) -> Result<Vec<ActionEffectInterval>, IntervalError> {
+    validate_joint_action_set(bank)?;
+    let mut ids = bank.action_ids.clone();
+    ids.sort_unstable();
+    let mut effects = Vec::with_capacity(ids.len() * (ids.len() - 1) / 2);
+    for left in 0..ids.len() {
+        for right in (left + 1)..ids.len() {
+            effects.push(joint_action_effect_interval(
+                bank, ids[left], ids[right], nominal_coverage
+            )?);
+        }
+    }
+    Ok(effects)
 }
 
 /// Measure marginal interval coverage, sharpness and the proper interval score.
@@ -338,6 +505,98 @@ fn linear_quantile(sorted: &[f64], probability: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+
+    fn joint_bank_fixture() -> JointActionSetSamples {
+        JointActionSetSamples {
+            history_sha256: "a".repeat(64),
+            horizon_steps: 5,
+            action_ids: vec![17, 3, 9],
+            joint_draw_ids: vec![100, 101, 102, 103, 104],
+            joint_draw_bank_sha256: "b".repeat(64),
+            coupling: JointDrawCoupling::SharedPosteriorAndWorldNoise,
+            outcome_samples: vec![
+                vec![100.0, 110.0, 120.0, 130.0, 140.0],
+                vec![99.0, 109.0, 119.0, 129.0, 139.0],
+                vec![97.0, 107.0, 117.0, 127.0, 137.0],
+            ],
+        }
+    }
+
+    #[test]
+    fn joint_action_bank_preserves_common_mode_effect_cancellation() {
+        let bank = joint_bank_fixture();
+        validate_joint_action_set(&bank).unwrap();
+        let effect = joint_action_effect_interval(&bank, 17, 3, 0.8).unwrap();
+        assert_eq!(effect.left_action_id, 17);
+        assert_eq!(effect.right_action_id, 3);
+        assert_eq!(effect.paired_draw_count, 5);
+        assert!((effect.interval.lower - 1.0).abs() < 1e-12);
+        assert!((effect.interval.upper - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn joint_action_effects_are_invariant_to_action_row_permutation() {
+        let original = joint_bank_fixture();
+        let original_effect = joint_action_effect_interval(&original, 17, 9, 0.8).unwrap();
+        let permuted = JointActionSetSamples {
+            action_ids: vec![9, 17, 3],
+            outcome_samples: vec![
+                original.outcome_samples[2].clone(),
+                original.outcome_samples[0].clone(),
+                original.outcome_samples[1].clone(),
+            ],
+            ..original.clone()
+        };
+        let permuted_effect = joint_action_effect_interval(&permuted, 17, 9, 0.8).unwrap();
+        assert_eq!(original_effect, permuted_effect);
+        let all = all_joint_action_effect_intervals(&permuted, 0.8).unwrap();
+        assert_eq!(
+            all.iter().map(|effect| (effect.left_action_id, effect.right_action_id)).collect::<Vec<_>>(),
+            vec![(3, 9), (3, 17), (9, 17)]
+        );
+    }
+
+    #[test]
+    fn joint_action_bank_rejects_duplicate_ids_and_bad_cardinality() {
+        let mut bank = joint_bank_fixture();
+        bank.action_ids[1] = bank.action_ids[0];
+        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::DuplicateActionId));
+
+        let mut bank = joint_bank_fixture();
+        bank.joint_draw_ids[1] = bank.joint_draw_ids[0];
+        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::DuplicateJointDrawId));
+
+        let mut bank = joint_bank_fixture();
+        bank.outcome_samples[1].pop();
+        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::ActionSampleCardinalityMismatch));
+    }
+
+    #[test]
+    fn joint_action_bank_rejects_missing_or_invalid_provenance_and_horizon() {
+        let mut bank = joint_bank_fixture();
+        bank.history_sha256 = "not-a-digest".into();
+        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::InvalidHistoryDigest));
+
+        let mut bank = joint_bank_fixture();
+        bank.joint_draw_bank_sha256 = "B".repeat(64);
+        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::InvalidJointDrawDigest));
+
+        let mut bank = joint_bank_fixture();
+        bank.horizon_steps = 0;
+        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::InvalidHorizon));
+    }
+
+    #[test]
+    fn joint_action_bank_rejects_nonfinite_draws_and_same_action_effect() {
+        let mut bank = joint_bank_fixture();
+        bank.outcome_samples[0][0] = f64::NAN;
+        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::NonFiniteDerivedMetric));
+
+        let bank = joint_bank_fixture();
+        assert_eq!(joint_action_effect_interval(&bank, 17, 17, 0.8), Err(IntervalError::SameActionRequested));
+        assert_eq!(joint_action_effect_interval(&bank, 17, 999, 0.8), Err(IntervalError::InvalidSelectedIndex));
+    }
 
     fn interval(lower: f64, upper: f64, nominal_coverage: f64) -> PredictiveInterval {
         PredictiveInterval {
