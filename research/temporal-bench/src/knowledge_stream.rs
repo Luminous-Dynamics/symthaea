@@ -794,8 +794,8 @@ mod tests {
     fn query_knowledge_time_never_exceeds_issue_time() {
         let (task, _) = generate_knowledge_stream(config()).unwrap();
         for event in &task.events {
-            if let KnowledgeEventKind::Query { known_at, .. } = event.kind {
-                assert!(known_at <= event.observed_at);
+            if let KnowledgeEventKind::Query { known_at, .. } = &event.kind {
+                assert!(*known_at <= event.observed_at);
             }
         }
     }
