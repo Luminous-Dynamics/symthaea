@@ -414,6 +414,8 @@ pub enum MemoryTopologyError {
     RouteEndpointMismatch,
     /// A route requiring an acyclic path revisits a region.
     MemoryRouteCycle,
+    /// A scenario identifier is duplicated.
+    DuplicateMemoryScenario,
     /// Topology does not bind to the exact observation.
     ObservationMismatch,
     /// Topology does not bind to the exact architecture.
@@ -512,6 +514,10 @@ pub fn validate_memory_topology(
         || topology.scenarios.is_empty()
     {
         return Err(MemoryTopologyError::EmptyCollection);
+    }
+    let mut scenarios = HashSet::new();
+    if topology.scenarios.iter().any(|scenario| !scenarios.insert(*scenario)) {
+        return Err(MemoryTopologyError::DuplicateMemoryScenario);
     }
 
     let mut region_ids = HashSet::new();
@@ -991,6 +997,16 @@ mod tests {
     #[test]
     fn validates_well_formed_memory_topology() {
         assert_eq!(validate_memory_topology(&base_topology()), Ok(()));
+    }
+
+    #[test]
+    fn rejects_duplicate_scenarios() {
+        let mut topology = base_topology();
+        topology.scenarios.push(MemoryTopologyScenario::ColdStart);
+        assert_eq!(
+            validate_memory_topology(&topology),
+            Err(MemoryTopologyError::DuplicateMemoryScenario)
+        );
     }
 
     #[test]
