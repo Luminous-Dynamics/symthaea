@@ -9,6 +9,12 @@
     "experiment_id",
     "replicate_id",
     "design_sha256",
+    "training_stage",
+    "exposure_mechanism",
+    "model_base_checkpoint_sha256",
+    "shared_training_corpus_sha256",
+    "shared_training_token_count",
+    "total_training_token_budget",
     "randomization_seed_commitment_sha256",
     "assignment_sha256",
     "exposed_cluster_count",
@@ -104,6 +110,39 @@
     "claim_boundary": {
       "type": "string",
       "minLength": 1
+    },
+    "training_stage": {
+      "type": "string",
+      "enum": [
+        "continued_pretraining",
+        "instruction_sft",
+        "answer_augmented_sft",
+        "preference_optimization"
+      ]
+    },
+    "exposure_mechanism": {
+      "type": "string",
+      "enum": [
+        "exact_instance",
+        "syntactic_variant",
+        "semantic_variant",
+        "shared_task_recipe",
+        "answer_only"
+      ]
+    },
+    "model_base_checkpoint_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "shared_training_corpus_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "shared_training_token_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "total_training_token_budget": {
+      "type": "integer",
+      "minimum": 1
     }
   },
   "$defs": {
