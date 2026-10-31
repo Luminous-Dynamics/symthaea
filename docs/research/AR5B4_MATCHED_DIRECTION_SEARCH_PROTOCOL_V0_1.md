@@ -21,18 +21,19 @@ This decomposes the research lifecycle into separate failure surfaces. A high pr
 
 ## 2. What the current implementation does — and does not — establish
 
-The current sequential direction campaign now has eight deterministic payoff families:
+The current sequential direction campaign now has eight deterministic payoff families plus one seeded stochastic family:
 
 - delayed breakthrough;
 - no-new-direction null;
 - new-operator breakthrough;
 - rank reversal;
 - deceptive proxy (a high initial score collapses while a slower arm ends higher);
-- heteroscedastic reward profiles (a high-variance arm versus stable alternatives);
+- deterministic heteroscedastic reward profiles;
 - correlated directions (near-parallel payoff profiles for two initial arms);
-- strict null/no-breakthrough (equal outcomes and no beneficial NEW direction).
+- strict null/no-breakthrough (equal outcomes and no beneficial NEW direction);
+- seeded stochastic heteroscedastic rewards.
 
-These are controlled deterministic surfaces, not evidence of stochastic real-world noise. The heteroscedastic family tests reward-variance sensitivity under a fixed schedule; seed-varying stochastic disturbances, multi-objective trade-offs, heterogeneous execution costs, semantic alias injection and verifier-label corruption remain separate planned controls rather than being implied by the eight current scalar families.
+The stochastic generator keys each potential observation by campaign seed, direction ID and within-direction evaluation index, so all policies see the same realized potential reward for the same arm/seed/index regardless of action ordering. Expected arm means remain evaluator-side metadata; only noisy observations are exposed to policies. Simple regret is computed against the best expected score among tested candidates, not the luckiest realized sample. The deterministic high-variance fixture remains a separate variance-pattern control. Multi-objective trade-offs, heterogeneous execution costs, semantic alias injection and verifier-label corruption remain separate planned controls.
 
 Before policy-controlled actions, all policies receive the same three initial direction evaluations (A, B, C). Each subsequent action is either one direction evaluation or one NEW-direction proposal. Each action costs one synthetic unit. The verifier is currently a deterministic fixture that owns the payoff schedule and admits the one configured new operator direction.
 
@@ -151,16 +152,15 @@ MAP-Elites is relevant only when behavior descriptors have a defensible interpre
 
 ## 6. Landscape design
 
-The executable scalar suite currently has eight deterministic payoff families (listed in Section 2). Before confirmatory claims, extend it with separately versioned controls for:
+The executable scalar suite currently has nine payoff families (eight deterministic plus one seeded stochastic; listed in Section 2). Before confirmatory claims, extend it with separately versioned controls for:
 
-1. seed-varying heteroscedastic noise, with the realization key frozen independently of policy selection;
-2. multi-objective quality/robustness/resource trade-offs, scored as vectors with hypervolume/reference-point sensitivity;
-3. heterogeneous candidate execution costs, hard caps, retries and explicitly unknown resource estimates;
-4. duplicate semantic aliases and verifier-label disagreement/error injection;
-5. a sealed no-new-opportunity null and a verifier-corruption negative control;
-6. held-out grammar expansion and cross-family transfer.
+1. multi-objective quality/robustness/resource trade-offs, scored as vectors with hypervolume/reference-point sensitivity;
+2. heterogeneous candidate execution costs, hard caps, retries and explicitly unknown resource estimates;
+3. duplicate semantic aliases and verifier-label disagreement/error injection;
+4. a sealed no-new-opportunity null and a verifier-corruption negative control;
+5. held-out grammar expansion and cross-family transfer.
 
-Do not label the current deterministic high-variance payoff fixture as stochastic noise, or the scalar benchmark as multi-objective.
+The seeded stochastic family is a synthetic noise control, not real experimental telemetry. Do not label the scalar benchmark as multi-objective.
 
 The six-family criterion is a floor, not a sample-size guarantee. The inference implementation now has explicit tiers: Pilot requires at least six independent landscape clusters and four paired seeds per landscape; Confirmatory requires at least 100 independent landscape clusters and four paired seeds per landscape. The 100-landscape floor is an initial protocol minimum, not a power guarantee. Set final sample size using pilot variance, a predeclared minimum practical effect and multiplicity control. Seeds generated from the same payoff template are not independent landscapes; uncertainty must be clustered at the independent landscape/template level.
 
@@ -178,7 +178,7 @@ Use fixed total charged resource, not evaluation count alone, as the primary den
 ### Primary endpoints
 
 - held-out verified score / objective at fixed charged budget;
-- simple regret against a declared feasible optimum or lower bound;
+- simple regret against a declared feasible optimum or lower bound (for stochastic surfaces, use expected reward, not the maximum lucky observation);
 - probability of hitting a predeclared target before budget exhaustion;
 - charged resources to first verified improvement and to target;
 - worst-family performance and transfer retention.
