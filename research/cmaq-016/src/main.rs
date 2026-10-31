@@ -219,7 +219,7 @@ fn optimize(
     let predicted = match policy {
         Policy::DirectPolicy => actual,
         Policy::Oracle => actual,
-        _ => mean_model_prediction(scenario, action, episode_seed),
+        _ => reference_model_prediction(scenario, action, episode_seed),
     };
 
     EpisodeResult {
@@ -289,7 +289,7 @@ fn uniform_grid_prediction_mse(scenario: Scenario, seed: u64) -> f64 {
     (0..points)
         .map(|index| {
             let action = -1.0 + 2.0 * index as f64 / (points - 1) as f64;
-            let residual = mean_model_prediction(scenario, action, seed) - true_return(action);
+            let residual = reference_model_prediction(scenario, action, seed) - true_return(action);
             residual * residual
         })
         .sum::<f64>()
@@ -427,7 +427,7 @@ mod tests {
 
     #[test]
     fn pessimistic_minimum_suppresses_a_single_head_pocket() {
-        let optimistic = mean_model_prediction(
+        let optimistic = reference_model_prediction(
             Scenario::NarrowOptimismPocket,
             POCKET_CENTER,
             BASE_SEED,
