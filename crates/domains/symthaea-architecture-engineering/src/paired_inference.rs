@@ -250,8 +250,8 @@ pub fn analyze_paired_metric(
             ));
         }
 
-        let mut sum_delta = 0.0;
-        for (seed, policy_values) in seed_cells {
+        let mut landscape_mean = 0.0;
+        for (seed_index, (seed, policy_values)) in seed_cells.iter().enumerate() {
             if policy_values.len() != 2
                 || !policy_values.contains_key(&plan.baseline_policy_id)
                 || !policy_values.contains_key(&plan.challenger_policy_id)
@@ -293,7 +293,7 @@ pub fn analyze_paired_metric(
 
     // Sorting makes the analysis receipt invariant to caller observation order.
     landscape_deltas.sort_by(|left, right| left.landscape_id.cmp(&right.landscape_id));
-    let mut cluster_values: Vec<f64> = landscape_deltas
+    let cluster_values: Vec<f64> = landscape_deltas
         .iter()
         .map(|delta| delta.challenger_advantage)
         .collect();
@@ -556,7 +556,7 @@ fn paired_sign_flip_p_value(
             let mut randomized_mean = 0.0;
             for (index, value) in values.iter().enumerate() {
                 let count = (index + 1) as f64;
-                let signed = if (mask & (1u64 << index)) == 0 {
+                let signed = if (*mask & (1u64 << index)) == 0 {
                     -*value
                 } else {
                     *value
