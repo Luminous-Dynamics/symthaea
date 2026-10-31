@@ -543,6 +543,22 @@
           "historical_as_known_preservation_rate"
         ],
         "scorer": "score_knowledge_predictions in research/temporal-bench/src/knowledge_stream.rs"
+      },
+      "proposed_extensions": {
+        "temporal_error_debt": {
+          "tracking_issue": 9492,
+          "status": "specified_not_implemented",
+          "required_query_stream": "Repeated predictions for the same valid_at coordinate at every evidence/update checkpoint.",
+          "measures": [
+            "wrong_belief_exposure_time",
+            "abstention_exposure_time",
+            "missing_prediction_exposure_time",
+            "time_to_first_correct_state_after_correction",
+            "time_to_first_no_fact_after_retraction",
+            "area_under_per_chunk_error_curve"
+          ],
+          "boundary": "Not part of current T10 v0.1 scores or official OAKS scores; source timestamps required for seconds, otherwise use chunk-time units."
+        }
       }
     }
   ],
@@ -656,7 +672,11 @@
     "phase_prediction_coverage_against_full_stream",
     "missing_phase_prediction_count",
     "affine_time_dilation_normalized_phase_error",
-    "affine_time_dilation_physical_crossing_time_error"
+    "affine_time_dilation_physical_crossing_time_error",
+    "temporal_error_debt_wrong_belief_exposure_time",
+    "temporal_error_debt_abstention_exposure_time",
+    "temporal_error_debt_missing_prediction_exposure_time",
+    "temporal_error_debt_area_under_error_curve"
   ],
   "statistical_design": {
     "pilot_paired_seeds_min": 10,
@@ -692,7 +712,8 @@
     "historical_as_known_answers_survive_later_corrections_and_retractions",
     "official_oaks_evaluation_reproduced_only_under_compatible_license_and_pinned_manifest",
     "phase_predictions_are_scored_against_the_full_public_stream_denominator",
-    "affine_time_dilation_preserves_normalized_phase_and_signal_and_scales_physical_times_exactly"
+    "affine_time_dilation_preserves_normalized_phase_and_signal_and_scales_physical_times_exactly",
+    "temporal_error_debt_separates_wrong_belief_abstention_and_missing_exposure"
   ],
   "claim_ceiling": "Results apply only to declared workloads, splits, implementations, and hardware. They do not establish consciousness, general intelligence, universal superiority, or neuromorphic efficiency when measured only on conventional CPU/GPU.",
   "baseline_registry": {
