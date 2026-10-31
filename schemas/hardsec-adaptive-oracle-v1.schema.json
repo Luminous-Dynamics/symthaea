@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/hardsec-adaptive-oracle-v1.schema.json",
+  "title": "HARDSEC adaptive campaign outcome oracle v1",
+  "description": "Evaluator-controlled independent truth. Must not be supplied to detector or explainer.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-adaptive-oracle-v1"
+    },
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "class",
+          "attack_effect",
+          "outcome_evidence_sha256"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "class": {
+            "enum": [
+              "malicious",
+              "benign"
+            ]
+          },
+          "attack_effect": {
+            "enum": [
+              "observed",
+              "not_observed",
+              "unknown",
+              "not_applicable"
+            ]
+          },
+          "outcome_evidence_sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "class": {
+                  "const": "benign"
+                }
+              },
+              "required": [
+                "class"
+              ]
+            },
+            "then": {
+              "properties": {
+                "attack_effect": {
+                  "const": "not_applicable"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "class": {
+                  "const": "malicious"
+                }
+              },
+              "required": [
+                "class"
+              ]
+            },
+            "then": {
+              "properties": {
+                "attack_effect": {
+                  "enum": [
+                    "observed",
+                    "not_observed",
+                    "unknown"
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "$comment": "Truth labels are evaluator-side and are not exposed to the subject detector. Hash binding does not itself authenticate an outcome oracle."
+}
