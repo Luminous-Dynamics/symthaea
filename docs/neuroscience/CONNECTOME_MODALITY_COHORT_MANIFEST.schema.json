@@ -18,15 +18,39 @@
     "scope_note"
   ],
   "properties": {
-    "schema_version": { "const": 1 },
-    "dataset_id": { "const": "jeffbbrown2/ConnectomeBench2" },
-    "dataset_revision": { "const": "v2" },
-    "dataset_revision_commit_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-    "pinned_upstream_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-    "source_sidecar_jsonl_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "eligibility_policy_version": { "const": "connectomebench2-v2-modality-cohorts-v1" },
-    "cohort_set_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "scope_note": { "type": "string", "minLength": 1 },
+    "schema_version": {
+      "const": 1
+    },
+    "dataset_id": {
+      "const": "jeffbbrown2/ConnectomeBench2"
+    },
+    "dataset_revision": {
+      "const": "v2"
+    },
+    "dataset_revision_commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "pinned_upstream_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "source_sidecar_jsonl_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "eligibility_policy_version": {
+      "const": "connectomebench2-v2-modality-cohorts-v1"
+    },
+    "cohort_set_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "scope_note": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Task-specific paired cohorts require dual geometry for false_split_correction and single geometry for false_merge_identification/split_mask_generation. The schema describes membership shape; Rust audit tests verify paired ID equality. It does not verify Parquet payload bytes or task-specific pixel transformations."
+    },
     "cohorts": {
       "type": "object",
       "additionalProperties": false,
@@ -38,16 +62,32 @@
         "paired_geometry_only",
         "paired_em_legal_views",
         "geometry_without_legal_em",
-        "em_best_only_excluded"
+        "em_best_only_excluded",
+        "paired_false_split_correction_geometry_only",
+        "paired_false_split_correction_em_legal_views",
+        "paired_false_merge_identification_geometry_only",
+        "paired_false_merge_identification_em_legal_views",
+        "paired_split_mask_generation_geometry_only",
+        "paired_split_mask_generation_em_legal_views"
       ],
       "properties": {
-        "geometry_all": { "$ref": "#/$defs/cohort" },
-        "em_legal_any_view": { "$ref": "#/$defs/cohort" },
-        "em_legal_full_triplet": { "$ref": "#/$defs/cohort" },
-        "fused_geometry_legal_em": { "$ref": "#/$defs/cohort" },
+        "geometry_all": {
+          "$ref": "#/$defs/cohort"
+        },
+        "em_legal_any_view": {
+          "$ref": "#/$defs/cohort"
+        },
+        "em_legal_full_triplet": {
+          "$ref": "#/$defs/cohort"
+        },
+        "fused_geometry_legal_em": {
+          "$ref": "#/$defs/cohort"
+        },
         "paired_geometry_only": {
           "allOf": [
-            { "$ref": "#/$defs/cohort" },
+            {
+              "$ref": "#/$defs/cohort"
+            },
             {
               "description": "Must contain exactly the same sorted sample_ids as fused_geometry_legal_em."
             }
@@ -55,14 +95,80 @@
         },
         "paired_em_legal_views": {
           "allOf": [
-            { "$ref": "#/$defs/cohort" },
+            {
+              "$ref": "#/$defs/cohort"
+            },
             {
               "description": "Must contain exactly the same sorted sample_ids as fused_geometry_legal_em."
             }
           ]
         },
-        "geometry_without_legal_em": { "$ref": "#/$defs/cohort" },
-        "em_best_only_excluded": { "$ref": "#/$defs/cohort" }
+        "geometry_without_legal_em": {
+          "$ref": "#/$defs/cohort"
+        },
+        "em_best_only_excluded": {
+          "$ref": "#/$defs/cohort"
+        },
+        "paired_false_split_correction_geometry_only": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/cohort"
+            },
+            {
+              "description": "Task-specific geometry cohort. Its paired legal-EM cohort must have exactly the same sorted sample_ids."
+            }
+          ]
+        },
+        "paired_false_split_correction_em_legal_views": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/cohort"
+            },
+            {
+              "description": "Must contain exactly the same sorted sample_ids as its task-specific geometry-only cohort."
+            }
+          ]
+        },
+        "paired_false_merge_identification_geometry_only": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/cohort"
+            },
+            {
+              "description": "Task-specific geometry cohort. Its paired legal-EM cohort must have exactly the same sorted sample_ids."
+            }
+          ]
+        },
+        "paired_false_merge_identification_em_legal_views": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/cohort"
+            },
+            {
+              "description": "Must contain exactly the same sorted sample_ids as its task-specific geometry-only cohort."
+            }
+          ]
+        },
+        "paired_split_mask_generation_geometry_only": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/cohort"
+            },
+            {
+              "description": "Task-specific geometry cohort. Its paired legal-EM cohort must have exactly the same sorted sample_ids."
+            }
+          ]
+        },
+        "paired_split_mask_generation_em_legal_views": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/cohort"
+            },
+            {
+              "description": "Must contain exactly the same sorted sample_ids as its task-specific geometry-only cohort."
+            }
+          ]
+        }
       }
     }
   },
@@ -79,16 +185,31 @@
       ],
       "properties": {
         "membership_status": {
-          "enum": ["ELIGIBLE", "NOT_ESTIMABLE"],
+          "enum": [
+            "ELIGIBLE",
+            "NOT_ESTIMABLE"
+          ],
           "description": "Empty cohorts are NOT_ESTIMABLE; they are not silently interpreted as zero prevalence or zero coverage."
         },
-        "eligibility_rule": { "type": "string", "minLength": 1 },
-        "sample_count": { "type": "integer", "minimum": 0 },
-        "sample_ids_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "eligibility_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sample_ids_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
         "sample_ids": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^[0-9a-f]{32}$" }
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{32}$"
+          }
         }
       }
     }
