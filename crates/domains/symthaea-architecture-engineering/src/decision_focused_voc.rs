@@ -644,6 +644,14 @@ fn validate_action(
             "action likelihoods must bind to the exact source, posterior and likelihood-model digests",
         ));
     }
+    if action.kind == VoCActionKind::SentinelAudit
+        && action.current_fidelity_index.is_none()
+    {
+        return Err(DecisionFocusedVoCError::new(
+            format!("actions[{index}].current_fidelity_index"),
+            "sentinel audits must inspect a cohort discarded from a prior fidelity",
+        ));
+    }
     match (action.kind, action.candidate_id.as_deref()) {
         (VoCActionKind::FidelityQuery | VoCActionKind::DormantReactivation, Some(candidate_id))
             if posterior.candidate_ids.iter().any(|known| known == candidate_id) => {}
