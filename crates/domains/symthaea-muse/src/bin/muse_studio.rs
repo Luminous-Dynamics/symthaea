@@ -4432,6 +4432,7 @@ fn plan_kind_str(plan: &GrammarPlanEvidence) -> &'static str {
         GrammarPlanEvidence::ProgSuite(_) => "prog_suite",
         GrammarPlanEvidence::Sonata(_) => "sonata",
         GrammarPlanEvidence::Renaissance(_) => "renaissance",
+        GrammarPlanEvidence::Opera(_) => "opera",
         GrammarPlanEvidence::Compatibility { .. } => "compatibility",
     }
 }
