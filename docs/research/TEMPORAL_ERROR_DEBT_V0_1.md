@@ -48,15 +48,15 @@ The prediction at a checkpoint is treated as constant over that exposure window.
 
 ## 4. Exposure definitions
 
-Let (y^*(v,t)) be the evaluator-resolved answer and (\hat{y}_i) the candidate state for interval (i) of duration (\Delta t_i).
+Let expected(v, t_i) be the evaluator-resolved answer and prediction_i be the candidate state for interval i with duration delta_t_i.
 
-[
-TED_{wrong} = \sum_i \Delta t_i\;\mathbf{1}[\hat{y}_i \not\equiv y^*(v,t_i)]
-]
+```text
+TED_wrong = sum_i delta_t_i * indicator(prediction_i != expected(v, t_i))
+```
 
-where the equivalence relation is:
-- `Value(x)` is correct iff (y^*=x);
-- `NoFact` is correct iff (y^*=\varnothing);
+where:
+- Value(x) is correct iff expected(v, t_i) equals x;
+- NoFact is correct iff expected(v, t_i) is empty;
 - `Abstain` is never counted as a correct substantive answer;
 - missing is represented by no prediction record.
 
@@ -83,16 +83,16 @@ With four distractors and interval step 16, the T10 generator yields:
 - retraction observed at knowledge time 96;
 - retraction valid from time 48.
 
-For a query at valid time 49, use contiguous windows ([0,80), [80,88), [88,96), [96,106)).
+For a query at valid time 49, use contiguous windows [0,80), [80,88), [88,96), [96,106).
 
 An event-aligned candidate emits:
-- initial value during ([0,80));
-- corrected value during ([80,88)) and ([88,96));
-- NoFact during ([96,106)).
+- initial value during [0,80);
+- corrected value during [80,88) and [88,96);
+- NoFact during [96,106).
 
 Its wrong-belief, abstention, missing, future-leak, missed-correction and stale-after-retraction exposure are all zero. Correction and retraction latency are both zero time units.
 
-A delayed candidate emits the initial value during ([80,88)), then the corrected value during ([88,96)), and NoFact after retraction. It reaches the same final state, but accumulates eight units of wrong-belief and missed-correction exposure and has correction latency eight.
+A delayed candidate emits the initial value during [80,88), then the corrected value during ([88,96)), and NoFact after retraction. It reaches the same final state, but accumulates eight units of wrong-belief and missed-correction exposure and has correction latency eight.
 
 A model that emits the corrected value before knowledge time 80 accumulates future-knowledge leakage exposure. A model that emits NoFact after correction but before the retraction is known also incurs wrong-belief and premature-future-retraction exposure. Abstention and missing output contribute only to their own exposure components.
 
