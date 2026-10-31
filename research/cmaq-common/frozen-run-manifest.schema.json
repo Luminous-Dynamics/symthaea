@@ -323,7 +323,7 @@
             "$ref": "#/$defs/nonempty"
           },
           "manifest_sha256": {
-            "$ref": "#/$defs/nullable_sha256"
+            "$ref": "#/$defs/sha256"
           },
           "license": {
             "$ref": "#/$defs/nonempty"
