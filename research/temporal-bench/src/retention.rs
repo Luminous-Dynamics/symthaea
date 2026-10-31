@@ -123,7 +123,10 @@ impl fmt::Display for RetentionVerificationError {
             Self::StreamIdMismatch => write!(f, "retention task and oracle stream IDs differ"),
             Self::PublicDigestMismatch => write!(f, "retention public SHA-256 digest mismatch"),
             Self::OracleDigestMismatch => write!(f, "retention oracle SHA-256 digest mismatch"),
-            Self::SeedReplayMismatch => write!(f, "retention task/oracle do not match the supplied seed and configuration"),
+            Self::SeedReplayMismatch => write!(
+                f,
+                "retention task/oracle do not match the supplied seed and configuration"
+            ),
             Self::InvalidEventCount => write!(f, "retention event count is inconsistent"),
             Self::InvalidTargetStore => write!(f, "target store event is missing or invalid"),
             Self::InvalidDistractor { index } => {
