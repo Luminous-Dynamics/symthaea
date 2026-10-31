@@ -155,3 +155,8 @@ The synthetic known-answer fixture has mean realized regret 1.25, mean bound 1.2
 ### Fail-closed selection and industry benchmark matrix
 
 CMAQ-018 now has a fail-closed interval-dominant action selector: it returns an action only when exactly one action's lower bound clears all competing upper bounds; otherwise it abstains. This is conditional on simultaneous interval coverage and is not actuator authority. The new frontier benchmark matrix in `INDUSTRY_BENCHMARK_MATRIX_2026-11-01.md` defines P0–P6 evaluation, matched D0/D1/W1/W2/W3 baselines, selection-aware calibration and explicit SOTA comparison rules.
+
+
+### Executable net decision value
+
+A new matched-episode evaluator charges inference, information acquisition and failure/recovery costs against realized utility, comparing the world-model arm with D0 and D1. It reports gross advantage, net advantage and win rate for each baseline, rejecting negative costs and non-finite outcomes. The schema and synthetic arithmetic fixture are `net-decision-value.v0.1.schema.json` and `fixtures/net-decision-value.example.json`. This is metric plumbing—not a claim of real decision improvement.
