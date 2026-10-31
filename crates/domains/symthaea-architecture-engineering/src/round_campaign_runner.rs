@@ -538,9 +538,8 @@ fn allocate_round(
                             .descriptor
                             .scope
                             .split_once(':')
-                            .map(|(_, direction_id)| direction_id)
-                            .unwrap_or("")
-                            .to_owned(),
+                            .map(|(_, direction_id)| direction_id.to_ascii_uppercase())
+                            .unwrap_or_default(),
                         potential,
                     )
                 })
