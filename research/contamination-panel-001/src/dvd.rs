@@ -730,6 +730,9 @@ mod tests {
         let fixture: DvdGenerationInputV1 = serde_json::from_str(include_str!(
             "../fixtures/dvd-two-state-input.json"
         )).unwrap();
+        let report_schema: Value = serde_json::from_str(include_str!(
+            "../schema/dvd-item-report.schema.json"
+        )).unwrap();
         assert_eq!(
             schema["properties"]["schema"]["const"].as_str(),
             Some(DVD_INPUT_SCHEMA)
@@ -738,9 +741,24 @@ mod tests {
             schema["properties"]["log_probability_semantics"]["const"].as_str(),
             Some("base_model_conditional_log_probability")
         );
+        assert_eq!(
+            report_schema["properties"]["schema"]["const"].as_str(),
+            Some(DVD_REPORT_SCHEMA)
+        );
         assert_eq!(fixture.requested_generation_count, DVD_PAPER_GENERATIONS);
         assert_eq!(fixture.tail_token_count, DVD_PAPER_TAIL_TOKENS);
-        assert!(score_dvd_item(&fixture).is_ok());
+        let report = score_dvd_item(&fixture).unwrap();
+        assert_eq!(
+            serde_json::to_value(&report).unwrap()["schema"].as_str(),
+            Some(DVD_REPORT_SCHEMA)
+        );
+        let report_required: std::collections::BTreeSet<String> = report_schema["required"]
+            .as_array().unwrap().iter()
+            .map(|value| value.as_str().unwrap().to_owned())
+            .collect();
+        let report_fields: std::collections::BTreeSet<String> = report_schema["properties"]
+            .as_object().unwrap().keys().cloned().collect();
+        assert_eq!(report_required, report_fields);
     }
 
     #[test]
