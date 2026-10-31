@@ -33,9 +33,9 @@ That option tests FAN_CLASS_CONTENT group initialization, which may require CAP_
 | process tracepoint attach | Not attempted | Event enablement, process identity, ordering or loss |
 | cgroup workload scope | Not attempted | Child inheritance, process-tree closure or migration race resistance |
 
-The Landlock query is the documented version-discovery interface. It supplies a version value when called with a null attribute, zero size and the version flag; it does not create a ruleset. Error handling preserves ENOSYS, EOPNOTSUPP, and permission denial as distinct result classes.
+The Landlock query is the documented version-discovery interface. It supplies a version value when called with a null attribute, zero size and the version flag; it does not create a ruleset. Error handling preserves ENOSYS (not supported), EOPNOTSUPP (disabled), EPERM/EACCES (permission denied), and EINVAL (invalid request/flag combination) as distinct result classes. In particular, EINVAL is not silently reported as kernel absence.
 
-The fanotify tests use only group initialization. They do not call fanotify_mark, read an event, issue a permission response, or create any workload. A successful fanotify_init is evidence of group creation only. The returned descriptor is explicitly closed and the result records whether the close was confirmed.
+The default FAN_CLASS_NOTIF path requests FAN_REPORT_FID, which is required for the restricted unprivileged group mode. The opt-in FAN_CLASS_CONTENT path omits FAN_REPORT_FID because the kernel rejects that combination with EINVAL. The fanotify tests use only group initialization. They do not call fanotify_mark, read an event, issue a permission response, or create any workload. A successful fanotify_init is evidence of group creation only. The returned descriptor is explicitly closed and the result records whether the close was confirmed.
 
 ## Safety boundary
 
