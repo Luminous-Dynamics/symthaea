@@ -48,7 +48,7 @@ Fail-closed checks:
 - Unique event IDs and unique declared encodings; ambiguous aliases are rejected from this v1 contract.
 - Every observed event and encoding must match the plan exactly.
 - `time_enabled > 0`, `time_running > 0`, and `time_running ≤ time_enabled`.
-- Lost samples cannot exceed total samples.
+- Lost samples cannot exceed total samples; aggregate counters use checked arithmetic. Absence of sample-mode records is reported as not applicable, not as a measured zero-loss result.
 - Each matched block must contain the no-PMU baseline, one singleton trial per event, one exact co-scheduled event set and one exact overcommitted event set.
 - Every trial uses the exact fixed work-unit denominator and platform/workload/protocol IDs.
 - Order indices must be unique and contiguous; every trial uses the preregistered randomization seed.
