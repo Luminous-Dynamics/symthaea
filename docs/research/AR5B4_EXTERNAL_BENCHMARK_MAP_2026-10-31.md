@@ -98,3 +98,8 @@ A valid superiority claim requires all of the following:
 7. public negative results and ablations, including the oracle ceiling.
 
 A result on the nine synthetic AR-5B landscapes (eight deterministic surfaces plus one seed-matched stochastic heteroscedastic surface) is a useful mechanism-control result only. The stochastic surface uses common random numbers keyed by campaign seed × arm × within-arm evaluation index, so policies receive identical potential outcomes. Simple regret is computed from expected reward, not a lucky observed draw. This is not evidence of a scientific-agent SOTA claim. The immediate goal is to make AR-5B a better experimental instrument than a self-authored score table: same offers, exact action semantics, executable budgets, sealed labels, full receipts, independent inference and transfer.
+
+
+## AR-5B synthetic benchmark claim ceiling
+
+The current scalar suite has eight deterministic surfaces plus one seed-matched stochastic heteroscedastic surface. The seeded stochastic surface uses common random numbers keyed by campaign seed, direction ID and within-direction evaluation index, so policies receive identical potential outcomes. Simple regret uses evaluator-side expected reward, not a lucky observation. These are mechanism controls, not a scientific-agent SOTA result.
