@@ -233,26 +233,6 @@ impl ActionResourceTotals {
         Ok(())
     }
 
-    fn checked_add_assign(
-        &mut self,
-        other: &Self,
-        path: &str,
-    ) -> Result<(), EventTapeParetoError> {
-        self.action_count = checked_add(self.action_count, other.action_count, &format!("{path}.action_count"))?;
-        self.host_cpu_millis = checked_add(self.host_cpu_millis, other.host_cpu_millis, &format!("{path}.host_cpu_millis"))?;
-        self.sum_action_wall_millis = checked_add(self.sum_action_wall_millis, other.sum_action_wall_millis, &format!("{path}.sum_action_wall_millis"))?;
-        self.accelerator_millis = checked_add(self.accelerator_millis, other.accelerator_millis, &format!("{path}.accelerator_millis"))?;
-        self.max_action_peak_memory_bytes = self.max_action_peak_memory_bytes.max(other.max_action_peak_memory_bytes);
-        self.max_action_accelerator_peak_memory_bytes = self.max_action_accelerator_peak_memory_bytes.max(other.max_action_accelerator_peak_memory_bytes);
-        self.energy_millijoules = checked_add(self.energy_millijoules, other.energy_millijoules, &format!("{path}.energy_millijoules"))?;
-        self.input_tokens = checked_add(self.input_tokens, other.input_tokens, &format!("{path}.input_tokens"))?;
-        self.output_tokens = checked_add(self.output_tokens, other.output_tokens, &format!("{path}.output_tokens"))?;
-        self.tool_calls = checked_add(self.tool_calls, other.tool_calls, &format!("{path}.tool_calls"))?;
-        self.evaluator_calls = checked_add(self.evaluator_calls, other.evaluator_calls, &format!("{path}.evaluator_calls"))?;
-        self.verifier_calls = checked_add(self.verifier_calls, other.verifier_calls, &format!("{path}.verifier_calls"))?;
-        self.charged_budget_microunits = checked_add(self.charged_budget_microunits, other.charged_budget_microunits, &format!("{path}.charged_budget_microunits"))?;
-        Ok(())
-    }
 
     fn value(&self, metric: &CandidateObjectiveMetric) -> f64 {
         match metric {
@@ -513,7 +493,7 @@ pub fn event_tape_to_pareto(
                     }
                 }
                 CandidateObjectiveMetric::VerifiedAttemptRate => verified_attempt_rate,
-                metric => accumulator.resources.value(&metric),
+                metric => accumulator.resources.value(metric),
             };
             if !value.is_finite() {
                 return Err(EventTapeParetoError::new(
