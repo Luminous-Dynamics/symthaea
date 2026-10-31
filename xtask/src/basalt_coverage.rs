@@ -449,7 +449,7 @@ fn validate_channels(profile: &Profile, receipt: &Receipt, report: &mut Coverage
             }
             match event.status.as_str() {
                 "observed" => {
-                    if !event.evidence_digest.as_deref().is_some_and(valid_digest) || event.reason.as_ref().is_some_and(|reason| !reason.trim().is_empty()) {
+                    if !event.evidence_digest.as_deref().is_some_and(valid_digest) || event.reason.is_some() {
                         push_error(report, "E_OBSERVED_EVENT_WITNESS", &format!("{event_path}"), "observed events require a digest and must not carry an unresolved/exclusion reason");
                     } else {
                         report.counts.observed_event_kinds += 1;
@@ -748,6 +748,16 @@ mod tests {
         let (profile, receipt) = encoded_pair("complete_within_profile");
         let mut value: Value = serde_json::from_slice(&receipt).unwrap();
         value["controls_active"].as_array_mut().unwrap().pop();
+        let report = audit_bytes(&profile, &serde_json::to_vec(&value).unwrap());
+        assert!(report.overstated_claim);
+        assert!(!report.coverage_complete_within_profile);
+    }
+
+    #[test]
+    fn rejects_complete_claim_without_required_kernel_btf_identity() {
+        let (profile, receipt) = encoded_pair("complete_within_profile");
+        let mut value: Value = serde_json::from_slice(&receipt).unwrap();
+        value["platform"]["kernel_btf_digest"] = Value::Null;
         let report = audit_bytes(&profile, &serde_json::to_vec(&value).unwrap());
         assert!(report.overstated_claim);
         assert!(!report.coverage_complete_within_profile);
