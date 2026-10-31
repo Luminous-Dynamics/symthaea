@@ -158,6 +158,11 @@ pub struct VerifiedRendererAudioBinding {
     performed_event_map_artifact_sha256: String,
     expected_primary_pitches_sha256: String,
     performed_event_lineage: Vec<PerformedEventLineage>,
+    renderer_executable_sha256: String,
+    soundfont_sha256: String,
+    render_config_sha256: String,
+    output_bits_per_sample: u16,
+    output_sample_format: crate::renderer_execution_receipt::DecodedSampleFormat,
     /// Explicit FluidSynth effects-group count parsed from the exact, receipt-
     /// bound child argv. None means the historical/unknown topology did not
     /// explicitly record the setting; downstream routing adapters must abstain.
@@ -224,6 +229,11 @@ pub(crate) fn test_verified_renderer_audio_binding(
         performed_event_map_artifact_sha256,
         expected_primary_pitches_sha256,
         performed_event_lineage,
+        renderer_executable_sha256: sha256_hex(b"test-fluid-synth-executable"),
+        soundfont_sha256: sha256_hex(b"test-soundfont"),
+        render_config_sha256: sha256_hex(b"test-render-config"),
+        output_bits_per_sample: 32,
+        output_sample_format: crate::renderer_execution_receipt::DecodedSampleFormat::PcmFloat,
         fluid_synth_effects_groups: None,
     }
 }
@@ -274,6 +284,12 @@ impl VerifiedRendererAudioBinding {
     pub fn fluid_synth_effects_groups(&self) -> Option<u8> {
         self.fluid_synth_effects_groups
     }
+
+    pub fn renderer_executable_sha256(&self) -> &str { &self.renderer_executable_sha256 }
+    pub fn soundfont_sha256(&self) -> &str { &self.soundfont_sha256 }
+    pub fn render_config_sha256(&self) -> &str { &self.render_config_sha256 }
+    pub fn output_bits_per_sample(&self) -> u16 { self.output_bits_per_sample }
+    pub fn output_sample_format(&self) -> crate::renderer_execution_receipt::DecodedSampleFormat { self.output_sample_format }
 }
 
 /// Hash the interleaved decoded f32 samples exactly as the renderer receipt
@@ -489,6 +505,11 @@ pub(crate) fn verify_renderer_audio_binding_excluding_set(
         performed_event_map_artifact_sha256: sha256_hex(performed_event_map_bytes),
         expected_primary_pitches_sha256: sha256_hex(expected_primary_midi_by_score_index),
         performed_event_lineage: parsed_map.events,
+        renderer_executable_sha256: receipt.renderer_executable_sha256.clone().ok_or(CounterfactualInfluenceError::RendererReceiptInvalid)?,
+        soundfont_sha256: receipt.soundfont_sha256.clone().ok_or(CounterfactualInfluenceError::RendererReceiptInvalid)?,
+        render_config_sha256: receipt.render_config_sha256.clone(),
+        output_bits_per_sample: receipt.output.bits_per_sample,
+        output_sample_format: receipt.output.sample_format,
         fluid_synth_effects_groups: receipt_fluidsynth_effects_groups(receipt),
     })
 }
