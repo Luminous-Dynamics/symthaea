@@ -21,7 +21,7 @@
 //! authenticated callers. A Git commit or SHA-256 digest is not a trusted clock or
 //! external authorization signature.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 
@@ -34,7 +34,7 @@ use crate::multi_resource_budget::{
 };
 use crate::nas_action_authorization::{
     compute_preflight_receipt_sha256, verify_action_preflight_receipt_digest,
-    NasActionKind, NasAuthorizationError, NasActionPreflightReceipt,
+    NasActionKind, NasActionPreflightReceipt,
     VerifiedMeasurementReservation,
 };
 
