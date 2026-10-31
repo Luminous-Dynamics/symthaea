@@ -221,7 +221,7 @@ impl JsonValue {
 
     fn as_u64(&self, field: &str) -> Result<u64, String> {
         match self {
-            Self::Number(value) if !value.contains(['.', 'e', 'E', '-']) => value.parse::<u64>()
+            Self::Number(value) if !value.bytes().any(|byte| matches!(byte, b'.' | b'e' | b'E' | b'-')) => value.parse::<u64>()
                 .map_err(|_| format!("JSON field {field:?} must be a non-negative integer")),
             _ => Err(format!("JSON field {field:?} must be a non-negative integer")),
         }
@@ -310,7 +310,9 @@ impl<'a> JsonParser<'a> {
                         b'u' => {
                             let first = self.parse_hex_quad()?;
                             let codepoint = if (0xD800..=0xDBFF).contains(&first) {
-                                if self.bytes.get(self.position..self.position + 2) != Some(b"\\u") {
+                                if !self.bytes.get(self.position..self.position + 2)
+                                    .is_some_and(|bytes| bytes == b"\\u")
+                                {
                                     return Err("high surrogate must be followed by a low surrogate".into());
                                 }
                                 self.position += 2;
@@ -361,10 +363,10 @@ impl<'a> JsonParser<'a> {
         let start = self.position;
         if self.bytes.get(self.position) == Some(&b'-') { self.position += 1; }
         match self.bytes.get(self.position) {
-            Some(b'0') => self.position += 1,
-            Some(b'1'..=b'9') => {
+            Some(&b'0') => self.position += 1,
+            Some(&b'1'..=&b'9') => {
                 self.position += 1;
-                while self.bytes.get(self.position).is_some_and(u8::is_ascii_digit) {
+                while self.bytes.get(self.position).is_some_and(|byte| byte.is_ascii_digit()) {
                     self.position += 1;
                 }
             }
@@ -373,16 +375,16 @@ impl<'a> JsonParser<'a> {
         if self.bytes.get(self.position) == Some(&b'.') {
             self.position += 1;
             let fraction_start = self.position;
-            while self.bytes.get(self.position).is_some_and(u8::is_ascii_digit) {
+            while self.bytes.get(self.position).is_some_and(|byte| byte.is_ascii_digit()) {
                 self.position += 1;
             }
             if self.position == fraction_start {
                 return Err("JSON number has an empty fractional part".into());
             }
         }
-        if matches!(self.bytes.get(self.position), Some(b'e' | b'E')) {
+        if matches!(self.bytes.get(self.position), Some(&b'e') | Some(&b'E')) {
             self.position += 1;
-            if matches!(self.bytes.get(self.position), Some(b'+' | b'-')) { self.position += 1; }
+            if matches!(self.bytes.get(self.position), Some(&b'+') | Some(&b'-')) { self.position += 1; }
             let exponent_start = self.position;
             while self.bytes.get(self.position).is_some_and(u8::is_ascii_digit) {
                 self.position += 1;
