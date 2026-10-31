@@ -1,0 +1,448 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-002-activearena-adapter-contract-v0.1.json",
+  "title": "CMAQ-002 ActiveArena observation custody and qualification contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "task",
+    "source",
+    "dataset",
+    "license_gates",
+    "candidate_observation",
+    "observation_memory",
+    "forecasts",
+    "evaluator_only",
+    "integrity",
+    "resource_accounting",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-002-activearena-adapter-contract-v0.1"
+    },
+    "status": {
+      "enum": [
+        "metadata_only",
+        "qualification_ready"
+      ]
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "split",
+        "episode_count",
+        "task_count",
+        "category",
+        "action_dimension",
+        "predicted_action_steps"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split": {
+          "enum": [
+            "ID",
+            "OOD"
+          ]
+        },
+        "episode_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "task_count": {
+          "const": 35
+        },
+        "category": {
+          "enum": [
+            "SS",
+            "SL",
+            "ML",
+            "MD",
+            "IA"
+          ]
+        },
+        "action_dimension": {
+          "const": 18
+        },
+        "predicted_action_steps": {
+          "const": 16
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "activearena_source_commit",
+        "activearena_vla_source_commit",
+        "adapter_source_commit"
+      ],
+      "properties": {
+        "activearena_source_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "activearena_vla_source_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "adapter_source_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        }
+      }
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "license",
+        "immutable_revision",
+        "checksum_manifest_sha256"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "format": "uri"
+        },
+        "license": {
+          "const": "Apache-2.0"
+        },
+        "immutable_revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "checksum_manifest_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "license_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "base_asset_license_reviewed",
+        "activearena_asset_license_reviewed",
+        "policy_checkpoint_terms_reviewed"
+      ],
+      "properties": {
+        "base_asset_license_reviewed": {
+          "type": "boolean"
+        },
+        "activearena_asset_license_reviewed": {
+          "type": "boolean"
+        },
+        "policy_checkpoint_terms_reviewed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "candidate_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "camera",
+        "observation_sha256",
+        "capture_timestamp_ms",
+        "camera_pose_sha256",
+        "action_chunk_id",
+        "provenance"
+      ],
+      "properties": {
+        "camera": {
+          "const": "head"
+        },
+        "observation_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "capture_timestamp_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "camera_pose_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "action_chunk_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "provenance": {
+          "const": "environment_acquired"
+        }
+      }
+    },
+    "observation_memory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event_type",
+          "camera",
+          "observation_sha256",
+          "capture_timestamp_ms",
+          "action_chunk_id",
+          "candidate_visible"
+        ],
+        "properties": {
+          "event_type": {
+            "const": "acquired_observation"
+          },
+          "camera": {
+            "const": "head"
+          },
+          "observation_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "capture_timestamp_ms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "action_chunk_id": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "candidate_visible": {
+            "const": true
+          }
+        }
+      }
+    },
+    "forecasts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "forecast_id",
+          "provenance",
+          "forecast_sha256",
+          "horizon_steps",
+          "memory_promoted",
+          "candidate_visible"
+        ],
+        "properties": {
+          "forecast_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "provenance": {
+            "const": "model_forecast"
+          },
+          "forecast_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "horizon_steps": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "memory_promoted": {
+            "const": false
+          },
+          "candidate_visible": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "evaluator_only": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_visible",
+        "side_camera_sha256",
+        "front_camera_sha256",
+        "ground_truth_sha256",
+        "success_label",
+        "scoring_artifact_sha256"
+      ],
+      "properties": {
+        "candidate_visible": {
+          "const": false
+        },
+        "side_camera_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "front_camera_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "ground_truth_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "success_label": {
+          "type": "boolean"
+        },
+        "scoring_artifact_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "network_access",
+        "agent_can_access_hidden_targets",
+        "agent_can_write_scoring_artifacts",
+        "outcome_verification",
+        "candidate_tool_allowlist"
+      ],
+      "properties": {
+        "network_access": {
+          "enum": [
+            "disabled",
+            "allowlisted"
+          ]
+        },
+        "agent_can_access_hidden_targets": {
+          "const": false
+        },
+        "agent_can_write_scoring_artifacts": {
+          "const": false
+        },
+        "outcome_verification": {
+          "const": "environment_side"
+        },
+        "candidate_tool_allowlist": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "get_head_camera_observation",
+              "get_robot_state",
+              "execute_action_chunk",
+              "reset_episode",
+              "retrieve_candidate_memory"
+            ]
+          }
+        }
+      }
+    },
+    "resource_accounting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "memory_capacity_frames",
+        "peak_memory_bytes",
+        "allocator_work_units",
+        "encoder_forward_calls",
+        "retrieval_calls",
+        "latency_p50_ms",
+        "latency_p95_ms",
+        "energy_millijoules"
+      ],
+      "properties": {
+        "memory_capacity_frames": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "peak_memory_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "allocator_work_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "encoder_forward_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retrieval_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "latency_p50_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "latency_p95_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "energy_millijoules": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "qualification_ready"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "dataset": {
+            "properties": {
+              "immutable_revision": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "checksum_manifest_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "license_gates": {
+            "properties": {
+              "base_asset_license_reviewed": {
+                "const": true
+              },
+              "activearena_asset_license_reviewed": {
+                "const": true
+              },
+              "policy_checkpoint_terms_reviewed": {
+                "const": true
+              }
+            }
+          },
+          "claim_ceiling": {
+            "const": "qualification_ready_contract_no_performance_claim"
+          }
+        }
+      }
+    }
+  ]
+}
