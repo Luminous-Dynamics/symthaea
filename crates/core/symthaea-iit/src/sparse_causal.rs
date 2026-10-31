@@ -25,13 +25,13 @@ use crate::{
 const SPARSE_MODEL_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-BINARY-CAUSAL-MODEL\0v0.1\0";
 const SPARSE_EVALUATION_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EVALUATION\0v0.1\0";
 const SPARSE_EQ4_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-REQUEST\0v0.1\0";
-const SPARSE_EQ4_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-RECEIPT\0v0.1\0";
+const SPARSE_EQ4_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-RECEIPT\0v0.2\0";
 const SPARSE_PARTITION_SCORE_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-PARTITION-SCORE-REQUEST\0v0.1\0";
 const SPARSE_SYSTEM_SEARCH_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-SYSTEM-SEARCH-REQUEST\0v0.1\0";
 pub const SPARSE_IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID: &str =
     "symthaea-iit/sparse-iit4-2023-system-search/0.1.0";
 const SPARSE_PARTITION_SCORE_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-PARTITION-SCORE-RECEIPT\0v0.1\0";
-pub const SPARSE_IIT4_EQ4_ALGORITHM_ID: &str = "symthaea-iit/sparse-iit4-eq4-minfill/0.1.0";
+pub const SPARSE_IIT4_EQ4_ALGORITHM_ID: &str = "symthaea-iit/sparse-iit4-eq4-minfill/0.2.0";
 pub const SPARSE_IIT4_PARTITION_SCORE_ALGORITHM_ID: &str =
     "symthaea-iit/sparse-iit4-partition-score/0.1.0";
 
@@ -178,6 +178,13 @@ pub struct SparseEq4Report {
     pub forward_likelihood: Vec<f64>,
     pub posterior_induced_width: usize,
     pub maximum_target_induced_width: usize,
+    /// Largest preflight bucket table for the observed-state posterior contraction.
+    pub posterior_predicted_peak_factor_entries: usize,
+    /// Largest preflight bucket table across target-wise likelihood contractions.
+    pub maximum_target_predicted_peak_factor_entries: usize,
+    /// Maximum predicted factor-table size over all contractions in this request.
+    pub predicted_peak_factor_entries: usize,
+    /// Largest table actually observed over all contractions in this request.
     pub peak_factor_entries: usize,
     pub factor_multiplications: usize,
 }
@@ -200,6 +207,9 @@ impl SparseEq4Report {
         }
         sparse_receipt_u64(&mut bytes, self.posterior_induced_width as u64);
         sparse_receipt_u64(&mut bytes, self.maximum_target_induced_width as u64);
+        sparse_receipt_u64(&mut bytes, self.posterior_predicted_peak_factor_entries as u64);
+        sparse_receipt_u64(&mut bytes, self.maximum_target_predicted_peak_factor_entries as u64);
+        sparse_receipt_u64(&mut bytes, self.predicted_peak_factor_entries as u64);
         sparse_receipt_u64(&mut bytes, self.peak_factor_entries as u64);
         sparse_receipt_u64(&mut bytes, self.factor_multiplications as u64);
         Ok(sparse_hex_digest(&bytes))
@@ -1382,6 +1392,8 @@ impl SparseBinaryCausalModel {
 
         let mut forward = vec![1.0; candidate_state_count];
         let mut maximum_target_induced_width = 0usize;
+        let mut maximum_target_predicted_peak_factor_entries = 0usize;
+        let mut predicted_peak_factor_entries = normalizer.predicted_peak_factor_entries;
         let mut peak_factor_entries = normalizer.peak_factor_entries;
         let mut factor_multiplications = normalizer.factor_multiplications;
 
@@ -1422,6 +1434,10 @@ impl SparseBinaryCausalModel {
                 *joint *= factor_value;
             }
             maximum_target_induced_width = maximum_target_induced_width.max(report.induced_width);
+            maximum_target_predicted_peak_factor_entries = maximum_target_predicted_peak_factor_entries
+                .max(report.predicted_peak_factor_entries);
+            predicted_peak_factor_entries = predicted_peak_factor_entries
+                .max(report.predicted_peak_factor_entries);
             peak_factor_entries = peak_factor_entries.max(report.peak_factor_entries);
             factor_multiplications += report.factor_multiplications;
         }
@@ -1441,6 +1457,9 @@ impl SparseBinaryCausalModel {
             forward_likelihood: forward,
             posterior_induced_width: normalizer.induced_width,
             maximum_target_induced_width,
+            posterior_predicted_peak_factor_entries: normalizer.predicted_peak_factor_entries,
+            maximum_target_predicted_peak_factor_entries,
+            predicted_peak_factor_entries,
             peak_factor_entries,
             factor_multiplications,
         })
@@ -2022,6 +2041,17 @@ mod tests {
 
         let other_budget = sparse.forward_cause_likelihood_iit4(&[0, 1], &state, 1 << 17).unwrap();
         assert_ne!(report.receipt_sha256().unwrap(), other_budget.receipt_sha256().unwrap());
+        assert!(
+            report.predicted_peak_factor_entries >= report.peak_factor_entries,
+            "preflight prediction must cover observed factor-table peak"
+        );
+
+        let mut changed_prediction = report.clone();
+        changed_prediction.predicted_peak_factor_entries += 1;
+        assert_ne!(
+            report.receipt_sha256().unwrap(),
+            changed_prediction.receipt_sha256().unwrap()
+        );
 
         let mut tampered = report.clone();
         tampered.forward_likelihood[0] += 0.001;
