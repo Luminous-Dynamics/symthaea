@@ -236,7 +236,14 @@ def verify_recertification_step(
     a, b, d = _normalise_problem(n, alpha, base_loss, slope)
     old = _normalise_controller(old_controller, n, len(b))
     new = _normalise_controller(new_controller, n, len(b))
+    old_validity = verify_controller(old, n, a, b, d)
     failures: list[tuple] = []
+    if not old_validity["valid"]:
+        failures.append((
+            "baseline_not_finite_exchangeability_valid",
+            old_validity["worst_augmented_multiset"],
+            old_validity["minimum_slack"],
+        ))
     minimum_heldout_margin: Fraction | None = None
     inequalities_checked = 0
 
