@@ -1034,6 +1034,19 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_submission_evidence_cannot_be_reused_across_conditions() {
+        let mut study = two_block_fixture_study();
+        study.blocks[0].runs[1].score_report.submission_sha256 =
+            study.blocks[0].runs[0].score_report.submission_sha256.clone();
+        study.blocks[0].runs[1].score_report.report_sha256.clear();
+        let bytes = serde_json::to_vec(&study.blocks[0].runs[1].score_report).unwrap();
+        study.blocks[0].runs[1].score_report.report_sha256 =
+            hash_domain(b"fresh-instance-score-report.v1", &bytes);
+        assert!(analyze_search_time_access_trial(&study)
+            .unwrap_err().contains("submission digests must be unique"));
+    }
+
+    #[test]
     fn independent_run_namespaces_must_never_be_reused() {
         let mut study = two_block_fixture_study();
         study.blocks[0].runs[1].cache_namespace_sha256 =
@@ -1168,6 +1181,29 @@ mod tests {
             (&report_schema, serde_json::to_value(&report).unwrap(), SEARCH_TRIAL_REPORT_SCHEMA),
         ] {
             assert_eq!(schema["properties"]["schema"]["const"].as_str(), Some(version));
+            let required: BTreeSet<String> = schema["required"].as_array().unwrap()
+                .iter().map(|item| item.as_str().unwrap().to_owned()).collect();
+            let properties: BTreeSet<String> = schema["properties"].as_object().unwrap()
+                .keys().cloned().collect();
+            let actual: BTreeSet<String> = value.as_object().unwrap()
+                .keys().cloned().collect();
+            assert_eq!(required, properties);
+            assert_eq!(actual, properties);
+        }
+        let budget_value = serde_json::to_value(&study.budget).unwrap();
+        let run_value = serde_json::to_value(&study.blocks[0].runs[0]).unwrap();
+        let block_value = serde_json::to_value(&study.blocks[0]).unwrap();
+        let condition_mean_value = serde_json::to_value(&report.condition_means[0]).unwrap();
+        let interval_value = serde_json::to_value(&report.allowlisted_minus_disabled_accuracy_permille).unwrap();
+        let block_effect_value = serde_json::to_value(&report.block_effects[0]).unwrap();
+        for (schema, value) in [
+            (&study_schema["$defs"]["budget"], &budget_value),
+            (&study_schema["$defs"]["run"], &run_value),
+            (&study_schema["$defs"]["block"], &block_value),
+            (&report_schema["properties"]["condition_means"]["items"], &condition_mean_value),
+            (&report_schema["$defs"]["interval"], &interval_value),
+            (&report_schema["$defs"]["effect"], &block_effect_value),
+        ] {
             let required: BTreeSet<String> = schema["required"].as_array().unwrap()
                 .iter().map(|item| item.as_str().unwrap().to_owned()).collect();
             let properties: BTreeSet<String> = schema["properties"].as_object().unwrap()
