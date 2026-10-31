@@ -1,0 +1,114 @@
+{
+  "schema": "symthaea-exact-rational-common-depth-crc-v1",
+  "status": "EXACT_RATIONAL_REFERENCE_ORACLE_RESULTS",
+  "reference": "Bai & Ramdas (2026), arXiv:2610.35821, Appendix B.7",
+  "protocol": {
+    "n_calibration": 50,
+    "calibration_count_vectors": 1326,
+    "augmented_count_vectors": 1378,
+    "alpha": [
+      "1/50",
+      "1/20",
+      "1/10",
+      "3/20"
+    ],
+    "rounds": 500,
+    "snapshots": [
+      0,
+      1,
+      10,
+      20,
+      50,
+      100,
+      200,
+      500
+    ],
+    "losses": {
+      "type0": "0",
+      "type1": "max(a-1,0)/2",
+      "type2": "a/2"
+    },
+    "action_domain": "[0,2]",
+    "arithmetic": "exact arbitrary-precision rational fractions",
+    "verifier": "for every augmented q, sum_c q[c] * loss(c, A(q-e_c)) <= (n+1)*alpha"
+  },
+  "local_validation": {
+    "unit_tests_passed": 7,
+    "unit_tests_total": 7,
+    "exact_reference_tests": "local module copy matching committed implementation logic",
+    "committed_source_blob": "4246b82635d20ff7b8aa4f83024d11b3671fc37b",
+    "committed_tests_blob": "61b7a92efe0cf1f514a1daab78d3620e3b4e5326",
+    "per_alpha_validation_passes": 1009,
+    "exact_checks_per_alpha": 1390402,
+    "exact_checks_total_four_alphas": 5561608,
+    "alpha_0_10_committed_equivalent_run_seconds": 43.4057,
+    "alpha_0_10_all_pass": true,
+    "alpha_0_10_max_final_denominator_digits": 865
+  },
+  "four_target_runs": {
+    "0.02": {
+      "seconds": 19.2328,
+      "all_500_rounds_valid": true,
+      "final_max_depth_denominator_digits": 858,
+      "exact_excess": "0",
+      "worst_augmented_count": [
+        0,
+        0,
+        51
+      ],
+      "worst_total": "51/50",
+      "budget": "51/50"
+    },
+    "0.05": {
+      "seconds": 23.8331,
+      "all_500_rounds_valid": true,
+      "final_max_depth_denominator_digits": 863,
+      "exact_excess": "0",
+      "worst_augmented_count": [
+        0,
+        0,
+        51
+      ],
+      "worst_total": "51/20",
+      "budget": "51/20"
+    },
+    "0.10": {
+      "seconds": 33.2354,
+      "all_500_rounds_valid": true,
+      "final_max_depth_denominator_digits": 865,
+      "exact_excess": "0",
+      "worst_augmented_count": [
+        0,
+        0,
+        51
+      ],
+      "worst_total": "51/10",
+      "budget": "51/10"
+    },
+    "0.15": {
+      "seconds": 32.9933,
+      "all_500_rounds_valid": true,
+      "final_max_depth_denominator_digits": 870,
+      "exact_excess": "0",
+      "worst_augmented_count": [
+        0,
+        0,
+        51
+      ],
+      "worst_total": "153/20",
+      "budget": "153/20"
+    }
+  },
+  "interpretation": [
+    "Standard CRC and envelope CRC baselines were checked exactly for all four levels.",
+    "Envelope CRC remained exactly valid through 500 recertification rounds at all four levels.",
+    "Every saved snapshot had exact zero budget excess; no float tolerance was used.",
+    "The all-type-2 augmented state [0,0,51] was worst and exactly binding at every saved snapshot.",
+    "Final Fraction denominators reached 858-870 decimal digits; exact rational arithmetic is a trusted reference oracle, not the production performance target."
+  ],
+  "limitations": [
+    "Common-depth family only, not confidence-adaptive per-image scores.",
+    "Finite exchangeability only; no arbitrary distribution-shift guarantee.",
+    "No clean separate checkout or remote CI pass is claimed."
+  ]
+}
