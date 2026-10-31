@@ -5,6 +5,9 @@
 
 #![deny(unsafe_code)]
 
+// Shared deterministic provenance graph used by engineering evidence fixtures.
+pub mod provenance_graph;
+
 use serde::{Deserialize, Serialize};
 use symthaea_broca::{BrocaConfig, BrocaGenerator, ThoughtChannels};
 use symthaea_causal_reasoning::causal_calculus::StructuralCausalModel;
