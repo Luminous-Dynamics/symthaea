@@ -95,6 +95,38 @@ Each scenario is a multi-session chain with explicit dependencies:
 
 Every decisive intervention has a matched irrelevant control. Freeze seed, environment generator, transition oracle, intervention schedule and hidden test labels by digest before model runs.
 
+### Stage-resolved memory lifecycle: write, maintain, retrieve, use
+
+WorldMemArena (arXiv:2605.29341) evaluates 400 multi-session multimodal tasks and separates the memory lifecycle into four observable stages: write, maintain, retrieve and use. It includes Lifelong Evolution and Agentic Execution regimes and reports that stronger memory extraction/storage alone does not guarantee better downstream use; visual evidence can be degraded when reduced to captions, and performance is brittle on GUI/embodied trajectories.
+
+MACE should therefore publish four separate stage scorecards:
+
+| Stage | What is evaluated | Required diagnostics |
+|---|---|---|
+| Write | Which experience atoms and transition claims enter persistent memory | evidence-point precision/recall, action/outcome separation, provenance completeness, causal-claim calibration, memory-write cost |
+| Maintain | Whether memory survives corrections, regime changes and policy updates correctly | freshness accuracy, stale-memory exposure, invalidation latency, alternative-support retention, interference/poisoning rate |
+| Retrieve | Whether all decision-relevant support is found at the moment it is needed | required-evidence recall, proof closure, distractor exclusion, session coverage, modality-preserving retrieval |
+| Use | Whether retrieved memory changes the decision correctly | action ranking, dependent-task completion, regret reduction, safe abstention, outcome reconciliation |
+
+Do not combine these stages into a single average. A weak writer can starve a strong retriever; a weak maintainer can invalidate an otherwise correct memory; a weak user can retrieve everything and still act incorrectly. Preserve per-stage error attribution and link each downstream error to the earliest upstream defect that caused it.
+
+For multimodal extensions, retain image/frame/object/region/time references and renderer/model lineage. A caption is a derived representation, not a replacement for the original visual observation when spatial, temporal or procedural details determine the action.
+
+### Continual improvement: progressive experience ladders
+
+The Continual Learning Exam (CLE, arXiv:2610.33956, submitted 25 October 2026) introduces 120 expert-authored tasks arranged as five-level ladders (600 levels total), spanning 89 professional roles and 12 occupational domains. Its best reported configuration completes 47.7% of levels and all five levels in 23.3% of tasks; diagnostic feedback plus one revision improves median completion by 5.3 percentage points. These are preprint-specific results, not a general workplace-success rate or a matched Broca comparison.
+
+MACE should add a **progressive transfer lane**:
+1. Level 1 teaches a bounded skill through a task with observable outcome.
+2. Levels 2–4 change constraints, tools, scale and relevant regime variables while reusing prior experience.
+3. Level 5 is a held-out transfer task with an altered surface form and at least one explicit negative-transfer trap.
+4. Compare no memory, raw episode replay, episodic summaries, objective-aware memory, causal transition memory, and causal + proof/lifecycle memory.
+5. Add a distinct feedback arm: diagnostic feedback and at most one revision. Record it separately from persistent-memory improvement so feedback effects are not misattributed to memory.
+
+Measure the learning curve across levels, retained improvement after distractor sessions, transfer to unpracticed variants, recovery after correction, negative transfer under changed preconditions, and total resources spent per newly acquired capability. Require improvement to persist after the feedback message and immediate context have been removed; otherwise the result may be in-context revision rather than durable learning.
+
+Official adapters should preserve the original CLE and WorldMemArena evaluators. MACE-specific synthetic tasks are a separate controlled track and must not be pooled into their official scores.
+
 ## 5. Baselines and ablations
 
 Within each paired comparison, freeze backbone, tool schema, environment seed, observation budget and action budget.
