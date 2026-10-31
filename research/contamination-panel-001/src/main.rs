@@ -1,9 +1,11 @@
 use contamination_panel_bench::{
     ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, DetectorRunV1,
-    DetectorSpecV1, FeaturePValuesV1, FtdWeightPolicyV1, PublicChallengePacketV1,
-    ScoreObservationV1, SealedChallengeKeyV1, ReferenceTailV1,
+    DetectorSpecV1, PublicChallengePacketV1, SealedChallengeKeyV1,
     audit_blinded_adjudications, detectors::{evaluate_detector_run, score_public_packet},
-    empirical_reference_p_values, ftd_weighted_cauchy_bh,
+    ftd::{
+        empirical_reference_p_values, ftd_weighted_cauchy_bh, FeaturePValuesV1,
+        FtdWeightPolicyV1, ReferenceTailV1, ScoreObservationV1,
+    },
     generate_challenge_bundle, GeneratorConfigV1,
 };
 use std::{
