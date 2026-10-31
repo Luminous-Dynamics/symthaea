@@ -6,7 +6,7 @@ const BASE_SEED: u64 = 0xC0A9_0016_2026_1031;
 const POCKET_CENTER: f64 = 0.72;
 const POCKET_WIDTH: f64 = 0.018;
 const POCKET_AMPLITUDE: f64 = 0.65;
-const ENSEMBLE_CENTERS: [f64; 5] = [0.64, 0.68, 0.72, 0.76, 0.80];
+const ENSEMBLE_CENTERS: [f64; 5] = [0.56, 0.64, 0.72, 0.80, 0.88];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Scenario {
@@ -148,11 +148,10 @@ fn model_head_prediction(
     }
 }
 
-fn mean_model_prediction(scenario: Scenario, action: f64, seed: u64) -> f64 {
-    let total: f64 = (0..ENSEMBLE_CENTERS.len())
-        .map(|head| model_head_prediction(scenario, action, seed, head))
-        .sum();
-    total / ENSEMBLE_CENTERS.len() as f64
+fn reference_model_prediction(scenario: Scenario, action: f64, seed: u64) -> f64 {
+    // The point-predictor baseline uses the central head. Other heads are
+    // reserved for the explicitly pessimistic ensemble arm.
+    model_head_prediction(scenario, action, seed, 2)
 }
 
 fn pessimistic_model_prediction(scenario: Scenario, action: f64, seed: u64) -> f64 {
@@ -173,7 +172,7 @@ fn policy_score(
         }
         Policy::Oracle => true_return(action),
         Policy::DirectPolicy | Policy::RandomSearch | Policy::AdaptiveCem => {
-            mean_model_prediction(scenario, action, episode_seed)
+            reference_model_prediction(scenario, action, episode_seed)
         }
     }
 }
@@ -320,7 +319,9 @@ fn summarize(
         mse_sum += uniform_grid_prediction_mse(scenario, episode_seed);
 
         if scenario == Scenario::NarrowOptimismPocket
-            && (result.action - POCKET_CENTER).abs() <= 0.045
+            && ENSEMBLE_CENTERS
+                .iter()
+                .any(|center| (result.action - center).abs() <= 0.045)
         {
             pocket_count += 1;
         }
