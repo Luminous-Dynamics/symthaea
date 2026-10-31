@@ -34,7 +34,7 @@
     },
     "baselines": {
       "type": "array",
-      "minItems": 7,
+      "minItems": 8,
       "uniqueItems": true,
       "items": {
         "type": "string"
@@ -42,7 +42,7 @@
     },
     "candidates": {
       "type": "array",
-      "minItems": 3,
+      "minItems": 4,
       "uniqueItems": true,
       "items": {
         "type": "string"
