@@ -66,17 +66,20 @@ The explicit effect head is not presumed superior. The comparison tests whether 
 
 Reported independently for each scenario/model pair:
 
-- Pairwise effect-sign accuracy on non-tied true effects.
-- Pairwise effect-magnitude MAE.
-- Kendall tau-b action-ranking agreement, including explicit tie handling.
-- Top-1 regret against the best action in the same frozen branch bank.
+- Pairwise effect-sign accuracy on non-tied true effects, with a 95% percentile-bootstrap interval.
+- Pairwise effect-magnitude MAE, with a 95% percentile-bootstrap interval.
+- Kendall tau-b action-ranking agreement, including explicit tie handling and a 95% percentile-bootstrap interval.
+- Top-1 regret against the best action in the same frozen branch bank, with a 95% percentile-bootstrap interval.
+- Terminal false-safe rate with a 95% percentile-bootstrap interval where actual terminal branches have predictions.
 - Null-effect false-positive rate: predicted nonzero effects when all true effects are zero.
 - Pair-coverage and branch-prediction coverage, so abstention is not hidden.
 - Absolute branch-utility MAE and next-state MAE where the model emits branch predictions.
 - Terminal false-safe rate where actual terminal branches have predictions.
 - Branch prediction evaluations, direct pair-effect evaluations, and oracle branch evaluations, reported separately.
 
-No single composite score is emitted. A metric that is undefined for a scenario/model pair is represented as JSON `null`, not zero.
+Intervals resample the 64 independent episode histories as clusters (2,000 deterministic percentile-bootstrap replicates). The 21 action pairs inside one episode are never treated as independent samples. Each metric's per-episode value is computed first, then episodes are resampled. Undefined metrics remain JSON `null`, including their interval bounds.
+
+No single composite score is emitted.
 
 ## Reproduction
 
