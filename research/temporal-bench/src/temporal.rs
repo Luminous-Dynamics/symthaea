@@ -1,0 +1,389 @@
+//! Deterministic multi-timescale forecasting and delayed-feedback controls.
+//!
+//! The task stream exposes noisy observations and delayed online feedback.
+//! The oracle contains the hidden periods, phases, regime boundary, and all
+//! target labels. This module intentionally returns both artifacts for local
+//! prototype testing; it is NOT a sealed evaluator boundary.
+
+use super::{mix64, SplitMix64};
+use std::fmt;
+
+const MAX_STEPS: usize = 100_000;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MultiTimescaleConfig {
+    pub seed: u64,
+    pub steps: usize,
+    pub forecast_horizon: u64,
+    pub feedback_delay: u64,
+    pub regime_shift: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TemporalEventKind {
+    Observation {
+        fast: i16,
+        medium: i16,
+        slow: i16,
+    },
+    Feedback {
+        source_step: u64,
+        label: i8,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TemporalEvent {
+    pub step: u64,
+    /// Observations are ordinal 0; same-time delayed feedback is ordinal 1.
+    pub ordinal: u8,
+    pub kind: TemporalEventKind,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MultiTimescaleTask {
+    pub stream_id: u64,
+    pub forecast_horizon: u64,
+    pub feedback_delay: u64,
+    pub events: Vec<TemporalEvent>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TemporalTarget {
+    pub source_step: u64,
+    pub target_step: u64,
+    pub label: i8,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MultiTimescaleOracle {
+    pub stream_id: u64,
+    pub targets: Vec<TemporalTarget>,
+    pub hidden_change_step: Option<u64>,
+    pub hidden_periods: [u64; 3],
+    pub hidden_phases: [u64; 3],
+    pub weights_before: [i8; 3],
+    pub weights_after: [i8; 3],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TemporalGenerationError {
+    ZeroSteps,
+    TooManySteps { requested: usize, maximum: usize },
+    TooFewStepsForRegimeShift { requested: usize, minimum: usize },
+    ZeroForecastHorizon,
+    ZeroFeedbackDelay,
+}
+
+impl fmt::Display for TemporalGenerationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ZeroSteps => write!(f, "steps must be greater than zero"),
+            Self::TooManySteps { requested, maximum } => {
+                write!(f, "steps {requested} exceeds the maximum {maximum}")
+            }
+            Self::TooFewStepsForRegimeShift { requested, minimum } => write!(
+                f,
+                "regime-shift tasks require at least {minimum} steps, received {requested}"
+            ),
+            Self::ZeroForecastHorizon => {
+                write!(f, "forecast_horizon must be greater than zero")
+            }
+            Self::ZeroFeedbackDelay => {
+                write!(f, "feedback_delay must be greater than zero")
+            }
+        }
+    }
+}
+
+impl std::error::Error for TemporalGenerationError {}
+
+/// Generate a causal multiscale stream with delayed labels.
+///
+/// The public task exposes observations and feedback only. It does not expose
+/// latent periods, phases, target labels before feedback, or the regime-change
+/// time. The returned oracle is for evaluator-side validation only. Because
+/// this function returns both records in one process, deployment must move
+/// oracle handling into a separate process or permission boundary.
+pub fn generate_multiscale_task(
+    config: MultiTimescaleConfig,
+) -> Result<(MultiTimescaleTask, MultiTimescaleOracle), TemporalGenerationError> {
+    validate_config(config)?;
+
+    let stream_id = multiscale_stream_id(config);
+    let mut rng = SplitMix64::new(config.seed ^ 0x4D55_4C54_4953_4341);
+
+    let periods = [
+        2 + (rng.next_u64() % 7),
+        9 + (rng.next_u64() % 16),
+        25 + (rng.next_u64() % 40),
+    ];
+    let phases = [
+        rng.next_u64() % periods[0],
+        rng.next_u64() % periods[1],
+        rng.next_u64() % periods[2],
+    ];
+    let weights_before = [random_weight(&mut rng), random_weight(&mut rng), random_weight(&mut rng)];
+    let weights_after = [
+        weights_before[2],
+        -weights_before[1],
+        weights_before[0],
+    ];
+    let hidden_change_step = if config.regime_shift {
+        let low = u64::try_from(config.steps / 3).unwrap_or(u64::MAX);
+        let high = u64::try_from((config.steps * 2) / 3).unwrap_or(u64::MAX);
+        let width = high.saturating_sub(low).saturating_add(1);
+        Some(low.saturating_add(rng.next_u64() % width))
+    } else {
+        None
+    };
+
+    let step_count = u64::try_from(config.steps).unwrap_or(u64::MAX);
+    let mut targets = Vec::with_capacity(config.steps);
+    for source_step in 0..step_count {
+        let target_step = source_step.saturating_add(config.forecast_horizon);
+        let weights = weights_for_step(target_step, hidden_change_step, weights_before, weights_after);
+        let label = target_label(target_step, periods, phases, weights);
+        targets.push(TemporalTarget {
+            source_step,
+            target_step,
+            label,
+        });
+    }
+
+    let mut events = Vec::with_capacity(config.steps.saturating_mul(2));
+    for step in 0..step_count {
+        let fast = noisy_wave(step, periods[0], phases[0], &mut rng);
+        let medium = noisy_wave(step, periods[1], phases[1], &mut rng);
+        let slow = noisy_wave(step, periods[2], phases[2], &mut rng);
+
+        events.push(TemporalEvent {
+            step,
+            ordinal: 0,
+            kind: TemporalEventKind::Observation {
+                fast,
+                medium,
+                slow,
+            },
+        });
+
+        if step >= config.feedback_delay {
+            let source_step = step - config.feedback_delay;
+            let index = usize::try_from(source_step).unwrap_or(usize::MAX);
+            let label = targets[index].label;
+            events.push(TemporalEvent {
+                step,
+                ordinal: 1,
+                kind: TemporalEventKind::Feedback { source_step, label },
+            });
+        }
+    }
+
+    Ok((
+        MultiTimescaleTask {
+            stream_id,
+            forecast_horizon: config.forecast_horizon,
+            feedback_delay: config.feedback_delay,
+            events,
+        },
+        MultiTimescaleOracle {
+            stream_id,
+            targets,
+            hidden_change_step,
+            hidden_periods: periods,
+            hidden_phases: phases,
+            weights_before,
+            weights_after,
+        },
+    ))
+}
+
+fn validate_config(config: MultiTimescaleConfig) -> Result<(), TemporalGenerationError> {
+    if config.steps == 0 {
+        return Err(TemporalGenerationError::ZeroSteps);
+    }
+    if config.steps > MAX_STEPS {
+        return Err(TemporalGenerationError::TooManySteps {
+            requested: config.steps,
+            maximum: MAX_STEPS,
+        });
+    }
+    if config.regime_shift && config.steps < 3 {
+        return Err(TemporalGenerationError::TooFewStepsForRegimeShift {
+            requested: config.steps,
+            minimum: 3,
+        });
+    }
+    if config.forecast_horizon == 0 {
+        return Err(TemporalGenerationError::ZeroForecastHorizon);
+    }
+    if config.feedback_delay == 0 {
+        return Err(TemporalGenerationError::ZeroFeedbackDelay);
+    }
+    Ok(())
+}
+
+fn multiscale_stream_id(config: MultiTimescaleConfig) -> u64 {
+    let mut value = config.seed ^ (config.steps as u64).rotate_left(11);
+    value ^= config.forecast_horizon.rotate_left(23);
+    value ^= config.feedback_delay.rotate_left(37);
+    value ^= if config.regime_shift {
+        0x5245_4749_4D45_5348
+    } else {
+        0x5354_4154_4943_0000
+    };
+    mix64(value)
+}
+
+fn random_weight(rng: &mut SplitMix64) -> i8 {
+    let magnitude = i8::try_from(1 + (rng.next_u64() % 4)).unwrap_or(1);
+    if rng.next_u64() & 1 == 0 {
+        magnitude
+    } else {
+        -magnitude
+    }
+}
+
+fn weights_for_step(
+    target_step: u64,
+    change_step: Option<u64>,
+    before: [i8; 3],
+    after: [i8; 3],
+) -> [i8; 3] {
+    match change_step {
+        Some(change) if target_step >= change => after,
+        _ => before,
+    }
+}
+
+fn target_label(
+    step: u64,
+    periods: [u64; 3],
+    phases: [u64; 3],
+    weights: [i8; 3],
+) -> i8 {
+    let fast = i64::from(wave(step, periods[0], phases[0]));
+    let medium = i64::from(wave(step, periods[1], phases[1]));
+    let slow = i64::from(wave(step, periods[2], phases[2]));
+    let weighted = fast * i64::from(weights[0])
+        + medium * i64::from(weights[1])
+        + slow * i64::from(weights[2]);
+    if weighted >= 0 { 1 } else { -1 }
+}
+
+fn wave(step: u64, period: u64, phase: u64) -> i16 {
+    let position = step.wrapping_add(phase) % period;
+    let scaled = (u128::from(position) * 2_000) / u128::from(period);
+    i16::try_from(i32::try_from(scaled).unwrap_or(i32::MAX) - 1_000).unwrap_or(0)
+}
+
+fn noisy_wave(
+    step: u64,
+    period: u64,
+    phase: u64,
+    rng: &mut SplitMix64,
+) -> i16 {
+    let noise = i16::try_from(rng.next_u64() % 41).unwrap_or(0) - 20;
+    wave(step, period, phase).saturating_add(noise).clamp(-1_000, 1_000)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config(regime_shift: bool) -> MultiTimescaleConfig {
+        MultiTimescaleConfig {
+            seed: 0x5EED_2026_1031,
+            steps: 512,
+            forecast_horizon: 7,
+            feedback_delay: 3,
+            regime_shift,
+        }
+    }
+
+    #[test]
+    fn generation_is_deterministic_for_fixed_seed() {
+        let first = generate_multiscale_task(config(true)).unwrap();
+        let second = generate_multiscale_task(config(true)).unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn periods_are_in_preregistered_fast_medium_slow_bands() {
+        let (_, oracle) = generate_multiscale_task(config(false)).unwrap();
+        assert!((2..=8).contains(&oracle.hidden_periods[0]));
+        assert!((9..=24).contains(&oracle.hidden_periods[1]));
+        assert!((25..=64).contains(&oracle.hidden_periods[2]));
+    }
+
+    #[test]
+    fn regime_change_is_hidden_and_bounded_to_middle_third_band() {
+        let (task, oracle) = generate_multiscale_task(config(true)).unwrap();
+        let change = oracle.hidden_change_step.unwrap();
+        assert!((task.events.first().unwrap().step..=512).contains(&change));
+        assert!((512 / 3..=(512 * 2) / 3).contains(&(change as usize)));
+        assert_ne!(oracle.weights_before, oracle.weights_after);
+    }
+
+    #[test]
+    fn static_task_has_no_change_point() {
+        let (_, oracle) = generate_multiscale_task(config(false)).unwrap();
+        assert_eq!(oracle.hidden_change_step, None);
+        assert_eq!(oracle.weights_before, oracle.weights_after);
+    }
+
+    #[test]
+    fn feedback_arrives_after_declared_delay_and_matches_oracle() {
+        let (task, oracle) = generate_multiscale_task(config(true)).unwrap();
+        for event in &task.events {
+            if let TemporalEventKind::Feedback { source_step, label } = event.kind {
+                assert_eq!(event.step - source_step, task.feedback_delay);
+                assert_eq!(
+                    oracle.targets[source_step as usize].label,
+                    label
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn observations_precede_same_time_feedback() {
+        let (task, _) = generate_multiscale_task(config(true)).unwrap();
+        for pair in task.events.windows(2) {
+            if pair[0].step == pair[1].step {
+                assert!(pair[0].ordinal < pair[1].ordinal);
+            }
+        }
+    }
+
+    #[test]
+    fn oracle_forecast_horizon_matches_configuration() {
+        let (_, oracle) = generate_multiscale_task(config(false)).unwrap();
+        for target in oracle.targets {
+            assert_eq!(target.target_step - target.source_step, 7);
+        }
+    }
+
+    #[test]
+    fn zero_feedback_delay_is_rejected() {
+        let mut cfg = config(false);
+        cfg.feedback_delay = 0;
+        assert_eq!(
+            generate_multiscale_task(cfg),
+            Err(TemporalGenerationError::ZeroFeedbackDelay)
+        );
+    }
+
+    #[test]
+    fn regime_shift_rejects_too_short_stream() {
+        let mut cfg = config(true);
+        cfg.steps = 2;
+        assert_eq!(
+            generate_multiscale_task(cfg),
+            Err(TemporalGenerationError::TooFewStepsForRegimeShift {
+                requested: 2,
+                minimum: 3
+            })
+        );
+    }
+}
