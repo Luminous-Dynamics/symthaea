@@ -366,20 +366,54 @@ pub fn verify_fresh_score_report_integrity(report: &FreshScoreReportV1) -> Resul
     if hash_domain(b"fresh-instance-score-report.v1", &bytes) != report.report_sha256 {
         return Err("fresh score report digest does not match contents".to_owned());
     }
-    let total = report.correct_count
-        .checked_add(report.incorrect_count)
-        .and_then(|value| value.checked_add(report.invalid_format_count))
-        .and_then(|value| value.checked_add(report.abstained_count))
+    let mut seen_items = BTreeSet::new();
+    let mut correct = 0_u64;
+    let mut incorrect = 0_u64;
+    let mut invalid = 0_u64;
+    let mut abstained = 0_u64;
+    for item in &report.items {
+        if item.item_id.trim().is_empty() || !seen_items.insert(item.item_id.as_str()) {
+            return Err("fresh score report item IDs must be unique and nonempty".to_owned());
+        }
+        validate_digest(&item.response_sha256, "item.response_sha256")?;
+        match item.status {
+            FreshItemScoreStatusV1::Correct => correct += 1,
+            FreshItemScoreStatusV1::Incorrect => incorrect += 1,
+            FreshItemScoreStatusV1::InvalidFormat => invalid += 1,
+            FreshItemScoreStatusV1::Abstained => abstained += 1,
+        }
+    }
+    let total = correct.checked_add(incorrect)
+        .and_then(|value| value.checked_add(invalid))
+        .and_then(|value| value.checked_add(abstained))
         .ok_or_else(|| "fresh score report count partition overflowed".to_owned())?;
-    if total != report.item_count
-        || report.answered_count != report.item_count.saturating_sub(report.abstained_count)
-        || report.valid_format_response_count != report.correct_count + report.incorrect_count
+    let answered = total.saturating_sub(abstained);
+    let valid_format = correct.checked_add(incorrect)
+        .ok_or_else(|| "fresh score report valid-format count overflowed".to_owned())?;
+    let expected_accuracy = correct as f64 * 1_000.0 / total as f64;
+    let expected_coverage = answered as f64 * 1_000.0 / total as f64;
+    let rate_matches = |actual: Option<f64>, expected: Option<f64>| match (actual, expected) {
+        (None, None) => true,
+        (Some(actual), Some(expected)) => actual.is_finite() && (actual - expected).abs() < 1.0e-9,
+        _ => false,
+    };
+    if total == 0
+        || total != report.item_count
+        || correct != report.correct_count
+        || incorrect != report.incorrect_count
+        || invalid != report.invalid_format_count
+        || abstained != report.abstained_count
+        || answered != report.answered_count
+        || valid_format != report.valid_format_response_count
+        || !report.accuracy_over_all_permille.is_finite()
+        || !report.coverage_permille.is_finite()
+        || (report.accuracy_over_all_permille - expected_accuracy).abs() >= 1.0e-9
+        || (report.coverage_permille - expected_coverage).abs() >= 1.0e-9
+        || !rate_matches(report.accuracy_when_answered_permille, optional_rate(correct, answered))
+        || !rate_matches(report.accuracy_when_valid_format_permille, optional_rate(correct, valid_format))
         || report.independently_verified
     {
-        return Err("fresh score report count partition or trust boundary is invalid".to_owned());
-    }
-    if report.items.len() as u64 != report.item_count {
-        return Err("fresh score report item outcomes do not cover item_count".to_owned());
+        return Err("fresh score report item statuses, summary counts/rates or trust boundary are inconsistent".to_owned());
     }
     Ok(())
 }
