@@ -149,3 +149,8 @@ This document is a research protocol. It does not assert that Symthaea currently
 The current Rust API now includes `CostedDecisionOutcome`, `DecisionValueEpisode` and `evaluate_net_decision_value`. For each matched episode, the evaluator subtracts inference, acquisition and failure/recovery costs from realized utility for the world-model arm, D0 and D1. It then reports paired mean gross and net advantages and net win rates versus both direct baselines. Negative costs and non-finite values are rejected.
 
 The synthetic known-answer fixture illustrates why gross reward is not enough: mean gross advantage is +2.333 versus D0, but after costs the advantage is only +0.333; versus D1 the net advantage is +0.167. These values only test arithmetic and do not represent a measured policy. A real advantage claim still requires enough independent episodes, paired uncertainty intervals and equal-budget accounting.
+
+
+### VIS-005 production-readiness distinction
+
+The [VIS-005 source audit](VIS005_ACTION_CONDITIONED_GAP_AUDIT_2026-11-01.md) records that existing delayed-horizon visual forecasting is observation-grounded but autonomous, the cross-manifold path is vision-to-cognition, and the current JEPA path uses a generated CfC target. These are important baselines, not action-conditioned visual world-model evidence. P2/P3 claims require a true action-conditioned predictor trained/scored against later observations and same-history alternative branches.
