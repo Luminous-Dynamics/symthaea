@@ -81,7 +81,7 @@ Do not compare smoke checks to Falco or Tetragon on event throughput: they are r
 
 Proposed targets (not measured results or industry standards):
 - 100% precision for non-unknown operational status against controlled syscall outcomes;
-- 100% correct distinction among unsupported, disabled and permission-denied outcomes;
+- 100% correct distinction among syscall-not-implemented, operation-not-supported/disabled, permission-denied and invalid-request outcomes;
 - 100% explicit cleanup confirmation for successfully created group descriptors;
 - zero unintended host-side effects;
 - zero reports claiming observer attachment, event capture, workload execution or qualification;
@@ -92,8 +92,8 @@ Use the host/kernel-boot/mount-namespace/privilege-context as the independent un
 
 ## Next high-value work
 
-1. Add a deterministic syscall adapter seam and failure-injection tests for every errno/cleanup path.
-2. Run on a matrix of unprivileged host, root host, unprivileged container, seccomp-restricted container and Landlock-disabled kernel.
+1. Execute the 23 authored tests and compile/rustfmt the exact reviewed head; tests are not evidence until run on that head.
+2. Run on independent strata: unprivileged host, privileged host, unprivileged container, seccomp-restricted container and Landlock-disabled kernel. Preserve host/boot/namespace/privilege as the statistical unit.
 3. Add a separately pinned and allowlisted BPF attach/unload probe only after an independent teardown verifier exists.
 4. Add a controlled fanotify permission-event fixture under a disposable mount or test filesystem, with bounded timeouts and exact response semantics. Do not test this against arbitrary host paths.
 5. Build the full observer capture and counterfactual oracle lane. Only that lane may support a coverage envelope.
