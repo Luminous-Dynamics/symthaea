@@ -13,7 +13,9 @@
 use std::time::{Duration, Instant};
 
 use symthaea_iit::{
-    min_fill_log_sum_product, min_fill_log_sum_product_with_cutset, BinaryLogFactor,
+    min_fill_log_sum_product, min_fill_log_sum_product_with_cutset,
+    min_fill_log_sum_product_with_cutset_plan, plan_min_fill_cutset_elimination,
+    BinaryLogFactor,
 };
 
 #[derive(Clone, Copy)]
@@ -123,7 +125,7 @@ fn equivalent(left: &[f64], right: &[f64]) -> bool {
 fn run() -> Result<(), String> {
     let repeats = parse_repeats()?;
     println!(
-        "side,variables,factors,cutset_variables,cutset_assignments,cutset_factor_entry_budget,standard_minfill_rejected_same_budget,baseline_induced_width,baseline_peak_entries,cutset_induced_width,cutset_peak_entries,conditioned_factor_entries_written,branch_output_entries_accumulated,factor_multiplications,baseline_median_ns,cutset_median_ns,cutset_over_baseline_time_ratio,exact_output_parity,within_cutset_budget"
+        "side,variables,factors,cutset_variables,cutset_assignments,cutset_factor_entry_budget,standard_minfill_rejected_same_budget,baseline_induced_width,baseline_peak_entries,cutset_induced_width,cutset_peak_entries,conditioned_factor_entries_written,branch_output_entries_accumulated,factor_multiplications,cutset_plan_build_ns,baseline_median_ns,cutset_replanned_median_ns,cutset_reused_plan_median_ns,cutset_replanned_over_baseline_ratio,cutset_reused_over_baseline_ratio,exact_output_parity,within_cutset_budget"
     );
 
     for fixture in FIXTURES {
@@ -152,18 +154,42 @@ fn run() -> Result<(), String> {
             ));
         }
 
+        let factor_scopes = factors
+            .iter()
+            .map(|factor| factor.variables().to_vec())
+            .collect::<Vec<_>>();
+        let plan_start = Instant::now();
+        let cutset_plan = plan_min_fill_cutset_elimination(
+            &factor_scopes,
+            &eliminate,
+            &cutset,
+            cutset_factor_entry_budget,
+            branch_budget,
+        ).map_err(|error| format!("cutset preflight failed for {side}x{side}: {error}"))?;
+        let cutset_plan_build_ns = plan_start.elapsed().as_nanos();
+
         let baseline = min_fill_log_sum_product(
             &factors,
             &eliminate,
             BASELINE_FACTOR_ENTRY_BUDGET,
         ).map_err(|error| format!("baseline failed for {side}x{side}: {error}"))?;
-        let cutset_report = min_fill_log_sum_product_with_cutset(
+        let cutset_report = min_fill_log_sum_product_with_cutset_plan(
+            &factors,
+            &cutset_plan,
+        ).map_err(|error| format!("reused cutset plan failed for {side}x{side}: {error}"))?;
+        let cutset_replanned_report = min_fill_log_sum_product_with_cutset(
             &factors,
             &eliminate,
             &cutset,
             cutset_factor_entry_budget,
             branch_budget,
-        ).map_err(|error| format!("cutset path failed for {side}x{side}: {error}"))?;
+        ).map_err(|error| format!("replanned cutset path failed for {side}x{side}: {error}"))?;
+        if !equivalent(
+            cutset_report.factor.log_values(),
+            cutset_replanned_report.factor.log_values(),
+        ) {
+            return Err(format!("reused/rebuilt plan parity failed for {side}x{side}"));
+        }
 
         if baseline.factor.variables() != [retained]
             || cutset_report.factor.variables() != [retained]
@@ -197,7 +223,8 @@ fn run() -> Result<(), String> {
         }
 
         let mut baseline_samples = Vec::with_capacity(repeats);
-        let mut cutset_samples = Vec::with_capacity(repeats);
+        let mut cutset_replanned_samples = Vec::with_capacity(repeats);
+        let mut cutset_reused_samples = Vec::with_capacity(repeats);
         for _ in 0..repeats {
             let start = Instant::now();
             let baseline_trial = min_fill_log_sum_product(
@@ -208,32 +235,48 @@ fn run() -> Result<(), String> {
             baseline_samples.push(start.elapsed());
 
             let start = Instant::now();
-            let cutset_trial = min_fill_log_sum_product_with_cutset(
+            let cutset_replanned_trial = min_fill_log_sum_product_with_cutset(
                 &factors,
                 &eliminate,
                 &cutset,
                 cutset_factor_entry_budget,
                 branch_budget,
             ).map_err(|error| error.to_string())?;
-            cutset_samples.push(start.elapsed());
+            cutset_replanned_samples.push(start.elapsed());
+
+            let start = Instant::now();
+            let cutset_reused_trial = min_fill_log_sum_product_with_cutset_plan(
+                &factors,
+                &cutset_plan,
+            ).map_err(|error| error.to_string())?;
+            cutset_reused_samples.push(start.elapsed());
 
             if !equivalent(
                 baseline_trial.factor.log_values(),
-                cutset_trial.factor.log_values(),
+                cutset_replanned_trial.factor.log_values(),
+            ) || !equivalent(
+                baseline_trial.factor.log_values(),
+                cutset_reused_trial.factor.log_values(),
             ) {
                 return Err(format!("timed-trial parity changed for {side}x{side}"));
             }
         }
 
         let baseline_median = median_duration(&mut baseline_samples).as_nanos();
-        let cutset_median = median_duration(&mut cutset_samples).as_nanos();
-        let ratio = if baseline_median == 0 {
+        let cutset_replanned_median = median_duration(&mut cutset_replanned_samples).as_nanos();
+        let cutset_reused_median = median_duration(&mut cutset_reused_samples).as_nanos();
+        let replanned_ratio = if baseline_median == 0 {
             0.0
         } else {
-            cutset_median as f64 / baseline_median as f64
+            cutset_replanned_median as f64 / baseline_median as f64
+        };
+        let reused_ratio = if baseline_median == 0 {
+            0.0
+        } else {
+            cutset_reused_median as f64 / baseline_median as f64
         };
         println!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.4},{},{}",
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.4},{:.4},{},{}",
             side,
             variables,
             factors.len(),
@@ -248,9 +291,12 @@ fn run() -> Result<(), String> {
             cutset_report.conditioned_factor_entries_written,
             cutset_report.branch_output_entries_accumulated,
             cutset_report.factor_multiplications,
+            cutset_plan_build_ns,
             baseline_median,
-            cutset_median,
-            ratio,
+            cutset_replanned_median,
+            cutset_reused_median,
+            replanned_ratio,
+            reused_ratio,
             true,
             cutset_report.peak_factor_entries <= cutset_factor_entry_budget,
         );
