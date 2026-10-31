@@ -29,6 +29,7 @@ pub mod pareto_benchmarks;
 pub mod pareto_nsga2;
 pub mod pareto_moead;
 pub mod pareto_smsemoa;
+pub mod pareto_baseline_comparison;
 pub mod coral_baseline;
 pub mod coral_execution;
 pub mod resource_pareto;
