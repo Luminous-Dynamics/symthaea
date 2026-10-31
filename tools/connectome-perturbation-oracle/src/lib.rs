@@ -44,6 +44,9 @@ pub enum OracleError {
     NodeOutOfRange { node: usize, node_count: usize },
     EpochOutOfRange { epoch: usize, horizon: usize },
     ZeroDelay,
+    EdgeIndexOutOfRange { edge_index: usize, edge_count: usize },
+    DuplicateEdgeIndex,
+    BaselineQueryUnreachable,
     NonFiniteParameter,
     ShapeMismatch,
     TargetOutOfRange { node: usize, node_count: usize },
@@ -62,6 +65,13 @@ impl fmt::Display for OracleError {
                 write!(formatter, "epoch {epoch} is outside 0..{horizon}")
             }
             Self::ZeroDelay => write!(formatter, "edge delay must be at least one epoch"),
+            Self::EdgeIndexOutOfRange { edge_index, edge_count } => {
+                write!(formatter, "edge index {edge_index} is outside 0..{edge_count}")
+            }
+            Self::DuplicateEdgeIndex => write!(formatter, "edge indices must be distinct"),
+            Self::BaselineQueryUnreachable => {
+                write!(formatter, "baseline reachability query must be true for an interaction")
+            }
             Self::NonFiniteParameter => write!(formatter, "weights and amplitudes must be finite"),
             Self::ShapeMismatch => write!(formatter, "trajectory shapes do not match"),
             Self::TargetOutOfRange { node, node_count } => {
@@ -250,6 +260,119 @@ pub fn first_detectable_epoch(
         return Err(OracleError::NonFiniteParameter);
     }
     Ok(trace.iter().position(|value| value.abs() > threshold))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReachabilityInteraction {
+    pub baseline_reachable: bool,
+    pub without_first: bool,
+    pub without_second: bool,
+    pub without_both: bool,
+    /// Binary-loss interaction: L(both) - L(first) - L(second) + L(none).
+    /// +1 means the pair is jointly critical although neither edge is;
+    /// -1 means both single deletions already destroy the query.
+    pub interaction: i8,
+}
+
+/// Directed reachability after removing the listed edge indices.
+///
+/// This is a graph-query oracle, separate from the neural-state simulator.
+/// It supports exact small-graph tests for redundant paths and bridge edges.
+pub fn directed_path_exists(
+    network: &Network,
+    source: usize,
+    target: usize,
+    removed_edge_indices: &[usize],
+) -> Result<bool, OracleError> {
+    validate(network, 1, &[])?;
+    if source >= network.node_count {
+        return Err(OracleError::NodeOutOfRange {
+            node: source,
+            node_count: network.node_count,
+        });
+    }
+    if target >= network.node_count {
+        return Err(OracleError::NodeOutOfRange {
+            node: target,
+            node_count: network.node_count,
+        });
+    }
+
+    let mut removed = vec![false; network.edges.len()];
+    for &edge_index in removed_edge_indices {
+        if edge_index >= network.edges.len() {
+            return Err(OracleError::EdgeIndexOutOfRange {
+                edge_index,
+                edge_count: network.edges.len(),
+            });
+        }
+        if removed[edge_index] {
+            return Err(OracleError::DuplicateEdgeIndex);
+        }
+        removed[edge_index] = true;
+    }
+
+    if source == target {
+        return Ok(true);
+    }
+
+    let mut visited = vec![false; network.node_count];
+    let mut pending = std::collections::VecDeque::new();
+    visited[source] = true;
+    pending.push_back(source);
+
+    while let Some(node) = pending.pop_front() {
+        for (edge_index, edge) in network.edges.iter().enumerate() {
+            if !removed[edge_index] && edge.source == node && !visited[edge.target] {
+                if edge.target == target {
+                    return Ok(true);
+                }
+                visited[edge.target] = true;
+                pending.push_back(edge.target);
+            }
+        }
+    }
+    Ok(false)
+}
+
+/// Exact pairwise interaction for a binary directed-reachability query.
+///
+/// A true baseline query is required. This avoids reporting an interaction
+/// around an already-failed baseline. The metric is a query-level topology
+/// diagnostic, not a physiological causal effect.
+pub fn pairwise_edge_reachability_interaction(
+    network: &Network,
+    source: usize,
+    target: usize,
+    first_edge: usize,
+    second_edge: usize,
+) -> Result<ReachabilityInteraction, OracleError> {
+    if first_edge == second_edge {
+        return Err(OracleError::DuplicateEdgeIndex);
+    }
+
+    let baseline_reachable = directed_path_exists(network, source, target, &[])?;
+    if !baseline_reachable {
+        return Err(OracleError::BaselineQueryUnreachable);
+    }
+    let without_first =
+        directed_path_exists(network, source, target, &[first_edge])?;
+    let without_second =
+        directed_path_exists(network, source, target, &[second_edge])?;
+    let without_both =
+        directed_path_exists(network, source, target, &[first_edge, second_edge])?;
+
+    let loss = |reachable: bool| if reachable { 0_i8 } else { 1_i8 };
+    let interaction = loss(without_both) - loss(without_first) - loss(without_second)
+        + loss(baseline_reachable);
+
+    Ok(ReachabilityInteraction {
+        baseline_reachable,
+        without_first,
+        without_second,
+        without_both,
+        interaction,
+    })
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -643,6 +766,61 @@ mod tests {
             values: vec![vec![0.0, 1.0], vec![0.0, 0.0]],
         };
         assert_eq!(node_rmse(&left, &right, 0), Err(OracleError::ShapeMismatch));
+    }
+
+
+    #[test]
+    fn redundant_parallel_paths_have_positive_pairwise_interaction() {
+        let network = make_network(
+            4,
+            &[(0, 1, 1.0, 1), (1, 3, 1.0, 1), (0, 2, 1.0, 1), (2, 3, 1.0, 1)],
+        );
+        let result = pairwise_edge_reachability_interaction(&network, 0, 3, 0, 2).unwrap();
+        assert!(result.baseline_reachable);
+        assert!(result.without_first);
+        assert!(result.without_second);
+        assert!(!result.without_both);
+        assert_eq!(result.interaction, 1);
+    }
+
+    #[test]
+    fn serial_bottleneck_edges_have_negative_pairwise_interaction() {
+        let network = make_network(3, &[(0, 1, 1.0, 1), (1, 2, 1.0, 1)]);
+        let result = pairwise_edge_reachability_interaction(&network, 0, 2, 0, 1).unwrap();
+        assert!(result.baseline_reachable);
+        assert!(!result.without_first);
+        assert!(!result.without_second);
+        assert!(!result.without_both);
+        assert_eq!(result.interaction, -1);
+    }
+
+    #[test]
+    fn graph_query_rejects_duplicate_or_out_of_range_edge_indices() {
+        let network = make_network(2, &[(0, 1, 1.0, 1)]);
+        assert_eq!(
+            directed_path_exists(&network, 0, 1, &[0, 0]),
+            Err(OracleError::DuplicateEdgeIndex)
+        );
+        assert_eq!(
+            directed_path_exists(&network, 0, 1, &[1]),
+            Err(OracleError::EdgeIndexOutOfRange {
+                edge_index: 1,
+                edge_count: 1
+            })
+        );
+    }
+
+    #[test]
+    fn pairwise_interaction_requires_reachable_baseline_and_distinct_edges() {
+        let network = make_network(3, &[(0, 1, 1.0, 1), (1, 2, 1.0, 1)]);
+        assert_eq!(
+            pairwise_edge_reachability_interaction(&network, 0, 2, 0, 0),
+            Err(OracleError::DuplicateEdgeIndex)
+        );
+        assert_eq!(
+            pairwise_edge_reachability_interaction(&network, 2, 0, 0, 1),
+            Err(OracleError::BaselineQueryUnreachable)
+        );
     }
 
     #[test]
