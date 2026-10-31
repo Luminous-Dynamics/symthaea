@@ -90,5 +90,23 @@
       },
       "implementation_status": "source_pinned_metrics_and_execution_not_reproduced"
     }
-  ]
+  ],
+  "reference_calibration_design": {
+    "total_alpha_budget": 0.04,
+    "total_dkw_delta_budget": 0.01,
+    "context_count_for_fixture": 2,
+    "alpha_per_context_for_fixture": 0.02,
+    "delta_per_context_for_fixture": 0.005,
+    "dkw_epsilon_formula": "sqrt(ln(2/delta_context)/(2*n_context))",
+    "dkw_epsilon_at_n_600": 0.07066036458008114,
+    "required_independent_reference_units_per_context": {
+      "epsilon_le_0_05": 1199,
+      "epsilon_le_0_025": 4794,
+      "epsilon_le_0_01": 29958,
+      "epsilon_le_0_005": 119830
+    },
+    "unit_definition": "one independently justified calibration score per context; repeated windows from one execution do not automatically qualify as separate units",
+    "iid_reference_assumption_required": true,
+    "windows_do_not_establish_reference_independence": true
+  }
 }
