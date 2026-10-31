@@ -71,4 +71,14 @@ jobs:
           assert support["program_macro_recall"]["independent_group_count"] == 3
           assert support["benign_program_macro_false_alert_rate"]["independent_group_count"] == 4
           assert support["benign_program_macro_false_alert_rate"]["lower_95"] is None
+          bounds = support["group_failure_bounds"]
+          assert bounds["attack_family"]["groups_with_any_failure"] == 1
+          assert bounds["attack_family"]["independent_group_count"] == 1
+          assert bounds["attack_family"]["upper_confidence_bound"] == 1.0
+          assert bounds["adaptation_family_level"]["groups_with_any_failure"] == 2
+          assert bounds["adaptation_family_level"]["independent_group_count"] == 3
+          assert bounds["benign_program"]["groups_with_any_failure"] == 1
+          assert bounds["benign_program"]["independent_group_count"] == 4
+          assert math.isclose(bounds["benign_program"]["upper_confidence_bound"], 0.8677566049821364, rel_tol=0.0, abs_tol=1e-12)
+          assert bounds["benign_program"]["bonferroni_endpoint_count"] == 6
           PY
