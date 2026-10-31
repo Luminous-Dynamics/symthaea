@@ -121,6 +121,8 @@ pub enum IrregularVerificationError {
     OracleDigestMismatch,
     LengthMismatch,
     DroppedSlotManifestInvalid,
+    InvalidTaskContract,
+    InvalidOracleSchedule,
     TimeNotStrictlyIncreasing { index: usize },
     OraclePointMismatch { index: usize },
     NoiseBoundExceeded { index: usize },
@@ -134,6 +136,8 @@ impl fmt::Display for IrregularVerificationError {
             Self::OracleDigestMismatch => write!(f, "irregular oracle SHA-256 digest mismatch"),
             Self::LengthMismatch => write!(f, "irregular public/oracle point count is inconsistent"),
             Self::DroppedSlotManifestInvalid => write!(f, "dropped-slot manifest is invalid"),
+            Self::InvalidTaskContract => write!(f, "irregular task timing or missingness contract is invalid"),
+            Self::InvalidOracleSchedule => write!(f, "irregular oracle schedule is outside the generator bounds"),
             Self::TimeNotStrictlyIncreasing { index } => {
                 write!(f, "observation timestamps are not strictly increasing at index {index}")
             }
@@ -308,6 +312,14 @@ pub fn verify_irregular_trace(
     {
         return Err(IrregularVerificationError::LengthMismatch);
     }
+    if task.nominal_interval_us == 0
+        || task.jitter_per_mille > 900
+        || task.missing_per_mille >= 1_000
+        || oracle.scheduled_slots < 2
+        || oracle.scheduled_slots > MAX_SLOTS
+    {
+        return Err(IrregularVerificationError::InvalidTaskContract);
+    }
     let mut previous_drop = None;
     for slot in &oracle.dropped_slots {
         if usize::try_from(*slot).unwrap_or(usize::MAX) >= oracle.scheduled_slots
@@ -317,14 +329,46 @@ pub fn verify_irregular_trace(
         }
         previous_drop = Some(*slot);
     }
-    if oracle.periods_us.iter().any(|period| *period < 2) {
-        return Err(IrregularVerificationError::LengthMismatch);
+    if oracle
+        .periods_us
+        .iter()
+        .any(|period| *period < 2 || *period > MAX_DURATION_US)
+        || oracle
+            .phases_us
+            .iter()
+            .zip(oracle.periods_us)
+            .any(|(phase, period)| *phase >= period)
+    {
+        return Err(IrregularVerificationError::InvalidOracleSchedule);
     }
 
-    for (index, (observation, point)) in task
+    let mut observed_slots = Vec::with_capacity(task.observations.len());
+    let mut next_drop = 0_usize;
+    for slot in 0..oracle.scheduled_slots {
+        if oracle.dropped_slots.get(next_drop).copied()
+            == Some(u32::try_from(slot).unwrap_or(u32::MAX))
+        {
+            next_drop = next_drop.saturating_add(1);
+        } else {
+            observed_slots.push(u32::try_from(slot).unwrap_or(u32::MAX));
+        }
+    }
+    if observed_slots.len() != task.observations.len() {
+        return Err(IrregularVerificationError::DroppedSlotManifestInvalid);
+    }
+
+    let max_jitter = u64::try_from(
+        (u128::from(task.nominal_interval_us) * u128::from(task.jitter_per_mille)) / 1_000,
+    )
+    .unwrap_or(u64::MAX);
+    let minimum_interval = task.nominal_interval_us.saturating_sub(max_jitter);
+    let maximum_interval = task.nominal_interval_us.saturating_add(max_jitter);
+
+    for (index, ((observation, point), slot)) in task
         .observations
         .iter()
         .zip(&oracle.points)
+        .zip(&observed_slots)
         .enumerate()
     {
         if index > 0
@@ -332,6 +376,19 @@ pub fn verify_irregular_trace(
         {
             return Err(IrregularVerificationError::TimeNotStrictlyIncreasing { index });
         }
+        let previous_slot = if index == 0 { 0 } else { observed_slots[index - 1] };
+        let gap_slots = if index == 0 { *slot } else { slot.saturating_sub(previous_slot) };
+        let delta_us = if index == 0 {
+            observation.time_us
+        } else {
+            observation.time_us.saturating_sub(task.observations[index - 1].time_us)
+        };
+        let minimum_gap = u128::from(minimum_interval) * u128::from(gap_slots);
+        let maximum_gap = u128::from(maximum_interval) * u128::from(gap_slots);
+        if u128::from(delta_us) < minimum_gap || u128::from(delta_us) > maximum_gap {
+            return Err(IrregularVerificationError::InvalidOracleSchedule);
+        }
+
         let observed = [observation.fast, observation.medium, observation.slow];
         if observation.time_us != point.time_us || observed != point.observed {
             return Err(IrregularVerificationError::OraclePointMismatch { index });
@@ -383,8 +440,12 @@ fn validate_config(config: IrregularConfig) -> Result<(), IrregularGenerationErr
             });
         }
     }
-    let total_duration = u128::from(config.nominal_interval_us)
-        .saturating_mul(u128::try_from(config.slots).unwrap_or(u128::MAX));
+    let maximum_interval = (u128::from(config.nominal_interval_us)
+        * (1_000 + u128::from(config.jitter_per_mille)))
+        / 1_000;
+    let total_duration = maximum_interval.saturating_mul(
+        u128::try_from(config.slots.saturating_sub(1)).unwrap_or(u128::MAX),
+    );
     if total_duration > u128::from(MAX_DURATION_US) {
         return Err(IrregularGenerationError::DurationExceedsLimit);
     }
