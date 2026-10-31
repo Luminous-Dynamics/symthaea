@@ -1062,6 +1062,120 @@
       "evidence_grade": "peer-reviewed-primary-paper",
       "comparison_notes": "Mem-Gallery tests multimodal information preserved and evolved across long conversational trajectories. It is a benchmark-scope reference; headline system scores are not copied without matched protocol verification.",
       "source": "https://aclanthology.org/2026.acl-long.1892/"
+    },
+    {
+      "category": "same-harness-reproduction-maintainer-conflict",
+      "benchmark": "BEAM",
+      "benchmark_revision": "OmniMemEval results snapshot checked 12 Oct 2026; same GPT-4.1-mini answer model and GPT-4o-mini judge",
+      "metric": "10M BEAM nugget score",
+      "answer_model": "GPT-4.1-mini-2025-04-14",
+      "judge": "GPT-4o-mini-2024-07-18",
+      "reported_date": "2026-10-12",
+      "sample_size": null,
+      "evidence_grade": "public-reproducible-harness-with-maintainer-conflict",
+      "source": "https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md",
+      "id": "omnimemeval-hindsight-beam10m-2026-10",
+      "system": "Hindsight",
+      "value_percent": 59.75,
+      "secondary_metrics": {
+        "average_answer_context_tokens_10m": 23815
+      },
+      "comparison_notes": "Same evaluator setup across the OmniMemEval table: GPT-4.1-mini answers and GPT-4o-mini judge. This is more useful for relative comparison than separately published vendor runs, but the benchmark and harness are maintained by MemTensor, which also makes MemOS; treat that conflict transparently. Scores are BEAM nugget scores, not interchangeable with past.dev answer accuracy or LongMemEval Recall@20."
+    },
+    {
+      "category": "same-harness-reproduction-maintainer-conflict",
+      "benchmark": "BEAM",
+      "benchmark_revision": "OmniMemEval results snapshot checked 12 Oct 2026; same GPT-4.1-mini answer model and GPT-4o-mini judge",
+      "metric": "10M BEAM nugget score",
+      "answer_model": "GPT-4.1-mini-2025-04-14",
+      "judge": "GPT-4o-mini-2024-07-18",
+      "reported_date": "2026-10-12",
+      "sample_size": null,
+      "evidence_grade": "public-reproducible-harness-with-maintainer-conflict",
+      "source": "https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md",
+      "id": "omnimemeval-memos-beam10m-2026-10",
+      "system": "MemOS",
+      "value_percent": 56.75,
+      "secondary_metrics": {
+        "average_answer_context_tokens_10m": 1558
+      },
+      "comparison_notes": "Same evaluator setup across the OmniMemEval table: GPT-4.1-mini answers and GPT-4o-mini judge. This is more useful for relative comparison than separately published vendor runs, but the benchmark and harness are maintained by MemTensor, which also makes MemOS; treat that conflict transparently. Scores are BEAM nugget scores, not interchangeable with past.dev answer accuracy or LongMemEval Recall@20."
+    },
+    {
+      "category": "same-harness-reproduction-maintainer-conflict",
+      "benchmark": "BEAM",
+      "benchmark_revision": "OmniMemEval results snapshot checked 12 Oct 2026; same GPT-4.1-mini answer model and GPT-4o-mini judge",
+      "metric": "10M BEAM nugget score",
+      "answer_model": "GPT-4.1-mini-2025-04-14",
+      "judge": "GPT-4o-mini-2024-07-18",
+      "reported_date": "2026-10-12",
+      "sample_size": null,
+      "evidence_grade": "public-reproducible-harness-with-maintainer-conflict",
+      "source": "https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md",
+      "id": "omnimemeval-zep-graphiti-beam10m-2026-10",
+      "system": "Zep / Graphiti",
+      "value_percent": 56.11,
+      "secondary_metrics": {
+        "average_answer_context_tokens_10m": 1862
+      },
+      "comparison_notes": "Same evaluator setup across the OmniMemEval table: GPT-4.1-mini answers and GPT-4o-mini judge. This is more useful for relative comparison than separately published vendor runs, but the benchmark and harness are maintained by MemTensor, which also makes MemOS; treat that conflict transparently. Scores are BEAM nugget scores, not interchangeable with past.dev answer accuracy or LongMemEval Recall@20."
+    },
+    {
+      "category": "same-harness-reproduction-maintainer-conflict",
+      "benchmark": "BEAM",
+      "benchmark_revision": "OmniMemEval results snapshot checked 12 Oct 2026; same GPT-4.1-mini answer model and GPT-4o-mini judge",
+      "metric": "10M BEAM nugget score",
+      "answer_model": "GPT-4.1-mini-2025-04-14",
+      "judge": "GPT-4o-mini-2024-07-18",
+      "reported_date": "2026-10-12",
+      "sample_size": null,
+      "evidence_grade": "public-reproducible-harness-with-maintainer-conflict",
+      "source": "https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md",
+      "id": "omnimemeval-cognee-beam10m-2026-10",
+      "system": "Cognee",
+      "value_percent": 56.02,
+      "secondary_metrics": {
+        "average_answer_context_tokens_10m": 40914
+      },
+      "comparison_notes": "Same evaluator setup across the OmniMemEval table: GPT-4.1-mini answers and GPT-4o-mini judge. This is more useful for relative comparison than separately published vendor runs, but the benchmark and harness are maintained by MemTensor, which also makes MemOS; treat that conflict transparently. Scores are BEAM nugget scores, not interchangeable with past.dev answer accuracy or LongMemEval Recall@20."
+    },
+    {
+      "category": "same-harness-reproduction-maintainer-conflict",
+      "benchmark": "BEAM",
+      "benchmark_revision": "OmniMemEval results snapshot checked 12 Oct 2026; same GPT-4.1-mini answer model and GPT-4o-mini judge",
+      "metric": "10M BEAM nugget score",
+      "answer_model": "GPT-4.1-mini-2025-04-14",
+      "judge": "GPT-4o-mini-2024-07-18",
+      "reported_date": "2026-10-12",
+      "sample_size": null,
+      "evidence_grade": "public-reproducible-harness-with-maintainer-conflict",
+      "source": "https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md",
+      "id": "omnimemeval-letta-beam10m-2026-10",
+      "system": "Letta",
+      "value_percent": 52.3,
+      "secondary_metrics": {
+        "average_answer_context_tokens_10m": 49786
+      },
+      "comparison_notes": "Same evaluator setup across the OmniMemEval table: GPT-4.1-mini answers and GPT-4o-mini judge. This is more useful for relative comparison than separately published vendor runs, but the benchmark and harness are maintained by MemTensor, which also makes MemOS; treat that conflict transparently. Scores are BEAM nugget scores, not interchangeable with past.dev answer accuracy or LongMemEval Recall@20."
+    },
+    {
+      "category": "same-harness-reproduction-maintainer-conflict",
+      "benchmark": "BEAM",
+      "benchmark_revision": "OmniMemEval results snapshot checked 12 Oct 2026; same GPT-4.1-mini answer model and GPT-4o-mini judge",
+      "metric": "10M BEAM nugget score",
+      "answer_model": "GPT-4.1-mini-2025-04-14",
+      "judge": "GPT-4o-mini-2024-07-18",
+      "reported_date": "2026-10-12",
+      "sample_size": null,
+      "evidence_grade": "public-reproducible-harness-with-maintainer-conflict",
+      "source": "https://github.com/MemTensor/OmniMemEval/blob/main/docs/user_memory/results.md",
+      "id": "omnimemeval-mem0-beam10m-2026-10",
+      "system": "Mem0",
+      "value_percent": 43.33,
+      "secondary_metrics": {
+        "average_answer_context_tokens_10m": 6914
+      },
+      "comparison_notes": "Same evaluator setup across the OmniMemEval table: GPT-4.1-mini answers and GPT-4o-mini judge. This is more useful for relative comparison than separately published vendor runs, but the benchmark and harness are maintained by MemTensor, which also makes MemOS; treat that conflict transparently. Scores are BEAM nugget scores, not interchangeable with past.dev answer accuracy or LongMemEval Recall@20."
     }
   ],
   "broca_targets": {
