@@ -52,7 +52,7 @@ jobs:
           assert report["schema_version"] == "cmaq-017-multistep-exploitability-v0.1"
           assert report["episode_count"] == 16
           assert report["environment_steps"] == 12
-          assert report["evaluator_uniform_grid_probe_count"] == 201
+          assert report["evaluator_structured_probe_count"] == 201
           assert report["horizons"] == [1, 4, 8]
           assert report["candidate_budgets"] == [8, 32, 64]
           assert report["execution_blocks"] == [1, 4]
@@ -73,7 +73,7 @@ jobs:
               assert row["candidate_budget"] in (8, 32, 64)
               assert row["return_ci95_lower"] <= row["mean_return"] <= row["return_ci95_upper"]
               assert row["worst_episode_return"] <= row["lower_decile_mean_return"] <= row["mean_return"]
-              assert row["uniform_grid_one_step_state_rmse"] >= 0.0
+              assert row["structured_probe_one_step_state_rmse"] >= 0.0
               assert row["paired_delta_vs_shuffled_ci95_lower"] <= (
                   row["paired_return_delta_vs_shuffled_future"]
               ) <= row["paired_delta_vs_shuffled_ci95_upper"]
