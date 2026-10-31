@@ -570,6 +570,7 @@ mod tests {
             } else {
                 InfluenceDisposition::EffectDetected
             },
+            raw_measured_support: intervals.clone(),
             support: EventInteractionSupport {
                 source_event_index: index,
                 acoustic_support: intervals,
@@ -733,7 +734,13 @@ mod tests {
             },
             total_channel_windows: 0,
             affected_channel_windows: 0,
+            support_policy: crate::counterfactual_influence::InfluenceSupportPolicy::default(),
+            window_measurements: Vec::new(),
             measured_influence_intervals: Vec::new(),
+            qualified_support_intervals: Vec::new(),
+            qualified_channel_windows: 0,
+            bridged_channel_windows: 0,
+            tail_extension_frames_applied: 0,
             disposition: InfluenceDisposition::NoEffectAboveNoiseFloor,
             receipt_sha256: digest("influence-report"),
         };
