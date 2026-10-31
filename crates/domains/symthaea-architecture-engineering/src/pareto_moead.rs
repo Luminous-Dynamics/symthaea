@@ -7,6 +7,7 @@
 
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
 
@@ -18,11 +19,16 @@ use super::pareto_objectives::{
     analyze_pareto, ObjectiveDirection, ParetoAnalysisPlan, ParetoAnalysisSummary,
     ParetoCandidate, ParetoError, ParetoObjectiveSpec,
 };
+use super::pareto_objectives::{
+    analyze_pareto, ObjectiveDirection, ParetoAnalysisPlan, ParetoAnalysisSummary,
+    ParetoCandidate, ParetoError, ParetoObjectiveSpec,
+};
 
 const SCHEMA: &str = "symthaea.architecture-engineering.pareto-moead";
 const VERSION: &str = "0.1.0";
 const ALGORITHM_ID: &str = "moead-de-reference-v0.1";
 const ZERO_WEIGHT_FLOOR: f64 = 1e-6;
+const MAX_POPULATION_SIZE: usize = 2_048;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MoeadError {
@@ -61,10 +67,10 @@ impl MoeadWeightMode {
     pub fn population_size(&self) -> Result<usize, MoeadError> {
         match self {
             Self::Uniform2d { population_size } => {
-                if *population_size < 4 {
+                if *population_size < 4 || *population_size > MAX_POPULATION_SIZE {
                     return Err(MoeadError::new(
                         "weight_mode.population_size",
-                        "two-objective population must be at least four",
+                        format!("two-objective population must be between four and {MAX_POPULATION_SIZE}"),
                     ));
                 }
                 Ok(*population_size)
@@ -78,11 +84,18 @@ impl MoeadWeightMode {
                 }
                 let h = divisions.checked_add(1)
                     .ok_or_else(|| MoeadError::new("weight_mode.divisions", "division count overflow"))?;
-                h.checked_mul(divisions.checked_add(2).ok_or_else(|| {
+                let count = h.checked_mul(divisions.checked_add(2).ok_or_else(|| {
                     MoeadError::new("weight_mode.divisions", "division count overflow")
                 })?)
                     .and_then(|value| value.checked_div(2))
-                    .ok_or_else(|| MoeadError::new("weight_mode", "simplex population count overflow"))
+                    .ok_or_else(|| MoeadError::new("weight_mode", "simplex population count overflow"))?;
+                if count > MAX_POPULATION_SIZE {
+                    return Err(MoeadError::new(
+                        "weight_mode.divisions",
+                        format!("simplex population cannot exceed {MAX_POPULATION_SIZE}"),
+                    ));
+                }
+                Ok(count)
             }
         }
     }
@@ -421,9 +434,9 @@ where
     let nondominated_front = front_indices.iter()
         .map(|index| to_candidate(&population[*index]))
         .collect::<Result<Vec<_>, _>>()?;
-    let mut final_population = final_population;
+    let final_population = final_population;
     let mut nondominated_front = nondominated_front;
-    final_population.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
+    // Final population order is the subproblem/weight-vector order and must be preserved.
     nondominated_front.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
 
     let report_sha256 = digest_serializable(&MoeadReportPayload {
@@ -458,6 +471,92 @@ where
         nondominated_front,
         report_sha256,
     })
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MoeadParetoAnalysis {
+    pub plan: ParetoAnalysisPlan,
+    pub analysis: ParetoAnalysisSummary,
+}
+
+/// Deterministically replay a MOEA/D report from the exact problem, configuration and seed.
+pub fn verify_moead_report(
+    report: &MoeadRunReport,
+    config: &MoeadConfig,
+) -> Result<(), MoeadError> {
+    let recomputed = match report.problem_id.as_str() {
+        "zdt1" => run_moead_zdt1(config, report.decision_dimensions)?,
+        "dtlz2-3obj" => run_moead_dtlz2(config, report.decision_dimensions)?,
+        other => {
+            return Err(MoeadError::new(
+                "report.problem_id",
+                format!("unsupported MOEA/D problem ID {other:?}"),
+            ));
+        }
+    };
+    if &recomputed != report {
+        return Err(MoeadError::new(
+            "report",
+            "stored MOEA/D report differs from deterministic replay",
+        ));
+    }
+    Ok(())
+}
+
+/// Convert a replay-verified nondominated archive to the shared Pareto indicator path.
+/// Repeated decision vectors are deduplicated only here, not in the evaluation count or run report.
+pub fn analyze_moead_report(
+    report: &MoeadRunReport,
+    config: &MoeadConfig,
+    objective_specs: Vec<ParetoObjectiveSpec>,
+    reference_point_utility: Vec<f64>,
+) -> Result<MoeadParetoAnalysis, MoeadError> {
+    verify_moead_report(report, config)?;
+    if objective_specs.len() != report.objective_dimensions {
+        return Err(MoeadError::new(
+            "objective_specs",
+            "objective specification count differs from the benchmark result",
+        ));
+    }
+    if objective_specs.iter().any(|objective| objective.direction != ObjectiveDirection::Minimize) {
+        return Err(MoeadError::new(
+            "objective_specs.direction",
+            "ZDT1 and DTLZ2 reference problems use native minimization objectives",
+        ));
+    }
+    let mut unique_candidates = BTreeMap::<String, ParetoCandidate>::new();
+    for candidate in &report.nondominated_front {
+        let evidence_sha256 = digest_serializable(candidate)?;
+        unique_candidates.entry(candidate.candidate_id.clone()).or_insert_with(|| {
+            ParetoCandidate {
+                candidate_id: candidate.candidate_id.clone(),
+                objective_values: candidate.objective_values.clone(),
+                feasible: true,
+                constraint_violations: Vec::new(),
+                evidence_sha256,
+            }
+        });
+    }
+    let candidates = unique_candidates.into_values().collect::<Vec<_>>();
+    if candidates.is_empty() {
+        return Err(MoeadError::new(
+            "report.nondominated_front",
+            "cannot compute Pareto indicators for an empty archive",
+        ));
+    }
+    let plan = ParetoAnalysisPlan::new(
+        format!("moead-{}-{}", report.problem_id, report.config_sha256),
+        objective_specs,
+        reference_point_utility,
+        candidates,
+    ).map_err(map_pareto_error)?;
+    let analysis = analyze_pareto(&plan).map_err(map_pareto_error)?;
+    Ok(MoeadParetoAnalysis { plan, analysis })
+}
+
+fn map_pareto_error(error: ParetoError) -> MoeadError {
+    MoeadError::new(error.path, error.message)
 }
 
 fn build_neighbourhoods(
@@ -670,6 +769,7 @@ fn digest_serializable<T: Serialize>(value: &T) -> Result<String, MoeadError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeSet;
 
     fn zdt_config(seed: u64) -> MoeadConfig {
         MoeadConfig {
@@ -737,6 +837,52 @@ mod tests {
                 && candidate.objective_values.len() == 3
                 && candidate.objective_values.iter().all(|value| value.is_finite())
         }));
+    }
+
+    #[test]
+    fn report_replay_and_common_pareto_indicators_are_bound_to_moead_archive() {
+        let config = zdt_config(87);
+        let report = run_moead_zdt1(&config, 10).unwrap();
+        verify_moead_report(&report, &config).unwrap();
+        assert_eq!(report.weight_vectors.len(), report.final_population.len());
+
+        let analysis = analyze_moead_report(
+            &report,
+            &config,
+            vec![
+                ParetoObjectiveSpec {
+                    objective_id: "f1".to_owned(),
+                    direction: ObjectiveDirection::Minimize,
+                    scale_lower: 0.0,
+                    scale_upper: 1.0,
+                },
+                ParetoObjectiveSpec {
+                    objective_id: "f2".to_owned(),
+                    direction: ObjectiveDirection::Minimize,
+                    scale_lower: 0.0,
+                    scale_upper: 1.0,
+                },
+            ],
+            vec![0.0, 0.0],
+        ).unwrap();
+        assert!(!analysis.analysis.nondominated_candidate_ids.is_empty());
+
+        let mut tampered = report.clone();
+        tampered.weight_vectors[0][0] += 0.01;
+        assert!(verify_moead_report(&tampered, &config).is_err());
+    }
+
+    #[test]
+    fn final_population_keeps_weight_vector_subproblem_order() {
+        let config = zdt_config(91);
+        let report = run_moead_zdt1(&config, 10).unwrap();
+        let weight_count = report.weight_vectors.len();
+        assert_eq!(weight_count, report.final_population.len());
+        for index in 0..weight_count {
+            let candidate = &report.final_population[index];
+            assert_eq!(candidate.decision_values.len(), 10);
+            assert!(report.weight_vectors[index].iter().sum::<f64>() > 0.999999);
+        }
     }
 
     #[test]
