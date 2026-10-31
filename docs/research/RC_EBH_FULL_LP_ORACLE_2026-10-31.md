@@ -1,7 +1,7 @@
 # RC-eBH exact full-subsets LP oracle
 
 **Date:** 2026-10-31  
-**Status:** 5/5 local tests passed; 200 random full-LP comparisons for K=1..5. This is independent finite computation, not a proof of the general optimality theorem.
+**Status:** 6/6 local tests passed; 200 random full-LP comparisons for K=1..5 and 60 additional comparisons for K=6..8. This is independent finite computation, not a proof of the general optimality theorem.
 
 ## Why this check matters
 
@@ -27,7 +27,7 @@ RC-eBH is calculated independently from the paper's greatest convex minorant for
 
 ## Executed results
 
-The suite tests 200 random e-value families (40 each for K=1,2,3,4,5) with alpha drawn from {.01,.025,.05,.10,.20,.50}.
+The suite tests 200 random e-value families (40 each for K=1,2,3,4,5) and 30 more families (10 each for K=6,7,8), with alpha drawn from {.01,.025,.05,.10,.20,.50}. An additional out-of-suite run checked 60 K=6..8 cases.
 
 | Check | Result |
 |---|---:|
@@ -35,8 +35,15 @@ The suite tests 200 random e-value families (40 each for K=1,2,3,4,5) with alpha
 | Random LP families | 200 |
 | Maximum absolute objective gap | 4.44e-16 |
 | Maximum difference between RC and LP tails | 3.33e-16 |
-| Maximum full-subset violation of RC-eBH | 3.33e-16 |
-| Maximum explicit LP constraints | 41 (K=5) |
+| Maximum full-subset violation of RC-eBH (K<=5) | 3.33e-16 |
+| Maximum explicit LP constraints (K<=5) | 41 |
+
+Additional K=6..8 run:
+- 60 cases, 20 per K, in 0.20 seconds;
+- maximum objective gap: 8.88e-16;
+- maximum tail difference: 7.77e-16;
+- maximum closure violation: 2.22e-16;
+- maximum LP constraint count: 271.
 
 Boundary tests include all-zero and tied vectors, a single large e-value, a log-spread from 1e-8 to 1e8, and mixed zero/positive e-values. All matched.
 
