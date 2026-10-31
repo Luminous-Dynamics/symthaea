@@ -169,37 +169,117 @@ jobs:
           if any(branch["status"] != "planned" for branch in fixture["branches"]) or fixture["promotion"]["status"] != "not_attempted":
               raise SystemExit("synthetic branch ledger cannot claim branch execution or promotion")
           def errors(value):
-              result=[]; branches=value["branches"]
-              ids=[b["branch_id"] for b in branches]; workspaces=[b["workspace_id"] for b in branches]
-              if len(ids)!=len(set(ids)): result.append("duplicate branch IDs")
-              if len(workspaces)!=len(set(workspaces)): result.append("shared mutable workspace")
-              by_id={b["branch_id"]:b for b in branches}; roots=[b for b in branches if b["parent_branch_id"] is None]
-              if len(roots)!=1 or roots[0]["kind"]!="root": result.append("branch graph must have one root")
-              for b in branches:
-                  p=b["parent_branch_id"]
-                  if p is not None and (p not in by_id or p==b["branch_id"]): result.append("orphan or self parent")
-                  if b["base_commit"]!=value["task"]["repository_commit"]: result.append("source commit drift")
-                  if b["proof_state_sha256"]!=value["task"]["proof_state_sha256"]: result.append("proof-state drift")
-              for b in branches:
-                  seen=set(); current=b["branch_id"]
+              result = []
+              branches = value["branches"]
+              ids = [b["branch_id"] for b in branches]
+              workspaces = [b["workspace_id"] for b in branches]
+              if len(ids) != len(set(ids)):
+                  result.append("duplicate branch IDs")
+              if len(workspaces) != len(set(workspaces)):
+                  result.append("shared mutable workspace")
+              by_id = {b["branch_id"]: b for b in branches}
+              roots = [b for b in branches if b["parent_branch_id"] is None]
+              if len(roots) != 1 or roots[0]["kind"] != "root":
+                  result.append("branch graph must have one root")
+              for branch in branches:
+                  parent_id = branch["parent_branch_id"]
+                  if parent_id is not None and (parent_id not in by_id or parent_id == branch["branch_id"]):
+                      result.append("orphan or self parent")
+                  if branch["base_commit"] != value["task"]["repository_commit"]:
+                      result.append("source commit drift")
+                  if branch["proof_state_sha256"] != value["task"]["proof_state_sha256"]:
+                      result.append("proof-state drift")
+                  candidate_sha = branch["candidate_sha256"]
+                  if candidate_sha is not None and (
+                      branch["status"] != "candidate_available"
+                      or branch["result_type"] != "proof_candidate"
+                  ):
+                      result.append("candidate digest is not bound to an available proof candidate")
+                  if branch["status"] == "candidate_available" and not candidate_sha:
+                      result.append("available proof candidate is missing its content digest")
+              for branch in branches:
+                  seen = set()
+                  current = branch["branch_id"]
                   while current is not None and current in by_id:
-                      if current in seen: result.append("branch cycle"); break
-                      seen.add(current); current=by_id[current]["parent_branch_id"]
-              budget=value["budget"]; actual=value["actual"]
-              if len(branches)>budget["max_branches"]: result.append("branch-count budget exceeded")
-              if actual["peak_active_branches"]>budget["max_active_branches"]: result.append("active-branch cap exceeded")
-              if actual["peak_lean_queries"]>budget["max_lean_queries"]: result.append("Lean-query cap exceeded")
-              caps={"tokens":"max_tokens","model_calls":"max_model_calls","lean_cpu_ms":"max_lean_cpu_ms","wall_ms":"max_wall_ms","cost_microusd":"max_cost_microusd"}
-              for field,cap in caps.items():
-                  if actual[field]>budget[cap]: result.append(field+" budget exceeded")
-                  if sum(b["resources"][field] for b in branches)!=actual[field]: result.append(field+" branch totals mismatch")
-              p=value["promotion"]
-              if p["status"]=="verified_success":
-                  if p["branch_id"] not in by_id: result.append("promoted branch missing")
-                  if p["target_type_before_sha256"]!=p["target_type_after_sha256"]: result.append("promoted theorem type changed")
-                  if p["patch_scope"]!="sorry-span-only": result.append("promotion escaped sorry span")
-                  if p["kernel_check"]!="passed" or p["contains_sorry_ax"]: result.append("promotion kernel/sorryAx gate failed")
-                  if p["new_axiom_names"] or not p["checker_receipt_sha256"] or not p["replay_receipt_sha256"]: result.append("promotion missing independent evidence")
+                      if current in seen:
+                          result.append("branch cycle")
+                          break
+                      seen.add(current)
+                      current = by_id[current]["parent_branch_id"]
+
+              budget = value["budget"]
+              actual = value["actual"]
+              if len(branches) > budget["max_branches"]:
+                  result.append("branch-count budget exceeded")
+              started = sum(branch["status"] != "planned" for branch in branches)
+              if actual["branches_started"] != started:
+                  result.append("started branch count mismatch")
+              if actual["peak_active_branches"] > budget["max_active_branches"]:
+                  result.append("active-branch cap exceeded")
+              if actual["peak_active_branches"] > actual["branches_started"]:
+                  result.append("active branches exceed branches started")
+              if actual["peak_lean_queries"] > budget["max_lean_queries"]:
+                  result.append("Lean-query cap exceeded")
+              if actual["peak_lean_queries"] > actual["branches_started"] and actual["branches_started"] == 0:
+                  result.append("Lean queries recorded without a started branch")
+              additive_caps = {
+                  "tokens": "max_tokens",
+                  "model_calls": "max_model_calls",
+                  "lean_cpu_ms": "max_lean_cpu_ms",
+                  "cost_microusd": "max_cost_microusd"
+              }
+              for field, cap in additive_caps.items():
+                  if actual[field] > budget[cap]:
+                      result.append(field + " budget exceeded")
+                  if sum(branch["resources"][field] for branch in branches) != actual[field]:
+                      result.append(field + " branch totals mismatch")
+              branch_wall_work = sum(branch["resources"]["wall_ms"] for branch in branches)
+              if branch_wall_work != actual["branch_wall_work_ms"]:
+                  result.append("branch wall-work total mismatch")
+              if branch_wall_work > budget["max_branch_wall_work_ms"]:
+                  result.append("branch wall-work budget exceeded")
+              if actual["wall_ms"] > budget["max_wall_ms"]:
+                  result.append("elapsed wall-clock budget exceeded")
+              promotion = value["promotion"]
+              if promotion["status"] == "not_attempted":
+                  null_fields = (
+                      "branch_id", "candidate_sha256", "source_patch_sha256",
+                      "checker_id", "replay_verifier_id", "checker_candidate_sha256",
+                      "replay_candidate_sha256", "target_type_before_sha256",
+                      "target_type_after_sha256", "patch_scope", "checker_receipt_sha256",
+                      "replay_receipt_sha256"
+                  )
+                  if any(promotion[field] is not None for field in null_fields):
+                      result.append("not-attempted promotion contains promotion evidence")
+                  if promotion["kernel_check"] != "not_run" or promotion["contains_sorry_ax"] or promotion["new_axiom_names"]:
+                      result.append("not-attempted promotion has execution claims")
+              if promotion["status"] == "verified_success":
+                  candidate_branch = by_id.get(promotion["branch_id"])
+                  if candidate_branch is None:
+                      result.append("promoted branch missing")
+                  else:
+                      if candidate_branch["status"] != "candidate_available" or candidate_branch["result_type"] != "proof_candidate":
+                          result.append("promoted branch did not return a proof candidate")
+                      if candidate_branch["candidate_sha256"] != promotion["candidate_sha256"]:
+                          result.append("promotion candidate digest differs from branch artifact")
+                  if promotion["candidate_sha256"] != promotion["checker_candidate_sha256"]:
+                      result.append("checker did not attest the promoted candidate bytes")
+                  if promotion["candidate_sha256"] != promotion["replay_candidate_sha256"]:
+                      result.append("independent replay did not check the promoted candidate bytes")
+                  if promotion["target_type_before_sha256"] != value["task"]["target_type_sha256"]:
+                      result.append("promotion target type differs from source task")
+                  if promotion["target_type_before_sha256"] != promotion["target_type_after_sha256"]:
+                      result.append("promoted theorem type changed")
+                  if promotion["patch_scope"] != "sorry-span-only":
+                      result.append("promotion escaped sorry span")
+                  if promotion["kernel_check"] != "passed" or promotion["contains_sorry_ax"]:
+                      result.append("promotion kernel/sorryAx gate failed")
+                  if promotion["new_axiom_names"]:
+                      result.append("promotion introduced unapproved axioms")
+                  if not promotion["checker_receipt_sha256"] or not promotion["replay_receipt_sha256"]:
+                      result.append("promotion missing independent evidence")
+                  if not promotion["checker_id"] or not promotion["replay_verifier_id"] or promotion["checker_id"] == promotion["replay_verifier_id"]:
+                      result.append("checker and replay identities are not independent")
               return result
           if errors(fixture): raise SystemExit("synthetic branch fixture semantic failure: "+repr(errors(fixture)))
           print("PITB_SPECULATIVE_BRANCH_FIXTURE_PASS: private planned workspaces; no execution or promotion")
@@ -215,6 +295,62 @@ jobs:
           bad=copy.deepcopy(fixture); bad["actual"]["peak_active_branches"]=3
           if not errors(bad): raise SystemExit("active-branch cap negative control did not fail")
           print("PITB_SPECULATIVE_BRANCH_NEGATIVE_CONTROLS_PASS: workspace, DAG, state, and concurrency")
+
+          # A real promotion-shaped synthetic ledger is used only to qualify the
+          # identity joins. It is never written as a measured run.
+          success = copy.deepcopy(fixture)
+          root, child = success["branches"]
+          root["status"] = "partial_result"
+          root["result_type"] = "retrieval_route"
+          root["resources"].update({"tokens":40,"model_calls":1,"lean_cpu_ms":20,"wall_ms":100,"cost_microusd":10})
+          child["status"] = "candidate_available"
+          child["result_type"] = "proof_candidate"
+          child["candidate_sha256"] = "a" * 64
+          child["resources"].update({"tokens":60,"model_calls":1,"lean_cpu_ms":30,"wall_ms":80,"cost_microusd":20})
+          success["actual"].update({
+              "branches_started":2,"peak_active_branches":2,"peak_lean_queries":1,
+              "tokens":100,"model_calls":2,"lean_cpu_ms":50,
+              "wall_ms":120,"branch_wall_work_ms":180,"cost_microusd":30
+          })
+          success["promotion"].update({
+              "status":"verified_success","branch_id":"delegated-1",
+              "candidate_sha256":"a"*64,"source_patch_sha256":"b"*64,
+              "checker_id":"lean-kernel-checker","replay_verifier_id":"independent-clean-replay",
+              "checker_candidate_sha256":"a"*64,"replay_candidate_sha256":"a"*64,
+              "target_type_before_sha256":success["task"]["target_type_sha256"],
+              "target_type_after_sha256":success["task"]["target_type_sha256"],
+              "patch_scope":"sorry-span-only",
+              "checker_receipt_sha256":"c"*64,"replay_receipt_sha256":"d"*64,
+              "kernel_check":"passed","contains_sorry_ax":False,"new_axiom_names":[]
+          })
+          validator.validate(success)
+          if errors(success):
+              raise SystemExit("candidate-bound synthetic promotion rejected: "+repr(errors(success)))
+          print("PITB_SPECULATIVE_BRANCH_PROMOTION_JOIN_PASS: candidate hash, patch, target and independent verifier identities agree")
+
+          bad=copy.deepcopy(success); bad["promotion"]["candidate_sha256"]="e"*64
+          must_reject("promoted candidate differs from branch artifact",bad)
+          bad=copy.deepcopy(success); bad["promotion"]["replay_candidate_sha256"]="e"*64
+          must_reject("replay checked different candidate bytes",bad)
+          bad=copy.deepcopy(success); bad["promotion"]["checker_id"]=bad["promotion"]["replay_verifier_id"]
+          must_reject("same verifier identity for check and replay",bad)
+          bad=copy.deepcopy(success); bad["promotion"]["target_type_after_sha256"]="e"*64
+          must_reject("promoted theorem statement changed",bad)
+          bad=copy.deepcopy(success); bad["promotion"]["patch_scope"]="outside-target-span"
+          must_reject("promotion edited outside sorry span",bad)
+          bad=copy.deepcopy(success); bad["promotion"]["new_axiom_names"]=["Unsafe.assumption"]
+          must_reject("unapproved axiom in promoted proof",bad)
+          bad=copy.deepcopy(success); bad["actual"]["wall_ms"]=240001
+          if not errors(bad): raise SystemExit("elapsed wall-time cap negative control did not fail")
+          bad=copy.deepcopy(success); bad["actual"]["branch_wall_work_ms"]=179
+          if not errors(bad): raise SystemExit("branch wall-work accounting control did not fail")
+          print("PITB_SPECULATIVE_BRANCH_PROMOTION_NEGATIVES_PASS: candidate substitution, replay identity, independence, theorem integrity, patch scope, axioms and wall budgets")
+
+          # Parallel workers can accumulate more branch wall-work than elapsed
+          # wall time. This is expected, not a resource-accounting mismatch.
+          if success["actual"]["branch_wall_work_ms"] <= success["actual"]["wall_ms"]:
+              raise SystemExit("parallel wall-work fixture failed to demonstrate overlapping branch execution")
+          print("PITB_SPECULATIVE_BRANCH_PARALLEL_WALL_ACCOUNTING_PASS: 180 branch-ms work / 120 elapsed-ms")
           PY
 
   sorrydb-snapshot-import:

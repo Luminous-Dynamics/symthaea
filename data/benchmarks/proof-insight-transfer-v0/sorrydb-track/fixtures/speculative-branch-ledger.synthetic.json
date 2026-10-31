@@ -16,7 +16,8 @@
     "max_model_calls": 100,
     "max_lean_cpu_ms": 60000,
     "max_wall_ms": 120000,
-    "max_cost_microusd": 10000
+    "max_cost_microusd": 10000,
+    "max_branch_wall_work_ms": 240000
   },
   "actual": {
     "branches_started": 0,
@@ -26,7 +27,8 @@
     "model_calls": 0,
     "lean_cpu_ms": 0,
     "wall_ms": 0,
-    "cost_microusd": 0
+    "cost_microusd": 0,
+    "branch_wall_work_ms": 0
   },
   "branches": [
     {
@@ -45,7 +47,8 @@
         "lean_cpu_ms": 0,
         "wall_ms": 0,
         "cost_microusd": 0
-      }
+      },
+      "candidate_sha256": null
     },
     {
       "branch_id": "delegated-1",
@@ -63,7 +66,8 @@
         "lean_cpu_ms": 0,
         "wall_ms": 0,
         "cost_microusd": 0
-      }
+      },
+      "candidate_sha256": null
     }
   ],
   "promotion": {
@@ -76,6 +80,12 @@
     "replay_receipt_sha256": null,
     "kernel_check": "not_run",
     "contains_sorry_ax": false,
-    "new_axiom_names": []
+    "new_axiom_names": [],
+    "candidate_sha256": null,
+    "source_patch_sha256": null,
+    "checker_id": null,
+    "replay_verifier_id": null,
+    "checker_candidate_sha256": null,
+    "replay_candidate_sha256": null
   }
 }

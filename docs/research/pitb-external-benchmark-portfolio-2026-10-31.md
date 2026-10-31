@@ -162,3 +162,10 @@ AutoformBench (Meta AI, 13 October 2026) addresses advanced-mathematics formaliz
 LCS-Bench tests theory-scale autoformalization of logics for computer science: 327 textbook items, more than 4,076 declarations and over 85K lines of Lean. Its reported state-of-the-art autoformalization score is 20.1% across its task setup. It is valuable for evaluating whether insights and typed dependencies scale from individual holes to whole formal libraries.
 
 **PITB implication:** add external replication targets by task type, not leaderboard score. SorryDB tests completion of project-local holes; AutoformBench tests filling in missing formal infrastructure around advanced mathematics; LCS-Bench tests coherent theory-scale construction; Aegis tests correctness obligations for real implementations. PITB's unifying contribution could be a typed evidence-and-search controller, but the success metric and denominators remain separate for each cohort.
+
+
+## Experimental architecture correction: branch wall-work versus elapsed time
+
+Parallel proof exploration needs two clocks. The sum of per-branch wall durations is **branch wall-work**; it can exceed end-to-end elapsed wall time when branches overlap. Do not add overlapping branch durations and call the result user-observed latency. The runtime ledger now records branch wall-work separately from elapsed wall-clock. Tokens, model calls, Lean CPU and cost remain additive across branches; elapsed wall time is a separate end-to-end measure. Report both branch wall-work and elapsed time, along with p50/p95 time-to-first-verified-proof.
+
+Promotion is now a content-addressed transaction. A branch candidate carries a digest; the promotion record must name the exact candidate digest, the checker and independent replay each state that exact digest, and the target type must match the source task before and after. The checker and replay identities must be distinct. A label such as candidate_available cannot authorize promotion by itself.
