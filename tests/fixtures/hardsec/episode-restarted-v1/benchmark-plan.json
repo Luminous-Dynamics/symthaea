@@ -11,7 +11,11 @@
     "fixed_reference_conformal",
     "authors_official_python_cctm_pinned",
     "weighted_restarted_sum_near_harmonic",
-    "weighted_restarted_max_near_harmonic"
+    "weighted_restarted_max_near_harmonic",
+    "t-smade-2024-two-stage-hpc-detector",
+    "mandal-2024-counter-interleaving-detector",
+    "intel-vtune-topdown-pmu-profile",
+    "linux-perf-pmu-counter-baseline"
   ],
   "scenarios": [
     "iid_episode_null",
@@ -53,7 +57,10 @@
     "randomizer_reuse_rate",
     "cpu_time_per_episode",
     "peak_memory",
-    "episode_aggregation_overhead"
+    "episode_aggregation_overhead",
+    "pfa_exact_binomial_confidence_interval",
+    "arl_reported_as_separate_operating_regime",
+    "device_hour_exposure"
   ],
   "aspirational_targets": {
     "iid_episode_null_pfa_max": 0.05,
@@ -70,5 +77,35 @@
     "correlated_windows_collapsed_before_testing": true,
     "delay_units_are_episodes": true,
     "synthetic_results_not_detector_performance": true
-  }
+  },
+  "reference_implementations": [
+    {
+      "id": "weighted_restarted_conformal_minimax_theory",
+      "url": "https://arxiv.org/abs/2609.27179",
+      "version": "2026-09-23",
+      "scope": "independent_episode_observations",
+      "implementation": "HARDSEC-021 Rust near-harmonic restarted weighted sum"
+    },
+    {
+      "id": "t-smade",
+      "url": "https://www.mdpi.com/2079-9292/13/20/4090",
+      "version": "2024",
+      "scope": "two-stage workload-aware hardware performance counter attack detection",
+      "implementation": "planned comparator"
+    },
+    {
+      "id": "mandal-counter-interleaving",
+      "url": "https://eprint.iacr.org/2024/1856",
+      "version": "2024",
+      "scope": "counter-interleaving side-channel detection",
+      "implementation": "planned comparator"
+    },
+    {
+      "id": "intel-vtune-topdown",
+      "url": "https://www.intel.com/content/www/us/en/docs/vtune-profiler/cookbook/2024-0/top-down-microarchitecture-analysis-method.html",
+      "version": "2024 documentation",
+      "scope": "industry PMU profiling/top-down metrics",
+      "implementation": "operational profiling baseline; not a security detector"
+    }
+  ]
 }
