@@ -97,6 +97,9 @@ pub struct InstrumentCapabilityProfile {
     pub range_status: QualificationStatus,
     pub articulation_status: QualificationStatus,
     pub renderer_controller_status: QualificationStatus,
+    /// Runtime asset coverage is unknown until the optional VCSL/VSCO2 banks
+    /// are indexed and probed. A code-declared path is not proof that every
+    /// pitch, velocity layer or articulation is installed and playable.
     pub sample_coverage_status: QualificationStatus,
 }
 
