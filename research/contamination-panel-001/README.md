@@ -248,3 +248,51 @@ The reported p-value direction in the ACL paper's Eq. (4) appears to be a lower-
 
 This is not a full FTD reproduction: model scoring for PPL, Min-K and Min-K++ is not implemented here. Nor does running BH or a Cauchy combination alone establish an FDR guarantee. The null reference must be representative, p-values must be super-uniform under contamination, and the multiple-hypothesis dependence assumptions must be justified on the actual evaluation population.
 
+
+
+## Finite-sample FTD calibration stress harness
+
+The module src/ftd_calibration.rs runs deterministic Monte Carlo comparisons over known-answer synthetic contaminated/clean score populations. It exposes:
+
+- shared per-feature reference banks reused across all test items;
+- independent per-hypothesis reference banks;
+- block-correlated items (common latent scores within task/source clusters);
+- correlated detector features;
+- deliberately shifted reference distributions;
+- upper- and lower-tail score directions;
+- paper normalized-rejection weights versus official softmax-sharpened weights.
+
+The dependence generator uses mixtures of common and independent uniform latent variables so each one-dimensional score marginal remains uniform under the matched-null design. Clean items are shifted toward higher scores with a monotone square-root transform. Contaminated items follow the null score distribution. Positive reference shifts use a power transform that pushes the reference scores lower; negative shifts push them higher.
+
+Example:
+
+~~~sh
+seed_hex="$(openssl rand -hex 32)"
+cargo run --locked -- ftd-calibrate \
+  research/contamination-panel-001/fixtures/ftd-calibration-shared-reference.json \
+  "$seed_hex" \
+  /secure/evaluator/ftd-calibration-report.json
+~~~
+
+Additional fixtures:
+- fixtures/ftd-calibration-null-only.json: all items follow the contaminated null. Clean-sample power is not estimable.
+- fixtures/ftd-calibration-shifted-reference.json: intentionally misspecified low-shifted reference plus block and feature dependence.
+- fixtures/ftd-calibration-shared-reference.json: mixed clean/contaminated population with a common finite reference bank.
+
+The report separately estimates:
+- mean false-discovery proportion across runs (the Monte Carlo analogue of FDR);
+- frequency of individual runs whose FDP exceeds the target alpha;
+- clean-sample retention power;
+- selected fraction and counts;
+- 95% Hoeffding intervals for bounded Monte Carlo mean outcomes, plus empirical Monte Carlo standard errors.
+
+The run-level exceedance rate is **not** the FDR definition. A high exceedance rate is a useful instability diagnostic; the mean FDP is the Monte Carlo estimate of expected FDP. All intervals describe Monte Carlo uncertainty over the simulator repetitions, not statistical uncertainty about real-world model contamination.
+
+### Important theorem/formula audit
+
+The paper's Section 4.2 Eq. (4) and Theorem 1 both print a lower-tail p-value. However, the paper's Section 4.1 convention says low scores indicate contamination, while Theorem 2's power premise requires clean items to have small p-values. For high-score-clean detectors, that direction requires the upper tail. The official FTD implementation uses the upper-tail greater direction in its reported experiment path.
+
+A lower-tail empirical p-value can still be uniform under the contaminated null when test and reference scores are exchangeable and continuous. So the printed lower-tail direction does not by itself disprove the null-uniformity/FDR argument. It does, however, reverse which alternative is powerful under the stated score semantics. The reproduction record therefore treats the official code direction as the operational comparator, preserves the lower-tail option for audit, and tests the power reversal explicitly.
+
+The simulation is a falsification tool, not a proof. A passing synthetic grid does not establish reference exchangeability, real-data null super-uniformity, cross-item dependence assumptions, semantic validity, or any universal FDR guarantee. Any scenario with reference shift or task clustering that exceeds the target blocks an FDR guarantee claim for that scope.
+
