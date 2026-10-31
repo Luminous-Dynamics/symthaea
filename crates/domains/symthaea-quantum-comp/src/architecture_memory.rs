@@ -592,8 +592,8 @@ pub fn validate_memory_topology(
         }
         if let Some(existing) = boundary_edges.get(edge.communication_boundary_id.as_str()) {
             let opposite_full_duplex_pair =
-                existing.source_region_id == edge.destination_region_id
-                    && existing.destination_region_id == edge.source_region_id
+                existing.source_region_id.as_str() == edge.destination_region_id.as_str()
+                    && existing.destination_region_id.as_str() == edge.source_region_id.as_str()
                     && matches!(
                         (existing.direction, edge.direction),
                         (MemoryTransferDirection::Read, MemoryTransferDirection::Write)
