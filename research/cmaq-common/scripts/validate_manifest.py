@@ -21,11 +21,24 @@ def semantic_errors(instance: dict) -> list[str]:
         errors.append("duplicate baseline IDs")
 
     baseline_set = set(baseline_ids)
+    baseline_by_id = {baseline["id"]: baseline for baseline in instance["baseline_registry"]}
     for comparison in instance["comparisons"]:
         if comparison["treatment_id"] not in baseline_set:
             errors.append("comparison treatment ID is not registered")
         if comparison["control_id"] not in baseline_set:
             errors.append("comparison control ID is not registered")
+        if comparison["status"] == "qualified":
+            required_match = {"episodes", "seeds", "observations", "actions", "horizon"}
+            if not required_match.issubset(set(comparison["matched_dimensions"])):
+                errors.append("qualified contrast is missing a core matched dimension")
+            if "compute" in comparison["matched_dimensions"]:
+                method = instance["budgets"]["matching_method"]
+                if method not in {"measured_flops", "measured_wallclock", "matched_multi_resource"}:
+                    errors.append("qualified compute contrast lacks a measured matching method")
+                for baseline_id in (comparison["treatment_id"], comparison["control_id"]):
+                    baseline = baseline_by_id.get(baseline_id)
+                    if baseline is None or baseline["cost_accounting"] != "measured":
+                        errors.append("qualified compute contrast includes an unmeasured baseline")
 
     if instance["candidate"]["source_commit"] != instance["repository"]["commit"]:
         errors.append("candidate source commit differs from frozen repository commit")
@@ -121,6 +134,17 @@ def main() -> None:
     mutated["baseline_registry"][-1]["eligibility"] = "eligible_for_primary_contrast"
     mutated["baseline_registry"][-1]["ineligibility_reason"] = None
     hostile_cases.append(("oracle admitted as primary deployable baseline", mutated))
+
+    mutated = copy.deepcopy(example)
+    mutated["comparisons"][0]["status"] = "qualified"
+    hostile_cases.append(("qualified contrast missing core matched dimensions", mutated))
+
+    mutated = copy.deepcopy(example)
+    mutated["comparisons"][0]["status"] = "qualified"
+    mutated["comparisons"][0]["matched_dimensions"].append("horizon")
+    mutated["comparisons"][0]["matched_dimensions"].append("compute")
+    mutated["budgets"]["matching_method"] = "candidate_budget_only"
+    hostile_cases.append(("qualified compute claim uses candidate-count-only budget", mutated))
 
     for label, hostile in hostile_cases:
         if fail_closed(validator, hostile):
