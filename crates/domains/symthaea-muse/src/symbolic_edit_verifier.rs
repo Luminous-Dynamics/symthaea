@@ -44,19 +44,6 @@ pub enum SymbolicFailureKind {
     ScoreMetadataChanged,
 }
 
-impl SymbolicFailureKind {
-    fn code(self) -> &'static str {
-        match self {
-            Self::NoOpRequestedChange => "no_op_requested_change",
-            Self::RequestedPitchNotRealized => "requested_pitch_not_realized",
-            Self::ProtectedNoteModified => "protected_note_modified",
-            Self::EditedNoteAttributesModified => "edited_note_attributes_modified",
-            Self::NoteCountChanged => "note_count_changed",
-            Self::ScoreMetadataChanged => "score_metadata_changed",
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SymbolicVerificationFailure {
     pub kind: SymbolicFailureKind,
@@ -71,7 +58,8 @@ pub struct SymbolicEditVerification {
     pub operation_id: String,
     pub source_score_sha256: String,
     pub target_score_sha256: String,
-    pub verdict: SymbolicEditVerdict,
+    pub symbolic_verdict: SymbolicEditVerdict,
+    pub overall_verdict: SymbolicEditVerdict,
     pub verified_obligation_ids: Vec<String>,
     pub failed_obligation_ids: Vec<String>,
     pub pending_external_obligation_ids: Vec<String>,
@@ -479,7 +467,12 @@ fn build_report(
     pending_ids.sort();
     pending_ids.dedup();
 
-    let verdict = if !failed_ids.is_empty() {
+    let symbolic_verdict = if failed_ids.is_empty() {
+        SymbolicEditVerdict::Pass
+    } else {
+        SymbolicEditVerdict::Fail
+    };
+    let overall_verdict = if symbolic_verdict == SymbolicEditVerdict::Fail {
         SymbolicEditVerdict::Fail
     } else if !pending_ids.is_empty() {
         SymbolicEditVerdict::Incomplete
@@ -492,7 +485,8 @@ fn build_report(
         operation_id: contract.operation_id.clone(),
         source_score_sha256: source_digest,
         target_score_sha256: target_digest,
-        verdict,
+        symbolic_verdict,
+        overall_verdict,
         verified_obligation_ids: verified_ids,
         failed_obligation_ids: failed_ids,
         pending_external_obligation_ids: pending_ids,
@@ -728,7 +722,8 @@ mod tests {
         target.notes[1].pitch = Pitch::from_midi(69);
         let contract = pitch_at_contract(&source, &target, 1, 69);
         let report = verify_symbolic_edit_contract(&source, &target, &contract).unwrap();
-        assert_eq!(report.verdict, SymbolicEditVerdict::Incomplete);
+        assert_eq!(report.symbolic_verdict, SymbolicEditVerdict::Pass);
+        assert_eq!(report.overall_verdict, SymbolicEditVerdict::Incomplete);
         assert!(report.failed_obligation_ids.is_empty());
         assert_eq!(report.pending_external_obligation_ids.len(), 4);
         assert!(verify_symbolic_edit_verification(&source, &target, &contract, &report));
@@ -758,7 +753,8 @@ mod tests {
         let target = source.clone();
         let contract = pitch_at_contract(&source, &target, 1, 64);
         let report = verify_symbolic_edit_contract(&source, &target, &contract).unwrap();
-        assert_eq!(report.verdict, SymbolicEditVerdict::Fail);
+        assert_eq!(report.symbolic_verdict, SymbolicEditVerdict::Fail);
+        assert_eq!(report.overall_verdict, SymbolicEditVerdict::Fail);
         assert!(report.failures.iter().any(|failure| failure.kind == SymbolicFailureKind::NoOpRequestedChange));
     }
 
