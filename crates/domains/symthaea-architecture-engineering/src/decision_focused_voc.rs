@@ -1450,6 +1450,20 @@ mod tests {
     }
 
     #[test]
+    fn rejects_non_finite_regret_equivalent_action_cost() {
+        let p = posterior();
+        let mut cfg = config();
+        cfg.total_budget_units = 1;
+        cfg.cost_penalty_per_unit = f64::MAX / 2.0;
+        assert!(evaluate(
+            &p,
+            vec![high_cost_query_action("query", "A")],
+            &cfg,
+            MetricDirection::Maximize,
+        ).is_err());
+    }
+
+    #[test]
     fn rejects_fidelity_name_index_mismatch() {
         let p = posterior();
         let mut actions = vec![query_action("query", "A", 1)];
