@@ -123,6 +123,126 @@ pub fn delayed_cue_oracle_digest_valid(oracle: &OracleRecord) -> bool {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DelayedCueVerificationError {
+    StreamIdMismatch,
+    PublicDigestMismatch,
+    OracleDigestMismatch,
+    InvalidEventCount,
+    InvalidTargetBinding,
+    InvalidProbe,
+    InvalidDistractor { index: usize },
+    InvalidEventOrder { index: usize },
+}
+
+impl fmt::Display for DelayedCueVerificationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::StreamIdMismatch => write!(f, "delayed-cue task and oracle stream IDs differ"),
+            Self::PublicDigestMismatch => write!(f, "delayed-cue public SHA-256 digest mismatch"),
+            Self::OracleDigestMismatch => write!(f, "delayed-cue oracle SHA-256 digest mismatch"),
+            Self::InvalidEventCount => write!(f, "delayed-cue event count is inconsistent"),
+            Self::InvalidTargetBinding => write!(f, "target cue binding is missing or inconsistent"),
+            Self::InvalidProbe => write!(f, "delayed-cue probe is invalid"),
+            Self::InvalidDistractor { index } => {
+                write!(f, "distractor {index} violates the declared schedule or similarity band")
+            }
+            Self::InvalidEventOrder { index } => {
+                write!(f, "event {index} is not in strict temporal/ordinal order")
+            }
+        }
+    }
+}
+
+impl std::error::Error for DelayedCueVerificationError {}
+
+/// Check canonical digests and the complete delayed-cue task contract.
+pub fn verify_delayed_cue_trace(
+    task: &PublicTask,
+    oracle: &OracleRecord,
+) -> Result<(), DelayedCueVerificationError> {
+    if task.stream_id != oracle.stream_id {
+        return Err(DelayedCueVerificationError::StreamIdMismatch);
+    }
+    if !delayed_cue_digest_valid(task) {
+        return Err(DelayedCueVerificationError::PublicDigestMismatch);
+    }
+    if !delayed_cue_oracle_digest_valid(oracle) {
+        return Err(DelayedCueVerificationError::OracleDigestMismatch);
+    }
+    if task.delay_steps == 0
+        || task.distractor_count > MAX_DISTRACTORS
+        || task.events.len() != task.distractor_count.saturating_add(2)
+    {
+        return Err(DelayedCueVerificationError::InvalidEventCount);
+    }
+
+    let first = task.events.first().ok_or(
+        DelayedCueVerificationError::InvalidTargetBinding,
+    )?;
+    match &first.kind {
+        EventKind::Associate { key, value }
+            if first.step == 0
+                && first.ordinal == 0
+                && *key == oracle.target_key
+                && *value == oracle.expected_value => {}
+        _ => return Err(DelayedCueVerificationError::InvalidTargetBinding),
+    }
+
+    let last = task.events.last().ok_or(
+        DelayedCueVerificationError::InvalidProbe,
+    )?;
+    let expected_probe_ordinal = u64::try_from(task.distractor_count)
+        .unwrap_or(u64::MAX)
+        .saturating_add(1);
+    match &last.kind {
+        EventKind::Probe { key }
+            if last.step == task.delay_steps
+                && last.ordinal == expected_probe_ordinal
+                && *key == oracle.target_key => {}
+        _ => return Err(DelayedCueVerificationError::InvalidProbe),
+    }
+
+    let mut keys = BTreeSet::new();
+    let mut values = BTreeSet::new();
+    keys.insert(oracle.target_key);
+    values.insert(oracle.expected_value);
+    for (index, event) in task.events[1..task.events.len() - 1].iter().enumerate() {
+        let ordinal = u64::try_from(index).unwrap_or(u64::MAX).saturating_add(1);
+        let expected_step = distractor_step(index, task.distractor_count, task.delay_steps);
+        match &event.kind {
+            EventKind::Associate { key, value } => {
+                let distance = (*key ^ oracle.target_key).count_ones();
+                let similarity_valid = match task.similarity {
+                    DistractorSimilarity::High => (1..=4).contains(&distance),
+                    DistractorSimilarity::Low => (28..=36).contains(&distance),
+                };
+                if event.step != expected_step
+                    || event.ordinal != ordinal
+                    || *key == oracle.target_key
+                    || !similarity_valid
+                    || !keys.insert(*key)
+                    || !values.insert(*value)
+                {
+                    return Err(DelayedCueVerificationError::InvalidDistractor { index });
+                }
+            }
+            EventKind::Probe { .. } => {
+                return Err(DelayedCueVerificationError::InvalidDistractor { index });
+            }
+        }
+    }
+
+    for (index, pair) in task.events.windows(2).enumerate() {
+        let previous = (pair[0].step, pair[0].ordinal);
+        let current = (pair[1].step, pair[1].ordinal);
+        if current <= previous {
+            return Err(DelayedCueVerificationError::InvalidEventOrder { index: index + 1 });
+        }
+    }
+    Ok(())
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum GenerationError {
     ZeroDelay,
     TooManyDistractors { requested: usize, maximum: usize },
@@ -356,6 +476,40 @@ mod tests {
         let (_, mut oracle) = generate_delayed_cue(config(DistractorSimilarity::High)).unwrap();
         oracle.expected_value ^= 1;
         assert!(!delayed_cue_oracle_digest_valid(&oracle));
+    }
+
+    #[test]
+    fn generated_delayed_cue_task_passes_full_verifier() {
+        let (task, oracle) = generate_delayed_cue(config(DistractorSimilarity::High)).unwrap();
+        assert_eq!(verify_delayed_cue_trace(&task, &oracle), Ok(()));
+    }
+
+    #[test]
+    fn verifier_rejects_recommitted_invalid_distractor() {
+        let (mut task, oracle) = generate_delayed_cue(config(DistractorSimilarity::High)).unwrap();
+        if let EventKind::Associate { key, .. } = &mut task.events[1].kind {
+            *key = oracle.target_key;
+        }
+        task.content_sha256 = delayed_cue_content_digest(&task);
+        assert!(matches!(
+            verify_delayed_cue_trace(&task, &oracle),
+            Err(DelayedCueVerificationError::InvalidDistractor { .. })
+        ));
+    }
+
+    #[test]
+    fn verifier_rejects_recommitted_wrong_probe() {
+        let (mut task, oracle) = generate_delayed_cue(config(DistractorSimilarity::Low)).unwrap();
+        if let Some(last) = task.events.last_mut() {
+            if let EventKind::Probe { key } = &mut last.kind {
+                *key ^= 1;
+            }
+        }
+        task.content_sha256 = delayed_cue_content_digest(&task);
+        assert_eq!(
+            verify_delayed_cue_trace(&task, &oracle),
+            Err(DelayedCueVerificationError::InvalidProbe)
+        );
     }
 
     #[test]
