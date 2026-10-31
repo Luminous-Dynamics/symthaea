@@ -39,6 +39,28 @@ pub struct SimultaneousMetrics {
     pub absolute_coverage_error: f64,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SelectionEpisode {
+    pub intervals: Vec<PredictiveInterval>,
+    pub realized_outcomes: Vec<f64>,
+    pub selected_index: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SelectionMetrics {
+    pub episode_count: usize,
+    pub actions_per_episode: usize,
+    pub mean_realized_regret: f64,
+    pub mean_regret_upper_bound: f64,
+    pub regret_bound_coverage: f64,
+    pub simultaneous_interval_coverage: f64,
+    pub dominant_certificate_count: usize,
+    pub false_dominant_certificate_count: usize,
+    pub false_dominant_certificate_rate: f64,
+    pub mean_selected_interval_width: f64,
+}
+
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JointDrawCoupling {
     SharedPosteriorAndWorldNoise,
@@ -540,6 +562,99 @@ pub fn evaluate_simultaneous_sets(
     }))
 }
 
+/// Evaluate whether uncertainty intervals support useful selected actions.
+///
+/// Outcomes are maximized. The regret bound is conditional on complete
+/// action-set interval coverage. This reports both the empirical bound
+/// coverage and false interval-dominance certificates; neither metric turns
+/// the interval calculation into a safety proof.
+pub fn evaluate_selected_action_sets(
+    episodes: &[SelectionEpisode],
+) -> Result<Option<SelectionMetrics>, IntervalError> {
+    let Some(first) = episodes.first() else {
+        return Ok(None);
+    };
+    if first.intervals.len() < 2 || first.realized_outcomes.len() != first.intervals.len() {
+        return Err(IntervalError::UnequalActionSetCardinality);
+    }
+    let actions_per_episode = first.intervals.len();
+    let nominal = first.intervals[0].nominal_coverage;
+    let mut total_regret = 0.0;
+    let mut total_bound = 0.0;
+    let mut total_selected_width = 0.0;
+    let mut covered_bounds = 0usize;
+    let mut simultaneous_covered = 0usize;
+    let mut dominant_certificates = 0usize;
+    let mut false_dominant = 0usize;
+
+    for episode in episodes {
+        if episode.intervals.len() != actions_per_episode
+            || episode.realized_outcomes.len() != actions_per_episode
+        {
+            return Err(IntervalError::UnequalActionSetCardinality);
+        }
+        if episode.selected_index >= actions_per_episode {
+            return Err(IntervalError::InvalidSelectedIndex);
+        }
+        let mut best_realized = f64::NEG_INFINITY;
+        let mut all_covered = true;
+        for (interval, realized) in episode.intervals.iter().zip(&episode.realized_outcomes) {
+            validate_interval(*interval)?;
+            if !realized.is_finite() {
+                return Err(IntervalError::NonFiniteRealization);
+            }
+            if interval.nominal_coverage.to_bits() != nominal.to_bits() {
+                return Err(IntervalError::MixedNominalCoverage);
+            }
+            best_realized = best_realized.max(*realized);
+            all_covered &= interval.lower <= *realized && *realized <= interval.upper;
+        }
+
+        let selected = episode.selected_index;
+        let selected_realized = episode.realized_outcomes[selected];
+        let regret = (best_realized - selected_realized).max(0.0);
+        let bound = selected_action_regret_upper_bound(&episode.intervals, selected)?;
+        let dominant = is_interval_dominant(&episode.intervals, selected)?;
+        total_regret += regret;
+        total_bound += bound;
+        total_selected_width += episode.intervals[selected].upper - episode.intervals[selected].lower;
+        covered_bounds += usize::from(bound + 1e-12 >= regret);
+        simultaneous_covered += usize::from(all_covered);
+        dominant_certificates += usize::from(dominant);
+        if dominant && regret > 1e-12 {
+            false_dominant += 1;
+        }
+    }
+
+    let count = episodes.len() as f64;
+    let mean_realized_regret = total_regret / count;
+    let mean_regret_upper_bound = total_bound / count;
+    let mean_selected_interval_width = total_selected_width / count;
+    if !mean_realized_regret.is_finite()
+        || !mean_regret_upper_bound.is_finite()
+        || !mean_selected_interval_width.is_finite()
+    {
+        return Err(IntervalError::NonFiniteDerivedMetric);
+    }
+    let dominant_certificate_count = dominant_certificates;
+    Ok(Some(SelectionMetrics {
+        episode_count: episodes.len(),
+        actions_per_episode,
+        mean_realized_regret,
+        mean_regret_upper_bound,
+        regret_bound_coverage: covered_bounds as f64 / count,
+        simultaneous_interval_coverage: simultaneous_covered as f64 / count,
+        dominant_certificate_count,
+        false_dominant_certificate_count: false_dominant,
+        false_dominant_certificate_rate: if dominant_certificate_count == 0 {
+            0.0
+        } else {
+            false_dominant as f64 / dominant_certificate_count as f64
+        },
+        mean_selected_interval_width,
+    }))
+}
+
 /// Return a conservative selected-action regret upper bound, conditional on
 /// every action interval in the set containing its true outcome.
 ///
@@ -936,6 +1051,66 @@ mod tests {
         ];
         assert_eq!(selected_action_regret_upper_bound(&uncertain, 0).unwrap(), 1.0);
         assert!(!is_interval_dominant(&uncertain, 0).unwrap());
+    }
+
+
+    #[test]
+    fn selected_action_evaluator_scores_realized_regret_and_certificate_quality() {
+        let episodes = vec![
+            SelectionEpisode {
+                intervals: vec![interval(2.0,4.0,0.9), interval(0.0,3.0,0.9)],
+                realized_outcomes: vec![3.5,3.0],
+                selected_index: 0,
+            },
+            SelectionEpisode {
+                intervals: vec![interval(0.0,2.0,0.9), interval(3.0,4.0,0.9)],
+                realized_outcomes: vec![1.5,3.5],
+                selected_index: 0,
+            },
+            SelectionEpisode {
+                intervals: vec![interval(3.0,4.0,0.9), interval(0.0,2.0,0.9)],
+                realized_outcomes: vec![3.5,1.0],
+                selected_index: 0,
+            },
+            SelectionEpisode {
+                intervals: vec![interval(3.0,4.0,0.9), interval(0.0,2.0,0.9)],
+                realized_outcomes: vec![1.0,4.0],
+                selected_index: 0,
+            },
+        ];
+        let metrics = evaluate_selected_action_sets(&episodes).unwrap().unwrap();
+        assert_eq!(metrics.episode_count, 4);
+        assert_eq!(metrics.actions_per_episode, 2);
+        assert!((metrics.mean_realized_regret - 1.0).abs() < 1e-12);
+        assert!((metrics.mean_regret_upper_bound - 1.25).abs() < 1e-12);
+        assert_eq!(metrics.regret_bound_coverage, 0.75);
+        assert_eq!(metrics.simultaneous_interval_coverage, 0.75);
+        assert_eq!(metrics.dominant_certificate_count, 2);
+        assert_eq!(metrics.false_dominant_certificate_count, 1);
+        assert_eq!(metrics.false_dominant_certificate_rate, 0.5);
+    }
+
+    #[test]
+    fn selected_action_evaluator_rejects_bad_episode_shapes_and_nonfinite_truth() {
+        assert_eq!(evaluate_selected_action_sets(&[]).unwrap(), None);
+        let bad_shape = [SelectionEpisode {
+            intervals: vec![interval(0.0,1.0,0.9), interval(0.0,1.0,0.9)],
+            realized_outcomes: vec![0.5],
+            selected_index: 0,
+        }];
+        assert_eq!(evaluate_selected_action_sets(&bad_shape), Err(IntervalError::UnequalActionSetCardinality));
+        let bad_index = [SelectionEpisode {
+            intervals: vec![interval(0.0,1.0,0.9), interval(0.0,1.0,0.9)],
+            realized_outcomes: vec![0.5,0.5],
+            selected_index: 2,
+        }];
+        assert_eq!(evaluate_selected_action_sets(&bad_index), Err(IntervalError::InvalidSelectedIndex));
+        let bad_truth = [SelectionEpisode {
+            intervals: vec![interval(0.0,1.0,0.9), interval(0.0,1.0,0.9)],
+            realized_outcomes: vec![0.5,f64::NAN],
+            selected_index: 0,
+        }];
+        assert_eq!(evaluate_selected_action_sets(&bad_truth), Err(IntervalError::NonFiniteRealization));
     }
 
     #[test]
