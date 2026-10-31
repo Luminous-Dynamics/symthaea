@@ -16,11 +16,21 @@
     "summary"
   ],
   "properties": {
-    "schema_version": { "const": "cmaq-018-counterfactual-branch-fidelity-v0.1" },
-    "episode_count": { "const": 64 },
-    "action_count": { "const": 7 },
-    "pair_count_per_episode": { "const": 21 },
-    "seed": { "type": "integer" },
+    "schema_version": {
+      "const": "cmaq-018-counterfactual-branch-fidelity-v0.1"
+    },
+    "episode_count": {
+      "const": 64
+    },
+    "action_count": {
+      "const": 7
+    },
+    "pair_count_per_episode": {
+      "const": 21
+    },
+    "seed": {
+      "type": "integer"
+    },
     "scenarios": {
       "const": [
         "null_effect",
@@ -48,12 +58,31 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "force", "grip", "training_supported"],
+        "required": [
+          "id",
+          "force",
+          "grip",
+          "training_supported"
+        ],
         "properties": {
-          "id": { "type": "integer", "minimum": 0, "maximum": 6 },
-          "force": { "type": "number", "minimum": 0, "maximum": 1 },
-          "grip": { "type": "number", "minimum": 0, "maximum": 1 },
-          "training_supported": { "type": "boolean" }
+          "id": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 6
+          },
+          "force": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "grip": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "training_supported": {
+            "type": "boolean"
+          }
         }
       }
     },
@@ -81,7 +110,17 @@
           "mean_terminal_false_safe_rate",
           "mean_branch_prediction_evaluations",
           "mean_pair_effect_evaluations",
-          "mean_oracle_branch_evaluations"
+          "mean_oracle_branch_evaluations",
+          "effect_sign_accuracy_ci95_lower",
+          "effect_sign_accuracy_ci95_upper",
+          "effect_magnitude_mae_ci95_lower",
+          "effect_magnitude_mae_ci95_upper",
+          "rank_tau_b_ci95_lower",
+          "rank_tau_b_ci95_upper",
+          "top1_regret_ci95_lower",
+          "top1_regret_ci95_upper",
+          "terminal_false_safe_rate_ci95_lower",
+          "terminal_false_safe_rate_ci95_upper"
         ],
         "properties": {
           "scenario": {
@@ -104,37 +143,170 @@
               "oracle"
             ]
           },
-          "episode_count": { "const": 64 },
-          "pair_count_per_episode": { "const": 21 },
-          "mean_pair_coverage": { "type": "number", "minimum": 0, "maximum": 1 },
-          "mean_effect_sign_accuracy": {
-            "type": ["number", "null"],
+          "episode_count": {
+            "const": 64
+          },
+          "pair_count_per_episode": {
+            "const": 21
+          },
+          "mean_pair_coverage": {
+            "type": "number",
             "minimum": 0,
             "maximum": 1
           },
-          "mean_effect_magnitude_mae": { "type": ["number", "null"], "minimum": 0 },
+          "mean_effect_sign_accuracy": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "mean_effect_magnitude_mae": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
           "mean_rank_tau_b": {
-            "type": ["number", "null"],
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": -1,
             "maximum": 1
           },
-          "mean_top1_regret": { "type": ["number", "null"], "minimum": 0 },
+          "mean_top1_regret": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
           "mean_null_false_effect_rate": {
-            "type": ["number", "null"],
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 1
           },
-          "mean_branch_coverage": { "type": "number", "minimum": 0, "maximum": 1 },
-          "mean_branch_outcome_mae": { "type": ["number", "null"], "minimum": 0 },
-          "mean_branch_state_mae": { "type": ["number", "null"], "minimum": 0 },
+          "mean_branch_coverage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "mean_branch_outcome_mae": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "mean_branch_state_mae": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
           "mean_terminal_false_safe_rate": {
-            "type": ["number", "null"],
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 1
           },
-          "mean_branch_prediction_evaluations": { "type": "number", "minimum": 0 },
-          "mean_pair_effect_evaluations": { "type": "number", "minimum": 0 },
-          "mean_oracle_branch_evaluations": { "type": "number", "minimum": 0 }
+          "mean_branch_prediction_evaluations": {
+            "type": "number",
+            "minimum": 0
+          },
+          "mean_pair_effect_evaluations": {
+            "type": "number",
+            "minimum": 0
+          },
+          "mean_oracle_branch_evaluations": {
+            "type": "number",
+            "minimum": 0
+          },
+          "effect_sign_accuracy_ci95_lower": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "effect_sign_accuracy_ci95_upper": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "effect_magnitude_mae_ci95_lower": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "effect_magnitude_mae_ci95_upper": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "rank_tau_b_ci95_lower": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -1,
+            "maximum": 1
+          },
+          "rank_tau_b_ci95_upper": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -1,
+            "maximum": 1
+          },
+          "top1_regret_ci95_lower": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "top1_regret_ci95_upper": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "terminal_false_safe_rate_ci95_lower": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "terminal_false_safe_rate_ci95_upper": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          }
         }
       }
     }
