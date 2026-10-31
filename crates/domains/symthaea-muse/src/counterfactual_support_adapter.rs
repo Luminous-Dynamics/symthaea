@@ -77,9 +77,6 @@ pub struct CounterfactualEventSupportEvidence {
     pub output_bits_per_sample: u16,
     pub output_sample_format: DecodedSampleFormat,
     pub effects_group_assignment: FluidSynthEffectsGroupAssignment,
-    /// Complete downstream route graph digest when independently attested.
-    /// None is the current state and blocks topology-specific tail profiles.
-    pub route_graph_sha256: Option<String>,
     pub sample_rate_hz: u32,
     pub channels: usize,
     pub output_frame_count: u64,
@@ -117,7 +114,15 @@ pub struct CounterfactualSupportAdapterReport {
     pub baseline_audio_sha256: String,
     pub renderer_identity_sha256: String,
     pub renderer_config_sha256: String,
+    pub renderer_executable_sha256: String,
+    pub soundfont_sha256: String,
+    pub render_config_sha256: String,
+    pub output_bits_per_sample: u16,
+    pub output_sample_format: DecodedSampleFormat,
     pub effects_group_assignment: FluidSynthEffectsGroupAssignment,
+    /// Complete downstream route graph digest when independently attested.
+    /// None is the current state and blocks topology-specific tail profiles.
+    pub route_graph_sha256: Option<String>,
     pub sample_rate_hz: u32,
     pub channels: usize,
     /// Exact rendered PCM output horizon, not source/input MIDI frames.
@@ -147,6 +152,14 @@ impl CounterfactualSupportAdapterReport {
                 event.source_event_index == index
                     && event.support.source_event_index == index
                     && event.support.acoustic_support == event.conservative_support_intervals
+                    && event.renderer_identity_sha256 == self.renderer_identity_sha256
+                    && event.renderer_config_sha256 == self.renderer_config_sha256
+                    && event.renderer_executable_sha256 == self.renderer_executable_sha256
+                    && event.soundfont_sha256 == self.soundfont_sha256
+                    && event.render_config_sha256 == self.render_config_sha256
+                    && event.output_bits_per_sample == self.output_bits_per_sample
+                    && event.output_sample_format == self.output_sample_format
+                    && event.effects_group_assignment == self.effects_group_assignment
                     && event.final_note_off_frame <= event.output_frame_count
                     && event.support.support_evidence_sha256.as_deref()
                         == Some(event.evidence_sha256.as_str())
