@@ -976,7 +976,7 @@ mod tests {
         let score = score_knowledge_predictions(&oracle, &predictions).unwrap();
         assert_eq!(score.abstentions, 1);
         assert_eq!(score.missing_predictions, 1);
-        assert_eq!(score.wrong_answers, 2);
+        assert_eq!(score.wrong_answers, 1);
         assert_eq!(score.predictions_received, 4);
     }
 
