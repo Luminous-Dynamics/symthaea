@@ -268,7 +268,9 @@ fn verify_pitch_at(
         );
     }
 
-    if source.notes.len() != target.notes.len() {
+    let source_events = source.events();
+    let target_events = target.events();
+    if source_events.len() != target_events.len() {
         let mut affected = pitch_ids.clone();
         affected.extend(onset_ids.clone());
         affected.extend(duration_ids.clone());
@@ -291,7 +293,7 @@ fn verify_pitch_at(
         );
         return;
     };
-    if selected_index >= source.notes.len() {
+    if selected_index >= source_events.len() {
         push_failure(
             failures,
             SymbolicFailureKind::RequestedPitchNotRealized,
@@ -301,8 +303,8 @@ fn verify_pitch_at(
         return;
     }
 
-    let source_pitch = source.notes[selected_index].pitch.midi();
-    let actual_pitch = target.notes[selected_index].pitch.midi();
+    let source_pitch = source_events[selected_index].pitch.midi();
+    let actual_pitch = target_events[selected_index].pitch.midi();
     if source_pitch == expected_midi {
         push_failure(
             failures,
@@ -319,9 +321,9 @@ fn verify_pitch_at(
         );
     }
 
-    for index in 0..source.notes.len() {
-        let before = source.notes[index];
-        let after = target.notes[index];
+    for index in 0..source_events.len() {
+        let before = source_events[index];
+        let after = target_events[index];
         if index == selected_index {
             if !non_pitch_note_equal(before, after) {
                 let mut affected = duration_ids.clone();
@@ -388,7 +390,9 @@ fn verify_transpose(
         );
     }
 
-    if source.notes.len() != target.notes.len() {
+    let source_events = source.events();
+    let target_events = target.events();
+    if source_events.len() != target_events.len() {
         let mut affected = pitch_ids.clone();
         affected.extend(onset_ids.clone());
         affected.extend(duration_ids.clone());
@@ -402,7 +406,7 @@ fn verify_transpose(
         return;
     }
 
-    for (index, (before, after)) in source.notes.iter().zip(target.notes.iter()).enumerate() {
+    for (index, (before, after)) in source_events.iter().zip(target_events.iter()).enumerate() {
         let expected_raw = before.pitch.midi() as i32 + delta;
         let pitch_matches = (0..=127).contains(&expected_raw)
             && after.pitch == Pitch::from_midi(expected_raw as u8);
@@ -728,6 +732,24 @@ mod tests {
         assert!(report.failed_obligation_ids.is_empty());
         assert_eq!(report.pending_external_obligation_ids.len(), 4);
         assert!(verify_symbolic_edit_verification(&source, &target, &contract, &report));
+    }
+
+
+    #[test]
+    fn pitch_at_event_index_uses_onset_sorted_render_event_stream() {
+        let mut source = score(&[60, 64, 67]);
+        source.notes.swap(0, 2);
+        let mut target = source.clone();
+        let event_to_edit = target
+            .notes
+            .iter_mut()
+            .find(|note| note.onset == Duration::new(1, 1))
+            .unwrap();
+        event_to_edit.pitch = Pitch::from_midi(69);
+        let contract = pitch_at_contract(&source, &target, 1, 69);
+        let report = verify_symbolic_edit_contract(&source, &target, &contract).unwrap();
+        assert_eq!(report.verdict, SymbolicEditVerdict::Incomplete);
+        assert!(report.failed_obligation_ids.is_empty());
     }
 
     #[test]
