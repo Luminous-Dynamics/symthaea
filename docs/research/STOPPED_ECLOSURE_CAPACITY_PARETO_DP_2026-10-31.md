@@ -160,6 +160,8 @@ The test module validation/test_stopped_eclosure_capacity_pareto.py covers:
 - non-persistence / no-feasible-irrevocable-extension failure;
 - a 100-hypothesis sparse-strong-signal fixture.
 
+The anchored module validation/anchored_capacity_e_bh.py and its tests additionally cover the paper's local e-value identity, maximum-cardinality step-up versus exhaustive subset search, the published strict example, mandatory retention of e-BH discoveries, capacity-aware utility selection, empty-baseline extension, threshold ties, and tampered step-up receipt rejection.
+
 Run from the repository root:
 
     PYTHONPATH=validation python -m unittest -v test_stopped_eclosure_capacity_pareto.py
