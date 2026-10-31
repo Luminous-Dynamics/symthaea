@@ -585,6 +585,29 @@ mod tests {
     }
 
     #[test]
+    fn verified_reader_context_preserves_user_and_assistant_speaker_provenance() {
+        let mut req = request();
+        req.obligations[0].alternatives = vec![ProofJustification {
+            justification_id: "mixed-speaker-proof".into(),
+            evidence_dependencies: vec!["A".into(), "B".into()],
+        }];
+        req.obligations[0].minimum_user_authored_evidence = 1;
+        req.candidates[1].source_speaker = Some(EvidenceSpeakerRole::Assistant);
+
+        let result = solve_proof_budget(req.clone()).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        let context = build_verified_proof_reader_context(&req, &result).unwrap();
+
+        let speakers: BTreeMap<&str, Option<EvidenceSpeakerRole>> = context.evidence
+            .iter()
+            .map(|item| (item.evidence_id.as_str(), item.source_speaker))
+            .collect();
+        assert_eq!(speakers["A"], Some(EvidenceSpeakerRole::User));
+        assert_eq!(speakers["B"], Some(EvidenceSpeakerRole::Assistant));
+        context.verify_internal_consistency().unwrap();
+    }
+
+    #[test]
     fn reader_context_requires_matching_request_identity_and_time() {
         let req = request();
         let result = solve_proof_budget(req.clone()).unwrap();
