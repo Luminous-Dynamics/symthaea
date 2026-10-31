@@ -16,8 +16,9 @@ use std::{
     collections::BTreeSet,
     env,
     fs,
+    io::Write,
     path::Path,
-    process::ExitCode,
+    process::{Command, ExitCode, Stdio},
 };
 
 use anyhow::{Context, Result, bail};
@@ -130,6 +131,40 @@ struct OutputManifest {
 
 fn sha256_hex(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
+}
+
+fn git_blob_sha1(raw: &[u8]) -> Result<String> {
+    let mut child = Command::new("git")
+        .args(["hash-object", "--stdin"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .context("spawn git hash-object to verify the upstream blob identity")?;
+    {
+        let mut stdin = child
+            .stdin
+            .take()
+            .context("open git hash-object stdin")?;
+        stdin.write_all(raw).context("write source bytes to git hash-object")?;
+    }
+    let output = child
+        .wait_with_output()
+        .context("wait for git hash-object")?;
+    if !output.status.success() {
+        bail!(
+            "git hash-object failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let digest = String::from_utf8(output.stdout)
+        .context("git hash-object emitted non-UTF-8 output")?
+        .trim()
+        .to_owned();
+    if !is_lower_hex(&digest, 40) {
+        bail!("git hash-object returned an invalid Git blob SHA-1");
+    }
+    Ok(digest)
 }
 
 fn is_lower_hex(value: &str, expected_len: usize) -> bool {
@@ -253,6 +288,12 @@ fn validate_snapshot(raw: &[u8]) -> Result<SourceSnapshot> {
     if actual_sha256 != SOURCE_SHA256 {
         bail!(
             "SorryDB source SHA-256 mismatch: expected {SOURCE_SHA256}, received {actual_sha256}"
+        );
+    }
+    let actual_git_blob_sha1 = git_blob_sha1(raw)?;
+    if actual_git_blob_sha1 != SOURCE_GIT_BLOB_SHA1 {
+        bail!(
+            "SorryDB Git blob SHA-1 mismatch: expected {SOURCE_GIT_BLOB_SHA1}, received {actual_git_blob_sha1}"
         );
     }
 

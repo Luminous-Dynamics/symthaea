@@ -51,8 +51,7 @@
           "const": "data/SorryDB_2601/SorryDB_2601_1000_evaluation_split.json"
         },
         "source_split_sha256": {
-          "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
+          "const": "26bfd11099f6b8db7f80d49bdea5d9f8ea0d23ba65d44d93f67ed42ba1530062"
         },
         "full_snapshot_task_count": {
           "const": 2601
