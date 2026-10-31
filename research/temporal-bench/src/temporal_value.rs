@@ -33,7 +33,9 @@ pub enum RetentionPolicy {
 pub struct TemporalMemoryCandidate {
     pub item_id: u64,
     pub bytes: u64,
-    /// Candidate-estimated future wrong-belief exposure avoided, in microseconds.
+    /// Candidate-estimated future wrong-belief exposure avoided over the effective
+    /// retention horizon, in microseconds. The estimator must account for any
+    /// hard validity deadline when producing this value.
     pub predicted_ted_reduction_us: u64,
     /// Fixed-point probabilities in parts per million.
     pub confidence_ppm: u32,
