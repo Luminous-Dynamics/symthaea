@@ -9,12 +9,14 @@
     "fixed_window_conformal",
     "growing_reference_conformal_test_martingale",
     "fixed_reference_conditional_conformal_test_martingale",
-    "context_agnostic_fixed_reference_eprocess"
+    "context_agnostic_fixed_reference_eprocess",
+    "dkw_corrected_fixed_reference_cctm_rust"
   ],
   "candidates": [
     "context_conditioned_fixed_reference_mixture_eprocess",
     "symthaea_hdc_score_plus_sequential_layer",
-    "symthaea_liquid_score_plus_sequential_layer"
+    "symthaea_liquid_score_plus_sequential_layer",
+    "context_conditioned_dkw_cctm_ons"
   ],
   "scenarios": [
     "stationary_null",
