@@ -309,6 +309,7 @@ pub enum TemporalGenerationError {
     TooFewStepsForRegimeShift { requested: usize, minimum: usize },
     ZeroForecastHorizon,
     ZeroFeedbackDelay,
+    FeedbackDelayOutsideStream { delay: u64, steps: usize },
 }
 
 impl fmt::Display for TemporalGenerationError {
@@ -327,6 +328,9 @@ impl fmt::Display for TemporalGenerationError {
             }
             Self::ZeroFeedbackDelay => {
                 write!(f, "feedback_delay must be greater than zero")
+            }
+            Self::FeedbackDelayOutsideStream { delay, steps } => {
+                write!(f, "feedback_delay {delay} must be less than stream steps {steps}")
             }
         }
     }
@@ -468,6 +472,12 @@ fn validate_config(config: MultiTimescaleConfig) -> Result<(), TemporalGeneratio
     }
     if config.feedback_delay == 0 {
         return Err(TemporalGenerationError::ZeroFeedbackDelay);
+    }
+    if config.feedback_delay >= u64::try_from(config.steps).unwrap_or(u64::MAX) {
+        return Err(TemporalGenerationError::FeedbackDelayOutsideStream {
+            delay: config.feedback_delay,
+            steps: config.steps,
+        });
     }
     Ok(())
 }
@@ -742,6 +752,19 @@ mod tests {
         assert_eq!(
             generate_multiscale_task(cfg),
             Err(TemporalGenerationError::ZeroFeedbackDelay)
+        );
+    }
+
+    #[test]
+    fn feedback_delay_must_arrive_within_stream() {
+        let mut cfg = config(false);
+        cfg.feedback_delay = cfg.steps as u64;
+        assert_eq!(
+            generate_multiscale_task(cfg),
+            Err(TemporalGenerationError::FeedbackDelayOutsideStream {
+                delay: cfg.steps as u64,
+                steps: cfg.steps,
+            })
         );
     }
 
