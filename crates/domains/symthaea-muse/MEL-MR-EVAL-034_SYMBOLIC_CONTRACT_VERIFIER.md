@@ -1,6 +1,6 @@
 # MEL-MR-EVAL-034 — independent symbolic edit-contract verification
 
-**Status:** theory-feature Rust verifier implemented; ten adversarial source tests authored; no compile/test run or audio/renderer claim made.
+**Status:** theory-feature Rust verifier implemented; eleven adversarial source tests authored; no compile/test run or audio/renderer claim made.
 
 ## Research hypothesis
 
@@ -20,7 +20,7 @@ The implementation intentionally uses the existing narrow EVAL-010/EVAL-011 poli
 
 ### pitch-at
 
-- Resolves a canonical event identifier, `score_event_index:N`, against the ordered source Score note list.
+- Resolves a canonical event identifier, `score_event_index:N`, against the onset-sorted Score::events() stream that Muse renders, not the backing storage order.
 - Requires the selected target pitch to equal the declared MIDI note and to differ from the source pitch.
 - Requires all other source/target notes to be exactly equal.
 - Requires selected-note non-pitch attributes, key, tempo, meter and total score length to remain unchanged.
@@ -32,7 +32,7 @@ The implementation intentionally uses the existing narrow EVAL-010/EVAL-011 poli
 - Requires every target note pitch to equal source pitch plus the declared delta.
 - Rejects MIDI range overflow/clamping.
 - Requires the key tonic to transpose by the same pitch-class delta while preserving tonality.
-- Preserves every non-pitch note field, tempo, meter and total length exactly.
+- Preserves every non-pitch note field bit-exactly (including float-valued dynamics), plus tempo, meter and total length.
 
 The verifier does not extend the supported operation list. Instrumentation, dynamics, articulation, cent-level tuning, audio-only edits and timbral edits remain outside this gate.
 
