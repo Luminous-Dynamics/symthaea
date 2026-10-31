@@ -65,6 +65,7 @@ jobs:
           assert guarantee["reference_sample_iid_assumption_status"] == "assumption_not_verified"
           assert guarantee["context_assignment_exogeneity_status"] == "assumption_not_verified"
           assert guarantee["theorem_guarantee_status"] == "not_established_from_input_receipts"
+          assert abs(guarantee["unconditional_type_i_upper_bound_if_all_paper_assumptions_hold"] - 0.05) < 1e-12
           assert guarantee["effective_sample_size_estimate"] is None
           assert receipt["theoretical_contract"]["null_hypothesis"].find("i.i.d.") >= 0
           assert any(row["abstention_reason"] == "unseen_workload_context" for row in monitor["window_decisions"])
