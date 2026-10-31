@@ -240,7 +240,6 @@ pub fn generate_retention_task(
     });
     events.push(RetentionEvent {
         step: invalidation_step,
-        ordinal: 0,
         ordinal: 1,
         kind: RetentionEventKind::Invalidate {
             record_id: target_record_id,
