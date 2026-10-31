@@ -53,6 +53,7 @@ jobs:
           assert monitor["overall_first_alarm_sequence_index"] == 16
           assert monitor["overall_first_alarm_context_id"] == "compute"
           assert monitor["valid_observation_count"] == 16
+          assert len(monitor["window_decisions"]) == 19
           assert monitor["abstention_count"] == 3
           assert monitor["post_alarm_reset_count"] == 0
           assert len(receipt["reference_policy"]["contexts"]) == 2
