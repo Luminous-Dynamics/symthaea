@@ -553,7 +553,7 @@ fn in_training_support(state: State) -> bool {
     state.x.abs() <= TRAINING_X_SUPPORT && state.v.abs() <= TRAINING_V_SUPPORT
 }
 
-fn uniform_grid_one_step_state_rmse(scenario: Scenario) -> f64 {
+fn structured_probe_one_step_state_rmse(scenario: Scenario) -> f64 {
     const GRID_POINTS: usize = 201;
     let mut squared_error = 0.0;
     for index in 0..GRID_POINTS {
@@ -747,7 +747,7 @@ fn append_row(
     let (shuffled_delta, shuffled_low, shuffled_high) = mean_and_ci(&paired_shuffled);
     let (oracle_gap, oracle_low, oracle_high) = mean_and_ci(&paired_oracle_gap);
 
-    let uniform_grid_rmse = uniform_grid_one_step_state_rmse(scenario);
+    let uniform_grid_rmse = structured_probe_one_step_state_rmse(scenario);
     let mean_gap = mean_optional(
         &episode_results
             .iter()
@@ -834,7 +834,7 @@ fn append_row(
     .expect("writing to String cannot fail");
     write!(
         output,
-        "\"uniform_grid_one_step_state_rmse\":{uniform_grid_rmse:.9},\"mean_predicted_minus_realized_block_return\":"
+        "\"structured_probe_one_step_state_rmse\":{uniform_grid_rmse:.9},\"mean_predicted_minus_realized_block_return\":"
     )
     .expect("writing to String cannot fail");
     write_option(output, mean_gap);
@@ -854,7 +854,7 @@ fn render_report() -> String {
     )
     .expect("writing to String cannot fail");
     output.push_str(
-        "\"evaluator_uniform_grid_probe_count\":201,\"scenarios\":[\"benign\",\"state_action_pocket\",\"compounding_drift\",\"termination_seam\",\"regime_migration\"],\"policies\":[\"direct_policy\",\"direct_search_control\",\"random_point_search\",\"adaptive_point_cem\",\"pessimistic_ensemble_cem\",\"uncertainty_lcb_cem\",\"shuffled_future_negative_control\",\"oracle_cem\"],\"horizons\":[1,4,8],\"candidate_budgets\":[8,32,64],\"execution_blocks\":[1,4],",
+        "\"evaluator_structured_probe_count\":201,\"scenarios\":[\"benign\",\"state_action_pocket\",\"compounding_drift\",\"termination_seam\",\"regime_migration\"],\"policies\":[\"direct_policy\",\"direct_search_control\",\"random_point_search\",\"adaptive_point_cem\",\"pessimistic_ensemble_cem\",\"uncertainty_lcb_cem\",\"shuffled_future_negative_control\",\"oracle_cem\"],\"horizons\":[1,4,8],\"candidate_budgets\":[8,32,64],\"execution_blocks\":[1,4],",
     );
     write!(
         &mut output,
