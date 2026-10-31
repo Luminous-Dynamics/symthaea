@@ -96,6 +96,13 @@ pub fn render_drum(hit: &DrumHit, sample_rate: u32) -> Vec<f32> {
 
 /// Render a drum hit with emotional coloring.
 pub fn render_drum_colored(hit: &DrumHit, sample_rate: u32, color: &DrumColor) -> Vec<f32> {
+    // The lowest modal voice uses a 25 Hz lower clamp and the highest mode
+    // is bounded below Nyquist. Refuse sample rates that cannot provide that
+    // valid interval rather than passing min > max to f32::clamp or dividing
+    // by zero in the time/envelope calculations.
+    if sample_rate < 56 {
+        return Vec::new();
+    }
     let sr = sample_rate as f32;
     match hit.drum {
         DrumType::Kick => render_kick(sr, hit.velocity, color),
@@ -563,6 +570,36 @@ mod tests {
             assert!(!buf.is_empty(), "{drum:?} produced an empty buffer");
             assert!(buf.iter().all(|sample| sample.is_finite()), "{drum:?} produced non-finite audio");
             assert!(buf.iter().any(|sample| sample.abs() > 1e-5), "{drum:?} produced silence");
+        }
+    }
+
+    #[test]
+    fn renderer_rejects_sample_rates_below_the_modal_nyquist_floor() {
+        for drum in [
+            DrumType::Kick,
+            DrumType::Snare,
+            DrumType::HiHat,
+            DrumType::Clave,
+            DrumType::Cowbell,
+            DrumType::Conga,
+            DrumType::Bongo,
+            DrumType::HandClap,
+            DrumType::Cabasa,
+            DrumType::Tambourine,
+        ] {
+            let hit = DrumHit {
+                drum,
+                time: 0.0,
+                velocity: 0.8,
+            };
+            assert!(
+                render_drum(&hit, 0).is_empty(),
+                "{drum:?} must reject a zero sample rate"
+            );
+            assert!(
+                render_drum(&hit, 55).is_empty(),
+                "{drum:?} must reject a rate with no valid 25 Hz-to-Nyquist interval"
+            );
         }
     }
 
