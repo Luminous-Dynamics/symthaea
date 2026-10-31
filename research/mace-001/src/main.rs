@@ -443,6 +443,10 @@ fn load_candidate(input: &str) -> Result<HashMap<String, CandidateCase>, String>
             "transfer_decision",
             "action_decision",
             "completion_state",
+            "write_decision",
+            "maintenance_decision",
+            "retrieval_decision",
+            "use_decision",
             "prediction_before_action",
             "prediction_record_id",
             "latency_us",
@@ -461,6 +465,10 @@ fn load_candidate(input: &str) -> Result<HashMap<String, CandidateCase>, String>
         let transfer = table.cell(row, "transfer_decision", "candidate trace")?.to_owned();
         let action = table.cell(row, "action_decision", "candidate trace")?.to_owned();
         let completion = table.cell(row, "completion_state", "candidate trace")?.to_owned();
+        let write_decision = table.cell(row, "write_decision", "candidate trace")?.to_owned();
+        let maintenance_decision = table.cell(row, "maintenance_decision", "candidate trace")?.to_owned();
+        let retrieval_decision = table.cell(row, "retrieval_decision", "candidate trace")?.to_owned();
+        let use_decision = table.cell(row, "use_decision", "candidate trace")?.to_owned();
         let prediction_before_action = parse_bool(
             table.cell(row, "prediction_before_action", "candidate trace")?,
             "prediction_before_action",
@@ -480,12 +488,23 @@ fn load_candidate(input: &str) -> Result<HashMap<String, CandidateCase>, String>
         if !valid_completion(&completion) {
             return Err(format!("candidate trace: case {id} has invalid completion_state"));
         }
+        if !valid_write_stage(&write_decision)
+            || !valid_maintenance_stage(&maintenance_decision)
+            || !valid_retrieval_stage(&retrieval_decision)
+            || !valid_use_stage(&use_decision)
+        {
+            return Err(format!("candidate trace: case {id} has an invalid lifecycle-stage decision"));
+        }
 
         let item = CandidateCase {
             causal_status,
             transfer,
             action,
             completion,
+            write_decision,
+            maintenance_decision,
+            retrieval_decision,
+            use_decision,
             prediction_before_action,
             prediction_record_id,
             latency_us: parse_u64(table.cell(row, "latency_us", "candidate trace")?, "latency_us", &id)?,
