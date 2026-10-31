@@ -181,7 +181,25 @@ Publish paired comparisons on identical held-out designs, identical review budge
 
 These fixtures qualify evaluator semantics only. They are not a hardware-detector score, physical-silicon result or security certification.
 
-## 11. Implementation sequence
+## 11. Machine-readable detector-facing contract
+
+The initial JSON contract is at `schemas/hardsec-localization-explanation-v1.schema.json`, with a non-production known-answer example at `tests/fixtures/hardsec/localization-explanation-v1.json`.
+
+The record binds source/netlist and node-edge-map digests, design/source grouping, model and training-lineage digests, explainer/configuration identity, frozen threshold profile, candidate regions, exact path references, counterevidence, uncertainty and review-budget/cost semantics.
+
+Ground-truth Trojan labels and evaluator-oracle answers are intentionally absent from the detector-facing schema. They belong in a separately access-controlled evaluator input and must never be passed to the explainer/model being scored.
+
+The JSON Schema validates record shape and local field constraints. It cannot by itself prove:
+- region node/edge IDs exist in the source graph;
+- edge endpoints form a continuous path;
+- a path set is complete;
+- group IDs truthfully describe source lineage;
+- equivalence evidence is valid;
+- the model or explanation was produced by the declared digest.
+
+Those are semantic-auditor obligations. The fixture is a schema example, not a valid detector result or a benchmark score.
+
+## 12. Implementation sequence
 
 1. Freeze the metric dictionary and review budgets. Reuse evidence/profile/path structures from #9108, #9202 and #9314.
 2. Implement a Rust explanation/localization receipt auditor with strict hashes, node/edge/path binding, review-budget curves and mutation tests.
@@ -189,7 +207,7 @@ These fixtures qualify evaluator semantics only. They are not a hardware-detecto
 4. Compare existing explanation outputs on identical lineage-aware holdouts and review budgets.
 5. Run a human study only when actual reviewers, consent, preregistered tasks and enough independent designs are available.
 
-## 12. Acceptance criteria
+## 13. Acceptance criteria
 
 - [ ] Review budgets and metrics are frozen before confirmatory evaluation.
 - [ ] Source/model/explainer/threshold/transform digests are bound in each receipt.
@@ -202,6 +220,6 @@ These fixtures qualify evaluator semantics only. They are not a hardware-detecto
 - [ ] Human workload claims are withheld until measured in controlled engineer studies.
 - [ ] Negative controls and independent receipt verification pass before explanation-quality/SOTA claims.
 
-## 13. Claim ceiling
+## 14. Claim ceiling
 
 This work can establish explanation fidelity, stability, localization coverage and review-budget behavior for named models, datasets, transformations and source groups. It does not prove a Trojan-free design, explain arbitrary analog/sequential behavior, establish industrial generalization from Trust-Hub or certify a chip.
