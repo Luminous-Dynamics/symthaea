@@ -99,7 +99,7 @@ The optional `--cohort-manifest-output` writes a deterministic sample-ID manifes
 - `em_legal_full_triplet` (all three legal EM views);
 - `fused_geometry_legal_em`;
 - `paired_geometry_only` and `paired_em_legal_views`, which have exactly identical sorted sample IDs across the broad geometry+EM intersection;
-- three additional task-specific paired pairs: `paired_false_split_correction_geometry_only` / `_em_legal_views` (requires dual geometry), `paired_false_merge_identification_geometry_only` / `_em_legal_views` (requires single geometry), and `paired_split_mask_generation_geometry_only` / `_em_legal_views` (requires single geometry);
+- three additional task-specific paired pairs: `paired_false_split_correction_geometry_only` / `paired_false_split_correction_em_legal_views` (requires dual geometry), `paired_false_merge_identification_geometry_only` / `paired_false_merge_identification_em_legal_views` (requires single geometry), and `paired_split_mask_generation_geometry_only` / `paired_split_mask_generation_em_legal_views` (requires single geometry);
 - `geometry_without_legal_em`;
 - `em_best_only_excluded`.
 
