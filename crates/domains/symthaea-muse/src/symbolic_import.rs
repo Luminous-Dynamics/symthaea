@@ -527,10 +527,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                         "MusicXML note end exceeds the safe rational score-time range".to_string()
                     })?;
                 if !rest {
-                    let midi = musicxml_pitch(child).ok_or_else(|| {
-                        "MusicXML pitched note contains an unsupported or malformed pitch"
-                            .to_string()
-                    })?;
+                    let midi = musicxml_pitch(child)?;
                     raw.push((part_index, midi, onset, duration));
                 }
                 previous_onset = onset;
@@ -591,32 +588,51 @@ fn node_i64(node: roxmltree::Node<'_, '_>) -> Option<i64> {
     node.text()?.trim().parse().ok()
 }
 
-fn musicxml_pitch(note: roxmltree::Node<'_, '_>) -> Option<u8> {
-    let pitch = note.children().find(|node| node.has_tag_name("pitch"))?;
+fn musicxml_pitch(note: roxmltree::Node<'_, '_>) -> Result<u8, String> {
+    let pitch = note
+        .children()
+        .find(|node| node.has_tag_name("pitch"))
+        .ok_or_else(|| "MusicXML pitched note is missing its pitch element".to_string())?;
     let step = pitch
         .children()
-        .find(|node| node.has_tag_name("step"))?
-        .text()?;
+        .find(|node| node.has_tag_name("step"))
+        .and_then(|node| node.text())
+        .ok_or_else(|| "MusicXML pitch is missing its step".to_string())?;
     let base = match step.trim() {
-        "C" => 0,
+        "C" => 0_i64,
         "D" => 2,
         "E" => 4,
         "F" => 5,
         "G" => 7,
         "A" => 9,
         "B" => 11,
-        _ => return None,
+        value => return Err(format!("MusicXML pitch step {value:?} is invalid")),
     };
-    let alter = pitch
-        .children()
-        .find(|node| node.has_tag_name("alter"))
-        .and_then(node_i64)
-        .unwrap_or(0);
+    let alter_node = pitch.children().find(|node| node.has_tag_name("alter"));
+    let alter = match alter_node {
+        Some(node) => node
+            .text()
+            .and_then(|value| value.trim().parse::<i64>().ok())
+            .ok_or_else(|| {
+                "MusicXML pitch alteration must be an integer semitone value".to_string()
+            })?,
+        None => 0,
+    };
     let octave = pitch
         .children()
         .find(|node| node.has_tag_name("octave"))
-        .and_then(node_i64)?;
-    Some(((octave + 1) * 12 + base + alter).clamp(0, 127) as u8)
+        .and_then(node_i64)
+        .ok_or_else(|| "MusicXML pitch is missing a valid octave".to_string())?;
+    let midi = octave
+        .checked_add(1)
+        .and_then(|value| value.checked_mul(12))
+        .and_then(|value| value.checked_add(base))
+        .and_then(|value| value.checked_add(alter))
+        .filter(|value| (0..=127).contains(value))
+        .ok_or_else(|| {
+            "MusicXML pitch is outside the integer MIDI range 0..=127".to_string()
+        })?;
+    u8::try_from(midi).map_err(|_| "MusicXML pitch conversion failed".into())
 }
 
 pub fn analyze(score: &Score) -> ImportedWorkAnalysis {
@@ -876,6 +892,33 @@ mod tests {
             <attributes><divisions>1</divisions></attributes>
             <backup><duration>1</duration></backup>
             <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        assert!(parse_musicxml(xml).is_err());
+    }
+
+    #[test]
+    fn musicxml_pitch_outside_midi_range_is_rejected_instead_of_clamped() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><pitch><step>C</step><octave>9</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        assert!(parse_musicxml(xml).is_err());
+    }
+
+    #[test]
+    fn musicxml_fractional_pitch_alteration_is_rejected_by_integer_score_pitch() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><pitch><step>C</step><alter>0.5</alter><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        assert!(parse_musicxml(xml).is_err());
+    }
+
+    #[test]
+    fn musicxml_malformed_pitch_alteration_is_not_treated_as_natural() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <note><pitch><step>C</step><alter>sharp</alter><octave>4</octave></pitch><duration>1</duration></note>
         </measure></part></score-partwise>"#;
         assert!(parse_musicxml(xml).is_err());
     }
