@@ -299,6 +299,7 @@ trait CandidateBranchPredictor {
         &self,
         observed_history: &ObservedHistory,
         hypothetical_action: Intervention,
+        forecast_kind: ForecastKind,
     ) -> Option<CandidateForecast>;
 }
 
@@ -320,6 +321,7 @@ impl CandidateBranchPredictor for PointOutcomePredictor {
         &self,
         history: &ObservedHistory,
         action: Intervention,
+        forecast_kind: ForecastKind,
     ) -> Option<CandidateForecast> {
         // A deliberately simple misspecified predictor with a common-mode offset.
         // The common offset should cancel when taking same-history differences.
@@ -334,7 +336,7 @@ impl CandidateBranchPredictor for PointOutcomePredictor {
                 next_v: 0.75 * history.v + 0.08 * action.force - 0.04 * action.grip,
                 terminal: false,
             },
-            kind: ForecastKind::Counterfactual,
+            kind: forecast_kind,
         })
     }
 }
@@ -347,8 +349,9 @@ impl CandidateBranchPredictor for ShuffledActionLabelsPredictor {
         &self,
         history: &ObservedHistory,
         action: Intervention,
+        forecast_kind: ForecastKind,
     ) -> Option<CandidateForecast> {
-        PointOutcomePredictor.predict(history, shuffled_action(action))
+        PointOutcomePredictor.predict(history, shuffled_action(action), forecast_kind)
     }
 }
 
@@ -360,9 +363,10 @@ impl CandidateBranchPredictor for SupportAwarePointPredictor {
         &self,
         history: &ObservedHistory,
         action: Intervention,
+        forecast_kind: ForecastKind,
     ) -> Option<CandidateForecast> {
         supported_intervention(action)
-            .then(|| PointOutcomePredictor.predict(history, action))
+            .then(|| PointOutcomePredictor.predict(history, action, forecast_kind))
             .flatten()
     }
 }
@@ -402,7 +406,9 @@ fn branch_predictions(
         .iter()
         .map(|action| {
             predictor
-                .and_then(|model| model.predict(&history, *action))
+                .and_then(|model| {
+                    model.predict(&history, *action, ForecastKind::Counterfactual)
+                })
                 .map(|forecast| {
                     debug_assert_eq!(forecast.kind, ForecastKind::Counterfactual);
                     forecast.outcome
@@ -999,10 +1005,14 @@ mod tests {
     fn candidate_predictor_trait_exposes_only_observed_history_and_hypothetical_action() {
         let history = ObservedHistory { x: -0.2, v: 0.1 };
         let forecast = PointOutcomePredictor
-            .predict(&history, ACTIONS[3])
+            .predict(&history, ACTIONS[3], ForecastKind::Counterfactual)
             .expect("point predictor produces a forecast");
         assert_eq!(forecast.kind, ForecastKind::Counterfactual);
         assert!(!forecast.outcome.terminal);
+        let prediction = PointOutcomePredictor
+            .predict(&history, ACTIONS[3], ForecastKind::Predicted)
+            .expect("predictor supports ordinary prediction outputs");
+        assert_eq!(prediction.kind, ForecastKind::Predicted);
     }
 
     #[test]
@@ -1010,12 +1020,12 @@ mod tests {
         let history = ObservedHistory { x: -0.2, v: 0.1 };
         assert!(
             SupportAwarePointPredictor
-                .predict(&history, ACTIONS[4])
+                .predict(&history, ACTIONS[4], ForecastKind::Counterfactual)
                 .is_none()
         );
         assert!(
             SupportAwarePointPredictor
-                .predict(&history, ACTIONS[5])
+                .predict(&history, ACTIONS[5], ForecastKind::Counterfactual)
                 .is_none()
         );
     }
