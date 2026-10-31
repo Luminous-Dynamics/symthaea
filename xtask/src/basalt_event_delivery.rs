@@ -623,7 +623,26 @@ fn audit_seal_bytes(ledger_bytes: &[u8], seal_bytes: &[u8]) -> EpochSealReport {
             return report;
         }
     };
-    let seal: SourceEpochSeal = match serde_json::from_slice(seal_bytes) {
+    let seal_value: serde_json::Value = match serde_json::from_slice(seal_bytes) {
+        Ok(value) => value,
+        Err(error) => {
+            report.errors.push(DeliveryAuditError {
+                code: "E_SEAL_JSON".to_string(),
+                path: "$.seal".to_string(),
+                message: format!("invalid source-epoch seal JSON: {error}"),
+            });
+            return report;
+        }
+    };
+    if !seal_value.as_object().is_some_and(|object| object.contains_key("previous_seal_digest")) {
+        report.errors.push(DeliveryAuditError {
+            code: "E_SEAL_REQUIRED_FIELD".to_string(),
+            path: "$.seal.previous_seal_digest".to_string(),
+            message: "previous_seal_digest must be explicitly present (null for generation 1)".to_string(),
+        });
+        return report;
+    }
+    let seal: SourceEpochSeal = match serde_json::from_value(seal_value) {
         Ok(value) => value,
         Err(error) => {
             report.errors.push(DeliveryAuditError {
@@ -1363,6 +1382,18 @@ mod tests {
         let report = audit_seal_bytes(&ledger, &serde_json::to_vec(&seal).unwrap());
         assert!(!report.integrity_passed);
         assert!(report.errors.iter().any(|error| error.code == "E_SEAL_SOURCE_UNKNOWN"));
+    }
+
+    #[test]
+    fn required_predecessor_field_cannot_be_omitted() {
+        let ledger = fixture().to_string().into_bytes();
+        let seal_bytes = make_seal(&ledger);
+        let mut seal: Value = serde_json::from_slice(&seal_bytes).unwrap();
+        seal.as_object_mut().unwrap().remove("previous_seal_digest");
+        let report = audit_seal_bytes(&ledger, seal.to_string().as_bytes());
+        assert!(!report.seal_well_formed);
+        assert!(!report.integrity_passed);
+        assert!(report.errors.iter().any(|error| error.code == "E_SEAL_REQUIRED_FIELD"));
     }
 
     #[test]
