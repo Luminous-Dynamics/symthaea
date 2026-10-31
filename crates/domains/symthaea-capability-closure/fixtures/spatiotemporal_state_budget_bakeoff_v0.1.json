@@ -100,7 +100,7 @@
         "downstream_temporal_detachment",
         "local_auxiliary_head_gradient"
       ],
-      "tests_authored": 18,
+      "tests_authored": 20,
       "tests_executed": false,
       "scope_limit": "Small scalar gradient-path control only; not STDL, BrainTrace, HDC-LTC, or a multi-module/event-vision benchmark.",
       "verification_controls": [
@@ -125,9 +125,20 @@
           "STDL_style_spatial_cut",
           "separate_local_auxiliary_objective"
         ],
-        "tests_authored": 9,
+        "tests_authored": 11,
         "tests_executed": false,
-        "claim_ceiling": "Analytic scalar chain only; it is not a reproduction or implementation of STDL, BrainTrace, HDC-LTC, or an event-vision model."
+        "claim_ceiling": "Analytic scalar chain only; it is not a reproduction or implementation of STDL, BrainTrace, HDC-LTC, or an event-vision model.",
+        "verification_controls": [
+          "two_module_BPTT_matches_centered_finite_difference",
+          "four_module_BPTT_matches_centered_finite_difference",
+          "all_temporal_modules_attached_matches_full_BPTT",
+          "temporal_detachment_changes_credit_coverage",
+          "spatial_cut_blocks_global_gradient_to_upstream_modules",
+          "local_auxiliary_restores_upstream_signal",
+          "local_auxiliary_gradient_matches_independent_finite_difference",
+          "downstream_global_gradients_match_full_BPTT",
+          "local_auxiliary_readout_gradient_reported_separately"
+        ]
       }
     },
     "sensitivity_factors": {
@@ -229,12 +240,14 @@
     "braintrace_implemented": false,
     "braintrace_sensitivity_sweep_implemented": false,
     "chain_oracle_implemented": true,
-    "chain_oracle_tests_authored": 9,
+    "chain_oracle_tests_authored": 11,
     "chain_oracle_tests_executed": false,
     "nonlinear_multimodule_oracle_implemented": false,
     "stdl_training_implemented": false,
     "braintrace_training_implemented": false,
-    "braintrace_pp_prop_sensitivity_implemented": false
+    "braintrace_pp_prop_sensitivity_implemented": false,
+    "all_stage0_oracle_tests_authored": 20,
+    "all_stage0_oracle_tests_executed": false
   },
   "caveats": [
     "STDL's public code snapshot predates journal publication; exact paper runner mapping unverified.",
