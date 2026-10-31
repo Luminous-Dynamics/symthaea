@@ -62,6 +62,7 @@ pub struct DmsTask {
     pub test_start_step: u32,
     pub test_end_step: u32,
     pub input_channels: usize,
+    pub rotation_steps: u8,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -220,6 +221,7 @@ pub fn generate_dms_task(
             test_start_step: test_start,
             test_end_step: test_end,
             input_channels: config.input_channels,
+            rotation_steps: config.rotation_steps,
         },
         DmsOracle {
             stream_id,
@@ -229,6 +231,91 @@ pub fn generate_dms_task(
             expected_label: u8::from(is_match),
         },
     ))
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DmsVerificationError {
+    StreamIdMismatch,
+    InvalidDecisionWindow,
+    InvalidOracle,
+    InvalidObservation { expected_step: u32 },
+    ChannelOutOfRange { step: u32, channel: u16 },
+    ChannelsNotStrictlyOrdered { step: u32 },
+}
+
+impl fmt::Display for DmsVerificationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::StreamIdMismatch => write!(f, "DMS public task and oracle stream IDs differ"),
+            Self::InvalidDecisionWindow => write!(f, "DMS decision window or observation length is invalid"),
+            Self::InvalidOracle => write!(f, "DMS oracle direction or match relation is invalid"),
+            Self::InvalidObservation { expected_step } => {
+                write!(f, "DMS observation is missing or reordered at step {expected_step}")
+            }
+            Self::ChannelOutOfRange { step, channel } => {
+                write!(f, "DMS observation at step {step} contains out-of-range channel {channel}")
+            }
+            Self::ChannelsNotStrictlyOrdered { step } => {
+                write!(f, "DMS active channels are duplicated or unordered at step {step}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for DmsVerificationError {}
+
+/// Evaluator-side structural and oracle check for a generated DMS stream.
+pub fn verify_dms_trace(
+    task: &DmsTask,
+    oracle: &DmsOracle,
+) -> Result<(), DmsVerificationError> {
+    if task.stream_id != oracle.stream_id {
+        return Err(DmsVerificationError::StreamIdMismatch);
+    }
+    if task.test_start_step >= task.test_end_step
+        || usize::try_from(task.test_end_step).unwrap_or(usize::MAX) != task.observations.len()
+        || task.test_start_step as usize >= task.observations.len()
+        || task.input_channels == 0
+        || task.input_channels > 4_096
+    {
+        return Err(DmsVerificationError::InvalidDecisionWindow);
+    }
+    if oracle.sample_direction >= MOTION_CHOICES
+        || oracle.test_direction >= MOTION_CHOICES
+        || oracle.expected_label != u8::from(oracle.is_match)
+        || task.rotation_steps >= MOTION_CHOICES
+    {
+        return Err(DmsVerificationError::InvalidOracle);
+    }
+    let rotated_sample = (oracle.sample_direction + task.rotation_steps) % MOTION_CHOICES;
+    if (oracle.is_match && oracle.test_direction != rotated_sample)
+        || (!oracle.is_match && oracle.test_direction == rotated_sample)
+    {
+        return Err(DmsVerificationError::InvalidOracle);
+    }
+
+    for (index, observation) in task.observations.iter().enumerate() {
+        let expected_step = u32::try_from(index).unwrap_or(u32::MAX);
+        if observation.step != expected_step {
+            return Err(DmsVerificationError::InvalidObservation { expected_step });
+        }
+        let mut previous = None;
+        for channel in &observation.active_channels {
+            if usize::from(*channel) >= task.input_channels {
+                return Err(DmsVerificationError::ChannelOutOfRange {
+                    step: observation.step,
+                    channel: *channel,
+                });
+            }
+            if previous.is_some_and(|prior| prior >= *channel) {
+                return Err(DmsVerificationError::ChannelsNotStrictlyOrdered {
+                    step: observation.step,
+                });
+            }
+            previous = Some(*channel);
+        }
+    }
+    Ok(())
 }
 
 fn validate_config(config: DmsConfig) -> Result<(), DmsGenerationError> {
@@ -373,6 +460,52 @@ mod tests {
                 .iter()
                 .all(|channel| usize::from(*channel) < config.input_channels));
         }
+    }
+
+    #[test]
+    fn generated_dms_trace_passes_oracle_verifier() {
+        let config = DmsConfig::braintrace_reference(93);
+        let (task, oracle) = generate_dms_task(config).unwrap();
+        assert_eq!(verify_dms_trace(&task, &oracle), Ok(()));
+    }
+
+    #[test]
+    fn verifier_rejects_wrong_direction_relation() {
+        let config = DmsConfig::braintrace_reference(93);
+        let (task, mut oracle) = generate_dms_task(config).unwrap();
+        oracle.test_direction = (oracle.test_direction + 1) % MOTION_CHOICES;
+        assert_eq!(
+            verify_dms_trace(&task, &oracle),
+            Err(DmsVerificationError::InvalidOracle)
+        );
+    }
+
+    #[test]
+    fn verifier_rejects_duplicate_channel_indices() {
+        let config = DmsConfig::braintrace_reference(93);
+        let (mut task, oracle) = generate_dms_task(config).unwrap();
+        let observation = task
+            .observations
+            .iter_mut()
+            .find(|observation| !observation.active_channels.is_empty())
+            .unwrap();
+        observation.active_channels.push(observation.active_channels[0]);
+        observation.active_channels.sort_unstable();
+        assert!(matches!(
+            verify_dms_trace(&task, &oracle),
+            Err(DmsVerificationError::ChannelsNotStrictlyOrdered { .. })
+        ));
+    }
+
+    #[test]
+    fn verifier_rejects_stream_identity_mismatch() {
+        let config = DmsConfig::braintrace_reference(93);
+        let (task, mut oracle) = generate_dms_task(config).unwrap();
+        oracle.stream_id ^= 1;
+        assert_eq!(
+            verify_dms_trace(&task, &oracle),
+            Err(DmsVerificationError::StreamIdMismatch)
+        );
     }
 
     #[test]
