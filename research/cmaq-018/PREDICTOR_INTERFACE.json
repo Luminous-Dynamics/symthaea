@@ -56,11 +56,10 @@
     "input": [
       "observed_history",
       "left_action",
-      "right_action",
-      "forecast_kind"
+      "right_action"
     ],
     "output": "pairwise_utility_delta_or_abstention",
-    "output_provenance": "counterfactual"
+    "output_provenance": "counterfactual_by_definition"
   },
   "memory_boundary": {
     "forecast_is_observation": false,
