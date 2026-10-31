@@ -1127,7 +1127,7 @@ mod tests {
     fn empty_qualification_or_cross_split_lineages_are_rejected() {
         let mut observations = vec![observation(0, 1, TailProfileSplit::Calibration, 20)];
         assert!(matches!(
-            create_profile_unsigned(&spec(), context(&topology_attestation("k", &signing_key())), &observations, "k"),
+            create_profile_unsigned(&spec(), context(&topology_attestation("k", &signing_key())), &observations, &digest("manifest"), &digest("audit"), "k"),
             Err(TailProfileError::InsufficientCalibrationLineages)
         ));
         observations.push(observation(1, 1, TailProfileSplit::Qualification, 10));
@@ -1149,6 +1149,8 @@ mod tests {
             version: PROFILE_VERSION.to_owned(),
             profile_id: "test".to_owned(),
             dataset_revision: "test".to_owned(),
+            benchmark_manifest_sha256: digest("manifest"),
+            benchmark_audit_sha256: digest("audit"),
             context: context(&topology_attestation("profile-publisher-v1", &key)),
             statistics: TailProfileStatistics {
                 selected_quantile_micros: 990_000,
