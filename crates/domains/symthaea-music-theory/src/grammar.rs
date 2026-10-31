@@ -587,6 +587,78 @@ mod tests {
     use super::*;
 
     #[test]
+    fn developmental_engines_emit_typed_plans_and_match_canonical_scores() {
+        use crate::style::Style;
+
+        let intent = crate::composer::MusicalIntent {
+            bars: 16,
+            seed: 17,
+            ..Default::default()
+        };
+
+        let prog_spec = Style::ProgFolk.spec();
+        let prog = compose_with_grammar_plan(Style::ProgFolk.grammar_profile(), &intent, &prog_spec);
+        match &prog.plan {
+            GrammarPlanEvidence::ProgSuite(plan) => {
+                assert_eq!(plan.sections.len(), 4);
+                assert_eq!(
+                    plan.sections.iter().map(|section| section.meter).collect::<Vec<_>>(),
+                    vec![4, 7, 5, 4]
+                );
+                assert!((plan.expected_total_beats - 160.0).abs() < 1e-7);
+            }
+            other => panic!("ProgFolk must expose ProgSuite plan, got {other:?}"),
+        }
+        assert_eq!(prog.score, crate::composer::compose_with_spec(&intent, &prog_spec));
+        assert_eq!(prog.trace.structures.len(), 4);
+        assert!(prog.trace.obligation_transitions.iter().any(|item| {
+            item.obligation_id == "prog-suite-meter-and-theme-return"
+                && item.to == crate::grammar_trace::AssertedObligationState::Fulfilled
+        }));
+
+        let sonata_spec = Style::Sonata.spec();
+        let sonata = compose_with_grammar_plan(
+            Style::Sonata.grammar_profile(),
+            &intent,
+            &sonata_spec,
+        );
+        match &sonata.plan {
+            GrammarPlanEvidence::Sonata(evidence) => {
+                assert_eq!(evidence.plan.sections.len(), 5);
+                assert!(!evidence.verification.is_empty());
+            }
+            other => panic!("Sonata must expose its obligation receipt, got {other:?}"),
+        }
+        assert_eq!(
+            sonata.score,
+            crate::composer::compose_with_spec(&intent, &sonata_spec)
+        );
+        assert_eq!(sonata.trace.structures.len(), 5);
+
+        let renaissance_spec = Style::RenaissancePolyphony.spec();
+        let renaissance = compose_with_grammar_plan(
+            Style::RenaissancePolyphony.grammar_profile(),
+            &intent,
+            &renaissance_spec,
+        );
+        match &renaissance.plan {
+            GrammarPlanEvidence::Renaissance(evidence) => {
+                assert_eq!(evidence.plan.total_bars, 9);
+                assert!(evidence.verification.all_verified(), "{:?}", evidence.verification);
+            }
+            other => panic!("Renaissance must expose equal-voice receipt, got {other:?}"),
+        }
+        assert_eq!(
+            renaissance.score,
+            crate::composer::compose_with_spec(&intent, &renaissance_spec)
+        );
+        assert_eq!(renaissance.trace.structures.len(), 4);
+        assert!(renaissance.trace.obligation_transitions.iter().all(|item| {
+            item.to != crate::grammar_trace::AssertedObligationState::Unresolved
+        }));
+    }
+
+    #[test]
     fn flagship_families_are_structurally_distinct() {
         let groove = GrammarFamily::GrooveCycle.profile();
         let process = GrammarFamily::ProcessAdditive.profile();
