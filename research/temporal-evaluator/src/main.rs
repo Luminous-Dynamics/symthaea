@@ -91,9 +91,17 @@ pub struct CounterfactualRun {
     pub outcome: ExposureOutcome,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TreatmentOrder {
+    RetainFirst,
+    EvictFirst,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CounterfactualEffect {
     pub episode_id: u64,
+    /// Reproducible evaluator-side order randomization; not a cryptographic RNG.
+    pub first_treatment: TreatmentOrder,
     pub intervention_item_ids: Vec<u64>,
     pub retained_run_id: u64,
     pub evicted_run_id: u64,
@@ -235,6 +243,7 @@ pub fn evaluate_paired_intervention(
     retained: &CounterfactualRun,
     evicted: &CounterfactualRun,
     intervention_item_ids: &[u64],
+    evaluator_randomization_seed: u64,
 ) -> Result<CounterfactualEffect, CounterfactualError> {
     if intervention_item_ids.is_empty() {
         return Err(CounterfactualError::EmptyIntervention);
@@ -263,9 +272,17 @@ pub fn evaluate_paired_intervention(
         return Err(CounterfactualError::TreatmentDiffersByUnexpectedItems);
     }
 
+    let intervention_item_ids: Vec<_> = intervention.into_iter().collect();
+    let first_treatment = randomize_treatment_order(
+        evaluator_randomization_seed,
+        retained.context.episode_id,
+        &intervention_item_ids,
+    )?;
+
     Ok(CounterfactualEffect {
         episode_id: retained.context.episode_id,
-        intervention_item_ids: intervention.into_iter().collect(),
+        first_treatment,
+        intervention_item_ids,
         retained_run_id: retained.run_id,
         evicted_run_id: evicted.run_id,
         retained_cost: retained.measured_cost,
@@ -279,6 +296,35 @@ pub fn evaluate_paired_intervention(
                 - i128::from(retained.outcome.missing_output_us),
         },
     })
+}
+
+/// Deterministic evaluator-side treatment-order randomization for paired
+/// interventions. The seed must remain evaluator-owned. SplitMix64 provides
+/// reproducible ordering only; it is not a cryptographic secrecy mechanism.
+pub fn randomize_treatment_order(
+    evaluator_seed: u64,
+    episode_id: u64,
+    intervention_item_ids: &[u64],
+) -> Result<TreatmentOrder, CounterfactualError> {
+    if intervention_item_ids.is_empty() {
+        return Err(CounterfactualError::EmptyIntervention);
+    }
+    let ids = sorted_unique_set(intervention_item_ids)?;
+    let mut state = evaluator_seed ^ episode_id.rotate_left(23) ^ 0x5445_4D50_4F52_414C;
+    for item_id in ids {
+        state = mix64(state ^ item_id.rotate_left(11));
+    }
+    Ok(if mix64(state) & 1 == 0 {
+        TreatmentOrder::RetainFirst
+    } else {
+        TreatmentOrder::EvictFirst
+    })
+}
+
+fn mix64(mut value: u64) -> u64 {
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    value ^ (value >> 31)
 }
 
 /// Exhaustively evaluate all subsets for at most 16 items. Each supplied run
@@ -607,7 +653,7 @@ mod tests {
             abstention_us: 5,
             missing_output_us: 4,
         });
-        let effect = evaluate_paired_intervention(&registry(), &retained, &evicted, &[10]).unwrap();
+        let effect = evaluate_paired_intervention(&registry(), &retained, &evicted, &[10], 123).unwrap();
         assert_eq!(effect.delta_evict_minus_retain, ExposureDelta {
             wrong_belief_us: 8,
             abstention_us: 2,
@@ -633,6 +679,21 @@ mod tests {
         assert_eq!(
             evaluate_paired_intervention(&registry(), &retained, &evicted, &[10]),
             Err(CounterfactualError::TreatmentDiffersByUnexpectedItems)
+        );
+    }
+
+    #[test]
+    fn treatment_order_is_seeded_reproducible_and_evaluator_side() {
+        let first = randomize_treatment_order(77, 42, &[10, 20]).unwrap();
+        let repeated = randomize_treatment_order(77, 42, &[10, 20]).unwrap();
+        assert_eq!(first, repeated);
+        assert_ne!(
+            randomize_treatment_order(77, 42, &[10, 20]).unwrap(),
+            randomize_treatment_order(78, 42, &[10, 20]).unwrap()
+        );
+        assert_eq!(
+            randomize_treatment_order(77, 42, &[]),
+            Err(CounterfactualError::EmptyIntervention)
         );
     }
 
@@ -692,7 +753,7 @@ mod tests {
             abstention_us: 0,
             missing_output_us: 0,
         });
-        let effect = evaluate_paired_intervention(&registry(), &retained, &evicted, &[10, 20]).unwrap();
+        let effect = evaluate_paired_intervention(&registry(), &retained, &evicted, &[10, 20], 123).unwrap();
         assert_eq!(effect.delta_evict_minus_retain.wrong_belief_us, 5);
     }
 
