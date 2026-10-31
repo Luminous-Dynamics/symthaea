@@ -316,9 +316,16 @@ compare every Eq. 4 per-node factor across embedded subsystems, noncanonical
 candidate ordering, and extreme joint-likelihood underflow. A separate test
 compares the complete partitioned cause-likelihood vector against an independent
 dense-factor projection for every directed cut of an embedded three-unit system.
-The published Fig. 1A system anchors remain end-to-end regression gates. This
-does not establish general PyPhi parity yet; broader generated-model differential
-coverage and release-profile performance comparisons are still required.
+The public `plan_min_fill_elimination` API plans the same deterministic order
+without multiplying factor tables. It reports induced width, predicted largest
+bucket table, and predicted final output table; the predicted peak is the maximum
+of input, bucket, and retained-output sizes. Both probability-domain and
+log-domain inference call this planner and expose predicted versus observed peak
+entries. A plan is rejected before contraction if either an intermediate or
+the fully materialized retained output exceeds the memory budget. The published
+Fig. 1A system anchors remain end-to-end regression gates. This does not establish
+general PyPhi parity yet; broader generated-model differential coverage and
+release-profile performance comparisons are still required.
 
 Run the topology sweep:
 
