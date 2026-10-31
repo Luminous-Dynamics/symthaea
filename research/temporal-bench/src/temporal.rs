@@ -144,6 +144,7 @@ pub enum TemporalVerificationError {
     InvalidObservationOrder { step: u64 },
     MissingFeedback { source_step: u64 },
     InvalidFeedback { source_step: u64 },
+    InvalidFeedbackSchedule,
     UnexpectedTrailingEvent,
 }
 
@@ -187,6 +188,9 @@ impl fmt::Display for TemporalVerificationError {
                     "delayed feedback/order/label error at source step {source_step}"
                 )
             }
+            Self::InvalidFeedbackSchedule => {
+                write!(f, "feedback is revealed before the forecast target can exist")
+            }
             Self::UnexpectedTrailingEvent => {
                 write!(f, "public task has unexpected trailing events")
             }
@@ -218,7 +222,7 @@ pub fn verify_multiscale_trace(
 
     let target_count = u64::try_from(oracle.targets.len()).unwrap_or(u64::MAX);
     if task.forecast_horizon == 0
-        || task.feedback_delay == 0
+        || task.feedback_delay < task.forecast_horizon
         || oracle.hidden_periods[0] < 2
         || oracle.hidden_periods[0] > 8
         || oracle.hidden_periods[1] < 9
@@ -236,7 +240,7 @@ pub fn verify_multiscale_trace(
             .chain(oracle.weights_after.iter())
             .any(|weight| *weight == 0 || !(-4..=4).contains(weight))
     {
-        return Err(TemporalVerificationError::InvalidOracleModel);
+        return Err(TemporalVerificationError::InvalidFeedbackSchedule);
     }
     let expected_after = [
         oracle.weights_before[2],
@@ -710,6 +714,17 @@ mod tests {
     fn generated_oracle_has_valid_sha256() {
         let (_, oracle) = generate_multiscale_task(config(true)).unwrap();
         assert_eq!(oracle.content_sha256, multiscale_oracle_digest(&oracle));
+    }
+
+    #[test]
+    fn verifier_rejects_recommitted_feedback_before_forecast_horizon() {
+        let (mut task, oracle) = generate_multiscale_task(config(true)).unwrap();
+        task.feedback_delay = task.forecast_horizon.saturating_sub(1);
+        task.content_sha256 = multiscale_content_digest(&task);
+        assert_eq!(
+            verify_multiscale_trace(&task, &oracle),
+            Err(TemporalVerificationError::InvalidFeedbackSchedule)
+        );
     }
 
     #[test]
