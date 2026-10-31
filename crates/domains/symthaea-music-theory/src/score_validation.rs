@@ -215,17 +215,37 @@ fn validate_notes(
         let onset = note.onset.beats();
         let duration = note.duration.beats();
         let end = onset + duration;
-        let finite = onset.is_finite()
-            && duration.is_finite()
-            && note.velocity.is_finite()
-            && note.section_intensity.is_finite();
-        let bounded = onset >= 0.0
-            && duration > 0.0
-            && end <= score.total_beats.beats() + 1e-9
-            && (0.0..=1.0).contains(&note.velocity)
-            && note.section_intensity >= 0.0
-            && (config.min_midi..=config.max_midi).contains(&note.pitch.midi());
-        if !finite || !bounded {
+        let mut violations = Vec::new();
+        if !onset.is_finite() {
+            violations.push("onset_not_finite");
+        } else if onset < 0.0 {
+            violations.push("onset_before_zero");
+        }
+        if !duration.is_finite() {
+            violations.push("duration_not_finite");
+        } else if duration <= 0.0 {
+            violations.push("duration_not_positive");
+        }
+        if !end.is_finite() {
+            violations.push("note_end_not_finite");
+        } else if end > score.total_beats.beats() + 1e-9 {
+            violations.push("note_end_exceeds_score_total");
+        }
+        if !note.velocity.is_finite() {
+            violations.push("velocity_not_finite");
+        } else if !(0.0..=1.0).contains(&note.velocity) {
+            violations.push("velocity_outside_0_to_1");
+        }
+        if !note.section_intensity.is_finite() {
+            violations.push("section_intensity_not_finite");
+        } else if note.section_intensity < 0.0 {
+            violations.push("section_intensity_negative");
+        }
+        let midi = note.pitch.midi();
+        if !(config.min_midi..=config.max_midi).contains(&midi) {
+            violations.push("pitch_outside_configured_midi_range");
+        }
+        if !violations.is_empty() {
             issue(
                 issues,
                 ScoreValidationRule::NoteBounds,
@@ -233,7 +253,15 @@ fn validate_notes(
                 vec![index],
                 Some(onset),
                 Some(end),
-                format!("note {index} has invalid timing, dynamics, intensity, or pitch range"),
+                format!(
+                    "note {index} violates [{}]: onset={onset:?}, duration={duration:?}, end={end:?}, score_total={:?}, velocity={:?}, section_intensity={:?}, pitch_midi={midi}, allowed_midi={}..={}",
+                    violations.join(","),
+                    score.total_beats.beats(),
+                    note.velocity,
+                    note.section_intensity,
+                    config.min_midi,
+                    config.max_midi,
+                ),
             );
         }
     }
@@ -560,6 +588,21 @@ mod tests {
         let report = validate_score(&valid_score(), &ScoreValidationConfig::default());
         assert!(report.valid, "{:?}", report.issues);
         assert_eq!(report.fatal_count(), 0);
+    }
+
+    #[test]
+    fn note_bounds_diagnostic_names_the_specific_failed_field() {
+        let mut score = valid_score();
+        score.notes[1].velocity = 1.2;
+        let report = validate_score(&score, &ScoreValidationConfig::default());
+        let issue = report
+            .issues
+            .iter()
+            .find(|issue| issue.rule == ScoreValidationRule::NoteBounds)
+            .expect("out-of-range velocity should be diagnosed");
+        assert!(issue.message.contains("velocity_outside_0_to_1"));
+        assert!(issue.message.contains("velocity=1.2"));
+        assert!(issue.message.contains("allowed_midi=24..=108"));
     }
 
     #[test]

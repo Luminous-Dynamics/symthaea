@@ -1,0 +1,50 @@
+{
+  "schema": "muse-choro-preregistered-analysis-plan-v1",
+  "plan_id": "CHORO-EMPIRICAL-ANALYSIS-PLAN-TEMPLATE-001",
+  "status": "template_not_registered",
+  "pre_registration": {
+    "status": "not_registered",
+    "registered_on": null,
+    "registration_record_url": null,
+    "hypotheses_frozen": false,
+    "null_models_frozen": false,
+    "thresholds_frozen": false
+  },
+  "required_freeze_contract": [
+    "Use a unique plan_id for the exact empirical study, not for this template.",
+    "Pin the exact authorized source/corpus version and state the inclusion/exclusion rules before hypothesis outcomes are inspected.",
+    "Freeze primary hypotheses, null models, test statistics, effect-size and uncertainty thresholds, multiplicity correction, missing-data rules, and mandatory sensitivity analyses.",
+    "Record the frozen plan in an immutable, timestamped HTTPS registration record. A repository path or commit identifier alone is not asserted to be an external pre-registration record.",
+    "Bind the exact on-disk plan bytes with lowercase SHA-256 in the input manifest; changing one byte invalidates the plan digest and rights-review scope digest.",
+    "Keep the registered date and registration URL identical in the manifest and the plan file.",
+    "Do not analyze restricted source material unless the separate source authorization manifest is authorized for the declared purpose.",
+    "A plan marked registered must include concrete hypotheses with unique IDs, primary test, analysis unit and falsification rule; each null model must specify what it preserves, the randomization/permutation and the resampling unit.",
+    "Populate source/version pin, inclusion and exclusion criteria, primary outcomes, mandatory sensitivity analyses, effect/uncertainty/decision thresholds, multiplicity correction, missing-data policy, split strategy and deviation policy. Boolean frozen flags alone are insufficient.",
+    "The plan must enumerate exact authorized-source bindings (intake source ID, record URL, file URL, relative artifact path, SHA-256, byte count, and selected work/movement IDs); the validator must compare this list with the approved input manifest."
+  ],
+  "limitations": [
+    "This checked-in file is a blocked template, not a registered plan.",
+    "The Choro source intake remains metadata-only; no score or corpus file is authorized.",
+    "Template values cannot support an empirical result or an authenticity claim."
+  ],
+  "design": {
+    "source_version_pin": null,
+    "study_question": null,
+    "inclusion_criteria": [],
+    "exclusion_criteria": [],
+    "hypotheses": [],
+    "null_models": [],
+    "primary_outcomes": [],
+    "sensitivity_analyses": [],
+    "effect_and_uncertainty_thresholds": {
+      "effect_size_rule": null,
+      "uncertainty_rule": null,
+      "decision_rule": null
+    },
+    "multiplicity_correction": null,
+    "missing_data_policy": null,
+    "split_strategy": null,
+    "deviation_policy": null,
+    "authorized_source_bindings": []
+  }
+}

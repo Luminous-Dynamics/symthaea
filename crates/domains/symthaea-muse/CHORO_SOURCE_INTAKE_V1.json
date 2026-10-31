@@ -1,0 +1,157 @@
+{
+  "schema": "muse-choro-source-intake-v1",
+  "status": "metadata_only_candidate_inventory_not_rights_cleared",
+  "date": "2026-10-14",
+  "purpose": "Identify candidate score sources for a future rights-reviewed Choro research subset without importing, transcribing, or analyzing the score contents.",
+  "summary": {
+    "source_records": 6,
+    "records_rights_cleared": 0,
+    "records_pending_rights_review": 6,
+    "files_downloaded": 0,
+    "score_content_transcribed": 0,
+    "empirical_analysis_performed": 0
+  },
+  "sources": [
+    {
+      "id": "imslp-chorinho-braga-1918",
+      "title": "Chorinho",
+      "composer": "José Mauricio Braga",
+      "composition_year": "circa 1918",
+      "scope": "historical candidate; piano solo; one short score entry",
+      "source_url": "https://imslp.org/wiki/Chorinho_%28Braga%2C_Jos%C3%A9_Mauricio%29",
+      "source_stated_rights": "IMSLP page labels the score Public Domain and records first publication as Rio de Janeiro: O Malho, No. 840, 1918.",
+      "source_evidence_kind": "per_work_score_catalog_record",
+      "fit": "Potential historical score for testing notation-to-symbolic-analysis mechanics; piano solo alone is not representative of ensemble Choro.",
+      "status": "candidate_not_rights_cleared",
+      "commercial_use_status": "not_approved",
+      "unresolved": [
+        "Confirm source scan and publication provenance.",
+        "Verify public-domain status in each intended jurisdiction and distinguish the underlying composition from the scan/edition.",
+        "No score content has been downloaded, copied, or transcribed."
+      ]
+    },
+    {
+      "id": "imslp-choro-mineiro-rocha-2022",
+      "title": "Choro mineiro",
+      "composer": "Davi Rocha",
+      "composition_year": 2022,
+      "scope": "contemporary Choro; page describes open instrumentation including flute, guitar and cavaquinho",
+      "source_url": "https://imslp.org/wiki/Choro_mineiro_%28Rocha%2C_Davi%29",
+      "source_stated_rights": "IMSLP page identifies the composer-typeset score as Creative Commons Attribution 4.0.",
+      "source_evidence_kind": "author_published_score_catalog_record",
+      "fit": "Promising contemporary, ensemble-oriented candidate; still a single piece and not a representative corpus.",
+      "status": "candidate_not_rights_cleared",
+      "commercial_use_status": "not_approved",
+      "unresolved": [
+        "Verify that the CC BY 4.0 notice applies to the exact downloadable score and all included material.",
+        "Record exact attribution and license notice if subsequently approved.",
+        "Confirm all intended jurisdictions and any third-party components before use."
+      ]
+    },
+    {
+      "id": "imslp-choros-songbook-rocha-2008-2023",
+      "title": "Choros Songbook (14 choros)",
+      "composer": "Davi Rocha",
+      "composition_year": "2008–2023",
+      "scope": "contemporary guitar-led collection of 14 works by one composer",
+      "source_url": "https://imslp.org/wiki/Choros_Songbook_%28Rocha%2C_Davi%29",
+      "source_stated_rights": "IMSLP page identifies the composer-typeset collection as Creative Commons Attribution 4.0.",
+      "source_evidence_kind": "author_published_collection_catalog_record",
+      "fit": "Potentially useful for a small contemporary-authorized test set; selection is composer-specific and cannot establish general Choro characteristics.",
+      "status": "candidate_not_rights_cleared",
+      "commercial_use_status": "not_approved",
+      "unresolved": [
+        "Verify exact license file/notice on the work to be used and whether the underlying compositions and annotations are all covered.",
+        "Confirm attribution requirements and provenance for every selected work.",
+        "Do not generalize a single-composer collection to the full Choro tradition."
+      ]
+    },
+    {
+      "id": "imslp-chora-chora-moreira-boundary-control",
+      "title": "Chóra, chóra, choradô (Samba Rio-Grandense)",
+      "composer": "Luiz Moreira",
+      "composition_year": "early 20th century",
+      "scope": "boundary/control item; vocal/chorus/piano and cataloged as Samba, not a clean core Choro example",
+      "source_url": "https://imslp.org/wiki/Ch%C3%B3ra,_ch%C3%B3ra,_chorad%C3%B4_(Moreira,_Luiz)",
+      "source_stated_rights": "IMSLP page labels this score Public Domain; it also states the alternative title Samba Rio-Grandense and lists voice, chorus and piano.",
+      "source_evidence_kind": "per_work_score_catalog_record",
+      "fit": "Possible boundary/control study to test whether intake and labeling preserve neighboring styles; not to be counted as core Choro evidence.",
+      "status": "candidate_not_rights_cleared",
+      "commercial_use_status": "not_approved",
+      "unresolved": [
+        "Confirm territorial rights and source provenance.",
+        "The title/categorization itself flags overlap with Samba; obtain specialist guidance before classifying it as Choro.",
+        "Keep separate from the core candidate set unless an expert-defined scope justifies inclusion."
+      ]
+    },
+    {
+      "id": "imslp-12-exercicios-brasileiros-gallet-1928",
+      "title": "12 Exercícios brasileiros (including Chôrinho)",
+      "composer": "Luciano Gallet",
+      "composition_year": 1928,
+      "scope": "historical pedagogical collection of 12 Brazilian pieces; piano four-hands; one listed movement is titled Chôrinho",
+      "source_url": "https://imslp.org/wiki/12_Exerc%C3%ADcios_brasileiros_%28Gallet%2C_Luciano%29",
+      "source_stated_rights": "IMSLP labels the score Public Domain; the catalog record attributes the scan to Instituto Piano Brasileiro and lists Ricordi publication metadata. This is a catalog signal only, not clearance of the exact edition, scan, or all jurisdictions.",
+      "source_evidence_kind": "collection_score_catalog_record",
+      "fit": "Adds an independent composer and a named Chôrinho movement for a bounded notation-method pilot and selection-robustness check. The pedagogical piano-four-hands setting is not representative of ensemble Choro.",
+      "status": "candidate_not_rights_cleared",
+      "commercial_use_status": "not_approved",
+      "unresolved": [
+        "Verify that the stated rights cover the exact edition and digitized file, and identify any third-party editorial material.",
+        "Review the underlying compositions, edition, and scan separately for every intended jurisdiction and use.",
+        "Treat the named Chôrinho as one movement in a pedagogical collection; do not treat the whole collection as an ensemble Choro sample.",
+        "No score content has been downloaded, copied, transcribed, or analyzed."
+      ]
+    },
+    {
+      "id": "imslp-choro-pra-portinari-macedo-1982",
+      "title": "Choro p'ra Portinari",
+      "composer": "Norberto Macedo",
+      "composition_year": 1982,
+      "scope": "modern guitar solo; score typeset by Musica Brasilis in 2025; editor George Svetlichny",
+      "source_url": "https://imslp.org/wiki/Choro_p%27ra_Portinari_%28Macedo%2C_Norberto%29",
+      "source_stated_rights": "IMSLP lists the 2025 Musica Brasilis typesetting as Creative Commons Attribution-ShareAlike 4.0 and names an editor. This catalog notice does not independently establish that every underlying and edition right is held by the licensor.",
+      "source_evidence_kind": "editor_typeset_score_catalog_record",
+      "fit": "Adds a distinct contemporary composer and guitar-only notation context for studying whether score-analysis procedures generalize beyond piano or one composer. A solo guitar score is not representative of ensemble Choro.",
+      "status": "candidate_not_rights_cleared",
+      "commercial_use_status": "not_approved",
+      "unresolved": [
+        "Verify the exact downloaded file's CC BY-SA 4.0 notice, licensor authority and attribution requirements.",
+        "Identify and review the rights status of the underlying composition, editor contribution, digital typesetting and scan separately.",
+        "Document any ShareAlike obligations for adaptations and the intended commercial/non-commercial outputs before use.",
+        "Confirm territorial rights for each intended jurisdiction.",
+        "No score content has been downloaded, copied, transcribed, or analyzed."
+      ]
+    }
+  ],
+  "global_gates": [
+    "No source is marked rights-cleared in this inventory.",
+    "IMSLP catalogue metadata is a lead, not legal advice or a substitute for reviewing the exact file's rights notice.",
+    "Evaluate composition, score engraving/transcription, scan, recording, lyrics, and metadata rights separately where relevant.",
+    "Confirm territorial status for each intended use and document license version, attribution, and permitted outputs.",
+    "Do not download, transcribe, ingest, or analyze any item until the intended use and source-specific rights review are recorded.",
+    "Even a permissively licensed score does not make a one-composer or piano-only sample representative of the living Choro tradition."
+  ],
+  "non_goals": [
+    "This inventory is not permission to use or reproduce any score.",
+    "This inventory does not create a training dataset or represent the scores as analyzed.",
+    "This inventory does not change Choro's proposal-only state or create a composer route."
+  ],
+  "restricted_reference_corpus": {
+    "title": "Choro Songbook Corpus",
+    "doi": "10.5281/zenodo.3881347",
+    "zenodo_record_url": "https://zenodo.org/records/3881347",
+    "zenodo_record_rights_display": "Other (Open) — no further description.",
+    "related_repository_url": "https://github.com/DCMLab/choro",
+    "repository_license_file_url": "https://github.com/DCMLab/choro/blob/fe409c62deed50fc7f4b0d667863cd13ab230ff6/LICENSE",
+    "repository_license_stated": "CC BY-NC-SA 4.0",
+    "published_paper_data_availability": "The paper states the dataset is available for non-commercial use.",
+    "status": "non_commercial_reference_not_approved_for_commercial_analysis",
+    "use_decision": "No corpus data is downloaded, ingested or analyzed by this work. For a commercial or broader use, do not rely on the Zenodo label 'Other (Open)' as a specific grant; resolve license/permission with rights holders or use individually reviewed alternative sources.",
+    "sources": [
+      "https://doi.org/10.1080/09298215.2020.1797109",
+      "https://zenodo.org/records/3881347",
+      "https://github.com/DCMLab/choro/tree/fe409c62deed50fc7f4b0d667863cd13ab230ff6"
+    ]
+  }
+}

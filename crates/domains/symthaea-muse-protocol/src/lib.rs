@@ -25,12 +25,12 @@
 //! design (see above), and a client deserializing a subset of a larger
 //! JSON object is exactly the intended, supported use.
 
-/// The public Muse 152 style taxonomy.
+/// The public Muse 160 style taxonomy.
 ///
 /// Wired 2026-07-28. This module's file has existed since the commit that
 /// added it (`82330c0c0a`) but was never declared, so 1,257 lines — the
 /// whole `CATALOG` table plus its own validation tests, including
-/// `assert_eq!(CATALOG.len(), 152)` — had never once been compiled, while
+/// `assert_eq!(CATALOG.len(), 160)` — had never once been compiled, while
 /// `MUSE_152_STYLE_CATALOG_2026-07-18.md` described the registry as
 /// shipped. Declaring it is step 4a of making that document true.
 pub mod catalog;

@@ -179,10 +179,10 @@ pub fn compose_with_grammar_plan(
                 score,
                 form,
                 plan: GrammarPlanEvidence::PeriodSentence(PeriodSentencePlan {
-                    phrase_model: if intent.seed % 2 == 0 {
-                        "period"
-                    } else {
+                    phrase_model: if crate::composer::use_sentence_for(Some(profile), intent) {
                         "sentence"
+                    } else {
+                        "period"
                     }
                     .into(),
                     section_count,
@@ -521,6 +521,53 @@ mod tests {
         assert_ne!(groove.phrase, process.phrase);
         assert_ne!(process.harmony, raga.harmony);
         assert_ne!(raga.performance, groove.performance);
+    }
+
+    #[test]
+    fn period_sentence_plan_reports_the_same_model_the_composer_uses() {
+        use crate::composer::MusicalIntent;
+        use crate::style::Style;
+
+        let style = Style::Classical;
+        assert_eq!(
+            style.grammar_profile().family,
+            GrammarFamily::PeriodSentence
+        );
+        for (arousal, energy, seed) in [
+            (0.0, 0.0, 1),
+            (0.5, 0.5, 2),
+            (0.6, 0.75, 3),
+            (0.61, 0.5, 4),
+            (0.5, 0.76, 5),
+            (1.0, 1.0, 6),
+        ] {
+            let intent = MusicalIntent {
+                arousal,
+                energy,
+                seed,
+                ..MusicalIntent::default()
+            };
+            let expected = if crate::composer::use_sentence_for(
+                Some(style.grammar_profile()),
+                &intent,
+            ) {
+                "sentence"
+            } else {
+                "period"
+            };
+            let realization = compose_with_grammar_plan(
+                style.grammar_profile(),
+                &intent,
+                &style.spec(),
+            );
+            let GrammarPlanEvidence::PeriodSentence(plan) = realization.plan else {
+                panic!("Classical must emit a PeriodSentence plan");
+            };
+            assert_eq!(
+                plan.phrase_model, expected,
+                "arousal={arousal}, energy={energy}, seed={seed}"
+            );
+        }
     }
 
     #[test]

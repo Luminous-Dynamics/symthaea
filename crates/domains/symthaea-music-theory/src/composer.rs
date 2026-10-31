@@ -314,7 +314,7 @@ pub fn compose_with_spec_and_form(
 /// otherwise silently overwrite. `PeriodSentence`'s own name says it
 /// legitimately uses BOTH, chosen by energy — exactly today's behavior — so
 /// it (and the ungraded `None` case) keeps the heuristic.
-fn use_sentence_for(
+pub(crate) fn use_sentence_for(
     grammar: Option<crate::grammar::GrammarProfile>,
     intent: &MusicalIntent,
 ) -> bool {

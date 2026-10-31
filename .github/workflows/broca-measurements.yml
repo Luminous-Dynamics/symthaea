@@ -9,6 +9,8 @@ on:
       - "crates/domains/symthaea-broca/**"
       - "scripts/broca_measurement_artifacts.sh"
       - "scripts/broca_capture_baseline.sh"
+      - "scripts/check_cargo_lock_closure.sh"
+      - "tests/shell/test-cargo-lock-closure.sh"
       - ".github/workflows/broca-measurements.yml"
   workflow_dispatch:
 
@@ -58,8 +60,23 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake
 
+      - name: Self-test Cargo lock closure diagnostics
+        run: bash tests/shell/test-cargo-lock-closure.sh
+
+      - name: Verify full workspace Cargo lock closure
+        run: bash scripts/check_cargo_lock_closure.sh target/broca-lock-closure
+
       - name: Generate Broca measurement artifacts
         run: scripts/broca_measurement_artifacts.sh target/broca-measurements
+
+      - name: Upload Cargo lock-closure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: broca-lock-closure-${{ github.sha }}
+          path: target/broca-lock-closure/
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Upload Broca measurement artifacts
         uses: actions/upload-artifact@v4
