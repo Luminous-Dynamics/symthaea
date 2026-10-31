@@ -19,9 +19,17 @@ class ConfidenceAdaptiveCRCTests(unittest.TestCase):
         grouped=ConfidenceAdaptiveCRC(cal,query,.25,cap_breakpoints=False,group_duplicates=True)
         ungrouped=ConfidenceAdaptiveCRC(cal,query,.25,cap_breakpoints=False,group_duplicates=False)
         self.assertLess(grouped.state_count,ungrouped.state_count)
-        for j,counts in grouped.states:
-            check=grouped.expand_group_state_against_ungrouped(ungrouped,j,counts)
-            self.assertTrue(check["match"],check)
+        grouped_table=dict(grouped.baseline_table)
+        ungrouped_table=dict(ungrouped.baseline_table)
+        for round_index in range(3):
+            for j,counts in grouped.states:
+                check=grouped.expand_group_state_against_ungrouped(
+                    ungrouped,j,counts,grouped_table=grouped_table,
+                    ungrouped_table=ungrouped_table)
+                self.assertTrue(check["match"],check)
+            if round_index<2:
+                grouped_table=grouped.recertify_round(grouped_table)
+                ungrouped_table=ungrouped.recertify_round(ungrouped_table)
 
     def test_breakpoint_capping_preserves_all_ungrouped_baseline_cells(self):
         cal=[
@@ -33,8 +41,14 @@ class ConfidenceAdaptiveCRCTests(unittest.TestCase):
         capped=ConfidenceAdaptiveCRC(cal,query,.25,cap_breakpoints=True,group_duplicates=False)
         self.assertIsNotNone(capped.cap_threshold)
         self.assertEqual(uncapped.states,capped.states)
-        for state in uncapped.states:
-            self.assertAlmostEqual(uncapped.baseline_table[state],capped.baseline_table[state],places=12)
+        uncapped_table=dict(uncapped.baseline_table)
+        capped_table=dict(capped.baseline_table)
+        for round_index in range(4):
+            for state in uncapped.states:
+                self.assertAlmostEqual(uncapped_table[state],capped_table[state],places=12)
+            if round_index<3:
+                uncapped_table=uncapped.recertify_round(uncapped_table)
+                capped_table=capped.recertify_round(capped_table)
 
     def test_every_round_keeps_all_hypothetical_type_constraints_valid(self):
         cal=[(.02,.3,1),(.08,.42,2),(.02,.3,1),(.11,.55,1),(.0,.0,0),(.08,.42,2)]
