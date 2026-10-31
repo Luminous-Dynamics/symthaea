@@ -33,7 +33,7 @@ The probe does **not**:
 
 | Capability | Inventory basis | What still needs a separate test |
 |---|---|---|
-| BPF LSM | Active LSM list, BTF presence/digest, kernel config flags, bpftool binary/version | Attach the exact pinned LSM hook set, validate CO-RE and verifier behavior, test permission/privilege requirements, record link identities and event loss |
+| BPF LSM | Active LSM list, BTF presence/digest, kernel config flags, bpftool executable identity/digest | Attach the exact pinned LSM hook set, validate CO-RE and verifier behavior, test permission/privilege requirements, record link identities and event loss |
 | Process tracepoints | tracefs/debugfs mount and scheduler fork/exec/exit event IDs | Enable/consume under a supervised workload; validate event ordering, task identity, filtering and loss |
 | fanotify notifications | `CONFIG_FANOTIFY` in readable kernel config | Create a notification group and marks, verify permissions, mount coverage, queue overflow and teardown |
 | fanotify permission events | `CONFIG_FANOTIFY_ACCESS_PERMISSIONS` separately from base fanotify config | Exercise a permission event and verify exact response/timeout semantics |
