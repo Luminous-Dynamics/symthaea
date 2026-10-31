@@ -274,6 +274,10 @@ impl ClaimEval {
 #[derive(Debug, Clone)]
 pub struct GraphSuite {
     planner_cases: Vec<PlannerCase>,
+    // Generator identity used when serializing deterministic benchmark artifacts.
+    seed: u64,
+    split: DatasetSplit,
+    config: GraphGenerationConfig,
     // Private and deliberately omitted from all planner-facing records.
     oracle: BTreeMap<String, BTreeMap<String, HiddenTruth>>,
 }
@@ -611,7 +615,13 @@ pub fn generate_poar_graph_suite_with_config(
     }
 
     let t = (seed % 1_000_000) * 100;
-    let mut suite = GraphSuite { planner_cases: Vec::new(), oracle: BTreeMap::new() };
+    let mut suite = GraphSuite {
+        planner_cases: Vec::new(),
+        seed,
+        split,
+        config,
+        oracle: BTreeMap::new(),
+    };
 
     // AND: root needs a supported child claim and separate root evidence.
     add(&mut suite, seed, split, "and-chain", q(t+5,t+5), &["root"], vec![
@@ -763,6 +773,251 @@ pub fn generate_poar_graph_suite_with_config(
     ],&[("e-independent-a",HiddenTruth::SupportsAssertion),("e-independent-b",HiddenTruth::SupportsAssertion)]);
 
     Ok(suite)
+}
+
+fn hex_field(value: &str) -> String {
+    let mut output = String::with_capacity(value.len() * 2);
+    for byte in value.as_bytes() {
+        use std::fmt::Write as _;
+        write!(&mut output, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    output
+}
+
+fn polarity_field(polarity: Polarity) -> &'static str {
+    match polarity {
+        Polarity::Supports => "supports",
+        Polarity::Refutes => "refutes",
+    }
+}
+
+fn optional_u64_field(value: Option<u64>) -> String {
+    value.map_or_else(|| "-".to_string(), |number| number.to_string())
+}
+
+fn integrity_field(integrity: SourceIntegrity) -> &'static str {
+    match integrity {
+        SourceIntegrity::Verified => "verified",
+        SourceIntegrity::Unverified => "unverified",
+        SourceIntegrity::Invalid => "invalid",
+    }
+}
+
+fn lifecycle_field(lifecycle: EvidenceLifecycle) -> &'static str {
+    match lifecycle {
+        EvidenceLifecycle::Active => "active",
+        EvidenceLifecycle::Retracted => "retracted",
+    }
+}
+
+fn join_record(fields: &[String]) -> String {
+    fields.join("\t")
+}
+
+/// Encode planner-visible claims, asserted evidence metadata, and graph
+/// references only. Hidden source-truth labels and gold outcomes are omitted.
+pub fn encode_planner_artifact_v1(
+    suite: &GraphSuite,
+    generator_revision: &str,
+) -> Result<String, String> {
+    if generator_revision.is_empty() {
+        return Err("generator revision must not be empty".into());
+    }
+
+    let mut records = Vec::<String>::new();
+    for case in &suite.planner_cases {
+        let case_id = hex_field(&case.id);
+        records.push(join_record(&[
+            "CASE".into(),
+            case_id.clone(),
+            case.query.valid_at.to_string(),
+            case.query.known_at.to_string(),
+            hex_field(&case.query.required_scope),
+            hex_field(&case.query.required_authority),
+        ]));
+
+        for target in &case.target_claim_ids {
+            records.push(join_record(&[
+                "TARGET".into(),
+                case_id.clone(),
+                hex_field(target),
+            ]));
+        }
+
+        for claim in &case.claims {
+            records.push(join_record(&[
+                "CLAIM".into(),
+                case_id.clone(),
+                hex_field(&claim.id),
+            ]));
+            for alternative in &claim.alternatives {
+                records.push(join_record(&[
+                    "ALT".into(),
+                    case_id.clone(),
+                    hex_field(&claim.id),
+                    hex_field(&alternative.id),
+                    polarity_field(alternative.conclusion).into(),
+                    alternative.min_independent_groups.to_string(),
+                ]));
+
+                for requirement in &alternative.requirements {
+                    match requirement {
+                        ProofRequirement::Evidence(evidence_id) => records.push(join_record(&[
+                            "REQ_E".into(),
+                            case_id.clone(),
+                            hex_field(&claim.id),
+                            hex_field(&alternative.id),
+                            hex_field(evidence_id),
+                        ])),
+                        ProofRequirement::Claim { claim_id, polarity } => records.push(join_record(&[
+                            "REQ_C".into(),
+                            case_id.clone(),
+                            hex_field(&claim.id),
+                            hex_field(&alternative.id),
+                            hex_field(claim_id),
+                            polarity_field(*polarity).into(),
+                        ])),
+                    }
+                }
+            }
+        }
+
+        for evidence in &case.evidence {
+            records.push(join_record(&[
+                "EVIDENCE".into(),
+                case_id.clone(),
+                hex_field(&evidence.id),
+                hex_field(&evidence.source_id),
+                hex_field(&evidence.source_family_id),
+                hex_field(&evidence.independence_group_id),
+                hex_field(&evidence.subject_claim_id),
+                polarity_field(evidence.asserted_polarity).into(),
+                evidence.valid_from.to_string(),
+                optional_u64_field(evidence.valid_until),
+                evidence.known_from.to_string(),
+                optional_u64_field(evidence.known_until),
+                hex_field(&evidence.scope_id),
+                hex_field(&evidence.authority_id),
+                integrity_field(evidence.integrity).into(),
+                lifecycle_field(evidence.lifecycle).into(),
+            ]));
+        }
+    }
+
+    records.sort_unstable();
+    let mut output = format!(
+        "HEADER\tPOAR-TSV/1\t{}\t{}\t{}\t{}\n",
+        hex_field(generator_revision),
+        suite.seed,
+        suite.split.label(),
+        suite.config.chain_depth
+    );
+    for record in records {
+        output.push_str(&record);
+        output.push('\n');
+    }
+    Ok(output)
+}
+
+fn hidden_truth_field(truth: HiddenTruth) -> &'static str {
+    match truth {
+        HiddenTruth::SupportsAssertion => "supports_assertion",
+        HiddenTruth::RefutesAssertion => "refutes_assertion",
+        HiddenTruth::Irrelevant => "irrelevant",
+    }
+}
+
+fn oracle_state_field(state: OracleState) -> &'static str {
+    match state {
+        OracleState::Supported => "supported",
+        OracleState::Refuted => "refuted",
+        OracleState::Contested => "contested",
+        OracleState::Unknown => "unknown",
+    }
+}
+
+/// Encode hidden source labels and gold proof witnesses for evaluator-only use.
+/// The planner digest must be the lowercase SHA-256 of the exact planner bytes;
+/// the evaluator must verify it before accepting predictions.
+pub fn encode_oracle_artifact_v1(
+    suite: &GraphSuite,
+    generator_revision: &str,
+    planner_sha256: &str,
+) -> Result<String, String> {
+    if generator_revision.is_empty() {
+        return Err("generator revision must not be empty".into());
+    }
+    if planner_sha256.len() != 64
+        || !planner_sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+        || planner_sha256.bytes().any(|byte| byte.is_ascii_uppercase())
+    {
+        return Err("planner SHA-256 must be exactly 64 lowercase hexadecimal characters".into());
+    }
+
+    let mut records = Vec::<String>::new();
+    for case in &suite.planner_cases {
+        let case_id = hex_field(&case.id);
+        let labels = suite.oracle.get(&case.id)
+            .ok_or_else(|| format!("missing oracle labels for case {}", case.id))?;
+
+        for (evidence_id, truth) in labels {
+            records.push(join_record(&[
+                "TRUTH".into(),
+                case_id.clone(),
+                hex_field(evidence_id),
+                hidden_truth_field(*truth).into(),
+            ]));
+        }
+
+        let mut memo = BTreeMap::new();
+        for claim_id in &case.target_claim_ids {
+            let evaluation = resolve_claim(
+                case,
+                labels,
+                claim_id,
+                &mut BTreeSet::new(),
+                &mut memo,
+            );
+            records.push(join_record(&[
+                "GOLD_CLAIM".into(),
+                case_id.clone(),
+                hex_field(claim_id),
+                oracle_state_field(evaluation.state()).into(),
+            ]));
+
+            for (polarity, witnesses) in [
+                (Polarity::Supports, &evaluation.support),
+                (Polarity::Refutes, &evaluation.refute),
+            ] {
+                for (alternative_id, witness) in witnesses {
+                    let mut fields = vec![
+                        "GOLD_PATH".into(),
+                        case_id.clone(),
+                        hex_field(claim_id),
+                        polarity_field(polarity).into(),
+                        hex_field(alternative_id),
+                        witness.evidence_ids.len().to_string(),
+                    ];
+                    fields.extend(witness.evidence_ids.iter().map(|id| hex_field(id)));
+                    records.push(join_record(&fields));
+                }
+            }
+        }
+    }
+
+    records.sort_unstable();
+    let mut output = format!(
+        "ORACLE_HEADER\tPOAR-TSV/1\t{}\t{}\t{}\t{}\n",
+        planner_sha256,
+        hex_field(generator_revision),
+        suite.seed,
+        suite.split.label()
+    );
+    for record in records {
+        output.push_str(&record);
+        output.push('\n');
+    }
+    Ok(output)
 }
 
 #[cfg(test)]
