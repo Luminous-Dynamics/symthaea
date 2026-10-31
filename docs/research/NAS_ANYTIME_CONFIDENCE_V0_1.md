@@ -100,8 +100,9 @@ These are research targets. No real dataset run, Rust test execution, CI pass, q
 - Waudby-Smith and Ramdas, *Estimating means of bounded random variables by betting*, JRSS B (2024 issue; published online 2023): https://doi.org/10.1093/jrsssb/qkad009
 - L'Ecuyer et al., *Confidence intervals for randomized quasi-Monte Carlo estimators*, Winter Simulation Conference (2023): https://doi.org/10.1109/WSC60868.2023.10408613
 - EdgeVolution, *Communications Engineering* (23 June 2026): https://doi.org/10.1038/s44172-026-00708-2
-- ConNAS, ICLR 2026: https://openreview.net/forum?id=7c9f851081499ed5c60c51e312d3235f
-- NATS-Bench-MCU v2, Zenodo record 21644470 (28 July 2026): https://doi.org/10.5281/zenodo.21644470
+- ConNAS, ICLR 2026: https://openreview.net/forum?id=7c9f851081499ed5c60c51e312d3235f. Its proceedings abstract reports that constrained search reaches within 0.14% of the optimal feasible architecture on NATS-Bench and up to 1.55% higher accuracy than handcrafted architectures in a practical tight-budget deployment. These numbers are a strong comparator, not a directly comparable result for this pipeline until task, search space, constraint, and evaluation protocol are matched.
+- EdgeVolution, Communications Engineering (23 June 2026): https://doi.org/10.1038/s44172-026-00708-2. It is an end-to-end hardware-in-the-loop platform that measures on-device latency and power and deploys the selected model to microcontrollers. Our comparison must include end-to-end physical measurement and deployability, not stop at proxy ranking.
+- NATS-Bench-MCU v2, Zenodo record 21644470 (28 July 2026): https://doi.org/10.5281/zenodo.21644470. Version 2 reports 14,281 physically profiled architectures and 1,344 flash-infeasible architectures from the 15,625-candidate topology space. Its v2 CSV export is the practical first evaluation target; the 36GB raw traces and 117-row correction overlay should be retained for selected deep audits.
 
 ## 7. Next integration gates
 
