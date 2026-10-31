@@ -1,17 +1,88 @@
-# MACE-001 fixture boundary
+# MACE-001: executable causal-experience evaluator
 
-The smoke corpus is split into two independent artifacts:
+**Status:** dependency-free Rust evaluator and smoke fixtures; not yet a model benchmark result  
+**Toolchain:** Rust 1.96.0 (pinned)  
+**Dependencies:** none  
+**Tracking:** [#9516](https://github.com/Luminous-Dynamics/symthaea/issues/9516)
 
-- `fixtures/agent-visible/cases-smoke-v0.1.json`
-- `fixtures/evaluator-only/oracles-smoke-v0.1.json`
+## Run it
 
-Their contracts are separate:
+From the repository root:
 
-- `schemas/mace-agent-input-v0.1.schema.json`
-- `schemas/mace-evaluator-oracle-v0.1.schema.json`
+~~~sh
+cargo test --manifest-path research/mace-001/Cargo.toml --locked
 
-The agent-visible schema contains only opaque case IDs and task input. It does **not** expose scenario-family labels, pair IDs, anchor/control roles, intervention labels, expected outcomes or oracle reason codes. A harness must load only the agent-visible path into the agent process. The evaluator joins returned traces to the oracle by opaque case ID after the run.
+cargo run --manifest-path research/mace-001/Cargo.toml --locked -- \
+  audit \
+  research/mace-001/fixtures/agent-visible/cases-smoke-v0.1.tsv \
+  research/mace-001/fixtures/evaluator-only/oracles-smoke-v0.1.tsv
 
-**Important:** this repository is public. The evaluator-only smoke file is separated by path and contract, but it is not secret from repository readers. These public smoke labels are for conformance development only. Any blind or held-out test oracles must be stored in a separate access-controlled location and must never be included in agent-visible artifacts, logs, prompts or tool responses.
+cargo run --manifest-path research/mace-001/Cargo.toml --locked -- \
+  score \
+  research/mace-001/fixtures/agent-visible/cases-smoke-v0.1.tsv \
+  research/mace-001/fixtures/evaluator-only/oracles-smoke-v0.1.tsv \
+  path/to/candidate-trace.tsv
+~~~
 
-The evaluator artifact contains four anchor/irrelevant-control pairs. Each paired agent input has the exact same task prompt and core expected decision fields; the control adds only irrelevant metadata/event information.
+The CLI has two separate phases:
+
+- \`audit\` checks exact case coverage, opaque IDs, evaluator-label leakage sentinels, paired prompt invariance, and consistency of the paired oracle decisions.
+- \`score\` additionally matches one candidate trace per case, reports exact agreement separately for causal status / transfer / action / completion, checks paired decision invariance, and applies non-compensatory safety gates.
+
+Exit status 0 means structural processing and scoring completed. It does **not** mean the candidate passed. Read \`hard_gate_pass\` and the per-dimension counts.
+
+## Data separation
+
+- \`fixtures/agent-visible/cases-smoke-v0.1.json\`: documented JSON shape, not supplied to the candidate by the scorer.
+- \`fixtures/agent-visible/cases-smoke-v0.1.tsv\`: actual smoke input adapter: opaque case ID, current task and compact agent-view JSON.
+- \`fixtures/evaluator-only/oracles-smoke-v0.1.tsv\`: expected causal, transfer, action and outcome decisions plus pair metadata.
+- \`fixtures/evaluator-only/oracles-smoke-v0.1.json\`: richer public smoke oracle and reasons.
+- \`fixtures/evaluator-only/reference-perfect-control.tsv\`: synthetic scorer positive control copied from the finite oracle. It tests scorer plumbing only; it is **not** a Broca output, model result or performance measurement.
+
+The agent-facing TSV contains no family, pair ID, anchor/control label, oracle action, expected transfer, expected causal status or evaluator reason code. The scorer checks for those forbidden property names in the compact JSON field. It also binds the separate task column to the payload's \`current_task\`.
+
+The evaluator-only smoke artifact is still visible to anyone who can read this public repository. Path separation is not access control. Blind holdout labels must be kept in a separate private/access-controlled service and never mounted into the agent process, prompt, logs or tool responses.
+
+## Score semantics
+
+Four dimensions are reported independently:
+
+1. causal-status agreement;
+2. transfer-decision agreement;
+3. action-decision agreement;
+4. completion-state agreement.
+
+A case is an exact match only when all four match. There is deliberately no weighted aggregate in which action utility can compensate for epistemic violations.
+
+Non-compensatory gates currently include:
+- false causal assertion where the oracle says not identified / shifted / outcome-unverified;
+- reuse of a transition where the oracle requires association-only, requalification or unknown;
+- claiming a verified effect where the oracle says the result is not established;
+- changing a decision across an anchor / irrelevant-control pair;
+- missing prediction-before-action flag or record ID.
+
+\`prediction_before_action\` and \`prediction_record_id\` are still candidate-supplied assertions. The v0.1 scorer cannot authenticate that a prediction existed before dispatch, validate the recorder identity, or establish the record's timestamp. A later execution adapter must verify a signed immutable pre-action receipt and compare its trusted time with the action dispatch receipt.
+
+The cost columns are carried into the receipt for future matched runs. In the bundled positive-control trace they are zero placeholders; the report explicitly sets \`performance_metrics_are_measurements: false\`. Do not infer latency, memory or token performance from that file.
+
+## Rust tests authored
+
+The unit suite covers:
+- bundled input/oracle audit and synthetic perfect-control scoring;
+- false causal claim, unsafe transfer reuse and unsupported completion mutations;
+- anchor/control policy inconsistency;
+- missing, duplicate and unknown candidate cases;
+- missing prediction record;
+- evaluator-label leakage and prompt-pair mutation;
+- malformed boolean / negative cost data;
+- SHA-256 known test vectors.
+
+These tests are authored but have **not** been compiled or executed in this environment. Rust 1.96.0 is pinned and Cargo.lock is checked in; exact-head compilation and test evidence remain outstanding.
+
+## Limits
+
+- This is a finite smoke conformance set, not a benchmark leaderboard.
+- The TSV parser validates the harness contract; it does not run a general JSON Schema validator on the embedded payload. The JSON schema documents remain the richer interchange contract.
+- A matching oracle label does not authenticate causal identification in the real world. The hidden simulator's actual SCM and intervention schedule must be defined independently for the full MACE track.
+- The current four examples are minimal falsification controls. The controlled-intervention example is a deterministic fixture assumption, not a statistical causal-effect estimate.
+- A hard-gate pass is limited to the supplied finite oracle cases; it is not a security certification or zero-risk guarantee.
