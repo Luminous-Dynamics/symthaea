@@ -82,7 +82,7 @@ The ledger currently validates a caller-supplied receipt bundle. It is not a dis
 
 ## Authored tests
 
-Twelve unit tests are authored for:
+Fourteen unit tests are authored for:
 
 - plan digest and seat validation;
 - duplicate action IDs;
@@ -94,6 +94,8 @@ Twelve unit tests are authored for:
 - result/action-kind mismatch;
 - failure cost accounting;
 - contiguous round and parent-close chain, including reconstruction of ledger totals and tamper rejection;
+- order-independent close digests for asynchronous result arrival;
+- distinct duplicate-proposal accounting.
 - zero action charge rejection.
 
 These tests are authored but have **not** been compiled or executed in this authoring environment. Do not report them as passing.
