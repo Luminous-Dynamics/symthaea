@@ -131,7 +131,7 @@ This provides a second-process replay check, not an independent trust root: the 
 
 The separate command `basalt-cargo-mtime-evidence-verify` consumes retained mtime evidence and the exact challenge catalog. It checks the catalog digest, embedded fixture digest and every retained fixture-template file; Cargo/rustc binary, version, sysroot and PATH identity; retained Git baseline and clean working tree; ignored/untracked input state; final input bytes and content digests; build-script source digests; and exact recorded mtime.
 
-It then creates a new empty verifier CARGO_HOME, reruns Cargo against the retained warm target directory and compares output and digest with the original warm-cache evidence. Finally, it performs a new fresh-target replay and requires the mutated value and digest.
+It reuses the recorded isolated CARGO_HOME to avoid changing Cargo's configuration/cache namespace, reruns Cargo against the retained warm target directory, and compares output and digest with the original warm-cache evidence. Each verification invocation creates a fresh, exclusive replay-target directory. Finally, it performs a new fresh-target replay and requires the mutated value and digest.
 
 Run it after the mtime fixture has emitted its evidence:
 

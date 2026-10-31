@@ -734,11 +734,9 @@ pub fn verify(evidence_path: &Path, catalog_path: &Path) -> anyhow::Result<Mtime
         bail!("recorded fresh replay did not detect mutation");
     }
 
-    let cargo_home = run_root.join("verifier-cargo-home");
-    if cargo_home.exists() {
-        bail!("verifier CARGO_HOME already exists; refusing to reuse it");
-    }
-    fs::create_dir(&cargo_home)?;
+    // Replay with the same recorded isolated CARGO_HOME so the verifier does
+    // not change Cargo's configuration/cache namespace while checking the warm target.
+    let cargo_home = cargo_home_path;
     let mtime_dir = workspace.join("mtime");
     let warm_replay = run_cargo(
         &cargo,
@@ -767,11 +765,13 @@ pub fn verify(evidence_path: &Path, catalog_path: &Path) -> anyhow::Result<Mtime
         bail!("independent warm replay output/digest differs from recorded warm-cache evidence");
     }
 
-    let fresh_root = run_root.join("verifier-fresh-replay");
-    if fresh_root.exists() {
-        bail!("verifier fresh target already exists; refusing to reuse it");
-    }
-    fs::create_dir(&fresh_root)?;
+    let verification_nonce = SystemTime::now().duration_since(UNIX_EPOCH)
+        .context("system clock is before UNIX epoch")?.as_nanos();
+    let fresh_root = run_root.join(format!(
+        "verifier-fresh-replay-{}-{verification_nonce}",
+        std::process::id()
+    ));
+    fs::create_dir(&fresh_root).context("creating exclusive verifier fresh-replay directory")?;
     let fresh_replay = run_cargo(
         &cargo,
         &rustc_binary,
