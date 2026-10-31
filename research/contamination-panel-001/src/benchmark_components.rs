@@ -240,6 +240,7 @@ pub struct BenchmarkComponentAuditV1 {
     pub all_explicit_requirements_covered: bool,
     pub all_requirement_preconditions_covered: bool,
     pub no_orphan_evaluator_checks: bool,
+    pub no_orphan_precondition_mappings: bool,
     pub no_unknown_requirement_references: bool,
     pub no_unknown_precondition_references: bool,
     pub review_dispositions_valid: bool,
@@ -251,6 +252,7 @@ pub struct BenchmarkComponentAuditV1 {
     pub missing_capability_count: u64,
     pub exposed_prohibited_capability_count: u64,
     pub orphan_evaluator_check_count: u64,
+    pub orphan_precondition_mapping_count: u64,
     pub unknown_requirement_reference_count: u64,
     pub review_finding_count: u64,
     pub unresolved_blocker_count: u64,
@@ -381,6 +383,9 @@ pub fn audit_benchmark_components(
     validate_id(&manifest.evaluation.artifact_id, "evaluation.artifact_id")?;
     validate_digest(&manifest.manifest_sha256, "manifest_sha256")?;
     validate_component_digests(manifest)?;
+    if manifest.user_task.requirements.is_empty() || manifest.evaluator_checks.is_empty() {
+        return Err("component audit requires at least one user requirement and evaluator check".to_owned());
+    }
     if manifest.user_task.requirements.len() > COMPONENT_AUDIT_MAX_REQUIREMENTS
         || manifest.evaluator_checks.len() > COMPONENT_AUDIT_MAX_CHECKS
         || manifest.review_findings.len() > COMPONENT_AUDIT_MAX_FINDINGS
@@ -403,6 +408,7 @@ pub fn audit_benchmark_components(
     let mut all_explicit_requirements_covered = true;
     let mut all_requirement_preconditions_covered = true;
     let mut no_orphan_checks = true;
+    let mut no_orphan_precondition_mappings = true;
     let mut no_unknown_requirement_refs = true;
     let mut no_unknown_precondition_refs = true;
     let mut review_dispositions_valid = true;
@@ -542,14 +548,27 @@ pub fn audit_benchmark_components(
                 issues.push(format!("evaluator check {} references unknown environment precondition {}", check.check_id, precondition_id));
             }
         }
+        let mut relevant_preconditions_for_check = BTreeSet::new();
         for requirement in known_requirements_for_check {
             for precondition in &requirement.environment_precondition_ids {
+                relevant_preconditions_for_check.insert(precondition.as_str());
                 if known_preconditions_for_check.contains(&precondition.as_str()) {
                     covered_requirement_preconditions.insert((
                         requirement.requirement_id.as_str(),
                         precondition.as_str(),
                     ));
                 }
+            }
+        }
+        for precondition in &known_preconditions_for_check {
+            if !relevant_preconditions_for_check.contains(precondition) {
+                no_orphan_precondition_mappings = false;
+                orphan_precondition_mapping_count += 1;
+                issues.push(format!(
+                    "evaluator check {} maps environment precondition {} without a requirement that declares it",
+                    check.check_id,
+                    precondition
+                ));
             }
         }
     }
@@ -623,6 +642,7 @@ pub fn audit_benchmark_components(
         && all_explicit_requirements_covered
         && all_requirement_preconditions_covered
         && no_orphan_checks
+        && no_orphan_precondition_mappings
         && no_unknown_requirement_refs
         && no_unknown_precondition_refs
         && review_dispositions_valid
@@ -640,6 +660,7 @@ pub fn audit_benchmark_components(
         all_explicit_requirements_covered,
         all_requirement_preconditions_covered,
         no_orphan_evaluator_checks: no_orphan_checks,
+        no_orphan_precondition_mappings,
         no_unknown_requirement_references: no_unknown_requirement_refs,
         no_unknown_precondition_references: no_unknown_precondition_refs,
         review_dispositions_valid,
@@ -651,6 +672,7 @@ pub fn audit_benchmark_components(
         missing_capability_count: u64::try_from(missing_capabilities.len()).map_err(|_| "missing capability count exceeds u64")?,
         exposed_prohibited_capability_count: u64::try_from(exposed_prohibited.len()).map_err(|_| "prohibited capability count exceeds u64")?,
         orphan_evaluator_check_count: orphan_check_count,
+        orphan_precondition_mapping_count,
         unknown_requirement_reference_count,
         review_finding_count: u64::try_from(manifest.review_findings.len()).map_err(|_| "review finding count exceeds u64")?,
         unresolved_blocker_count: unresolved_blockers,
@@ -696,6 +718,8 @@ pub fn verify_benchmark_component_audit_integrity(
             == (report.exposed_prohibited_capability_count == 0)
         && report.no_orphan_evaluator_checks
             == (report.orphan_evaluator_check_count == 0)
+        && report.no_orphan_precondition_mappings
+            == (report.orphan_precondition_mapping_count == 0)
         && report.no_unknown_requirement_references
             == (report.unknown_requirement_reference_count == 0)
         && report.no_unknown_precondition_references
@@ -715,6 +739,7 @@ pub fn verify_benchmark_component_audit_integrity(
             && report.all_explicit_requirements_covered
             && report.all_requirement_preconditions_covered
             && report.no_orphan_evaluator_checks
+            && report.no_orphan_precondition_mappings
             && report.no_unknown_requirement_references
             && report.no_unknown_precondition_references
             && report.review_dispositions_valid
@@ -1065,6 +1090,33 @@ mod tests {
         manifest.manifest_sha256 = benchmark_component_manifest_digest(&manifest).unwrap();
         let report = audit_benchmark_components(&manifest).unwrap();
         assert!(!report.all_required_interfaces_present);
+    }
+
+    #[test]
+    fn evaluator_precondition_mapping_must_belong_to_a_mapped_requirement() {
+        let mut manifest = manifest();
+        manifest.evaluator_checks[1].covered_precondition_ids = vec!["PRE-001".to_owned()];
+        manifest.manifest_sha256 = benchmark_component_manifest_digest(&manifest).unwrap();
+        let report = audit_benchmark_components(&manifest).unwrap();
+        assert!(!report.no_orphan_precondition_mappings);
+        assert_eq!(report.orphan_precondition_mapping_count, 1);
+        assert!(!report.valid);
+    }
+
+    #[test]
+    fn empty_requirement_or_check_universe_fails_closed() {
+        let mut manifest = manifest();
+        manifest.user_task.requirements.clear();
+        manifest.manifest_sha256 = benchmark_component_manifest_digest(&manifest).unwrap();
+        assert!(audit_benchmark_components(&manifest).unwrap_err()
+            .contains("at least one user requirement"));
+
+        let mut manifest = manifest();
+        manifest.evaluator_checks.clear();
+        manifest.evaluation.check_ids.clear();
+        manifest.manifest_sha256 = benchmark_component_manifest_digest(&manifest).unwrap();
+        assert!(audit_benchmark_components(&manifest).unwrap_err()
+            .contains("at least one user requirement"));
     }
 
     #[test]
