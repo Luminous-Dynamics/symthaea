@@ -1720,9 +1720,9 @@ mod tests {
         assert!(parse_json(r#"{"n":1.}"#).is_err());
         assert!(parse_json(r#"{"n":1e}"#).is_err());
         assert!(parse_json(r#"{"n":1e9999}"#).is_err());
-        assert!(parse_json(r#"{"s":"\\q"}"#).is_err());
-        assert!(parse_json(r#"{"s":"\\uD800"}"#).is_err());
-        assert!(parse_json(r#"{"s":"\\uDC00"}"#).is_err());
+        assert!(parse_json(r#"{"s":"\q"}"#).is_err());
+        assert!(parse_json(r#"{"s":"\uD800"}"#).is_err());
+        assert!(parse_json(r#"{"s":"\uDC00"}"#).is_err());
         assert!(parse_json(r#"{"x":[1,]}"#).is_err());
     }
 
