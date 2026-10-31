@@ -212,8 +212,6 @@ pub fn run_coral_batch_campaign(
             *direction_id,
             0,
             score,
-            None,
-            None,
         )?;
         bootstrap_actions += 1;
     }
@@ -242,7 +240,8 @@ pub fn run_coral_batch_campaign(
             return Err("Coral largest-remainder allocator did not produce four seats".to_owned());
         }
 
-        let remaining_budget = (action_budget_units - total_action_units) as usize;
+        let remaining_budget = usize::try_from(action_budget_units - total_action_units)
+            .map_err(|_| "remaining action budget does not fit usize".to_owned())?;
         if remaining_budget < coral_config.agent_count {
             // Claim caps can leave unspent budget. Do not turn a four-seat reference
             // configuration into a partial batch merely to consume the residual units.
@@ -250,7 +249,6 @@ pub fn run_coral_batch_campaign(
         }
         let first_coral_allocation_round = scheduled_round == 1;
         let mut direction_claims: BTreeMap<String, usize> = BTreeMap::new();
-        let mut new_claims = 0usize;
         let mut round_actions = Vec::new();
         let mut staged_events = Vec::new();
         let mut round_eval_offsets: BTreeMap<String, usize> = BTreeMap::new();
@@ -321,7 +319,6 @@ pub fn run_coral_batch_campaign(
                     });
                 }
                 CoralArm::New => {
-                    new_claims += 1;
                     let known_new_direction = board.directions.contains_key("D");
                     let (disposition, score, canonical) = if landscape == DirectionLandscapeFamily::NewOperatorBreakthrough {
                         if known_new_direction {
@@ -371,7 +368,7 @@ pub fn run_coral_batch_campaign(
                                 landscape,
                                 seed,
                                 &attempt_id,
-                                proposal_index(new_attempt_index),
+                                new_attempt_index,
                                 DirectionProposalDisposition::Admitted {
                                     canonical_direction_id: direction_id.to_owned(),
                                 },
@@ -535,8 +532,6 @@ fn append_candidate_event(
     direction_id: &str,
     eval_index: usize,
     score: f64,
-    _disposition: Option<DirectionProposalDisposition>,
-    _proposal: Option<usize>,
 ) -> Result<(), String> {
     tape.append(make_candidate_event(
         round_id, worker_id, visible_through, claimed_arm, landscape, seed,
