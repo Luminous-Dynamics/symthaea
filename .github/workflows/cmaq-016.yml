@@ -54,6 +54,10 @@ jobs:
                   assert abs(row[field]) < 1e6
               assert 0.0 <= row["selected_pocket_rate"] <= 1.0
               assert row["candidate_budget"] in report["candidate_budgets"]
+              if row["policy"] in ("direct_policy", "oracle"):
+                  assert row["mean_candidate_queries_per_episode"] == 0.0
+              else:
+                  assert row["mean_candidate_queries_per_episode"] == row["candidate_budget"]
           # Oracle is exact and direct-policy output is independent of model-error lane.
           for budget in report["candidate_budgets"]:
               for scenario in report["scenarios"]:
