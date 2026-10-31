@@ -483,7 +483,7 @@ mod tests {
         trace
     }
 
-    fn finding(trace: &SearchTimeExposureTraceV1) -> CompositionalExposureFindingV1 {
+    fn finding() -> CompositionalExposureFindingV1 {
         let support = vec![1, 2, 3];
         let single = support.iter().map(|sequence| SingleEventInsufficiencyV1 {
             event_sequence: *sequence,
@@ -526,7 +526,7 @@ mod tests {
             schema: COMPOSITION_FINDINGS_SCHEMA.to_owned(),
             run_id: trace.run_id.clone(),
             trace_root_sha256: trace.trace_root_sha256.clone(),
-            findings: vec![finding(trace)],
+            findings: vec![finding()],
             findings_sha256: String::new(),
             claim_boundary: "synthetic evaluator fixture".to_owned(),
         };
