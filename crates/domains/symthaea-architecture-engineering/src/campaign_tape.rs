@@ -1030,6 +1030,39 @@ mod tests {
         }
     }
 
+    fn novel_candidate_event(
+        event_id: &str,
+        round: u64,
+        worker: &str,
+        cutoff: u64,
+        disposition: DirectionProposalDisposition,
+        score: Option<f64>,
+    ) -> CampaignEvent {
+        CampaignEvent {
+            event_id: event_id.to_owned(),
+            sequence_number: 0,
+            round_id: round,
+            worker_id: worker.to_owned(),
+            policy_visible_through_sequence: cutoff,
+            claimed_arm: ArmClaim::NewDirection,
+            task_recipe_sha256: A.to_owned(),
+            evaluator_sha256: B.to_owned(),
+            comparison_profile_sha256: C.to_owned(),
+            payload: CampaignEventPayload::NovelCandidateEvaluation {
+                candidate_sha256: D.to_owned(),
+                parent_candidate_sha256: A.to_owned(),
+                semantic_delta_sha256: B.to_owned(),
+                proposal_sha256: C.to_owned(),
+                descriptor_sha256: D.to_owned(),
+                disposition,
+                score,
+            },
+            resource_usage: usage(),
+            previous_event_sha256: String::new(),
+            event_sha256: String::new(),
+        }
+    }
+
     fn tape(policy_id: &str) -> CampaignTape {
         CampaignTape::new(
             format!("tape-{policy_id}"),
@@ -1231,6 +1264,112 @@ mod tests {
         let mut second = evaluation_event("o2", 2, "w1", 1, "B");
         second.resource_usage.wall_millis = Some(1);
         tape.append(second).unwrap();
+        assert!(tape.seal().is_err());
+    }
+
+    #[test]
+    fn novel_candidate_admission_is_one_charged_action_and_direction_opens_next_round() {
+        let mut tape = tape("novel-admit");
+        tape.append(novel_candidate_event(
+            "n1",
+            1,
+            "w1",
+            0,
+            DirectionProposalDisposition::Admitted {
+                canonical_direction_id: "D".to_owned(),
+            },
+            Some(0.81),
+        )).unwrap();
+        tape.append(evaluation_event("e2", 2, "w1", 1, "D")).unwrap();
+        tape.seal().unwrap();
+        let totals = tape.totals().unwrap();
+        assert_eq!(totals.action_units, 2);
+        assert_eq!(tape.events.len(), 2);
+    }
+
+    #[test]
+    fn novel_candidate_duplicate_maps_to_existing_arm_with_one_charge() {
+        let mut tape = tape("novel-duplicate");
+        tape.append(novel_candidate_event(
+            "n1",
+            1,
+            "w1",
+            0,
+            DirectionProposalDisposition::Duplicate {
+                existing_direction_id: "A".to_owned(),
+            },
+            Some(0.77),
+        )).unwrap();
+        tape.seal().unwrap();
+        assert_eq!(tape.totals().unwrap().action_units, 1);
+    }
+
+    #[test]
+    fn novel_candidate_admission_and_duplicate_can_share_a_batch() {
+        let mut batch_config = config();
+        batch_config.new_direction_claim_cap = 2;
+        let mut tape = CampaignTape::new(
+            "tape-novel-same-batch",
+            "novel_same_batch",
+            A,
+            batch_config,
+        ).unwrap();
+        tape.append(novel_candidate_event(
+            "n1",
+            1,
+            "w1",
+            0,
+            DirectionProposalDisposition::Admitted {
+                canonical_direction_id: "D".to_owned(),
+            },
+            Some(0.80),
+        )).unwrap();
+        tape.append(novel_candidate_event(
+            "n2",
+            1,
+            "w2",
+            0,
+            DirectionProposalDisposition::Duplicate {
+                existing_direction_id: "D".to_owned(),
+            },
+            Some(0.82),
+        )).unwrap();
+        tape.seal().unwrap();
+        assert_eq!(tape.totals().unwrap().action_units, 2);
+    }
+
+    #[test]
+    fn rejected_and_inconclusive_novel_candidates_cannot_publish_a_score() {
+        for (policy, disposition) in [
+            ("novel-rejected", DirectionProposalDisposition::Rejected {
+                reason_code: "not_novel".to_owned(),
+            }),
+            ("novel-inconclusive", DirectionProposalDisposition::Inconclusive {
+                reason_code: "insufficient_evidence".to_owned(),
+            }),
+        ] {
+            let mut tape = tape(policy);
+            tape.append(novel_candidate_event(
+                "n1", 1, "w1", 0, disposition, None,
+            )).unwrap();
+            tape.seal().unwrap();
+            assert_eq!(tape.totals().unwrap().action_units, 1);
+        }
+    }
+
+    #[test]
+    fn rejected_novel_candidate_with_score_is_invalid() {
+        let mut tape = tape("novel-rejected-with-score");
+        tape.append(novel_candidate_event(
+            "n1",
+            1,
+            "w1",
+            0,
+            DirectionProposalDisposition::Rejected {
+                reason_code: "not_novel".to_owned(),
+            },
+            Some(0.95),
+        )).unwrap();
         assert!(tape.seal().is_err());
     }
 
