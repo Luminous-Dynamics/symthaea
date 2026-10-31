@@ -384,7 +384,7 @@ fn parse_args() -> Result<(usize, usize), String> {
 fn run() -> Result<(), String> {
     let (repeats, max_units) = parse_args()?;
     println!(
-        "substrate_units,candidate_units,partitions,state_pairs,partition_score_evaluations,repeats,naive_median_ns,naive_p95_ns,reused_median_ns,reused_p95_ns,median_speedup,uncut_posterior_preparations_naive,uncut_posterior_preparations_reused,partition_repertoire_preparations_naive,partition_repertoire_preparations_reused,phi_s,result_status,validated"
+        "substrate_units,candidate_units,partitions,state_pairs,partition_score_evaluations,repeats,naive_median_ns,naive_p95_ns,reused_median_ns,reused_p95_ns,median_speedup,uncut_posterior_preparations_naive,uncut_posterior_preparations_reused,partition_repertoire_preparations_naive,partition_repertoire_preparations_reused,nested_eq4_receipt_hashes_naive,nested_eq4_receipt_hashes_reused,phi_s,result_status,validated"
     );
 
     let config = search_config();
@@ -437,9 +437,11 @@ fn run() -> Result<(), String> {
         let reused_posterior_preparations = 1usize;
         let naive_partition_terms = score_evaluations;
         let reused_partition_terms = partition_count;
+        let naive_nested_receipt_hashes = score_evaluations * 2;
+        let reused_nested_receipt_hashes = partition_count + 1;
 
         println!(
-            "{},{},{},{},{},{},{},{},{},{},{:.4},{},{},{},{},{},{:?},{}",
+            "{},{},{},{},{},{},{},{},{},{},{:.4},{},{},{},{},{},{},{},{:?},{}",
             n_units,
             CANDIDATE.len(),
             partition_count,
@@ -455,6 +457,8 @@ fn run() -> Result<(), String> {
             reused_posterior_preparations,
             naive_partition_terms,
             reused_partition_terms,
+            naive_nested_receipt_hashes,
+            reused_nested_receipt_hashes,
             phi_s.map(|value| format!("{value:.17}")).unwrap_or_else(|| "UNRESOLVED".to_string()),
             result_status,
             true
