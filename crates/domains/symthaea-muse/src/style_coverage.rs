@@ -491,6 +491,30 @@ mod tests {
     }
 
     #[test]
+    fn each_canonical_constellation_has_exactly_eight_styles() {
+        let report = collect_style_coverage();
+        for constellation in Constellation::ALL {
+            assert_eq!(
+                report.styles.iter()
+                    .filter(|style| style.constellation == constellation.name())
+                    .count(),
+                8,
+                "{}",
+                constellation.name()
+            );
+        }
+    }
+
+    #[test]
+    fn canonical_ids_are_unique_sorted_and_complete() {
+        let report = collect_style_coverage();
+        assert_eq!(
+            report.styles.iter().map(|style| style.catalog_id).collect::<Vec<_>>(),
+            (1_u16..=152).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
     fn route_mappings_are_unique_and_spec_validation_is_accounted_for() {
         let report = collect_style_coverage();
         let mut names = std::collections::BTreeSet::new();
