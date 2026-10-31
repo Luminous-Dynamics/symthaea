@@ -363,8 +363,8 @@ impl<'a> JsonParser<'a> {
         let start = self.position;
         if self.bytes.get(self.position) == Some(&b'-') { self.position += 1; }
         match self.bytes.get(self.position) {
-            Some(byte) if **byte == b'0' => self.position += 1,
-            Some(byte) if (b'1'..=b'9').contains(*byte) => {
+            Some(byte) if *byte == b'0' => self.position += 1,
+            Some(byte) if (b'1'..=b'9').contains(byte) => {
                 self.position += 1;
                 while self.bytes.get(self.position).is_some_and(|byte| byte.is_ascii_digit()) {
                     self.position += 1;
