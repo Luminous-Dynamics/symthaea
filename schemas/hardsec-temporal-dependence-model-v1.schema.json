@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/hardsec-temporal-dependence-model-v1.schema.json",
+  "title": "HARDSEC temporal dependence model and FDM contract v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dependence_model_id",
+    "evidence_domain",
+    "stream_id",
+    "calibration_execution_group_id",
+    "evaluation_execution_group_id",
+    "calibration_device_boot_group_id",
+    "evaluation_device_boot_group_id",
+    "context_id",
+    "scoring_artifact_sha256",
+    "anomaly_score_direction",
+    "target_miscoverage_alpha",
+    "predictor_fixed_status",
+    "score_marginal_continuity_status",
+    "causal_innovation_model",
+    "dependence_bound",
+    "block_diagnostic"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-temporal-dependence-model-v1"
+    },
+    "dependence_model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_domain": {
+      "enum": [
+        "synthetic_fixture",
+        "simulator",
+        "physical_hardware"
+      ]
+    },
+    "stream_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "calibration_execution_group_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_execution_group_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "calibration_device_boot_group_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_device_boot_group_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "context_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scoring_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "anomaly_score_direction": {
+      "const": "higher_is_more_anomalous"
+    },
+    "target_miscoverage_alpha": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "predictor_fixed_status": {
+      "const": "assumption_not_verified"
+    },
+    "score_marginal_continuity_status": {
+      "const": "assumption_not_verified"
+    },
+    "causal_innovation_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_type",
+        "model_artifact_sha256",
+        "innovation_distribution",
+        "iid_innovations_status",
+        "stationarity_status",
+        "causal_representation_status"
+      ],
+      "properties": {
+        "model_type": {
+          "enum": [
+            "causal_innovation_recursion",
+            "gaussian_linear_process",
+            "other_declared_causal_model"
+          ]
+        },
+        "model_artifact_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "innovation_distribution": {
+          "type": "string",
+          "minLength": 1
+        },
+        "iid_innovations_status": {
+          "const": "assumption_not_verified"
+        },
+        "stationarity_status": {
+          "const": "assumption_not_verified"
+        },
+        "causal_representation_status": {
+          "const": "assumption_not_verified"
+        }
+      }
+    },
+    "dependence_bound": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "envelope_type",
+            "amplitude",
+            "rho",
+            "lag_upper_bounds",
+            "proof_artifact_sha256",
+            "proof_reference",
+            "per_lag_bound_proof_status"
+          ],
+          "properties": {
+            "status": {
+              "const": "summable_geometric_claimed"
+            },
+            "envelope_type": {
+              "const": "geometric"
+            },
+            "amplitude": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "rho": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "exclusiveMaximum": 1
+            },
+            "lag_upper_bounds": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "lag",
+                  "theta_upper_bound"
+                ],
+                "properties": {
+                  "lag": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "theta_upper_bound": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            },
+            "proof_artifact_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "proof_reference": {
+              "type": "string",
+              "minLength": 1
+            },
+            "per_lag_bound_proof_status": {
+              "const": "assumption_not_verified"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "const": "not_bounded"
+            }
+          }
+        }
+      ]
+    },
+    "block_diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "block_lengths",
+        "primary_block_length",
+        "nominal_two_sided_level",
+        "block_inference_assumption_status"
+      ],
+      "properties": {
+        "block_lengths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "primary_block_length": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "nominal_two_sided_level": {
+          "enum": [
+            0.1,
+            0.05,
+            0.01
+          ]
+        },
+        "block_inference_assumption_status": {
+          "const": "assumption_not_verified"
+        }
+      }
+    }
+  }
+}
