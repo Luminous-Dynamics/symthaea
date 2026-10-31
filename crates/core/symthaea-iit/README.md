@@ -601,6 +601,37 @@ on a pinned PyPhi artifact.
   background convention, partition family, and result receipt.
 
 
+## Topology-sensitive sparse Eq. 4 benchmark
+
+The `sparse_eq4_topology_sweep` compares three local-CPT graph families while
+holding the evaluated candidate subsystem at four units:
+
+- **Ring:** a sparse cycle, used to expose substrate-size scaling at bounded
+  induced width
+- **Hub-spoke:** conditionally independent leaves connected through one shared
+  hub, separating large substrate size from high treewidth
+- **Open grid:** local self/north/west parent scopes on square grids, exposing
+  how induced width grows with graph geometry even when each unit has at most
+  three local parents
+
+The sweep records model-construction time separately from analysis time,
+posterior and target induced widths, predicted and observed peak factor entries,
+factor multiplications, p50/p95/minimum latency, and a deterministic report
+receipt. It also emits an explicit `budget_rejected` row when a topology exceeds
+the configured 65,536-entry factor budget; an over-budget exact analysis is
+never replaced with a truncated result.
+
+Run:
+
+    cargo run --release --locked -p symthaea-iit --example sparse_eq4_topology_sweep
+    cargo run --release --locked -p symthaea-iit --example sparse_eq4_topology_sweep -- --repeats 9
+
+This is a structural scaling experiment, not a PyPhi speed comparison. The fixed
+four-unit candidate and growing substrate must be reported separately. The
+benchmark's open-grid family is intentionally included to prevent a ring-only
+claim from hiding treewidth sensitivity. The report receipt must be identical
+across repetitions before timing is accepted.
+
 ## Claim ceiling
 
 A valid BinaryCausalModel proves only that the input satisfies this crate's shape
