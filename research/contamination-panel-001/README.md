@@ -838,3 +838,11 @@ Schemas:
 
 The Rust tests include synthetic one- and twenty-block fixtures, randomized-order checks, policy/score/trace binding, model identity and budget invariants, unique run-state/evidence artifacts, and nested schema/struct comparisons. These are software fixtures only, not evidence of live agent trials or retrieval contamination rates.
 
+
+
+The network-disabled, allowlisted and unrestricted policy digests are preregistered at study level and must remain constant for their respective condition across all blocks. Each run binds the condition policy digest to its search trace. Model provider/name/version/access mode must also remain identical across all arms.
+
+The analyzer rejects reuse of run IDs, sandbox/memory/cache/reset namespaces, execution receipts, answer submissions, score reports, trace roots or findings digests across run conditions and blocks. The shared budget-spec digest is intentionally repeated; it defines the same cap for every arm. Actual counters are checked against the shared caps.
+
+The 95% intervals use a conservative Student-t critical-value table. For degrees of freedom above the tabulated range, the fallback remains 1.98 rather than 1.96 so finite-sample uncertainty is not understated. Multiple contrasts are descriptive/exploratory in this implementation; a confirmatory protocol still needs a prespecified primary contrast and multiplicity policy, plus power simulations at the independent-block level.
+
