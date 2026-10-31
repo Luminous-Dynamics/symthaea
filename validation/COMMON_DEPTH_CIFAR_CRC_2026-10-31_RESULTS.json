@@ -1,0 +1,82 @@
+{
+  "schema":"symthaea-common-depth-cifar-crc-v1",
+  "status":"INDEPENDENT_COMMON_DEPTH_TYPE_COUNT_REPRODUCTION_NOT_ORIGINAL_SPLIT_MANIFEST",
+  "reference":"Bai & Ramdas (2026), arXiv:2610.35821, Sections 3.6.1-3.6.2 and Appendix B.7",
+  "protocol":{
+    "pool_error_type_counts":[7300,969,1731],
+    "n_calibration":50,
+    "n_test":16,
+    "paired_splits":300,
+    "seed":20261031,
+    "same_split_draws_for_all_methods_and_alpha":true,
+    "sampling":"uniform without replacement within each split from a finite population represented by the published error-type counts",
+    "common_depth_state_count":1326,
+    "augmented_count_state_count":1378,
+    "method":"CRC / envelope CRC / equal-share recertification of the common-depth controller",
+    "risk_loss":"ell0(a)=0; ell1(a)=0.5*max(a-1,0); ell2(a)=0.5*a; a in [0,2]",
+    "verification":"all 1,378 augmented multiset constraints checked on every table after every update"
+  },
+  "local_execution":{
+    "runtime_seconds_total":7.715,
+    "per_alpha_500_round_table_build_seconds":[1.908,1.895,1.912,1.853],
+    "executed_with":"Independent Python reference driver implementing the committed equations",
+    "exact_committed_module_execution":"not yet performed; the branch's unit tests are authored but not run against exact fetched commit bytes",
+    "remote_ci":"not run / no pass claimed"
+  },
+  "results":{
+    "0.02":{
+      "CRC":{"risk":0.000459,"correct_specificity_pct":0.279273,"mean_node_size":99.505024},
+      "Envelope_CRC":{"risk":0.020419,"correct_specificity_pct":12.416746,"mean_node_size":77.987225},
+      "Recertified_1":{"risk":0.020419,"correct_specificity_pct":12.416746,"mean_node_size":77.987225},
+      "Recertified_50":{"risk":0.020419,"correct_specificity_pct":12.416746,"mean_node_size":77.987225},
+      "Recertified_500":{"risk":0.020419,"correct_specificity_pct":12.416746,"mean_node_size":77.987225},
+      "paired_gain_500_vs_envelope_pp":{"mean":0.0,"ci95":[0.0,0.0]},
+      "paired_gain_500_vs_crc_pp":{"mean":12.137473,"ci95":[11.655655,12.619291]}
+    },
+    "0.05":{
+      "CRC":{"risk":0.035519,"correct_specificity_pct":21.610882,"mean_node_size":61.701777},
+      "Envelope_CRC":{"risk":0.050894,"correct_specificity_pct":30.745128,"mean_node_size":45.556256},
+      "Recertified_1":{"risk":0.050929,"correct_specificity_pct":30.750544,"mean_node_size":45.555152},
+      "Recertified_50":{"risk":0.051118,"correct_specificity_pct":30.779728,"mean_node_size":45.549247},
+      "Recertified_500":{"risk":0.051118,"correct_specificity_pct":30.779777,"mean_node_size":45.549237},
+      "paired_gain_1_vs_envelope_pp":{"mean":0.005416,"ci95":[0.001493,0.009338]},
+      "paired_gain_50_vs_envelope_pp":{"mean":0.034600,"ci95":[0.011836,0.057363]},
+      "paired_gain_500_vs_envelope_pp":{"mean":0.034649,"ci95":[0.011879,0.057419]},
+      "paired_gain_500_vs_crc_pp":{"mean":9.168894,"ci95":[8.920954,9.416835]}
+    },
+    "0.10":{
+      "CRC":{"risk":0.090392,"correct_specificity_pct":49.215412,"mean_node_size":15.228290},
+      "Envelope_CRC":{"risk":0.099453,"correct_specificity_pct":52.648034,"mean_node_size":10.155187},
+      "Recertified_1":{"risk":0.099999,"correct_specificity_pct":52.724981,"mean_node_size":10.139240},
+      "Recertified_50":{"risk":0.101921,"correct_specificity_pct":52.996398,"mean_node_size":10.082842},
+      "Recertified_500":{"risk":0.101921,"correct_specificity_pct":52.996419,"mean_node_size":10.082838},
+      "paired_gain_1_vs_envelope_pp":{"mean":0.076947,"ci95":[0.066648,0.087247]},
+      "paired_gain_50_vs_envelope_pp":{"mean":0.348364,"ci95":[0.301656,0.395072]},
+      "paired_gain_500_vs_envelope_pp":{"mean":0.348385,"ci95":[0.301673,0.395098]},
+      "paired_gain_500_vs_crc_pp":{"mean":3.781008,"ci95":[3.566698,3.995317]}
+    },
+    "0.15":{
+      "CRC":{"risk":0.142431,"correct_specificity_pct":60.944635,"mean_node_size":3.719750},
+      "Envelope_CRC":{"risk":0.147858,"correct_specificity_pct":61.789991,"mean_node_size":3.356181},
+      "Recertified_1":{"risk":0.148690,"correct_specificity_pct":61.903408,"mean_node_size":3.332208},
+      "Recertified_50":{"risk":0.151050,"correct_specificity_pct":62.228550,"mean_node_size":3.263659},
+      "Recertified_500":{"risk":0.151050,"correct_specificity_pct":62.228553,"mean_node_size":3.263659},
+      "paired_gain_1_vs_envelope_pp":{"mean":0.113417,"ci95":[0.105100,0.121734]},
+      "paired_gain_50_vs_envelope_pp":{"mean":0.438559,"ci95":[0.404324,0.472795]},
+      "paired_gain_500_vs_envelope_pp":{"mean":0.438562,"ci95":[0.404326,0.472798]},
+      "paired_gain_500_vs_crc_pp":{"mean":1.283918,"ci95":[1.202255,1.365580]}
+    }
+  },
+  "paper_reference_common_depth":{
+    "0.02":{"Envelope_CRC":{"risk":0.01961,"CS_pct":12.538,"size":77.96},"Recertified_500":{"risk":0.01961,"CS_pct":12.538,"size":77.96},"gain_pp":0.0},
+    "0.05":{"Envelope_CRC":{"risk":0.04884,"CS_pct":30.989,"size":45.62},"Recertified_500":{"risk":0.04907,"CS_pct":31.025,"size":45.61},"gain_pp":0.036},
+    "0.10":{"Envelope_CRC":{"risk":0.09645,"CS_pct":52.883,"size":10.65},"Recertified_500":{"risk":0.09898,"CS_pct":53.220,"size":10.58},"gain_pp":0.337},
+    "0.15":{"Envelope_CRC":{"risk":0.14462,"CS_pct":62.279,"size":3.37},"Recertified_500":{"risk":0.14780,"CS_pct":62.722,"size":3.28},"gain_pp":0.443}
+  },
+  "limitations":[
+    "Common-depth family only; confidence-adaptive per-image thresholds are not implemented by the common-depth count-vector engine.",
+    "The cached ResNet-18 predictions and original image/split IDs were not used. For common depth, only the published pool counts matter to the controller and metrics, enabling exact type-count simulation.",
+    "The confidence-adaptive family requires individual (u_i,v_i) breakpoints, exact hypothetical-label recursion, breakpoint capping and grouping; it cannot be reconstructed from the three aggregate type counts.",
+    "No robustness under covariate/label shift is claimed. Finite exchangeability is the guarantee."
+  ]
+}
