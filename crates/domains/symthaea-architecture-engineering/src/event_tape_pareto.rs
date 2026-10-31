@@ -238,6 +238,27 @@ impl ActionResourceTotals {
     }
 
 
+    fn checked_add_totals(
+        &mut self,
+        other: &Self,
+        path: &str,
+    ) -> Result<(), EventTapeParetoError> {
+        self.action_count = checked_add(self.action_count, other.action_count, &format!("{path}.action_count"))?;
+        self.host_cpu_millis = checked_add(self.host_cpu_millis, other.host_cpu_millis, &format!("{path}.host_cpu_millis"))?;
+        self.sum_action_wall_millis = checked_add(self.sum_action_wall_millis, other.sum_action_wall_millis, &format!("{path}.sum_action_wall_millis"))?;
+        self.accelerator_millis = checked_add(self.accelerator_millis, other.accelerator_millis, &format!("{path}.accelerator_millis"))?;
+        self.max_action_peak_memory_bytes = self.max_action_peak_memory_bytes.max(other.max_action_peak_memory_bytes);
+        self.max_action_accelerator_peak_memory_bytes = self.max_action_accelerator_peak_memory_bytes.max(other.max_action_accelerator_peak_memory_bytes);
+        self.energy_millijoules = checked_add(self.energy_millijoules, other.energy_millijoules, &format!("{path}.energy_millijoules"))?;
+        self.input_tokens = checked_add(self.input_tokens, other.input_tokens, &format!("{path}.input_tokens"))?;
+        self.output_tokens = checked_add(self.output_tokens, other.output_tokens, &format!("{path}.output_tokens"))?;
+        self.tool_calls = checked_add(self.tool_calls, other.tool_calls, &format!("{path}.tool_calls"))?;
+        self.evaluator_calls = checked_add(self.evaluator_calls, other.evaluator_calls, &format!("{path}.evaluator_calls"))?;
+        self.verifier_calls = checked_add(self.verifier_calls, other.verifier_calls, &format!("{path}.verifier_calls"))?;
+        self.charged_budget_microunits = checked_add(self.charged_budget_microunits, other.charged_budget_microunits, &format!("{path}.charged_budget_microunits"))?;
+        Ok(())
+    }
+
     fn value(&self, metric: &CandidateObjectiveMetric) -> f64 {
         match metric {
             CandidateObjectiveMetric::EvaluationAttemptCount => self.action_count as f64,
@@ -430,6 +451,18 @@ pub fn event_tape_to_pareto(
                 ));
             }
         }
+    }
+
+    let mut reconciled_resources = candidate_evaluation_resources.clone();
+    reconciled_resources.checked_add_totals(
+        &direction_proposal_overhead,
+        "resource_reconciliation",
+    )?;
+    if reconciled_resources != campaign_resources {
+        return Err(EventTapeParetoError::new(
+            "resource_reconciliation",
+            "candidate-evaluation totals plus proposal overhead do not equal campaign totals",
+        ));
     }
 
     if candidates.is_empty() {
@@ -857,6 +890,9 @@ mod tests {
         assert_eq!(report.direction_proposal_overhead.action_count, 1);
         assert_eq!(report.campaign_resources.action_count, 4);
         assert_eq!(report.campaign_resources.host_cpu_millis, 45);
+        let mut recomposed = report.candidate_evaluation_resources.clone();
+        recomposed.checked_add_totals(&report.direction_proposal_overhead, "test").unwrap();
+        assert_eq!(recomposed, report.campaign_resources);
         assert_eq!(report.candidate_evaluation_resources.host_cpu_millis, 38);
         assert_eq!(report.direction_proposal_overhead.host_cpu_millis, 7);
 
