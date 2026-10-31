@@ -584,6 +584,29 @@ pub enum SystemPhiError {
     StatePairCounterOverflow,
 }
 
+/// Fail-closed validation against the IIT 4.0 (2023) theorem-domain ceiling.
+/// The bound is deliberately optional: TotalCut/one-unit systems are outside
+/// the theorem's assumptions and must not be checked against this result.
+pub(crate) fn validate_certified_iit4_2023_system_phi(
+    phi_s: Option<f64>,
+    certified_upper_bound: Option<usize>,
+    decimal_precision: u32,
+) -> Result<(), SystemPhiError> {
+    if let (Some(value), Some(upper_bound)) = (phi_s, certified_upper_bound) {
+        if !value.is_finite() {
+            return Err(SystemPhiError::NonFinitePartitionScore);
+        }
+        let tolerance = 10.0_f64.powi(-(decimal_precision as i32));
+        if value > upper_bound as f64 + tolerance {
+            return Err(SystemPhiError::CertifiedUpperBoundViolation {
+                value,
+                upper_bound,
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Errors while applying a directed partition to a causal model.
 #[derive(Debug, Clone, PartialEq, Error)]
 pub enum PartitionApplyError {
@@ -2691,21 +2714,15 @@ impl BinaryCausalModel {
                 )
             };
 
-        if let (Some(value), Some(upper_bound)) = (
+        let certified_upper_bound = certified_iit4_2023_system_phi_upper_bound(
+            candidate_system.len(),
+            config.include_total_cut,
+        );
+        validate_certified_iit4_2023_system_phi(
             phi_s,
-            certified_iit4_2023_system_phi_upper_bound(
-                candidate_system.len(),
-                config.include_total_cut,
-            ),
-        ) {
-            let tolerance = 10.0_f64.powi(-(config.decimal_precision as i32));
-            if value > upper_bound as f64 + tolerance {
-                return Err(SystemPhiError::CertifiedUpperBoundViolation {
-                    value,
-                    upper_bound,
-                });
-            }
-        }
+            certified_upper_bound,
+            config.decimal_precision,
+        )?;
         Ok(Iit4SystemPhiAnalysis {
             formalism: FormalismProfile::Iit4_0_2023,
             candidate_system: candidate_system.to_vec(),
@@ -3678,6 +3695,32 @@ mod tests {
                 max_evaluations,
             }) if candidate_evaluations == baseline.partition_score_evaluations
                 && max_evaluations == budget
+        ));
+    }
+
+    #[test]
+    fn certified_system_phi_bound_guard_fails_closed_and_respects_domain() {
+        assert!(validate_certified_iit4_2023_system_phi(
+            Some(5.999_999_5),
+            Some(6),
+            6,
+        ).is_ok());
+        assert!(matches!(
+            validate_certified_iit4_2023_system_phi(Some(6.1), Some(6), 6),
+            Err(SystemPhiError::CertifiedUpperBoundViolation {
+                value,
+                upper_bound: 6
+            }) if (value - 6.1).abs() < 1e-12
+        ));
+        // No theorem-domain certificate means the invariant is not applied.
+        assert!(validate_certified_iit4_2023_system_phi(
+            Some(100.0),
+            None,
+            6,
+        ).is_ok());
+        assert!(matches!(
+            validate_certified_iit4_2023_system_phi(Some(f64::NAN), Some(6), 6),
+            Err(SystemPhiError::NonFinitePartitionScore)
         ));
     }
 
