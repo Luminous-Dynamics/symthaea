@@ -102,6 +102,7 @@ pub enum FastEventGenerationError {
     ZeroSampleInterval,
     DurationExceedsLimit,
     TooManyEvents { requested: usize, available_blocks: usize },
+    TooManyDistinctDistractorCodes { requested: usize, maximum: usize },
 }
 
 impl fmt::Display for FastEventGenerationError {
@@ -118,6 +119,10 @@ impl fmt::Display for FastEventGenerationError {
             Self::TooManyEvents { requested, available_blocks } => write!(
                 f,
                 "requested {requested} events but only {available_blocks} non-overlapping event blocks exist"
+            ),
+            Self::TooManyDistinctDistractorCodes { requested, maximum } => write!(
+                f,
+                "requested {requested} distinct distractor codes but only {maximum} exist in the selected similarity band"
             ),
         }
     }
@@ -540,7 +545,8 @@ pub fn score_fast_event_predictions(
         for (event_index, event) in oracle.events.iter().enumerate() {
             let within_target_window = event.is_target
                 && prediction.step >= event.start_step
-                && prediction.step <= event.end_step;
+                && prediction.step
+                    <= event.start_step.saturating_add(task.response_deadline_steps);
             if within_target_window {
                 if matched_targets[event_index] {
                     score.duplicate_target_activations =
@@ -577,7 +583,10 @@ pub fn score_fast_event_predictions(
 
     let event_slots: u64 = oracle.events
         .iter()
-        .map(|event| u64::from(event.end_step.saturating_sub(event.start_step)))
+        .map(|event| {
+            u64::from(event.end_step.saturating_sub(event.start_step))
+                .saturating_add(u64::from(event.is_target))
+        })
         .sum();
     let total_slots = u64::try_from(task.slots).unwrap_or(u64::MAX);
     score.quiet_exposure_us = total_slots
@@ -614,6 +623,16 @@ fn validate_config(config: FastEventConfig) -> Result<(), FastEventGenerationErr
         return Err(FastEventGenerationError::TooManyEvents {
             requested: event_count,
             available_blocks,
+        });
+    }
+    let maximum_distinct_codes = match config.similarity {
+        EventDistractorSimilarity::High => 92,
+        EventDistractorSimilarity::Low => 162,
+    };
+    if config.distractor_event_count > maximum_distinct_codes {
+        return Err(FastEventGenerationError::TooManyDistinctDistractorCodes {
+            requested: config.distractor_event_count,
+            maximum: maximum_distinct_codes,
         });
     }
     Ok(())
@@ -817,6 +836,19 @@ mod tests {
         assert!(matches!(
             score_fast_event_predictions(&task, &oracle, &predictions),
             Err(FastEventScoringError::PredictionsNotStrictlyIncreasing { .. })
+        ));
+    }
+
+    #[test]
+    fn excessive_distinct_distractor_codes_are_rejected() {
+        let mut config = FastEventConfig::reference(1);
+        config.distractor_event_count = 93;
+        assert!(matches!(
+            generate_fast_event_task(config),
+            Err(FastEventGenerationError::TooManyDistinctDistractorCodes {
+                requested: 93,
+                maximum: 92
+            })
         ));
     }
 
