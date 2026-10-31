@@ -1072,11 +1072,24 @@ mod tests {
                 evidence_sha256: sha('7'),
             },
         });
+        observations.push(ObjectiveObservation {
+            candidate_id: "candidate-A".into(),
+            candidate_config_sha256: config.clone(),
+            objective_id: "latency".into(),
+            registry_sha256: registries[1].registry_sha256.clone(),
+            measurement_protocol_sha256: registries[1].objectives[1].measurement_protocol_sha256.clone(),
+            hardware_profile_sha256: Some(profiles[1].profile_sha256.clone()),
+            outcome: MeasurementOutcome::NotMeasured {
+                reason_code: "not_collected".into(),
+            },
+        });
         let result = evaluate_fleet_candidate(
             &manifest, &registries, "candidate-A", &config, &observations,
         ).unwrap();
         assert_eq!(result.status, FleetCandidateStatus::IncompleteEvidence);
-        assert!(result.incomplete_reasons[0].contains("instrument_timeout"));
+        assert_eq!(result.incomplete_reasons.len(), 2);
+        assert!(result.incomplete_reasons.iter().any(|reason| reason.contains("instrument_timeout")));
+        assert!(result.incomplete_reasons.iter().any(|reason| reason.contains("not_collected")));
     }
 
     #[test]
