@@ -432,8 +432,10 @@ fn block_report(
         None
     };
     let critical = normal_critical_value(nominal_level);
-    let lower = (realized_coverage - critical * block_standard_error).max(0.0);
-    let upper = (realized_coverage + critical * block_standard_error).min(1.0);
+    // Null prediction band for the future realized coverage is centered on
+    // the nominal target, not on the observed evaluation coverage.
+    let lower = (target_coverage - critical * block_standard_error).max(0.0);
+    let upper = (target_coverage + critical * block_standard_error).min(1.0);
     let diagnostic_status = if block_count >= 10 && block_standard_error > 0.0 {
         "asymptotic_normal_diagnostic_only_assumptions_unverified"
     } else {
@@ -504,7 +506,7 @@ fn audit_values(
             "amplitude":fdm.amplitude,
             "rho":fdm.rho,
             "lag_count":fdm.lag_upper_bounds.len(),
-            "lag_upper_bounds":fdm.lag_upper_bounds,
+            "lag_upper_bounds":fdm.lag_upper_bounds.clone(),
             "finite_partial_sum":fdm.lag_upper_bounds.iter().sum::<f64>(),
             "tail_upper_bound_after_last_lag":fdm.tail_upper_bound,
             "theta_sum_upper_bound":fdm.theta_sum_upper_bound,
@@ -538,8 +540,10 @@ fn audit_values(
         "target_coverage":target,
         "standardized_coverage_deviation":report.standardized_coverage_deviation,
         "normal_critical_value":report.normal_critical_value,
-        "normal_interval_lower":report.normal_interval_lower,
-        "normal_interval_upper":report.normal_interval_upper,
+        "null_realized_coverage_interval_lower":report.normal_interval_lower,
+        "null_realized_coverage_interval_upper":report.normal_interval_upper,
+        "observed_coverage_inside_null_interval":report.realized_evaluation_coverage >= report.normal_interval_lower
+            && report.realized_evaluation_coverage <= report.normal_interval_upper,
         "diagnostic_status":report.diagnostic_status
     })).collect();
 
