@@ -722,6 +722,10 @@ pub fn compare_paired_direction_campaign_runs(
         BTreeMap<DirectionCampaignPolicy, &DirectionCampaignRun>,
     > = BTreeMap::new();
     for run in runs {
+        let tape = run.to_campaign_tape()?;
+        if tape.tape_sha256 != run.action_tape_sha256 {
+            return Err("paired comparison received a run with a mismatched action tape digest".to_owned());
+        }
         let cell = cells
             .entry((run.landscape, run.action_budget, run.seed))
             .or_default();
@@ -1329,6 +1333,18 @@ mod tests {
             assert_eq!(tape.events[2].policy_visible_through_sequence, 0);
             assert_eq!(tape.events[3].policy_visible_through_sequence, 3);
         }
+    }
+
+    #[test]
+    fn aggregation_rejects_stale_action_tape_digest() {
+        let mut run = run_direction_campaign(
+            DirectionLandscapeFamily::DelayedBreakthrough,
+            DirectionCampaignPolicy::GlobalUcb,
+            32,
+            0x987,
+        ).unwrap();
+        run.actions[3].observed_score = Some(0.99);
+        assert!(aggregate_direction_campaign_runs(&[run]).is_err());
     }
 
     #[test]
