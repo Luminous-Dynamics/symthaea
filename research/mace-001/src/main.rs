@@ -878,7 +878,7 @@ mod tests {
         let report = score_texts(AGENT_INPUT, ORACLE_INPUT, &trace, digests()).unwrap();
         assert!(report.hard_gate_pass);
         assert_eq!(report.exact_case_matches, 6);
-        assert!(!report.hard_gate_pass && report.exact_case_matches == report.cases);
+        assert!(report.to_json().contains("\"full_conformance_pass\": false"));
     }
 
     #[test]
