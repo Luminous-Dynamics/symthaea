@@ -13,6 +13,8 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use super::event_tape::EventTape;
+
 const SCHEMA: &str = "symthaea.architecture-engineering.paired-inference";
 const VERSION: &str = "0.1.0";
 
@@ -149,6 +151,95 @@ struct InferenceDigestPayload<'a> {
     cluster_bootstrap_upper: f64,
     paired_randomization_p_value: f64,
     decision: InferenceDecision,
+}
+
+
+/// Compute a deterministic digest of the complete policy tape set used by a campaign.
+///
+/// Tapes are sorted by policy ID before serialization, so caller input order is irrelevant.
+/// Every tape must pass strict qualification; this helper never hashes an empty, structurally
+/// invalid, or resource-unqualified campaign as confirmatory evidence.
+pub fn event_tape_set_sha256(tapes: &[EventTape]) -> Result<String, PairedInferenceError> {
+    if tapes.len() < 2 {
+        return Err(PairedInferenceError::new(
+            "event_tapes",
+            "at least two policy event tapes are required",
+        ));
+    }
+    let mut campaign_id: Option<&str> = None;
+    let mut policy_ids = BTreeSet::new();
+    for (index, tape) in tapes.iter().enumerate() {
+        tape.validate().map_err(|error| {
+            PairedInferenceError::new(
+                format!("event_tapes[{index}].qualification"),
+                error.to_string(),
+            )
+        })?;
+        let header = tape.header();
+        if let Some(expected) = campaign_id {
+            if expected != header.campaign_id {
+                return Err(PairedInferenceError::new(
+                    format!("event_tapes[{index}].campaign_id"),
+                    "campaign ID differs across event tapes",
+                ));
+            }
+        } else {
+            campaign_id = Some(&header.campaign_id);
+        }
+        if !policy_ids.insert(header.policy.policy_id.as_str()) {
+            return Err(PairedInferenceError::new(
+                format!("event_tapes[{index}].policy_id"),
+                "duplicate policy tape in event-tape set",
+            ));
+        }
+    }
+    let mut canonical: Vec<&EventTape> = tapes.iter().collect();
+    canonical.sort_by(|left, right| {
+        left.header()
+            .policy
+            .policy_id
+            .cmp(&right.header().policy.policy_id)
+    });
+    digest_serializable(&canonical)
+}
+
+/// Analyze a primary endpoint only when its preregistered event-tape-set digest matches the
+/// exact supplied, fully qualified tapes. Call the matched-campaign/offer-set gate before this
+/// function to establish mechanism matching and identical offered choices.
+pub fn analyze_paired_metric_bound_to_tapes(
+    plan: &PairedInferencePlan,
+    observations: &[PairedMetricObservation],
+    tapes: &[EventTape],
+) -> Result<PairedInferenceSummary, PairedInferenceError> {
+    let actual_digest = event_tape_set_sha256(tapes)?;
+    if actual_digest != plan.campaign_event_tape_set_sha256 {
+        return Err(PairedInferenceError::new(
+            "plan.campaign_event_tape_set_sha256",
+            "preregistered tape-set digest does not match the supplied policy evidence",
+        ));
+    }
+    let policy_ids: BTreeSet<&str> = tapes
+        .iter()
+        .map(|tape| tape.header().policy.policy_id.as_str())
+        .collect();
+    if !policy_ids.contains(plan.baseline_policy_id.as_str())
+        || !policy_ids.contains(plan.challenger_policy_id.as_str())
+    {
+        return Err(PairedInferenceError::new(
+            "event_tapes.policy_ids",
+            "baseline and challenger policies from the plan must both be present in the tape set",
+        ));
+    }
+    if tapes
+        .iter()
+        .any(|tape| tape.header().campaign_id != plan.campaign_id)
+    {
+        return Err(PairedInferenceError::new(
+            "event_tapes.campaign_id",
+            "event-tape campaign IDs differ from the preregistered inference plan",
+        ));
+    }
+    analyze_paired_metric(plan, observations)
 }
 
 /// Analyze one frozen primary endpoint with exact pairing and landscape-clustered uncertainty.
@@ -807,5 +898,140 @@ mod tests {
         let rows = observations(MetricDirection::HigherIsBetter, 6, 4, 0.05);
         assert!(analyze_paired_metric(&plan, &rows).is_err());
     }
+
+    fn evidence_tape(policy_id: &str, config_value: serde_json::Value) -> EventTape {
+        use crate::event_tape::{
+            ActionEvent, ActionIntent, ActionOutcome, BudgetModel, CandidateDisposition,
+            ComparisonMode, EventTapeHeader, ExecutionContract, ExecutionMode, MeterValue,
+            PolicySnapshot, ResourceReceipt,
+        };
+
+        let digest = |value: &serde_json::Value| {
+            let bytes = serde_json::to_vec(value).unwrap();
+            let hash = Sha256::digest(bytes);
+            hash.iter().map(|byte| format!("{byte:02x}")).collect::<String>()
+        };
+        let config_sha256 = digest(&config_value);
+        let budget_model = BudgetModel::ActionUnit {
+            charge_per_action_microunits: 1_000_000,
+        };
+        let budget_model_sha256 = digest(&serde_json::to_value(&budget_model).unwrap());
+        let header = EventTapeHeader {
+            schema: "symthaea.ar5b4.event-tape".to_owned(),
+            version: "0.1.0".to_owned(),
+            campaign_id: "ar5b4-paired-test".to_owned(),
+            source_commit: "0123456789abcdef0123456789abcdef01234567".to_owned(),
+            execution_environment_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned(),
+            comparison_mode: ComparisonMode::MechanismMatched,
+            proposal_source_id: "paired-inference-test-proposals".to_owned(),
+            proposal_stream_sha256: Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned()),
+            task_recipe_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_owned(),
+            comparison_profile_sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_owned(),
+            evaluator_sha256: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_owned(),
+            verifier_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned(),
+            budget_model_id: "test-action-unit-v1".to_owned(),
+            budget_model,
+            budget_model_sha256,
+            budget_limit_microunits: 10_000_000,
+            initial_direction_ids: vec!["A".to_owned()],
+            execution: ExecutionContract {
+                mode: ExecutionMode::Sequential,
+                worker_count: 1,
+                seats_per_round: 1,
+                first_round_claim_cap: None,
+                steady_state_claim_cap: None,
+            },
+            policy: PolicySnapshot {
+                policy_id: policy_id.to_owned(),
+                algorithm_id: format!("algorithm-{policy_id}"),
+                config_sha256,
+                config: config_value,
+                has_hidden_oracle_access: false,
+            },
+        };
+        let mut tape = EventTape::new(header).unwrap();
+        let meter = |value| MeterValue::Measured { value };
+        tape.append(ActionEvent {
+            event_id: format!("event-{policy_id}"),
+            policy_id: policy_id.to_owned(),
+            worker_id: 0,
+            round_id: 1,
+            batch_id: None,
+            observed_through_sequence: 0,
+            visible_history_sha256: String::new(),
+            retry_of_event_id: None,
+            intent: ActionIntent::EvaluateCandidate {
+                candidate_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_owned(),
+                parent_candidate_sha256: None,
+                semantic_delta_sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_owned(),
+                direction_id: "A".to_owned(),
+            },
+            outcome: ActionOutcome::CandidateEvaluation {
+                task_recipe_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_owned(),
+                comparison_profile_sha256: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_owned(),
+                evaluator_sha256: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_owned(),
+                verifier_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned(),
+                verifier_receipt_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
+                disposition: CandidateDisposition::Verified,
+                score: Some(0.9),
+                uncertainty: Some(0.0),
+                evidence_sha256: Some("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_owned()),
+            },
+            resources: ResourceReceipt {
+                host_cpu_millis: meter(10),
+                wall_millis: meter(5),
+                accelerator_millis: meter(0),
+                peak_memory_bytes: meter(1024),
+                accelerator_peak_memory_bytes: meter(0),
+                energy_millijoules: meter(1),
+                input_tokens: meter(0),
+                output_tokens: meter(0),
+                tool_calls: meter(0),
+                evaluator_calls: meter(1),
+                verifier_calls: meter(1),
+                charged_budget_microunits: meter(1_000_000),
+            },
+        })
+        .unwrap();
+        tape
+    }
+
+    #[test]
+    fn tape_set_digest_is_order_invariant_and_binds_complete_policy_evidence() {
+        let left = evidence_tape("baseline", serde_json::json!({"alpha": 0.5}));
+        let right = evidence_tape("challenger", serde_json::json!({"beta": 0.7}));
+        let first = event_tape_set_sha256(&[left.clone(), right.clone()]).unwrap();
+        let reversed = event_tape_set_sha256(&[right.clone(), left.clone()]).unwrap();
+        assert_eq!(first, reversed);
+
+        let changed = evidence_tape("challenger", serde_json::json!({"beta": 0.8}));
+        let changed_digest = event_tape_set_sha256(&[left, changed]).unwrap();
+        assert_ne!(first, changed_digest);
+    }
+
+    #[test]
+    fn bound_analysis_rejects_a_tape_set_that_differs_from_preregistration() {
+        let left = evidence_tape("baseline", serde_json::json!({"alpha": 0.5}));
+        let right = evidence_tape("challenger", serde_json::json!({"beta": 0.7}));
+        let changed = evidence_tape("challenger", serde_json::json!({"beta": 0.8}));
+        let mut plan = plan(MetricDirection::HigherIsBetter);
+        plan.campaign_event_tape_set_sha256 =
+            event_tape_set_sha256(&[left.clone(), right]).unwrap();
+        let rows = observations(MetricDirection::HigherIsBetter, 12, 8, 0.05);
+        assert!(analyze_paired_metric_bound_to_tapes(&plan, &rows, &[left, changed]).is_err());
+    }
+
+    #[test]
+    fn bound_analysis_uses_the_exact_preregistered_tape_set() {
+        let left = evidence_tape("baseline", serde_json::json!({"alpha": 0.5}));
+        let right = evidence_tape("challenger", serde_json::json!({"beta": 0.7}));
+        let mut plan = plan(MetricDirection::HigherIsBetter);
+        plan.campaign_event_tape_set_sha256 =
+            event_tape_set_sha256(&[left.clone(), right.clone()]).unwrap();
+        let rows = observations(MetricDirection::HigherIsBetter, 12, 8, 0.05);
+        let summary = analyze_paired_metric_bound_to_tapes(&plan, &rows, &[right, left]).unwrap();
+        assert_eq!(summary.decision, InferenceDecision::EvidenceOfSuperiority);
+    }
+
 
 }
