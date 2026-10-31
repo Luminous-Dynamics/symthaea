@@ -42,6 +42,17 @@ def main() -> None:
         if comparison["control_id"] not in baseline_set:
             raise SystemExit("comparison control ID is not registered")
 
+    for baseline in example["baseline_registry"]:
+        if (
+            baseline["cost_accounting"] == "candidate_count_only"
+            and baseline["eligibility"] == "eligible_for_primary_contrast"
+        ):
+            raise SystemExit("candidate-count-only baseline cannot be eligible as compute matched")
+        if baseline["kind"] == "oracle" and baseline["eligibility"] != "oracle_only":
+            raise SystemExit("oracle baseline must remain oracle-only")
+        if baseline["eligibility"] == "eligible_for_primary_contrast" and baseline["ineligibility_reason"] is not None:
+            raise SystemExit("eligible baseline cannot carry an ineligibility reason")
+
     if example["candidate"]["source_commit"] != example["repository"]["commit"]:
         raise SystemExit("candidate source commit differs from frozen repository commit")
     if example["generator"]["source_commit"] != example["repository"]["commit"]:
@@ -89,7 +100,13 @@ def main() -> None:
     mutated = copy.deepcopy(example)
     mutated["baseline_registry"][0]["eligibility"] = "eligible_for_primary_contrast"
     mutated["baseline_registry"][0]["cost_accounting"] = "candidate_count_only"
+    mutated["baseline_registry"][0]["ineligibility_reason"] = None
     hostile_cases.append(("candidate count mislabeled as eligible matched baseline", mutated))
+
+    mutated = copy.deepcopy(example)
+    mutated["baseline_registry"][-1]["eligibility"] = "eligible_for_primary_contrast"
+    mutated["baseline_registry"][-1]["ineligibility_reason"] = None
+    hostile_cases.append(("oracle admitted as primary deployable baseline", mutated))
 
     for label, hostile in hostile_cases:
         if fail_closed(validator, hostile):
@@ -100,7 +117,7 @@ def main() -> None:
             {
                 "schema_version": schema["properties"]["schema_version"]["const"],
                 "example_valid": True,
-                "cross_reference_checks": 4,
+                "cross_reference_checks": 7,
                 "hostile_cases_rejected": len(hostile_cases),
                 "ci_only": True,
                 "performance_result_present": example["claim_boundary"]["performance_result_present"],
