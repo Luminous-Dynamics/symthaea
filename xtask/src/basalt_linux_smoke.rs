@@ -15,8 +15,6 @@ use serde::Serialize;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 #[cfg(target_os = "linux")]
-use std::os::fd::{FromRawFd, IntoRawFd, OwnedFd};
-#[cfg(target_os = "linux")]
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -189,42 +187,98 @@ fn kernel_identity() -> KernelIdentity {
     }
 }
 
+trait LinuxSmokeSyscalls {
+    fn landlock_abi_version(&self) -> Result<i32, i32>;
+    fn fanotify_init(&self, flags: libc::c_uint, event_file_flags: libc::c_int) -> Result<libc::c_int, i32>;
+    fn close_fd(&self, fd: libc::c_int) -> Result<(), i32>;
+}
+
+#[cfg(target_os = "linux")]
+struct SystemLinuxSmokeSyscalls;
+
+#[cfg(target_os = "linux")]
+impl LinuxSmokeSyscalls for SystemLinuxSmokeSyscalls {
+    fn landlock_abi_version(&self) -> Result<i32, i32> {
+        let result = unsafe {
+            libc::syscall(
+                libc::SYS_landlock_create_ruleset,
+                std::ptr::null::<libc::c_void>(),
+                0usize,
+                LANDLOCK_CREATE_RULESET_VERSION,
+            )
+        };
+        if result < 0 {
+            Err(std::io::Error::last_os_error().raw_os_error().unwrap_or(libc::EIO))
+        } else {
+            i32::try_from(result).map_err(|_| libc::EOVERFLOW)
+        }
+    }
+
+    fn fanotify_init(
+        &self,
+        flags: libc::c_uint,
+        event_file_flags: libc::c_int,
+    ) -> Result<libc::c_int, i32> {
+        let result = unsafe {
+            libc::syscall(libc::SYS_fanotify_init, flags, event_file_flags)
+        };
+        if result < 0 {
+            Err(std::io::Error::last_os_error().raw_os_error().unwrap_or(libc::EIO))
+        } else {
+            libc::c_int::try_from(result).map_err(|_| libc::EOVERFLOW)
+        }
+    }
+
+    fn close_fd(&self, fd: libc::c_int) -> Result<(), i32> {
+        let result = unsafe { libc::close(fd) };
+        if result == 0 {
+            Ok(())
+        } else {
+            Err(std::io::Error::last_os_error().raw_os_error().unwrap_or(libc::EIO))
+        }
+    }
+}
+
 #[cfg(target_os = "linux")]
 fn probe_landlock_abi() -> ProbeObservation {
-    // LANDLOCK_CREATE_RULESET_VERSION with a NULL attr and zero size is the
-    // documented ABI query. It returns a version, not a ruleset file descriptor.
-    let result = unsafe {
-        libc::syscall(
-            libc::SYS_landlock_create_ruleset,
-            std::ptr::null::<libc::c_void>(),
-            0usize,
-            LANDLOCK_CREATE_RULESET_VERSION,
-        )
-    };
-    if result >= 1 {
-        return ProbeObservation {
+    probe_landlock_abi_with(&SystemLinuxSmokeSyscalls)
+}
+
+fn probe_landlock_abi_with(calls: &impl LinuxSmokeSyscalls) -> ProbeObservation {
+    match calls.landlock_abi_version() {
+        Ok(version) if version >= 1 => ProbeObservation {
             probe_id: "landlock_abi_version_query",
             status: ProbeStatus::Passed,
             detail: "side-effect-free ABI query returned a supported version; no ruleset was created or enforced".to_string(),
-            abi_version: i32::try_from(result).ok(),
+            abi_version: Some(version),
             errno: None,
             cleanup_status: CleanupStatus::NotRequired,
             resource_created: false,
             event_capture_attempted: false,
-        };
-    }
-
-    let error = std::io::Error::last_os_error();
-    let errno = error.raw_os_error().unwrap_or(0);
-    ProbeObservation {
-        probe_id: "landlock_abi_version_query",
-        status: classify_errno(errno),
-        detail: format!("Landlock ABI query failed: {error}"),
-        abi_version: None,
-        errno: Some(errno),
-        cleanup_status: CleanupStatus::NotRequired,
-        resource_created: false,
-        event_capture_attempted: false,
+        },
+        Ok(version) => ProbeObservation {
+            probe_id: "landlock_abi_version_query",
+            status: ProbeStatus::Failed,
+            detail: format!("Landlock ABI query returned invalid version {version}; expected a positive version"),
+            abi_version: Some(version),
+            errno: None,
+            cleanup_status: CleanupStatus::NotRequired,
+            resource_created: false,
+            event_capture_attempted: false,
+        },
+        Err(errno) => ProbeObservation {
+            probe_id: "landlock_abi_version_query",
+            status: classify_errno(errno),
+            detail: format!(
+                "Landlock ABI query failed: {}",
+                std::io::Error::from_raw_os_error(errno)
+            ),
+            abi_version: None,
+            errno: Some(errno),
+            cleanup_status: CleanupStatus::NotRequired,
+            resource_created: false,
+            event_capture_attempted: false,
+        },
     }
 }
 
@@ -235,40 +289,42 @@ fn probe_landlock_abi() -> ProbeObservation {
 
 #[cfg(target_os = "linux")]
 fn probe_fanotify_group(probe_id: &'static str, class_flag: libc::c_uint) -> ProbeObservation {
-    // FAN_REPORT_FID is required for the limited unprivileged fanotify API on
-    // modern kernels. No mark is installed, no event is generated or read.
+    probe_fanotify_group_with(&SystemLinuxSmokeSyscalls, probe_id, class_flag)
+}
+
+fn probe_fanotify_group_with(
+    calls: &impl LinuxSmokeSyscalls,
+    probe_id: &'static str,
+    class_flag: libc::c_uint,
+) -> ProbeObservation {
+    // FAN_REPORT_FID is required for restricted unprivileged notification
+    // groups, but the kernel rejects it with FAN_CLASS_CONTENT/PRE_CONTENT.
     let flags = fanotify_init_flags(class_flag);
     let event_file_flags = libc::O_RDONLY | libc::O_LARGEFILE;
-    let result = unsafe {
-        libc::syscall(
-            libc::SYS_fanotify_init,
-            flags,
-            event_file_flags,
-        )
+    let fd = match calls.fanotify_init(flags, event_file_flags) {
+        Ok(fd) => fd,
+        Err(errno) => {
+            return ProbeObservation {
+                probe_id,
+                status: classify_errno(errno),
+                detail: format!(
+                    "fanotify_init failed before a group descriptor was created: {}",
+                    std::io::Error::from_raw_os_error(errno)
+                ),
+                abi_version: None,
+                errno: Some(errno),
+                cleanup_status: CleanupStatus::NotRequired,
+                resource_created: false,
+                event_capture_attempted: false,
+            };
+        }
     };
 
-    if result < 0 {
-        let error = std::io::Error::last_os_error();
-        let errno = error.raw_os_error().unwrap_or(0);
-        return ProbeObservation {
-            probe_id,
-            status: classify_errno(errno),
-            detail: format!("fanotify_init failed before a group descriptor was created: {error}"),
-            abi_version: None,
-            errno: Some(errno),
-            cleanup_status: CleanupStatus::NotRequired,
-            resource_created: false,
-            event_capture_attempted: false,
-        };
-    }
-
-    // Immediately close the descriptor. into_raw_fd makes the close explicit
-    // so the receipt can record teardown rather than relying on Drop alone.
-    let owned_fd = unsafe { OwnedFd::from_raw_fd(result as libc::c_int) };
-    let raw_fd = owned_fd.into_raw_fd();
-    let close_result = unsafe { libc::close(raw_fd) };
-    if close_result == 0 {
-        ProbeObservation {
+    // No operation occurs between descriptor acquisition and close other
+    // than recording the returned integer. The injected adapter makes both
+    // acquisition and cleanup paths independently testable.
+    match calls.close_fd(fd) {
+        Ok(()) => ProbeObservation {
             probe_id,
             status: ProbeStatus::Passed,
             detail: "fanotify group initialization succeeded and its descriptor was immediately closed; no marks or events were used".to_string(),
@@ -277,20 +333,20 @@ fn probe_fanotify_group(probe_id: &'static str, class_flag: libc::c_uint) -> Pro
             cleanup_status: CleanupStatus::Closed,
             resource_created: true,
             event_capture_attempted: false,
-        }
-    } else {
-        let error = std::io::Error::last_os_error();
-        let errno = error.raw_os_error().unwrap_or(0);
-        ProbeObservation {
+        },
+        Err(errno) => ProbeObservation {
             probe_id,
             status: ProbeStatus::Failed,
-            detail: format!("fanotify group initialized but descriptor close was not confirmed: {error}"),
+            detail: format!(
+                "fanotify group initialized but descriptor close was not confirmed: {}",
+                std::io::Error::from_raw_os_error(errno)
+            ),
             abi_version: None,
             errno: Some(errno),
             cleanup_status: CleanupStatus::Failed,
             resource_created: true,
             event_capture_attempted: false,
-        }
+        },
     }
 }
 
@@ -301,7 +357,7 @@ fn probe_fanotify_group(probe_id: &'static str, _class_flag: u32) -> ProbeObserv
 
 fn fanotify_init_flags(class_flag: libc::c_uint) -> libc::c_uint {
     // FAN_REPORT_FID is mandatory for restricted unprivileged notification
-    // groups, but the kernel rejects it with FAN_CLASS_CONTENT/PRE_CONTENT.
+    // groups, but is invalid with FAN_CLASS_CONTENT and FAN_CLASS_PRE_CONTENT.
     let object_id_flag = if class_flag == 0 { FAN_REPORT_FID } else { 0 };
     FAN_CLOEXEC | FAN_NONBLOCK | object_id_flag | class_flag
 }
