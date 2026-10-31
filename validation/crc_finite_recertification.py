@@ -186,16 +186,22 @@ def recertify_once(
     alpha: int | float | str | Fraction,
     base_loss: Sequence[int | float | str | Fraction],
     slope: Sequence[int | float | str | Fraction],
+    *,
+    allocation: str = "equal",
 ) -> Controller:
-    """Redistribute each augmented sample's exact slack over held-out positions.
+    """Redistribute exact augmented-sample slack over held-out positions.
 
-    For each training multiset D, choose the smallest action lambda in [0,1]
-    satisfying, for every support point z,
+    Equal allocation gives Delta/(n+1) to every held-out position.
+    Loss-proportional allocation gives each position a share proportional to
+    its baseline held-out loss. Both schemes are permutation-equivariant and
+    assign identical shares to duplicate observations.
 
-      loss(z, lambda) <= loss(z, A(D)) + Delta_A(D + z) / (n + 1).
-
-    With affine loss b_z + d_z(1-lambda), this has the exact closed form below.
+    For each training multiset D, choose the smallest action satisfying
+    loss(z, lambda) <= loss(z, A(D)) + w(D+z,z)*Delta_A(D+z)
+    for every support point z. Affine losses admit an exact rational update.
     """
+    if allocation not in ("equal", "loss_proportional"):
+        raise ValueError("allocation must be 'equal' or 'loss_proportional'")
     a, b, d = _normalise_problem(n, alpha, base_loss, slope)
     current = _normalise_controller(controller, n, len(b))
     baseline_check = verify_controller(current, n, a, b, d)
@@ -214,8 +220,13 @@ def recertify_once(
             slack = augmented_slack(current, augmented, a, b, d)
             if slack < 0:
                 raise ArithmeticError("negative slack encountered after baseline verification")
+            weight = Fraction(1, n + 1)
+            if allocation == "loss_proportional":
+                total_loss = (n + 1) * a - slack
+                heldout_loss = loss(heldout_type, current[training], b, d)
+                weight = heldout_loss / total_loss if total_loss > 0 else Fraction(1, n + 1)
             if d[heldout_type] > 0:
-                bound = current[training] - slack / ((n + 1) * d[heldout_type])
+                bound = current[training] - weight * slack / d[heldout_type]
                 lower_bound = max(lower_bound, bound)
         action = max(Fraction(0), lower_bound)
         if action > current[training]:
@@ -231,8 +242,12 @@ def verify_recertification_step(
     alpha: int | float | str | Fraction,
     base_loss: Sequence[int | float | str | Fraction],
     slope: Sequence[int | float | str | Fraction],
+    *,
+    allocation: str = "equal",
 ) -> dict:
-    """Independently check held-out inequalities and full augmented risk."""
+    """Independently check allocation inequalities and full augmented risk."""
+    if allocation not in ("equal", "loss_proportional"):
+        raise ValueError("allocation must be 'equal' or 'loss_proportional'")
     a, b, d = _normalise_problem(n, alpha, base_loss, slope)
     old = _normalise_controller(old_controller, n, len(b))
     new = _normalise_controller(new_controller, n, len(b))
@@ -253,8 +268,13 @@ def verify_recertification_step(
         for heldout_type in range(len(b)):
             augmented = add_observation(training, heldout_type)
             slack = augmented_slack(old, augmented, a, b, d)
+            heldout_loss = loss(heldout_type, old[training], b, d)
+            weight = Fraction(1, n + 1)
+            if allocation == "loss_proportional":
+                total_loss = (n + 1) * a - slack
+                weight = heldout_loss / total_loss if total_loss > 0 else Fraction(1, n + 1)
             lhs = loss(heldout_type, new[training], b, d)
-            rhs = loss(heldout_type, old[training], b, d) + slack / (n + 1)
+            rhs = heldout_loss + weight * slack
             margin = rhs - lhs
             inequalities_checked += 1
             if minimum_heldout_margin is None or margin < minimum_heldout_margin:
@@ -288,9 +308,12 @@ def iterate_recertification(
     slope: Sequence[int | float | str | Fraction],
     *,
     max_iterations: int = 100,
+    allocation: str = "equal",
 ) -> dict:
     if not isinstance(max_iterations, int) or max_iterations < 1:
         raise ValueError("max_iterations must be a positive integer")
+    if allocation not in ("equal", "loss_proportional"):
+        raise ValueError("allocation must be 'equal' or 'loss_proportional'")
     a, b, d = _normalise_problem(n, alpha, base_loss, slope)
     current = _normalise_controller(controller, n, len(b))
     history = []
@@ -299,8 +322,10 @@ def iterate_recertification(
         old_validity = verify_controller(current, n, a, b, d)
         if not old_validity["valid"]:
             raise ValueError("iteration input lost its finite-exchangeability guarantee")
-        candidate = recertify_once(current, n, a, b, d)
-        step_check = verify_recertification_step(current, candidate, n, a, b, d)
+        candidate = recertify_once(current, n, a, b, d, allocation=allocation)
+        step_check = verify_recertification_step(
+            current, candidate, n, a, b, d, allocation=allocation
+        )
         if not step_check["valid"]:
             raise ArithmeticError(f"recertification verification failed: {step_check}")
         step_size = max(abs(current[state] - candidate[state]) for state in current)
