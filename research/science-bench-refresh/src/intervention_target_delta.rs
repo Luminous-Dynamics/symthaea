@@ -975,3 +975,372 @@ pub fn analyze_intervention_target_delta(
     Ok(TargetDeltaReportV1 { fields, report_commitment_sha256 })
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::{json, Value};
+
+    fn digest(label: &str) -> String {
+        sha256_hex(label.as_bytes())
+    }
+
+    fn blinded_quality_reviewers(candidate_id: &str, verdict: &str) -> Vec<Value> {
+        (0..3)
+            .map(|index| {
+                json!({
+                    "reviewer_id_sha256": digest(&format!("quality-reviewer-{candidate_id}-{index}")),
+                    "verdict": verdict,
+                    "blind_to_generator_identity": true,
+                    "blind_to_intended_relation": true,
+                    "blind_to_pipeline_disposition": true,
+                    "blind_to_evaluator_outcome": true,
+                    "adjudication_artifact_sha256": digest(&format!("quality-artifact-{candidate_id}-{index}"))
+                })
+            })
+            .collect()
+    }
+
+    fn target_reviewers(
+        candidate_id: &str,
+        change: &str,
+        changed_claims: &[String],
+        collateral: &str,
+    ) -> Vec<Value> {
+        (0..3)
+            .map(|index| {
+                json!({
+                    "reviewer_id_sha256": digest(&format!("target-reviewer-{candidate_id}-{index}")),
+                    "observed_target_change": change,
+                    "observed_changed_claim_ids_sha256": changed_claims,
+                    "collateral_change": collateral,
+                    "blind_to_generator_identity": true,
+                    "blind_to_intended_relation": true,
+                    "blind_to_pipeline_disposition": true,
+                    "blind_to_evaluator_outcome": true,
+                    "blind_to_expected_target_change": true,
+                    "blind_to_allowed_changed_claims": true,
+                    "adjudication_artifact_sha256": digest(&format!("target-artifact-{candidate_id}-{index}"))
+                })
+            })
+            .collect()
+    }
+
+    fn fixtures() -> (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, String, String) {
+        let analyzer_revision = crate::BUILT_GENERATOR_SOURCE_REVISION.to_owned();
+        let invariant_target_id = digest("claim:invariant-target");
+        let changed_target_id = digest("claim:changed-target");
+        let invariant_control_id = digest("claim:invariant-control");
+        let changed_control_id = digest("claim:changed-control");
+        let invariant_baseline = digest("state:invariant-target");
+        let changed_baseline = digest("state:changed-target:baseline");
+        let changed_variant = digest("state:changed-target:variant");
+
+        let quality_fields = json!({
+            "schema": crate::intervention_quality::QUALITY_PLAN_SCHEMA,
+            "analyzer_source_revision": analyzer_revision,
+            "purpose": "example_only",
+            "study_id": "target-delta-study-001",
+            "generator_source_revision": "a".repeat(40),
+            "generator_prompt_sha256": digest("generator prompt"),
+            "semantic_verifier_source_revision": "b".repeat(40),
+            "semantic_verifier_policy_sha256": digest("semantic verifier policy"),
+            "candidate_sampling_policy": "full_census",
+            "adjudication_policy": {
+                "reviewers_per_candidate": 3,
+                "consensus_threshold_permille": 666,
+                "require_blind_to_generator_identity": true,
+                "require_blind_to_intended_relation": true,
+                "require_blind_to_pipeline_disposition": true,
+                "require_blind_to_evaluator_outcome": true
+            },
+            "candidates": [
+                {
+                    "candidate_id": "candidate-invariant",
+                    "transformation_family": "formatting",
+                    "target_failure_mode": "surface-format",
+                    "semantic_cluster_sha256": digest("cluster invariant"),
+                    "intended_relation": "semantic_invariant",
+                    "pipeline_disposition": "accepted",
+                    "baseline_input_sha256": digest("invariant baseline input"),
+                    "variant_input_sha256": digest("invariant variant input"),
+                    "generation_tokens": 100,
+                    "generation_cost_micro_usd": 1000,
+                    "generation_wall_clock_ms": 10
+                },
+                {
+                    "candidate_id": "candidate-change",
+                    "transformation_family": "evidence",
+                    "target_failure_mode": "evidence-withdrawal",
+                    "semantic_cluster_sha256": digest("cluster changed"),
+                    "intended_relation": "semantic_change",
+                    "pipeline_disposition": "accepted",
+                    "baseline_input_sha256": digest("change baseline input"),
+                    "variant_input_sha256": digest("change variant input"),
+                    "generation_tokens": 200,
+                    "generation_cost_micro_usd": 2000,
+                    "generation_wall_clock_ms": 20
+                }
+            ]
+        });
+        let quality_fields_bytes = serde_json::to_vec(&quality_fields).unwrap();
+        let quality_commitment =
+            crate::intervention_quality::compute_intervention_quality_plan_commitment(&quality_fields_bytes).unwrap();
+        let mut quality_plan_value = quality_fields.clone();
+        quality_plan_value["plan_commitment_sha256"] = json!(quality_commitment);
+        let quality_plan_bytes = serde_json::to_vec_pretty(&quality_plan_value).unwrap();
+
+        let quality_receipt_value = json!({
+            "schema": crate::intervention_quality::QUALITY_RECEIPT_SCHEMA,
+            "analyzer_source_revision": analyzer_revision,
+            "purpose": "example_only",
+            "run_id": "quality-run-001",
+            "plan_sha256": sha256_hex(&quality_plan_bytes),
+            "plan_commitment_sha256": quality_commitment,
+            "generator_source_revision": "a".repeat(40),
+            "semantic_verifier_source_revision": "b".repeat(40),
+            "semantic_verifier_policy_sha256": digest("semantic verifier policy"),
+            "adjudications": [
+                {
+                    "candidate_id": "candidate-invariant",
+                    "reviewers": blinded_quality_reviewers("candidate-invariant", "meaning_preserving")
+                },
+                {
+                    "candidate_id": "candidate-change",
+                    "reviewers": blinded_quality_reviewers("candidate-change", "meaning_changing")
+                }
+            ]
+        });
+        let quality_receipt_bytes = serde_json::to_vec_pretty(&quality_receipt_value).unwrap();
+
+        let mut invariant_changed = Vec::<String>::new();
+        let mut invariant_preserved = vec![invariant_target_id.clone(), invariant_control_id];
+        invariant_preserved.sort();
+        let mut changed_claims = vec![changed_target_id.clone()];
+        changed_claims.sort();
+        let mut changed_preserved = vec![changed_control_id];
+        changed_preserved.sort();
+
+        let target_fields = json!({
+            "schema": TARGET_DELTA_PLAN_SCHEMA,
+            "analyzer_source_revision": analyzer_revision,
+            "purpose": "example_only",
+            "study_id": "target-delta-study-001",
+            "quality_plan_sha256": sha256_hex(&quality_plan_bytes),
+            "quality_plan_commitment_sha256": quality_commitment,
+            "reviewers_per_candidate": 3,
+            "consensus_threshold_permille": 666,
+            "candidates": [
+                {
+                    "candidate_id": "candidate-invariant",
+                    "target_identity_sha256": invariant_target_id,
+                    "baseline_target_state_sha256": invariant_baseline,
+                    "variant_target_state_sha256": invariant_baseline,
+                    "expected_target_change": "unchanged",
+                    "expected_changed_claim_ids_sha256": invariant_changed,
+                    "preserved_claim_ids_sha256": invariant_preserved
+                },
+                {
+                    "candidate_id": "candidate-change",
+                    "target_identity_sha256": changed_target_id,
+                    "baseline_target_state_sha256": changed_baseline,
+                    "variant_target_state_sha256": changed_variant,
+                    "expected_target_change": "support_decreased",
+                    "expected_changed_claim_ids_sha256": changed_claims,
+                    "preserved_claim_ids_sha256": changed_preserved
+                }
+            ]
+        });
+        let target_fields_bytes = serde_json::to_vec(&target_fields).unwrap();
+        let target_commitment =
+            compute_target_delta_plan_commitment(&target_fields_bytes, &quality_plan_bytes).unwrap();
+        let mut target_plan_value = target_fields.clone();
+        target_plan_value["plan_commitment_sha256"] = json!(target_commitment);
+        let target_plan_bytes = serde_json::to_vec_pretty(&target_plan_value).unwrap();
+
+        let target_receipt_value = json!({
+            "schema": TARGET_DELTA_RECEIPT_SCHEMA,
+            "analyzer_source_revision": analyzer_revision,
+            "purpose": "example_only",
+            "run_id": "target-delta-run-001",
+            "target_plan_sha256": sha256_hex(&target_plan_bytes),
+            "target_plan_commitment_sha256": target_commitment,
+            "quality_plan_sha256": sha256_hex(&quality_plan_bytes),
+            "quality_receipt_sha256": sha256_hex(&quality_receipt_bytes),
+            "adjudications": [
+                {
+                    "candidate_id": "candidate-invariant",
+                    "reviewers": target_reviewers("candidate-invariant", "unchanged", &[], "none_observed")
+                },
+                {
+                    "candidate_id": "candidate-change",
+                    "reviewers": target_reviewers("candidate-change", "support_decreased", &[changed_target_id.clone()], "none_observed")
+                }
+            ]
+        });
+        let target_receipt_bytes = serde_json::to_vec_pretty(&target_receipt_value).unwrap();
+
+        (quality_plan_bytes, quality_receipt_bytes, target_plan_bytes, target_receipt_bytes, changed_target_id, changed_control_id_placeholder())
+    }
+
+    fn changed_control_id_placeholder() -> String {
+        // Stable placeholder used only by test return shape; it is not a committed identity.
+        "unused-control-placeholder".to_owned()
+    }
+
+    fn parse_receipt(bytes: &[u8]) -> Value {
+        serde_json::from_slice(bytes).unwrap()
+    }
+
+    fn report(
+        quality_plan: &[u8],
+        quality_receipt: &[u8],
+        target_plan: &[u8],
+        target_receipt: &[u8],
+    ) -> TargetDeltaReportV1 {
+        analyze_intervention_target_delta(quality_plan, quality_receipt, target_plan, target_receipt).unwrap()
+    }
+
+    #[test]
+    fn accepts_matching_global_and_target_delta_relations() {
+        let (quality_plan, quality_receipt, target_plan, target_receipt, _, _) = fixtures();
+        let result = report(&quality_plan, &quality_receipt, &target_plan, &target_receipt);
+        assert_eq!(result.fields.candidate_count, 2);
+        assert_eq!(result.fields.global_relation_valid_count, 2);
+        assert_eq!(result.fields.target_delta_valid_count, 2);
+        assert_eq!(result.fields.final_valid_count, 2);
+        assert_eq!(result.fields.accepted_valid_count, 2);
+        assert_eq!(result.fields.exact_changed_scope_match_count, 2);
+        assert_eq!(result.fields.reviewer_pairwise_comparison_count, 6);
+        assert_eq!(result.fields.reviewer_target_transition_comparison_count, 6);
+        assert_eq!(result.fields.scoring_eligible_declared, false);
+        assert_eq!(result.fields.semantic_truth_proven, false);
+    }
+
+    #[test]
+    fn wrong_target_direction_is_invalid_even_when_global_relation_is_valid() {
+        let (quality_plan, quality_receipt, target_plan, target_receipt, _, _) = fixtures();
+        let mut receipt = parse_receipt(&target_receipt);
+        for reviewer in receipt["adjudications"][1]["reviewers"].as_array_mut().unwrap() {
+            reviewer["observed_target_change"] = json!("support_increased");
+        }
+        let altered = serde_json::to_vec(&receipt).unwrap();
+        let result = report(&quality_plan, &quality_receipt, &target_plan, &altered);
+        assert_eq!(result.fields.global_relation_valid_count, 2);
+        assert_eq!(result.fields.target_delta_invalid_count, 1);
+        assert_eq!(result.fields.final_invalid_count, 1);
+    }
+
+    #[test]
+    fn collateral_change_invalidates_an_otherwise_correct_target_delta() {
+        let (quality_plan, quality_receipt, target_plan, target_receipt, _, _) = fixtures();
+        let mut receipt = parse_receipt(&target_receipt);
+        for reviewer in receipt["adjudications"][1]["reviewers"].as_array_mut().unwrap() {
+            reviewer["collateral_change"] = json!("material_change_outside_allowed_scope");
+        }
+        let altered = serde_json::to_vec(&receipt).unwrap();
+        let result = report(&quality_plan, &quality_receipt, &target_plan, &altered);
+        assert_eq!(result.fields.target_delta_invalid_count, 1);
+        assert_eq!(result.fields.collateral_material_change_count, 1);
+        assert_eq!(result.fields.final_invalid_count, 1);
+    }
+
+    #[test]
+    fn ambiguous_target_panel_remains_ambiguous() {
+        let (quality_plan, quality_receipt, target_plan, target_receipt, _, _) = fixtures();
+        let mut receipt = parse_receipt(&target_receipt);
+        let reviewers = receipt["adjudications"][1]["reviewers"].as_array_mut().unwrap();
+        reviewers[0]["observed_target_change"] = json!("support_increased");
+        reviewers[1]["observed_target_change"] = json!("contradiction_introduced");
+        reviewers[2]["observed_target_change"] = json!("support_decreased");
+        let altered = serde_json::to_vec(&receipt).unwrap();
+        let result = report(&quality_plan, &quality_receipt, &target_plan, &altered);
+        assert_eq!(result.fields.target_delta_ambiguous_count, 1);
+        assert_eq!(result.fields.final_ambiguous_count, 1);
+    }
+
+    #[test]
+    fn known_target_failure_is_not_hidden_by_ambiguous_global_relation() {
+        let (quality_plan, quality_receipt, target_plan, target_receipt, _, _) = fixtures();
+        let mut parent_receipt = parse_receipt(&quality_receipt);
+        let parent_reviewers = parent_receipt["adjudications"][1]["reviewers"].as_array_mut().unwrap();
+        parent_reviewers[0]["verdict"] = json!("meaning_changing");
+        parent_reviewers[1]["verdict"] = json!("meaning_preserving");
+        parent_reviewers[2]["verdict"] = json!("ambiguous");
+        let parent_receipt_bytes = serde_json::to_vec(&parent_receipt).unwrap();
+        // Bind target receipt to the changed exact parent-receipt bytes.
+        let mut target_receipt_value = parse_receipt(&target_receipt);
+        target_receipt_value["quality_receipt_sha256"] = json!(sha256_hex(&parent_receipt_bytes));
+        let target_receipt_bytes = serde_json::to_vec(&target_receipt_value).unwrap();
+        let mut target = parse_receipt(&target_receipt_bytes);
+        for reviewer in target["adjudications"][1]["reviewers"].as_array_mut().unwrap() {
+            reviewer["observed_target_change"] = json!("support_increased");
+        }
+        let target_receipt_bytes = serde_json::to_vec(&target).unwrap();
+        let result = report(&quality_plan, &parent_receipt_bytes, &target_plan, &target_receipt_bytes);
+        assert_eq!(result.fields.global_relation_ambiguous_count, 1);
+        assert_eq!(result.fields.target_delta_invalid_count, 1);
+        assert_eq!(result.fields.final_invalid_count, 1);
+    }
+
+    #[test]
+    fn rejects_unblinded_reviewers_and_duplicate_or_missing_candidates() {
+        let (quality_plan, quality_receipt, target_plan, target_receipt, _, _) = fixtures();
+        let mut receipt = parse_receipt(&target_receipt);
+        receipt["adjudications"][0]["reviewers"][0]["blind_to_expected_target_change"] = json!(false);
+        let altered = serde_json::to_vec(&receipt).unwrap();
+        assert!(analyze_intervention_target_delta(&quality_plan,&quality_receipt,&target_plan,&altered)
+            .unwrap_err().contains("non-blinded"));
+
+        let mut receipt = parse_receipt(&target_receipt);
+        receipt["adjudications"].as_array_mut().unwrap().pop();
+        let altered = serde_json::to_vec(&receipt).unwrap();
+        assert!(analyze_intervention_target_delta(&quality_plan,&quality_receipt,&target_plan,&altered)
+            .unwrap_err().contains("exactly one adjudication"));
+
+        let mut receipt = parse_receipt(&target_receipt);
+        let first = receipt["adjudications"][0].clone();
+        receipt["adjudications"].as_array_mut().unwrap().push(first);
+        let altered = serde_json::to_vec(&receipt).unwrap();
+        assert!(analyze_intervention_target_delta(&quality_plan,&quality_receipt,&target_plan,&altered)
+            .unwrap_err().contains("duplicate target-delta adjudication"));
+    }
+
+    #[test]
+    fn rejects_target_plan_scope_and_parent_binding_tampering() {
+        let (quality_plan, quality_receipt, target_plan, target_receipt, changed_id, _) = fixtures();
+        let mut plan = parse_receipt(&target_plan);
+        plan["candidates"][1]["expected_changed_claim_ids_sha256"] = json!([digest("unrelated claim"), changed_id]);
+        let plan_fields: TargetDeltaPlanFieldsV1 = {
+            let fields_value = {
+                let mut value = plan.clone();
+                value.as_object_mut().unwrap().remove("plan_commitment_sha256");
+                value
+            };
+            serde_json::from_value(fields_value).unwrap()
+        };
+        assert!(validate_target_delta_plan_fields(&plan_fields, &quality_plan).unwrap_err()
+            .iter().any(|issue| issue.contains("changed/preserved") || issue.contains("target identity")));
+
+        let mut altered = parse_receipt(&target_receipt);
+        altered["quality_plan_sha256"] = json!(digest("wrong parent plan"));
+        let altered = serde_json::to_vec(&altered).unwrap();
+        assert!(analyze_intervention_target_delta(&quality_plan,&quality_receipt,&target_plan,&altered)
+            .unwrap_err().contains("exact target and parent quality artifacts"));
+    }
+
+    #[test]
+    fn report_is_deterministic_and_claims_remain_bounded() {
+        let (quality_plan, quality_receipt, target_plan, target_receipt, _, _) = fixtures();
+        let first = serde_json::to_vec(&report(&quality_plan,&quality_receipt,&target_plan,&target_receipt)).unwrap();
+        let second = serde_json::to_vec(&report(&quality_plan,&quality_receipt,&target_plan,&target_receipt)).unwrap();
+        assert_eq!(first, second);
+        let result: Value = serde_json::from_slice(&first).unwrap();
+        assert_eq!(result["fields"]["reviewer_independence_proven"], false);
+        assert_eq!(result["fields"]["reviewer_competence_proven"], false);
+        assert_eq!(result["fields"]["semantic_truth_proven"], false);
+        assert_eq!(result["fields"]["execution_authenticity_proven"], false);
+        assert_eq!(result["fields"]["external_anchor_required"], true);
+        assert_eq!(result["fields"]["scoring_eligible_declared"], false);
+    }
+}
