@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-018-joint-action-bank-v0.1.json",
+  "title": "CMAQ-018 same-history joint action-bank sample contract",
+  "description": "Typed adapter payload for one history, one horizon and one scalar outcome channel predicted for a frozen action set using the same joint draw axis. Shape and provenance bindings are validated in Rust; the declared coupling itself still requires producer evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "claim_ceiling",
+    "history_sha256",
+    "horizon_steps",
+    "action_manifest_sha256",
+    "outcome_channel",
+    "action_ids",
+    "joint_draw_ids",
+    "joint_draw_bank_sha256",
+    "coupling",
+    "outcome_samples"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-018-joint-action-bank-v0.1"
+    },
+    "claim_ceiling": {
+      "const": "joint_draw_bank_shape_and_pairing_contract_only_no_calibration_or_coupling_attestation"
+    },
+    "history_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "horizon_steps": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "action_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "outcome_channel": {
+      "type": "string",
+      "minLength": 1
+    },
+    "action_ids": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "joint_draw_ids": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "joint_draw_bank_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "coupling": {
+      "enum": [
+        "shared_posterior_and_world_noise",
+        "paired_exogenous_disturbance",
+        "deterministic_shared_latent"
+      ]
+    },
+    "outcome_samples": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "items": {
+          "type": "number"
+        }
+      }
+    }
+  },
+  "x-rust-invariants": [
+    "outcome_samples.length equals action_ids.length",
+    "each outcome_samples row length equals joint_draw_ids.length",
+    "all action_ids are unique and each maps to exactly one row",
+    "all joint_draw_ids are unique and the jth sample in every row shares the same declared joint draw",
+    "history_sha256 and action_manifest_sha256 are frozen across every action in this bank",
+    "paired effects are computed from same-column sample differences, never marginal interval endpoint subtraction"
+  ]
+}
