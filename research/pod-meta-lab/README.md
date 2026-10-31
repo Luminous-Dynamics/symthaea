@@ -27,8 +27,8 @@ cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-v1
 - A declared producer/verifier identity distinction (not cryptographic proof of independence).
 - Receipt validation is transactional: duplicate state IDs, missing/mismatched current-state identities, or stale receipt bindings leave the obligation state unchanged.
 - A public deterministic POAR-v1 runner with 16 scheduler/receipt conformance fixtures. Fifteen fixtures assert routing/stopping choices; one exercises the valid-promotion → revocation → stale-replay receipt lifecycle. These are structural smoke fixtures, not full domain simulations.
-- An AND/OR graph generator with private source-truth labels, a separate recursive oracle, disjoint source-family splits, valid-time / known-time evidence revisions, source-independence groups, scope/authority constraints, cycle rejection, and a retraction mutation control.
-- 35 authored unit tests: 24 scheduler/receipt tests, one POAR routing-suite test, and ten graph/oracle tests.
+- An AND/OR graph generator with private source-truth labels, a separate recursive oracle, disjoint source-family splits, valid-time / known-time evidence revisions, source-independence groups, scope/authority constraints, cycle rejection, a 64-claim dependency chain, false asserted content, an unverified-source case, and a retraction mutation control.
+- 38 authored unit tests: 24 scheduler/receipt tests, one POAR routing-suite test, and 13 graph/oracle tests.
 - Graph benchmarks report disposition correctness, false support/refutation, unsupported proof paths, citation completeness, temporal/scope/authority/integrity violations, retracted citations, and correlated-source violations as separate metrics; there is no composite score.
 
 ## Deliberate limits
