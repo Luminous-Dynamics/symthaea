@@ -48,7 +48,7 @@ These findings are more useful than treating the aggregate ranking as a single t
 - No model dominates every dimension.
 - Navigation and semantic interaction are distinct: strong navigation does not guarantee event-edit or subject-action competence.
 - Camera movement does not guarantee subject/perspective consistency.
-- The project reports video-quality/physical-correctness correlation of \\(\\rho=0.82\\), but near-zero correlation between control ability and physics scores. Visual quality can be a proxy for some physical metrics while being a poor proxy for controllability.
+- The project reports video-quality/physical-correctness correlation of `rho = 0.82`, but near-zero correlation between control ability and physics scores. Visual quality can be a proxy for some physical metrics while being a poor proxy for controllability.
 - Navigation accuracy falls by about 21 points between turn 1 and turn 4 in the aggregate analysis; this is direct evidence that errors compound across interaction turns.
 
 The leaderboard page is last marked updated 2026-10-12 and was viewed 2026-10-31. Its 45 model entries are split into 13 text, 21 camera and 11 action interfaces. The all-types Navi ranking must not be presented as an action-only result. The official project page exposes type filters, but any action-only comparison must export/filter the exact action entries, preserve their per-metric sample counts and exclude mixed-provenance scores from independent-performance claims.
