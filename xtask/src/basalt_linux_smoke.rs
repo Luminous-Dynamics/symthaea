@@ -508,6 +508,8 @@ fn write_new(path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
         .open(path)
         .with_context(|| format!("creating new smoke report {}", path.display()))?;
     file.write_all(bytes)?;
+    #[cfg(target_os = "linux")]
+    file.set_permissions(fs::Permissions::from_mode(0o600))?;
     file.sync_all()?;
     Ok(())
 }
