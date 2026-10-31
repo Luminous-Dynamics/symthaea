@@ -304,9 +304,10 @@ pub struct GenomeObjectives {
     /// Fraction of the four generic motif-transformation labels observed.
     /// None means the family did not emit that trace representation.
     pub motif_transformation_richness: Option<f64>,
-    /// Legacy generic-Form variation. None means this grammar has no generic
-    /// Form object; dedicated plan topology is measured separately below.
-    pub form_variation: Option<f64>,
+    /// Fraction of configured generic-Form alternatives observed. None means
+    /// this grammar has no generic Form object; dedicated plan topology is
+    /// measured separately below.
+    pub form_coverage: Option<f64>,
     /// Fraction of distinct family-native grammar-plan topologies observed
     /// across deterministic trials. Applicable to every qualified plan family.
     pub grammar_topology_variation: f64,
@@ -324,7 +325,7 @@ impl GenomeObjectives {
             self.novelty_distance,
             Some(self.within_genome_diversity),
             self.motif_transformation_richness,
-            self.form_variation,
+            self.form_coverage,
             Some(self.grammar_topology_variation),
             Some(self.grammar_operation_diversity),
         ]
@@ -882,7 +883,7 @@ pub fn evaluate_genome(
         .filter_map(|trial| trial.form_signature.as_ref())
         .collect::<BTreeSet<_>>()
         .len();
-    let form_variation = if trials.iter().any(|trial| trial.form_signature.is_some()) {
+    let form_coverage = if trials.iter().any(|trial| trial.form_signature.is_some()) {
         let denominator = compiled.spec.form_pool.len().min(trials.len()).max(1);
         Some(distinct_form_topologies as f64 / denominator as f64)
     } else {
@@ -891,8 +892,12 @@ pub fn evaluate_genome(
     let grammar_topologies = trials.iter()
         .filter_map(|trial| trial.grammar_plan_signature.as_ref())
         .collect::<BTreeSet<_>>();
-    let grammar_topology_variation =
-        grammar_topologies.len() as f64 / trials.len().max(1) as f64;
+    let grammar_topology_variation = pairwise_signature_diversity(
+        &trials
+            .iter()
+            .filter_map(|trial| trial.grammar_plan_signature.as_deref())
+            .collect::<Vec<_>>(),
+    );
     let grammar_operation_diversity = mean_pairwise_operation_diversity(&trials);
 
     let mut mean_fingerprint = vec![0.0; fingerprint::STRUCT_DIMS];
@@ -924,7 +929,7 @@ pub fn evaluate_genome(
             novelty_distance,
             within_genome_diversity,
             motif_transformation_richness,
-            form_variation,
+            form_coverage,
             grammar_topology_variation,
             grammar_operation_diversity,
         },
@@ -1383,6 +1388,23 @@ fn jaccard_distance(left: &[String], right: &[String]) -> f64 {
     1.0 - intersection as f64 / union as f64
 }
 
+fn pairwise_signature_diversity(signatures: &[&str]) -> f64 {
+    if signatures.len() < 2 {
+        return 0.0;
+    }
+    let mut different_pairs = 0usize;
+    let mut pair_count = 0usize;
+    for left in 0..signatures.len() {
+        for right in left + 1..signatures.len() {
+            if signatures[left] != signatures[right] {
+                different_pairs += 1;
+            }
+            pair_count += 1;
+        }
+    }
+    different_pairs as f64 / pair_count.max(1) as f64
+}
+
 fn mean_pairwise_operation_diversity(trials: &[GenomeTrial]) -> f64 {
     if trials.len() < 2 {
         return 0.0;
@@ -1584,7 +1606,7 @@ impl GenomeEvaluation {
             && self.objectives.within_genome_diversity.is_finite()
             && self.objectives.motif_transformation_richness
                 .is_none_or(|value| value.is_finite() && (0.0..=1.0).contains(&value))
-            && self.objectives.form_variation
+            && self.objectives.form_coverage
                 .is_none_or(|value| value.is_finite() && (0.0..=1.0).contains(&value))
             && self.objectives.grammar_topology_variation.is_finite()
             && (0.0..=1.0).contains(&self.objectives.grammar_topology_variation)
