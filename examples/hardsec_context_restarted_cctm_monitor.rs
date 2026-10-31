@@ -1381,7 +1381,141 @@ mod tests {
         let r = audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
         assert_eq!(r["sequential_monitor"]["valid_observation_count"], 0);
         assert_eq!(r["sequential_monitor"]["abstention_count"], 26);
-        assert_eq!(r["result"], "no_alarm_threshold_crossed");
+        assert_eq!(r["result"], "no_restarted_alarm_threshold_crossed");
+    }
+
+
+    #[test]
+    fn near_harmonic_restart_weights_have_a_proved_unit_capital_bound() {
+        let scale = 1.0 / 3.0;
+        let upper = restart_weight_sum_upper_bound(scale);
+        assert!(upper < 0.744 && upper < 1.0, "upper bound {upper}");
+        let mut partial = 0.0;
+        let mut previous = f64::INFINITY;
+        for index in 1..=1_000_000usize {
+            let weight = restart_weight(index, scale);
+            assert!(weight > 0.0 && weight < previous);
+            previous = weight;
+            partial += weight;
+        }
+        assert!(partial <= upper + 1e-12);
+        assert!(1.0 - partial > 0.25);
+    }
+
+    #[test]
+    fn restart_lifetime_is_bounded_and_expiry_is_absorbing() {
+        let (mut p, s, _, _) = fixture();
+        p["maximum_restart_age"] = json!(2);
+        let receipt = audit(&p, &s).unwrap();
+        for context in receipt["reference_policy"]["contexts"].as_array().unwrap() {
+            let restart = &context["restart_policy"];
+            assert!(restart["live_restart_state_count"].as_u64().unwrap() <= 2);
+            assert!(restart["expired_restart_state_count"].as_u64().unwrap() > 0);
+            assert!(restart["unallocated_capital_reserve"].as_f64().unwrap() > 0.25);
+        }
+        assert_eq!(receipt["sequential_monitor"]["restart_guarantee_contract"]["maximum_restart_age"], 2);
+    }
+
+    #[test]
+    fn restarted_process_beats_single_start_after_a_late_shift_in_deterministic_stress() {
+        let k = 1e-6_f64;
+        let epsilon = ((2.0_f64 / 0.005).ln() / (2.0 * 600.0)).sqrt();
+        let scale = 1.0 / (0.5 + (1.0 + k * k).sqrt() * epsilon);
+        let alpha = 0.02_f64;
+        let threshold = (1.0 / alpha).ln();
+        let mut context = ContextState {
+            reference_id: "reference".to_owned(),
+            reference_group_count: 600,
+            reference_digest: "a".repeat(64),
+            scores: Vec::new(),
+            alpha,
+            delta: 0.005,
+            epsilon,
+            scale,
+            eta: 0.0,
+            ons_accumulator: 1.0,
+            log_wealth: Some(0.0),
+            first_alarm_sequence_index: None,
+            restart_observation_count: 0,
+            restart_weight_sum: 0.0,
+            restart_states: Vec::new(),
+            restart_expired_state_count: 0,
+            restart_log_e_value: 0.0,
+            restart_first_alarm_sequence_index: None,
+        };
+        let mut single_eta = 0.0_f64;
+        let mut single_accumulator = 1.0_f64;
+        let mut single_log_wealth = 0.0_f64;
+        let mut rng = 0x1234_5678_u32;
+
+        // Deterministic xorshift null-score sequence: this is a reproducible
+        // delay stress fixture, not an iid-validity or PFA simulation.
+        for index in 1..=10_000usize {
+            rng ^= rng << 13;
+            rng ^= rng >> 17;
+            rng ^= rng << 5;
+            let p_value = rng as f64 / (u32::MAX as f64 + 1.0);
+
+            let (beta, _, derivative) = cctm_bet(p_value, single_eta, epsilon, k, scale).unwrap();
+            if beta > 0.0 {
+                single_log_wealth += beta.ln();
+                let (eta_next, accumulator_next) =
+                    ons_next_eta(single_eta, single_accumulator, derivative, beta).unwrap();
+                single_eta = eta_next;
+                single_accumulator = accumulator_next;
+            }
+
+            update_restarted_processes(
+                &mut context, p_value, epsilon, k, scale,
+                256, index
+            ).unwrap();
+        }
+
+        let mut restarted_delay = None;
+        let mut single_start_delay = None;
+        for delay in 1..=500usize {
+            let (beta, _, derivative) = cctm_bet(1.0, single_eta, epsilon, k, scale).unwrap();
+            if beta > 0.0 {
+                single_log_wealth += beta.ln();
+                let (eta_next, accumulator_next) =
+                    ons_next_eta(single_eta, single_accumulator, derivative, beta).unwrap();
+                single_eta = eta_next;
+                single_accumulator = accumulator_next;
+            }
+            update_restarted_processes(
+                &mut context, 1.0, epsilon, k, scale,
+                256, 10_000 + delay
+            ).unwrap();
+
+            if restarted_delay.is_none() && context.restart_log_e_value >= threshold {
+                restarted_delay = Some(delay);
+            }
+            if single_start_delay.is_none() && single_log_wealth >= threshold {
+                single_start_delay = Some(delay);
+            }
+            if restarted_delay.is_some() && single_start_delay.is_some() {
+                break;
+            }
+        }
+        let restarted_delay = restarted_delay.expect("restarted detector should cross in the stress fixture");
+        let single_start_delay = single_start_delay.expect("single-start detector should eventually cross");
+        assert_eq!(restarted_delay, 50);
+        assert_eq!(single_start_delay, 200);
+        assert!(restarted_delay < single_start_delay);
+    }
+
+    #[test]
+    fn restart_processes_do_not_advance_on_context_assignment_abstentions() {
+        let (p, s, pb, sb) = fixture();
+        let bytes = include_bytes!("../tests/fixtures/hardsec/context-restarted-v1/runtime-receipt.json");
+        let assignment_receipt: Value = serde_json::from_slice(bytes).unwrap();
+        let rb = bytes.to_vec();
+        let receipt = audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
+        let contexts = receipt["reference_policy"]["contexts"].as_array().unwrap();
+        let compute = contexts.iter().find(|v| v["context_id"] == "compute").unwrap();
+        let memory = contexts.iter().find(|v| v["context_id"] == "memory").unwrap();
+        assert_eq!(compute["restart_policy"]["restart_observation_count"], 22);
+        assert_eq!(memory["restart_policy"]["restart_observation_count"], 1);
     }
 
     #[test]
