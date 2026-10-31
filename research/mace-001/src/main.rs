@@ -960,18 +960,18 @@ mod tests {
         let changed = AGENT_INPUT
             .lines()
             .map(|line| {
-                if line.starts_with("MACE-287\\t") {
+                if line.starts_with("MACE-287\t") {
                     line.replace(
-                        "\\\"current_state\\\":{\\\"pump\\\":\\\"on\\\"",
-                        "\\\"current_state\\\":{\\\"pump\\\":\\\"off\\\"",
+                        "\"current_state\":{\"pump\":\"on\"",
+                        "\"current_state\":{\"pump\":\"off\"",
                     )
                 } else {
                     line.to_owned()
                 }
             })
             .collect::<Vec<_>>()
-            .join("\\n")
-            + "\\n";
+            .join("\n")
+            + "\n";
         assert!(audit_texts(&changed, ORACLE_INPUT, ("a", "o")).is_err());
     }
 
