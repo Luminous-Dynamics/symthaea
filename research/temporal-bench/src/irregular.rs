@@ -468,18 +468,17 @@ mod tests {
     }
 
     #[test]
-    fn jitter_bounds_are_respected() {
-        let config = IrregularConfig::reference(24);
+    fn jitter_bounds_are_respected_without_dropouts() {
+        let mut config = IrregularConfig::reference(24);
+        config.missing_per_mille = 0;
         let (task, _) = generate_irregular_task(config).unwrap();
         let max_jitter = config.nominal_interval_us
             * u64::from(config.jitter_per_mille)
             / 1_000;
         for pair in task.observations.windows(2) {
             let delta = pair[1].time_us - pair[0].time_us;
-            // Missing samples can create larger gaps; compare only to the nearest
-            // nominal interval envelope, not to a single sampling step.
-            assert!(delta >= config.nominal_interval_us / 10);
-            assert!(delta <= config.nominal_interval_us + max_jitter * 3);
+            assert!(delta >= config.nominal_interval_us - max_jitter);
+            assert!(delta <= config.nominal_interval_us + max_jitter);
         }
     }
 
