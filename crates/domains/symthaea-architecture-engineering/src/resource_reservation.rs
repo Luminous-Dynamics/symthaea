@@ -72,6 +72,7 @@ pub struct ResourceReservationRecord {
     pub reservation_id: String,
     pub action_id: String,
     pub preflight_receipt_sha256: String,
+    pub preflight_reservation_ledger_head_sha256: String,
     pub preflight_receipt: NasActionPreflightReceipt,
     pub resource_registry_sha256: String,
     pub resource_budget_sha256: String,
@@ -271,6 +272,8 @@ impl ResourceReservationLedger {
             if existing.action_id != proof.preflight_receipt.action_id
                 || existing.preflight_receipt_sha256 != proof.preflight_receipt.receipt_sha256
                 || existing.resource_cost != proof.resource_cost
+                || existing.preflight_reservation_ledger_head_sha256
+                    != proof.reservation_ledger_head_sha256
                 || existing.expires_at_epoch != expires_at_epoch
             {
                 return Err(ResourceReservationError::new(
@@ -320,6 +323,7 @@ impl ResourceReservationLedger {
             reservation_id: proof.scope_sha256.clone(),
             action_id: proof.preflight_receipt.action_id.clone(),
             preflight_receipt_sha256: proof.preflight_receipt.receipt_sha256.clone(),
+            preflight_reservation_ledger_head_sha256: proof.reservation_ledger_head_sha256.clone(),
             preflight_receipt: proof.preflight_receipt.clone(),
             resource_registry_sha256: self.resource_registry.registry_sha256.clone(),
             resource_budget_sha256: proof.resource_budget_sha256.clone(),
@@ -596,6 +600,7 @@ pub fn verify_resource_reservation_ledger(
         if record.preflight_receipt.receipt_sha256 != record.preflight_receipt_sha256
             || record.preflight_receipt.scope_sha256 != record.reservation_id
             || record.preflight_receipt.run_id != ledger.run_id
+            || !is_sha256(&record.preflight_reservation_ledger_head_sha256)
             || record.preflight_receipt.action_id != record.action_id
             || record.preflight_receipt.action_kind != NasActionKind::AcquireMeasurement
             || record.preflight_receipt.disposition != "PREFLIGHT_ELIGIBLE_NO_RESERVATION_NO_EXECUTION"
@@ -1233,6 +1238,13 @@ mod tests {
             .unwrap();
         assert_eq!(first.reservation_id, retry.reservation_id);
         assert_eq!(first.receipt_sha256, retry.receipt_sha256);
+        assert_eq!(ledger.events().len(), events_before);
+        let (_, _, cost_changed_head) = fixture();
+        let mut changed_head_proof = proof(&ledger, "measure-001", &scope, cost_changed_head, 'd');
+        changed_head_proof.reservation_ledger_head_sha256 = sha('f');
+        assert!(ledger
+            .reserve_measurement(&head, changed_head_proof, 5)
+            .is_err());
         assert_eq!(ledger.events().len(), events_before);
         let (_, _, cost_changed_lease) = fixture();
         let mut conflicting_retry = proof(&ledger, "measure-001", &scope, cost_changed_lease, 'd');
