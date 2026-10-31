@@ -1,0 +1,273 @@
+{
+  "schema_version": "cmaq-frozen-run-manifest-v0.1",
+  "manifest_kind": "pre_run_freeze",
+  "run_id": "cmaq018_dev_proto_20261031_01",
+  "frozen_at_utc": "2026-10-31T12:00:00Z",
+  "track": {
+    "id": "cmaq-018",
+    "protocol_version": "0.1.0",
+    "scientific_claim": "Measure same-history action-effect and action-ranking behavior on a controlled synthetic intervention panel.",
+    "status": "development"
+  },
+  "repository": {
+    "url": "https://github.com/Luminous-Dynamics/symthaea",
+    "commit": "14a77b64224a01aeac69e20f30e2371872068fa8",
+    "dirty_tree": false,
+    "source_tree_sha256": null
+  },
+  "candidate": {
+    "name": "CMAQ-018 synthetic predictor-arm suite",
+    "kind": "synthetic_reference_arms",
+    "source_commit": "2503b1b0abb69a822c1b8fa86e81e47177362736",
+    "artifact_sha256": null,
+    "config_sha256": "356a6a75c0d201771385fc5f8e330a2b2a312c20d96b26f5a9a5411dfce22601",
+    "weights_sha256": null,
+    "adapter_sha256": null,
+    "build_status": "source_only_not_compiled",
+    "config_path": "research/cmaq-common/examples/assets/cmaq018/candidate-config.v0.1.json"
+  },
+  "generator": {
+    "name": "CMAQ-018 deterministic same-history branch generator",
+    "source_commit": "2503b1b0abb69a822c1b8fa86e81e47177362736",
+    "config_sha256": "cdc87841a4a5de86ebfe96e67de32695e685aec87b6fc9dde56d5162af9151e6",
+    "config_path": "research/cmaq-common/examples/assets/cmaq018/generator-config.v0.1.json"
+  },
+  "evaluator": {
+    "name": "CMAQ-018 branch-fidelity evaluator",
+    "source_commit": "2503b1b0abb69a822c1b8fa86e81e47177362736",
+    "metric_bundle_sha256": "dcc58899a6d7abd2fbe70d5325f980c82998d59a7a2b1494e0744695d15ba5a3",
+    "version": "0.1.0",
+    "external_judge": null,
+    "metric_bundle_path": "research/cmaq-common/examples/assets/cmaq018/metric-bundle.v0.1.json"
+  },
+  "data_sources": [
+    {
+      "id": "cmaq018-synthetic-v01",
+      "kind": "synthetic",
+      "name": "CMAQ-018 seven-family deterministic intervention generator",
+      "revision": "cmaq-018-v0.1",
+      "split": "development",
+      "manifest_sha256": "4935148bb09293ea9bce35a4e6516d0d8e9b5b586bf49a51d4eb26ffee74c61a",
+      "license": "internal synthetic",
+      "visibility": "mixed_with_explicit_partition",
+      "candidate_access": [
+        "observed_history.x",
+        "observed_history.v",
+        "canonical_action.id",
+        "canonical_action.force",
+        "canonical_action.grip"
+      ],
+      "manifest_path": "research/cmaq-common/examples/assets/cmaq018/data-manifest.v0.1.json"
+    }
+  ],
+  "task_contract": {
+    "suite": "CMAQ-018",
+    "environment_id": "cmaq018-matched-history-synthetic",
+    "environment_revision": "0.1.0",
+    "observation_schema_sha256": "68b19f4c240da5f57e9a258dbcbe0e38012976e4abad16e0d75b546bcb64e124",
+    "action_schema_sha256": "5206eed15d9bea16ca7cd2edf3c1e54cce79f7f49afe91d4425f2b00bc410fd0",
+    "reward_definition_sha256": "1a410b977370fa9e24e3e03e54552b1ad1ac38b22d0ae3a54409245d38645cff",
+    "wrapper_stack": [
+      "same-history branch cloning",
+      "common disturbance within episode",
+      "canonical action identity"
+    ],
+    "wrapper_stack_sha256": "072d1104a47ad6a20549ca48323b83dfdeb613558d3ae666dcad7efa33cc78cd",
+    "action_repeat": 1,
+    "simulator_steps_per_action": 1,
+    "controller_horizon": 1,
+    "base_simulator_horizon": 1,
+    "reward_aggregation": "single_step",
+    "termination_semantics": "terminal branch is retained and charged its explicit terminal utility penalty",
+    "observation_schema_path": "research/cmaq-common/examples/assets/cmaq018/observation-schema.v0.1.json",
+    "action_schema_path": "research/cmaq-common/examples/assets/cmaq018/action-schema.v0.1.json",
+    "reward_definition_path": "research/cmaq-common/examples/assets/cmaq018/reward-definition.v0.1.json",
+    "wrapper_stack_path": "research/cmaq-common/examples/assets/cmaq018/wrapper-stack.v0.1.json"
+  },
+  "sample": {
+    "episode_count": 64,
+    "episode_seed_commitment_sha256": "5bc559963289ce80429bea306a0187ba271c40a38b1e15bb18f15f585e8a587d",
+    "seed_derivation": "base=0xC0A9001820261031; episode_seed(i)=base XOR ((i*0x9E3779B97F4A7C15) mod 2^64), i=0..63; commitment=SHA256(compact JSON array of the 64 uint64 seed values); candidate receives neither seed nor evaluator history ID",
+    "unit_of_analysis": "episode_history",
+    "paired_seed_design": true,
+    "mechanism_family_split": {
+      "development": [
+        "null_effect",
+        "monotone",
+        "non_monotone",
+        "state_dependent_reversal",
+        "action_interaction",
+        "termination_seam",
+        "hidden_regime"
+      ],
+      "calibration": [],
+      "qualification": [],
+      "family_disjoint": false
+    },
+    "episode_count_scope": "per_scenario_model_condition"
+  },
+  "budgets": {
+    "episode_limit": 64,
+    "action_interventions_per_episode": 7,
+    "candidate_sequences_per_decision": null,
+    "model_forward_calls_limit": null,
+    "model_transition_evaluations_limit": null,
+    "wallclock_ms_limit": null,
+    "peak_memory_mb_limit": null,
+    "energy_mwh_limit": null,
+    "measurement_status": "not_measured",
+    "matching_method": "none",
+    "matching_tolerance": null
+  },
+  "baseline_registry": [
+    {
+      "id": "point_outcome",
+      "role": "primary",
+      "kind": "world_model",
+      "source_commit": "2503b1b0abb69a822c1b8fa86e81e47177362736",
+      "config_sha256": "356a6a75c0d201771385fc5f8e330a2b2a312c20d96b26f5a9a5411dfce22601",
+      "eligibility": "diagnostic_only",
+      "ineligibility_reason": "Synthetic fixed predictor; no trained model or compute-matched deployment claim.",
+      "cost_accounting": "not_measured"
+    },
+    {
+      "id": "explicit_effect_head",
+      "role": "world_model_control",
+      "kind": "world_model",
+      "source_commit": "2503b1b0abb69a822c1b8fa86e81e47177362736",
+      "config_sha256": "356a6a75c0d201771385fc5f8e330a2b2a312c20d96b26f5a9a5411dfce22601",
+      "eligibility": "diagnostic_only",
+      "ineligibility_reason": "Pair-effect head has different query granularity from absolute branch prediction.",
+      "cost_accounting": "not_measured"
+    },
+    {
+      "id": "shuffled_action_labels",
+      "role": "negative_control",
+      "kind": "negative_control",
+      "source_commit": "2503b1b0abb69a822c1b8fa86e81e47177362736",
+      "config_sha256": "356a6a75c0d201771385fc5f8e330a2b2a312c20d96b26f5a9a5411dfce22601",
+      "eligibility": "diagnostic_only",
+      "ineligibility_reason": "Intentional action-identity corruption; negative control only.",
+      "cost_accounting": "not_measured"
+    },
+    {
+      "id": "support_aware_point",
+      "role": "world_model_control",
+      "kind": "world_model",
+      "source_commit": "2503b1b0abb69a822c1b8fa86e81e47177362736",
+      "config_sha256": "356a6a75c0d201771385fc5f8e330a2b2a312c20d96b26f5a9a5411dfce22601",
+      "eligibility": "diagnostic_only",
+      "ineligibility_reason": "Deterministic support rule is not a calibrated learned uncertainty model.",
+      "cost_accounting": "not_measured"
+    },
+    {
+      "id": "oracle",
+      "role": "oracle_ceiling",
+      "kind": "oracle",
+      "source_commit": "2503b1b0abb69a822c1b8fa86e81e47177362736",
+      "config_sha256": "356a6a75c0d201771385fc5f8e330a2b2a312c20d96b26f5a9a5411dfce22601",
+      "eligibility": "oracle_only",
+      "ineligibility_reason": "Evaluator-owned truth; not candidate deployable.",
+      "cost_accounting": "not_measured"
+    }
+  ],
+  "comparisons": [
+    {
+      "id": "explicit_effect_vs_point",
+      "treatment_id": "explicit_effect_head",
+      "control_id": "point_outcome",
+      "status": "diagnostic_only",
+      "matched_dimensions": [
+        "episodes",
+        "seeds",
+        "observations",
+        "actions"
+      ],
+      "claim": "Compare interventional effect metrics across two synthetic prediction interfaces.",
+      "limitation": "No compute matching; no claim of learned-model superiority."
+    },
+    {
+      "id": "shuffled_vs_point",
+      "treatment_id": "shuffled_action_labels",
+      "control_id": "point_outcome",
+      "status": "diagnostic_only",
+      "matched_dimensions": [
+        "episodes",
+        "seeds",
+        "observations",
+        "actions"
+      ],
+      "claim": "Verify degradation under deliberately corrupted action identity.",
+      "limitation": "Negative control only."
+    }
+  ],
+  "metrics": {
+    "bundle_id": "cmaq018-v0.1-metrics",
+    "bundle_sha256": "dcc58899a6d7abd2fbe70d5325f980c82998d59a7a2b1494e0744695d15ba5a3",
+    "required_metrics": [
+      "pair_coverage",
+      "effect_sign_accuracy",
+      "effect_sign_accuracy_episode_count",
+      "effect_sign_accuracy_ci95",
+      "effect_magnitude_mae",
+      "effect_magnitude_mae_episode_count",
+      "effect_magnitude_mae_ci95",
+      "kendall_tau_b",
+      "rank_tau_b_episode_count",
+      "rank_tau_b_ci95",
+      "top1_regret",
+      "top1_regret_episode_count",
+      "top1_regret_ci95",
+      "null_false_effect_rate",
+      "null_false_effect_episode_count",
+      "null_false_effect_rate_ci95",
+      "branch_coverage",
+      "branch_outcome_mae",
+      "branch_state_mae",
+      "terminal_false_safe_rate",
+      "terminal_false_safe_rate_episode_count",
+      "terminal_false_safe_rate_ci95",
+      "branch_outcome_mae_episode_count",
+      "branch_state_mae_episode_count"
+    ],
+    "cross_track_pooling": false
+  },
+  "statistics": {
+    "uncertainty_method": "percentile_bootstrap",
+    "confidence_level": 0.95,
+    "bootstrap_resamples": 2000,
+    "cluster_unit": "episode_history",
+    "paired_analysis": true,
+    "multiple_looks_policy": "descriptive_only"
+  },
+  "qualification": {
+    "stage": "development",
+    "candidate_frozen": true,
+    "evaluator_frozen": true,
+    "thresholds_frozen": true,
+    "qualification_data_sealed": false,
+    "candidate_truth_access": false,
+    "freeze_order": [
+      "candidate",
+      "config",
+      "adapter",
+      "data_split",
+      "seeds",
+      "metrics",
+      "thresholds",
+      "evaluator",
+      "freeze"
+    ]
+  },
+  "claim_boundary": {
+    "maximum_claim": "Pre-run specification of a synthetic development evaluation; no performance results are included.",
+    "prohibited_claims": [
+      "real-world counterfactual correctness",
+      "physical safety",
+      "commercial benchmark superiority",
+      "SOTA",
+      "trained Symthaea model performance"
+    ],
+    "performance_result_present": false
+  }
+}
