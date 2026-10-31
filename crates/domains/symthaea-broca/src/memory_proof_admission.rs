@@ -599,6 +599,52 @@ mod tests {
     }
 
     #[test]
+    fn admission_derives_speaker_from_snapshot_bound_source_step_and_enforces_user_threshold() {
+        for (step_id, expected_role, expected_status) in [
+            (
+                "user-0",
+                Some(crate::memory_evidence::EvidenceSpeakerRole::User),
+                ProofBudgetStatus::Supported,
+            ),
+            (
+                "assistant-1",
+                Some(crate::memory_evidence::EvidenceSpeakerRole::Assistant),
+                ProofBudgetStatus::NoEligibleProof,
+            ),
+            (
+                "turn-2",
+                None,
+                ProofBudgetStatus::NoEligibleProof,
+            ),
+        ] {
+            let mut proof_request = request();
+            proof_request.obligations[0].minimum_user_authored_evidence = 1;
+
+            let mut source_hit = hit("A", "invoice paid by user", 1.0);
+            source_hit.source.step_id = Some(step_id.into());
+            let mut trusted_admission = admission("A");
+            trusted_admission.source_step_id = Some(step_id.into());
+
+            let admitted = admit_lexical_hits_for_proof_budget(
+                proof_request,
+                &[source_hit],
+                &[trusted_admission],
+                &snapshot_receipt(),
+            ).unwrap();
+            assert_eq!(admitted.candidates[0].source_speaker, expected_role);
+
+            let result = solve_proof_budget(admitted).unwrap();
+            assert_eq!(result.status, expected_status, "source step {step_id}");
+            if expected_status == ProofBudgetStatus::NoEligibleProof {
+                assert!(result.justification_rejections.iter().any(|rejection| {
+                    rejection.reason
+                        == crate::memory_proof_budget::JustificationRejectionReason::UserEvidenceCountInsufficient
+                }));
+            }
+        }
+    }
+
+    #[test]
     fn refuses_snapshot_known_at_mismatch() {
         let error = admit_lexical_hits_for_proof_budget(
             request(),
