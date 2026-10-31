@@ -228,3 +228,27 @@ Sources:
 ### Updated claim ceiling
 
 The three methods are compact in-repository reference variants on ZDT1/DTLZ2. No results have been compiled, run, cross-checked against PlatEMO 4.16, or measured for CPU/GPU/energy. Do not call the harness an industry leaderboard yet. Next work is external implementation parity, larger test families, multiple seeds, target-attainment evaluation and real resource telemetry.
+
+
+### AR-5B5 follow-on: anytime evidence-cost attainment
+
+The current matched-baseline reports compare final archives at equal objective-evaluation counts. The next tranche must preserve the entire evaluation history and compute first-attainment receipts for frozen HV, IGD+, and additive-epsilon targets. This is an extension of COCO's established fixed-target/anytime methodology, not a claim to invent it.
+
+Symthaea's research extension is to bind each first target crossing to:
+- a replayable archive prefix and its digest;
+- the exact objective/reference/target plan;
+- the complete measured resource vector (CPU, worker-time, accelerator, energy, memory high-water, tokens, tool/evaluator/verifier calls and normalized charge);
+- independent evidence and verifier qualification state;
+- explicit not-reached/censored outcomes.
+
+Keep mechanism-matched allocator comparisons separate from end-to-end best-practical-system comparisons. Start with sequential baseline runs; do not qualify parallel/asynchronous target costs until dispatch, completion, in-flight work, batch barriers, and elapsed-vs-worker-time semantics are fully charged.
+
+The detailed implementation contract and acceptance tests are in \`AR5B5_ANYTIME_EVIDENCE_COST_ATTAINMENT_V0_1.md\`.
+
+Sources:
+- COCO fixed-target, anytime assessment: https://numbbo.github.io/coco-doc/perf-assessment/
+- COCO biobjective archive/HV target assessment: https://numbbo.github.io/coco-doc/bbob-biobj/perf-assessment/
+- PlatEMO v4.16 release (2026-07-19): https://github.com/BIMK/PlatEMO/releases/tag/v4.16
+- CodeEvolve, Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.1345/
+
+Claim ceiling: this is a research specification only. It does not add trajectory code, run tests, establish optimizer superiority, or constitute an SOTA result.
