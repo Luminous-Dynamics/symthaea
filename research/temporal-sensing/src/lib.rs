@@ -10,6 +10,12 @@ use std::fmt;
 
 const PPM: u128 = 1_000_000;
 
+fn mix64(mut value: u64) -> u64 {
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    value ^ (value >> 31)
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SensingFeatures {
     /// Candidate-estimated chance/severity score for a near-term event.
@@ -37,6 +43,13 @@ pub struct SensingContext {
 pub enum SensingPolicy {
     /// Fixed-rate observation with an upper bound on the inter-observation gap.
     FixedInterval { interval_us: u64 },
+    /// Reproducible jittered schedule baseline. The seed is candidate-side,
+    /// not an evaluator schedule key.
+    JitteredInterval {
+        interval_us: u64,
+        jitter_per_mille: u16,
+        seed: u64,
+    },
     /// Choose between two rates from candidate-visible event/uncertainty signals.
     MultiRate {
         fast_interval_us: u64,
@@ -86,6 +99,8 @@ pub enum SensingDecision {
     BudgetBlocked {
         reason: BudgetBlock,
         must_observe_by_us: u64,
+        /// True when the maximum-gap deadline has already passed.
+        deadline_missed: bool,
     },
 }
 
@@ -188,6 +203,7 @@ pub fn decide_next_observation(
         return Ok(SensingDecision::BudgetBlocked {
             reason: block_reason,
             must_observe_by_us: deadline_us,
+            deadline_missed: maximum_gap_reached,
         });
     }
 
@@ -219,6 +235,26 @@ fn proposed_delay(
     let (target_interval, reason) = match policy {
         SensingPolicy::FixedInterval { interval_us } => {
             (interval_us, TriggerReason::FixedSchedule)
+        }
+        SensingPolicy::JitteredInterval {
+            interval_us,
+            jitter_per_mille,
+            seed,
+        } => {
+            let max_jitter = u128::from(interval_us)
+                .checked_mul(u128::from(jitter_per_mille))
+                .ok_or(SensingError::ArithmeticOverflow)?
+                / 1_000;
+            let width = max_jitter
+                .checked_mul(2)
+                .and_then(|value| value.checked_add(1))
+                .ok_or(SensingError::ArithmeticOverflow)?;
+            let random = u128::from(mix64(seed ^ context.last_observation_us.rotate_left(19)));
+            let offset = random % width;
+            let jittered = u128::from(interval_us) + offset - max_jitter;
+            let jittered_interval = u64::try_from(jittered)
+                .map_err(|_| SensingError::ArithmeticOverflow)?;
+            (jittered_interval, TriggerReason::FixedSchedule)
         }
         SensingPolicy::MultiRate {
             fast_interval_us,
@@ -299,6 +335,18 @@ fn validate_policy(policy: SensingPolicy) -> Result<(), SensingError> {
     match policy {
         SensingPolicy::FixedInterval { interval_us } if !valid_interval(interval_us) => {
             Err(SensingError::ZeroInterval)
+        }
+        SensingPolicy::JitteredInterval { interval_us, jitter_per_mille, .. }
+            if !valid_interval(interval_us) || jitter_per_mille >= 1_000 =>
+        {
+            if interval_us == 0 {
+                Err(SensingError::ZeroInterval)
+            } else {
+                Err(SensingError::InvalidProbability {
+                    field: "jitter_per_mille",
+                    value: u32::from(jitter_per_mille),
+                })
+            }
         }
         SensingPolicy::MultiRate {
             fast_interval_us,
@@ -384,6 +432,24 @@ mod tests {
             reason: TriggerReason::FixedSchedule,
             estimated_energy_nj: 50,
         });
+    }
+
+    #[test]
+    fn jittered_schedule_is_deterministic_and_within_declared_band() {
+        let policy = SensingPolicy::JitteredInterval {
+            interval_us: 100,
+            jitter_per_mille: 200,
+            seed: 0xA11C_E001,
+        };
+        let first = decide_next_observation(policy, context(0), features()).unwrap();
+        let repeated = decide_next_observation(policy, context(0), features()).unwrap();
+        assert_eq!(first, repeated);
+        match first {
+            SensingDecision::Wait { delay_us, .. } => {
+                assert!((80..=120).contains(&delay_us));
+            }
+            other => panic!("expected a wait decision, got {other:?}"),
+        }
     }
 
     #[test]
