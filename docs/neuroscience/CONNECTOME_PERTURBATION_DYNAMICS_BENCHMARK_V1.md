@@ -35,6 +35,18 @@ These tiers must remain separate because they support different estimands.
 
 ## 2. Direct anatomical connectivity is not effective connectivity
 
+### Required peer-reviewed effective-connectivity baseline
+
+Randi et al., *Neural signal propagation atlas of Caenorhabditis elegans*, Nature 623, 406–414 (1 November 2023): https://www.nature.com/articles/s41586-023-06683-4
+
+The study optogenetically activated single neurons while imaging whole-brain calcium responses. It surveyed 23,433 neuron pairs across 113 animals and 186 of 188 head neurons. Of those measured pairs, 1,310 (6%) met the study's stringent functionally-connected criterion. 11% of those significant functional connections were inhibitory. The analysis distinguishes evidence for a functional connection, evidence for functional non-connection within a prespecified equivalence bound, and insufficient evidence. The paper's term "functional connection" means an **effective connection over all possible paths**, not necessarily a direct monosynaptic connection.
+
+The paper reports rapid dense-core-vesicle/neuropeptide signalling that is not visible in the anatomical connectome and better spontaneous-activity prediction from the measured signal-propagation atlas than from anatomy-only predictions in its experimental setting. These findings are a strong reason to include an explicit extrasynaptic/latent channel in dynamical model comparisons.
+
+Limitations remain important: the animals were immobilized and awake under a transgenic study configuration, the pairwise map is conditioned on the stimulation/recording sampling and statistical detection procedure, and it is not a perfect physiological census. Pin the source artifacts and do not generalize the result beyond its experimental scope.
+
+
+
 A crucial peer-reviewed C. elegans reference must be part of the benchmark:
 
 Randi et al., *Neural signal propagation atlas of Caenorhabditis elegans*, Nature 623, 406–414 (1 November 2023): https://www.nature.com/articles/s41586-023-06683-4
