@@ -61,5 +61,6 @@
     "latency_relative": 0.05,
     "peak_memory_relative": 0.1
   },
-  "claim_ceiling": "synthetic_fixture_only_no_hardware_or_profiler_measurement_claim"
+  "claim_ceiling": "measurement_profile_contract_only_receipt_bytes_must_be_independently_verified",
+  "fixture_only": true
 }
