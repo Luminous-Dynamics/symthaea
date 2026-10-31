@@ -2296,6 +2296,150 @@ mod tests {
     }
 
     #[test]
+    fn dense_sparse_full_system_search_parity_spans_cpt_seeds_and_observed_states() {
+        // Deterministic fixture matrix: vary local CPT probabilities and
+        // observations while preserving a strongly-connected directed cycle.
+        // Every run compares the complete bounded system-search result, not
+        // only one hand-selected partition score.
+        for n_units in [3usize, 4] {
+            let candidate = (0..n_units).collect::<Vec<_>>();
+            for seed in 0..3usize {
+                let mut connectivity = vec![false; n_units * n_units];
+                for target in 0..n_units {
+                    let previous = (target + n_units - 1) % n_units;
+                    connectivity[target * n_units + target] = true;
+                    connectivity[previous * n_units + target] = true;
+                }
+                let mut tpm = vec![0.0; (1usize << n_units) * n_units];
+                for state_index in 0..(1usize << n_units) {
+                    for target in 0..n_units {
+                        let previous = (target + n_units - 1) % n_units;
+                        let self_on = ((state_index >> target) & 1) != 0;
+                        let previous_on = ((state_index >> previous) & 1) != 0;
+                        let base = 0.12 + seed as f64 * 0.01 + target as f64 * 0.003;
+                        let self_weight = 0.24 + seed as f64 * 0.015;
+                        let previous_weight = 0.28 + target as f64 * 0.01;
+                        tpm[state_index * n_units + target] =
+                            base
+                                + if self_on { self_weight } else { 0.0 }
+                                + if previous_on { previous_weight } else { 0.0 };
+                    }
+                }
+                let dense = BinaryCausalModel::new(n_units, tpm, connectivity).unwrap();
+                let sparse = SparseBinaryCausalModel::from_dense(&dense).unwrap();
+                let config = crate::Iit4SystemPhiSearchConfig {
+                    decimal_precision: 6,
+                    max_partition_combinations: 2_000,
+                    max_state_pair_evaluations: 1 << (2 * n_units),
+                    max_partition_score_evaluations: 2_000_000,
+                    include_total_cut: false,
+                };
+
+                for observation_pattern in 0..3usize {
+                    let current_state = (0..n_units)
+                        .map(|unit| {
+                            (unit * 3 + seed + observation_pattern * 2) % 5 < 2
+                        })
+                        .collect::<Vec<_>>();
+                    let dense_result = dense
+                        .analyze_iit4_2023_system_phi_s(&candidate, &current_state, config)
+                        .unwrap_or_else(|error| {
+                            panic!(
+                                "dense analysis failed: n={n_units}, seed={seed}, pattern={observation_pattern}: {error}"
+                            )
+                        });
+                    let sparse_result = sparse
+                        .analyze_iit4_2023_system_phi_s(
+                            &candidate,
+                            &current_state,
+                            config,
+                            1 << 16,
+                        )
+                        .unwrap_or_else(|error| {
+                            panic!(
+                                "sparse analysis failed: n={n_units}, seed={seed}, pattern={observation_pattern}: {error}"
+                            )
+                        });
+
+                    assert!(dense_result.complete);
+                    assert!(sparse_result.complete);
+                    assert_eq!(sparse_result.formalism, dense_result.formalism);
+                    assert_ne!(sparse_result.algorithm_id, dense_result.algorithm_id);
+                    assert_eq!(sparse_result.status, dense_result.status);
+                    assert_eq!(
+                        sparse_result.certified_upper_bound,
+                        dense_result.certified_upper_bound
+                    );
+                    assert_eq!(
+                        sparse_result.partition_score_evaluations,
+                        dense_result.partition_score_evaluations
+                    );
+                    assert_eq!(
+                        sparse_result.selected_state_pair_index,
+                        dense_result.selected_state_pair_index
+                    );
+                    assert_eq!(
+                        sparse_result.tied_state_pair_indices,
+                        dense_result.tied_state_pair_indices
+                    );
+                    match (sparse_result.phi_s, dense_result.phi_s) {
+                        (Some(sparse_phi), Some(dense_phi)) => {
+                            assert!(
+                                (sparse_phi - dense_phi).abs() <= 1e-12,
+                                "phi_s mismatch n={n_units} seed={seed} pattern={observation_pattern}"
+                            );
+                        }
+                        (None, None) => {}
+                        other => panic!(
+                            "phi_s presence mismatch n={n_units} seed={seed} pattern={observation_pattern}: {other:?}"
+                        ),
+                    }
+                    assert_eq!(
+                        sparse_result.state_pair_results.len(),
+                        dense_result.state_pair_results.len()
+                    );
+                    for (sparse_pair, dense_pair) in sparse_result
+                        .state_pair_results
+                        .iter()
+                        .zip(&dense_result.state_pair_results)
+                    {
+                        assert_eq!(sparse_pair.system_state, dense_pair.system_state);
+                        assert_eq!(
+                            sparse_pair.winning_partition.cut_matrix(),
+                            dense_pair.winning_partition.cut_matrix()
+                        );
+                        assert_eq!(
+                            sparse_pair.score.severed_connections,
+                            dense_pair.score.severed_connections
+                        );
+                        for (field, sparse_value, dense_value) in [
+                            ("phi", sparse_pair.score.phi, dense_pair.score.phi),
+                            ("signed_phi", sparse_pair.score.signed_phi, dense_pair.score.signed_phi),
+                            ("normalized_phi", sparse_pair.score.normalized_phi, dense_pair.score.normalized_phi),
+                            ("signed_normalized_phi", sparse_pair.score.signed_normalized_phi, dense_pair.score.signed_normalized_phi),
+                            ("cause_phi", sparse_pair.score.cause.signed_phi, dense_pair.score.cause.signed_phi),
+                            ("effect_phi", sparse_pair.score.effect.signed_phi, dense_pair.score.effect.signed_phi),
+                            ("cause_selectivity", sparse_pair.score.cause.selectivity, dense_pair.score.cause.selectivity),
+                            ("cause_forward", sparse_pair.score.cause.forward_probability, dense_pair.score.cause.forward_probability),
+                            ("cause_partitioned_forward", sparse_pair.score.cause.partitioned_forward_probability, dense_pair.score.cause.partitioned_forward_probability),
+                            ("effect_selectivity", sparse_pair.score.effect.selectivity, dense_pair.score.effect.selectivity),
+                            ("effect_forward", sparse_pair.score.effect.forward_probability, dense_pair.score.effect.forward_probability),
+                            ("effect_partitioned_forward", sparse_pair.score.effect.partitioned_forward_probability, dense_pair.score.effect.partitioned_forward_probability),
+                        ] {
+                            assert!(
+                                (sparse_value - dense_value).abs() <= 1e-12,
+                                "{field} mismatch n={n_units} seed={seed} pattern={observation_pattern}: sparse={sparse_value:.17}, dense={dense_value:.17}"
+                            );
+                        }
+                    }
+                    assert!(sparse_result.receipt_sha256().is_ok());
+                    assert!(dense_result.receipt_sha256().is_ok());
+                }
+            }
+        }
+    }
+
+    #[test]
     fn sparse_effect_repertoire_matches_dense_eq3_for_embedded_subsystems() {
         let dense = dense_ring_model(5);
         let sparse = SparseBinaryCausalModel::from_dense(&dense).unwrap();
