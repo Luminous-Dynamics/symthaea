@@ -25,7 +25,7 @@ The existing eight prediction fields remain unchanged. The optional complete dom
 - `shift_axis`
 - `is_ood_domain`
 
-If novelty detection is included, provide `ood_score` for every row. Domain metadata and novelty scores must each be complete across the input; partial annotation fails closed. Every domain-tagged run must also provide `--domain-split-manifest-sha256`, recorded in the report, which identifies the frozen manifest that assigned held-out status.
+If novelty detection is included, provide `ood_score` for every row. Domain metadata and novelty scores must each be complete across the input; partial annotation fails closed. Every domain-tagged run must provide `--domain-split-manifest <path>`. The scorer hashes the file bytes itself and records the SHA-256. The manifest binds the exact dataset revision, shift axis, seen/held-out domain lists, sample IDs, dependency-cluster IDs and split roles. It must contain every row in the requested evaluation partition, not a curated subset.
 
 A cluster_id must not span two domain_id values in one run; use globally unique/domain-qualified dependency identifiers. This prevents the OOD bootstrap from treating distinct domain blocks as one cluster.
 
@@ -72,19 +72,19 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
   --bin proofreading-score -- \
   --input docs/neuroscience/examples/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT.example.jsonl \
   --mapping-reference docs/neuroscience/CONNECTOMEBENCH2_V2_INTAKE_MANIFEST.schema.json \
-  --dataset-revision-commit-sha <exact-40-character-v2-commit> \
+  --dataset-revision-commit-sha 1111111111111111111111111111111111111111 \
   --policy-id domain-shift-fixture-v1 \
   --prediction-profile-sha256 <exact-64-character-profile-digest> \
   --evaluation-partition development \
   --review-time-basis synthetic-proxy \
   --require-domain-shift-audit \
-  --domain-split-manifest-sha256 <exact-64-character-domain-split-manifest-digest> \
+  --domain-split-manifest docs/neuroscience/examples/CONNECTOME_PROOFREADING_DOMAIN_SPLIT.example.json \
   --ood-detector-id mahalanobis-diagonal-v1 \
   --ood-detector-profile-sha256 <exact-64-character-ood-detector-digest> \
   --output domain-shift-development-report.json
 ```
 
-The placeholders above must be replaced with the exact pinned dataset and profile identities before a real run. The checked-in fixture uses synthetic IDs and is only a regression input.
+The checked-in domain-split manifest and prediction file are synthetic regression fixtures. The all-ones dataset revision SHA is a synthetic identity, not a claim about the real ConnectomeBench2 commit. For a real run, pin the actual V2 commit in both the CLI and manifest, enumerate the complete split lineage, and never reuse the synthetic IDs.
 
 For a later confirmatory/lockbox report, use the same frozen split-manifest digest and detector ID/profile digest, supply `--ood-score-threshold <development-selected-value>` plus `--ood-threshold-selection-partition development`, and change `--evaluation-partition` to `confirmatory` or `lockbox`. The scorer rejects threshold application to the development partition itself. Never pass confirmatory or lockbox labels back into threshold selection.
 
