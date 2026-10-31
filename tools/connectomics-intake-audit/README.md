@@ -93,7 +93,7 @@ The synthetic fixture `docs/neuroscience/examples/CONNECTOMEBENCH2_V2_METADATA_L
 
 ### Content-addressed modality cohorts
 
-The optional `--cohort-manifest-output` writes a deterministic sample-ID manifest **only when the metadata audit status is PASS**. The schema is `docs/neuroscience/CONNECTOME_MODALITY_COHORT_MANIFEST.schema.json`. It contains:
+The optional `--cohort-manifest-output` writes a deterministic sample-ID manifest **only when the metadata audit status is PASS**. The schema is `docs/neuroscience/CONNECTOME_MODALITY_COHORT_MANIFEST.schema.json`. A synthetic example (with placeholder source revision/digests) is at `docs/neuroscience/examples/CONNECTOME_MODALITY_COHORT_MANIFEST.example.json`; it is not a biological dataset audit output. It contains:
 - `geometry_all`;
 - `em_legal_any_view` (at least one of `em_xy`, `em_xz`, `em_yz`);
 - `em_legal_full_triplet` (all three legal EM views);
