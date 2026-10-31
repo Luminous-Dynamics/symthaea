@@ -193,6 +193,9 @@ impl TrustedWitness {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct WitnessQuorumPolicy {
     pub total_witnesses: u16,
+    /// Maximum Byzantine witnesses tolerated by the configured quorum.
+    pub max_byzantine_witnesses: u16,
+    /// Required matching attestations; must be at least 2f+1.
     pub threshold: u16,
 }
 
