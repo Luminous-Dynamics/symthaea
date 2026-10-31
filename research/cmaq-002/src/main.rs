@@ -261,7 +261,9 @@ fn actual_decision_value(world: &Mechanism, worlds: &[Mechanism], posterior: &[u
         let action = candidate_action(worlds, posterior, context);
         let (utility, unsafe_action) = actual_context_utility(world, context, action);
         total += utility;
-        unsafe_actions += usize::from(unsafe_action);
+        if unsafe_action {
+            unsafe_actions += 1;
+        }
     }
     (total / CONTEXTS as f64, unsafe_actions)
 }
