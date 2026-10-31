@@ -283,6 +283,8 @@ class RandomizedCommonDepthCRC:
             return {"valid":False,"reason":"unsupported certificate schema"}
         if certificate.get("certificate_type")!="RandomizedFiniteExchangeabilityCRC":
             return {"valid":False,"reason":"certificate type mismatch"}
+        if certificate.get("proof_lane")!="ExactFiniteExchangeabilityPlusLPOptimality":
+            return {"valid":False,"reason":"proof lane mismatch"}
         if certificate.get("scope",{}).get("n_calibration")!=self.n:
             return {"valid":False,"reason":"calibration scope mismatch"}
         if certificate.get("risk_target",{}).get("level")!=self.alpha:
@@ -305,17 +307,26 @@ class RandomizedCommonDepthCRC:
             if certificate.get(field)!=expected.get(field):
                 return {"valid":False,"reason":f"certificate field mismatch: {field}"}
         optimization=certificate.get("optimization_receipt",{})
-        if optimization.get("status")!="pass":
+        if not isinstance(optimization,dict) or optimization.get("status")!="pass":
             return {"valid":False,"reason":"optimization receipt is not marked pass"}
         dual=self.verify_optimality_witness(
             optimization.get("dual_witness",{}),probabilities,tolerance
         )
+        if not dual.get("valid",False):
+            return {"valid":False,"reason":"LP dual witness failed KKT checks",
+                    "optimality":dual}
         reported_kkt=optimization.get("kkt_summary",{})
+        if not isinstance(reported_kkt,dict):
+            return {"valid":False,"reason":"KKT summary is malformed"}
         for name,value in dual.items():
             if name=="valid":continue
-            if name not in reported_kkt or not np.isclose(
-                float(reported_kkt[name]),float(value),atol=tolerance,rtol=0.0
-            ):
+            if name not in reported_kkt:
+                return {"valid":False,"reason":f"KKT summary missing field: {name}"}
+            try:
+                reported_value=float(reported_kkt[name])
+            except (TypeError,ValueError):
+                return {"valid":False,"reason":f"KKT summary malformed field: {name}"}
+            if not np.isclose(reported_value,float(value),atol=tolerance,rtol=0.0):
                 return {"valid":False,"reason":f"KKT summary mismatch: {name}"}
         return {
             "valid":bool(dual.get("valid",False)),
@@ -528,6 +539,10 @@ def run_suite(n: int=50, pool_counts: tuple[int,int,int]=(7300,969,1731),
                 key:lp["expected_metrics"][key]-evaluate_deterministic_controller(engine,recertified)[key]
                 for key in lp["expected_metrics"]},
             "solver":lp["solver"],
+            "certificate":lp["certificate"],
+            "certificate_verification":engine.verify_certificate(
+                lp["certificate"],np.asarray(lp["probabilities"],dtype=np.float64)
+            ),
             "verification":{
                 "valid":lp["verification"]["valid"],
                 "max_budget_excess":lp["verification"]["max_budget_excess"],
