@@ -267,6 +267,40 @@ pub fn compose_prog_suite_with_plan(
     ))
 }
 
+/// Compose an Opera score while retaining the exact two-theme dialogue
+/// plan and score-side interruption verification from the same engine pass.
+pub fn compose_opera_with_plan(
+    intent: &MusicalIntent,
+    spec: &crate::spec::CompositionSpec,
+) -> Option<crate::opera::OperaRealization> {
+    if spec.form_kind(intent.seed) != crate::spec::FormKind::Opera {
+        return None;
+    }
+    let key = spec
+        .mode
+        .and_then(|mode| Key::modal(intent.tonic, mode))
+        .unwrap_or_else(|| {
+            if intent.valence >= 0.0 {
+                Key::major(intent.tonic)
+            } else {
+                Key::minor(intent.tonic)
+            }
+        });
+    let tempo = spec.tempo(intent.arousal)
+        * match spec.attitude {
+            Some(crate::spec::Attitude::Joy) => 1.08,
+            Some(crate::spec::Attitude::Grief) => 0.85,
+            _ => 1.0,
+        };
+    Some(crate::opera::realize_opera_with_plan(
+        key,
+        tempo,
+        spec.meter as f64,
+        intent.seed,
+        intent,
+    ))
+}
+
 /// Compose a Renaissance score while retaining its exact equal-voice,
 /// entry-order and cadence evidence from the same realization pass.
 pub fn compose_renaissance_with_plan(
@@ -552,7 +586,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
     // consume the spec-derived `motif` at all — see `crate::opera`.
     if spec.form_kind(intent.seed) == crate::spec::FormKind::Opera {
         return (
-            crate::opera::realize_opera(key, tempo, meter_beats, intent.seed, intent),
+            compose_opera_with_plan(intent, spec)
+                .expect("Opera form must expose its dramatic plan and verification")
+                .score,
             None,
         );
     }
