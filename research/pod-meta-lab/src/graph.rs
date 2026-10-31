@@ -63,6 +63,8 @@ pub struct ProofAlternative {
     pub conclusion: Polarity,
     /// Requirements are ANDed. Alternatives on one claim node are ORed.
     pub requirements: Vec<ProofRequirement>,
+    /// Minimum distinct groups among this alternative's direct Evidence requirements.
+    /// Each dependent Claim is independently checked against its own alternatives.
     pub min_independent_groups: usize,
 }
 
@@ -276,6 +278,7 @@ fn resolve_claim(
 
     for alt in &node.alternatives {
         let mut witness = Witness::default();
+        let mut direct_independence_groups = BTreeSet::new();
         let mut valid = true;
         for req in &alt.requirements {
             match req {
@@ -287,6 +290,7 @@ fn resolve_claim(
                     }
                     witness.evidence_ids.insert(e.id.clone());
                     witness.independence_groups.insert(e.independence_group_id.clone());
+                    direct_independence_groups.insert(e.independence_group_id.clone());
                 }
                 ProofRequirement::Claim { claim_id: child_id, polarity } => {
                     let child = resolve_claim(case, labels, child_id, stack, memo);
@@ -300,7 +304,7 @@ fn resolve_claim(
             }
         }
         if !valid { continue; }
-        if witness.independence_groups.len() < alt.min_independent_groups {
+        if direct_independence_groups.len() < alt.min_independent_groups {
             result.correlation_rejected.insert(alt.id.clone());
             continue;
         }
@@ -434,7 +438,7 @@ pub fn generate_poar_graph_suite(seed: u64, split: DatasetSplit) -> GraphSuite {
         claim("root", vec![alt("and-path", Polarity::Supports, vec![
             ProofRequirement::Claim { claim_id: "leaf".into(), polarity: Polarity::Supports },
             ProofRequirement::Evidence("e-root".into()),
-        ], 2)]),
+        ], 1)]),
     ], vec![
         ev(split,"and","e-leaf","leaf",Polarity::Supports,"g-leaf",(t,None),(t,None),"scope-a","authority-a"),
         ev(split,"and","e-root","root",Polarity::Supports,"g-root",(t,None),(t,None),"scope-a","authority-a"),
