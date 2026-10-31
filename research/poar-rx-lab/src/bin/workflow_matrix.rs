@@ -2,7 +2,7 @@ use poar_rx_lab::workflow::{run_workflow, WorkflowFault, WorkflowPolicy};
 
 fn main() {
     println!(
-        "policy\tfault\tcompensation_authorized\tterminal\tfirst_target\tsecond_target\tfirst_agent_writes\tsecond_agent_writes\tcompensation_writes\texternal_writes\treadback_calls\tunauthorized_effects\tlost_concurrent_updates\treported_complete\tgoal_state_holds\tcompletion_verified\tabort_verified\tduplicate_effect\tfalse_completion\tcompensation_failed"
+        "policy\tfault\tcompensation_authorized\tterminal\tfirst_target\tsecond_target\tfirst_agent_writes\tsecond_agent_writes\tcompensation_writes\texternal_writes\treadback_calls\tunauthorized_effects\tlost_concurrent_updates\treported_complete\tgoal_state_holds\tcompletion_verified\tcompensation_verified\tduplicate_effect\tfalse_completion\tcompensation_failed"
     );
 
     for fault in WorkflowFault::ALL {
@@ -27,7 +27,7 @@ fn main() {
                     result.reported_complete,
                     result.goal_state_holds,
                     result.completion_verified,
-                    result.abort_verified,
+                    result.compensation_verified,
                     result.duplicate_effect,
                     result.false_completion,
                     result.compensation_failed,
