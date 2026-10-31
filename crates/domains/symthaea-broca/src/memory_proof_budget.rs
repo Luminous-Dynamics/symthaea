@@ -1759,6 +1759,72 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn optimizer_prefers_user_authored_evidence_over_cheaper_assistant_only_match() {
+        let mut assistant = candidate("assistant", "family-assistant", 1);
+        assistant.source_speaker = Some(EvidenceSpeakerRole::Assistant);
+        let mut user = candidate("user", "family-user", 5);
+        user.source_speaker = Some(EvidenceSpeakerRole::User);
+        let mut required = obligation(
+            "claim-user-source",
+            vec![
+                justification("cheap-assistant-only", &["assistant"]),
+                justification("user-authored-proof", &["user"]),
+            ],
+        );
+        required.minimum_user_authored_evidence = 1;
+
+        let req = request(vec![assistant, user], vec![required], 32);
+        let result = solve_proof_budget(req.clone()).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        assert_eq!(result.total_token_cost, 5);
+        assert_eq!(result.selected_proofs[0].justification_id, "user-authored-proof");
+        assert_eq!(result.evidence[0].source_speaker, Some(EvidenceSpeakerRole::User));
+        assert!(result.justification_rejections.iter().any(|rejection| {
+            rejection.justification_id == "cheap-assistant-only"
+                && rejection.reason == JustificationRejectionReason::UserEvidenceCountInsufficient
+        }));
+        verify_proof_budget_result(&req, &result).unwrap();
+    }
+
+    #[test]
+    fn assistant_and_unknown_speaker_evidence_never_satisfy_user_requirement() {
+        for role in [Some(EvidenceSpeakerRole::Assistant), None] {
+            let mut item = candidate("only", "family-only", 1);
+            item.source_speaker = role;
+            let mut required = obligation(
+                "claim-user-source",
+                vec![justification("non-user-proof", &["only"])],
+            );
+            required.minimum_user_authored_evidence = 1;
+            let result = solve_proof_budget(
+                request(vec![item], vec![required], 16)
+            ).unwrap();
+
+            assert_eq!(result.status, ProofBudgetStatus::NoEligibleProof);
+            assert!(result.justification_rejections.iter().any(|rejection| {
+                rejection.reason == JustificationRejectionReason::UserEvidenceCountInsufficient
+            }));
+        }
+    }
+
+    #[test]
+    fn proof_packet_rejects_speaker_role_tampering() {
+        let mut user = candidate("user", "family-user", 2);
+        user.source_speaker = Some(EvidenceSpeakerRole::User);
+        let mut required = obligation(
+            "claim-user-source",
+            vec![justification("user-proof", &["user"])],
+        );
+        required.minimum_user_authored_evidence = 1;
+        let req = request(vec![user], vec![required], 16);
+        let mut result = solve_proof_budget(req.clone()).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        result.evidence[0].source_speaker = Some(EvidenceSpeakerRole::Assistant);
+        assert!(verify_proof_budget_result(&req, &result).is_err());
+    }
+
     #[test]
     fn out_of_scope_candidate_is_not_eligible() {
         let mut item = candidate("A", "family-A", 1);
