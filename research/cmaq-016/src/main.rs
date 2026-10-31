@@ -99,7 +99,8 @@ struct Summary {
     candidate_budget: usize,
     policy: &'static str,
     mean_true_return: f64,
-    mean_predicted_return: f64,
+    mean_reference_model_return: f64,
+    mean_candidate_queries_per_episode: f64,
     mean_optimizer_optimism_gap: f64,
     mean_selected_action_regret: f64,
     selected_pocket_rate: f64,
@@ -250,7 +251,7 @@ fn cem_search(
     let mut best_score = policy_score(scenario, policy, best_action, episode_seed);
 
     for round in 0..rounds {
-        let count = base_per_round + usize::from(round < remainder);
+        let count = base_per_round + (round < remainder) as usize;
         if count == 0 {
             continue;
         }
@@ -302,6 +303,7 @@ fn summarize(
 ) -> Summary {
     let mut actual_sum = 0.0;
     let mut predicted_sum = 0.0;
+    let mut query_sum = 0usize;
     let mut optimism_sum = 0.0;
     let mut regret_sum = 0.0;
     let mut pocket_count = 0usize;
@@ -313,15 +315,14 @@ fn summarize(
         let result = optimize(scenario, policy, candidate_budget, episode_seed);
         actual_sum += result.true_return;
         predicted_sum += result.predicted_return;
+        query_sum += result.candidate_queries;
         optimism_sum += result.optimizer_optimism_gap;
         regret_sum += 1.0 - result.true_return;
         error_sum += result.selected_action_error;
         mse_sum += uniform_grid_prediction_mse(scenario, episode_seed);
 
         if scenario == Scenario::NarrowOptimismPocket
-            && ENSEMBLE_CENTERS
-                .iter()
-                .any(|center| (result.action - center).abs() <= 0.045)
+            && (result.action - POCKET_CENTER).abs() <= 0.045
         {
             pocket_count += 1;
         }
@@ -334,7 +335,8 @@ fn summarize(
         candidate_budget,
         policy: policy.name(),
         mean_true_return: actual_sum / denominator,
-        mean_predicted_return: predicted_sum / denominator,
+        mean_reference_model_return: predicted_sum / denominator,
+        mean_candidate_queries_per_episode: query_sum as f64 / denominator,
         mean_optimizer_optimism_gap: optimism_sum / denominator,
         mean_selected_action_regret: regret_sum / denominator,
         selected_pocket_rate: pocket_count as f64 / denominator,
@@ -372,12 +374,13 @@ fn render_report() -> String {
         }
         write!(
             &mut output,
-            "{{\"scenario\":\"{}\",\"candidate_budget\":{},\"policy\":\"{}\",             \"mean_true_return\":{:.9},\"mean_predicted_return\":{:.9},             \"mean_optimizer_optimism_gap\":{:.9},\"mean_selected_action_regret\":{:.9},             \"selected_pocket_rate\":{:.9},\"mean_selected_action_error\":{:.9},             \"uniform_grid_prediction_mse\":{:.9}}}",
+            "{{\"scenario\":\"{}\",\"candidate_budget\":{},\"policy\":\"{}\",             \"mean_true_return\":{:.9},\"mean_reference_model_return\":{:.9},\"mean_candidate_queries_per_episode\":{:.3},             \"mean_optimizer_optimism_gap\":{:.9},\"mean_selected_action_regret\":{:.9},             \"selected_pocket_rate\":{:.9},\"mean_selected_action_error\":{:.9},             \"uniform_grid_prediction_mse\":{:.9}}}",
             row.scenario,
             row.candidate_budget,
             row.policy,
             row.mean_true_return,
-            row.mean_predicted_return,
+            row.mean_reference_model_return,
+            row.mean_candidate_queries_per_episode,
             row.mean_optimizer_optimism_gap,
             row.mean_selected_action_regret,
             row.selected_pocket_rate,
