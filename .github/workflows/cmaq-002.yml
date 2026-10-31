@@ -41,6 +41,18 @@ jobs:
 
           schema = json.loads(Path("report.schema.json").read_text())
           Draft202012Validator.check_schema(schema)
+          activearena_schema = json.loads(Path("activearena-baseline.schema.json").read_text())
+          Draft202012Validator.check_schema(activearena_schema)
+          activearena_lock = json.loads(Path("activearena-baseline.lock.json").read_text())
+          validate(instance=activearena_lock, schema=activearena_schema)
+          assert activearena_lock["source"]["repository_license"] == "MIT"
+          assert activearena_lock["dataset"]["observed_license"] == "Apache-2.0"
+          assert activearena_lock["dataset"]["immutable_revision"] is None
+          assert activearena_lock["dataset"]["download_status"] == "not_downloaded"
+          assert activearena_lock["assets"]["download_status"] == "not_downloaded"
+          assert activearena_lock["policy_baseline"]["checkpoint_bundle"]["status"] == "unpinned_not_downloaded"
+          assert activearena_lock["benchmark"]["candidate_visible_camera"] == "head"
+          assert activearena_lock["benchmark"]["action_dimension"] == 18
           report = json.loads(Path("/tmp/cmaq-002-report.json").read_text())
           validate(instance=report, schema=schema)
           assert report["schema_version"] == "cmaq-002-evoi-report-v0.3"
