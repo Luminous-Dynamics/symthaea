@@ -35,7 +35,7 @@ These checks prevent a D1 ledger from passing after relabelling a model-predicti
 
 ## Matching rules
 
-The v0.2 defaults are fixed in the auditor and repeated in the emitted report:
+The v0.2 defaults are fixed in the auditor and repeated in the emitted report. For every resource dimension, the auditor first computes a relative difference for each *paired episode* (same task history and seed), then takes p50/p95 of those per-episode differences. It does not compare only independent arm-level marginals, which could hide crossed cost profiles where the arms have equal marginal distributions but different per-seed costs:
 
 - Compute-work p50 and p95: relative difference no greater than 5%.
 - End-to-end latency p50 and p95: relative difference no greater than 5%.
