@@ -27,3 +27,7 @@ path = "src/bin/poar_graph_export.rs"
 [[bin]]
 name = "poar-graph-eval"
 path = "src/bin/poar_artifact_eval.rs"
+
+[[bin]]
+name = "poar-prediction-demo"
+path = "src/bin/poar_prediction_demo.rs"
