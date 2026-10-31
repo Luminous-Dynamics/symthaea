@@ -299,6 +299,7 @@ fn validate_design(
     let mut cluster_ids = BTreeSet::new();
     let mut item_ids = BTreeSet::new();
     let mut source_digests = BTreeSet::new();
+    let mut stratum_exposure_token_counts = BTreeMap::<String, u64>::new();
     let mut exposure_variant_digests = BTreeSet::new();
     let mut placebo_record_digests = BTreeSet::new();
     for cluster in &design.clusters {
@@ -339,6 +340,16 @@ fn validate_design(
                 "cluster {} exposure and placebo token counts must be equal and positive",
                 cluster.cluster_id
             ));
+        }
+        let stratum = stratum_id(&cluster.task_family, size_bucket(cluster.item_ids.len()));
+        if let Some(existing) = stratum_exposure_token_counts.get(&stratum) {
+            if *existing != cluster.exposure_token_count {
+                return Err(format!(
+                    "stratum {stratum} must use an equal exposure token count for seed-invariant budget conservation"
+                ));
+            }
+        } else {
+            stratum_exposure_token_counts.insert(stratum, cluster.exposure_token_count);
         }
         if !source_digests.insert(cluster.source_family_sha256.as_str()) {
             // Multiple clusters may originate from the same source family. This
@@ -875,6 +886,16 @@ mod tests {
         assert!(randomize_intervention(&design, &seed())
             .unwrap_err()
             .contains("duplicated within/across"));
+    }
+
+    #[test]
+    fn unequal_token_counts_within_stratum_fail_before_randomization() {
+        let mut invalid_design = design();
+        invalid_design.clusters[1].exposure_token_count += 1;
+        invalid_design.clusters[1].matched_placebo_token_count += 1;
+        assert!(randomize_intervention(&invalid_design, &seed())
+            .unwrap_err()
+            .contains("equal exposure token count"));
     }
 
     #[test]
