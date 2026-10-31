@@ -615,7 +615,9 @@ fn parse_pmu_qualification(
     let semantics = receipt_value.get("measurement_semantics")
         .ok_or("PMU receipt measurement_semantics missing")?;
     if semantics.get("raw_counts_are_preserved").and_then(Value::as_bool) != Some(true)
-        || semantics.get("multiplex_scaled_values_confirmatory").and_then(Value::as_bool) != Some(false) {
+        || semantics.get("multiplex_scaled_values_are_estimates").and_then(Value::as_bool) != Some(true)
+        || semantics.get("multiplex_scaled_values_confirmatory").and_then(Value::as_bool) != Some(false)
+        || semantics.get("scaling_does_not_correct_systematic_interference").and_then(Value::as_bool) != Some(true) {
         return Err("PMU receipt must preserve raw counts and exclude multiplex-scaled estimates from confirmation".to_owned());
     }
 
@@ -1145,6 +1147,7 @@ fn audit_values_with_pmu(
                 "source_trace_sha256":episode.source_trace_sha256,
                 "program_binary_sha256":episode.program_binary_sha256,
                 "device_config_id":episode.device_config_id,
+                "pmu_acquisition_condition_id":episode.pmu_acquisition_condition_id,
                 "source_window_count":episode.windows.len(),
                 "aggregated_episode_score":null,
                 "context_id":assigned_context,
@@ -1189,6 +1192,7 @@ fn audit_values_with_pmu(
             "source_trace_sha256":episode.source_trace_sha256,
             "program_binary_sha256":episode.program_binary_sha256,
             "device_config_id":episode.device_config_id,
+            "pmu_acquisition_condition_id":episode.pmu_acquisition_condition_id,
             "source_window_count":episode.windows.len(),
             "aggregated_episode_score":episode_score,
             "aggregation_policy":"max_anomaly_score",
@@ -1343,6 +1347,9 @@ fn parse_args() -> Result<Args, String> {
     let mut plan = None;
     let mut episodes = None;
     let mut context_receipt = None;
+    let mut pmu_plan = None;
+    let mut pmu_observations = None;
+    let mut pmu_receipt = None;
     let mut receipt = None;
     let mut args = env::args().skip(1);
     while let Some(flag) = args.next() {
@@ -1350,6 +1357,9 @@ fn parse_args() -> Result<Args, String> {
             "--plan" => &mut plan,
             "--episodes" => &mut episodes,
             "--context-receipt" => &mut context_receipt,
+            "--pmu-plan" => &mut pmu_plan,
+            "--pmu-observations" => &mut pmu_observations,
+            "--pmu-receipt" => &mut pmu_receipt,
             "--receipt" => &mut receipt,
             _ => return Err(format!("unknown argument {flag}")),
         };
@@ -1362,6 +1372,9 @@ fn parse_args() -> Result<Args, String> {
         plan:plan.ok_or("missing required argument --plan")?,
         episodes:episodes.ok_or("missing required argument --episodes")?,
         context_receipt:context_receipt.ok_or("missing required argument --context-receipt")?,
+        pmu_plan:pmu_plan.ok_or("missing required argument --pmu-plan")?,
+        pmu_observations:pmu_observations.ok_or("missing required argument --pmu-observations")?,
+        pmu_receipt:pmu_receipt.ok_or("missing required argument --pmu-receipt")?,
         receipt:receipt.ok_or("missing required argument --receipt")?,
     })
 }
@@ -1388,12 +1401,32 @@ fn run() -> Result<(), String> {
     let (plan_bytes, plan_value) = read_input(&args.plan, "plan")?;
     let (episode_bytes, episode_value) = read_input(&args.episodes, "episode stream")?;
     let (context_bytes, context_value) = read_input(&args.context_receipt, "context assignment receipt")?;
+    let (pmu_plan_bytes, pmu_plan_value) = read_input(&args.pmu_plan, "PMU metrology plan")?;
+    let (pmu_observation_bytes, pmu_observations_value) =
+        read_input(&args.pmu_observations, "PMU metrology observations")?;
+    let (pmu_receipt_bytes, pmu_receipt_value) =
+        read_input(&args.pmu_receipt, "PMU metrology receipt")?;
     validate_receipt_location(&args.receipt, &[
-        args.plan.as_path(), args.episodes.as_path(), args.context_receipt.as_path()
+        args.plan.as_path(),
+        args.episodes.as_path(),
+        args.context_receipt.as_path(),
+        args.pmu_plan.as_path(),
+        args.pmu_observations.as_path(),
+        args.pmu_receipt.as_path(),
     ])?;
-    let receipt = audit_values(
-        &plan_value, &episode_value, &context_value,
-        &plan_bytes, &episode_bytes, &context_bytes
+    let receipt = audit_values_with_pmu(
+        &plan_value,
+        &episode_value,
+        &context_value,
+        &pmu_plan_value,
+        &pmu_observations_value,
+        &pmu_receipt_value,
+        &plan_bytes,
+        &episode_bytes,
+        &context_bytes,
+        &pmu_plan_bytes,
+        &pmu_observation_bytes,
+        &pmu_receipt_bytes,
     )?;
     let encoded = serde_json::to_vec_pretty(&receipt).map_err(|e| format!("cannot encode receipt: {e}"))?;
     let mut file = OpenOptions::new().write(true).create_new(true).open(&args.receipt)
@@ -1431,6 +1464,71 @@ mod tests {
         let mut bytes = serde_json::to_vec_pretty(value).unwrap();
         bytes.push(b'\n');
         bytes
+    }
+
+    fn pmu_fixture() -> (Value, Value, Value, Vec<u8>, Vec<u8>, Vec<u8>) {
+        let plan_bytes = include_bytes!("../tests/fixtures/hardsec/pmu-metrology-v1/plan.json").to_vec();
+        let observations_bytes = include_bytes!("../tests/fixtures/hardsec/pmu-metrology-v1/observations.json").to_vec();
+        let plan: Value = serde_json::from_slice(&plan_bytes).unwrap();
+        let observations: Value = serde_json::from_slice(&observations_bytes).unwrap();
+        let event_ids = unique_string_set(
+            plan.get("acquisition_conditions").unwrap(),
+            "co_scheduled_event_ids",
+            "pmu_plan.acquisition_conditions",
+        ).unwrap();
+        let events = plan["events"].as_array().unwrap().iter().map(|event| {
+            let event_id = event["event_id"].as_str().unwrap();
+            json!({
+                "event_id":event_id,
+                "co_scheduled":{"status":if event_ids.contains(event_id) {
+                    "confirmatory_eligible_under_declared_thresholds"
+                } else {
+                    "not_in_co_scheduled_group_not_tested"
+                }},
+                "overcommitted":{"confirmatory_eligible":false}
+            })
+        }).collect::<Vec<_>>();
+        let receipt = json!({
+            "schema_version":"hardsec-pmu-metrology-receipt-v1",
+            "result":"qualified_for_named_acquisition_conditions",
+            "claim_scope":"measurement_configuration_and_declared_trial_record_qualification_only",
+            "protocol_id":plan["protocol_id"],
+            "evidence_domain":plan["evidence_domain"],
+            "platform_id":plan["platform"]["platform_id"],
+            "workload_id":plan["workload"]["workload_id"],
+            "inputs":{
+                "plan_sha256":sha256(&plan_bytes),
+                "observations_sha256":sha256(&observations_bytes)
+            },
+            "support":{
+                "matched_block_count":8,
+                "trial_count":32,
+                "trials_per_block":4,
+                "independence_status":"not_established",
+                "effective_sample_size_estimate":null
+            },
+            "event_qualification":events,
+            "observer_effect":{"overall_status":"within_declared_thresholds"},
+            "measurement_semantics":{
+                "raw_counts_are_preserved":true,
+                "multiplex_scaled_values_are_estimates":true,
+                "multiplex_scaled_values_confirmatory":false,
+                "scaling_does_not_correct_systematic_interference":true
+            }
+        });
+        let receipt_bytes = encode(&receipt);
+        (plan, observations, receipt, plan_bytes, observations_bytes, receipt_bytes)
+    }
+
+    fn audit_values(
+        p: &Value, e: &Value, c: &Value,
+        pb: &[u8], eb: &[u8], cb: &[u8],
+    ) -> Result<Value, String> {
+        let (pp, po, pr, ppb, pob, prb) = pmu_fixture();
+        audit_values_with_pmu(
+            p, e, c, &pp, &po, &pr,
+            pb, eb, cb, &ppb, &pob, &prb
+        )
     }
 
     fn audit(p: &Value, e: &Value, c: &Value) -> Result<Value, String> {
