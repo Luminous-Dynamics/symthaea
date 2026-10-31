@@ -147,11 +147,33 @@ fn run() -> Result<(), String> {
             if !evaluation.verify_digest() {
                 return Err("newly generated evaluation receipt failed digest verification".into());
             }
+            let observed_symbolic_genes = evaluation.gene_effect_audits
+                .iter()
+                .filter(|audit| audit.layer == symthaea_muse::style_genome::GeneEffectLayer::Symbolic
+                    && audit.status == symthaea_muse::style_genome::GeneEffectStatus::Observed)
+                .count();
+            let renderer_pending_genes = evaluation.gene_effect_audits
+                .iter()
+                .filter(|audit| audit.status == symthaea_muse::style_genome::GeneEffectStatus::RendererPending)
+                .count();
+            let no_effect_genes = evaluation.gene_effect_audits
+                .iter()
+                .filter(|audit| audit.status == symthaea_muse::style_genome::GeneEffectStatus::NoObservedEffect)
+                .count();
+            let unavailable_counterfactuals = evaluation.gene_effect_audits
+                .iter()
+                .filter(|audit| audit.status == symthaea_muse::style_genome::GeneEffectStatus::CounterfactualUnavailable)
+                .count();
             eprintln!(
-                "genome={} eligible={} seeds={} objective_axes=6 evaluation_sha256={}",
+                "genome={} eligible={} seeds={} objective_axes=6 gene_audits={} symbolic_observed={} no_effect={} counterfactual_unavailable={} renderer_pending={} evaluation_sha256={}",
                 evaluation.genome.genome_id,
                 evaluation.eligible_for_archive,
                 evaluation.seed_count,
+                evaluation.gene_effect_audits.len(),
+                observed_symbolic_genes,
+                no_effect_genes,
+                unavailable_counterfactuals,
+                renderer_pending_genes,
                 evaluation.evaluation_sha256,
             );
             if !evaluation.eligible_for_archive {
@@ -169,7 +191,7 @@ fn run() -> Result<(), String> {
             let evaluation: GenomeEvaluation = read_json(&input)?;
             if !evaluation.verify_digest() {
                 return Err(
-                    "evaluation schema, genome identity, config commitment, score trials or report digest failed".into()
+                    "evaluation schema, genome identity, config commitment, score trials, native plans, gene-effect counterfactuals or report digest failed".into()
                 );
             }
             match (&evaluation.reference_population_sha256, references.as_deref()) {
