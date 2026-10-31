@@ -302,7 +302,10 @@ fn parse_stream(value: &Value, plan: &Plan) -> Result<Vec<StreamRecord>, String>
 // Conservative empirical upper-tail rank. Ties are counted in the tail:
 // p = (1 + #{reference score >= observation score}) / (n + 1).
 fn empirical_upper_tail_p_value(reference_scores: &[f64], score: f64) -> f64 {
-    let tail_count = reference_scores.iter().filter(|reference| **reference >= score).count();
+    // parse_plan sorts each immutable reference once, so each observation
+    // needs O(log n) binary search rather than a full reference scan.
+    let first_tail_index = reference_scores.partition_point(|reference| *reference < score);
+    let tail_count = reference_scores.len() - first_tail_index;
     (1.0 + tail_count as f64) / (reference_scores.len() as f64 + 1.0)
 }
 
