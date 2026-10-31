@@ -334,7 +334,9 @@ fn validate_snapshot(raw: &[u8]) -> Result<SourceSnapshot> {
     let actual_git_blob_sha1 = git_blob_sha1(raw);
     if actual_git_blob_sha1 != SOURCE_GIT_BLOB_SHA1 {
         bail!(
-            "SorryDB Git blob SHA-1 mismatch: expected {SOURCE_GIT_BLOB_SHA1}, received {actual_git_blob_sha1}"
+            "SorryDB Git blob SHA-1 mismatch: expected {}, received {}",
+            SOURCE_GIT_BLOB_SHA1,
+            actual_git_blob_sha1
         );
     }
 
