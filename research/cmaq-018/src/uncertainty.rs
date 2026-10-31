@@ -681,6 +681,10 @@ mod tests {
         );
         let mut bank = joint_bank_fixture();
         let digest = bank.joint_draw_bank_sha256.clone();
+        assert_eq!(
+            digest,
+            "47a1f2b937faef8235704f6907523967c946cad8184bf7c5f643916bd3441979"
+        );
         assert_eq!(compute_joint_draw_bank_sha256(&bank).unwrap(), digest);
         bank.outcome_samples[0][0] += 0.25;
         assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::JointDrawBankDigestMismatch));
