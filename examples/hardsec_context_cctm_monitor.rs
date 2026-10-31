@@ -648,9 +648,9 @@ mod tests {
         let (p, s, pb, sb) = fixture();
         let receipt = audit_values(&p, &s, &pb, &sb).unwrap();
         assert_eq!(receipt["result"], "alarm_threshold_crossed");
-        assert_eq!(receipt["sequential_monitor"]["overall_first_alarm_sequence_index"], 15);
+        assert_eq!(receipt["sequential_monitor"]["overall_first_alarm_sequence_index"], 16);
         assert_eq!(receipt["sequential_monitor"]["overall_first_alarm_context_id"], "compute");
-        assert_eq!(receipt["sequential_monitor"]["valid_observation_count"], 15);
+        assert_eq!(receipt["sequential_monitor"]["valid_observation_count"], 16);
         assert_eq!(receipt["sequential_monitor"]["abstention_count"], 3);
         assert_eq!(receipt["sequential_monitor"]["post_alarm_reset_count"], 0);
         assert_eq!(receipt["statistical_guarantees"]["null_stream_iid_assumption_status"], "assumption_not_verified");
@@ -672,8 +672,8 @@ mod tests {
     fn alpha_and_delta_are_bonferroni_allocated_over_contexts() {
         let (p, s, pb, sb) = fixture();
         let receipt = audit_values(&p, &s, &pb, &sb).unwrap();
-        assert_eq!(receipt["reference_policy"]["contexts"][0]["alpha_allocation"], 0.025);
-        assert_eq!(receipt["reference_policy"]["contexts"][1]["alpha_allocation"], 0.025);
+        assert_eq!(receipt["reference_policy"]["contexts"][0]["alpha_allocation"], 0.02);
+        assert_eq!(receipt["reference_policy"]["contexts"][1]["alpha_allocation"], 0.02);
         assert_eq!(receipt["reference_policy"]["contexts"][0]["delta_allocation"], 0.005);
         assert_eq!(receipt["reference_policy"]["contexts"][1]["delta_allocation"], 0.005);
     }
@@ -784,7 +784,7 @@ mod tests {
         // assumption must not be silently dropped.
         let n = 600.0_f64;
         let delta = 0.01_f64;
-        let alpha = 0.05_f64;
+        let alpha = 0.04_f64;
         let k = 1e-6_f64;
         let epsilon = ((2.0 / delta).ln() / (2.0 * n)).sqrt();
         let scale = 1.0 / (0.5 + (1.0 + k * k).sqrt() * epsilon);
