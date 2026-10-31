@@ -11,6 +11,7 @@ Can a fixed training-state and memory budget be allocated across spatial learnin
 The candidate mechanisms are complementary in principle:
 - **STDL:** spatial partitioning with local auxiliary subnetworks, selecting downstream context under an auxiliary-memory constraint, and temporal detachment;
 - **BrainTrace:** online eligibility traces for long-horizon credit assignment. The paper notes that pp-prop approximation quality depends on firing statistics and network depth, so a single tuned point is not a fair baseline;
+- **PMSN:** configurable interacting multi-compartment state and parallel temporal training; a direct multi-timescale neuron/training comparator, not an online-credit algorithm;
 - **Symthaea HDC-LTC:** compressed relational summaries and fast/slow state for temporal context and cross-boundary memory.
 
 The experiment must establish whether these mechanisms are complementary, redundant, or harmful when combined. Stacking methods is not assumed to help.
@@ -70,10 +71,11 @@ For pp-prop, explicitly report approximation/filter/decay settings and its firin
 
 ## 4. Stage 1 — controlled event-vision parity
 
-Start with tasks that align with the STDL code and SNN input semantics:
+Start with tasks that align with the STDL code and SNN input semantics. Add the pinned PMSN reference tasks as a separate multi-timescale neuron parity stratum:
 - CIFAR10DVS;
 - DVS Gesture with source-recording / subject-aware partitions;
 - SHD and SSC only after matching the input encoding and output semantics;
+- Sequential CIFAR-10 at 1,024 steps, S-MNIST and PS-MNIST from the pinned PMSN code; these are temporal-neuron parity tasks, not automatically equivalent to STDL's event-vision settings;
 - CIFAR-10/100 and ImageNet as static-vision controls for the STDL spatial-learning mechanism, not as proof of temporal-memory advantage.
 
 Every dataset requires:
@@ -84,7 +86,7 @@ Every dataset requires:
 - fixed time window, temporal binning, augmentation, input precision, batch and update budget;
 - independent paired seeds shared across algorithms.
 
-The inspected public STDL loader uses test splits as a per-epoch model-selection loader for several datasets. A strict comparison must not copy that leak: create a separate development set and preserve the confirmatory set until the final run.
+The inspected public STDL loader uses test splits as a per-epoch model-selection loader for several datasets. The pinned PMSN Sequential CIFAR-10 and S-MNIST trainers also evaluate the official test loader every epoch and use it to update the best checkpoint. A strict comparison must correct both public-code paths: create a separate development set and preserve the confirmatory set until the final run. PMSN's inspected CUDA path also sets `cudnn.benchmark=True` after seeding; record actual deterministic settings and run paired seeds.
 
 ## 5. Stage 2 — adaptive boundary allocation
 
@@ -170,7 +172,7 @@ A successful result establishes only the declared architecture, task, split, bud
 
 1. Extend and validate the implemented scalar Stage 0 exact-gradient oracle into two- and four-module dependency cases.
 2. Implement measurement adapters for the full training-state budget.
-3. Reproduce pinned STDL and BrainTrace task/model baselines with clean development/confirmatory splits.
+3. Reproduce pinned STDL, BrainTrace and PMSN task/model baselines with clean development/confirmatory splits.
 4. Run fixed architecture arms at 25/50/75/100% memory budgets.
 5. Only then test adaptive boundary selection and hybrid HDC summaries.
 6. Execute confirmatory seeds after #9437 evaluator isolation/receipts are available.
