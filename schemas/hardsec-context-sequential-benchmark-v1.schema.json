@@ -44,7 +44,7 @@
     },
     "candidates": {
       "type": "array",
-      "minItems": 4,
+      "minItems": 6,
       "uniqueItems": true,
       "items": {
         "type": "string"
@@ -123,7 +123,10 @@
         "alpha_budget_allocated_across_streams",
         "domain_pooling_forbidden",
         "random_window_confirmatory_claim_forbidden",
-        "targets_not_achievements"
+        "targets_not_achievements",
+        "pfa_and_arl_not_conflated",
+        "finite_restart_lifetime_requires_predictable_kill",
+        "iid_or_conditional_superuniformity_required_for_sequential_guarantees"
       ],
       "properties": {
         "conditional_superuniformity_must_be_justified": {
@@ -139,6 +142,15 @@
           "const": true
         },
         "targets_not_achievements": {
+          "const": true
+        },
+        "pfa_and_arl_not_conflated": {
+          "const": true
+        },
+        "finite_restart_lifetime_requires_predictable_kill": {
+          "const": true
+        },
+        "iid_or_conditional_superuniformity_required_for_sequential_guarantees": {
           "const": true
         }
       }
@@ -179,7 +191,8 @@
           "implementation_status": {
             "enum": [
               "rust_equations_implemented_parity_not_yet_independently_reproduced",
-              "source_pinned_metrics_and_execution_not_reproduced"
+              "source_pinned_metrics_and_execution_not_reproduced",
+              "paper_protocol_not_yet_reproduced"
             ]
           }
         }
