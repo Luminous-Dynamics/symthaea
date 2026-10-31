@@ -607,6 +607,96 @@ pub fn plan_min_fill_cutset_elimination(
         remaining_elimination_plan,
     })
 }
+fn cutset_plan_dominates(
+    left: &CutsetFrontierCandidate,
+    right: &CutsetFrontierCandidate,
+) -> bool {
+    let left_width = left.plan.remaining_elimination_plan().induced_width;
+    let right_width = right.plan.remaining_elimination_plan().induced_width;
+    let left_branches = left.plan.cutset_assignments();
+    let right_branches = right.plan.cutset_assignments();
+    let left_peak = left.plan.predicted_peak_factor_entries();
+    let right_peak = right.plan.predicted_peak_factor_entries();
+
+    let no_worse = left_branches <= right_branches
+        && left_width <= right_width
+        && left_peak <= right_peak;
+    let strictly_better = left_branches < right_branches
+        || left_width < right_width
+        || left_peak < right_peak;
+    let exact_tie_precedes = left_branches == right_branches
+        && left_width == right_width
+        && left_peak == right_peak
+        && left.candidate_index < right.candidate_index;
+    no_worse && (strictly_better || exact_tie_precedes)
+}
+
+/// Preflight a supplied family of exact cutset candidates and return its Pareto frontier.
+///
+/// Each candidate is planned independently with the same factor-entry and
+/// assignment budgets. Infeasible candidates are preserved in the report
+/// rather than causing otherwise useful candidates to be discarded. Feasible
+/// candidates are compared on three resources:
+///
+/// - exact number of conditioned branches (2^|cutset|);
+/// - residual induced width after conditioning;
+/// - predicted peak factor-table entries, including original inputs and the
+///   residual plan's buckets/output.
+///
+/// A candidate is dominated only when another is no worse on all three axes
+/// and strictly better on at least one. Exact metric ties keep the earliest
+/// input candidate. This searches only the caller-supplied family; it does not
+/// claim to find a globally optimal separator.
+pub fn plan_min_fill_cutset_frontier(
+    factor_scopes: &[Vec<usize>],
+    eliminate: &[usize],
+    candidate_cutsets: &[Vec<usize>],
+    max_factor_entries: usize,
+    max_cutset_assignments: usize,
+) -> Result<CutsetPlanFrontierReport, FactorGraphError> {
+    if candidate_cutsets.is_empty() {
+        return Err(FactorGraphError::EmptyCutsetCandidateSet);
+    }
+
+    let mut candidates = Vec::new();
+    let mut rejected_candidates = Vec::new();
+    for (candidate_index, cutset) in candidate_cutsets.iter().enumerate() {
+        match plan_min_fill_cutset_elimination(
+            factor_scopes,
+            eliminate,
+            cutset,
+            max_factor_entries,
+            max_cutset_assignments,
+        ) {
+            Ok(plan) => candidates.push(CutsetFrontierCandidate {
+                candidate_index,
+                plan,
+            }),
+            Err(error) => rejected_candidates.push(CutsetFrontierRejection {
+                candidate_index,
+                error,
+            }),
+        }
+    }
+
+    let frontier_candidate_indices = candidates
+        .iter()
+        .filter(|candidate| {
+            !candidates
+                .iter()
+                .any(|other| other.candidate_index != candidate.candidate_index
+                    && cutset_plan_dominates(other, candidate))
+        })
+        .map(|candidate| candidate.candidate_index)
+        .collect();
+
+    Ok(CutsetPlanFrontierReport {
+        candidates,
+        frontier_candidate_indices,
+        rejected_candidates,
+    })
+}
+
 /// Telemetry for one completed log-domain min-fill contraction.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LogFactorEliminationReport {
@@ -2094,6 +2184,77 @@ mod tests {
         assert!(matches!(
             min_fill_log_sum_product_with_cutset(&[factor], &[1, 2], &[1, 2], 2, 3),
             Err(FactorGraphError::CutsetAssignmentBudgetExceeded { assignments: 4, maximum: 3 })
+        ));
+    }
+
+    #[test]
+    fn cutset_frontier_preserves_tradeoffs_and_reports_rejected_candidates() {
+        const SIDE: usize = 4;
+        let mut scopes = Vec::new();
+        for row in 0..SIDE {
+            for column in 0..SIDE {
+                let here = row * SIDE + column;
+                if column + 1 < SIDE {
+                    scopes.push(vec![here, here + 1]);
+                }
+                if row + 1 < SIDE {
+                    scopes.push(vec![here, here + SIDE]);
+                }
+            }
+        }
+        let eliminate = (0..SIDE * SIDE - 1).collect::<Vec<_>>();
+        let candidates = vec![
+            vec![4, 5, 6, 7],            // 16 branches, width 2, peak 8
+            (4..12).collect::<Vec<_>>(), // 256 branches, width 1, peak 4
+            (0..15).collect::<Vec<_>>(), // Exceeds the 1,024-branch budget.
+            vec![7, 6, 5, 4],            // Exact metric tie with candidate 0.
+        ];
+
+        let report = plan_min_fill_cutset_frontier(
+            &scopes,
+            &eliminate,
+            &candidates,
+            8,
+            1_024,
+        ).unwrap();
+
+        assert_eq!(
+            report.candidates.iter().map(|candidate| candidate.candidate_index).collect::<Vec<_>>(),
+            vec![0, 1, 3]
+        );
+        assert_eq!(report.frontier_candidate_indices, vec![0, 1]);
+        assert_eq!(report.rejected_candidates.len(), 1);
+        assert_eq!(report.rejected_candidates[0].candidate_index, 2);
+        assert!(matches!(
+            report.rejected_candidates[0].error,
+            FactorGraphError::CutsetAssignmentBudgetExceeded {
+                assignments: 32_768,
+                maximum: 1_024
+            }
+        ));
+
+        assert_eq!(report.candidates[0].plan.cutset_variables(), &[4, 5, 6, 7]);
+        assert_eq!(report.candidates[0].plan.cutset_assignments(), 16);
+        assert_eq!(
+            report.candidates[0].plan.remaining_elimination_plan().induced_width,
+            2
+        );
+        assert_eq!(report.candidates[0].plan.predicted_peak_factor_entries(), 8);
+
+        assert_eq!(report.candidates[1].plan.cutset_variables(), &(4..12).collect::<Vec<_>>());
+        assert_eq!(report.candidates[1].plan.cutset_assignments(), 256);
+        assert_eq!(
+            report.candidates[1].plan.remaining_elimination_plan().induced_width,
+            1
+        );
+        assert_eq!(report.candidates[1].plan.predicted_peak_factor_entries(), 4);
+    }
+
+    #[test]
+    fn cutset_frontier_rejects_an_empty_candidate_family() {
+        assert!(matches!(
+            plan_min_fill_cutset_frontier(&[vec![0, 1]], &[0], &[], 4, 4),
+            Err(FactorGraphError::EmptyCutsetCandidateSet)
         ));
     }
 
