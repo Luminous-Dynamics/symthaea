@@ -164,6 +164,9 @@ struct Summary {
     top1_regret_ci95_lower: Option<f64>,
     top1_regret_ci95_upper: Option<f64>,
     mean_null_false_effect_rate: Option<f64>,
+    null_false_effect_episode_count: usize,
+    null_false_effect_rate_ci95_lower: Option<f64>,
+    null_false_effect_rate_ci95_upper: Option<f64>,
     mean_branch_coverage: f64,
     mean_branch_outcome_mae: Option<f64>,
     mean_branch_state_mae: Option<f64>,
@@ -624,6 +627,13 @@ fn summarize(scenario: Scenario, model: Model) -> Summary {
             .collect::<Vec<_>>(),
         metric_bootstrap_seed(scenario, model, 5),
     );
+    let null_false_effect_ci = bootstrap_mean_ci(
+        &rows
+            .iter()
+            .map(|row| row.null_false_effect_rate)
+            .collect::<Vec<_>>(),
+        metric_bootstrap_seed(scenario, model, 6),
+    );
     Summary {
         scenario: scenario.name(),
         model: model.name(),
@@ -663,6 +673,11 @@ fn summarize(scenario: Scenario, model: Model) -> Summary {
         mean_null_false_effect_rate: mean_optional(
             &rows.iter().map(|row| row.null_false_effect_rate).collect::<Vec<_>>(),
         ),
+        null_false_effect_episode_count: optional_sample_count(
+            &rows.iter().map(|row| row.null_false_effect_rate).collect::<Vec<_>>(),
+        ),
+        null_false_effect_rate_ci95_lower: null_false_effect_ci.map(|interval| interval.0),
+        null_false_effect_rate_ci95_upper: null_false_effect_ci.map(|interval| interval.1),
         mean_branch_coverage: rows.iter().map(|row| row.branch_coverage).sum::<f64>() / denominator,
         mean_branch_outcome_mae: mean_optional(
             &rows.iter().map(|row| row.branch_outcome_mae).collect::<Vec<_>>(),
@@ -802,6 +817,16 @@ fn render_report() -> String {
             write_optional(&mut output, row.top1_regret_ci95_upper);
             output.push_str(",\"mean_null_false_effect_rate\":");
             write_optional(&mut output, row.mean_null_false_effect_rate);
+            write!(
+                &mut output,
+                ",\"null_false_effect_episode_count\":{}",
+                row.null_false_effect_episode_count
+            )
+            .expect("writing to String cannot fail");
+            output.push_str(",\"null_false_effect_rate_ci95_lower\":");
+            write_optional(&mut output, row.null_false_effect_rate_ci95_lower);
+            output.push_str(",\"null_false_effect_rate_ci95_upper\":");
+            write_optional(&mut output, row.null_false_effect_rate_ci95_upper);
             write!(
                 &mut output,
                 ",\"mean_branch_coverage\":{:.9},\"mean_branch_outcome_mae\":",
