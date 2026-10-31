@@ -272,6 +272,7 @@ The same design fixes the base checkpoint, common corpus, stage, optimizer sched
 The validator enforces:
 - per-cluster exposure and placebo token counts are exactly equal and positive;
 - treatment and placebo records have distinct, non-reused digests;
+- all clusters within a task-family / cluster-size stratum use the same exposure token count, making the assigned token total invariant to which cluster IDs are selected;
 - shared_training_token_count + exposed_training_token_count equals total_training_token_budget;
 - shared_training_token_count + matched_placebo_token_count equals total_training_token_budget;
 - all item IDs are globally unique and no source family is split across clusters;
@@ -280,7 +281,7 @@ The validator enforces:
 
 ### Randomization and replay
 
-The allocator builds strata from task family and cluster-size bucket, computes HMAC-derived cluster priorities using experiment and replicate identity, and assigns the predeclared fraction within each stratum. The manifest records exact assignments, treatment/placebo token totals, strata, assignment digest, design digest and seed commitment.
+The allocator builds strata from task family and cluster-size bucket, computes HMAC-derived cluster priorities using experiment and replicate identity, and assigns the predeclared fraction within each stratum. Interior doses require at least two clusters per stratum and retain at least one cluster in both treatment and placebo groups, even for extreme 1‰/999‰ targets. Token counts are homogeneous within each stratum so the fixed total training budget does not depend on which random clusters are selected. The manifest records exact assignments, treatment/placebo token totals, strata, assignment digest, design digest and seed commitment.
 
 The reviewer/evaluator retains the seed and assignment key. Model/detector teams receive only the information approved by the preregistered protocol; do not disclose hidden assignment labels before the confirmatory run is locked.
 
