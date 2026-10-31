@@ -1256,7 +1256,10 @@ impl DirectionCampaignRun {
                 host_cpu_millis: unknown("synthetic campaign does not meter host CPU"),
                 wall_millis: unknown("synthetic campaign does not meter per-action wall time"),
                 accelerator_millis: unknown("synthetic campaign does not meter accelerator time"),
-                peak_memory_bytes: unknown("synthetic campaign does not meter peak memory"),
+                peak_memory_bytes: unknown("synthetic campaign does not meter host peak memory"),
+                accelerator_peak_memory_bytes: unknown(
+                    "synthetic campaign does not meter accelerator peak memory"
+                ),
                 energy_millijoules: unknown("synthetic campaign does not meter energy"),
                 input_tokens: unknown("synthetic campaign does not meter model tokens"),
                 output_tokens: unknown("synthetic campaign does not meter model tokens"),
