@@ -285,9 +285,9 @@ fn validate_design(
         return Err("treatment and placebo training corpus digests must differ".to_owned());
     }
     if design.shared_training_token_count == 0
-        || design.shared_training_token_count >= design.total_training_token_budget
+        || design.shared_training_token_count > design.total_training_token_budget
     {
-        return Err("shared_training_token_count must be positive and below total budget".to_owned());
+        return Err("shared_training_token_count must be positive and no greater than total budget".to_owned());
     }
     if !(2..=MAX_INTERVENTION_CLUSTERS).contains(&design.clusters.len()) {
         return Err(format!(
@@ -625,6 +625,7 @@ pub fn audit_intervention(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
 
     fn digest(value: &str) -> String {
         hash_domain(b"intervention-fixture", value.as_bytes())
@@ -678,6 +679,46 @@ mod tests {
     }
 
     #[test]
+    fn versioned_schemas_and_design_fixture_are_consistent() {
+        let design_schema: Value = serde_json::from_str(include_str!(
+            "../schema/randomized-intervention-design.schema.json"
+        )).unwrap();
+        let manifest_schema: Value = serde_json::from_str(include_str!(
+            "../schema/randomized-intervention-manifest.schema.json"
+        )).unwrap();
+        let fixture: RandomizedInterventionDesignV1 = serde_json::from_str(include_str!(
+            "../fixtures/intervention-semantic-variant-design.json"
+        )).unwrap();
+
+        assert_eq!(
+            design_schema["properties"]["schema"]["const"].as_str(),
+            Some(INTERVENTION_DESIGN_SCHEMA)
+        );
+        let design_required: BTreeSet<String> = design_schema["required"].as_array().unwrap()
+            .iter().map(|value| value.as_str().unwrap().to_owned()).collect();
+        let design_properties: BTreeSet<String> = design_schema["properties"].as_object().unwrap()
+            .keys().cloned().collect();
+        assert_eq!(design_required, design_properties);
+
+        assert_eq!(
+            manifest_schema["properties"]["schema"]["const"].as_str(),
+            Some(INTERVENTION_MANIFEST_SCHEMA)
+        );
+        let manifest_required: BTreeSet<String> = manifest_schema["required"].as_array().unwrap()
+            .iter().map(|value| value.as_str().unwrap().to_owned()).collect();
+        let manifest_properties: BTreeSet<String> = manifest_schema["properties"].as_object().unwrap()
+            .keys().cloned().collect();
+        assert_eq!(manifest_required, manifest_properties);
+
+        let manifest = randomize_intervention(&fixture, &seed()).unwrap();
+        let manifest_json: Value = serde_json::to_value(&manifest).unwrap();
+        assert_eq!(manifest_json["schema"].as_str(), Some(INTERVENTION_MANIFEST_SCHEMA));
+        assert_eq!(manifest.exposed_training_token_count, 8_000);
+        assert_eq!(manifest.shared_training_token_count, 92_000);
+        assert_eq!(manifest.total_training_token_budget, 100_000);
+    }
+
+    #[test]
     fn randomization_is_deterministic_and_replayable() {
         let design = design();
         let first = randomize_intervention(&design, &seed()).unwrap();
@@ -727,6 +768,7 @@ mod tests {
     fn zero_dose_produces_a_clean_negative_control() {
         let mut design = design();
         design.target_exposure_fraction_permille = 0;
+        design.shared_training_token_count = design.total_training_token_budget;
         let manifest = randomize_intervention(&design, &seed()).unwrap();
         assert_eq!(manifest.exposed_cluster_count, 0);
         assert_eq!(manifest.exposed_item_count, 0);
@@ -738,6 +780,7 @@ mod tests {
     fn full_dose_exposes_every_cluster_within_each_stratum() {
         let mut design = design();
         design.target_exposure_fraction_permille = 1_000;
+        design.shared_training_token_count = 1_984_000;
         let manifest = randomize_intervention(&design, &seed()).unwrap();
         assert_eq!(manifest.exposed_cluster_count, manifest.total_cluster_count);
         assert_eq!(manifest.exposed_item_count, manifest.total_item_count);
