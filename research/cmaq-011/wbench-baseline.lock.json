@@ -1,0 +1,222 @@
+{
+  "schema_version": "cmaq-011-external-baseline-lock-v0.1",
+  "baseline_id": "wbench",
+  "name": "WBench: A Comprehensive Multi-turn Benchmark for Interactive Video World Model Evaluation",
+  "paper": "https://arxiv.org/abs/2605.25874",
+  "repository_url": "https://github.com/meituan-longcat/WBench",
+  "source_commit": "edc4e80e642baac4f2b5764dec9f1a491200af8f",
+  "source_commit_url": "https://github.com/meituan-longcat/WBench/commit/edc4e80e642baac4f2b5764dec9f1a491200af8f",
+  "source_license": "MIT",
+  "data_url": "https://huggingface.co/datasets/meituan-longcat/WBench",
+  "weights_url": "https://huggingface.co/meituan-longcat/WBench-weights",
+  "examples_url": "https://huggingface.co/datasets/meituan-longcat/WBench-examples",
+  "benchmark_shape": {
+    "model_count_reported": 39,
+    "total_cases": 289,
+    "interaction_turns": 1058,
+    "interaction_types": [
+      "navigation",
+      "subject_action",
+      "event_editing",
+      "perspective_switching"
+    ],
+    "dimensions": [
+      "quality",
+      "consistency",
+      "interaction",
+      "setting",
+      "physical"
+    ],
+    "metric_count": 22,
+    "navi_case_count": 158,
+    "model_interfaces": {
+      "text_conditioned": "text prompt plus first-frame image; 289 cases",
+      "camera_conditioned": "first-frame image plus 6-DoF camera pose; 158 Navi cases",
+      "action_conditioned": "first-frame image plus discrete action; 158 Navi cases"
+    },
+    "model_count_reported_from_pinned_readme": 39
+  },
+  "score_semantics": {
+    "navi": "158-case subset intended for camera/action navigation interfaces",
+    "full": "289-case task set",
+    "metrics": {
+      "quality": [
+        "aesthetic_quality",
+        "imaging_quality",
+        "temporal_flickering",
+        "dynamic_degree",
+        "motion_smoothness",
+        "hpsv3_quality"
+      ],
+      "consistency": [
+        "background_consistency",
+        "segment_continuity",
+        "perspective_consistency",
+        "subject_consistency",
+        "geometric_consistency",
+        "photometric_consistency",
+        "spatial_consistency",
+        "gated_spatial_consistency"
+      ],
+      "interaction": [
+        "navigation_trajectory",
+        "event_edit_adherence",
+        "subject_action_adherence",
+        "perspective_switch_adherence"
+      ],
+      "setting": [
+        "scene_adherence",
+        "subject_adherence"
+      ],
+      "physical": [
+        "visual_plausibility",
+        "causal_fidelity"
+      ]
+    },
+    "comparison_rule": "Keep each metric and interface separate; never compare text, camera and discrete-action interfaces as the same task."
+  },
+  "current_published_submissions": [
+    {
+      "model": "VWA-World",
+      "organization": "X-Era AI",
+      "interface": "action",
+      "split": "navi",
+      "cases": 158,
+      "published_score": 81.7,
+      "evaluation_date": "2026-10-10",
+      "published_date": "2026-10-12",
+      "evaluation_source": "16 submitter-evaluated metrics plus 3 organizer-evaluated VLM metrics",
+      "organizer_evaluated_metrics": [
+        "causal_fidelity",
+        "scene_adherence",
+        "subject_adherence"
+      ],
+      "judge_model": "doubao-seed-2-0-lite-260215",
+      "report_blob": "bb4f4d05c79a5e73c510bb9d1334794a4b00b805",
+      "provenance_blob": "c83c7e01e3f0b9648a301e63339b0424bed6ade9",
+      "provenance_limitation": "16 submitted local metrics were aggregate-schema/count checked only; per-case local scores not provided."
+    },
+    {
+      "model": "gd_world",
+      "organization": "gd_cv",
+      "interface": "camera",
+      "split": "navi",
+      "cases": 158,
+      "published_score": 81.2,
+      "evaluation_date": "2026-10-10",
+      "published_date": "2026-10-12",
+      "evaluation_source": "organizer evaluation",
+      "judge_model": "doubao-seed-2-0-lite-260215",
+      "report_blob": "4e70646749fc67194e465fc0069ae127391135ec",
+      "provenance_blob": "07b948611e85b3ea5fdbc728a3a77ba46616c01c",
+      "provenance_limitation": "Original inference sidecars were not supplied for independent reconstruction of turn boundaries."
+    }
+  ],
+  "reproduction_requirements": {
+    "judge": "Pin VLM judge and exact endpoint/model version. The README warns scores from different judges are not directly comparable.",
+    "compute": "GPU-heavy preprocessing includes SAM2, DA3, MegaSAM, and VLM phases; measure generation and evaluation separately.",
+    "data": "The README indicates MIT for code and data; model weights retain their original licenses. Review each model/checkpoint's original license before reproduction.",
+    "no_composite_claims": "Do not compare the mixed-provenance VWA-World score as though all 19 metrics were independently organizer evaluated.",
+    "current_page_model_count_note": "Pinned repository README describes 39 models; current public leaderboard page lists 45 entries (13 text, 21 camera, 11 action). Keep source-revision count and live page snapshot distinct."
+  },
+  "source_files": {
+    "README.md": "5e6c04ae19f5d50c33b9b081ec539212fe55869a",
+    "LICENSE": "4ed94d09baac8ffcecc5e93c203c18554ed2b4ea",
+    "assets/submissions/vwa_world/report.json": "bb4f4d05c79a5e73c510bb9d1334794a4b00b805",
+    "assets/submissions/vwa_world/provenance.json": "c83c7e01e3f0b9648a301e63339b0424bed6ade9",
+    "assets/submissions/gd_world/report.json": "4e70646749fc67194e465fc0069ae127391135ec",
+    "assets/submissions/gd_world/provenance.json": "07b948611e85b3ea5fdbc728a3a77ba46616c01c"
+  },
+  "reproduction_status": "pinned_reference_not_reproduced",
+  "claim_ceiling": "Public leaderboard reference only. Scores have mixed self/organizer provenance and separate action/camera interfaces. No Symthaea score or SOTA claim.",
+  "live_leaderboard_snapshot": {
+    "observed_at": "2026-10-31",
+    "site_last_updated": "2026-10-12",
+    "total_model_entries": 45,
+    "interface_counts": {
+      "text": 13,
+      "camera": 21,
+      "action": 11
+    },
+    "split": "Navi (158 cases)",
+    "selected_overall_rows": [
+      {
+        "model": "Alaya-EVOKE-Turbo",
+        "average": 82,
+        "rank": 1
+      },
+      {
+        "model": "XGEN-Jing",
+        "average": 81.9,
+        "rank": 2
+      },
+      {
+        "model": "Enuma",
+        "average": 81.7,
+        "rank": 3
+      },
+      {
+        "model": "VWA-World",
+        "average": 81.7,
+        "rank": 4
+      }
+    ],
+    "provenance_note": "The table combines model interfaces; do not read overall Navi rank as an action-conditioned-only ranking. VWA-World's published report provenance records 16 submitter-evaluated metrics plus three organizer-evaluated VLM metrics.",
+    "page_last_updated": "2026-10-12",
+    "all_types_table_top": [
+      {
+        "model": "Alaya-EVOKE-Turbo",
+        "average": 82,
+        "rank": 1
+      },
+      {
+        "model": "XGEN-Jing",
+        "average": 81.9,
+        "rank": 2
+      },
+      {
+        "model": "Enuma",
+        "average": 81.7,
+        "rank": 3
+      },
+      {
+        "model": "VWA-World",
+        "average": 81.7,
+        "rank": 4
+      },
+      {
+        "model": "JoyAI-Echo-1.5 (WM)",
+        "average": 81.6,
+        "rank": 5
+      }
+    ],
+    "caveat": "All-types Navi aggregate table mixes text, camera and action interfaces. It must not be presented as an action-only SOTA ranking. The page also lists some unranked entries separately; retain their status rather than assigning them a rank."
+  },
+  "published_findings": [
+    {
+      "id": "no_single_model_dominates_all_dimensions",
+      "source": "official live leaderboard key findings",
+      "details": "The benchmark reports different models leading different dimensions; the top aggregate score is not evidence of universal superiority."
+    },
+    {
+      "id": "navigation_and_interaction_are_partly_orthogonal",
+      "source": "official live leaderboard key findings",
+      "details": "YUME 1.5 has high navigation but weak event-edit/perspective-switch scores, while Wan 2.7 has strong event/subject action but lower navigation."
+    },
+    {
+      "id": "camera_control_is_not_subject_control",
+      "source": "official live leaderboard key findings",
+      "details": "Navigation accuracy and perspective consistency are separately measured and can diverge substantially."
+    },
+    {
+      "id": "physics_quality_not_control_proxy",
+      "source": "official live leaderboard key findings",
+      "details": "Reported video-quality/physical-plausibility correlation rho=0.82; control ability versus physics shows near-zero correlation."
+    },
+    {
+      "id": "multi_turn_error_compounds",
+      "source": "official live leaderboard key findings",
+      "details": "Navigation accuracy drops about 21 points from turn 1 to turn 4; dedicated geometric control degrades less than text-conditioned generation."
+    }
+  ]
+}
