@@ -1079,6 +1079,29 @@ mod tests {
     }
 
     #[test]
+    fn close_digest_is_independent_of_async_receipt_arrival_order() {
+        let plan = plan();
+        let close = close_for(&plan);
+        let mut reordered = close.clone();
+        reordered.results.reverse();
+        reordered.costs.reverse();
+        assert_eq!(close.digest().unwrap(), reordered.digest().unwrap());
+    }
+
+    #[test]
+    fn duplicate_proposals_have_a_distinct_auditable_count() {
+        let plan = plan();
+        let mut close = close_for(&plan);
+        close.results[2].outcome = ActionOutcome::Proposal {
+            disposition: ProposalDisposition::Duplicate,
+            resolved_direction_id: Some("A".to_owned()),
+        };
+        let summary = close.validate_against(&plan).unwrap();
+        assert_eq!(summary.admitted_directions, 0);
+        assert_eq!(summary.duplicate_proposals, 1);
+    }
+
+    #[test]
     fn unknown_or_zero_action_charge_is_rejected() {
         let plan = plan();
         let mut close = close_for(&plan);
