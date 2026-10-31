@@ -1112,6 +1112,7 @@ impl DirectionCampaignRun {
             execution: ExecutionContract {
                 mode: ExecutionMode::Sequential,
                 worker_count: 1,
+                seats_per_round: 1,
                 first_round_claim_cap: None,
                 steady_state_claim_cap: None,
             },
@@ -1195,12 +1196,15 @@ impl DirectionCampaignRun {
                         action.slot
                     )
                 })?;
-                let evaluation_index = evaluations_per_direction
-                    .entry(action.arm_id.clone())
-                    .or_default();
-                *evaluation_index = evaluation_index
-                    .checked_add(1)
-                    .ok_or_else(|| "direction evaluation index overflow".to_owned())?;
+                let evaluation_index = {
+                    let count = evaluations_per_direction
+                        .entry(action.arm_id.clone())
+                        .or_default();
+                    *count = count
+                        .checked_add(1)
+                        .ok_or_else(|| "direction evaluation index overflow".to_owned())?;
+                    *count
+                };
                 let candidate_sha256 = digest(&format!(
                     "synthetic-candidate:{}:{}:{}",
                     landscape_id, action.arm_id, evaluation_index
@@ -1245,7 +1249,7 @@ impl DirectionCampaignRun {
                 output_tokens: unknown("synthetic campaign does not meter model tokens"),
                 tool_calls: unknown("synthetic campaign does not meter external tool calls"),
                 evaluator_calls: meter_value(1),
-                verifier_calls: meter_value(u64::from(action.is_new_proposal)),
+                verifier_calls: meter_value(if action.is_new_proposal { 1 } else { 0 }),
                 charged_budget_microunits: meter_value(charge),
             };
             tape.append(ActionEvent {
