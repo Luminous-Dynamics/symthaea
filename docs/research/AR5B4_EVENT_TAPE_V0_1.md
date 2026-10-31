@@ -78,3 +78,60 @@ Manifest validation requires exact coverage of all and only the event tape's dec
 The state digest is still a commitment, not the state artifact itself. The campaign evidence bundle must retain the underlying evaluator-owned state/offer-set artifact, and an independent auditor must recompute `source_state_sha256`. Without that artifact, the manifest establishes cross-policy digest consistency but not the truth of the offered choices. The current API intentionally does not claim cryptographic identity of the evaluator process or a remote timestamp.
 
 The `matched_campaign` summary also aggregates full per-policy resource vectors (host CPU, wall time, accelerator time, host/accelerator memory, energy, tokens, tools, evaluator/verifier calls and normalized charges) rather than exposing only a scalar. It separately reports whether normalized total spend is equal across policies. Equal budget ceilings are not equal realized spend; a campaign can reconcile its common contract while explicitly failing the equal-spend comparison gate.
+
+
+## Landscape-clustered paired inference
+
+The `paired_inference` module implements a preregistered primary-endpoint comparison. It accepts exactly two policy identities (baseline and challenger), one metric/direction, a practically meaningful effect threshold, alpha, bootstrap/randomization replicate counts, deterministic analysis seed, and minimum landscape/paired-seed counts.
+
+Every `(landscape, seed)` must contain exactly one observation per policy. Within each landscape, matched seed deltas are averaged first; landscapes—not runs/seeds—are then the independent units. The confidence interval resamples landscapes with replacement. The paired sign-flip randomization test operates on those landscape means, using exhaustive sign assignments up to the configured exact limit and seeded Monte Carlo beyond it. The receipt includes per-landscape deltas, landscape and seed win/tie/loss counts, CI, p-value, plan/data digests and an inference digest.
+
+A policy is labelled superior only when the entire two-sided cluster-bootstrap interval exceeds the preregistered minimum practical effect and the paired sign-flip p-value is at most alpha. An analogous rule labels inferiority. Otherwise the result is `NoDemonstratedDifference`; it is not an equivalence claim. This module handles one primary endpoint at a time. If several endpoints or subgroups are promoted to confirmatory claims, the campaign must pre-register a familywise/multiplicity procedure (for example Holm correction) outside this v0.1 primitive.
+
+This method intentionally prevents a large number of correlated seeds from one landscape from being counted as a large number of independent samples. For a serious confirmatory comparison, target at least 30 independent landscape templates and 100 paired seeds per landscape where feasible. More seeds improve within-landscape measurement precision; more independent landscape templates improve external validity. The values are recommended campaign targets, not a claim that every existing synthetic campaign has met them.
+
+## Research scoreboards and benchmark positioning
+
+Do not collapse all evidence into one leaderboard. Publish three separate scoreboards:
+
+1. **Mechanism-matched policy quality.** Same materialized offer-set, evaluator, verifier, source/runtime, batch semantics, normalized-cost model and pre-registered budget. Use paired landscapes, seeds and the clustered inference receipt. This answers whether one allocation/search mechanism is better.
+2. **Best-practical-system performance.** Each complete system may use native proposal generation, orchestration, retries, batching and model/tool choices. Charge all work, including failed attempts and verifier/evaluator overhead. This answers which deployable system gets the best outcome per real cost.
+3. **Scientific integrity and transfer.** Evaluate reproduction of known findings, claim/evidence consistency, mechanism/insight quality, held-out prediction/ranking and transfer to independent task families. This answers whether an apparent optimization win is actually useful science.
+
+External benchmark mapping:
+
+| Benchmark/system | What it adds to AR-5B4 | How to use it |
+|---|---|---|
+| Coral Discovery | Direction-board mechanism; four-agent allocation; duplicates and direction crowding | Reproduce all runs and task conditions; treat its published 6/1/2 best-of-three result as a reference, not a guaranteed expected win. Report cost and margins, not just win count. |
+| ShinkaEvolve | Parent selection, novelty rejection and bandit selection of model ensembles | Add as evolution-search controls and ablate each operator; the paper reports a 150-sample circle-packing discovery, but compare under a matched task/model/budget. |
+| CodeEvolve | Island evolution, inspiration crossover, CVT-MAP-Elites and model ensembles | Include as a stronger evolutionary-system baseline. Its 2026 Findings paper reports matched-condition advantages on several AlphaEvolve benchmark tasks; this makes it an important competitor, not an optional citation. |
+| FormulaCode | Repository-scale performance diagnosis and correctness-constrained multi-objective optimization | Use external tasks when eligible; add Symthaea/Rust repository bottlenecks as a separate domain-specific transfer suite with expert-reviewed patches/workloads. |
+| FIRE-Bench | Full-cycle rediscovery, experimental design, execution and evidence-backed claims | Use as the scientific-integrity track; inspect all run-level variance and claim-level precision/recall, not only aggregate F1. |
+| SciAgentArena | Approximately 200 interactive, stepwise-verified tasks across scientific domains | Use for cross-domain interactive transfer and per-step failure diagnosis. |
+| Into the Unknown | Scientist-authored open research conditions and integrity verification | Use as a hard scientific-integrity stress test; no system should pass by producing a polished report unsupported by its tape. |
+| Autonomous Science Bench 0.1 | Six pilot real-lab workflows, budgeted rounds, discovery plus ranking of unmeasured designs | Use as a pilot/adapter target, not a stable broad leaderboard. Its own scoring separates discovery from learning/ranking unseen designs. |
+| EurekaBench | Long-horizon mechanisms, predictive accuracy and scientific insight | Use to test whether policies discover explanatory mechanisms, not only high-scoring candidates. |
+
+## Metrics to publish
+
+**Primary efficiency metrics:** area under best independently verified quality versus cumulative normalized spend; cost to first independently verified improvement; cost per verified improvement; probability of reaching a pre-registered target before budget exhaustion; and simple regret at fixed budget.
+
+**Search-mechanism diagnostics:** unique directions admitted; duplicate proposal rate; false novelty rate from blinded verifier audit; direction entropy and Herfindahl concentration; candidate/offer-set coverage; fraction of budget spent on exploitation versus new directions; and time/budget to first useful direction.
+
+**Reliability metrics:** exact tape replay rate; missing/corrupt artifact rate; false-positive/false-negative verifier rates from independently adjudicated controls; unmetered action rate; budget reconciliation error; and claim-to-evidence contradiction rate. Failures, retries and verifier costs remain charged.
+
+**Transfer metrics:** held-out task-family performance; ranking quality on candidates never evaluated by the search policy; performance retention after domain shift; mechanism/insight rubric scores; and degradation under misleading, noisy, nonstationary or adversarial verifier feedback.
+
+**Pareto metrics:** quality, latency, host CPU, accelerator time, host/accelerator peak memory, energy, input/output tokens and tool/evaluator/verifier calls, reported as vectors. Also report dominated fraction, hypervolume under a frozen reference point and the cost-quality frontier. Never collapse this to one scalar unless the conversion weights were pre-registered.
+
+## Synthetic stress landscapes
+
+The eight-policy direction campaign should not be evaluated only on stationary independent-arm payoffs. Build frozen task families covering: deceptive local optima; heavy-tailed and heteroscedastic noise; correlated directions; nonstationarity and change points; delayed feedback; duplicate/near-duplicate proposals; variable evaluator costs; verifier false positives and false negatives; censored/time-out observations; sparse rewards; changing offer sets; multi-objective quality/cost trade-offs; and capability cliffs requiring a new operator or abstraction.
+
+For each family include a null control, a positive-control policy/landscape, an oracle upper bound reported separately, and at least one adversarial integrity condition. Freeze the generator and seed manifest before policy evaluation; do not retune a policy after inspecting the confirmatory holdout.
+
+## What would count as beating the state of the art
+
+Do not define SOTA as beating one paper's best run or winning more tasks on a best-of-k table. First reproduce Coral, ShinkaEvolve, CodeEvolve and appropriate repository/science-agent baselines under disclosed conditions. Then seek a pre-registered practical improvement in at least two independent task families, with a cluster-level interval above the minimum effect, no material regression in critical families, full replayable evidence, and lower or equal total normalized spend. Finally repeat on held-out landscapes and one external domain suite.
+
+A particularly strong result would be: **same independently verified target quality with substantially lower total cost, while retaining the advantage under held-out landscapes and external task families**. A second, distinct breakthrough would be greater scientific insight/transfer at equal budget, even where raw best score is unchanged. These are stronger claims than simply obtaining more discoveries per fixed number of synthetic actions.
