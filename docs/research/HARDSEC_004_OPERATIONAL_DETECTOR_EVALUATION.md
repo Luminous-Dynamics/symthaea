@@ -25,6 +25,10 @@ The following are published findings, not locally reproduced results:
 
 For an operational open-set claim, require distinct held-out strata for unseen malicious programs/families and unseen benign programs, then add a mixed benign/attack test where the data and monitored exposure support it. Report held-out-attack sensitivity and held-out-benign false-alert behavior separately. Precision and alerts per device-hour require an explicit prevalence/exposure model; they cannot be recovered from an attack-only fold.
 
+**Model-selection provenance is a separate unresolved question:** the physical paper states that the leave-one-attack-program-out experiment reuses hyperparameters from the earlier experiment because “the previous validation was performed using the entire dataset.” The article text does not fully establish whether the held-out attack program also influenced feature ranking, feature subset choice, hyperparameter selection, or other learned preprocessing before the leave-one-attack-out test. This is not sufficient evidence to declare proven leakage, but it is not enough to certify a fully untouched confirmatory holdout either.
+
+A clean reproduction must use an outer program-group holdout. Inside each outer-training partition only, perform feature selection (including mRMR/RFECV), normalization/transform fitting, model and hyperparameter selection, probability calibration, and threshold selection using group-aware inner validation. The outer held-out program must not influence any learned choice before final scoring. Report the paper-faithful setup and this fully nested setup separately if they differ; do not silently describe the former as leakage-free.
+
 These results make four failure modes first-class: source/program leakage, held-out-family failure, false alarms in benign but unusual workloads, and measurement-induced distribution shift.
 
 References:
