@@ -660,6 +660,21 @@ pub fn verify_search_time_power_report(
     if report.schema != SEARCH_POWER_REPORT_SCHEMA {
         return Err(format!("power report schema must be {SEARCH_POWER_REPORT_SCHEMA}"));
     }
+    for (digest, label) in [
+        (&report.configuration_sha256, "configuration_sha256"),
+        (&report.simulation_seed_commitment_sha256, "simulation_seed_commitment_sha256"),
+    ] {
+        if !valid_digest(digest) {
+            return Err(format!("{label} must be a lowercase SHA-256 digest"));
+        }
+    }
+    if report.monte_carlo_repetitions < 1_000
+        || report.alpha_permille != 50
+        || report.candidate_results.is_empty()
+        || report.candidate_results.len() > SEARCH_POWER_MAX_CANDIDATES
+    {
+        return Err("power report has invalid repetition/alpha/candidate metadata".to_owned());
+    }
     let mut normalized = report.clone();
     normalized.report_sha256.clear();
     let bytes = serde_json::to_vec(&normalized)
@@ -675,10 +690,28 @@ pub fn verify_search_time_power_report(
     }
     let mut previous_count = 0_u32;
     for candidate in &report.candidate_results {
-        if candidate.candidate_block_count <= previous_count {
-            return Err("power report candidate block counts must be strictly increasing".to_owned());
+        if candidate.candidate_block_count <= previous_count
+            || candidate.candidate_block_count > SEARCH_POWER_MAX_CANDIDATE_BLOCKS
+        {
+            return Err("power report candidate block counts must be strictly increasing and in range".to_owned());
         }
         previous_count = candidate.candidate_block_count;
+        for outcome in [
+            &candidate.null_type_i_error,
+            &candidate.positive_effect_power,
+            &candidate.negative_effect_power,
+        ] {
+            if outcome.planned_repetitions != report.monte_carlo_repetitions
+                || outcome.estimable_repetitions.saturating_add(outcome.inconclusive_repetitions)
+                    != outcome.planned_repetitions
+                || outcome.rejection_rate.trials != u64::from(outcome.estimable_repetitions)
+                || outcome.coverage_rate.trials != u64::from(outcome.estimable_repetitions)
+                || outcome.rejection_rate.successes > outcome.rejection_rate.trials
+                || outcome.coverage_rate.successes > outcome.coverage_rate.trials
+            {
+                return Err("power simulation outcome counts are internally inconsistent".to_owned());
+            }
+        }
         let null = &candidate.null_type_i_error;
         let positive = &candidate.positive_effect_power;
         let negative = &candidate.negative_effect_power;
@@ -834,6 +867,6 @@ mod tests {
         let bytes = serde_json::to_vec(&rehashed).unwrap();
         rehashed.report_sha256 = hash_domain(b"search-time-power-report.v1", &bytes);
         assert!(verify_search_time_power_report(&rehashed)
-            .unwrap_err().contains("qualification summary"));
+            .unwrap_err().contains("pass/fail status"));
     }
 }
