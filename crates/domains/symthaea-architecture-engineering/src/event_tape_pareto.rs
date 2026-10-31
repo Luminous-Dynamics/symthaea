@@ -52,6 +52,8 @@ impl Error for EventTapeParetoError {}
 pub enum CandidateObjectiveMetric {
     MeanVerifiedScore,
     MinimumVerifiedScore,
+    MeanReportedUncertainty,
+    MaximumReportedUncertainty,
     /// Mean minus z times the sample standard-error proxy. Requires at least two verified scores.
     /// This is an optimizer-facing conservative statistic, not a calibrated confidence interval.
     LowerConfidenceBoundVerifiedScore { z_value: f64 },
@@ -175,6 +177,8 @@ fn expected_direction(metric: &CandidateObjectiveMetric) -> super::pareto_object
         | CandidateObjectiveMetric::MinimumVerifiedScore
         | CandidateObjectiveMetric::LowerConfidenceBoundVerifiedScore { .. }
         | CandidateObjectiveMetric::VerifiedAttemptRate => Maximize,
+        CandidateObjectiveMetric::MeanReportedUncertainty
+        | CandidateObjectiveMetric::MaximumReportedUncertainty => Minimize,
         CandidateObjectiveMetric::EvaluationAttemptCount
         | CandidateObjectiveMetric::TotalHostCpuMillis
         | CandidateObjectiveMetric::SumActionWallMillis
@@ -251,6 +255,8 @@ impl ActionResourceTotals {
             CandidateObjectiveMetric::TotalChargedBudgetMicrounits => self.charged_budget_microunits as f64,
             CandidateObjectiveMetric::MeanVerifiedScore
             | CandidateObjectiveMetric::MinimumVerifiedScore
+            | CandidateObjectiveMetric::MeanReportedUncertainty
+            | CandidateObjectiveMetric::MaximumReportedUncertainty
             | CandidateObjectiveMetric::LowerConfidenceBoundVerifiedScore { .. }
             | CandidateObjectiveMetric::VerifiedAttemptRate => unreachable!("score metrics are not resource totals"),
         }
@@ -267,6 +273,7 @@ pub struct CandidateEventReference {
     pub retry_of_event_id: Option<String>,
     pub disposition: CandidateDisposition,
     pub score: Option<f64>,
+    pub uncertainty: Option<f64>,
     pub evidence_sha256: Option<String>,
 }
 
@@ -341,6 +348,7 @@ struct EventTapeParetoReportPayload<'a> {
 struct CandidateAccumulator {
     resources: ActionResourceTotals,
     scores: Vec<f64>,
+    uncertainties: Vec<f64>,
     verified_attempts: u64,
     directions: BTreeSet<String>,
     evidence_events: Vec<CandidateEventReference>,
@@ -375,6 +383,7 @@ pub fn event_tape_to_pareto(
                     disposition,
                     score,
                     evidence_sha256,
+                    uncertainty,
                     ..
                 },
             ) => {
@@ -390,6 +399,9 @@ pub fn event_tape_to_pareto(
                         )
                     })?;
                     accumulator.scores.push(verified_score);
+                    if let Some(reported_uncertainty) = uncertainty {
+                        accumulator.uncertainties.push(*reported_uncertainty);
+                    }
                     accumulator.verified_attempts = checked_add(
                         accumulator.verified_attempts,
                         1,
@@ -404,6 +416,7 @@ pub fn event_tape_to_pareto(
                     retry_of_event_id: payload.retry_of_event_id.clone(),
                     disposition: *disposition,
                     score: *score,
+                    uncertainty: *uncertainty,
                     evidence_sha256: evidence_sha256.clone(),
                 });
             }
@@ -469,12 +482,36 @@ pub fn event_tape_to_pareto(
         let minimum_score = accumulator.scores.iter().copied()
             .reduce(f64::min)
             .unwrap_or(config.unverified_score_value);
+        if accumulator.uncertainties.len() != accumulator.verified_attempts as usize
+            && config.objective_mappings.iter().any(|mapping| matches!(
+                mapping.metric,
+                CandidateObjectiveMetric::MeanReportedUncertainty
+                    | CandidateObjectiveMetric::MaximumReportedUncertainty
+            ))
+        {
+            return Err(EventTapeParetoError::new(
+                format!("candidate[{candidate_sha256}].uncertainty"),
+                "every verified attempt must include evaluator-reported uncertainty when an uncertainty objective is selected",
+            ));
+        }
+        let mean_uncertainty = if accumulator.uncertainties.is_empty() {
+            None
+        } else {
+            Some(accumulator.uncertainties.iter().sum::<f64>() / accumulator.uncertainties.len() as f64)
+        };
+        let maximum_uncertainty = accumulator.uncertainties.iter().copied().reduce(f64::max);
 
         let mut objective_values = Vec::with_capacity(config.objective_mappings.len());
         for (index, mapping) in config.objective_mappings.iter().enumerate() {
             let value = match &mapping.metric {
                 CandidateObjectiveMetric::MeanVerifiedScore => mean_score,
                 CandidateObjectiveMetric::MinimumVerifiedScore => minimum_score,
+                CandidateObjectiveMetric::MeanReportedUncertainty => mean_uncertainty.unwrap_or(
+                    config.objective_specs[index].scale_upper
+                ),
+                CandidateObjectiveMetric::MaximumReportedUncertainty => maximum_uncertainty.unwrap_or(
+                    config.objective_specs[index].scale_upper
+                ),
                 CandidateObjectiveMetric::LowerConfidenceBoundVerifiedScore { z_value } => {
                     if accumulator.scores.is_empty() {
                         config.unverified_score_value
