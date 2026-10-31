@@ -52,7 +52,7 @@ cargo run --locked \
 - Adaptation-family and adaptation-family/level recall are reported separately (avoiding severity-level pseudoreplication), plus program-group and execution-group recall, with macro and worst-group outcomes.
 - Benign false-alert rate is reported overall and on valid-sensor cases; valid-sensor true-negative rate excludes invalid telemetry.
 - Holdout checks require disjoint program, execution, attack-family and adaptation-family IDs across train/validation/test; the sentinel value none is excluded from attack/adaptation-family grouping for benign/no-adaptation cases.
-- Fourteen Rust unit tests are authored, including direct attack-family and adaptation-family leakage mutations.
+- Sixteen Rust unit tests are authored, including direct attack-family and adaptation-family leakage mutations.
 - Sensor-invalid cases are counted separately. Any clear response on a missing, stale, misaligned, multiplexed or untrusted sensor is reported as an integrity violation.
 - Acquisition and inference nanoseconds, telemetry bytes and peak memory are summarized only where their required per-case measurements are complete. Energy is not inferred.
 
@@ -87,7 +87,7 @@ Expected evaluator-mechanics outputs:
 
 These numbers are intentionally illustrative fixture behavior, not detection-performance results.
 
-Fourteen Rust unit tests cover known-answer outcomes, holdout leakage, duplicate/missing case IDs, failed/unknown effect semantics, invalid sensor clear verdicts, incomplete cost, calibration, adaptation-stratum reporting and evidence-domain separation.
+Fourteen Rust unit tests cover known-answer outcomes, program/attack/adaptation-family holdout leakage, duplicate/missing case IDs, failed/unknown effect semantics, invalid sensor clear verdicts, incomplete cost, calibration, adaptation-stratum reporting and evidence-domain separation.
 
 ## 6. Mandatory comparison arms
 
