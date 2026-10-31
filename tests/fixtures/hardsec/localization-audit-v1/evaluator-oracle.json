@@ -1,7 +1,7 @@
 {
   "schema_version": "hardsec-localization-oracle-v1",
   "design_id": "design-alpha-01",
-  "source_sha256": "f42cce69fba811f099fa28f8fe36e6cce257965bd0c5d8612abc4502c88ee05f",
+  "source_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
   "label_semantics": "insertion_footprint",
   "reference_paths_complete": false,
   "positive_node_ids": [
