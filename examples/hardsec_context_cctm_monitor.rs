@@ -44,7 +44,7 @@ struct ContextState {
     scale: f64,
     eta: f64,
     ons_accumulator: f64,
-    log_wealth: f64,
+    log_wealth: Option<f64>,
     first_alarm_sequence_index: Option<usize>,
 }
 
@@ -246,7 +246,7 @@ fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> 
             scale,
             eta: 0.0,
             ons_accumulator: 1.0,
-            log_wealth: 0.0,
+            log_wealth: Some(0.0),
             first_alarm_sequence_index: None,
         };
         if contexts.insert(context_id.clone(), state).is_some() {
@@ -414,16 +414,17 @@ fn audit_values(plan_value: &Value, stream_value: &Value, plan_bytes: &[u8], str
         let eta_used = state.eta;
         let (beta, g, g_prime) = cctm_bet(p_value, eta_used, state.epsilon, plan.smoothing_k, state.scale)?;
         let (eta_next, next_accumulator) = ons_next_eta(eta_used, state.ons_accumulator, g_prime, beta)?;
-        state.log_wealth = if beta == 0.0 {
-            f64::NEG_INFINITY
-        } else {
-            state.log_wealth + beta.ln()
+        state.log_wealth = match (state.log_wealth, beta) {
+            (Some(_), 0.0) => None, // exact zero wealth is represented as JSON null, never non-finite JSON.
+            (Some(previous), factor) => Some(previous + factor.ln()),
+            (None, _) => None, // zero wealth cannot recover under multiplicative betting.
         };
         state.eta = eta_next;
         state.ons_accumulator = next_accumulator;
         let threshold = -state.alpha.ln();
 
-        let crossing_now = state.first_alarm_sequence_index.is_none() && state.log_wealth >= threshold;
+        let crossing_now = state.first_alarm_sequence_index.is_none()
+            && state.log_wealth.is_some_and(|wealth| wealth >= threshold);
         if crossing_now {
             state.first_alarm_sequence_index = Some(record.sequence_index);
             if first_alarm_sequence_index.is_none() {
@@ -770,6 +771,59 @@ mod tests {
         let (mut p, s, _, _) = fixture();
         p["null_stream_assumption_status"] = json!("verified");
         assert!(audit(&p, &s).unwrap_err().contains("must remain assumption_not_verified"));
+    }
+
+    #[test]
+    fn perfectly_dependent_marginally_null_streams_expose_iid_assumption_failure() {
+        // Deterministic 10,000-point quadrature over one latent X ~ Uniform[0,6].
+        // Each stream repeats that same X for 100 consecutive windows: every
+        // window is marginally null, but the stream is maximally dependent.
+        // The DKW-corrected CCTM rejects far more often than alpha in this
+        // deliberately IID-violating negative control. This is not a CI/type-I
+        // estimate for hardware; it demonstrates why the paper's IID null
+        // assumption must not be silently dropped.
+        let n = 600.0_f64;
+        let delta = 0.01_f64;
+        let alpha = 0.05_f64;
+        let k = 1e-6_f64;
+        let epsilon = ((2.0 / delta).ln() / (2.0 * n)).sqrt();
+        let scale = 1.0 / (0.5 + (1.0 + k * k).sqrt() * epsilon);
+        let threshold = (1.0 / alpha).ln();
+        let mut alarm_paths = 0usize;
+
+        for grid_index in 0..10_000usize {
+            let latent_u = (grid_index as f64 + 0.5) / 10_000.0;
+            let latent_score = 6.0 * latent_u;
+            let ecdf_count = (latent_score * 100.0).floor().clamp(0.0, 600.0);
+            let p_value = ecdf_count / 600.0;
+
+            let mut eta = 0.0_f64;
+            let mut accumulator = 1.0_f64;
+            let mut log_wealth = 0.0_f64;
+            let mut crossed = false;
+
+            for _ in 0..100 {
+                let root = (eta * eta + k * k).sqrt();
+                let g = scale * (eta * (p_value - 0.5) - root * epsilon);
+                let beta = 1.0 + g;
+                assert!(beta > 0.0 && beta <= 2.0);
+                log_wealth += beta.ln();
+                let g_prime = scale * (p_value - 0.5 - (eta / root) * epsilon);
+                let z = g_prime / beta;
+                accumulator += z * z;
+                eta = (eta + 4.0 * z / accumulator).clamp(-0.5, 0.5);
+                if log_wealth >= threshold {
+                    crossed = true;
+                    break;
+                }
+            }
+            if crossed {
+                alarm_paths += 1;
+            }
+        }
+
+        let fraction = alarm_paths as f64 / 10_000.0;
+        assert!(fraction > 0.75 && fraction < 0.85, "dependent-null grid alarm fraction {fraction}");
     }
 
     #[test]
