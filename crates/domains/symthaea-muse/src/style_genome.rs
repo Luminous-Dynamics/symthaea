@@ -770,7 +770,15 @@ pub fn evaluate_genome(
         let semantic_trace_verified = semantic_verification.issues.is_empty()
             && semantic_verification.checked_records == semantic_verification.verified_records
             && semantic_verification.checked_records > 0;
-        let grammar_plan_well_formed = period_plan_well_formed(&realization.plan);
+        let grammar_plan_well_formed = grammar_plan_well_formed(&realization.plan);
+        let grammar_plan_signature = grammar_plan_signature(&realization.plan);
+        let grammar_transformations = grammar_transformations(&realization.plan);
+        if grammar_plan_signature.is_none() {
+            issues.push(GenomeIssue::new(
+                "grammar_plan_fingerprint_missing",
+                format!("seed {seed} emitted no family-native grammar plan fingerprint"),
+            ));
+        }
         let structural_fingerprint = fingerprint::structural_fingerprint(
             &realization.score,
             &realization.form,
@@ -813,6 +821,8 @@ pub fn evaluate_genome(
             semantic_trace_issues,
             grammar_plan_kind: grammar_plan_name(&realization.plan),
             grammar_plan_well_formed,
+            grammar_plan_signature,
+            grammar_transformations,
             form_signature,
             motif_transformations,
             note_count: realization.score.notes.len(),
@@ -863,13 +873,27 @@ pub fn evaluate_genome(
     let motif_transformations = trials.iter()
         .flat_map(|trial| trial.motif_transformations.iter().cloned())
         .collect::<BTreeSet<_>>();
-    let motif_transformation_richness = (motif_transformations.len() as f64 / 4.0).min(1.0);
+    let motif_transformation_richness = if motif_transformations.is_empty() {
+        None
+    } else {
+        Some((motif_transformations.len() as f64 / 4.0).min(1.0))
+    };
     let distinct_form_topologies = trials.iter()
         .filter_map(|trial| trial.form_signature.as_ref())
         .collect::<BTreeSet<_>>()
         .len();
-    let form_variation_denominator = compiled.spec.form_pool.len().min(trials.len()).max(1);
-    let form_variation = distinct_form_topologies as f64 / form_variation_denominator as f64;
+    let form_variation = if trials.iter().any(|trial| trial.form_signature.is_some()) {
+        let denominator = compiled.spec.form_pool.len().min(trials.len()).max(1);
+        Some(distinct_form_topologies as f64 / denominator as f64)
+    } else {
+        None
+    };
+    let grammar_topologies = trials.iter()
+        .filter_map(|trial| trial.grammar_plan_signature.as_ref())
+        .collect::<BTreeSet<_>>();
+    let grammar_topology_variation =
+        grammar_topologies.len() as f64 / trials.len().max(1) as f64;
+    let grammar_operation_diversity = mean_pairwise_operation_diversity(&trials);
 
     let mut mean_fingerprint = vec![0.0; fingerprint::STRUCT_DIMS];
     if !trial_fingerprints.is_empty() {
@@ -887,6 +911,7 @@ pub fn evaluate_genome(
         theory_validation_version: symthaea_music_theory::THEORY_VALIDATION_VERSION.into(),
         trace_reference_audit_version: STYLE_GENOME_TRACE_REFERENCE_AUDIT_VERSION.into(),
         fingerprint_version: STYLE_GENOME_FINGERPRINT_VERSION.into(),
+        grammar_plan_fingerprint_version: STYLE_GENOME_GRAMMAR_PLAN_FINGERPRINT_VERSION.into(),
         compiled_spec_sha256: compiled.provenance.compiled_spec_sha256.clone(),
         evaluation_config: config.clone(),
         evaluation_config_sha256,
@@ -900,6 +925,8 @@ pub fn evaluate_genome(
             within_genome_diversity,
             motif_transformation_richness,
             form_variation,
+            grammar_topology_variation,
+            grammar_operation_diversity,
         },
         mean_structural_fingerprint: mean_fingerprint,
         layer_coverage,
@@ -1539,6 +1566,7 @@ impl GenomeEvaluation {
             && self.theory_validation_version == symthaea_music_theory::THEORY_VALIDATION_VERSION
             && self.trace_reference_audit_version == STYLE_GENOME_TRACE_REFERENCE_AUDIT_VERSION
             && self.fingerprint_version == STYLE_GENOME_FINGERPRINT_VERSION
+            && self.grammar_plan_fingerprint_version == STYLE_GENOME_GRAMMAR_PLAN_FINGERPRINT_VERSION
             && self.genome.verify_id()
             && is_sha256_hex(&self.evaluation_config_sha256)
             && config_digest(&self.evaluation_config).is_ok_and(|expected| {
@@ -1557,8 +1585,14 @@ impl GenomeEvaluation {
             && self.mean_structural_fingerprint.len() == fingerprint::STRUCT_DIMS
             && self.mean_structural_fingerprint.iter().all(|value| value.is_finite())
             && self.objectives.within_genome_diversity.is_finite()
-            && (0.0..=1.0).contains(&self.objectives.motif_transformation_richness)
-            && (0.0..=1.0).contains(&self.objectives.form_variation)
+            && self.objectives.motif_transformation_richness
+                .is_none_or(|value| value.is_finite() && (0.0..=1.0).contains(&value))
+            && self.objectives.form_variation
+                .is_none_or(|value| value.is_finite() && (0.0..=1.0).contains(&value))
+            && self.objectives.grammar_topology_variation.is_finite()
+            && (0.0..=1.0).contains(&self.objectives.grammar_topology_variation)
+            && self.objectives.grammar_operation_diversity.is_finite()
+            && (0.0..=1.0).contains(&self.objectives.grammar_operation_diversity)
             && self.objectives.novelty_distance.is_none_or(|value| value.is_finite() && value >= 0.0)
             && evaluation_digest(self).is_ok_and(|expected| expected == self.evaluation_sha256)
     }
