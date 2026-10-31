@@ -871,7 +871,7 @@ mod tests {
             &[left_manifest, right_manifest],
         )
         .unwrap();
-        assert!(!qualification.qualified_for_confirmatory_comparison);
+        assert!(!qualification.matched_execution_qualified);
         assert!(qualification
             .qualification_blockers
             .iter()
