@@ -1034,7 +1034,6 @@ fn encode_sha256(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hardware_objectives::compute_objective_registry_sha256;
     use crate::multi_resource_budget::{
         compute_resource_registry_sha256, ResourceBudgetLimit, ResourceClass,
         ResourceDefinition, ResourceQuantity,
