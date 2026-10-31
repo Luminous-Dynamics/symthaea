@@ -18,5 +18,6 @@
   "environment_transition_calls": 3,
   "optimizer_iterations": 3,
   "recorder_id": "synthetic-fixture-no-independent-recorder",
-  "claim_ceiling": "synthetic_fixture_only_receipt_not_hardware_evidence"
+  "claim_ceiling": "digest_bound_run_record_not_independently_verified_by_v0_2_cli",
+  "fixture_only": true
 }
