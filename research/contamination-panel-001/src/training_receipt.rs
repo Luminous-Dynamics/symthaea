@@ -62,6 +62,7 @@ pub struct TrainingArmExecutionReceiptV1 {
     pub requested_total_training_token_budget: u64,
     pub requested_training_steps: u64,
     pub observed_training_steps: u64,
+    pub training_rng_seed_commitment_sha256: String,
     pub training_code_sha256: String,
     pub runtime_image_sha256: String,
     pub tokenization_pipeline_sha256: String,
@@ -262,6 +263,7 @@ fn validate_arm_common(
         (&arm.intervention_manifest_sha256, "intervention_manifest_sha256"),
         (&arm.intervention_assignment_sha256, "intervention_assignment_sha256"),
         (&arm.intervention_payload_sha256, "intervention_payload_sha256"),
+        (&arm.training_rng_seed_commitment_sha256, "training_rng_seed_commitment_sha256"),
         (&arm.training_code_sha256, "training_code_sha256"),
         (&arm.runtime_image_sha256, "runtime_image_sha256"),
         (&arm.tokenization_pipeline_sha256, "tokenization_pipeline_sha256"),
@@ -321,7 +323,8 @@ fn validate_arm_common(
     {
         return Err(format!("{expected_arm:?} requested training budget/steps do not match design"));
     }
-    if arm.training_code_sha256 != design.training_code_sha256
+    if arm.training_rng_seed_commitment_sha256 != design.training_rng_seed_commitment_sha256
+        || arm.training_code_sha256 != design.training_code_sha256
         || arm.runtime_image_sha256 != design.runtime_image_sha256
         || arm.tokenization_pipeline_sha256 != design.tokenization_pipeline_sha256
         || arm.training_hyperparameters_sha256 != design.training_hyperparameters_sha256
@@ -447,6 +450,7 @@ pub fn validate_paired_training_execution_receipt(
         && receipt.treatment.tokenization_pipeline_sha256 == receipt.placebo.tokenization_pipeline_sha256
         && receipt.treatment.training_hyperparameters_sha256 == receipt.placebo.training_hyperparameters_sha256
         && receipt.treatment.optimizer_schedule_sha256 == receipt.placebo.optimizer_schedule_sha256
+        && receipt.treatment.training_rng_seed_commitment_sha256 == receipt.placebo.training_rng_seed_commitment_sha256
         && receipt.treatment.requested_training_steps == receipt.placebo.requested_training_steps
         && receipt.treatment.requested_total_training_token_budget == receipt.placebo.requested_total_training_token_budget;
     let base_checkpoint_matched =
@@ -569,6 +573,7 @@ mod tests {
             shared_training_token_count: 1_992_000,
             total_training_token_budget: 2_000_000,
             training_steps: 5_000,
+            training_rng_seed_commitment_sha256: digest("training-rng-seed"),
             training_code_sha256: digest("training-code"),
             runtime_image_sha256: digest("runtime"),
             tokenization_pipeline_sha256: digest("tokenizer"),
@@ -622,6 +627,7 @@ mod tests {
             requested_total_training_token_budget: design.total_training_token_budget,
             requested_training_steps: design.training_steps,
             observed_training_steps: design.training_steps,
+            training_rng_seed_commitment_sha256: design.training_rng_seed_commitment_sha256.clone(),
             training_code_sha256: design.training_code_sha256.clone(),
             runtime_image_sha256: design.runtime_image_sha256.clone(),
             tokenization_pipeline_sha256: design.tokenization_pipeline_sha256.clone(),
