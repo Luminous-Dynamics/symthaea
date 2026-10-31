@@ -1,0 +1,529 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/hardsec-localization-explanation-v1.schema.json",
+  "title": "HARDSEC localization explanation v1",
+  "description": "Detector-facing explanation record. Ground-truth labels and evaluator oracles are intentionally excluded.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "explanation_id",
+    "evidence_domain",
+    "dataset_role",
+    "grouping",
+    "source",
+    "model",
+    "explainer",
+    "decision",
+    "review_budget",
+    "candidate_regions",
+    "paths",
+    "counterevidence",
+    "uncertainty",
+    "review_effort",
+    "path_coverage",
+    "claim_limits"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-localization-explanation-v1"
+    },
+    "explanation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_domain": {
+      "enum": [
+        "synthetic_fixture",
+        "benchmark_netlist",
+        "industrial_netlist"
+      ]
+    },
+    "dataset_role": {
+      "enum": [
+        "training",
+        "validation",
+        "test",
+        "reference_fixture_only",
+        "stress_only"
+      ]
+    },
+    "grouping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "split_protocol",
+        "split",
+        "host_family_id",
+        "design_id",
+        "insertion_source_id",
+        "trojan_family_id",
+        "synthesis_toolchain_id",
+        "cell_library_id"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split_protocol": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split": {
+          "enum": [
+            "train",
+            "validation",
+            "test",
+            "not_applicable"
+          ]
+        },
+        "host_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "design_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "insertion_source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trojan_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "synthesis_toolchain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cell_library_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "source_path",
+        "source_sha256",
+        "node_edge_map_sha256"
+      ],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "node_edge_map_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_id",
+        "model_sha256",
+        "config_sha256",
+        "training_lineage_sha256"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "config_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "training_lineage_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "explainer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "explainer_id",
+        "method",
+        "version",
+        "config_sha256"
+      ],
+      "properties": {
+        "explainer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method": {
+          "enum": [
+            "feature_attribution",
+            "case_based",
+            "domain_property",
+            "graph_subgraph",
+            "hdc_region_binding",
+            "hybrid"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "config_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "score",
+        "threshold_profile_sha256"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "clear",
+            "suspect",
+            "abstain"
+          ]
+        },
+        "score": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "threshold_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "review_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "limit"
+      ],
+      "properties": {
+        "unit": {
+          "enum": [
+            "regions",
+            "gates",
+            "edges"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "candidate_regions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "region_id",
+          "rank",
+          "score",
+          "node_ids",
+          "edge_ids",
+          "support_claim_ids"
+        ],
+        "properties": {
+          "region_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "node_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "edge_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "support_claim_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          }
+        }
+      }
+    },
+    "paths": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path_id",
+          "status",
+          "source_sha256",
+          "edge_ids",
+          "reason"
+        ],
+        "properties": {
+          "path_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "retained",
+              "cut_and_reported",
+              "unknown",
+              "contradicted"
+            ]
+          },
+          "source_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "edge_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "counterevidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "counterevidence_id",
+          "kind",
+          "description",
+          "evidence_sha256"
+        ],
+        "properties": {
+          "counterevidence_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "benign_equivalent_control",
+              "conflicting_observation",
+              "unsupported_semantics",
+              "lineage_overlap",
+              "other"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ood_status",
+        "calibration_status",
+        "abstention_reason"
+      ],
+      "properties": {
+        "ood_status": {
+          "enum": [
+            "in_distribution",
+            "ood",
+            "unknown"
+          ]
+        },
+        "calibration_status": {
+          "enum": [
+            "calibrated",
+            "uncalibrated",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "abstention_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "review_effort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measurement_kind",
+        "value",
+        "unit"
+      ],
+      "properties": {
+        "measurement_kind": {
+          "enum": [
+            "measured",
+            "proxy",
+            "not_measured"
+          ]
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "unit": {
+          "enum": [
+            "seconds",
+            "candidate_gates",
+            "candidate_edges",
+            "regions",
+            "not_applicable"
+          ]
+        }
+      }
+    },
+    "path_coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "oracle_id",
+        "certificate_sha256"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_claimed",
+            "partial",
+            "complete"
+          ]
+        },
+        "oracle_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "certificate_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "complete"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "oracle_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "certificate_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "claim_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claims_mechanism",
+        "claims_causal_localization",
+        "unsupported_claims"
+      ],
+      "properties": {
+        "claims_mechanism": {
+          "type": "boolean"
+        },
+        "claims_causal_localization": {
+          "type": "boolean"
+        },
+        "unsupported_claims": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}
