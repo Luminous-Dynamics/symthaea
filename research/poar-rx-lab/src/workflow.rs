@@ -72,7 +72,7 @@ impl WorkflowPolicy {
 pub enum WorkflowTerminal {
     CompletedVerified,
     CompletedUnverified,
-    AbortedVerified,
+    CompensatedVerified,
     PartialState,
     UnknownOutcome,
 }
@@ -82,7 +82,7 @@ impl WorkflowTerminal {
         match self {
             Self::CompletedVerified => "completed_verified",
             Self::CompletedUnverified => "completed_unverified",
-            Self::AbortedVerified => "aborted_verified",
+            Self::CompensatedVerified => "aborted_verified",
             Self::PartialState => "partial_state",
             Self::UnknownOutcome => "unknown_outcome",
         }
@@ -107,7 +107,7 @@ pub struct WorkflowResult {
     pub reported_complete: bool,
     pub goal_state_holds: bool,
     pub completion_verified: bool,
-    pub abort_verified: bool,
+    pub compensation_verified: bool,
     pub duplicate_effect: bool,
     pub false_completion: bool,
     pub compensation_failed: bool,
@@ -252,7 +252,7 @@ pub fn run_workflow(
     let mut readback_calls = 0;
     let mut reported_complete = false;
     let mut completion_verified = false;
-    let mut abort_verified = false;
+    let mut compensation_verified = false;
     let mut terminal = WorkflowTerminal::PartialState;
 
     match policy {
@@ -290,10 +290,10 @@ pub fn run_workflow(
                 let injected_failure = fault == WorkflowFault::CompensationFailure;
                 if world.compensate_first(true, injected_failure) {
                     readback_calls += 1;
-                    abort_verified = world.first == "first-before"
+                    compensation_verified = world.first == "first-before"
                         && world.second_agent_writes == 0;
-                    terminal = if abort_verified {
-                        WorkflowTerminal::AbortedVerified
+                    terminal = if compensation_verified {
+                        WorkflowTerminal::CompensatedVerified
                     } else {
                         WorkflowTerminal::PartialState
                     };
@@ -318,11 +318,11 @@ pub fn run_workflow(
                     // Verify both the compensation and that a concurrent
                     // external update to the other branch was preserved.
                     readback_calls += 2;
-                    abort_verified = world.first == "first-before"
+                    compensation_verified = world.first == "first-before"
                         && world.second_agent_writes == 0
                         && world.unauthorized_effects == 0;
-                    terminal = if abort_verified {
-                        WorkflowTerminal::AbortedVerified
+                    terminal = if compensation_verified {
+                        WorkflowTerminal::CompensatedVerified
                     } else {
                         WorkflowTerminal::PartialState
                     };
@@ -354,7 +354,7 @@ pub fn run_workflow(
         reported_complete,
         goal_state_holds,
         completion_verified,
-        abort_verified,
+        compensation_verified,
         duplicate_effect,
         false_completion,
         compensation_failed: world.compensation_failed,
@@ -451,8 +451,8 @@ mod tests {
             WorkflowFault::ConcurrentUpdateSecondTarget,
             true,
         );
-        assert_eq!(result.terminal, WorkflowTerminal::AbortedVerified);
-        assert!(result.abort_verified);
+        assert_eq!(result.terminal, WorkflowTerminal::CompensatedVerified);
+        assert!(result.compensation_verified);
         assert_eq!(result.first_target, "first-before");
         assert_eq!(result.second_target, "external-second");
         assert_eq!(result.lost_concurrent_updates, 0);
@@ -503,8 +503,8 @@ mod tests {
             WorkflowFault::SecondActionRejected,
             true,
         );
-        assert_eq!(result.terminal, WorkflowTerminal::AbortedVerified);
-        assert!(result.abort_verified);
+        assert_eq!(result.terminal, WorkflowTerminal::CompensatedVerified);
+        assert!(result.compensation_verified);
     }
 
     #[test]
