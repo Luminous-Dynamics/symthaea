@@ -92,7 +92,7 @@ The executable rejects reference/evaluation group overlap, cross-context referen
 
 The fixture has two workload contexts and seven observations. The synthetic monitor crosses its nominal log-wealth boundary at sequence index 4; the last three records exercise stale telemetry, an unseen context and an untrusted sensor. This validates algorithm mechanics only. The fixture is not a detector-performance result or a false-alarm-rate experiment.
 
-Thirteen authored Rust tests cover the known answer and failure modes, including reference-group leakage, duplicate windows, sequence order, mixture weights, insufficient calibration, conservative ties, score artifact binding, invalid/unqualified telemetry and evidence-domain mismatch.
+Fourteen authored Rust tests cover the known answer and failure modes, including reference-group leakage, duplicate windows, sequence order, mixture weights, insufficient calibration, conservative ties, score artifact binding, invalid/unqualified telemetry and evidence-domain mismatch.
 
 ## 6. Run
 
