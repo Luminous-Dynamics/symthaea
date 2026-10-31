@@ -31,6 +31,31 @@
         "EProp"
       ],
       "pp_prop_is_exact_gradient": false
+    },
+    "PMSN": {
+      "repository": "https://github.com/xychen-comp/Parallel-Multi-compartment-Spiking-Neuron-PMSN",
+      "commit": "6828f8f20a93ea7eff513fc6286f981152d2ae17",
+      "audit_document": "docs/research/PMSN_REFERENCE_AUDIT_V0_1.md",
+      "code_blobs": {
+        "sequential_cifar1024": "6e4e4a1fb4bfd61ef456df96f9cc170e7d061ad3",
+        "pmsn_neuron": "bcc4005c306554e5c6cc8329d75b5d6b34b26ffd",
+        "smnist_psmnist": "4e7524996adb695c143154816b6ac70c7279e105",
+        "license": "117ef6de35f929665099d9d3ba5e75a6abc90b42"
+      },
+      "applicable_tasks": [
+        "Sequential_CIFAR10_1024",
+        "S_MNIST",
+        "PS_MNIST",
+        "SHD"
+      ],
+      "code_license": "MIT",
+      "strict_reproduction_caveats": [
+        "public_test_split_used_for_epoch_checkpoint_selection",
+        "single_default_seed_1111",
+        "cuda_benchmark_enabled_after_seeding"
+      ],
+      "paper_metric_scope_verified_to_code": false,
+      "reproduction_status": "source_audit_only_not_executed"
     }
   },
   "budget_contract": {
@@ -201,7 +226,24 @@
       "one_shot_confirmatory"
     ],
     "paired_seeds_pilot_min": 10,
-    "paired_seeds_confirmatory_min": 30
+    "paired_seeds_confirmatory_min": 30,
+    "multiscale_snn_reference": [
+      "Sequential_CIFAR10_1024",
+      "S_MNIST",
+      "PS_MNIST",
+      "SHD"
+    ],
+    "baseline_arms": [
+      "PMSN_parallel",
+      "PMSN_serial",
+      "LIF_or_ALIF",
+      "BrainTrace_compatible_online_learning",
+      "STDL_compatible_spatiotemporal_training",
+      "HDC_LTC_fast_only",
+      "HDC_LTC_slow_only",
+      "HDC_LTC_fast_slow",
+      "GRU_LSTM_compatible_sequence_baselines"
+    ]
   },
   "stage2": {
     "name": "adaptive boundary allocation",
