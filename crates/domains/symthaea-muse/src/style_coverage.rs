@@ -15,8 +15,7 @@ use symthaea_muse_protocol::catalog::{
     CanonicalStyle, Constellation, catalog_for_constellation,
 };
 use symthaea_music_theory::{
-    CompositionSpec, DrumPolicy, FormKind, MUSIC_THEORY_ENGINE_VERSION,
-    ProgressionSpec, Style, TextureSpec,
+    MUSIC_THEORY_ENGINE_VERSION, ProgressionSpec, Style, TextureSpec,
     spec::MelodicDna,
 };
 
@@ -55,6 +54,9 @@ pub enum StyleCoverageState {
     NameResolvesOnly,
     /// A declared instrument name does not resolve through Instrument::from_name.
     UnresolvedInstrumentName,
+    /// The axis currently relies on a shared engine default rather than
+    /// a style-specific CompositionSpec value.
+    SharedEngineDefault,
     /// No qualified per-style renderer / production recipe is present here.
     NotRendererQualified,
 }
@@ -363,6 +365,20 @@ fn build_axes(
         ];
     };
 
+    if route.grammar_family == "unresolved" {
+        return vec![
+            axis(StyleCoverageAxis::CorpusAndProvenance, StyleCoverageState::FamilyHypothesisOnly, "no style-specific source corpus is linked from the canonical catalogue"),
+            axis(StyleCoverageAxis::Structure, StyleCoverageState::FamilyHypothesisOnly, "composer route is declared but does not resolve to Style::ALL"),
+            axis(StyleCoverageAxis::Melody, StyleCoverageState::FamilyHypothesisOnly, anatomy.melodic_language),
+            axis(StyleCoverageAxis::Rhythm, StyleCoverageState::FamilyHypothesisOnly, anatomy.rhythm),
+            axis(StyleCoverageAxis::HarmonyAndTuning, StyleCoverageState::FamilyHypothesisOnly, anatomy.harmonic_system),
+            axis(StyleCoverageAxis::TextureAndCounterpoint, StyleCoverageState::FamilyHypothesisOnly, anatomy.phrase_behavior),
+            axis(StyleCoverageAxis::InstrumentationAndTechnique, StyleCoverageState::FamilyHypothesisOnly, anatomy.ensemble),
+            axis(StyleCoverageAxis::Performance, StyleCoverageState::FamilyHypothesisOnly, anatomy.performance_dialect),
+            axis(StyleCoverageAxis::Production, StyleCoverageState::FamilyHypothesisOnly, anatomy.production_environment),
+        ];
+    }
+
     let instrument_state = if !route.ensemble_instrument_resolution.is_empty()
         && route.ensemble_instrument_resolution.iter().all(|instrument| instrument.resolved)
     {
@@ -373,12 +389,31 @@ fn build_axes(
         StyleCoverageState::DeclaredInSpec
     };
 
+    let has_style_specific_melody = !route.melodic_dna.hook_rhythms.is_empty()
+        || !route.melodic_dna.hook_contours.is_empty()
+        || route.melodic_dna.appoggiatura_rate > 0.0
+        || route.melodic_dna.ornament_rate > 0.0
+        || route.melodic_dna.blue_note_rate > 0.0
+        || route.melodic_dna.use_procedural_foundry;
+    let melody_state = if has_style_specific_melody {
+        StyleCoverageState::DeclaredInSpec
+    } else {
+        StyleCoverageState::SharedEngineDefault
+    };
+    let has_style_specific_harmony = !matches!(route.progression_spec, ProgressionSpec::Grammar)
+        || route.mode.is_some()
+        || !route.mode_pool.is_empty();
+    let harmony_state = if has_style_specific_harmony {
+        StyleCoverageState::DeclaredInSpec
+    } else {
+        StyleCoverageState::SharedEngineDefault
+    };
     vec![
         axis(StyleCoverageAxis::CorpusAndProvenance, StyleCoverageState::FamilyHypothesisOnly, "source-specific corpus lineage is not recorded in the canonical style catalogue"),
         axis(StyleCoverageAxis::Structure, StyleCoverageState::RegisteredComposerRoute, &format!("{} / {}; form pool: {:?}", route.composer_style, route.grammar_family, route.form_pool)),
-        axis(StyleCoverageAxis::Melody, StyleCoverageState::DeclaredInSpec, &format!("{} hook rhythms, {} hook contours; appoggiatura {:.3}, ornament {:.3}, blue-note {:.3}; motif banks {:?}", route.melodic_dna.hook_rhythms.len(), route.melodic_dna.hook_contours.len(), route.melodic_dna.appoggiatura_rate, route.melodic_dna.ornament_rate, route.melodic_dna.blue_note_rate, route.motif_bank_counts)),
+        axis(StyleCoverageAxis::Melody, melody_state, &format!("{} hook rhythms, {} hook contours; appoggiatura {:.3}, ornament {:.3}, blue-note {:.3}; motif banks {:?}", route.melodic_dna.hook_rhythms.len(), route.melodic_dna.hook_contours.len(), route.melodic_dna.appoggiatura_rate, route.melodic_dna.ornament_rate, route.melodic_dna.blue_note_rate, route.motif_bank_counts)),
         axis(StyleCoverageAxis::Rhythm, StyleCoverageState::DeclaredInSpec, &format!("meter {} quarter-note beats; accompaniment {:?}; meter alternatives {:?}", route.meter_quarter_beats_per_bar, route.accompaniment_pool, route.meter_pool)),
-        axis(StyleCoverageAxis::HarmonyAndTuning, StyleCoverageState::DeclaredInSpec, &format!("progression {:?}; mode {:?}; mode pool {:?}", route.progression_spec, route.mode, route.mode_pool)),
+        axis(StyleCoverageAxis::HarmonyAndTuning, harmony_state, &format!("progression {:?}; mode {:?}; mode pool {:?}", route.progression_spec, route.mode, route.mode_pool)),
         axis(StyleCoverageAxis::TextureAndCounterpoint, StyleCoverageState::DeclaredInSpec, &format!("rhetoric {}; development {}; texture fields recorded", route.phrase_rhetoric, route.development_dna)),
         axis(StyleCoverageAxis::InstrumentationAndTechnique, instrument_state, &format!("{} ensemble name cells; {} resolve; name resolution is not range/sample/technique qualification", route.ensemble_instrument_resolution.len(), route.ensemble_instrument_resolution.iter().filter(|cell| cell.resolved).count())),
         axis(StyleCoverageAxis::Performance, StyleCoverageState::DeclaredInSpec, &format!("tempo range {:?}; swing {}; intro bars {}; staged entrances {}; held arrivals {}", route.tempo_range_bpm, route.texture.swing, route.texture.intro_bars, route.texture.staged_entrances, route.texture.held_arrivals)),
@@ -485,15 +520,16 @@ mod tests {
             }
             let instruments = style.axes.iter().find(|axis| axis.axis == StyleCoverageAxis::InstrumentationAndTechnique).unwrap();
             if let Some(route) = &style.route {
-                assert!(
-                    instruments.state == StyleCoverageState::NameResolvesOnly
-                        || instruments.state == StyleCoverageState::UnresolvedInstrumentName
-                        || instruments.state == StyleCoverageState::DeclaredInSpec
-                );
-                assert_eq!(
-                    route.ensemble_instrument_resolution.iter().filter(|cell| cell.resolved).count(),
-                    style.axes.iter().find(|axis| axis.axis == StyleCoverageAxis::InstrumentationAndTechnique).unwrap().detail.matches("resolves").count().min(route.ensemble_instrument_resolution.len()),
-                );
+                let expected = if route.grammar_family == "unresolved" {
+                    StyleCoverageState::FamilyHypothesisOnly
+                } else if route.ensemble_instrument_resolution.iter().any(|cell| !cell.resolved) {
+                    StyleCoverageState::UnresolvedInstrumentName
+                } else if route.ensemble_instrument_resolution.is_empty() {
+                    StyleCoverageState::DeclaredInSpec
+                } else {
+                    StyleCoverageState::NameResolvesOnly
+                };
+                assert_eq!(instruments.state, expected);
             }
         }
     }
