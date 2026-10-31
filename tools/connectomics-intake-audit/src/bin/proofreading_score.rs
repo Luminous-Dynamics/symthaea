@@ -172,6 +172,25 @@ struct CalibrationDiagnostics {
 }
 
 #[derive(Debug, Serialize)]
+struct CalibrationClusterBootstrap {
+    requested_replicates: usize,
+    valid_replicates: usize,
+    minimum_valid_replicates_for_interval: usize,
+    expected_calibration_error_95: Option<Interval>,
+    maximum_calibration_error_95: Option<Interval>,
+    brier_score_95: Option<Interval>,
+}
+
+#[derive(Debug, Serialize)]
+struct OodClusterBootstrap {
+    requested_replicates: usize,
+    valid_replicates: usize,
+    minimum_valid_replicates_for_interval: usize,
+    roc_auc_95: Option<Interval>,
+    average_precision_95: Option<Interval>,
+}
+
+#[derive(Debug, Serialize)]
 struct DomainEvaluation {
     domain_id: String,
     shift_axis: String,
@@ -180,15 +199,18 @@ struct DomainEvaluation {
     independent_cluster_count: usize,
     classification: ClassificationMetrics,
     calibration: CalibrationDiagnostics,
+    calibration_cluster_bootstrap_95: CalibrationClusterBootstrap,
 }
 
 #[derive(Debug, Serialize)]
 struct OodDetectionMetrics {
     n: usize,
+    independent_cluster_count: usize,
     in_domain_count: usize,
     held_out_domain_count: usize,
     roc_auc: Option<f64>,
     average_precision: Option<f64>,
+    cluster_bootstrap_95: OodClusterBootstrap,
     frozen_threshold: Option<f64>,
     false_ood_count: Option<usize>,
     false_ood_rate_on_in_domain: Option<f64>,
@@ -227,6 +249,7 @@ struct Report {
     domain_shift_audit_status: &'static str,
     domain_shift_axis: Option<String>,
     overall_calibration: Option<CalibrationDiagnostics>,
+    overall_calibration_cluster_bootstrap_95: Option<CalibrationClusterBootstrap>,
     per_domain: Option<BTreeMap<String, DomainEvaluation>>,
     ood_detection: Option<OodDetectionMetrics>,
     scope_note: &'static str,
@@ -657,6 +680,127 @@ fn cluster_bootstrap(rows: &[&Prediction], replicates: usize, seed_material: &st
         valid_replicates: scores.len(),
         minimum_valid_replicates_for_interval: minimum_valid,
         balanced_accuracy_95: interval,
+    }
+}
+
+fn scalar_percentile_interval(mut values: Vec<f64>, requested_replicates: usize) -> Option<Interval> {
+    let minimum_valid = ((requested_replicates as f64) * 0.8).ceil() as usize;
+    if values.len() < minimum_valid || values.is_empty() {
+        return None;
+    }
+    values.sort_by(f64::total_cmp);
+    Some(Interval {
+        lower: percentile(&values, 0.025)?,
+        upper: percentile(&values, 0.975)?,
+    })
+}
+
+fn calibration_cluster_bootstrap(
+    rows: &[&Prediction],
+    replicates: usize,
+    seed_material: &str,
+) -> CalibrationClusterBootstrap {
+    let mut clusters: BTreeMap<String, Vec<&Prediction>> = BTreeMap::new();
+    for row in rows {
+        clusters.entry(row.cluster_id.clone()).or_default().push(*row);
+    }
+    let cluster_rows = clusters.into_values().collect::<Vec<_>>();
+    let minimum_valid = ((replicates as f64) * 0.8).ceil() as usize;
+    if cluster_rows.len() < 2 || replicates == 0 {
+        return CalibrationClusterBootstrap {
+            requested_replicates: replicates,
+            valid_replicates: 0,
+            minimum_valid_replicates_for_interval: minimum_valid,
+            expected_calibration_error_95: None,
+            maximum_calibration_error_95: None,
+            brier_score_95: None,
+        };
+    }
+
+    let digest = sha256(seed_material.as_bytes());
+    let mut state = u64::from_str_radix(&digest[..16], 16).unwrap_or(1);
+    if state == 0 { state = 1; }
+    let mut ece = Vec::with_capacity(replicates);
+    let mut mce = Vec::with_capacity(replicates);
+    let mut brier = Vec::with_capacity(replicates);
+    for _ in 0..replicates {
+        let mut sample = Vec::with_capacity(rows.len());
+        for _ in 0..cluster_rows.len() {
+            let index = (next_u64(&mut state) % cluster_rows.len() as u64) as usize;
+            sample.extend(cluster_rows[index].iter().copied());
+        }
+        let metrics = calibration_diagnostics(&sample);
+        if let (Some(e), Some(m), Some(b)) = (
+            metrics.expected_calibration_error,
+            metrics.maximum_calibration_error,
+            metrics.brier_score,
+        ) {
+            if e.is_finite() && m.is_finite() && b.is_finite() {
+                ece.push(e);
+                mce.push(m);
+                brier.push(b);
+            }
+        }
+    }
+    CalibrationClusterBootstrap {
+        requested_replicates: replicates,
+        valid_replicates: ece.len(),
+        minimum_valid_replicates_for_interval: minimum_valid,
+        expected_calibration_error_95: scalar_percentile_interval(ece, replicates),
+        maximum_calibration_error_95: scalar_percentile_interval(mce, replicates),
+        brier_score_95: scalar_percentile_interval(brier, replicates),
+    }
+}
+
+fn ood_cluster_bootstrap(
+    rows: &[&Prediction],
+    replicates: usize,
+    seed_material: &str,
+) -> OodClusterBootstrap {
+    let mut clusters: BTreeMap<String, Vec<&Prediction>> = BTreeMap::new();
+    for row in rows {
+        clusters.entry(row.cluster_id.clone()).or_default().push(*row);
+    }
+    let cluster_rows = clusters.into_values().collect::<Vec<_>>();
+    let minimum_valid = ((replicates as f64) * 0.8).ceil() as usize;
+    if cluster_rows.len() < 2 || replicates == 0 {
+        return OodClusterBootstrap {
+            requested_replicates: replicates,
+            valid_replicates: 0,
+            minimum_valid_replicates_for_interval: minimum_valid,
+            roc_auc_95: None,
+            average_precision_95: None,
+        };
+    }
+
+    let digest = sha256(seed_material.as_bytes());
+    let mut state = u64::from_str_radix(&digest[..16], 16).unwrap_or(1);
+    if state == 0 { state = 1; }
+    let mut auc = Vec::with_capacity(replicates);
+    let mut average_precision = Vec::with_capacity(replicates);
+    for _ in 0..replicates {
+        let mut sample = Vec::with_capacity(rows.len());
+        for _ in 0..cluster_rows.len() {
+            let index = (next_u64(&mut state) % cluster_rows.len() as u64) as usize;
+            sample.extend(cluster_rows[index].iter().copied());
+        }
+        let scores = sample.iter().filter_map(|row| {
+            Some((row.is_ood_domain?, row.ood_score?))
+        }).collect::<Vec<_>>();
+        let (sample_auc, sample_ap) = binary_ranking_metrics(&scores);
+        if let (Some(a), Some(ap)) = (sample_auc, sample_ap) {
+            if a.is_finite() && ap.is_finite() {
+                auc.push(a);
+                average_precision.push(ap);
+            }
+        }
+    }
+    OodClusterBootstrap {
+        requested_replicates: replicates,
+        valid_replicates: auc.len(),
+        minimum_valid_replicates_for_interval: minimum_valid,
+        roc_auc_95: scalar_percentile_interval(auc, replicates),
+        average_precision_95: scalar_percentile_interval(average_precision, replicates),
     }
 }
 
@@ -1145,6 +1289,8 @@ fn binary_ranking_metrics(labels_and_scores: &[(bool, f64)]) -> (Option<f64>, Op
 fn ood_detection_metrics(
     rows: &[&Prediction],
     threshold: Option<f64>,
+    bootstrap_replicates: usize,
+    seed_material: &str,
 ) -> OodDetectionMetrics {
     let labelled_scores = rows.iter().filter_map(|row| {
         Some((row.is_ood_domain?, row.ood_score?))
@@ -1168,12 +1314,19 @@ fn ood_detection_metrics(
         )
     });
 
+    let cluster_count = rows.iter().map(|row| row.cluster_id.as_str()).collect::<BTreeSet<_>>().len();
     OodDetectionMetrics {
         n: rows.len(),
+        independent_cluster_count: cluster_count,
         in_domain_count,
         held_out_domain_count,
         roc_auc,
         average_precision,
+        cluster_bootstrap_95: ood_cluster_bootstrap(
+            rows,
+            bootstrap_replicates,
+            seed_material,
+        ),
         frozen_threshold: threshold,
         false_ood_count: operating.map(|value| value.0),
         false_ood_rate_on_in_domain: operating.map(|value| value.2),
@@ -1186,10 +1339,13 @@ fn domain_shift_evaluation(
     records: &[Prediction],
     required: bool,
     ood_threshold: Option<f64>,
+    bootstrap_replicates: usize,
+    seed_material: &str,
 ) -> Result<(
     &'static str,
     Option<String>,
     Option<CalibrationDiagnostics>,
+    Option<CalibrationClusterBootstrap>,
     Option<BTreeMap<String, DomainEvaluation>>,
     Option<OodDetectionMetrics>,
 ), String> {
@@ -1201,7 +1357,7 @@ fn domain_shift_evaluation(
         if ood_threshold.is_some() {
             return Err("--ood-score-threshold requires complete domain metadata and novelty scores".into());
         }
-        return Ok(("NOT_PROVIDED", None, None, None, None));
+        return Ok(("NOT_PROVIDED", None, None, None, None, None));
     }
 
     let axis = records.first().and_then(|row| row.shift_axis.clone())
@@ -1217,13 +1373,18 @@ fn domain_shift_evaluation(
         let clusters = rows.iter().map(|row| row.cluster_id.as_str()).collect::<BTreeSet<_>>();
         let refs = rows.iter().copied().collect::<Vec<_>>();
         per_domain.insert(domain_id.clone(), DomainEvaluation {
-            domain_id,
+            domain_id: domain_id.clone(),
             shift_axis: axis.clone(),
             is_ood_domain: first.is_ood_domain.unwrap_or(false),
             n: rows.len(),
             independent_cluster_count: clusters.len(),
             classification: classification(&refs),
             calibration: calibration_diagnostics(&refs),
+            calibration_cluster_bootstrap_95: calibration_cluster_bootstrap(
+                &refs,
+                bootstrap_replicates,
+                &format!("{seed_material}:domain:{domain_id}:calibration"),
+            ),
         });
     }
 
@@ -1233,13 +1394,30 @@ fn domain_shift_evaluation(
     }
     let refs = records.iter().collect::<Vec<_>>();
     let overall_calibration = Some(calibration_diagnostics(&refs));
+    let overall_calibration_bootstrap = Some(calibration_cluster_bootstrap(
+        &refs,
+        bootstrap_replicates,
+        &format!("{seed_material}:overall-calibration"),
+    ));
     let ood_detection = if novelty_present {
-        Some(ood_detection_metrics(&refs, ood_threshold))
+        Some(ood_detection_metrics(
+            &refs,
+            ood_threshold,
+            bootstrap_replicates,
+            &format!("{seed_material}:ood-detection"),
+        ))
     } else {
         None
     };
     let status = if ood_detection.is_some() { "OOD_SCORED" } else { "DOMAIN_STRATIFIED_ONLY" };
-    Ok((status, Some(axis), overall_calibration, Some(per_domain), ood_detection))
+    Ok((
+        status,
+        Some(axis),
+        overall_calibration,
+        overall_calibration_bootstrap,
+        Some(per_domain),
+        ood_detection,
+    ))
 }
 
 
@@ -1272,8 +1450,20 @@ fn run() -> Result<i32, String> {
         .map_err(|e| format!("failed to read input {}: {e}", args.input.display()))?;
     let input_hash = sha256(&input_bytes);
     let records = parse_jsonl(&input_bytes)?;
-    let (domain_shift_audit_status, domain_shift_axis, overall_calibration, per_domain, ood_detection) =
-        domain_shift_evaluation(&records, args.require_domain_shift_audit, args.ood_score_threshold)?;
+    let (
+        domain_shift_audit_status,
+        domain_shift_axis,
+        overall_calibration,
+        overall_calibration_cluster_bootstrap_95,
+        per_domain,
+        ood_detection,
+    ) = domain_shift_evaluation(
+        &records,
+        args.require_domain_shift_audit,
+        args.ood_score_threshold,
+        args.bootstrap_replicates,
+        &input_hash,
+    )?;
     let refs: Vec<&Prediction> = records.iter().collect();
     let overall = classification(&refs);
     let overall_cluster_bootstrap_95 = cluster_bootstrap(
@@ -1342,6 +1532,7 @@ fn run() -> Result<i32, String> {
         domain_shift_audit_status,
         domain_shift_axis,
         overall_calibration,
+        overall_calibration_cluster_bootstrap_95,
         per_domain,
         ood_detection,
         scope_note: "Metrics describe this frozen prediction file only. Cluster-bootstrap intervals resample the caller-declared cluster_id; they do not prove that the chosen cluster unit is independent. This scorer does not validate dataset labels/mapping truth or establish prospective review-time savings. Use a locked evaluation protocol before claims.",
@@ -1406,6 +1597,68 @@ mod tests {
     }
 
     #[test]
+    fn calibration_cluster_bootstrap_is_deterministic_and_uses_clusters() {
+        let mut rows = Vec::new();
+        for cluster in 0..6 {
+            for within in 0..2 {
+                let label = within == 0;
+                let mut item = row(
+                    &format!("cb-{cluster}-{within}"),
+                    label,
+                    if label { 0.8 } else { 0.2 },
+                    0.5,
+                    1.0,
+                    1.0,
+                    "merge",
+                );
+                item.cluster_id = format!("psu-{cluster}");
+                rows.push(item);
+            }
+        }
+        let refs = rows.iter().collect::<Vec<_>>();
+        let first = calibration_cluster_bootstrap(&refs, 200, "calibration-seed");
+        let second = calibration_cluster_bootstrap(&refs, 200, "calibration-seed");
+        assert_eq!(first.valid_replicates, 200);
+        assert_eq!(
+            first.expected_calibration_error_95.map(|x| (x.lower, x.upper)),
+            second.expected_calibration_error_95.map(|x| (x.lower, x.upper))
+        );
+        assert_eq!(first.brier_score_95, Some(Interval { lower: 0.04, upper: 0.04 }));
+    }
+
+    #[test]
+    fn calibration_cluster_bootstrap_refuses_one_cluster() {
+        let mut a = row("one-a", true, 0.9, 0.9, 1.0, 1.0, "merge");
+        let mut b = row("one-b", false, 0.1, 0.1, 1.0, 1.0, "merge");
+        a.cluster_id = "one-psu".into();
+        b.cluster_id = "one-psu".into();
+        let interval = calibration_cluster_bootstrap(&[&a, &b], 200, "one-cluster");
+        assert_eq!(interval.valid_replicates, 0);
+        assert_eq!(interval.expected_calibration_error_95, None);
+        assert_eq!(interval.brier_score_95, None);
+    }
+
+    #[test]
+    fn ood_cluster_bootstrap_refuses_single_class_cluster_resamples() {
+        let mut in_domain = row("in", false, 0.1, 0.1, 1.0, 1.0, "merge");
+        let mut ood = row("out", true, 0.9, 0.9, 1.0, 1.0, "merge");
+        in_domain.cluster_id = "one-in-cluster".into();
+        ood.cluster_id = "one-out-cluster".into();
+        in_domain.domain_id = Some("mouse".into());
+        in_domain.shift_axis = Some("species".into());
+        in_domain.is_ood_domain = Some(false);
+        in_domain.ood_score = Some(0.1);
+        ood.domain_id = Some("zebrafish".into());
+        ood.shift_axis = Some("species".into());
+        ood.is_ood_domain = Some(true);
+        ood.ood_score = Some(0.9);
+        let interval = ood_cluster_bootstrap(&[&in_domain, &ood], 500, "sparse-ood");
+        assert!(interval.valid_replicates < 400);
+        assert_eq!(interval.roc_auc_95, None);
+        assert_eq!(interval.average_precision_95, None);
+    }
+
+    #[test]
     fn calibration_bins_expose_counts_and_expected_error() {
         let rows = vec![
             row("c1", true, 0.95, 0.5, 1.0, 1.0, "merge"),
@@ -1430,7 +1683,7 @@ mod tests {
             tagged_row("d4", false, 0.9, "zebrafish", true, 0.8),
         ];
         let refs = rows.iter().collect::<Vec<_>>();
-        let metrics = ood_detection_metrics(&refs, Some(0.5));
+        let metrics = ood_detection_metrics(&refs, Some(0.5), 500, "test:ood-bootstrap");
         assert_eq!(metrics.roc_auc, Some(1.0));
         assert_eq!(metrics.average_precision, Some(1.0));
         assert_eq!(metrics.false_ood_count, Some(0));
@@ -1463,10 +1716,12 @@ mod tests {
             tagged_row("e3", true, 0.1, "zebrafish", true, 0.9),
             tagged_row("e4", false, 0.9, "zebrafish", true, 0.8),
         ];
-        let (status, axis, overall, domains, ood) = domain_shift_evaluation(&rows, true, Some(0.5)).unwrap();
+        let (status, axis, overall, overall_bootstrap, domains, ood) =
+            domain_shift_evaluation(&rows, true, Some(0.5), 500, "test:domain-bootstrap").unwrap();
         assert_eq!(status, "OOD_SCORED");
         assert_eq!(axis.as_deref(), Some("species"));
         assert!(overall.is_some());
+        assert!(overall_bootstrap.is_some());
         assert_eq!(domains.unwrap().len(), 2);
         assert_eq!(ood.unwrap().roc_auc, Some(1.0));
     }
@@ -1474,14 +1729,14 @@ mod tests {
     #[test]
     fn domain_audit_refuses_missing_metadata_when_required() {
         let rows = vec![row("n1", true, 0.9, 0.9, 1.0, 1.0, "merge")];
-        assert!(domain_shift_evaluation(&rows, true, None).is_err());
+        assert!(domain_shift_evaluation(&rows, true, None, 100, "test:missing-domain").is_err());
     }
 
     #[test]
     fn domain_audit_refuses_threshold_without_novelty_scores() {
         let mut item = tagged_row("n2", true, 0.9, "mouse", false, 0.2);
         item.ood_score = None;
-        assert!(domain_shift_evaluation(&[item], false, Some(0.5)).is_err());
+        assert!(domain_shift_evaluation(&[item], false, Some(0.5), 100, "test:missing-ood").is_err());
     }
 
     #[test]
