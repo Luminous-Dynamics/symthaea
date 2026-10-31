@@ -1,6 +1,6 @@
 # MEL-MR-EVAL-034 — calibrated hysteresis and explicit tail qualification
 
-**Status:** versioned EVAL-017 v0.2 segmenter implemented; seven new segmentation-focused tests authored; EVAL-025 adapter upgraded to v2 with eight focused adapter tests; no compile, runner, real FluidSynth render or empirical support-quality result claimed.
+**Status:** versioned EVAL-017 v0.2 segmenter implemented; seven new segmentation-focused tests authored; EVAL-025 adapter upgraded to v2 with eleven focused adapter tests; no compile, runner, real FluidSynth render or empirical support-quality result claimed.
 
 ## Why this is separate from EVAL-017 v0.1
 
