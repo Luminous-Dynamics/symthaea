@@ -30,17 +30,17 @@
     "benchmark_executed": false,
     "hardware_energy_measured": false,
     "result_values_present": false,
-    "generator_scope": "Prototype Rust generators are authored for all nine task families: T1 sparse event/quiet idle, T2 delayed cue, T3/T4 multiscale forecast/change-point, T5 irregular/missingness, T6 selective retention/invalidation, T7 phase prediction, T8 BrainTrace DMS semantics, T9 BrainTrace evidence accumulation. T1 burst clusters, sinusoidal/frequency-sweep T7 extensions, runner/oracle isolation, datasets, and system measurements remain unimplemented.",
+    "generator_scope": "Prototype Rust generators are authored for all nine task families: T1 always-on sparse event/quiet idle, T2 delayed cue, T3/T4 multiscale forecast/change-point, T5 irregular/missingness, T6 selective retention/invalidation, T7 phase prediction, T8 BrainTrace DMS semantics, T9 BrainTrace evidence accumulation. Seed-bound deterministic regeneration is implemented for multiscale, DMS and evidence tasks. T1 burst clusters, sinusoidal/frequency-sweep T7 extensions, evaluator runner/oracle isolation, real-dataset adapters, model baselines, and system measurements remain unimplemented.",
     "rust_tests_authored": true,
     "oracle_trace_verifier_implemented": true,
     "oracle_process_isolation_implemented": false,
-    "rust_tests_authored_count": 139,
+    "rust_tests_authored_count": 144,
     "rust_tests_by_file": {
       "research/temporal-bench/src/digest.rs": 2,
       "research/temporal-bench/src/lib.rs": 16,
-      "research/temporal-bench/src/temporal.rs": 22,
-      "research/temporal-bench/src/dms.rs": 16,
-      "research/temporal-bench/src/evidence.rs": 17,
+      "research/temporal-bench/src/temporal.rs": 23,
+      "research/temporal-bench/src/dms.rs": 18,
+      "research/temporal-bench/src/evidence.rs": 19,
       "research/temporal-bench/src/irregular.rs": 13,
       "research/temporal-bench/src/retention.rs": 15,
       "research/temporal-bench/src/fast_event.rs": 21,
@@ -58,7 +58,17 @@
       "phase_prediction": true
     },
     "cryptographic_oracle_digest_implemented": true,
-    "signed_evaluator_receipt_implemented": false
+    "signed_evaluator_receipt_implemented": false,
+    "seed_bound_regeneration": {
+      "multiscale": true,
+      "braintrace_dms": true,
+      "evidence_accumulation": true,
+      "irregular_missingness": false,
+      "selective_retention": false,
+      "fast_event": false,
+      "phase_prediction": false,
+      "note": "Seed-bound exact reconstruction is implemented for multiscale, DMS and evidence tasks. Other generators currently validate their stored public/oracle digests and task semantics but do not all reconstruct the full stream from a recorded seed."
+    }
   },
   "workload_contract": {
     "sample_semantics": "Causal observations; no future samples; elapsed simulated time is explicit.",
