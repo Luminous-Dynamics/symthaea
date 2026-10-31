@@ -121,7 +121,7 @@ Relevant sources:
 - SynAnno (IEEE TVCG, 2026): https://pubmed.ncbi.nlm.nih.gov/41396767/
 - Uncertainty quantification in connectomics (Nature Methods, 2025): https://www.nature.com/articles/s41592-025-02945-3
 
-As one concrete reference point, the September/October 2026 VLM preprint reports on the full ConnectomeBench2 test split (101,929 samples) an EM-only ViT-B score of 94.2% split-error and 91.1% merge-error balanced accuracy; Gemma 4 12B LoRA reports 95.0% and 90.9%. Its unseen-species and balanced-subset results differ by task and species. Those values are protocol-specific comparators, not whole-connectome recall or scientific-query correctness. Reproduction requires the paper's exact cohort and evaluation procedure.
+The original ConnectomeBench2 paper reports its full multimodal ViT-B at 97.0% split-error and 93.0% merge-error balanced accuracy (ViT-L: 97.2% and 92.8%), compared with expert baselines of 93.0% and 84.1%. These are operation-level held-out benchmark results, not whole-connectome recall. The September/October 2026 VLM preprint reports on its full ConnectomeBench2 test split (101,929 samples) an **EM-only** ViT-B score of 94.2% split-error and 91.1% merge-error balanced accuracy; Gemma 4 12B LoRA reports 95.0% and 90.9%. The EM-only comparison must not be mistaken for the original full multimodal CB2 headline result. The VLM paper's unseen-species and balanced-subset results differ by task and species. These values are protocol-specific comparators, not whole-connectome recall or scientific-query correctness. Reproduction requires the exact cohort, modality eligibility, and evaluation procedure of the relevant paper.
 
 ## 5. Benchmark ladder and promotion gates
 
