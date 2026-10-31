@@ -116,6 +116,7 @@ pub struct SearchTimeExposureAuditV1 {
     pub accepted_response_receipts_complete: bool,
     pub blocked_events_have_no_response_bytes: bool,
     pub network_disabled_policy_respected: bool,
+    pub allowlist_policy_respected: bool,
     pub all_event_channels_declared_instrumented: bool,
     pub all_known_channel_types_accounted_for: bool,
     pub no_unobserved_channels_declared: bool,
@@ -523,6 +524,7 @@ pub fn audit_search_time_trace(
         accepted_response_receipts_complete: response_receipts_complete,
         blocked_events_have_no_response_bytes: blocked_events_clean,
         network_disabled_policy_respected: network_disabled_respected,
+        allowlist_policy_respected: allowlist_respected,
         all_event_channels_declared_instrumented: channels_instrumented,
         all_known_channel_types_accounted_for,
         no_unobserved_channels_declared: no_unobserved_channels,
@@ -759,6 +761,31 @@ mod tests {
     }
 
     #[test]
+    fn allowlisted_mode_accepts_only_declared_destination_digests() {
+        let mut trace = trace();
+        trace.access_mode = SearchAccessModeV1::Allowlisted;
+        trace.allowlisted_destination_sha256s = vec![digest("allowed-search-destination")];
+        trace.events[0] = event(
+            1,
+            SearchInformationChannelV1::WebSearch,
+            SearchEventDispositionV1::Allowed,
+            "2026-10-31T18:00:00Z",
+        );
+        trace.events[0].destination_sha256 = digest("allowed-search-destination");
+        seal_search_time_trace(&mut trace).unwrap();
+        let audit = audit_search_time_trace(&trace).unwrap();
+        assert!(audit.valid);
+        assert!(audit.allowlist_policy_respected);
+
+        let mut trace = trace;
+        trace.events[0].destination_sha256 = digest("unlisted-search-destination");
+        trace.trace_root_sha256 = trace_digest(&trace).unwrap();
+        let audit = audit_search_time_trace(&trace).unwrap();
+        assert!(!audit.valid);
+        assert!(!audit.allowlist_policy_respected);
+    }
+
+    #[test]
     fn blocked_event_must_not_claim_response_bytes() {
         let mut trace = trace();
         trace.events[1].response_sha256 = Some(digest("impossible-response"));
@@ -769,6 +796,7 @@ mod tests {
     #[test]
     fn unobserved_or_undeclared_channels_prevent_validity() {
         let mut trace = trace();
+        trace.instrumented_channels.retain(|channel| *channel != SearchInformationChannelV1::AgentMemory);
         trace.unobserved_channels.push(SearchInformationChannelV1::AgentMemory);
         seal_search_time_trace(&mut trace).unwrap();
         let audit = audit_search_time_trace(&trace).unwrap();
