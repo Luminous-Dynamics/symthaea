@@ -1717,6 +1717,7 @@ fn parse_planner_artifact_v1(bytes: &[u8]) -> Result<ParsedPlannerV1, String> {
                 return Err(format!("planner: target {target:?} is not a declared claim"));
             }
         }
+        let evidence_ids = builder.evidence.keys().cloned().collect::<BTreeSet<_>>();
         let mut claims = builder.declared_claims.iter()
             .map(|id| (id.clone(), Vec::<ProofAlternative>::new()))
             .collect::<BTreeMap<_, _>>();
@@ -1724,9 +1725,16 @@ fn parse_planner_artifact_v1(bytes: &[u8]) -> Result<ParsedPlannerV1, String> {
             let alternatives = claims.get_mut(&claim_id)
                 .ok_or_else(|| format!("planner: alternative belongs to undeclared claim {claim_id:?}"))?;
             for requirement in &alternative.requirements {
-                if let ProofRequirement::Claim { claim_id: child, .. } = requirement {
-                    if !builder.declared_claims.contains(child) {
-                        return Err(format!("planner: alternative references unknown child claim {child:?}"));
+                match requirement {
+                    ProofRequirement::Claim { claim_id: child, .. } => {
+                        if !builder.declared_claims.contains(child) {
+                            return Err(format!("planner: alternative references unknown child claim {child:?}"));
+                        }
+                    }
+                    ProofRequirement::Evidence(evidence_id) => {
+                        if !evidence_ids.contains(evidence_id) {
+                            return Err(format!("planner: alternative references unknown evidence {evidence_id:?}"));
+                        }
                     }
                 }
             }
