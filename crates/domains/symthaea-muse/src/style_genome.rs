@@ -382,6 +382,7 @@ pub enum ArchiveInsertDisposition {
     RejectedNearClone,
     RejectedDominated,
     RejectedCapacity,
+    RejectedReferencePopulationMismatch,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -416,6 +417,24 @@ impl GenomeArchive {
 
     pub fn insert(&mut self, evaluation: GenomeEvaluation) -> ArchiveInsertReceipt {
         let genome_id = evaluation.genome.genome_id.clone();
+        if !evaluation.genome.verify_id() || !evaluation.verify_digest() {
+            return receipt(
+                ArchiveInsertDisposition::RejectedIneligible,
+                &genome_id,
+                Vec::new(),
+                "genome identity or evaluation receipt digest did not verify",
+            );
+        }
+        if self.reference_population_bound
+            && self.reference_population_sha256 != evaluation.reference_population_sha256
+        {
+            return receipt(
+                ArchiveInsertDisposition::RejectedReferencePopulationMismatch,
+                &genome_id,
+                Vec::new(),
+                "Pareto candidates must use the same frozen reference-population digest",
+            );
+        }
         if !evaluation.eligible_for_archive {
             return receipt(
                 ArchiveInsertDisposition::RejectedIneligible,
@@ -479,10 +498,11 @@ impl GenomeArchive {
         }
         self.entries.retain(|entry| !removed.contains(&entry.genome_id));
 
-        if removed.is_empty() && self.entries.iter().any(|entry| {
-            mean_fingerprint_array(&entry.mean_structural_fingerprint)
-                .is_some_and(|existing| normalized_distance(&candidate, &existing)
-                    <= self.config.near_clone_threshold)
+        if removed.is_empty() && self.config.near_clone_threshold.is_some_and(|threshold| {
+            self.entries.iter().any(|entry| {
+                mean_fingerprint_array(&entry.mean_structural_fingerprint)
+                    .is_some_and(|existing| normalized_distance(&candidate, &existing) <= threshold)
+            })
         }) {
             return receipt(
                 ArchiveInsertDisposition::RejectedNearClone,
@@ -507,6 +527,10 @@ impl GenomeArchive {
             objectives: evaluation.objectives.clone(),
             evaluation,
         };
+        if !self.reference_population_bound {
+            self.reference_population_sha256 = entry.evaluation.reference_population_sha256.clone();
+            self.reference_population_bound = true;
+        }
         self.entries.push(entry);
         self.entries.sort_by(|left, right| left.genome_id.cmp(&right.genome_id));
         receipt(
@@ -541,6 +565,19 @@ pub fn evaluate_genome(
             "evaluation seeds must be unique",
         )]);
     }
+    if reference_population.iter().any(|vector| vector.iter().any(|value| !value.is_finite())) {
+        return Err(vec![GenomeIssue::new(
+            "invalid_reference_population",
+            "reference fingerprints must contain only finite values",
+        )]);
+    }
+    let evaluation_config_sha256 = {
+        let bytes = serde_json::to_vec(config).map_err(|error| {
+            vec![GenomeIssue::new("evaluation_config_serialization_failed", error.to_string())]
+        })?;
+        domain_sha256(b"symthaea:muse-style-genome-config:v1\n", &bytes)
+    };
+    let reference_population_sha256 = reference_population_digest(reference_population)?;
     let compiled = compile_hybrid_style(&genome.recipe).map_err(|mix_issues| {
         mix_issues.into_iter().map(|problem| {
             GenomeIssue::new(&problem.code, problem.message)
@@ -657,7 +694,7 @@ pub fn evaluate_genome(
     let motif_transformations = trials.iter()
         .flat_map(|trial| trial.motif_transformations.iter().cloned())
         .collect::<BTreeSet<_>>();
-    let motif_transformation_richness = motif_transformations.len() as f64 / 7.0;
+    let motif_transformation_richness = motif_transformations.len() as f64 / 4.0;
     let form_variation = trials.iter()
         .filter_map(|trial| trial.form_signature.as_ref())
         .collect::<BTreeSet<_>>()
@@ -678,6 +715,8 @@ pub fn evaluate_genome(
         genome: genome.clone(),
         compiler_schema: crate::style_mixer::HYBRID_STYLE_COMPILER_SCHEMA.into(),
         compiled_spec_sha256: compiled.provenance.compiled_spec_sha256.clone(),
+        evaluation_config_sha256,
+        reference_population_sha256,
         seed_count: config.seeds.len(),
         eligible_for_archive,
         abstention_reasons: issues,
@@ -692,7 +731,7 @@ pub fn evaluate_genome(
         trials,
         evaluation_sha256: String::new(),
     };
-    evaluation.evaluation_sha256 = evaluation_digest(&evaluation, config)?;
+    evaluation.evaluation_sha256 = evaluation_digest(&evaluation)?;
     Ok(evaluation)
 }
 
@@ -959,7 +998,7 @@ mod tests {
     fn structural_owner_gene_cannot_be_erased() {
         let genome = classical_genome();
         let result = genome.replace_gene(GenomeAxis::Structure, None);
-        assert!(result.unwrap_err().iter().any(|issue| issue.code == "structural_gene_cannot_be_empty"));
+        assert_eq!(result.unwrap_err().code, "structural_gene_cannot_be_empty");
     }
 
     #[test]
