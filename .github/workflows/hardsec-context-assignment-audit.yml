@@ -1,0 +1,66 @@
+name: HARDSEC-020 workload context assignment audit
+
+on:
+  pull_request:
+    paths:
+      - "examples/hardsec_context_assignment_audit.rs"
+      - "docs/research/HARDSEC_020_CONTEXT_ASSIGNMENT_AUDITOR.md"
+      - "schemas/hardsec-context-assignment-*.schema.json"
+      - "tests/fixtures/hardsec/context-assignment-v1/**"
+      - "tools/hardsec-adaptive-evasion-audit-harness/**"
+      - ".github/workflows/hardsec-context-assignment-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-context-assignment-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  context-assignment-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact pull request revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_context_assignment_audit.rs
+      - name: Run focused context assignment unit suite
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-assignment-audit --example hardsec_context_assignment_audit
+      - name: Audit synthetic context assignment fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          out_dir="$(mktemp -d)"
+          cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-assignment-audit --example hardsec_context_assignment_audit -- \
+            --policy tests/fixtures/hardsec/context-assignment-v1/policy.json \
+            --assignments tests/fixtures/hardsec/context-assignment-v1/assignments.json \
+            --truth tests/fixtures/hardsec/context-assignment-v1/truth-oracle.json \
+            --receipt "$out_dir/context-assignment-receipt.json"
+          python3 - "$out_dir/context-assignment-receipt.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          assert receipt["result"] == "audited"
+          metrics = receipt["assignment_integrity"]
+          assert metrics["assignment_record_count"] == 19
+          assert metrics["accepted_count"] == 16
+          assert metrics["abstained_count"] == 3
+          assert metrics["accepted_accuracy_denominator"] == 16
+          assert abs(metrics["accepted_accuracy"] - 1.0) < 1e-12
+          assert abs(metrics["accepted_coverage"] - 16 / 19) < 1e-12
+          assert abs(metrics["end_to_end_correct_context_coverage"] - 16 / 19) < 1e-12
+          mapping = receipt["runtime_mapping"]
+          assert mapping["contains_truth_labels"] is False
+          assert len(mapping["assignments"]) == 19
+          assert mapping["assignments"][17]["decision_reason"] == "unknown_context"
+          assert receipt["assumptions"]["context_assignment_exogeneity_status"] == "not_established_from_input_receipts"
+          PY
