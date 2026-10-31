@@ -68,7 +68,7 @@ jobs:
         run: cargo run --locked -p symthaea-iit --example sparse_partition_score_sweep -- --repeats 1
 
       - name: Benchmark exact sparse system-search reuse
-        run: cargo run --release --locked -p symthaea-iit --example sparse_system_search_reuse_sweep -- --repeats 3 --max-units 64
+        run: cargo run --release --locked -p symthaea-iit --example sparse_system_search_reuse_sweep -- --repeats 2 --max-units 2048
 
       - name: Clippy the isolated crate
         run: cargo clippy --locked -p symthaea-iit --all-targets -- -D warnings
