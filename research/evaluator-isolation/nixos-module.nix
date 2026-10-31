@@ -42,8 +42,8 @@ let
     ProcSubset = "pid";
 
     SystemCallArchitectures = "native";
-    # Prevent a service from undoing the mount namespace protections.
-    SystemCallFilter = [ "@system-service" "~@mount" ];
+    # The systemd @system-service group already excludes @mount syscalls.
+    SystemCallFilter = [ "@system-service" ];
     SystemCallErrorNumber = "EPERM";
   };
 
