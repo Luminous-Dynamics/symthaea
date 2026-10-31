@@ -483,13 +483,17 @@ fn pair_digest(pair: &PublicPairV1) -> Result<String, String> {
 }
 
 fn recipe_digest(seed: &[u8], ordinal: u64, side: u64, same: bool) -> String {
-    let recipe_ordinal = if same { 0 } else { ordinal };
-    keyed_id(seed, b"recipe-family", recipe_ordinal, side)
+    let (recipe_ordinal, recipe_slot) = if same { (0, 0) } else { (ordinal, side) };
+    keyed_id(seed, b"recipe-family", recipe_ordinal, recipe_slot)
 }
 
 fn source_digest(seed: &[u8], ordinal: u64, side: u64, same: bool) -> String {
-    let source_ordinal = if same { ordinal ^ 0x8000_0000_0000_0000 } else { ordinal };
-    keyed_id(seed, b"source-lineage", source_ordinal, side)
+    let (source_ordinal, source_slot) = if same {
+        (ordinal ^ 0x8000_0000_0000_0000, 0)
+    } else {
+        (ordinal, side)
+    };
+    keyed_id(seed, b"source-lineage", source_ordinal, source_slot)
 }
 
 /// Generate a public packet, separately held answer key, and commitment manifest.
@@ -519,8 +523,8 @@ pub fn generate_challenge_bundle(
                 let mut left_text = construction.left_text;
                 let mut right_text = construction.right_text;
                 let mut mechanisms = construction.mechanisms;
-                let mut relationship = construction.relationship;
-                let mut transformation_family = construction.transformation_family;
+                let relationship = construction.relationship;
+                let transformation_family = construction.transformation_family;
                 let mut left_source_lineage_sha256 =
                     source_digest(seed, ordinal, 0, construction.same_source_lineage);
                 let mut right_source_lineage_sha256 =
@@ -1006,17 +1010,15 @@ mod tests {
     fn pair_mutation_invalidates_blinded_adjudication_binding() {
         let bundle = generate_challenge_bundle(&config(), &seed(21)).unwrap();
         let mut packet = packet(&bundle);
-        let mut records = valid_records(&packet);
-        let mutated_pair = &mut packet.pairs[0];
-        mutated_pair.left_text.push_str(" mutated");
+        let records = valid_records(&packet);
+        packet.pairs[0].left_text.push_str(" mutated");
         let error = audit_blinded_adjudications(&packet, &records).unwrap_err();
         assert!(error.contains("digest does not match public content"));
 
         // Re-sealing pair content still invalidates an old reviewer record.
-        mutated_pair.pair_digest_sha256 = pair_digest(mutated_pair).unwrap();
+        packet.pairs[0].pair_digest_sha256 = pair_digest(&packet.pairs[0]).unwrap();
         let error = audit_blinded_adjudications(&packet, &records).unwrap_err();
         assert!(error.contains("does not bind the exact public pair"));
-        records.clear();
     }
 
     #[test]
