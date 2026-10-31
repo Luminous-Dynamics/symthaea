@@ -104,6 +104,50 @@ class RandomizedGlobalCommonDepthTests(unittest.TestCase):
         self.assertAlmostEqual(receipt["primal_objective_min"],
                                receipt["dual_objective_min"],places=7)
 
+
+    def test_digest_bound_risk_certificate_verifies(self):
+        engine=RandomizedCommonDepthCRC(5,.2,(70,20,10))
+        result=engine.solve()
+        probabilities=np.asarray(result["probabilities"])
+        verified=engine.verify_certificate(result["certificate"],probabilities)
+        self.assertTrue(verified["valid"],verified)
+        self.assertTrue(verified["exact_validity"]["valid"])
+        self.assertTrue(verified["optimality"]["valid"])
+
+    def test_certificate_fails_closed_on_policy_tampering(self):
+        import copy
+        engine=RandomizedCommonDepthCRC(5,.2,(70,20,10))
+        result=engine.solve()
+        probabilities=np.asarray(result["probabilities"])
+        tampered=probabilities.copy()
+        tampered[0]=np.roll(tampered[0],1)
+        verified=engine.verify_certificate(result["certificate"],tampered)
+        self.assertFalse(verified["valid"])
+        self.assertIn("digest mismatch",verified["reason"])
+
+    def test_certificate_fails_closed_on_risk_target_or_state_domain_change(self):
+        import copy
+        engine=RandomizedCommonDepthCRC(5,.2,(70,20,10))
+        result=engine.solve()
+        probabilities=np.asarray(result["probabilities"])
+        changed_alpha=RandomizedCommonDepthCRC(5,.21,(70,20,10))
+        self.assertFalse(changed_alpha.verify_certificate(
+            result["certificate"],probabilities)["valid"])
+        changed_scope=copy.deepcopy(result["certificate"])
+        changed_scope["scope"]["augmented_state_count"]-=1
+        self.assertFalse(engine.verify_certificate(changed_scope,probabilities)["valid"])
+
+    def test_certificate_fails_closed_on_corrupt_dual_witness(self):
+        import copy
+        engine=RandomizedCommonDepthCRC(5,.2,(70,20,10))
+        result=engine.solve()
+        probabilities=np.asarray(result["probabilities"])
+        corrupt=copy.deepcopy(result["certificate"])
+        corrupt["optimization_receipt"]["dual_witness"]["inequality_marginals"][0]+=0.1
+        verified=engine.verify_certificate(corrupt,probabilities)
+        self.assertFalse(verified["valid"])
+        self.assertEqual(verified["reason"],"LP dual witness failed KKT checks")
+
     def test_invalid_population_and_action_grid_fail_closed(self):
         with self.assertRaises(ValueError):
             RandomizedCommonDepthCRC(50,.1,(10,10,10))
