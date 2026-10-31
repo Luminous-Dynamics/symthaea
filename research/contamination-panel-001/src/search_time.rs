@@ -20,6 +20,7 @@ pub const SEARCH_TRACE_GENESIS: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
 pub const SEARCH_MAX_EVENTS: usize = 1_000_000;
 pub const SEARCH_MAX_TRACE_BYTES: usize = 256 * 1024 * 1024;
+pub const SEARCH_MAX_FINDINGS_BYTES: usize = 64 * 1024 * 1024;
 pub const SEARCH_MAX_ALLOWLIST_DESTINATIONS: usize = 100_000;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
