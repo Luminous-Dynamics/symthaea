@@ -87,6 +87,14 @@ struct Args {
     #[arg(long, default_value_t = false)]
     require_domain_shift_audit: bool,
 
+    /// Stable identifier for the frozen novelty/OOD detector that produced ood_score.
+    #[arg(long)]
+    ood_detector_id: Option<String>,
+
+    /// SHA-256 of the frozen novelty detector, representation, and preprocessing profile.
+    #[arg(long)]
+    ood_detector_profile_sha256: Option<String>,
+
     /// Frozen OOD novelty-score threshold; never selected from confirmatory labels.
     #[arg(long)]
     ood_score_threshold: Option<f64>,
@@ -272,6 +280,8 @@ struct Report {
     overall_calibration: Option<CalibrationDiagnostics>,
     overall_calibration_cluster_bootstrap_95: Option<CalibrationClusterBootstrap>,
     per_domain: Option<BTreeMap<String, DomainEvaluation>>,
+    ood_detector_id: Option<String>,
+    ood_detector_profile_sha256: Option<String>,
     ood_detection: Option<OodDetectionMetrics>,
     scope_note: &'static str,
 }
@@ -1573,6 +1583,34 @@ fn domain_shift_evaluation(
 }
 
 
+fn validate_ood_detector_provenance(
+    records: &[Prediction],
+    detector_id: Option<&str>,
+    detector_profile_sha256: Option<&str>,
+) -> Result<(), String> {
+    let novelty_present = !records.is_empty() && records.iter().all(|row| row.ood_score.is_some());
+    match (detector_id, detector_profile_sha256) {
+        (Some(id), Some(digest)) => {
+            if id.trim().is_empty() {
+                return Err("--ood-detector-id must be non-empty".into());
+            }
+            if !is_lower_hex(digest, 64) {
+                return Err("--ood-detector-profile-sha256 must be a lowercase 64-character SHA-256 digest".into());
+            }
+            if !novelty_present {
+                return Err("OOD detector provenance was supplied but the input contains no complete ood_score column".into());
+            }
+        }
+        (None, None) => {
+            if novelty_present {
+                return Err("every ood_score run requires --ood-detector-id and --ood-detector-profile-sha256".into());
+            }
+        }
+        _ => return Err("--ood-detector-id and --ood-detector-profile-sha256 must be supplied together".into()),
+    }
+    Ok(())
+}
+
 fn run() -> Result<i32, String> {
     let args = Args::parse();
     if args.mapping_reference.trim().is_empty() {
@@ -1602,6 +1640,11 @@ fn run() -> Result<i32, String> {
         .map_err(|e| format!("failed to read input {}: {e}", args.input.display()))?;
     let input_hash = sha256(&input_bytes);
     let records = parse_jsonl(&input_bytes)?;
+    validate_ood_detector_provenance(
+        &records,
+        args.ood_detector_id.as_deref(),
+        args.ood_detector_profile_sha256.as_deref(),
+    )?;
     let (
         domain_shift_audit_status,
         domain_shift_axis,
@@ -1686,6 +1729,8 @@ fn run() -> Result<i32, String> {
         overall_calibration,
         overall_calibration_cluster_bootstrap_95,
         per_domain,
+        ood_detector_id: args.ood_detector_id.clone(),
+        ood_detector_profile_sha256: args.ood_detector_profile_sha256.clone(),
         ood_detection,
         scope_note: "Metrics describe this frozen prediction file only. Cluster-bootstrap intervals resample the caller-declared cluster_id; they do not prove that the chosen cluster unit is independent. This scorer does not validate dataset labels/mapping truth or establish prospective review-time savings. Use a locked evaluation protocol before claims.",
     };
@@ -1889,6 +1934,26 @@ mod tests {
         let calibration = calibration_diagnostics(&zebrafish);
         assert_eq!(calibration.high_confidence_at_90.false_accept_count, 1);
         assert_eq!(calibration.low_confidence_below_10.missed_error_count, 0);
+    }
+
+    #[test]
+    fn novelty_scores_require_detector_provenance() {
+        let rows = vec![tagged_row("prov-1", true, 0.9, "mouse", false, 0.1)];
+        assert!(validate_ood_detector_provenance(&rows, None, None).unwrap_err().contains("requires --ood-detector-id"));
+        assert!(validate_ood_detector_provenance(&rows, Some("mahalanobis"), None).is_err());
+        assert!(validate_ood_detector_provenance(&rows, Some("mahalanobis"), Some(&"a".repeat(64))).is_ok());
+    }
+
+    #[test]
+    fn detector_provenance_without_novelty_scores_is_rejected() {
+        let rows = vec![row("prov-2", true, 0.9, 0.9, 1.0, 1.0, "merge")];
+        assert!(validate_ood_detector_provenance(&rows, Some("knn-distance"), Some(&"b".repeat(64))).is_err());
+    }
+
+    #[test]
+    fn invalid_detector_profile_digest_is_rejected() {
+        let rows = vec![tagged_row("prov-3", true, 0.9, "mouse", false, 0.1)];
+        assert!(validate_ood_detector_provenance(&rows, Some("ensemble-disagreement"), Some("not-a-sha")).is_err());
     }
 
     #[test]
