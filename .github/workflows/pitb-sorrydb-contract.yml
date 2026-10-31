@@ -275,3 +275,44 @@ jobs:
           assert [row["ordinal"] for row in manifest["tasks"]] == list(range(1000))
           print("PITB_SORRYDB_MANIFEST_PASS: pinned commit/blob/sha256, 1000 unique task IDs, 78 projects, deterministic ordinals")
           PY
+
+
+      - name: Validate toolchain-stratified smoke cohort remains candidate-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("data/benchmarks/proof-insight-transfer-v0/sorrydb-track/smoke-cohort-candidates.v0.json")
+          manifest = json.loads(path.read_text())
+          assert manifest["schema_version"] == "pitb.sorrydb.smoke-candidates.v0"
+          assert manifest["dataset"]["snapshot_id"] == "SorryDB_2601"
+          assert manifest["dataset"]["source_repository_commit"] == "74b3b63f8ba890d675f362924b21ac55db410383"
+          assert manifest["dataset"]["source_git_blob_sha1"] == "af3b663429dc4689ee728d2fb5c7d8d5034476f7"
+          assert manifest["dataset"]["source_sha256"] == "26bfd11099f6b8db7f80d49bdea5d9f8ea0d23ba65d44d93f67ed42ba1530062"
+          assert manifest["dataset"]["task_count"] == 1000
+          assert manifest["dataset"]["project_count"] == 78
+
+          versions = manifest["toolchain_stratification"]["task_counts"]
+          assert manifest["toolchain_stratification"]["distinct_toolchain_tags"] == 14
+          assert sum(row["tasks"] for row in versions) == 1000
+
+          tasks = manifest["tasks"]
+          assert len(tasks) == 3
+          assert len({row["task_id"] for row in tasks}) == 3
+          assert len({row["repository"]["remote"] for row in tasks}) == 3
+          assert len({row["repository"]["lean_version"] for row in tasks}) == 3
+          assert all(row["source_inspected"] for row in tasks)
+          assert all(row["location"]["verified_source_slice"] == "sorry" for row in tasks)
+          assert all(row["environment_reconstructed"] is False for row in tasks)
+          assert all(row["project_build_status"] == "not_run" for row in tasks)
+          assert all(row["lean_evidence_status"] == "not_run" for row in tasks)
+          assert all(row["proof_attempt_status"] == "not_run" for row in tasks)
+          instance = next(row for row in tasks if row["selection_role"] == "explicit_local_instance_registry_challenge")
+          assert instance["repository"]["remote"] == "https://github.com/Clap-lang/clap-lean"
+          assert instance["repository"]["lean_version"] == "v4.26.0-rc2"
+          assert "Fact (Nat.Prime p)" in instance["debug_context_signal"]
+          print("PITB_SORRYDB_SMOKE_COHORT_PASS: three pinned candidates, three Lean toolchains, explicit LocalInstances challenge; all execution states remain not-run")
+          PY
