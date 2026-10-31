@@ -1,0 +1,84 @@
+{
+  "schema_version": "hardsec-adaptive-case-trace-links-v1",
+  "campaign_id": "hs012-synthetic-campaign-01",
+  "trace_dataset_id": "hs014-hs012-linked-synthetic-fixture-v1",
+  "cases": [
+    {
+      "case_id": "tr1",
+      "trace_id": "trace-tr1",
+      "window_ids": [
+        "window-tr1-0"
+      ]
+    },
+    {
+      "case_id": "va1",
+      "trace_id": "trace-va1",
+      "window_ids": [
+        "window-va1-0"
+      ]
+    },
+    {
+      "case_id": "c1",
+      "trace_id": "trace-c1",
+      "window_ids": [
+        "window-c1-0"
+      ]
+    },
+    {
+      "case_id": "c2",
+      "trace_id": "trace-c2",
+      "window_ids": [
+        "window-c2-0"
+      ]
+    },
+    {
+      "case_id": "c3",
+      "trace_id": "trace-c3",
+      "window_ids": [
+        "window-c3-0"
+      ]
+    },
+    {
+      "case_id": "c4",
+      "trace_id": "trace-c4",
+      "window_ids": [
+        "window-c4-0"
+      ]
+    },
+    {
+      "case_id": "c5",
+      "trace_id": "trace-c5",
+      "window_ids": [
+        "window-c5-0"
+      ]
+    },
+    {
+      "case_id": "c6",
+      "trace_id": "trace-c6",
+      "window_ids": [
+        "window-c6-0"
+      ]
+    },
+    {
+      "case_id": "c7",
+      "trace_id": "trace-c7",
+      "window_ids": [
+        "window-c7-0"
+      ]
+    },
+    {
+      "case_id": "c8",
+      "trace_id": "trace-c8",
+      "window_ids": [
+        "window-c8-0"
+      ]
+    },
+    {
+      "case_id": "c9",
+      "trace_id": "trace-c9",
+      "window_ids": [
+        "window-c9-0"
+      ]
+    }
+  ]
+}
