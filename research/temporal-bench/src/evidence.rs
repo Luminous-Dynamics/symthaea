@@ -66,6 +66,7 @@ pub struct EvidenceTask {
     pub interval_steps: u32,
     pub cue_steps: u32,
     pub delay_steps: u32,
+    pub recall_steps: u32,
     pub cue_count: usize,
     pub input_channels: usize,
 }
@@ -229,6 +230,7 @@ pub fn generate_evidence_task(
             interval_steps,
             cue_steps,
             delay_steps,
+            recall_steps,
             cue_count: config.cue_count,
             input_channels: INPUT_CHANNELS,
         },
@@ -294,10 +296,11 @@ pub fn verify_evidence_trace(
         .saturating_mul(u64::from(task.interval_steps.saturating_add(task.cue_steps)));
     let expected_recall_start = expected_sequence_end.saturating_add(u64::from(task.delay_steps));
     if task.input_channels != INPUT_CHANNELS
+        || task.dt_ms == 0
         || task.cue_count == 0
         || task.cue_count != oracle.cue_assignments.len()
         || u64::from(task.recall_start_step) != expected_recall_start
-        || task.recall_start_step >= task.recall_end_step
+        || task.recall_start_step.saturating_add(task.recall_steps) != task.recall_end_step
         || usize::try_from(task.recall_end_step).unwrap_or(usize::MAX)
             != task.observations.len()
     {
@@ -467,6 +470,7 @@ mod tests {
         assert_eq!(task.input_channels, 100);
         assert_eq!(task.observations.len(), 2_200);
         assert_eq!(task.recall_start_step, 2_050);
+        assert_eq!(task.recall_steps, 150);
         assert_eq!(task.recall_end_step, 2_200);
     }
 
