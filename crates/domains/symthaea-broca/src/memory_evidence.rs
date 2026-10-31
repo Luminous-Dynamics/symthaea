@@ -822,6 +822,55 @@ impl EvidenceIndex {
         Ok(())
     }
 
+    /// Materialize every match in a verified enumeration as a full lexical
+    /// evidence hit suitable for the trusted proof-admission adapter. This
+    /// method re-verifies the entire enumeration before resolving any payload.
+    pub fn materialize_exact_lexical_enumeration_hits(
+        &self,
+        result: &ExactLexicalEnumerationResult,
+        payload_root: &Path,
+    ) -> Result<Vec<LexicalEvidenceHit>, String> {
+        self.verify_exact_lexical_enumeration(result)?;
+        let snapshot = self.snapshot_receipt(result.receipt.known_at_unix_ms)?;
+        let mut hits = Vec::with_capacity(result.matches.len());
+        for item in &result.matches {
+            let record = self.records.get(&item.hdc_id)
+                .ok_or_else(|| format!("enumeration evidence {:?} disappeared from index", item.evidence_id))?;
+            if record.evidence_id != item.evidence_id
+                || record.source.trajectory_id != item.trajectory_id
+                || record.source.step_id != item.source_step_id
+                || record.source.source_sha256 != item.source_sha256
+                || record.source.source_pointer != item.source_pointer
+                || record.content_sha256 != item.content_sha256
+            {
+                return Err(format!(
+                    "enumerated evidence {:?} no longer matches its source metadata",
+                    item.evidence_id
+                ));
+            }
+            let context = record.context_item(payload_root)?;
+            if context.kind != MemoryContextType::Text {
+                return Err("exact lexical enumeration may only materialize text hits".into());
+            }
+            hits.push(LexicalEvidenceHit {
+                hdc_id: item.hdc_id,
+                evidence_id: item.evidence_id.clone(),
+                scope_id: record.scope_id.clone(),
+                source: record.source.clone(),
+                content_sha256: record.content_sha256.clone(),
+                lifecycle: record.lifecycle.clone(),
+                valid_from_unix_ms: record.valid_from_unix_ms,
+                valid_until_unix_ms: record.valid_until_unix_ms,
+                snapshot_receipt: Some(snapshot.clone()),
+                // Exact enumeration is not relevance ranked. Zero is a neutral
+                // diagnostic score and rank is assigned by the admission order.
+                bm25_score: 0.0,
+                context,
+            });
+        }
+        Ok(hits)
+    }
+
     fn enumerate_exact_lexical_terms_at_snapshot(
         &self,
         query_terms: &[String],
