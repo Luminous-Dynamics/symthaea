@@ -311,7 +311,8 @@ def _solve_cardinality(
 
 
 def _prefix_digest(
-    paths, weights, active_masks, alpha, values, costs, capacities, t
+    paths, weights, active_masks, alpha, values, costs, capacities, t,
+    initial_mandatory_mask,
 ) -> str:
     active_universe = 0
     for mask in active_masks[: t + 1]:
@@ -319,6 +320,7 @@ def _prefix_digest(
     indices = [i for i in range(len(weights)) if (active_universe >> i) & 1]
     payload = {
         "time": t,
+        "initial_mandatory_mask": initial_mandatory_mask,
         "active_masks": list(active_masks[: t + 1]),
         "coordinate_evalues": {
             str(i): [fraction_pair(paths[i][j]) for j in range(t + 1)]
@@ -449,6 +451,7 @@ def select_capacity_aware_pareto(
     costs: Sequence[int | float | str | Fraction],
     cumulative_capacity: Sequence[int | float | str | Fraction],
     *,
+    initial_mandatory_mask: int = 0,
     frontier_limit: int = 100_000,
     verify_independent: bool = True,
     independent_frontier_limit: int = 100_000,
@@ -467,8 +470,15 @@ def select_capacity_aware_pareto(
     n = len(paths)
     if frontier_limit < 1 or independent_frontier_limit < 1:
         raise ValueError("frontier limits must be positive")
+    if (
+        isinstance(initial_mandatory_mask, bool)
+        or not isinstance(initial_mandatory_mask, int)
+        or initial_mandatory_mask < 0
+        or initial_mandatory_mask & ~active[0]
+    ):
+        raise ValueError("initial mandatory set must be a subset of the first active set")
     decisions = []
-    previous = 0
+    previous = initial_mandatory_mask
     max_seen_frontier = 0
     for t, active_mask in enumerate(active):
         current_e = tuple(paths[i][t] for i in range(n))
@@ -494,13 +504,15 @@ def select_capacity_aware_pareto(
             "max_frontier_states": detail["max_frontier_states"],
             "cardinality_summaries": detail["cardinality_summaries"],
             "prefix_sha256": _prefix_digest(
-                paths, w, active, level, v, c, capacity, t
+                paths, w, active, level, v, c, capacity, t,
+                initial_mandatory_mask,
             ),
         })
         previous = mask
 
     validity = verify_capacity_aware_pareto(
         decisions, paths, w, active, level, v, c, capacity,
+        initial_mandatory_mask=initial_mandatory_mask,
         independent=verify_independent,
         independent_frontier_limit=independent_frontier_limit,
     )
@@ -516,6 +528,7 @@ def select_capacity_aware_pareto(
         ),
         "weights": [fraction_pair(x) for x in w],
         "alpha": fraction_pair(level),
+        "initial_mandatory_mask": initial_mandatory_mask,
         "decisions": decisions,
         "verification": validity,
         "complexity": {
@@ -544,6 +557,7 @@ def verify_capacity_aware_pareto(
     costs,
     capacities,
     *,
+    initial_mandatory_mask: int = 0,
     independent: bool = True,
     independent_frontier_limit: int = 100_000,
 ) -> dict:
@@ -552,7 +566,15 @@ def verify_capacity_aware_pareto(
         paths, weights, active, alpha, values, costs, capacities
     )
     failures = []
-    previous = 0
+    if (
+        isinstance(initial_mandatory_mask, bool)
+        or not isinstance(initial_mandatory_mask, int)
+        or initial_mandatory_mask < 0
+        or initial_mandatory_mask & ~active[0]
+    ):
+        failures.append("invalid_initial_mandatory_mask")
+        initial_mandatory_mask = 0
+    previous = initial_mandatory_mask
     independent_verified = True
     frontier_peak = 0
     if len(decisions) != len(active):
@@ -600,7 +622,8 @@ def verify_capacity_aware_pareto(
             ),
             "worst_intersection_mask": cert["worst_intersection_mask"],
             "prefix_sha256": _prefix_digest(
-                paths, weights, active, alpha, values, costs, capacities, t
+                paths, weights, active, alpha, values, costs, capacities, t,
+                initial_mandatory_mask,
             ),
         }
         for field, expected_value in expected.items():
