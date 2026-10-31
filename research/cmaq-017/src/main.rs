@@ -335,7 +335,7 @@ fn direct_sequence_score(state: State, actions: &[f64]) -> f64 {
     score
 }
 
-fn aggregate_scores(values: &[(f64, f64)], policy: Policy) -> CandidateScore {
+fn aggregate_scores(values: &[(f64, f64, usize)], policy: Policy) -> CandidateScore {
     let full: Vec<f64> = values.iter().map(|value| value.0).collect();
     let prefix: Vec<f64> = values.iter().map(|value| value.1).collect();
     let model_transition_evaluations = if policy.is_oracle() {
