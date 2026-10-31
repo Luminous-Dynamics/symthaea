@@ -86,7 +86,7 @@ No claim of concurrent safety can be made from a pure preflight function.
 
 ## 7. Tests and limitations
 
-Eleven Rust unit tests are authored for scope mutation, commit/candidate replay, event-ID binding, valid and disabled run-wide pruning events, promotion blocking, objective-order hashing, instrument identity mutation, malformed scopes, and receipt digest integrity.
+Twelve Rust unit tests are authored for scope mutation, commit/candidate replay, event-ID binding, valid and disabled run-wide pruning events, promotion blocking, objective-order hashing, instrument identity mutation, malformed scopes, and receipt digest integrity.
 
 The successful measurement path also requires a full exact-fixture integration test that exercises all upstream crates together. The current authoring environment lacks `cargo`, `rustc`, and `rustfmt`; no compile/test/CI result is claimed.
 
