@@ -733,7 +733,7 @@ mod tests {
     fn verifier_rejects_recommitted_seed_inconsistent_observation() {
         let (mut task, oracle) = generate_multiscale_task(config(true)).unwrap();
         if let Some(event) = task.events.iter_mut().find(|event| {
-            matches!(event.kind, TemporalEventKind::Observation { .. })
+            matches!(&event.kind, TemporalEventKind::Observation { .. })
         }) {
             if let TemporalEventKind::Observation { fast, .. } = &mut event.kind {
                 *fast = fast.saturating_add(1);
