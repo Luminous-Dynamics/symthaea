@@ -91,20 +91,20 @@ The checked-in domain-split manifest and prediction file are synthetic regressio
 For a later confirmatory/lockbox report, provide the full confirmatory/lockbox prediction JSONL as `--input`, set `--evaluation-partition confirmatory` or `lockbox`, and add `--ood-threshold-selection-input <development-predictions.jsonl>`. The scorer independently hashes and validates the development rows against the same split manifest, then selects the threshold under the fixed 5% development false-OOD-rate constraint. It rejects using the development partition as both selection and evaluation. Never pass confirmatory or lockbox labels back into threshold selection.
 
 \`\`\`sh
-cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \\
-  --bin proofreading-score -- \\
-  --input docs/neuroscience/examples/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_CONFIRMATORY.example.jsonl \\
-  --ood-threshold-selection-input docs/neuroscience/examples/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT.example.jsonl \\
-  --mapping-reference docs/neuroscience/CONNECTOMEBENCH2_V2_INTAKE_MANIFEST.schema.json \\
-  --dataset-revision-commit-sha 1111111111111111111111111111111111111111 \\
-  --policy-id domain-shift-confirmatory-fixture-v1 \\
-  --prediction-profile-sha256 <exact-64-character-profile-digest> \\
-  --evaluation-partition confirmatory \\
-  --review-time-basis synthetic-proxy \\
-  --require-domain-shift-audit \\
-  --domain-split-manifest docs/neuroscience/examples/CONNECTOME_PROOFREADING_DOMAIN_SPLIT.example.json \\
-  --ood-detector-id mahalanobis-diagonal-v1 \\
-  --ood-detector-profile-sha256 <exact-64-character-ood-detector-digest> \\
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
+  --bin proofreading-score -- \
+  --input docs/neuroscience/examples/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_CONFIRMATORY.example.jsonl \
+  --ood-threshold-selection-input docs/neuroscience/examples/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT.example.jsonl \
+  --mapping-reference docs/neuroscience/CONNECTOMEBENCH2_V2_INTAKE_MANIFEST.schema.json \
+  --dataset-revision-commit-sha 1111111111111111111111111111111111111111 \
+  --policy-id domain-shift-confirmatory-fixture-v1 \
+  --prediction-profile-sha256 <exact-64-character-profile-digest> \
+  --evaluation-partition confirmatory \
+  --review-time-basis synthetic-proxy \
+  --require-domain-shift-audit \
+  --domain-split-manifest docs/neuroscience/examples/CONNECTOME_PROOFREADING_DOMAIN_SPLIT.example.json \
+  --ood-detector-id mahalanobis-diagonal-v1 \
+  --ood-detector-profile-sha256 <exact-64-character-ood-detector-digest> \
   --output domain-shift-confirmatory-report.json
 \`\`\`
 
