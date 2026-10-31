@@ -368,6 +368,16 @@ pub fn validate_artifact_record(record: &CorpusArtifactRecord) -> Vec<Eligibilit
         ));
     }
 
+    for relation in &record.work_relations {
+        if relation.related_artifact_id.trim().is_empty() {
+            issues.push(issue(
+                "work_relation_target_missing",
+                None,
+                "work relations require a related_artifact_id".into(),
+            ));
+        }
+    }
+
     for label in &record.labels {
         if label.value.trim().is_empty() || label.source_uri.trim().is_empty() {
             issues.push(issue(
@@ -386,6 +396,13 @@ pub fn validate_artifact_record(record: &CorpusArtifactRecord) -> Vec<Eligibilit
     }
 
     if let Some(alignment) = &record.alignment {
+        if alignment.method.trim().is_empty() {
+            issues.push(issue(
+                "alignment_method_missing",
+                None,
+                "alignment evidence requires a named method/version".into(),
+            ));
+        }
         if alignment.paired_item_count == 0 {
             issues.push(issue(
                 "empty_alignment_evidence",
@@ -422,9 +439,9 @@ pub fn validate_artifact_record(record: &CorpusArtifactRecord) -> Vec<Eligibilit
             let normalized = jurisdiction.trim().to_ascii_uppercase();
             let overlaps = seen_layer_jurisdictions.iter().any(|(layer, existing)| {
                 *layer == grant.layer
-                    && (existing == WORLDWIDE_JURISDICTION
+                    && (existing.as_str() == WORLDWIDE_JURISDICTION
                         || normalized == WORLDWIDE_JURISDICTION
-                        || *existing == normalized)
+                        || existing.as_str() == normalized.as_str())
             });
             if overlaps {
                 issues.push(issue(
@@ -557,6 +574,17 @@ fn snapshot_digest(snapshot: &CorpusRegistrySnapshot) -> Result<String, Vec<Elig
 
 impl CorpusRegistrySnapshot {
     pub fn verify_digest(&self) -> bool {
+        if self.schema != CORPUS_REGISTRY_SCHEMA || self.artifact_count != self.artifacts.len() {
+            return false;
+        }
+        let mut seen = BTreeSet::new();
+        for artifact in &self.artifacts {
+            if !seen.insert(artifact.artifact_id.clone())
+                || !validate_artifact_record(artifact).is_empty()
+            {
+                return false;
+            }
+        }
         snapshot_digest(self)
             .map(|expected| expected == self.registry_sha256)
             .unwrap_or(false)
