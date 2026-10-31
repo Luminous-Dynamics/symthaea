@@ -386,10 +386,21 @@ fn parse_context_assignment_receipt(
     if mapping.get("contains_truth_labels").and_then(Value::as_bool) != Some(false) {
         return Err("runtime context assignment mapping must not contain truth labels".to_owned());
     }
+    if mapping.get("mapping_digest_bound_to_assignment_input").and_then(Value::as_bool) != Some(true) {
+        return Err("runtime context assignment mapping must be digest-bound to assignment input".to_owned());
+    }
     let assignments = mapping.get("assignments").and_then(Value::as_array)
         .ok_or("context assignment receipt runtime_mapping.assignments must be an array")?;
     if assignments.len() != records.len() {
         return Err("context assignment receipt must map every CCTM stream record exactly once".to_owned());
+    }
+    let integrity = value.get("assignment_integrity").ok_or("context assignment receipt assignment_integrity missing")?;
+    let accepted_count = assignments.iter().filter(|a| a.get("decision_status").and_then(Value::as_str) == Some("accepted")).count();
+    let abstained_count = assignments.iter().filter(|a| a.get("decision_status").and_then(Value::as_str) == Some("abstained")).count();
+    if usize_field(integrity, "assignment_record_count", "context_receipt.assignment_integrity")? != assignments.len()
+        || usize_field(integrity, "accepted_count", "context_receipt.assignment_integrity")? != accepted_count
+        || usize_field(integrity, "abstained_count", "context_receipt.assignment_integrity")? != abstained_count {
+        return Err("context assignment receipt aggregate counts do not match its runtime mapping".to_owned());
     }
 
     let mut output = Vec::with_capacity(assignments.len());
@@ -1032,6 +1043,20 @@ mod tests {
         assert_eq!(rows[16]["abstention_reason"], "invalid_sensor_state");
         assert_eq!(rows[17]["abstention_reason"], "context_assignment_not_accepted");
         assert_eq!(rows[18]["abstention_reason"], "invalid_sensor_state");
+    }
+
+
+    #[test]
+    fn rejects_context_assignment_receipt_aggregate_count_mismatch() {
+        let (p, s, _, _) = fixture();
+        let bytes = include_bytes!("../tests/fixtures/hardsec/context-assignment-v1/runtime-receipt.json");
+        let mut assignment_receipt: Value = serde_json::from_slice(bytes).unwrap();
+        assignment_receipt["assignment_integrity"]["accepted_count"] = json!(15);
+        let pb = encode(&p);
+        let sb = encode(&s);
+        let rb = encode(&assignment_receipt);
+        assert!(audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb)
+            .unwrap_err().contains("aggregate counts do not match"));
     }
 
     #[test]
