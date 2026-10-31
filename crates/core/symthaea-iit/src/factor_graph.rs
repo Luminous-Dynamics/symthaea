@@ -836,6 +836,7 @@ mod tests {
         let chain_scopes = vec![vec![0, 1], vec![1, 2], vec![2, 3]];
         let plan = plan_min_fill_elimination(&chain_scopes, &[0, 1, 2], 8).unwrap();
         assert_eq!(plan.induced_width, 1);
+        assert_eq!(plan.predicted_output_entries, 2);
         assert_eq!(plan.predicted_peak_factor_entries, 4);
         assert_eq!(plan.max_factor_entries, 8);
 
@@ -845,6 +846,8 @@ mod tests {
             BinaryFactor::new(vec![2, 3], vec![0.6, 0.4, 0.3, 0.7]).unwrap(),
         ];
         let report = min_fill_sum_product(&factors, &[0, 1, 2], 8).unwrap();
+        assert_eq!(report.predicted_output_entries, 2);
+        assert_eq!(report.factor.values().len(), report.predicted_output_entries);
         assert_eq!(report.predicted_peak_factor_entries, 4);
         assert_eq!(report.peak_factor_entries, plan.predicted_peak_factor_entries);
 
@@ -862,10 +865,12 @@ mod tests {
     fn preflight_plan_handles_unary_and_unrepresented_variables() {
         let unary = plan_min_fill_elimination(&[vec![0]], &[0], 2).unwrap();
         assert_eq!(unary.induced_width, 0);
+        assert_eq!(unary.predicted_output_entries, 1);
         assert_eq!(unary.predicted_peak_factor_entries, 2);
 
         let scalar = plan_min_fill_elimination(&[vec![]], &[9], 1).unwrap();
         assert_eq!(scalar.induced_width, 0);
+        assert_eq!(scalar.predicted_output_entries, 1);
         assert_eq!(scalar.predicted_peak_factor_entries, 1);
     }
 
@@ -877,6 +882,8 @@ mod tests {
         ];
         let report = min_fill_log_sum_product(&factors, &[0, 1], 4).unwrap();
         assert_eq!(report.induced_width, 1);
+        assert_eq!(report.predicted_output_entries, 2);
+        assert_eq!(report.factor.log_values().len(), report.predicted_output_entries);
         assert_eq!(report.predicted_peak_factor_entries, 4);
         assert_eq!(report.peak_factor_entries, 4);
     }
@@ -1211,6 +1218,11 @@ mod tests {
                     "probability scope mismatch: n={variable_count}, seed={seed}"
                 );
                 assert_eq!(probability_report.factor.values().len(), expected.len());
+                assert_eq!(probability_report.predicted_output_entries, expected.len());
+                assert_eq!(
+                    probability_report.predicted_peak_factor_entries,
+                    probability_report.peak_factor_entries
+                );
                 for (index, (actual, expected)) in probability_report
                     .factor
                     .values()
@@ -1251,6 +1263,11 @@ mod tests {
                     "log scope mismatch: n={variable_count}, seed={seed}"
                 );
                 assert_eq!(log_report.factor.log_values().len(), expected.len());
+                assert_eq!(log_report.predicted_output_entries, expected.len());
+                assert_eq!(
+                    log_report.predicted_peak_factor_entries,
+                    log_report.peak_factor_entries
+                );
                 for (index, (actual_log, expected)) in log_report
                     .factor
                     .log_values()
