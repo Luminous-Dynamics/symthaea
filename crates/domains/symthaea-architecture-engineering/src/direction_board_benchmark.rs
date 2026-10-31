@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use super::event_tape::{
-    ActionEvent, ActionIntent, ActionOutcome, CandidateDisposition, ComparisonMode,
+    ActionEvent, ActionIntent, ActionOutcome, BudgetModel, CandidateDisposition, ComparisonMode,
     EventTape, EventTapeHeader, ExecutionContract, ExecutionMode, MeterValue,
     PolicySnapshot, ProposalDisposition, ResourceReceipt,
 };
@@ -1095,10 +1095,22 @@ impl DirectionCampaignRun {
         let verifier_sha256 = digest("symthaea.synthetic-direction.verifier.v0.1");
         let proposal_stream_sha256 =
             digest(&format!("synthetic-payoff-stream:{landscape_id}:{}", self.seed));
+        let action_cost_microunits = self
+            .policy_config
+            .action_cost_units
+            .checked_mul(1_000_000)
+            .ok_or_else(|| "normalized action-unit price overflow".to_owned())?;
         let budget_limit_microunits = u64::try_from(self.action_budget)
             .map_err(|_| "action budget does not fit u64".to_owned())?
-            .checked_mul(1_000_000)
+            .checked_mul(action_cost_microunits)
             .ok_or_else(|| "normalized action budget overflow".to_owned())?;
+        let budget_model = BudgetModel::ActionUnit {
+            charge_per_action_microunits: action_cost_microunits,
+        };
+        let budget_model_sha256 = digest_bytes(
+            &serde_json::to_vec(&budget_model)
+                .map_err(|error| format!("budget model encoding failed: {error}"))?,
+        );
 
         let mut tape = EventTape::new(EventTapeHeader {
             schema: "symthaea.ar5b4.event-tape".to_owned(),
@@ -1113,8 +1125,9 @@ impl DirectionCampaignRun {
             comparison_profile_sha256: PROFILE_SHA256.to_owned(),
             evaluator_sha256: evaluator_sha256.clone(),
             verifier_sha256: verifier_sha256.clone(),
-            budget_model_id: "synthetic-one-unit-per-action-v0.1".to_owned(),
-            budget_model_sha256: digest("synthetic-one-unit-per-action-v0.1"),
+            budget_model_id: "synthetic-action-unit-v0.1".to_owned(),
+            budget_model,
+            budget_model_sha256,
             budget_limit_microunits,
             initial_direction_ids: vec!["A".to_owned(), "B".to_owned(), "C".to_owned()],
             execution: ExecutionContract {
@@ -1138,6 +1151,12 @@ impl DirectionCampaignRun {
         let mut evaluations_per_direction = BTreeMap::<String, u64>::new();
         let mut proposal_index = 0u64;
         for action in &self.actions {
+            if action.cost_units != self.policy_config.action_cost_units {
+                return Err(format!(
+                    "action slot {} has cost {}, but the frozen synthetic action-unit model requires {}",
+                    action.slot, action.cost_units, self.policy_config.action_cost_units
+                ));
+            }
             let slot = u64::try_from(action.slot)
                 .map_err(|_| "action slot does not fit u64".to_owned())?;
             if slot == 0 || slot != tape.events().len() as u64 + 1 {
