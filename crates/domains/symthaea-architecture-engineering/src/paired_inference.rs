@@ -268,7 +268,19 @@ pub fn analyze_paired_metric(
                 challenger,
                 plan.metric_direction,
             );
+            if !advantage.is_finite() {
+                return Err(PairedInferenceError::new(
+                    format!("landscapes[{landscape_id}].seeds[{seed}].delta"),
+                    "paired metric difference overflowed or is non-finite",
+                ));
+            }
             sum_delta += advantage;
+            if !sum_delta.is_finite() {
+                return Err(PairedInferenceError::new(
+                    format!("landscapes[{landscape_id}].delta"),
+                    "landscape paired-delta accumulation overflowed",
+                ));
+            }
             paired_seed_count += 1;
             match compare_with_tolerance(advantage) {
                 std::cmp::Ordering::Greater => paired_seed_win_count += 1,
@@ -290,7 +302,7 @@ pub fn analyze_paired_metric(
         .iter()
         .map(|delta| delta.challenger_advantage)
         .collect();
-    let mean = arithmetic_mean(&cluster_values);
+    let mean = stable_mean(&cluster_values);
     let median = median(&mut cluster_values.clone());
     let (bootstrap_lower, bootstrap_upper) = cluster_bootstrap_interval(
         &cluster_values,
@@ -479,15 +491,20 @@ fn compare_with_tolerance(value: f64) -> std::cmp::Ordering {
     }
 }
 
-fn arithmetic_mean(values: &[f64]) -> f64 {
-    values.iter().sum::<f64>() / values.len() as f64
+fn stable_mean(values: &[f64]) -> f64 {
+    let mut mean = 0.0;
+    for (index, value) in values.iter().enumerate() {
+        let count = (index + 1) as f64;
+        mean = mean * ((count - 1.0) / count) + *value / count;
+    }
+    mean
 }
 
 fn median(values: &mut [f64]) -> f64 {
     values.sort_by(f64::total_cmp);
     let middle = values.len() / 2;
     if values.len() % 2 == 0 {
-        (values[middle - 1] + values[middle]) / 2.0
+        values[middle - 1] / 2.0 + values[middle] / 2.0
     } else {
         values[middle]
     }
@@ -501,7 +518,7 @@ fn quantile(sorted: &[f64], probability: f64) -> f64 {
     let lower = index.floor() as usize;
     let upper = index.ceil() as usize;
     let fraction = index - lower as f64;
-    sorted[lower] + (sorted[upper] - sorted[lower]) * fraction
+    sorted[lower] * (1.0 - fraction) + sorted[upper] * fraction
 }
 
 fn cluster_bootstrap_interval(
@@ -513,11 +530,13 @@ fn cluster_bootstrap_interval(
     let mut rng = DeterministicRng::new(seed);
     let mut samples = Vec::with_capacity(replicates);
     for _ in 0..replicates {
-        let mut sum = 0.0;
-        for _ in 0..values.len() {
-            sum += values[rng.index(values.len())];
+        let mut mean = 0.0;
+        for sample_index in 0..values.len() {
+            let count = (sample_index + 1) as f64;
+            mean = mean * ((count - 1.0) / count)
+                + values[rng.index(values.len())] / count;
         }
-        samples.push(sum / values.len() as f64);
+        samples.push(mean);
     }
     samples.sort_by(f64::total_cmp);
     (
@@ -592,7 +611,14 @@ impl DeterministicRng {
     }
 
     fn index(&mut self, length: usize) -> usize {
-        (self.next_u64() % length as u64) as usize
+        let bound = length as u64;
+        let threshold = bound.wrapping_neg() % bound;
+        loop {
+            let value = self.next_u64();
+            if value >= threshold {
+                return (value % bound) as usize;
+            }
+        }
     }
 }
 
