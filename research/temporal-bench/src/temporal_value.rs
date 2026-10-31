@@ -363,11 +363,36 @@ mod tests {
 
     #[test]
     fn lru_and_lfu_use_their_declared_observable_statistics() {
-        let items = [candidate(1, 1, 1), candidate(2, 1, 1)];
+        let mut recently_used = candidate(1, 1, 1);
+        recently_used.last_access_us = 90;
+        recently_used.access_count = 1;
+        let mut frequently_used = candidate(2, 1, 1);
+        frequently_used.last_access_us = 50;
+        frequently_used.access_count = 9;
+        let items = [recently_used, frequently_used];
         let lru = select_retained_items(&items, 1, 100, RetentionPolicy::Lru, [0; 32]).unwrap();
         let lfu = select_retained_items(&items, 1, 100, RetentionPolicy::Lfu, [0; 32]).unwrap();
-        assert_eq!(lru.selected_ids, vec![2]);
+        assert_eq!(lru.selected_ids, vec![1]);
         assert_eq!(lfu.selected_ids, vec![2]);
+    }
+
+    #[test]
+    fn hard_invalidation_overrides_every_retention_policy() {
+        let mut expired = candidate(7, 1, u64::MAX);
+        expired.valid_until_us = Some(99);
+        let policies = [
+            RetentionPolicy::TemporalValuePerByteSecond,
+            RetentionPolicy::Lru,
+            RetentionPolicy::Lfu,
+            RetentionPolicy::FixedTtl { ttl_us: 10 },
+            RetentionPolicy::NoveltyFirst,
+            RetentionPolicy::ConfidenceFirst,
+        ];
+        for policy in policies {
+            let plan = select_retained_items(&[expired.clone()], 1, 100, policy, [0; 32]).unwrap();
+            assert!(plan.selected_ids.is_empty());
+            assert_eq!(plan.evicted_ids, vec![7]);
+        }
     }
 
     #[test]
