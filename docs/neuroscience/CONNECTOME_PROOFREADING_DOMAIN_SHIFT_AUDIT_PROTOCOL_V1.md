@@ -45,7 +45,7 @@ Run one audit per axis. A domain ID must map to one axis and one held-out status
 
 ### Probability calibration
 
-The scorer reports a ten-bin fixed-width reliability table (last bin includes probability 1.0), including counts, mean predicted probability, observed adjudicated error frequency and absolute gap. It also reports:
+The scorer reports a ten-bin fixed-width probability-calibration table (last bin includes p_error = 1.0), including counts, mean predicted error probability, observed adjudicated error frequency and absolute gap. Separately, to align with ConnectomeBench2's confidence-calibration view, it reports a 15-bin adaptive confidence-versus-correctness ECE/MCE and a 12-bin equal-mass confidence reliability curve. Equal-confidence ties are never split across quantile bins. It also reports:
 - Brier score and log loss;
 - expected calibration error (ECE) and maximum calibration error (MCE);
 - false-accept fraction among predictions at `p_error >= 0.90` and `>= 0.95`;
@@ -90,7 +90,7 @@ The placeholders above must be replaced with the exact pinned dataset and profil
 - Keep source volume, neuron/root, operation, physical PSU and related reconstruction lineages within the declared split boundary.
 - Distinguish held-out-domain transfer from covariate-shift stress within a represented domain.
 - Do not treat image crops, skeleton windows, synapses or repeated pipeline variants as independent clusters.
-- Report the independent domain, volume, neuron/root and PSU counts. The scorer now reports deterministic cluster-bootstrap 95% percentile intervals for ECE, MCE and Brier score overall and per domain, plus OOD AUROC/AUPRC where a resampled replicate retains both OOD classes. OOD status is NOT_ESTIMABLE if the complete run contains no examples from either in-domain or held-out status. Clusters are resampled as complete units, never individual rows. An interval is withheld if fewer than two clusters exist or fewer than 80% of requested replicates are estimable. This is a minimum engineering safeguard, not a claim that two clusters provide adequate inferential power; promotion requires materially larger, independently justified cluster counts, coverage simulations and a source-volume-aware sampling design.
+- Report the independent domain, volume, neuron/root and PSU counts. The scorer now reports deterministic cluster-bootstrap 95% percentile intervals for fixed-bin ECE/MCE, adaptive 15-bin confidence ECE, 12-bin confidence reliability ECE and Brier score overall and per domain, plus OOD AUROC/AUPRC where a resampled replicate retains both OOD classes. OOD status is NOT_ESTIMABLE if the complete run contains no examples from either in-domain or held-out status. Clusters are resampled as complete units, never individual rows. An interval is withheld if fewer than two clusters exist or fewer than 80% of requested replicates are estimable. This is a minimum engineering safeguard, not a claim that two clusters provide adequate inferential power; promotion requires materially larger, independently justified cluster counts, coverage simulations and a source-volume-aware sampling design.
 - Preserve indeterminate adjudications and reviewer disagreement. The label reference is an adjudication process, not infallible biological truth.
 - If a domain/family has inadequate independent support, mark it NOT_ESTIMABLE and refer to human/specialist review.
 
