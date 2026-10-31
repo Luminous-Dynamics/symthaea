@@ -167,6 +167,7 @@ struct CalibrationDiagnostics {
     adaptive_confidence_maximum_calibration_error: Option<f64>,
     reliability_curve_bin_count_requested: usize,
     reliability_curve_bins: Vec<ConfidenceCalibrationBin>,
+    reliability_curve_expected_calibration_error: Option<f64>,
     brier_score: Option<f64>,
     log_loss: Option<f64>,
     expected_calibration_error: Option<f64>,
@@ -769,11 +770,7 @@ fn calibration_cluster_bootstrap(
             metrics.expected_calibration_error,
             metrics.maximum_calibration_error,
             metrics.adaptive_confidence_expected_calibration_error,
-            metrics.reliability_curve_bins.first().map(|_| {
-                metrics.reliability_curve_bins.iter()
-                    .map(|bin| bin.count as f64 / sample.len() as f64 * bin.absolute_calibration_gap)
-                    .sum::<f64>()
-            }),
+            metrics.reliability_curve_expected_calibration_error,
             metrics.brier_score,
         ) {
             if e.is_finite() && m.is_finite() && a.is_finite() && r.is_finite() && b.is_finite() {
@@ -1325,6 +1322,7 @@ fn calibration_diagnostics(rows: &[&Prediction]) -> CalibrationDiagnostics {
     let adaptive_confidence_mce = adaptive_confidence_bins_15.iter()
         .map(|bin| bin.absolute_calibration_gap)
         .reduce(f64::max);
+    let reliability_curve_ece = confidence_bins_ece(&reliability_curve_bins_12, rows.len());
 
     let mut bins = Vec::with_capacity(BIN_COUNT);
     let mut ece = 0.0_f64;
@@ -1362,6 +1360,7 @@ fn calibration_diagnostics(rows: &[&Prediction]) -> CalibrationDiagnostics {
         adaptive_confidence_maximum_calibration_error: adaptive_confidence_mce,
         reliability_curve_bin_count_requested: 12,
         reliability_curve_bins: reliability_curve_bins_12,
+        reliability_curve_expected_calibration_error: reliability_curve_ece,
         brier_score: if rows.is_empty() { None } else { Some(brier_sum / rows.len() as f64) },
         log_loss: if rows.is_empty() { None } else { Some(log_loss_sum / rows.len() as f64) },
         expected_calibration_error: if rows.is_empty() { None } else { Some(ece) },
@@ -1866,6 +1865,7 @@ mod tests {
         assert_eq!(diagnostics.reliability_curve_bin_count_requested, 12);
         assert_eq!(diagnostics.adaptive_confidence_bins.iter().map(|bin| bin.count).sum::<usize>(), 4);
         assert_eq!(diagnostics.reliability_curve_bins.iter().map(|bin| bin.count).sum::<usize>(), 4);
+        assert!(diagnostics.reliability_curve_expected_calibration_error.is_some());
         assert_eq!(diagnostics.bins.iter().map(|bin| bin.count).sum::<usize>(), 4);
         assert!((diagnostics.expected_calibration_error.unwrap() - 0.10).abs() < 1e-12);
         assert_eq!(diagnostics.high_confidence_at_90.false_accept_count, 0);
