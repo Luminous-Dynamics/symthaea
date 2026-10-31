@@ -1,0 +1,80 @@
+{
+  "schema_version": "hardsec-temporal-dependence-benchmark-v1",
+  "benchmark_id": "hs022-pmu-fdm-and-block-coverage",
+  "status": "planned",
+  "comparators": [
+    "iid_binomial_standard_error",
+    "non_overlapping_batch_means_block_standard_error",
+    "functional_dependence_non_asymptotic_coverage_bound",
+    "long_memory_block_sampling_inference",
+    "independent_execution_episode_level_evaluation",
+    "naive_window_iid_cctm_claim_negative_control"
+  ],
+  "scenarios": [
+    "iid_scores",
+    "ar1_scores",
+    "finite_memory_ma_scores",
+    "nonlinear_causal_innovation_recursion",
+    "overlapping_counter_windows",
+    "persistent_scheduler_and_frequency_phase",
+    "geometric_functional_dependence",
+    "polynomial_functional_dependence",
+    "nonmixing_summable_fdm",
+    "long_memory_gaussian_linear_process",
+    "misspecified_innovation_model",
+    "underestimated_fdm_envelope",
+    "threshold_indicator_dependence_differs_from_raw_score_acf",
+    "block_length_sensitivity",
+    "calibration_test_adjacent_dependence",
+    "independent_execution_episode_units"
+  ],
+  "holdout_axes": [
+    "device_boot_group",
+    "execution_group",
+    "program_binary",
+    "attack_family",
+    "workload_context",
+    "microarchitecture"
+  ],
+  "metrics": [
+    "fdm_theta_sum_upper_bound",
+    "fdm_envelope_fit_status",
+    "non_asymptotic_marginal_coverage_error_bound",
+    "realized_coverage",
+    "iid_standard_error",
+    "block_standard_error",
+    "block_over_iid_standard_error_ratio",
+    "block_length",
+    "complete_block_count",
+    "discarded_calibration_observations",
+    "empirical_coverage_bound_violation_rate",
+    "model_misspecification_detection_rate",
+    "episode_level_false_alert_rate",
+    "sequential_pfa",
+    "arl",
+    "cpu_time",
+    "memory",
+    "observer_effect"
+  ],
+  "reference_implementations": [
+    {
+      "id": "zhai_cheng_wu_2026_fdm_conformal_coverage",
+      "url": "https://arxiv.org/abs/2609.33868",
+      "status": "paper_protocol_implemented_in_part_not_independently_reproduced"
+    },
+    {
+      "id": "barber_pananjady_2026_switch_coefficient",
+      "url": "https://proceedings.mlr.press/v313/barber26a.html",
+      "status": "paper_reference_only_not_implemented"
+    }
+  ],
+  "claim_rules": {
+    "fdm_assumptions_not_authenticated_by_digest": true,
+    "block_standard_error_is_not_anytime_valid": true,
+    "block_standard_error_is_not_an_e_value": true,
+    "no_sequential_ctm_validity_from_fdm_coverage_bound": true,
+    "raw_acf_is_not_an_fdm_proof": true,
+    "independent_windows_not_inferred_from_unique_window_ids": true,
+    "pfa_and_arl_not_conflated": true
+  }
+}
