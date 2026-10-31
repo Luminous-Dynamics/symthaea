@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT run-level observer coverage envelope v1",
+  "description": "An untrusted run-level coverage claim checked against a separately pinned candidate profile. This format does not authenticate capture or qualify the profile.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format_version", "suite_id", "run_id", "profile_id", "profile_digest", "observer_binary_digest", "runner_binary_digest", "platform", "controls_active", "capture", "health", "channels", "claim"],
+  "properties": {
+    "format_version": {"const": 1},
+    "suite_id": {"const": "basalt-observer-coverage-envelope-v1"},
+    "run_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "profile_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
+    "profile_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "observer_binary_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "runner_binary_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "architecture", "kernel_release", "kernel_build_id", "kernel_btf_digest"],
+      "properties": {
+        "os": {"type": "string", "minLength": 1, "maxLength": 64},
+        "architecture": {"type": "string", "minLength": 1, "maxLength": 64},
+        "kernel_release": {"type": "string", "minLength": 1, "maxLength": 128},
+        "kernel_build_id": {"type": ["string", "null"], "maxLength": 256},
+        "kernel_btf_digest": {"type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$"}
+      }
+    },
+    "controls_active": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"}},
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_monotonic_ns", "end_monotonic_ns", "root_pid", "process_tree_closed", "monitored_roots", "snapshot_consistency"],
+      "properties": {
+        "start_monotonic_ns": {"type": "integer", "minimum": 0},
+        "end_monotonic_ns": {"type": "integer", "minimum": 0},
+        "root_pid": {"type": "integer", "minimum": 1},
+        "process_tree_closed": {"type": "boolean"},
+        "monitored_roots": {"type": "array", "maxItems": 1024, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 4096}},
+        "snapshot_consistency": {"enum": ["stable", "raced", "unknown"]}
+      }
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_count", "dropped_event_count", "ring_buffer_overflow_count", "observer_restart_count", "unmonitored_process_count", "root_escape_count"],
+      "properties": {
+        "event_count": {"type": "integer", "minimum": 0},
+        "dropped_event_count": {"type": "integer", "minimum": 0},
+        "ring_buffer_overflow_count": {"type": "integer", "minimum": 0},
+        "observer_restart_count": {"type": "integer", "minimum": 0},
+        "unmonitored_process_count": {"type": "integer", "minimum": 0},
+        "root_escape_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "channels": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["channel_id", "events"],
+        "properties": {
+          "channel_id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+          "events": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 256,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["event_kind", "status", "evidence_digest", "reason"],
+              "properties": {
+                "event_kind": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+                "status": {"enum": ["observed", "unresolved", "excluded"]},
+                "evidence_digest": {"type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$"},
+                "reason": {"type": ["string", "null"], "maxLength": 1024}
+              }
+            }
+          }
+        }
+      }
+    },
+    "claim": {"enum": ["complete_within_profile", "incomplete", "unsupported"]}
+  }
+}
