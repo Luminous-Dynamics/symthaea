@@ -3,6 +3,10 @@
   "oracles": [
     {
       "case_id": "MACE-A01",
+      "pair": {
+        "pair_id": "PAIR-OBS-01",
+        "role": "anchor"
+      },
       "evaluator_oracle": {
         "causal_status": "not_identified",
         "expected_transfer": "record_association_only",
@@ -16,6 +20,10 @@
     },
     {
       "case_id": "MACE-A02",
+      "pair": {
+        "pair_id": "PAIR-OBS-01",
+        "role": "irrelevant_control"
+      },
       "evaluator_oracle": {
         "causal_status": "not_identified",
         "expected_transfer": "record_association_only",
@@ -29,6 +37,10 @@
     },
     {
       "case_id": "MACE-B01",
+      "pair": {
+        "pair_id": "PAIR-INT-01",
+        "role": "anchor"
+      },
       "evaluator_oracle": {
         "causal_status": "identified",
         "expected_transfer": "reuse_qualified_transition",
@@ -50,6 +62,10 @@
     },
     {
       "case_id": "MACE-B02",
+      "pair": {
+        "pair_id": "PAIR-INT-01",
+        "role": "irrelevant_control"
+      },
       "evaluator_oracle": {
         "causal_status": "identified",
         "expected_transfer": "reuse_qualified_transition",
@@ -71,6 +87,10 @@
     },
     {
       "case_id": "MACE-C01",
+      "pair": {
+        "pair_id": "PAIR-REGIME-01",
+        "role": "anchor"
+      },
       "evaluator_oracle": {
         "causal_status": "regime_shifted",
         "expected_transfer": "requalify_before_reuse",
@@ -84,6 +104,10 @@
     },
     {
       "case_id": "MACE-C02",
+      "pair": {
+        "pair_id": "PAIR-REGIME-01",
+        "role": "irrelevant_control"
+      },
       "evaluator_oracle": {
         "causal_status": "regime_shifted",
         "expected_transfer": "requalify_before_reuse",
@@ -97,6 +121,10 @@
     },
     {
       "case_id": "MACE-D01",
+      "pair": {
+        "pair_id": "PAIR-OUTCOME-01",
+        "role": "anchor"
+      },
       "evaluator_oracle": {
         "causal_status": "outcome_unverified",
         "expected_transfer": "mark_outcome_unknown",
@@ -110,6 +138,10 @@
     },
     {
       "case_id": "MACE-D02",
+      "pair": {
+        "pair_id": "PAIR-OUTCOME-01",
+        "role": "irrelevant_control"
+      },
       "evaluator_oracle": {
         "causal_status": "outcome_unverified",
         "expected_transfer": "mark_outcome_unknown",
