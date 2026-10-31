@@ -17,7 +17,8 @@
 //! known_at coordinate as the request or this adapter refuses the batch.
 
 use crate::memory_evidence::{
-    EvidenceIndexSnapshotReceipt, EvidenceLifecycle, LexicalEvidenceHit, MemoryContextType,
+    evidence_speaker_role_from_step_id, EvidenceIndexSnapshotReceipt, EvidenceLifecycle,
+    LexicalEvidenceHit, MemoryContextType,
 };
 use crate::memory_proof_budget::{
     ProofBudgetRequest, ProofEvidenceCandidate,
@@ -292,6 +293,9 @@ pub fn admit_lexical_hits_for_proof_budget(
             // returned by the index and matched against the trusted admission.
             // AML ingestion sets trajectory_id directly from Add.session_id.
             source_session_id: Some(admission.source_trajectory_id.clone()),
+            // Speaker role is derived from the exact source step ID returned
+            // by the snapshot-bound EvidenceIndex hit, not a caller label.
+            source_speaker: evidence_speaker_role_from_step_id(hit.source.step_id.as_deref()),
             scope_id: admission.scope_id.clone(),
             payload_sha256: hit.content_sha256.clone(),
             source_span_sha256: resolved_digest.clone(),
