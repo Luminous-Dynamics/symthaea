@@ -134,12 +134,19 @@ struct ModalityCoverage {
     geometry_rows: u64,
     em_any_rows: u64,
     em_missing_rows: u64,
+    /// Rows with at least one non-label-conditioned EM view (not necessarily all views).
     em_usable_rows: u64,
+    em_xy_rows: u64,
+    em_xz_rows: u64,
+    em_yz_rows: u64,
+    em_full_triplet_rows: u64,
     em_best_present_rows: u64,
+    em_best_only_rows: u64,
     geometry_without_usable_em_rows: u64,
     fused_geometry_em_rows: u64,
     em_any_fraction: Option<f64>,
     em_usable_fraction: Option<f64>,
+    em_full_triplet_fraction: Option<f64>,
     fused_fraction: Option<f64>,
 }
 
@@ -147,9 +154,11 @@ impl ModalityCoverage {
     fn observe(&mut self, row: &Row, slots: &BTreeSet<String>) {
         self.total_rows += 1;
         let has_geometry = row.has_single_mask || row.has_dual_mask;
-        let has_usable_em = ["em_xy", "em_xz", "em_yz"]
-            .iter()
-            .any(|slot| slots.contains(*slot));
+        let has_xy = slots.contains("em_xy");
+        let has_xz = slots.contains("em_xz");
+        let has_yz = slots.contains("em_yz");
+        let has_usable_em = has_xy || has_xz || has_yz;
+        let has_full_triplet = has_xy && has_xz && has_yz;
         let has_em_best = slots.contains("em_best");
         if has_geometry {
             self.geometry_rows += 1;
@@ -162,8 +171,23 @@ impl ModalityCoverage {
         if has_usable_em {
             self.em_usable_rows += 1;
         }
+        if has_xy {
+            self.em_xy_rows += 1;
+        }
+        if has_xz {
+            self.em_xz_rows += 1;
+        }
+        if has_yz {
+            self.em_yz_rows += 1;
+        }
+        if has_full_triplet {
+            self.em_full_triplet_rows += 1;
+        }
         if has_em_best {
             self.em_best_present_rows += 1;
+            if !has_usable_em {
+                self.em_best_only_rows += 1;
+            }
         }
         if has_geometry && !has_usable_em {
             self.geometry_without_usable_em_rows += 1;
@@ -179,6 +203,8 @@ impl ModalityCoverage {
             .then_some(self.em_any_rows as f64 / total);
         self.em_usable_fraction = (self.total_rows > 0)
             .then_some(self.em_usable_rows as f64 / total);
+        self.em_full_triplet_fraction = (self.total_rows > 0)
+            .then_some(self.em_full_triplet_rows as f64 / total);
         self.fused_fraction = (self.total_rows > 0)
             .then_some(self.fused_geometry_em_rows as f64 / total);
     }
@@ -949,10 +975,16 @@ mod tests {
         assert_eq!(overall.em_any_rows, 3);
         assert_eq!(overall.em_missing_rows, 2);
         assert_eq!(overall.em_usable_rows, 2);
+        assert_eq!(overall.em_xy_rows, 1);
+        assert_eq!(overall.em_xz_rows, 1);
+        assert_eq!(overall.em_yz_rows, 0);
+        assert_eq!(overall.em_full_triplet_rows, 0);
         assert_eq!(overall.em_best_present_rows, 1);
+        assert_eq!(overall.em_best_only_rows, 1);
         assert_eq!(overall.fused_geometry_em_rows, 2);
         assert!((overall.em_any_fraction.unwrap() - 0.6).abs() < 1.0e-12);
         assert!((overall.em_usable_fraction.unwrap() - 0.4).abs() < 1.0e-12);
+        assert!((overall.em_full_triplet_fraction.unwrap() - 0.0).abs() < 1.0e-12);
 
         assert!(report.modality_coverage.contains_key("task_route|false_split_correction"));
         assert!(report.modality_coverage.contains_key("sample_type|merge_edit"));
