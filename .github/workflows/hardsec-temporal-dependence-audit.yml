@@ -1,0 +1,89 @@
+name: HARDSEC-022 functional dependence and block coverage audit
+
+on:
+  pull_request:
+    paths:
+      - "examples/hardsec_temporal_dependence_audit.rs"
+      - "docs/research/HARDSEC_022_FDM_DEPENDENCE_AUDITOR.md"
+      - "schemas/hardsec-temporal-dependence-*.schema.json"
+      - "tests/fixtures/hardsec/temporal-dependence-v1/**"
+      - "tools/hardsec-adaptive-evasion-audit-harness/**"
+      - ".github/workflows/hardsec-temporal-dependence-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-temporal-dependence-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  temporal-dependence-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact pull request revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_temporal_dependence_audit.rs
+      - name: Run functional dependence and block inference unit suite
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-temporal-dependence-audit --example hardsec_temporal_dependence_audit
+      - name: Audit synthetic FDM and block coverage fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          out_dir="$(mktemp -d)"
+          cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-temporal-dependence-audit --example hardsec_temporal_dependence_audit -- \
+            --model tests/fixtures/hardsec/temporal-dependence-v1/model.json \
+            --data tests/fixtures/hardsec/temporal-dependence-v1/data.json \
+            --receipt "$out_dir/temporal-dependence-receipt.json"
+          python3 - "$out_dir/temporal-dependence-receipt.json" <<'PY'
+          import json, sys, math
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          assert receipt["result"] == "audited"
+          assert receipt["calibration"]["score_count"] == 2000
+          assert receipt["evaluation"]["score_count"] == 2000
+          assert abs(receipt["calibration"]["fixed_cutoff"] - 0.9) < 1e-12
+          assert abs(receipt["evaluation"]["realized_coverage_at_fixed_cutoff"] - 0.9) < 1e-12
+          fdm = receipt["functional_dependence"]["fdm_contract"]
+          assert fdm["status"] == "model_bound_summable_fdm_contract_consistent_not_authenticated"
+          assert abs(fdm["theta_sum_upper_bound"] - 0.25) < 1e-10
+          marginal = fdm["marginal_coverage_bound_from_zhai_theorem_1"]
+          assert marginal["status"] == "numeric_condition_satisfied_assumptions_unverified"
+          assert abs(marginal["marginal_coverage_error_upper_bound"] - 0.06052753944880749) < 1e-10
+          assert receipt["functional_dependence"]["sequential_ctm_validity_inferred"] is False
+          assert receipt["functional_dependence"]["iid_innovations_status"] == "assumption_not_verified"
+          assert receipt["functional_dependence"]["stationarity_status"] == "assumption_not_verified"
+          assert receipt["block_diagnostic"]["not_anytime_valid"] is True
+          reports = receipt["block_diagnostic"]["block_length_sensitivity"]
+          assert [row["block_length"] for row in reports] == [25, 50, 100]
+          for row in reports:
+              assert row["block_count"] >= 10
+              assert row["block_standard_error"] > 2 * row["iid_standard_error"]
+              assert row["observed_coverage_inside_null_interval"] is True
+          PY
+      - name: Enforce temporal dependence benchmark claim ceiling
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          path = "tests/fixtures/hardsec/temporal-dependence-v1/benchmark-plan.json"
+          with open(path, "r", encoding="utf-8") as handle:
+              plan = json.load(handle)
+          assert plan["status"] == "planned"
+          assert len(plan["comparators"]) == 6
+          assert len(plan["scenarios"]) == 16
+          assert len(plan["metrics"]) == 18
+          rules = plan["claim_rules"]
+          assert all(value is True for value in rules.values())
+          assert any(source["id"] == "zhai_cheng_wu_2026_fdm_conformal_coverage" for source in plan["reference_implementations"])
+          PY
