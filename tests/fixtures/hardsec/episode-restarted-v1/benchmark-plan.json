@@ -60,7 +60,9 @@
     "episode_aggregation_overhead",
     "pfa_exact_binomial_confidence_interval",
     "arl_reported_as_separate_operating_regime",
-    "device_hour_exposure"
+    "device_hour_exposure",
+    "rank_lookup_latency_by_episode_index",
+    "episode_monitor_memory_bytes"
   ],
   "aspirational_targets": {
     "iid_episode_null_pfa_max": 0.05,
@@ -76,7 +78,10 @@
     "randomizer_independence_is_assumption_not_proven": true,
     "correlated_windows_collapsed_before_testing": true,
     "delay_units_are_episodes": true,
-    "synthetic_results_not_detector_performance": true
+    "synthetic_results_not_detector_performance": true,
+    "delay_theorem_local_kl_support_unverified": true,
+    "delay_theorem_score_transform_separation_unverified": true,
+    "pfa_claim_requires_exchangeable_episode_scores_and_independent_randomizers": true
   },
   "reference_implementations": [
     {
