@@ -151,10 +151,21 @@ impl fmt::Display for TemporalVerificationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::StreamIdMismatch => write!(f, "public task and oracle stream IDs differ"),
-            Self::ContentDigestMismatch => write!(f, "multiscale public task SHA-256 digest does not match its contents"),
-            Self::OracleDigestMismatch => write!(f, "multiscale oracle SHA-256 digest does not match its contents"),
-            Self::InvalidOracleModel => write!(f, "multiscale oracle parameters are outside the generator contract"),
-            Self::OracleLengthMismatch => write!(f, "oracle target count differs from observation count"),
+            Self::ContentDigestMismatch => write!(
+                f,
+                "multiscale public task SHA-256 digest does not match its contents"
+            ),
+            Self::OracleDigestMismatch => write!(
+                f,
+                "multiscale oracle SHA-256 digest does not match its contents"
+            ),
+            Self::InvalidOracleModel => write!(
+                f,
+                "multiscale oracle parameters are outside the generator contract"
+            ),
+            Self::OracleLengthMismatch => {
+                write!(f, "oracle target count differs from observation count")
+            }
             Self::InvalidOracleTarget { source_step } => {
                 write!(f, "oracle target record is invalid at source step {source_step}")
             }
@@ -171,9 +182,14 @@ impl fmt::Display for TemporalVerificationError {
                 write!(f, "missing delayed feedback for source step {source_step}")
             }
             Self::InvalidFeedback { source_step } => {
-                write!(f, "delayed feedback is early, reordered, or has an invalid label for source step {source_step}")
+                write!(
+                    f,
+                    "delayed feedback is early, reordered, or has an invalid label for source step {source_step}"
+                )
             }
-            Self::UnexpectedTrailingEvent => write!(f, "public task has unexpected trailing events"),
+            Self::UnexpectedTrailingEvent => {
+                write!(f, "public task has unexpected trailing events")
+            }
         }
     }
 }
@@ -403,7 +419,11 @@ pub fn generate_multiscale_task(
         rng.next_u64() % periods[1],
         rng.next_u64() % periods[2],
     ];
-    let weights_before = [random_weight(&mut rng), random_weight(&mut rng), random_weight(&mut rng)];
+    let weights_before = [
+        random_weight(&mut rng),
+        random_weight(&mut rng),
+        random_weight(&mut rng),
+    ];
     let weights_after = if config.regime_shift {
         [
             weights_before[2],
@@ -426,7 +446,12 @@ pub fn generate_multiscale_task(
     let mut targets = Vec::with_capacity(config.steps);
     for source_step in 0..step_count {
         let target_step = source_step.saturating_add(config.forecast_horizon);
-        let weights = weights_for_step(target_step, hidden_change_step, weights_before, weights_after);
+        let weights = weights_for_step(
+            target_step,
+            hidden_change_step,
+            weights_before,
+            weights_after,
+        );
         let label = target_label(target_step, periods, phases, weights);
         targets.push(TemporalTarget {
             source_step,
