@@ -609,7 +609,7 @@ fn audit_values_with_context_receipt(
                 "context_assignment_reason":assignment.decision_reason,
                 "action":if first_alarm_sequence_index.is_some() {"alert_latched_observation_abstained"} else {"abstain"},
                 "abstention_reason":reason,
-                "ecdf_value":null,
+                "randomized_pit_value":null,
                 "betting_factor":null,
                 "log_wealth_context":context_log_wealth,
                 "threshold_context":plan.contexts.get(&record.context_id).map(|s| -s.alpha.ln())
@@ -938,7 +938,7 @@ mod tests {
     fn audit(plan: &Value, stream: &Value) -> Result<Value, String> {
         let plan_bytes = encode(plan);
         let stream_bytes = encode(stream);
-        audit_values_with_context_receipt_fixture(plan, stream, &plan_bytes, &stream_bytes)
+        audit_values(plan, stream, &plan_bytes, &stream_bytes)
     }
 
     #[test]
