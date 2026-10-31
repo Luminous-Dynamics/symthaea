@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "evidence_class": "synthetic_known_answer",
+  "claim_ceiling": "SYNTHETIC_ONLY",
+  "cases": [
+    {"id":"pulse_order_dependence","response_a_then_b":[0.000000000000,1.000000000000,1.000000000000,0.000000000000],"response_b_then_a":[0.000000000000,0.000000000000,1.000000000000,0.000000000000],"status":"PASS"},
+    {"id":"calcium_observation_kernel","latent":[1.000000000000,0.000000000000,0.000000000000],"observed":[2.000000000000,1.000000000000,0.500000000000],"status":"PASS"}
+  ]
+}
