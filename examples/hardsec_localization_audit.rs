@@ -644,8 +644,10 @@ mod tests {
     use super::*;
 
     fn fixture_values() -> (Value, Value, Value, Vec<u8>, Vec<u8>, Vec<u8>) {
+        let source_artifact_sha = "9".repeat(64);
         let graph = json!({
             "schema_version":"hardsec-source-graph-v1",
+            "source_artifact_sha256":source_artifact_sha,
             "nodes":["g17","g18","g20","g99","g100"],
             "edges":[
                 {"edge_id":"e17-18","source":"g17","target":"g18"},
@@ -653,7 +655,6 @@ mod tests {
             ]
         });
         let graph_bytes = serde_json::to_vec(&graph).unwrap();
-        let graph_sha = sha256(&graph_bytes);
         let (nodes, edges, map_sha) = load_graph(&graph).unwrap();
         let _ = (nodes, edges);
         let explanation = json!({
@@ -666,7 +667,7 @@ mod tests {
             },
             "source":{
                 "artifact_id":"fixture-source-01","source_path":"fixture-source-01.json",
-                "source_sha256":graph_sha,
+                "source_sha256":source_artifact_sha,
                 "node_edge_map_sha256":map_sha
             },
             "model":{
