@@ -27,7 +27,8 @@
     "context_assignment_artifact_sha256",
     "restart_weight_schedule",
     "restart_weight_scale",
-    "maximum_restart_age"
+    "maximum_restart_age",
+    "accepted_observation_selection_assumption_status"
   ],
   "properties": {
     "schema_version": {
@@ -153,6 +154,9 @@
       "type": "integer",
       "minimum": 1,
       "maximum": 1000000
+    },
+    "accepted_observation_selection_assumption_status": {
+      "const": "assumption_not_verified"
     }
   }
 }
