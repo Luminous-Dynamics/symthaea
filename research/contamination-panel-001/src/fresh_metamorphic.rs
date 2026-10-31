@@ -657,14 +657,31 @@ pub fn audit_fresh_metamorphic_bundle(
     if !exact_preservation || !margin_preservation || !all_groups_exact {
         return Err("metamorphic oracle violates exact solution, stability margin or form-universe invariants".to_owned());
     }
-    let public = serde_json::to_string(&supplied.public_packet)
+    let public_value = serde_json::to_value(&supplied.public_packet)
         .map_err(|error| format!("cannot serialize metamorphic public packet: {error}"))?;
-    if public.contains("sealed_oracle")
-        || public.contains("solution")
-        || public.contains("parameters")
-        || public.contains(&supplied.sealed_oracle.generation_seed_commitment_sha256)
+    let public_keys: BTreeSet<String> = public_value.as_object()
+        .ok_or_else(|| "metamorphic public packet must be a JSON object".to_owned())?
+        .keys().cloned().collect();
+    let expected_public_keys: BTreeSet<String> = [
+        "schema", "batch_id", "benchmark_id", "benchmark_version", "task_family",
+        "model_checkpoint_sha256", "base_public_packet_sha256", "base_manifest_sha256",
+        "item_count", "group_count", "forms_per_group", "tasks",
+        "public_packet_sha256", "claim_boundary",
+    ].iter().map(|field| (*field).to_owned()).collect();
+    let task_fields_valid = supplied.public_packet.tasks.iter().all(|task| {
+        serde_json::to_value(task).ok().and_then(|value| {
+            let actual: BTreeSet<String> = value.as_object()?.keys().cloned().collect();
+            let expected: BTreeSet<String> = [
+                "item_id", "group_id", "parent_item_id", "form", "task_text", "task_text_sha256",
+            ].iter().map(|field| (*field).to_owned()).collect();
+            Some(actual == expected)
+        }).unwrap_or(false)
+    });
+    if public_keys != expected_public_keys
+        || !task_fields_valid
+        || public_value.to_string().contains(&supplied.sealed_oracle.generation_seed_commitment_sha256)
     {
-        return Err("metamorphic public packet contains evaluator-only oracle fields".to_owned());
+        return Err("metamorphic public packet contains evaluator-only or unexpected fields".to_owned());
     }
     Ok(FreshMetamorphicAuditV1 {
         schema: FRESH_METAMORPHIC_AUDIT_SCHEMA.to_owned(),
