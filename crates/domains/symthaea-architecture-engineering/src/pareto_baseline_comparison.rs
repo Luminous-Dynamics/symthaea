@@ -356,6 +356,29 @@ pub fn compare_pareto_baselines(
     })
 }
 
+/// Rebuild the complete comparison from the same replay-verified runs and frozen contract.
+pub fn verify_pareto_baseline_comparison(
+    runs: &[ParetoBaselineRun],
+    objective_specs: &[ParetoObjectiveSpec],
+    reference_point_utility: &[f64],
+    reference_front_utility: &[Vec<f64>],
+    stored: &ParetoBaselineComparison,
+) -> Result<(), BaselineComparisonError> {
+    let recomputed = compare_pareto_baselines(
+        runs,
+        objective_specs,
+        reference_point_utility,
+        reference_front_utility,
+    )?;
+    if &recomputed != stored {
+        return Err(BaselineComparisonError::new(
+            "comparison",
+            "stored baseline comparison differs from deterministic reconstruction",
+        ));
+    }
+    Ok(())
+}
+
 fn map_nsga2_error(error: super::pareto_nsga2::Nsga2Error) -> BaselineComparisonError {
     BaselineComparisonError::new(error.path, error.message)
 }
@@ -504,6 +527,50 @@ mod tests {
         assert!(compare_pareto_baselines(&duplicate, &specs, &[-0.1, -0.1], &ref_front).is_err());
 
         assert!(compare_pareto_baselines(&runs[..1], &specs, &[-0.1, -0.1], &ref_front).is_err());
+    }
+
+    #[test]
+    fn comparison_rejects_different_seed_and_verifies_tamper_free_receipt() {
+        let runs = baseline_runs(42);
+        let specs = objective_specs();
+        let front = reference_front();
+        let comparison = compare_pareto_baselines(&runs, &specs, &[-0.1, -0.1], &front).unwrap();
+        verify_pareto_baseline_comparison(
+            &runs,
+            &specs,
+            &[-0.1, -0.1],
+            &front,
+            &comparison,
+        ).unwrap();
+
+        let mut tampered = comparison.clone();
+        tampered.results[0].hypervolume += 0.01;
+        assert!(verify_pareto_baseline_comparison(
+            &runs,
+            &specs,
+            &[-0.1, -0.1],
+            &front,
+            &tampered,
+        ).is_err());
+
+        let mut different_seed = runs.clone();
+        let (config, _) = match &different_seed[0] {
+            ParetoBaselineRun::Nsga2 { config, report } => (config.clone(), report.clone()),
+            _ => return,
+        };
+        let mut changed_config = config;
+        changed_config.seed = 43;
+        let changed_report = super::super::pareto_nsga2::run_nsga2_zdt1(&changed_config, 10).unwrap();
+        different_seed[0] = ParetoBaselineRun::Nsga2 {
+            config: changed_config,
+            report: changed_report,
+        };
+        assert!(compare_pareto_baselines(
+            &different_seed,
+            &specs,
+            &[-0.1, -0.1],
+            &front,
+        ).is_err());
     }
 
     #[test]
