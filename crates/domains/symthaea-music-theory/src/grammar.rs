@@ -414,6 +414,14 @@ pub fn compose_with_grammar_plan(
     // after it both see the corrected score, not a pre-correction one.
     crate::composer::deoverlap_all_voices(&mut realized.score);
     crate::composer::sync_total_beats(&mut realized.score);
+    if let GrammarPlanEvidence::Opera(evidence) = &mut realized.plan {
+        let verification = crate::opera::verify_opera_plan(
+            &realized.score,
+            realized.score.key,
+            &evidence.plan,
+        );
+        evidence.verification = verification;
+    }
     realized.trace = crate::grammar_trace::build_grammar_trace(
         profile.family,
         &realized.score,
