@@ -98,6 +98,8 @@ pub enum RoundAction {
 #[serde(deny_unknown_fields)]
 pub struct RoundSeat {
     pub action_id: String,
+    /// Digest of the immutable candidate or proposal work packet.
+    pub work_item_sha256: String,
     pub action: RoundAction,
 }
 
@@ -111,6 +113,8 @@ pub struct RoundPlan {
     pub round_index: u64,
     pub policy_id: String,
     pub seed: u64,
+    /// Previous round-close digest; absent only for the first round.
+    pub parent_close_sha256: Option<String>,
     /// Digest of all policy-visible evidence before any seat in this round executes.
     pub pre_round_snapshot_sha256: String,
     /// Digest of the resource-cost profile pinned for the whole campaign.
@@ -129,6 +133,7 @@ impl RoundPlan {
         round_index: u64,
         policy_id: impl Into<String>,
         seed: u64,
+        parent_close_sha256: Option<String>,
         pre_round_snapshot_sha256: impl Into<String>,
         cost_profile_sha256: impl Into<String>,
         required_cost_dimensions: BTreeSet<CostDimension>,
@@ -142,6 +147,7 @@ impl RoundPlan {
             round_index,
             policy_id: policy_id.into(),
             seed,
+            parent_close_sha256,
             pre_round_snapshot_sha256: pre_round_snapshot_sha256.into(),
             cost_profile_sha256: cost_profile_sha256.into(),
             required_cost_dimensions,
@@ -171,6 +177,12 @@ impl RoundPlan {
         }
         validate_identifier("round_id", &self.round_id)?;
         validate_identifier("policy_id", &self.policy_id)?;
+        match (self.round_index, self.parent_close_sha256.as_deref()) {
+            (0, None) => {}
+            (0, Some(_)) => return Err(RoundContractError::new("parent_close_sha256", "first round cannot name a parent")),
+            (_, Some(parent)) => validate_sha256("parent_close_sha256", parent)?,
+            (_, None) => return Err(RoundContractError::new("parent_close_sha256", "non-first round must extend a prior close")),
+        }
         validate_sha256("pre_round_snapshot_sha256", &self.pre_round_snapshot_sha256)?;
         validate_sha256("cost_profile_sha256", &self.cost_profile_sha256)?;
         validate_sha256("plan_sha256", &self.plan_sha256)?;
@@ -190,6 +202,7 @@ impl RoundPlan {
         let mut proposal_ids = BTreeSet::new();
         for (index, seat) in self.seats.iter().enumerate() {
             validate_identifier(&format!("seats[{index}].action_id"), &seat.action_id)?;
+            validate_sha256(&format!("seats[{index}].work_item_sha256"), &seat.work_item_sha256)?;
             if !action_ids.insert(seat.action_id.as_str()) {
                 return Err(RoundContractError::new(
                     format!("seats[{index}].action_id"),
@@ -617,7 +630,6 @@ impl RoundLedger {
         &mut self,
         plan: &RoundPlan,
         close: &RoundCloseReceipt,
-        parent_close_sha256: Option<&str>,
     ) -> Result<ValidatedRoundSummary, RoundContractError> {
         plan.validate_integrity()?;
         if plan.round_index != self.next_round_index {
@@ -629,7 +641,7 @@ impl RoundLedger {
         if self.closed_round_ids.contains(&plan.round_id) {
             return Err(RoundContractError::new("round_id", "round ID was already closed"));
         }
-        match (&self.last_close_sha256, parent_close_sha256) {
+        match (&self.last_close_sha256, plan.parent_close_sha256.as_deref()) {
             (None, None) => {}
             (Some(expected), Some(actual)) if expected == actual => {}
             _ => {
@@ -712,6 +724,7 @@ mod tests {
             0,
             "coral-faithful",
             17,
+            None,
             digest("snapshot"),
             digest("cost-profile"),
             required,
@@ -719,18 +732,22 @@ mod tests {
             vec![
                 RoundSeat {
                     action_id: "a-1".to_owned(),
+                    work_item_sha256: digest("work-a1"),
                     action: RoundAction::EvaluateDirection("A".to_owned()),
                 },
                 RoundSeat {
                     action_id: "b-1".to_owned(),
+                    work_item_sha256: digest("work-b1"),
                     action: RoundAction::EvaluateDirection("B".to_owned()),
                 },
                 RoundSeat {
                     action_id: "c-1".to_owned(),
+                    work_item_sha256: digest("work-c1"),
                     action: RoundAction::ProposeDirection("proposal-1".to_owned()),
                 },
                 RoundSeat {
                     action_id: "c-2".to_owned(),
+                    work_item_sha256: digest("work-c2"),
                     action: RoundAction::EvaluateDirection("C".to_owned()),
                 },
             ],
@@ -814,7 +831,7 @@ mod tests {
     #[test]
     fn duplicate_proposal_ids_fail_closed() {
         let mut plan = plan();
-        plan.seats[2].action = RoundAction::ProposeDirection("proposal-1".to_owned());
+        plan.seats[3].action = RoundAction::ProposeDirection("proposal-1".to_owned());
         plan.plan_sha256 = plan.compute_digest().unwrap();
         assert!(plan.validate_integrity().is_err());
     }
@@ -879,17 +896,19 @@ mod tests {
         let plan = plan();
         let close = close_for(&plan);
         let mut ledger = RoundLedger::new("campaign-1").unwrap();
-        let summary = ledger.append(&plan, &close, None).unwrap();
+        let summary = ledger.append(&plan, &close).unwrap();
         assert_eq!(summary.verified_evaluations, 3);
         assert_eq!(summary.admitted_directions, 1);
         assert_eq!(ledger.total_action_count, 4);
         assert_eq!(ledger.total_charged_budget_units, 4);
 
+        let parent = ledger.last_close_sha256.clone().unwrap();
         let next = RoundPlan::new(
             "round-1",
             1,
             "coral-faithful",
             17,
+            Some(parent.clone()),
             digest("snapshot-1"),
             digest("cost-profile"),
             [
@@ -899,11 +918,12 @@ mod tests {
             .into_iter()
             .collect(),
             ClaimCapProfile {
-                max_evaluations_per_direction_per_round: 2,
-                max_new_proposals_per_round: 2,
+                max_evaluations_per_direction_per_round: 1,
+                max_new_proposals_per_round: 1,
             },
             vec![RoundSeat {
                 action_id: "a-2".to_owned(),
+                work_item_sha256: digest("work-a2"),
                 action: RoundAction::EvaluateDirection("A".to_owned()),
             }],
         )
@@ -936,10 +956,9 @@ mod tests {
                 .collect(),
             }],
         };
-        let parent = ledger.last_close_sha256.clone().unwrap();
-        ledger.append(&next, &next_close, Some(&parent)).unwrap();
+        ledger.append(&next, &next_close).unwrap();
         assert_eq!(ledger.next_round_index, 2);
-        assert!(ledger.append(&next, &next_close, Some(&parent)).is_err());
+        assert!(ledger.append(&next, &next_close).is_err());
     }
 
     #[test]
