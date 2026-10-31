@@ -705,6 +705,7 @@ pub fn verify_benchmark_component_audit_integrity(
     report: &BenchmarkComponentAuditV1,
 ) -> Result<(), String> {
     if report.schema != COMPONENT_AUDIT_SCHEMA
+        || !report.manifest_digest_matches
         || report.reviewer_attestations_authenticated
         || report.semantic_component_validity_verified
         || report.qualified_for_confirmatory_use
@@ -739,7 +740,8 @@ pub fn verify_benchmark_component_audit_integrity(
         return Err("benchmark component audit summary counts disagree with status flags".to_owned());
     }
     if report.valid
-        != (report.all_four_components_present
+        != (report.manifest_digest_matches
+            && report.all_four_components_present
             && report.component_artifact_digests_valid
             && report.evaluation_check_bindings_valid
             && report.all_required_interfaces_present
