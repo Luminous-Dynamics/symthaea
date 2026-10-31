@@ -52,7 +52,7 @@ Every row is keyed by scenario, horizon, execution block, candidate budget, and 
 - Paired return gap to the oracle arm.
 - Predicted-minus-realized return over the executed block, where the planner emitted a model prediction.
 - Fraction of visited states outside a declared rectangular training-support proxy.
-- Structured 201-point one-step state-transition RMSE and selected-trajectory one-step state RMSE against the reference point model. The former is an evaluator-only, low-dimensional diagnostic; the two errors are intentionally reported side by side.
+- Structured 201-point one-step state-transition probe RMSE and selected-trajectory one-step state RMSE against the reference point model. The probe set has uniform marginal coverage on x, velocity and action, but is a one-dimensional modular design rather than a full Cartesian state-action grid; joint coverage is limited. The two errors are intentionally reported side by side.
 - Reference-model false-safe rate when the point model predicts nontermination but the environment terminates.
 - Candidate-sequence queries, model-head evaluations, learned-model transition evaluations, oracle transition evaluations, and evaluator-only diagnostic transitions, separately. Transition calls are counted at the rollout step where they occur, so terminal truncation reduces the recorded count rather than being charged as a full horizon.
 
