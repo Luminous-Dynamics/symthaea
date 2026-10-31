@@ -65,11 +65,14 @@ pub struct CausalPowerCandidateEstimateV1 {
     pub model_pair_count: u32,
     pub null_evaluable_simulations: u32,
     pub null_inconclusive_simulations: u32,
+    pub null_rejected_simulations: u32,
     pub null_inconclusive_fraction_permille: f64,
     pub type_i_error_permille: Option<f64>,
     pub type_i_error_monte_carlo_se_permille: Option<f64>,
     pub alternative_evaluable_simulations: u32,
     pub alternative_inconclusive_simulations: u32,
+    pub alternative_rejected_simulations: u32,
+    pub alternative_covered_simulations: u32,
     pub alternative_inconclusive_fraction_permille: f64,
     pub estimated_power_permille: Option<f64>,
     pub power_monte_carlo_se_permille: Option<f64>,
@@ -470,11 +473,14 @@ pub fn plan_causal_power(
             model_pair_count: *pair_count,
             null_evaluable_simulations: null.evaluable,
             null_inconclusive_simulations: null.inconclusive,
+            null_rejected_simulations: null.rejected,
             null_inconclusive_fraction_permille: null_inconclusive_fraction,
             type_i_error_permille: type_i_error,
             type_i_error_monte_carlo_se_permille: type_i_se,
             alternative_evaluable_simulations: alternative.evaluable,
             alternative_inconclusive_simulations: alternative.inconclusive,
+            alternative_rejected_simulations: alternative.rejected,
+            alternative_covered_simulations: alternative.covered,
             alternative_inconclusive_fraction_permille: alternative_inconclusive_fraction,
             estimated_power_permille: power,
             power_monte_carlo_se_permille: power_se,
@@ -614,9 +620,6 @@ pub fn verify_causal_power_report(report: &CausalPowerPlanningReportV1) -> Resul
         {
             return Err("power candidate inconclusive rates or surviving-pair mean are inconsistent".to_owned());
         }
-        let (expected_type_i, expected_type_i_se) =
-            proportion_and_se(0, 0);
-        let _ = (expected_type_i, expected_type_i_se);
         let verify_rate = |observed: Option<f64>, observed_se: Option<f64>, successes: u32, trials: u32| {
             let (expected, expected_se) = proportion_and_se(successes, trials);
             match (observed, expected, observed_se, expected_se) {
@@ -629,31 +632,26 @@ pub fn verify_causal_power_report(report: &CausalPowerPlanningReportV1) -> Resul
                 _ => false,
             }
         };
+        if candidate.null_rejected_simulations > candidate.null_evaluable_simulations
+            || candidate.alternative_rejected_simulations > candidate.alternative_evaluable_simulations
+            || candidate.alternative_covered_simulations > candidate.alternative_evaluable_simulations
+        {
+            return Err("power candidate rejection/coverage counts exceed evaluable simulations".to_owned());
+        }
         if !verify_rate(
             candidate.type_i_error_permille,
             candidate.type_i_error_monte_carlo_se_permille,
-            // A candidate report stores rejections, not a second raw null count.
-            // The inferred count must be an integer consistent with the rate.
-            candidate.type_i_error_permille
-                .map(|rate| (rate * f64::from(candidate.null_evaluable_simulations) / 1_000.0).round() as u32)
-                .unwrap_or(0),
+            candidate.null_rejected_simulations,
             candidate.null_evaluable_simulations,
-        ) {
-            return Err("power candidate type-I error estimate or Monte Carlo SE is invalid".to_owned());
-        }
-        if !verify_rate(
+        ) || !verify_rate(
             candidate.estimated_power_permille,
             candidate.power_monte_carlo_se_permille,
-            candidate.estimated_power_permille
-                .map(|rate| (rate * f64::from(candidate.alternative_evaluable_simulations) / 1_000.0).round() as u32)
-                .unwrap_or(0),
+            candidate.alternative_rejected_simulations,
             candidate.alternative_evaluable_simulations,
         ) || !verify_rate(
             candidate.interval_coverage_permille,
             candidate.interval_coverage_monte_carlo_se_permille,
-            candidate.interval_coverage_permille
-                .map(|rate| (rate * f64::from(candidate.alternative_evaluable_simulations) / 1_000.0).round() as u32)
-                .unwrap_or(0),
+            candidate.alternative_covered_simulations,
             candidate.alternative_evaluable_simulations,
         ) {
             return Err("power/coverage estimate or Monte Carlo SE is invalid".to_owned());
