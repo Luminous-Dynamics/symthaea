@@ -107,6 +107,9 @@ pub struct SearchTimeAccessTrialStudyV1 {
     pub prompt_and_decoding_sha256: String,
     pub metric_definition_sha256: String,
     pub enforcement_build_sha256: String,
+    pub network_disabled_policy_sha256: String,
+    pub allowlisted_policy_sha256: String,
+    pub unrestricted_policy_sha256: String,
     pub minimum_confirmatory_blocks: u32,
     /// Evaluator-only root seed. The public report contains only its commitment.
     pub run_order_seed_hex: String,
@@ -319,6 +322,17 @@ fn within_budget(run: &SearchTrialConditionRunV1, budget: &SearchTrialBudgetV1) 
         && report.compute_cost_microusd <= budget.max_compute_cost_microusd
 }
 
+fn expected_policy_digest<'a>(
+    study: &'a SearchTimeAccessTrialStudyV1,
+    condition: SearchTrialConditionV1,
+) -> &'a str {
+    match condition {
+        SearchTrialConditionV1::NetworkDisabled => &study.network_disabled_policy_sha256,
+        SearchTrialConditionV1::Allowlisted => &study.allowlisted_policy_sha256,
+        SearchTrialConditionV1::Unrestricted => &study.unrestricted_policy_sha256,
+    }
+}
+
 fn validate_run(
     study: &SearchTimeAccessTrialStudyV1,
     run: &SearchTrialConditionRunV1,
@@ -367,7 +381,9 @@ fn validate_run(
         return Err(format!("run {} exceeded a declared inference budget", run.run_id));
     }
     validate_digest(&run.condition_policy_sha256, "condition_policy_sha256")?;
-    if run.trace.network_policy_sha256 != run.condition_policy_sha256
+    let expected_policy = expected_policy_digest(study, run.condition);
+    if run.condition_policy_sha256 != expected_policy
+        || run.trace.network_policy_sha256 != expected_policy
         || run.trace.run_id != run.run_id
         || run.trace.benchmark_id != study.benchmark_id
         || run.trace.benchmark_version != study.benchmark_version
@@ -443,6 +459,9 @@ pub fn analyze_search_time_access_trial(
         (&study.prompt_and_decoding_sha256, "prompt_and_decoding_sha256"),
         (&study.metric_definition_sha256, "metric_definition_sha256"),
         (&study.enforcement_build_sha256, "enforcement_build_sha256"),
+        (&study.network_disabled_policy_sha256, "network_disabled_policy_sha256"),
+        (&study.allowlisted_policy_sha256, "allowlisted_policy_sha256"),
+        (&study.unrestricted_policy_sha256, "unrestricted_policy_sha256"),
     ] {
         validate_digest(digest, label)?;
     }
@@ -690,7 +709,7 @@ mod tests {
             benchmark_version: study.benchmark_version.clone(),
             model_checkpoint_sha256: study.model_checkpoint_sha256.clone(),
             challenge_packet_sha256: study.challenge_packet_sha256.clone(),
-            network_policy_sha256: digest(&format!("policy-{condition:?}")),
+            network_policy_sha256: expected_policy_digest(study, condition).to_owned(),
             enforcement_build_sha256: study.enforcement_build_sha256.clone(),
             policy_id: format!("policy-{condition:?}"),
             access_mode: access,
@@ -786,7 +805,7 @@ mod tests {
             state_reset_receipt_sha256: digest(&format!("reset-{suffix}")),
             budget_spec_sha256: budget_digest(&study.budget).unwrap(),
             run_execution_receipt_sha256,
-            condition_policy_sha256: trace.network_policy_sha256.clone(),
+            condition_policy_sha256: expected_policy_digest(study, condition).to_owned(),
             trace,
             findings,
             score_report,
@@ -865,6 +884,9 @@ mod tests {
             prompt_and_decoding_sha256: digest("prompt"),
             metric_definition_sha256: digest("metric"),
             enforcement_build_sha256: digest("enforcer"),
+            network_disabled_policy_sha256: digest("policy-network-disabled"),
+            allowlisted_policy_sha256: digest("policy-allowlisted"),
+            unrestricted_policy_sha256: digest("policy-unrestricted"),
             minimum_confirmatory_blocks: SEARCH_TRIAL_MIN_BLOCKS as u32,
             run_order_seed_hex: "ab".repeat(32),
             budget: SearchTrialBudgetV1 {
@@ -996,6 +1018,14 @@ mod tests {
     }
 
     #[test]
+    fn condition_policy_digest_must_match_preregistered_condition_across_blocks() {
+        let mut study = two_block_fixture_study();
+        study.blocks[1].runs[0].condition_policy_sha256 = digest("unregistered-policy");
+        assert!(analyze_search_time_access_trial(&study)
+            .unwrap_err().contains("does not match the declared condition/study"));
+    }
+
+    #[test]
     fn model_identity_must_be_constant_across_conditions() {
         let mut study = two_block_fixture_study();
         study.blocks[0].runs[1].score_report.model_name = "different-model".to_owned();
@@ -1066,8 +1096,8 @@ mod tests {
                 run.state_reset_receipt_sha256 = digest(&format!("reset-{suffix}"));
                 run.run_execution_receipt_sha256 = digest(&format!("execution-{suffix}"));
                 run.trace.run_id = run.run_id.clone();
-                run.trace.network_policy_sha256 = digest(&format!("policy-{}-{:?}", suffix, run.condition));
-                run.condition_policy_sha256 = run.trace.network_policy_sha256.clone();
+                run.trace.network_policy_sha256 = expected_policy_digest(&expanded, run.condition).to_owned();
+                run.condition_policy_sha256 = expected_policy_digest(&expanded, run.condition).to_owned();
                 crate::search_time::seal_search_time_trace(&mut run.trace).unwrap();
                 run.findings.run_id = run.run_id.clone();
                 run.findings.trace_root_sha256 = run.trace.trace_root_sha256.clone();
