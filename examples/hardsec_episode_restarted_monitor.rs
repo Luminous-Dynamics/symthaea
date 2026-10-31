@@ -514,6 +514,154 @@ fn parse_episodes(value: &Value, plan: &Plan) -> Result<Vec<Episode>, String> {
     Ok(output)
 }
 
+fn parse_pmu_qualification(
+    plan_value: &Value,
+    observations_value: &Value,
+    receipt_value: &Value,
+    monitor_plan: &Plan,
+    pmu_plan_bytes: &[u8],
+    pmu_observation_bytes: &[u8],
+    pmu_receipt_bytes: &[u8],
+) -> Result<PmuQualification, String> {
+    let protocol_id = string_field(plan_value, "protocol_id", "pmu_plan")?.to_owned();
+    let evidence_domain = string_field(plan_value, "evidence_domain", "pmu_plan")?;
+    if string_field(plan_value, "schema_version", "pmu_plan")? != "hardsec-pmu-metrology-plan-v1"
+        || protocol_id != monitor_plan.pmu_metrology_protocol_id
+        || evidence_domain != monitor_plan.evidence_domain
+        || string_field(plan_value, "claim_scope", "pmu_plan")?
+            != "measurement_configuration_and_declared_trial_record_qualification_only" {
+        return Err("PMU metrology plan schema/protocol/evidence domain/claim scope mismatch".to_owned());
+    }
+
+    let platform = plan_value.get("platform").ok_or("PMU plan.platform missing")?;
+    let platform_id = string_field(platform, "platform_id", "pmu_plan.platform")?.to_owned();
+    if platform_id != monitor_plan.pmu_platform_id {
+        return Err("PMU platform_id does not match the preregistered episode plan".to_owned());
+    }
+    let workload = plan_value.get("workload").ok_or("PMU plan.workload missing")?;
+    let workload_id = string_field(workload, "workload_id", "pmu_plan.workload")?.to_owned();
+    let workload_binary_sha256 = string_field(workload, "binary_sha256", "pmu_plan.workload")?;
+    valid_sha(workload_binary_sha256, "pmu_plan.workload.binary_sha256")?;
+    if workload_id != monitor_plan.pmu_workload_id
+        || workload_binary_sha256 != monitor_plan.pmu_workload_binary_sha256 {
+        return Err("PMU workload identity/binary digest does not match the episode plan".to_owned());
+    }
+
+    let acquisition = plan_value.get("acquisition_conditions")
+        .ok_or("PMU plan.acquisition_conditions missing")?;
+    let acquisition_condition_id = string_field(
+        acquisition,
+        "co_scheduled_condition",
+        "pmu_plan.acquisition_conditions",
+    )?.to_owned();
+    if acquisition_condition_id != monitor_plan.pmu_acquisition_condition_id {
+        return Err("PMU co-scheduled acquisition condition does not match the episode plan".to_owned());
+    }
+    let metrology_event_ids = unique_string_set(
+        acquisition,
+        "co_scheduled_event_ids",
+        "pmu_plan.acquisition_conditions",
+    )?;
+    if metrology_event_ids != monitor_plan.pmu_event_ids {
+        return Err("PMU co-scheduled event IDs do not match the episode plan".to_owned());
+    }
+
+    if string_field(observations_value, "schema_version", "pmu_observations")?
+        != "hardsec-pmu-observations-v1"
+        || string_field(observations_value, "protocol_id", "pmu_observations")? != protocol_id
+        || string_field(observations_value, "evidence_domain", "pmu_observations")? != evidence_domain {
+        return Err("PMU observations identity does not match the metrology plan".to_owned());
+    }
+    if observations_value.get("trials").and_then(Value::as_array).is_none_or(|trials| trials.is_empty()) {
+        return Err("PMU observations must contain at least one trial".to_owned());
+    }
+
+    if string_field(receipt_value, "schema_version", "pmu_receipt")?
+        != "hardsec-pmu-metrology-receipt-v1"
+        || string_field(receipt_value, "claim_scope", "pmu_receipt")?
+            != "measurement_configuration_and_declared_trial_record_qualification_only" {
+        return Err("PMU metrology receipt schema/claim scope is unsupported".to_owned());
+    }
+    if string_field(receipt_value, "result", "pmu_receipt")?
+        != "qualified_for_named_acquisition_conditions" {
+        return Err("PMU metrology receipt did not qualify the named acquisition conditions".to_owned());
+    }
+    for (field, expected) in [
+        ("protocol_id", protocol_id.as_str()),
+        ("evidence_domain", evidence_domain),
+        ("platform_id", platform_id.as_str()),
+        ("workload_id", workload_id.as_str()),
+    ] {
+        if string_field(receipt_value, field, "pmu_receipt")? != expected {
+            return Err(format!("PMU receipt {field} does not match the metrology plan"));
+        }
+    }
+    let inputs = receipt_value.get("inputs").ok_or("PMU metrology receipt inputs missing")?;
+    let recorded_plan_sha = string_field(inputs, "plan_sha256", "pmu_receipt.inputs")?;
+    let recorded_observations_sha = string_field(inputs, "observations_sha256", "pmu_receipt.inputs")?;
+    valid_sha(recorded_plan_sha, "pmu_receipt.inputs.plan_sha256")?;
+    valid_sha(recorded_observations_sha, "pmu_receipt.inputs.observations_sha256")?;
+    let expected_plan_sha = sha256(pmu_plan_bytes);
+    let expected_observations_sha = sha256(pmu_observation_bytes);
+    if recorded_plan_sha != expected_plan_sha || recorded_observations_sha != expected_observations_sha {
+        return Err("PMU receipt input digests do not match the supplied metrology plan/observations bytes".to_owned());
+    }
+
+    let observer_effect = receipt_value.get("observer_effect").ok_or("PMU receipt observer_effect missing")?;
+    if string_field(observer_effect, "overall_status", "pmu_receipt.observer_effect")?
+        != "within_declared_thresholds" {
+        return Err("PMU acquisition observer-effect gate did not pass".to_owned());
+    }
+    let semantics = receipt_value.get("measurement_semantics")
+        .ok_or("PMU receipt measurement_semantics missing")?;
+    if semantics.get("raw_counts_are_preserved").and_then(Value::as_bool) != Some(true)
+        || semantics.get("multiplex_scaled_values_confirmatory").and_then(Value::as_bool) != Some(false) {
+        return Err("PMU receipt must preserve raw counts and exclude multiplex-scaled estimates from confirmation".to_owned());
+    }
+
+    let event_reports = receipt_value.get("event_qualification").and_then(Value::as_array)
+        .ok_or("PMU receipt event_qualification must be an array")?;
+    let mut seen_event_ids = BTreeSet::new();
+    for event_id in &monitor_plan.pmu_event_ids {
+        let report = event_reports.iter().find(|report| {
+            report.get("event_id").and_then(Value::as_str) == Some(event_id.as_str())
+        }).ok_or_else(|| format!("PMU receipt omits co-scheduled event {event_id}"))?;
+        if !seen_event_ids.insert(event_id.clone()) {
+            return Err(format!("duplicate PMU event qualification for {event_id}"));
+        }
+        let co = report.get("co_scheduled").ok_or_else(|| format!("PMU event {event_id} co_scheduled report missing"))?;
+        if string_field(co, "status", &format!("pmu_receipt.event_qualification.{event_id}.co_scheduled"))?
+            != "confirmatory_eligible_under_declared_thresholds" {
+            return Err(format!("PMU event {event_id} is not confirmatory-eligible in the co-scheduled acquisition"));
+        }
+        let overcommitted = report.get("overcommitted")
+            .ok_or_else(|| format!("PMU event {event_id} overcommitted report missing"))?;
+        if overcommitted.get("confirmatory_eligible").and_then(Value::as_bool) != Some(false) {
+            return Err(format!("PMU event {event_id} multiplex/overcommitted values must never be confirmatory"));
+        }
+    }
+
+    let support = receipt_value.get("support").ok_or("PMU receipt support missing")?;
+    let matched_block_count = count_field(support, "matched_block_count", "pmu_receipt.support")?;
+    let trial_count = count_field(support, "trial_count", "pmu_receipt.support")?;
+    if matched_block_count == 0 || trial_count == 0 {
+        return Err("PMU metrology receipt has no matched blocks or trials".to_owned());
+    }
+
+    Ok(PmuQualification {
+        protocol_id,
+        platform_id,
+        workload_id,
+        acquisition_condition_id,
+        event_ids: metrology_event_ids,
+        receipt_sha256: sha256(pmu_receipt_bytes),
+        plan_sha256: expected_plan_sha,
+        observations_sha256: expected_observations_sha,
+        matched_block_count,
+        trial_count,
+    })
+}
+
 fn parse_context_receipt(
     value: &Value,
     plan: &Plan,
@@ -909,17 +1057,32 @@ impl ContextState {
     }
 }
 
-fn audit_values(
+fn audit_values_with_pmu(
     plan_value: &Value,
     episode_value: &Value,
     context_receipt_value: &Value,
+    pmu_plan_value: &Value,
+    pmu_observations_value: &Value,
+    pmu_receipt_value: &Value,
     plan_bytes: &[u8],
     episode_bytes: &[u8],
     context_receipt_bytes: &[u8],
+    pmu_plan_bytes: &[u8],
+    pmu_observation_bytes: &[u8],
+    pmu_receipt_bytes: &[u8],
 ) -> Result<Value, String> {
     let plan = parse_plan(plan_value)?;
     let episodes = parse_episodes(episode_value, &plan)?;
     let assignments = parse_context_receipt(context_receipt_value, &plan, &episodes)?;
+    let pmu_qualification = parse_pmu_qualification(
+        pmu_plan_value,
+        pmu_observations_value,
+        pmu_receipt_value,
+        &plan,
+        pmu_plan_bytes,
+        pmu_observation_bytes,
+        pmu_receipt_bytes,
+    )?;
     let alpha_per_context = plan.alpha_total / plan.contexts.len() as f64;
     let mut states: BTreeMap<String, ContextState> = plan.contexts.iter()
         .map(|context| (context.clone(), ContextState::new(alpha_per_context, &plan.betting_family)))
@@ -1062,7 +1225,7 @@ fn audit_values(
     Ok(json!({
         "schema_version":RECEIPT_SCHEMA,
         "result":result,
-        "claim_scope":"fixed_episode_packaging_and_weighted_restarted_conformal_monitor_mechanics_only",
+        "claim_scope":"fixed_episode_packaging_context_assignment_and_pmu_metrology_linkage_plus_weighted_restarted_monitor_mechanics",
         "monitor_id":plan.monitor_id,
         "stream_id":plan.stream_id,
         "evaluation_group_id":plan.evaluation_group_id,
@@ -1071,10 +1234,27 @@ fn audit_values(
         "context_assignment_policy_id":plan.context_assignment_policy_id,
         "context_assignment_artifact_sha256":plan.context_assignment_artifact_sha256,
         "randomizer_source_sha256":plan.randomizer_source_sha256,
+        "pmu_qualification":{
+            "result":"qualified_for_named_acquisition_conditions",
+            "protocol_id":pmu_qualification.protocol_id,
+            "platform_id":pmu_qualification.platform_id,
+            "workload_id":pmu_qualification.workload_id,
+            "acquisition_condition_id":pmu_qualification.acquisition_condition_id,
+            "confirmatory_event_ids":pmu_qualification.event_ids,
+            "metrology_plan_sha256":pmu_qualification.plan_sha256,
+            "observations_sha256":pmu_qualification.observations_sha256,
+            "receipt_sha256":pmu_qualification.receipt_sha256,
+            "matched_block_count":pmu_qualification.matched_block_count,
+            "trial_count":pmu_qualification.trial_count,
+            "independence_status":"not_established_by_pmu_metrology"
+        },
         "inputs":{
             "plan_sha256":sha256(plan_bytes),
             "episode_stream_sha256":sha256(episode_bytes),
-            "context_assignment_receipt_sha256":sha256(context_receipt_bytes)
+            "context_assignment_receipt_sha256":sha256(context_receipt_bytes),
+            "pmu_metrology_plan_sha256":pmu_qualification.plan_sha256,
+            "pmu_observations_sha256":pmu_qualification.observations_sha256,
+            "pmu_metrology_receipt_sha256":pmu_qualification.receipt_sha256
         },
         "episode_integrity":{
             "episode_count":episodes.len(),
@@ -1136,6 +1316,7 @@ fn audit_values(
             "delay_unit":"independent execution episodes, not PMU windows"
         },
         "limitations":[
+            "The PMU receipt qualifies its supplied metrology plan/trial records only; it does not authenticate raw hardware, firmware, kernel or perf identities, nor prove execution-level independence.",
             "Unique execution IDs and disjoint declared group IDs do not prove that executions are independent or exchangeable.",
             "The p-value randomizers are caller-supplied; their independence from scores and past is not authenticated.",
             "The maximum episode score is fixed-length and preregistered, but aggregation does not authenticate the source trace or acquisition process.",
