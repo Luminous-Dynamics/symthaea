@@ -22,6 +22,8 @@ pub struct SamplingEpisode {
     pub duration_us: u64,
     pub observation_budget: u64,
     pub maximum_gap_us: u64,
+    /// Evaluator-declared sensor amplitude floor in milli-units.
+    pub minimum_detectable_amplitude_milli: u32,
     pub energy_budget_nj: Option<u64>,
 }
 
@@ -62,6 +64,12 @@ pub struct DetectionLatency {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PredictionLeadTime {
+    pub event_id: u64,
+    pub lead_us: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SamplingObservabilityScore {
     pub episode_id: u64,
     pub observations_used: u64,
@@ -78,6 +86,8 @@ pub struct SamplingObservabilityScore {
     pub missed_observable_event_ids: Vec<u64>,
     pub unobserved_event_ids: Vec<u64>,
     pub inferred_without_direct_observation_ids: Vec<u64>,
+    pub anticipated_event_ids: Vec<u64>,
+    pub prediction_lead_times: Vec<PredictionLeadTime>,
     pub false_detection_ids: Vec<u64>,
     pub detection_latencies: Vec<DetectionLatency>,
     pub event_observability_ppm: u32,
@@ -88,6 +98,7 @@ pub struct SamplingObservabilityScore {
 pub enum SamplingEvaluationError {
     ZeroEpisodeDuration,
     ZeroMaximumGap,
+    ZeroDetectableAmplitudeThreshold,
     ObservationOutOfRange { index: usize },
     ObservationNotStrictlyIncreasing { index: usize },
     EventOutOfRange { event_id: u64 },
@@ -104,6 +115,7 @@ impl fmt::Display for SamplingEvaluationError {
         match self {
             Self::ZeroEpisodeDuration => write!(f, "sampling episode duration must be positive"),
             Self::ZeroMaximumGap => write!(f, "maximum observation gap must be positive"),
+            Self::ZeroDetectableAmplitudeThreshold => write!(f, "minimum detectable amplitude must be positive"),
             Self::ObservationOutOfRange { index } => write!(f, "observation {index} is outside the episode"),
             Self::ObservationNotStrictlyIncreasing { index } => write!(f, "observation timestamps are not strictly increasing at index {index}"),
             Self::EventOutOfRange { event_id } => write!(f, "hidden event {event_id} has invalid episode bounds"),
@@ -136,6 +148,9 @@ pub fn score_sampling_observability(
     }
     if episode.maximum_gap_us == 0 {
         return Err(SamplingEvaluationError::ZeroMaximumGap);
+    }
+    if episode.minimum_detectable_amplitude_milli == 0 {
+        return Err(SamplingEvaluationError::ZeroDetectableAmplitudeThreshold);
     }
 
     let mut previous = None;
@@ -178,16 +193,33 @@ pub fn score_sampling_observability(
     let mut missed_observable = Vec::new();
     let mut unobserved = Vec::new();
     let mut inferred_without_direct_observation = Vec::new();
+    let mut anticipated = Vec::new();
+    let mut prediction_lead_times = Vec::new();
     let mut false_detections = Vec::new();
     let mut detection_latencies = Vec::new();
 
     for event in hidden_events {
-        let first_evidence = run.observations.iter()
-            .map(|sample| sample.time_us)
-            .find(|time| *time >= event.start_us && *time < event.end_us);
+        let amplitude = i64::from(event.amplitude_milli).unsigned_abs();
+        let amplitude_is_detectable =
+            amplitude >= u64::from(episode.minimum_detectable_amplitude_milli);
+        let first_evidence = if amplitude_is_detectable {
+            run.observations.iter()
+                .map(|sample| sample.time_us)
+                .find(|time| *time >= event.start_us && *time < event.end_us)
+        } else {
+            None
+        };
         let decision_time = decisions_by_id.get(&event.event_id).copied();
 
         match (first_evidence, decision_time) {
+            (Some(_), Some(decision)) if decision < event.start_us => {
+                directly_observable.push(event.event_id);
+                anticipated.push(event.event_id);
+                prediction_lead_times.push(PredictionLeadTime {
+                    event_id: event.event_id,
+                    lead_us: event.start_us - decision,
+                });
+            }
             (Some(first), Some(decision)) => {
                 if decision < first {
                     return Err(SamplingEvaluationError::FutureEventLeak {
@@ -206,6 +238,14 @@ pub fn score_sampling_observability(
             (Some(_), None) => {
                 directly_observable.push(event.event_id);
                 missed_observable.push(event.event_id);
+            }
+            (None, Some(decision)) if decision < event.start_us => {
+                unobserved.push(event.event_id);
+                anticipated.push(event.event_id);
+                prediction_lead_times.push(PredictionLeadTime {
+                    event_id: event.event_id,
+                    lead_us: event.start_us - decision,
+                });
             }
             (None, Some(_)) => {
                 unobserved.push(event.event_id);
@@ -226,6 +266,8 @@ pub fn score_sampling_observability(
     missed_observable.sort_unstable();
     unobserved.sort_unstable();
     inferred_without_direct_observation.sort_unstable();
+    anticipated.sort_unstable();
+    prediction_lead_times.sort_by_key(|entry| entry.event_id);
     false_detections.sort_unstable();
     detection_latencies.sort_by_key(|entry| entry.event_id);
 
@@ -254,6 +296,8 @@ pub fn score_sampling_observability(
         missed_observable_event_ids: missed_observable,
         unobserved_event_ids: unobserved,
         inferred_without_direct_observation_ids: inferred_without_direct_observation,
+        anticipated_event_ids: anticipated,
+        prediction_lead_times,
         false_detection_ids: false_detections,
         detection_latencies,
         event_observability_ppm,
@@ -487,6 +531,7 @@ mod tests {
             duration_us: 100,
             observation_budget: 5,
             maximum_gap_us: 40,
+            minimum_detectable_amplitude_milli: 500,
             energy_budget_nj: Some(1_000),
         }
     }
@@ -572,6 +617,46 @@ mod tests {
         };
         let events = [HiddenTransient { event_id: 7, start_us: 10, end_us: 30, amplitude_milli: 1_000 }];
         assert!(matches!(score_sampling_observability(&run, &events), Err(SamplingEvaluationError::FutureEventLeak { .. })));
+    }
+
+    #[test]
+    fn early_warning_is_scored_as_anticipation_not_future_leak() {
+        let run = SamplingRun {
+            episode: episode(),
+            observations: vec![ObservationSample { time_us: 25 }],
+            decisions: vec![CandidateEventDecision { event_id: 7, decision_time_us: 10 }],
+            measured_energy_nj: Some(100),
+        };
+        let events = [HiddenTransient {
+            event_id: 7,
+            start_us: 20,
+            end_us: 30,
+            amplitude_milli: 2_000,
+        }];
+        let score = score_sampling_observability(&run, &events).unwrap();
+        assert_eq!(score.anticipated_event_ids, vec![7]);
+        assert_eq!(score.prediction_lead_times, vec![PredictionLeadTime { event_id: 7, lead_us: 10 }]);
+        assert!(score.detected_observable_event_ids.is_empty());
+        assert!(score.missed_observable_event_ids.is_empty());
+    }
+
+    #[test]
+    fn below_threshold_transient_is_not_directly_observable_even_when_sampled() {
+        let run = SamplingRun {
+            episode: episode(),
+            observations: vec![ObservationSample { time_us: 25 }],
+            decisions: vec![],
+            measured_energy_nj: Some(100),
+        };
+        let events = [HiddenTransient {
+            event_id: 10,
+            start_us: 20,
+            end_us: 30,
+            amplitude_milli: 100,
+        }];
+        let score = score_sampling_observability(&run, &events).unwrap();
+        assert_eq!(score.unobserved_event_ids, vec![10]);
+        assert_eq!(score.event_observability_ppm, 0);
     }
 
     #[test]
