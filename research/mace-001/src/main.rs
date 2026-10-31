@@ -1,3 +1,5 @@
+mod scm_oracle;
+
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -328,6 +330,17 @@ fn audit_inputs(
 
     let mut pairs: HashMap<String, Vec<&OracleCase>> = HashMap::new();
     for item in oracle.values() {
+        let projection = scm_oracle::projection_for_family(&item.family)?;
+        if item.causal_status != projection.causal_status
+            || item.expected_transfer != projection.expected_transfer
+            || item.expected_action != projection.expected_action
+            || item.expected_completion != projection.expected_completion
+        {
+            return Err(format!(
+                "evaluator oracle: case {} disagrees with the independent {} SCM projection",
+                item.id, item.family
+            ));
+        }
         pairs.entry(item.pair_id.clone()).or_default().push(item);
     }
 
