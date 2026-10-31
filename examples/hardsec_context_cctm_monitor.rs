@@ -123,6 +123,12 @@ fn usize_field(value: &Value, key: &str, context: &str) -> Result<usize, String>
     usize::try_from(raw).map_err(|_| format!("{context}.{key} is outside the supported range"))
 }
 
+fn count_field(value: &Value, key: &str, context: &str) -> Result<usize, String> {
+    let raw = value.get(key).and_then(Value::as_u64)
+        .ok_or_else(|| format!("{context}.{key} must be a non-negative integer"))?;
+    usize::try_from(raw).map_err(|_| format!("{context}.{key} is outside the supported range"))
+}
+
 fn valid_sha(value: &str, context: &str) -> Result<(), String> {
     if value.len() != 64 || !value.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()) {
         return Err(format!("{context} must be a lowercase SHA-256 digest"));
@@ -397,9 +403,9 @@ fn parse_context_assignment_receipt(
     let integrity = value.get("assignment_integrity").ok_or("context assignment receipt assignment_integrity missing")?;
     let accepted_count = assignments.iter().filter(|a| a.get("decision_status").and_then(Value::as_str) == Some("accepted")).count();
     let abstained_count = assignments.iter().filter(|a| a.get("decision_status").and_then(Value::as_str) == Some("abstained")).count();
-    if usize_field(integrity, "assignment_record_count", "context_receipt.assignment_integrity")? != assignments.len()
-        || usize_field(integrity, "accepted_count", "context_receipt.assignment_integrity")? != accepted_count
-        || usize_field(integrity, "abstained_count", "context_receipt.assignment_integrity")? != abstained_count {
+    if count_field(integrity, "assignment_record_count", "context_receipt.assignment_integrity")? != assignments.len()
+        || count_field(integrity, "accepted_count", "context_receipt.assignment_integrity")? != accepted_count
+        || count_field(integrity, "abstained_count", "context_receipt.assignment_integrity")? != abstained_count {
         return Err("context assignment receipt aggregate counts do not match its runtime mapping".to_owned());
     }
 
@@ -1057,6 +1063,29 @@ mod tests {
         let rb = encode(&assignment_receipt);
         assert!(audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb)
             .unwrap_err().contains("aggregate counts do not match"));
+    }
+
+
+    #[test]
+    fn fully_abstained_assignment_stream_is_valid_and_updates_no_wealth() {
+        let (p, s, pb, sb) = fixture();
+        let bytes = include_bytes!("../tests/fixtures/hardsec/context-assignment-v1/runtime-receipt.json");
+        let mut assignment_receipt: Value = serde_json::from_slice(bytes).unwrap();
+        let mapping = assignment_receipt["runtime_mapping"]["assignments"].as_array_mut().unwrap();
+        for row in mapping.iter_mut() {
+            row["decision_status"] = json!("abstained");
+            row["decision_reason"] = json!("ambiguous_assignment");
+            row["selected_context_id"] = Value::Null;
+        }
+        assignment_receipt["assignment_integrity"]["accepted_count"] = json!(0);
+        assignment_receipt["assignment_integrity"]["abstained_count"] = json!(19);
+        assignment_receipt["assignment_integrity"]["accepted_accuracy"] = Value::Null;
+        assignment_receipt["assignment_integrity"]["accepted_accuracy_denominator"] = json!(0);
+        let rb = encode(&assignment_receipt);
+        let r = audit_values_with_context_receipt(&p, &s, &assignment_receipt, &pb, &sb, &rb).unwrap();
+        assert_eq!(r["sequential_monitor"]["valid_observation_count"], 0);
+        assert_eq!(r["sequential_monitor"]["abstention_count"], 19);
+        assert_eq!(r["result"], "no_alarm_threshold_crossed");
     }
 
     #[test]
