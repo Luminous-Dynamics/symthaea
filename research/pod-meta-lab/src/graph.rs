@@ -25,6 +25,41 @@ impl DatasetSplit {
     }
 }
 
+/// Explicit complexity controls for the deterministic synthetic graph suite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GraphGenerationConfig {
+    pub chain_depth: usize,
+}
+
+impl GraphGenerationConfig {
+    pub fn for_split(split: DatasetSplit) -> Self {
+        let chain_depth = match split {
+            DatasetSplit::Development => 8,
+            DatasetSplit::Calibration => 32,
+            DatasetSplit::Test => 64,
+        };
+        Self { chain_depth }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GraphGenerationError {
+    ChainDepthOutOfRange { requested: usize, minimum: usize, maximum: usize },
+}
+
+impl std::fmt::Display for GraphGenerationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ChainDepthOutOfRange { requested, minimum, maximum } => write!(
+                f,
+                "chain depth {requested} is outside the supported range {minimum}..={maximum}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for GraphGenerationError {}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QueryProfile {
     pub valid_at: u64,
@@ -554,6 +589,27 @@ fn add(
 /// Fixed-template synthetic generator. Seed salts identities and time coordinates;
 /// split prefixes guarantee disjoint synthetic source-family IDs.
 pub fn generate_poar_graph_suite(seed: u64, split: DatasetSplit) -> GraphSuite {
+    generate_poar_graph_suite_with_config(seed, split, GraphGenerationConfig::for_split(split))
+        .expect("the built-in split profiles have valid chain depths")
+}
+
+/// Generate a suite with explicit, validated graph complexity. The default
+/// wrapper preserves the fixed 8/32/64 split profiles for existing callers.
+pub fn generate_poar_graph_suite_with_config(
+    seed: u64,
+    split: DatasetSplit,
+    config: GraphGenerationConfig,
+) -> Result<GraphSuite, GraphGenerationError> {
+    const MIN_CHAIN_DEPTH: usize = 1;
+    const MAX_CHAIN_DEPTH: usize = 256;
+    if !(MIN_CHAIN_DEPTH..=MAX_CHAIN_DEPTH).contains(&config.chain_depth) {
+        return Err(GraphGenerationError::ChainDepthOutOfRange {
+            requested: config.chain_depth,
+            minimum: MIN_CHAIN_DEPTH,
+            maximum: MAX_CHAIN_DEPTH,
+        });
+    }
+
     let t = (seed % 1_000_000) * 100;
     let mut suite = GraphSuite { planner_cases: Vec::new(), oracle: BTreeMap::new() };
 
@@ -654,11 +710,7 @@ pub fn generate_poar_graph_suite(seed: u64, split: DatasetSplit) -> GraphSuite {
 
     // Difficulty is structurally stratified: dev=8, calibration=32, held-out test=64.
     {
-        let depth = match split {
-            DatasetSplit::Development => 8usize,
-            DatasetSplit::Calibration => 32usize,
-            DatasetSplit::Test => 64usize,
-        };
+        let depth = config.chain_depth;
         let mut claims = Vec::with_capacity(depth);
         for index in 0..depth {
             let id = format!("chain-{index:03}");
@@ -710,7 +762,7 @@ pub fn generate_poar_graph_suite(seed: u64, split: DatasetSplit) -> GraphSuite {
         ev(split,"independent","e-independent-b","claim",Polarity::Supports,"g-independent-b",(t,None),(t,None),"scope-a","authority-a"),
     ],&[("e-independent-a",HiddenTruth::SupportsAssertion),("e-independent-b",HiddenTruth::SupportsAssertion)]);
 
-    suite
+    Ok(suite)
 }
 
 #[cfg(test)]
@@ -741,6 +793,29 @@ mod tests {
         assert_eq!(chain_depth(&dev),8);
         assert_eq!(chain_depth(&cal),32);
         assert_eq!(chain_depth(&test),64);
+    }
+
+    #[test]
+    fn custom_generation_profiles_change_graph_depth_deterministically() {
+        let config=GraphGenerationConfig{chain_depth:5};
+        let first=generate_poar_graph_suite_with_config(99,DatasetSplit::Test,config).expect("valid config");
+        let second=generate_poar_graph_suite_with_config(99,DatasetSplit::Test,config).expect("same valid config");
+        assert_eq!(first.planner_cases(),second.planner_cases());
+        let chain=first.planner_cases().iter().find(|case| case.id.contains("long-chain-")).expect("custom chain exists");
+        assert_eq!(chain.claims.iter().filter(|claim| claim.id.starts_with("chain-")).count(),5);
+        assert!(chain.id.ends_with("long-chain-5"));
+    }
+
+    #[test]
+    fn invalid_generation_profiles_fail_closed() {
+        for depth in [0,257] {
+            let error=generate_poar_graph_suite_with_config(
+                99,DatasetSplit::Test,GraphGenerationConfig{chain_depth:depth}
+            ).expect_err("invalid depth must be rejected");
+            assert_eq!(error,GraphGenerationError::ChainDepthOutOfRange{
+                requested:depth,minimum:1,maximum:256
+            });
+        }
     }
 
     #[test]
