@@ -31,7 +31,7 @@ The manifest is not a run result and does not attest that a run actually happene
 The strict schema is `frozen-run-manifest.schema.json`. The example validator recomputes SHA-256 from repository-relative candidate, generator, metric bundle, data manifest, observation/action/reward schema and wrapper-stack artifacts; hash-shaped strings alone are not accepted. It rejects traversal, symlink and out-of-repository artifact paths. Its top-level fields bind:
 
 - **Track and claim:** one CMAQ lane, protocol version and maximum scientific claim.
-- **Repository and candidate:** immutable source commit, candidate artifact digest (nullable only when a source-only development fixture is explicitly marked), config/weights/adapter digests and build state.
+- **Repository and candidate:** immutable manifest-repository snapshot plus independent candidate source commit, candidate artifact digest (nullable only when a source-only development fixture is explicitly marked), config/weights/adapter digests and build state.
 - **Generator and evaluator:** their source revisions, repository-relative configuration/metric-bundle paths and digests, plus external judge identity/version where relevant.
 - **Data sources:** exact revision, split, manifest digest, license, candidate visibility and permitted candidate-facing fields.
 - **Task semantics:** observation/action schemas, reward definition, wrapper stack, action repeat, simulator-step cadence, controller horizon and terminal behavior.
@@ -81,7 +81,7 @@ python3 -m pip install -r requirements-validation.txt
 python3 scripts/validate_manifest.py
 ```
 
-The GitHub Actions workflow validates the example against the schema, checks cross-reference integrity, and runs hostile mutations that must be rejected.
+The GitHub Actions workflow validates the example against the schema, checks cross-reference integrity, recomputes eight SHA-256 digests from the actual repository files, and rejects 18 hostile mutations (including digest tampering, path traversal, symlinks, oracle admission, false compute matching and incomplete qualification freezes).
 
 This first PR establishes a declarative contract and CI cross-checks. A dependency-light Rust runtime validator and per-track native-report adapters remain follow-on work; the Python script is CI-only and must not be treated as production runtime code.
 
