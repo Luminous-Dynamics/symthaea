@@ -108,6 +108,9 @@ pub struct CampaignTapeConfig {
     /// Digest of the evaluator-owned candidate/proposal stream supplied to all policies.
     pub candidate_stream_sha256: String,
     pub worker_count: u16,
+    /// First round in which the policy has made an allocation decision. Earlier rounds
+    /// may contain common evaluator-owned bootstrap evaluations.
+    pub first_allocation_round: u64,
     pub first_round_direction_claim_cap: u16,
     pub steady_state_direction_claim_cap: u16,
     pub new_direction_claim_cap: u16,
@@ -127,6 +130,9 @@ impl CampaignTapeConfig {
         }
         if self.worker_count == 0 {
             return Err(CampaignTapeError::new("config.worker_count", "must be non-zero"));
+        }
+        if self.first_allocation_round == 0 {
+            return Err(CampaignTapeError::new("config.first_allocation_round", "must be non-zero"));
         }
         if self.first_round_direction_claim_cap == 0
             || self.steady_state_direction_claim_cap == 0
@@ -679,7 +685,7 @@ impl CampaignTape {
                 }
             }
 
-            let direction_cap = if round_id == 1 {
+            let direction_cap = if round_id <= self.config.first_allocation_round {
                 self.config.first_round_direction_claim_cap
             } else {
                 self.config.steady_state_direction_claim_cap
@@ -913,6 +919,7 @@ mod tests {
             comparison_profile_sha256: C.to_owned(),
             candidate_stream_sha256: D.to_owned(),
             worker_count: 2,
+            first_allocation_round: 1,
             first_round_direction_claim_cap: 1,
             steady_state_direction_claim_cap: 2,
             new_direction_claim_cap: 1,
