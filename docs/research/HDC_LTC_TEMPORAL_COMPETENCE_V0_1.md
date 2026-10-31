@@ -88,7 +88,9 @@ A deterministic synthetic task now exists in `research/temporal-bench/src/retent
 
 ### T7 — Periodic and phase-sensitive prediction
 
-Predict phase, transitions, and next events under controlled time scaling and phase shifts. When Fourier features are used as continuous-time forcing, evaluate at correct integration stage times. An interval-held snapshot is a distinct approximation and must be named as such.
+A fixed-point phase workload is implemented in `research/temporal-bench/src/phase.rs`. It generates timestamped noisy samples from a periodic triangle oscillator under four regimes: stable, phase jump, frequency/period shift, and combined phase+frequency shift. The oracle stores cycle phase, effective period, and the exact next rising zero-crossing time at every sample. Frequency changes map the fractional cycle phase continuously at the hidden transition; phase jumps create a declared discontinuity. Candidate predictions are scored with circular phase error and absolute next-crossing timing error.
+
+The v0.1 generator uses a piecewise-linear triangle oscillator to keep the oracle deterministic with integer arithmetic. It is a phase/timing control, not a sinusoidal Fourier benchmark or a reproduction of an external dataset. A sinusoidal/frequency-sweep variant and explicit burst-cluster controls remain extensions. When Fourier features are used as continuous-time forcing, evaluate at correct integration stage times. An interval-held snapshot is a distinct approximation and must be named as such.
 
 ## 5. Data and split discipline
 
@@ -198,7 +200,7 @@ These are targets, not measured results:
 ## 10. Execution ladder
 
 1. Validate the JSON matrix and deterministic generator contracts.
-2. Complete T7 phase-sensitive prediction and add burst-cluster variants to T1.
+2. Add burst-cluster variants to T1 and sinusoidal/frequency-sweep variants to T7.
 3. Implement the isolated taskgen/candidate/evaluator runner in #9437; verify SHA-256 content binding and signed receipt/replay semantics before any confirmatory claim.
 4. Compile and run the standalone Rust tests and negative controls.
 5. Add the runner adapter without modifying active neuron code.
@@ -219,14 +221,15 @@ These commands are a runbook, not evidence that checks have passed.
 
 ## 11. Evidence and claim boundary
 
-The repository contains an isolated Rust research crate under research/temporal-bench (using the standard sha2 crate, not a dependency-free implementation):
+The repository contains an isolated Rust research crate under research/temporal-bench (using the standard sha2 crate, not a dependency-free implementation). It now has prototype generators for all nine task families:
 - a delayed-cue generator with controlled key similarity and distractor interference;
-- a multi-timescale forecasting generator with hidden periods/phases, a hidden middle-third regime boundary, delayed online feedback, and labels recomputed by the verifier from the hidden process;
+- a multi-timescale forecasting/change-point generator with hidden periods/phases, a hidden middle-third regime boundary, delayed online feedback, and labels recomputed by the verifier from the hidden process;
 - a DMS generator/verifier matching the pinned eight-direction task timing and population-tuned spike input;
 - an evidence-accumulation generator/verifier matching the pinned seven-cue/1,000 ms delay/150 ms recall task structure;
 - an irregular-time/missingness generator with jittered microsecond timestamps, explicit dropped-slot manifests, bounded noise, and latent oracle points;
 - a selective-retention/invalidation generator with before/after query semantics and stale-memory abstention;
 - an always-on sparse-event generator with rare target motifs, controlled distractor similarity, a quiet-idle control, event-level scoring, and false-trigger exposure accounting;
+- a phase-sensitive prediction generator with fixed-point oscillator phase, hidden phase/frequency shifts, exact next-crossing targets, and circular phase/timing scoring;
 - canonical SHA-256 digests for public streams and oracle records, with mutation negative controls.
 
 The generated public event stream and oracle remain returned in one process. The verifier has been implemented, but the confirmatory oracle is **not yet sealed by process or permission isolation**. 101 Rust unit tests are authored but unrun in this environment; the environment used for this work has no cargo, rustc, or rustfmt. The full nine-family generator (including the DMS and evidence-accumulation adapters), streaming runner, real-dataset adapters, separate evaluator service, benchmark execution, model comparison, hardware measurement, and energy result are not yet included. A passing benchmark would establish a result only for the declared tasks, splits, model versions, and hardware. It would not establish consciousness, general intelligence, universal superiority, or neuromorphic hardware efficiency if measured only on conventional CPU/GPU execution.
