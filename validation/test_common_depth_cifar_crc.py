@@ -74,6 +74,20 @@ class CommonDepthCRCTests(unittest.TestCase):
         for key in manual:
             self.assertAlmostEqual(got[key],manual[key],places=12)
 
+
+    def test_paired_pool_benchmark_returns_all_rounds_and_paired_gains(self):
+        from common_depth_cifar_crc import run_pool_count_benchmark
+        result=run_pool_count_benchmark(
+            alphas=(.1,),pool_counts=(100,30,20),n_calibration=5,
+            n_test=4,n_splits=12,seed=44,rounds=(0,1,3)
+        )
+        self.assertEqual(result["protocol"]["n_splits"],12)
+        row=result["results"][0]
+        self.assertTrue(row["methods"]["0"]["risk"]["mean"]>=0.)
+        self.assertTrue(row["methods"]["3"]["risk"]["mean"]>=0.)
+        self.assertIn("3",row["paired_specificity_gain_vs_envelope"])
+        self.assertIn("ci95",row["paired_specificity_gain_vs_envelope"]["3"])
+
     def test_standard_and_envelope_baselines_are_valid_at_all_paper_levels(self):
         for alpha in (.02,.05,.10,.15):
             engine=CommonDepthCIFARCRC(50,alpha)
