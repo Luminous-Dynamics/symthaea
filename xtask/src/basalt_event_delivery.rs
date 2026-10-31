@@ -333,10 +333,15 @@ pub fn audit_bytes(bytes: &[u8]) -> DeliveryAuditReport {
                 sequence_ok = false;
                 continue;
             };
-            match range.disposition {
-                RangeDisposition::Lost => lost_count = lost_count.saturating_add(length),
-                RangeDisposition::DiscardedRequired => required_discard_count = required_discard_count.saturating_add(length),
-                RangeDisposition::DiscardedExcluded => excluded_discard_count = excluded_discard_count.saturating_add(length),
+            let counter = match range.disposition {
+                RangeDisposition::Lost => &mut lost_count,
+                RangeDisposition::DiscardedRequired => &mut required_discard_count,
+                RangeDisposition::DiscardedExcluded => &mut excluded_discard_count,
+            };
+            if !checked_accumulate(counter, length) {
+                push_error(&mut report, "E_RANGE_COUNT_OVERFLOW", "$.classified_ranges", "per-source classified range count overflows u64");
+                sequence_ok = false;
+                counters_ok = false;
             }
             spans.push(Span { first: range.first_sequence, last: range.last_sequence });
         }
@@ -345,16 +350,28 @@ pub fn audit_bytes(bytes: &[u8]) -> DeliveryAuditReport {
             .checked_sub(source.first_attempted_sequence)
             .and_then(|n| n.checked_add(1));
         if let Some(attempted) = attempted_count {
-            report.counts.attempted_sequences = report.counts.attempted_sequences.saturating_add(attempted);
+            if !checked_accumulate(&mut report.counts.attempted_sequences, attempted) {
+                push_error(&mut report, "E_AGGREGATE_COUNT_OVERFLOW", "$.source_epochs", "aggregate attempted-sequence count overflows u64");
+                sequence_ok = false;
+                counters_ok = false;
+            }
         } else {
             push_error(&mut report, "E_ATTEMPTED_COUNT_OVERFLOW", "$.source_epochs", "attempted sequence count overflows u64");
             sequence_ok = false;
         }
 
-        report.counts.published_sequences = report.counts.published_sequences.saturating_add(events.len() as u64);
-        report.counts.lost_sequences = report.counts.lost_sequences.saturating_add(lost_count);
-        report.counts.required_discards = report.counts.required_discards.saturating_add(required_discard_count);
-        report.counts.excluded_discards = report.counts.excluded_discards.saturating_add(excluded_discard_count);
+        for (total, increment, label) in [
+            (&mut report.counts.published_sequences, events.len() as u64, "published"),
+            (&mut report.counts.lost_sequences, lost_count, "lost"),
+            (&mut report.counts.required_discards, required_discard_count, "required-discard"),
+            (&mut report.counts.excluded_discards, excluded_discard_count, "excluded-discard"),
+        ] {
+            if !checked_accumulate(total, increment) {
+                push_error(&mut report, "E_AGGREGATE_COUNT_OVERFLOW", "$.source_epochs", &format!("aggregate {label} count overflows u64"));
+                sequence_ok = false;
+                counters_ok = false;
+            }
+        }
 
         spans.sort_by_key(|span| (span.first, span.last));
         let mut expected = source.first_attempted_sequence;
@@ -362,20 +379,26 @@ pub fn audit_bytes(bytes: &[u8]) -> DeliveryAuditReport {
         for span in spans {
             if completed {
                 push_error(&mut report, "E_SEQUENCE_OVERLAP", "$.source_epochs", "an additional published event or classified range appears after the terminal sequence was already accounted");
-                report.counts.overlapping_sequences = report.counts.overlapping_sequences.saturating_add(1);
+                if !checked_accumulate(&mut report.counts.overlapping_sequences, 1) {
+                    push_error(&mut report, "E_AGGREGATE_COUNT_OVERFLOW", "$.source_epochs", "aggregate overlap count overflows u64");
+                }
                 sequence_ok = false;
                 continue;
             }
             if span.first < expected {
                 push_error(&mut report, "E_SEQUENCE_OVERLAP", "$.source_epochs", "published event or classified range overlaps an earlier sequence span");
-                report.counts.overlapping_sequences = report.counts.overlapping_sequences.saturating_add(1);
+                if !checked_accumulate(&mut report.counts.overlapping_sequences, 1) {
+                    push_error(&mut report, "E_AGGREGATE_COUNT_OVERFLOW", "$.source_epochs", "aggregate overlap count overflows u64");
+                }
                 sequence_ok = false;
                 continue;
             }
             if span.first > expected {
                 let gap = span.first - expected;
                 push_error(&mut report, "E_SEQUENCE_UNCLASSIFIED_GAP", "$.source_epochs", "one or more attempted sequences are neither published nor classified as lost/discarded");
-                report.counts.unclassified_sequences = report.counts.unclassified_sequences.saturating_add(gap);
+                if !checked_accumulate(&mut report.counts.unclassified_sequences, gap) {
+                    push_error(&mut report, "E_AGGREGATE_COUNT_OVERFLOW", "$.source_epochs", "aggregate unclassified-sequence count overflows u64");
+                }
                 sequence_ok = false;
             }
             if span.last < span.first || span.last > source.last_attempted_sequence {
@@ -397,10 +420,15 @@ pub fn audit_bytes(bytes: &[u8]) -> DeliveryAuditReport {
         }
         if !completed {
             let tail_start = expected;
-            let tail_gap = source.last_attempted_sequence.saturating_sub(tail_start).saturating_add(1);
-            if tail_gap > 0 {
+            let tail_gap = source.last_attempted_sequence.checked_sub(tail_start).and_then(|n| n.checked_add(1));
+            if let Some(tail_gap) = tail_gap.filter(|count| *count > 0) {
                 push_error(&mut report, "E_SEQUENCE_TAIL_UNACCOUNTED", "$.source_epochs", "final attempted sequences are missing or unclassified; a terminal high-water mark must account for tail loss");
-                report.counts.unclassified_sequences = report.counts.unclassified_sequences.saturating_add(tail_gap);
+                if !checked_accumulate(&mut report.counts.unclassified_sequences, tail_gap) {
+                    push_error(&mut report, "E_AGGREGATE_COUNT_OVERFLOW", "$.source_epochs", "aggregate unclassified-sequence count overflows u64");
+                }
+                sequence_ok = false;
+            } else if tail_gap.is_none() {
+                push_error(&mut report, "E_SEQUENCE_OVERFLOW", "$.source_epochs", "terminal sequence gap length overflows u64");
                 sequence_ok = false;
             }
         }
@@ -427,7 +455,9 @@ pub fn audit_bytes(bytes: &[u8]) -> DeliveryAuditReport {
             loss_free = false;
         }
         if source.unmonitored_producer_count > 0 {
-            report.counts.unmonitored_producers = report.counts.unmonitored_producers.saturating_add(source.unmonitored_producer_count);
+            if !checked_accumulate(&mut report.counts.unmonitored_producers, source.unmonitored_producer_count) {
+                push_error(&mut report, "E_AGGREGATE_COUNT_OVERFLOW", "$.source_epochs", "aggregate unmonitored-producer count overflows u64");
+            }
             push_error(&mut report, "E_UNMONITORED_PRODUCER", "$.source_epochs", "unmonitored producers prevent a loss-free delivery claim");
             sources_closed = false;
             loss_free = false;
@@ -460,6 +490,7 @@ pub fn audit_bytes(bytes: &[u8]) -> DeliveryAuditReport {
             "E_SOURCE_CLOSE_FENCE" | "E_SOURCE_DUPLICATE" | "E_EVENT_DIGEST" |
             "E_EVENT_TIME" | "E_EVENT_SOURCE_UNKNOWN" | "E_EVENT_DUPLICATE_SEQUENCE" | "E_RANGE_ORDER" |
             "E_RANGE_EXCLUSION_REASON" | "E_RANGE_LOSS_REASON" | "E_RANGE_SOURCE_UNKNOWN" |
+            "E_RANGE_COUNT_OVERFLOW" | "E_AGGREGATE_COUNT_OVERFLOW" |
             "E_EVENT_OUT_OF_RANGE" | "E_RANGE_OUT_OF_RANGE" | "E_RANGE_LENGTH_OVERFLOW" |
             "E_ATTEMPTED_COUNT_OVERFLOW"
         )
@@ -474,6 +505,16 @@ pub fn audit_bytes(bytes: &[u8]) -> DeliveryAuditReport {
         && report.sources_closed
         && report.loss_free;
     report
+}
+
+fn checked_accumulate(total: &mut u64, increment: u64) -> bool {
+    match total.checked_add(increment) {
+        Some(value) => {
+            *total = value;
+            true
+        }
+        None => false,
+    }
 }
 
 fn valid_digest(value: &str) -> bool {
@@ -720,6 +761,58 @@ mod tests {
         let report = audit(&input);
         assert!(!report.ledger_well_formed);
         assert!(report.errors.iter().any(|e| e.code == "E_SOURCE_DUPLICATE"));
+    }
+
+    #[test]
+    fn per_source_classified_range_count_overflow_is_rejected() {
+        let mut input = fixture();
+        input["source_epochs"][0]["last_attempted_sequence"] = json!(u64::MAX);
+        input["source_epochs"][0]["reported_lost_count"] = json!(u64::MAX);
+        input["source_epochs"][0]["reported_published_count"] = json!(0);
+        input["events"] = json!([]);
+        input["classified_ranges"] = json!([
+            {
+                "source_id":"bpf:process-exit","epoch_id":"attach-1","partition_id":"cpu:0",
+                "first_sequence":1,"last_sequence":u64::MAX,
+                "disposition":"lost","reason":"ringbuf_reservation_failure_unknown"
+            },
+            {
+                "source_id":"bpf:process-exit","epoch_id":"attach-1","partition_id":"cpu:0",
+                "first_sequence":1,"last_sequence":u64::MAX,
+                "disposition":"lost","reason":"ringbuf_reservation_failure_unknown"
+            }
+        ]);
+        let report = audit(&input);
+        assert!(!report.ledger_well_formed);
+        assert!(!report.audit_passed);
+        assert!(report.errors.iter().any(|e| e.code == "E_RANGE_COUNT_OVERFLOW"));
+    }
+
+    #[test]
+    fn aggregate_sequence_totals_overflow_fail_closed() {
+        let mut input = fixture();
+        input["events"] = json!([]);
+        input["source_epochs"][0]["first_attempted_sequence"] = json!(1);
+        input["source_epochs"][0]["last_attempted_sequence"] = json!(u64::MAX);
+        input["source_epochs"][0]["reported_published_count"] = json!(0);
+        input["source_epochs"][0]["reported_lost_count"] = json!(u64::MAX);
+        input["classified_ranges"] = json!([{
+            "source_id":"bpf:process-exit","epoch_id":"attach-1","partition_id":"cpu:0",
+            "first_sequence":1,"last_sequence":u64::MAX,
+            "disposition":"lost","reason":"ringbuf_reservation_failure_unknown"
+        }]);
+        let mut second = input["source_epochs"][0].clone();
+        second["source_id"] = json!("bpf:process-exit-secondary");
+        input["source_epochs"] = json!([input["source_epochs"][0].clone(), second]);
+        input["classified_ranges"].as_array_mut().unwrap().push(json!({
+            "source_id":"bpf:process-exit-secondary","epoch_id":"attach-1","partition_id":"cpu:0",
+            "first_sequence":1,"last_sequence":u64::MAX,
+            "disposition":"lost","reason":"ringbuf_reservation_failure_unknown"
+        }));
+        let report = audit(&input);
+        assert!(!report.ledger_well_formed);
+        assert!(!report.audit_passed);
+        assert!(report.errors.iter().any(|e| e.code == "E_AGGREGATE_COUNT_OVERFLOW"));
     }
 
     #[test]
