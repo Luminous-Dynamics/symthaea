@@ -315,6 +315,7 @@ struct ResourceMatch {
     status: &'static str,
     resource_measurement_method: &'static str,
     resource_profile_sha256: String,
+    receipt_verification_status: &'static str,
     d1_role_valid: bool,
     learned_model_role_valid: bool,
     w2_workload_match_valid: bool,
@@ -475,6 +476,7 @@ fn evaluate_resource_match(
         status,
         resource_measurement_method: method.name(),
         resource_profile_sha256: reference.resource_profile_sha256.clone(),
+        receipt_verification_status: "digest_only_not_independently_verified",
         d1_role_valid,
         learned_model_role_valid,
         w2_workload_match_valid,
@@ -593,7 +595,7 @@ fn build_report(input: &str, replicates: usize, bootstrap_seed: u64) -> Result<R
             "smoke_only"
         } else {
             match resource_match.status {
-                "budget_matched" => "qualification_candidate",
+                "budget_matched" => "budget_match_unverified",
                 "budget_unmatched" => "budget_unmatched",
                 _ => "resource_unmeasured",
             }
@@ -665,9 +667,9 @@ fn render_report(report: &Report) -> String {
         writeln!(&mut out, "      \"eligibility\": \"{}\",", group.eligibility).unwrap();
         let resource = &group.resource_match;
         writeln!(&mut out,
-            "      \"resource_match\": {{\"status\": \"{}\", \"resource_measurement_method\": \"{}\", \"resource_profile_sha256\": \"{}\", \"d1_role_valid\": {}, \"learned_model_role_valid\": {}, \"w2_workload_match_valid\": {}, \"energy_status\": \"{}\", \"compute_work_tolerance_fraction\": {}, \"latency_tolerance_fraction\": {}, \"memory_tolerance_fraction\": {}, \"d1_vs_w1\": {}, \"w1_vs_w2\": {}, \"reasons\": [{}]}},",
+            "      \"resource_match\": {{\"status\": \"{}\", \"resource_measurement_method\": \"{}\", \"resource_profile_sha256\": \"{}\", \"receipt_verification_status\": \"{}\", \"d1_role_valid\": {}, \"learned_model_role_valid\": {}, \"w2_workload_match_valid\": {}, \"energy_status\": \"{}\", \"compute_work_tolerance_fraction\": {}, \"latency_tolerance_fraction\": {}, \"memory_tolerance_fraction\": {}, \"d1_vs_w1\": {}, \"w1_vs_w2\": {}, \"reasons\": [{}]}},",
             resource.status, resource.resource_measurement_method, resource.resource_profile_sha256,
-            resource.d1_role_valid, resource.learned_model_role_valid, resource.w2_workload_match_valid,
+            resource.receipt_verification_status, resource.d1_role_valid, resource.learned_model_role_valid, resource.w2_workload_match_valid,
             resource.energy_status, number(COMPUTE_WORK_TOLERANCE), number(LATENCY_TOLERANCE),
             number(MEMORY_TOLERANCE), render_resource_pair_delta(&resource.d1_vs_w1),
             render_resource_pair_delta(&resource.w1_vs_w2),
@@ -944,7 +946,8 @@ mod tests {
         assert!(report.groups[0].resource_match.d1_role_valid);
         assert!(report.groups[0].resource_match.learned_model_role_valid);
         assert!(report.groups[0].resource_match.w2_workload_match_valid);
-        assert_eq!(report.groups[0].eligibility, "qualification_candidate");
+        assert_eq!(report.groups[0].eligibility, "budget_match_unverified");
+        assert_eq!(report.groups[0].resource_match.receipt_verification_status, "digest_only_not_independently_verified");
     }
 
     #[test]
