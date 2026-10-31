@@ -268,7 +268,19 @@
       "id": "dfa_cfcn_human_activity",
       "family": "continuous_time_external",
       "paper_baseline": "DFA-CfN/PRDFA-CfN",
-      "requires_original_split_and_preprocessing": true
+      "requires_original_split_and_preprocessing": true,
+      "public_code_audit": {
+        "source": "basic continuous time series modelling tasks/duv_person_activity.py",
+        "blob_sha": "ee684aef95386d680ea8306abf14c05a5eb1bec7",
+        "window_length": 50,
+        "window_stride": 25,
+        "random_split_after_windowing": true,
+        "split_fraction_train": 0.8,
+        "train_test_split_seed": 42,
+        "observed_validation_uses_test_loader": true,
+        "leakage_risk": "Overlapping windows from one original record may occur in both train and test.",
+        "confirmatory_rule": "Split by original record/subject before windowing; use separate dev and one-shot confirmatory test."
+      }
     },
     {
       "id": "dfa_cfcn_physionet",
@@ -332,13 +344,17 @@
       "id": "nialim_dfa_cfn",
       "required_when_reproducible": true,
       "source": "https://github.com/nuist-xf/DFA-CfNs",
-      "paper_doi": "10.1109/TNNLS.2026.3669345"
+      "paper_doi": "10.1109/TNNLS.2026.3669345",
+      "reference_revision": "f0e77101e6a22f1c87eae9b105b8cc4e1b3175b7",
+      "paper_match_status": "not independently verified"
     },
     {
       "id": "nialim_prdfacfn",
       "required_when_reproducible": true,
       "source": "https://github.com/nuist-xf/DFA-CfNs",
-      "paper_doi": "10.1109/TNNLS.2026.3669345"
+      "paper_doi": "10.1109/TNNLS.2026.3669345",
+      "reference_revision": "f0e77101e6a22f1c87eae9b105b8cc4e1b3175b7",
+      "paper_match_status": "not independently verified"
     },
     {
       "id": "gru_lstm_grud",
@@ -407,5 +423,69 @@
     "No DFA-CfN/PRDFA-CfN result has been independently reproduced by this matrix.",
     "No hardware energy or speedup is asserted.",
     "This preregistration does not authorize production defaults or resolution promotion."
-  ]
+  ],
+  "external_baseline_code_audit": {
+    "repository": "https://github.com/nuist-xf/DFA-CfNs",
+    "inspected_branch": "main",
+    "inspected_head": "f0e77101e6a22f1c87eae9b105b8cc4e1b3175b7",
+    "latest_code_commit_utc": "2025-08-17T14:20:06Z",
+    "paper_online_publication_utc": "2026-03-06",
+    "journal_issue": "IEEE Transactions on Neural Networks and Learning Systems, 37(9), September 2026",
+    "doi": "10.1109/TNNLS.2026.3669345",
+    "paper_to_public_snapshot_exact_match": "not independently verified",
+    "files": {
+      "torch_dfa": {
+        "path": "basic continuous time series modelling tasks/torch_cfc_DFA.py",
+        "blob_sha": "4cc687d49655ea6d4ef5542ed9a1b318fa302d6e"
+      },
+      "torch_prdfa": {
+        "path": "basic continuous time series modelling tasks/torch_cfc_PRDFA.py",
+        "blob_sha": "a03de948e047a555f0f30c7cc11032c61d559f22"
+      },
+      "tensorflow_dfa": {
+        "path": "basic continuous time series modelling tasks/tf_cfc_DFA.py",
+        "blob_sha": "702bd2a6f4dc112c173bdfbafaeb255852bd90c5"
+      },
+      "tensorflow_prdfa": {
+        "path": "basic continuous time series modelling tasks/tf_cfc_PRDFA.py",
+        "blob_sha": "6930fdb3fa719addd6057fc05e32c27cbf8c7899"
+      },
+      "person_activity_loader": {
+        "path": "basic continuous time series modelling tasks/duv_person_activity.py",
+        "blob_sha": "ee684aef95386d680ea8306abf14c05a5eb1bec7"
+      },
+      "person_activity_dfa_train": {
+        "path": "basic continuous time series modelling tasks/train_person_activity_DFA.py",
+        "blob_sha": "1dff77bb84966ef64130fb223c0325917995899c"
+      },
+      "person_activity_prdfa_train": {
+        "path": "basic continuous time series modelling tasks/train_person_activity_PRDFA.py",
+        "blob_sha": "86cfd6fb7e566b3b3289f9cda0d769c62980765a"
+      },
+      "physionet_train": {
+        "path": "basic continuous time series modelling tasks/train_physio.py",
+        "blob_sha": "6f9d12b213020f3a89cecac8c3f773f0cf8c1265"
+      },
+      "imdb_dfa_train": {
+        "path": "basic continuous time series modelling tasks/train_imdb_DFA.py",
+        "blob_sha": "edb50b789fc602f34b3f3964f4dbab426850aeab"
+      }
+    },
+    "observed_differences": [
+      "PyTorch uses positive time_a multiplier; TensorFlow uses negative time_a multiplier in t_sum. Backend results are not pooled without a parity explanation.",
+      "PRDFA performs Multi_period_predication pre-reconstruction before the recurrent loop; DFA disables that encoder.",
+      "PyTorch per-step memory list is cleared each forward call, consumed when return_sequences is true, but still populated for non-sequence output.",
+      "Human Activity windows are length 50 and stride 25, then window-level train_test_split randomly assigns windows: overlapping pieces of an original record may cross train/test.",
+      "Human Activity scripts use test_loader as per-epoch validation and again for final test.",
+      "Human Activity scripts call fix_seed once before five repeated eval calls, not a per-replicate independent seed reset."
+    ],
+    "human_activity_confirmatory_requirements": [
+      "Group original records/subjects before windowing; no record or overlapping window can cross partitions.",
+      "Separate train, development, confirmatory test; test is never used per epoch.",
+      "Reset and log all random seeds per replicate.",
+      "Keep source-like split only as a diagnostic, not the primary confirmatory result."
+    ],
+    "primary_reproduction_label": "reference_implementation_reproduction_until_final-paper-source-revision-is-verified",
+    "no_paper_score_claim": true
+  }
 }
