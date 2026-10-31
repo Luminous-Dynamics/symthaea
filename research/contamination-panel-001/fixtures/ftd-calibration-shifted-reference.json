@@ -12,5 +12,6 @@
   "tail_direction": "greater",
   "weight_policy": "official_repository_softmax_sharpened",
   "softmax_temperature_milli": 500,
-  "alpha_permille": 50
+  "alpha_permille": 50,
+  "final_multiple_testing": "benjamini_yekutieli"
 }
