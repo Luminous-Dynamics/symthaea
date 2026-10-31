@@ -67,7 +67,7 @@ fn parse_repeats() -> Result<usize, String> {
 fn run() -> Result<(), String> {
     let repeats = parse_repeats()?;
     println!(
-        "substrate_units,candidate_units,background_units,stored_local_cpt_cells,parent_references,repeats,posterior_width,target_width_max,peak_factor_entries,factor_multiplications,factor_entry_budget,median_ns,min_ns,output_sum,validated"
+        "substrate_units,candidate_units,background_units,stored_local_cpt_cells,parent_references,repeats,posterior_width,target_width_max,posterior_predicted_peak_entries,target_predicted_peak_entries,predicted_peak_entries,observed_peak_entries,factor_multiplications,factor_entry_budget,median_ns,min_ns,output_sum,validated"
     );
 
     for n_units in SUBSTRATE_SIZES {
@@ -88,6 +88,7 @@ fn run() -> Result<(), String> {
         if warmup.forward_likelihood.len() != (1usize << CANDIDATE.len())
             || warmup.forward_likelihood.iter().any(|value| !value.is_finite() || *value < 0.0)
             || warmup.peak_factor_entries > FACTOR_ENTRY_BUDGET
+            || warmup.predicted_peak_factor_entries != warmup.peak_factor_entries
         {
             return Err(format!("invalid warm-up result at n={n_units}"));
         }
@@ -102,6 +103,9 @@ fn run() -> Result<(), String> {
             if report.forward_likelihood != warmup.forward_likelihood
                 || report.posterior_induced_width != warmup.posterior_induced_width
                 || report.maximum_target_induced_width != warmup.maximum_target_induced_width
+                || report.posterior_predicted_peak_factor_entries != warmup.posterior_predicted_peak_factor_entries
+                || report.maximum_target_predicted_peak_factor_entries != warmup.maximum_target_predicted_peak_factor_entries
+                || report.predicted_peak_factor_entries != warmup.predicted_peak_factor_entries
                 || report.peak_factor_entries != warmup.peak_factor_entries
                 || report.factor_multiplications != warmup.factor_multiplications
             {
@@ -113,7 +117,7 @@ fn run() -> Result<(), String> {
         let min_ns = samples.iter().copied().min().unwrap_or_default().as_nanos();
         let output_sum = warmup.forward_likelihood.iter().sum::<f64>();
         println!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},{:.17},{}",
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.17},{}",
             n_units,
             CANDIDATE.len(),
             n_units - CANDIDATE.len(),
@@ -122,6 +126,9 @@ fn run() -> Result<(), String> {
             repeats,
             warmup.posterior_induced_width,
             warmup.maximum_target_induced_width,
+            warmup.posterior_predicted_peak_factor_entries,
+            warmup.maximum_target_predicted_peak_factor_entries,
+            warmup.predicted_peak_factor_entries,
             warmup.peak_factor_entries,
             warmup.factor_multiplications,
             FACTOR_ENTRY_BUDGET,
