@@ -164,7 +164,7 @@ jobs:
               "workflow_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
           }
           Path("/tmp/cmaq-017-run-receipt.json").write_text(
-              json.dumps(receipt, sort_keys=True, indent=2) + "\\n"
+              json.dumps(receipt, sort_keys=True, indent=2) + "\n"
           )
           PY
           sha256sum /tmp/cmaq-017-report.json /tmp/cmaq-017-run-receipt.json
