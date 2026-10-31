@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT process lineage independent oracle v1",
+  "description": "Independent supervisor ground truth. PID values are scoped by host boot identity and PID namespace; process instances are distinguished by start-time ticks.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "suite_id",
+    "run_id",
+    "task_id",
+    "attempt_id",
+    "host_boot_id_digest",
+    "pid_namespace_inode",
+    "capture_start_monotonic_ns",
+    "capture_end_monotonic_ns",
+    "root_process",
+    "expected_tree_closed",
+    "harness_binary_digest",
+    "supervisor_binary_digest",
+    "processes",
+    "events"
+  ],
+  "properties": {
+    "format_version": {
+      "const": 1
+    },
+    "suite_id": {
+      "const": "basalt-process-lineage-oracle-v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "attempt_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "host_boot_id_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "pid_namespace_inode": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "capture_start_monotonic_ns": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "capture_end_monotonic_ns": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "root_process": {
+      "$ref": "#/$defs/processIdentity"
+    },
+    "expected_tree_closed": {
+      "type": "boolean"
+    },
+    "harness_binary_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "supervisor_binary_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "processes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "identity",
+          "parent"
+        ],
+        "properties": {
+          "identity": {
+            "$ref": "#/$defs/processIdentity"
+          },
+          "parent": {
+            "$ref": "#/$defs/parentRelation"
+          }
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "process",
+          "observed_at_monotonic_ns"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "root_start",
+              "fork",
+              "clone",
+              "vfork",
+              "exec",
+              "exit"
+            ]
+          },
+          "process": {
+            "$ref": "#/$defs/processIdentity"
+          },
+          "observed_at_monotonic_ns": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "processIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pid",
+        "start_time_ticks"
+      ],
+      "properties": {
+        "pid": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "start_time_ticks": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "parentRelation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "relation"
+          ],
+          "properties": {
+            "relation": {
+              "const": "root"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "relation",
+            "identity"
+          ],
+          "properties": {
+            "relation": {
+              "const": "parent"
+            },
+            "identity": {
+              "$ref": "#/$defs/processIdentity"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
