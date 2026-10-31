@@ -66,11 +66,12 @@ BASALT should complement these tools: sensors generate telemetry; BASALT verifie
 
 ## Benchmark plan
 
-The versioned benchmark includes clean controls, raw-byte mutation, event-root mutation, range-root mutation, source substitution, terminal-high-water mutation, observer/close-fence substitution, generation-link corruption, close-order reversal, commitment mutation omission of the required predecessor field and event-after-drain inconsistency and a reconciled-but-lossy seal control (15 scenarios).
+The versioned benchmark includes clean controls; raw-byte mutation; event-root mutation; range-root mutation; source substitution; terminal-high-water mutation; observer/close-fence substitution; generation-link corruption; close-order reversal; commitment mutation; omission of the required predecessor field; event-after-drain inconsistency; and a reconciled-but-lossy seal control (15 scenarios). It defines nine metrics: seven safety gates and two efficiency targets.
 
 Safety targets:
 - 100% rejection of every seeded ledger/chain/close/commitment mutation;
 - zero false signature, authorization, anti-rollback or qualification promotion;
+- zero cases where a classified-loss ledger reports `ledger_loss_free=true`, even when its integrity seal passes;
 - all negative and invalid attempts retained in the denominator.
 
 Efficiency targets (not measured):
