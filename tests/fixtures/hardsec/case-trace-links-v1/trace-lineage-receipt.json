@@ -1,0 +1,62 @@
+{
+  "schema_version": "hardsec-telemetry-trace-lineage-receipt-v1",
+  "result": "audited",
+  "claim_scope": "declared_trace_window_lineage_and_group_consistency_only",
+  "dataset_id": "hs014-hs012-linked-synthetic-fixture-v1",
+  "inputs": {
+    "manifest_sha256": "d4703bc1d708f0e036e600e8c58e1f3459d4d8015753ce6818e871535b62ab52",
+    "source_corpus_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "trace_lineage": {
+    "trace_record_count": 12,
+    "original_trace_count": 11,
+    "repeated_iteration_trace_count": 1,
+    "replayed_trace_count": 0,
+    "unknown_origin_trace_count": 0,
+    "unique_source_trace_sha256_count": 11,
+    "trace_origin_counts": {
+      "original": 11,
+      "repeated_iteration": 1
+    }
+  },
+  "window_support": {
+    "raw_window_count": 12,
+    "original_window_count": 11,
+    "repeated_iteration_window_count": 1,
+    "replayed_window_count": 0,
+    "unknown_origin_window_count": 0,
+    "duplicate_content_hash_groups": [
+      {
+        "window_sha256": "0000000000000000000000000000000000000000000000000000000000000203",
+        "occurrences": 2
+      }
+    ],
+    "duplicate_content_hash_group_count": 1,
+    "duplicate_content_extra_occurrences": 1,
+    "split_window_counts": {
+      "train": 1,
+      "validation": 1,
+      "test": 10
+    }
+  },
+  "independent_group_support": {
+    "unique_program_count": 11,
+    "unique_execution_id_count": 11,
+    "unique_device_config_count": 1,
+    "unique_attack_family_count_excluding_none": 3,
+    "unique_adaptation_family_count_excluding_none": 2,
+    "program_split_pairs": 11,
+    "effective_sample_size_estimate": null,
+    "effective_sample_size_status": "not_estimated",
+    "reason": "lineage counts do not establish temporal or cluster independence"
+  },
+  "sampling_policy": {
+    "offset_unit": "committed_instructions",
+    "window_size": 10000,
+    "stride": 10000
+  },
+  "limitations": [
+    "This synthetic fixture receipt is only a schema test; it is not evidence of a real audit.",
+    "Lineage metadata does not establish independence or authenticate source files."
+  ]
+}
