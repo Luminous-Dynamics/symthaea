@@ -126,6 +126,15 @@ fn musicxml_key_signature(document: &roxmltree::Document<'_>) -> Result<(i8, boo
     Ok(signatures.into_iter().next().unwrap_or((0, false)))
 }
 
+fn musicxml_max_score_units(divisions: i64) -> Result<i64, String> {
+    if divisions <= 0 || divisions.checked_mul(divisions).is_none() {
+        return Err(
+            "MusicXML divisions exceed the safe rational-duration denominator range".into(),
+        );
+    }
+    Ok(i64::MAX / divisions)
+}
+
 /// The legacy MusicXML importer has one divisions-per-quarter value for
 /// the whole document. Reject files that change it rather than interpreting
 /// every measure using whichever value happened to appear last.
@@ -457,6 +466,7 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
         return Err("MusicXML contains no score parts".into());
     }
     let divisions = musicxml_divisions(&document)?;
+    let max_score_units = musicxml_max_score_units(divisions)?;
     let (fifths, minor) = musicxml_key_signature(&document)?;
     let meter = musicxml_time_signature_meter(&document)?;
     let tempo = musicxml_tempo_bpm(&document)?;
@@ -491,9 +501,12 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                     .ok_or_else(|| {
                         "MusicXML forward requires a positive integer duration".to_string()
                     })?;
-                cursor = cursor.checked_add(amount).ok_or_else(|| {
-                    "MusicXML forward exceeds the supported signed duration range".to_string()
-                })?;
+                cursor = cursor
+                    .checked_add(amount)
+                    .filter(|value| *value <= max_score_units)
+                    .ok_or_else(|| {
+                        "MusicXML forward exceeds the safe rational score-time range".to_string()
+                    })?;
             } else if child.has_tag_name("note") {
                 let duration = child
                     .children()
@@ -507,6 +520,12 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 let chord = child.children().any(|node| node.has_tag_name("chord"));
                 let rest = child.children().any(|node| node.has_tag_name("rest"));
                 let onset = if chord { previous_onset } else { cursor };
+                onset
+                    .checked_add(duration)
+                    .filter(|end| *end <= max_score_units)
+                    .ok_or_else(|| {
+                        "MusicXML note end exceeds the safe rational score-time range".to_string()
+                    })?;
                 if !rest {
                     let midi = musicxml_pitch(child).ok_or_else(|| {
                         "MusicXML pitched note contains an unsupported or malformed pitch"
@@ -516,9 +535,12 @@ pub fn parse_musicxml(bytes: &[u8]) -> Result<Score, String> {
                 }
                 previous_onset = onset;
                 if !chord {
-                    cursor = cursor.checked_add(duration).ok_or_else(|| {
-                        "MusicXML note exceeds the supported signed duration range".to_string()
-                    })?;
+                    cursor = cursor
+                        .checked_add(duration)
+                        .filter(|value| *value <= max_score_units)
+                        .ok_or_else(|| {
+                            "MusicXML note exceeds the safe rational score-time range".to_string()
+                        })?;
                 }
             }
         }
@@ -826,6 +848,13 @@ mod tests {
             0x00, 0xff, 0x2f, 0x00,
         ];
         assert!(parse_midi(&midi).is_err());
+    }
+
+    #[test]
+    fn musicxml_divisions_are_bounded_for_exact_rational_addition() {
+        assert_eq!(musicxml_max_score_units(96).unwrap(), i64::MAX / 96);
+        assert!(musicxml_max_score_units(0).is_err());
+        assert!(musicxml_max_score_units(i64::MAX).is_err());
     }
 
     #[test]
