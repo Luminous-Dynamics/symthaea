@@ -1,0 +1,31 @@
+name: Contamination Panel Qualification
+
+on:
+  pull_request:
+    paths:
+      - "research/contamination-panel-001/**"
+      - ".github/workflows/contamination-panel-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Locked Rust tests, formatting and Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify rustfmt
+        run: cargo fmt --manifest-path research/contamination-panel-001/Cargo.toml -- --check
+
+      - name: Run locked tests
+        run: cargo test --locked --manifest-path research/contamination-panel-001/Cargo.toml
+
+      - name: Run Clippy
+        run: cargo clippy --locked --manifest-path research/contamination-panel-001/Cargo.toml --all-targets -- -D warnings
