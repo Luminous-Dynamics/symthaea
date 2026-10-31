@@ -1271,6 +1271,63 @@ mod tests {
         assert_eq!(r["statistical_guarantees"]["randomized_pit_atom_safe"], true);
     }
 
+
+    #[test]
+    fn exact_discrete_pit_control_spreads_atoms_uniformly() {
+        // Discrete null with masses .5, .3, .2. The randomized PIT fills
+        // [0,.5], [.5,.8], [.8,1] in proportion to those atom masses.
+        // Stratified deterministic U grids verify the probability-integral
+        // transform algebra without pretending to sample a CSPRNG.
+        let reference = vec![
+            1.0,1.0,1.0,1.0,1.0,
+            2.0,2.0,2.0,
+            3.0,3.0
+        ];
+        let mut randomized = Vec::new();
+        let atom_groups = [(1.0, 5usize), (2.0, 3usize), (3.0, 2usize)];
+        let grid_per_atom = 10_000usize;
+        let mut naive = Vec::new();
+        for (score, mass) in atom_groups {
+            let lower = reference.iter().filter(|v| **v < score).count() as f64 / reference.len() as f64;
+            let atom_mass = mass as f64 / reference.len() as f64;
+            let upper = lower + atom_mass;
+            naive.push(upper);
+            for index in 0..grid_per_atom {
+                let uniform = (index as f64 + 0.5) / grid_per_atom as f64;
+                let (value, _, observed_mass) = randomized_empirical_pit(&reference, score, uniform).unwrap();
+                assert_eq!(observed_mass, mass);
+                randomized.push(value);
+            }
+        }
+        randomized.sort_by(f64::total_cmp);
+        let n = randomized.len() as f64;
+        let mut ks = 0.0_f64;
+        for (index, value) in randomized.iter().enumerate() {
+            let expected = (index as f64 + 0.5) / n;
+            ks = ks.max((value - expected).abs());
+        }
+        assert!(ks <= 0.000051, "randomized PIT stratified-grid KS error {ks}");
+        assert_eq!(naive, vec![0.5,0.8,1.0]);
+        assert_eq!(naive.iter().copied().collect::<BTreeSet<_>>().len(),3);
+    }
+
+    #[test]
+    fn dkw_endpoint_interpolation_never_exceeds_same_sup_norm_error() {
+        // Endpoint errors bounded by epsilon imply every convex interpolation
+        // of the left/right CDF endpoints has error bounded by epsilon.
+        let epsilon = 0.07_f64;
+        let reference_left = 0.31_f64;
+        let reference_right = 0.59_f64;
+        let true_left = reference_left - epsilon * 0.9;
+        let true_right = reference_right + epsilon * 0.8;
+        for index in 0..=1000 {
+            let u = index as f64 / 1000.0;
+            let empirical = reference_left + u * (reference_right - reference_left);
+            let truth = true_left + u * (true_right - true_left);
+            assert!((empirical - truth).abs() <= epsilon + 1e-12);
+        }
+    }
+
     #[test]
     fn rejects_context_selection_based_on_monitor_score() {
         let (mut p, s, _, _) = fixture();
