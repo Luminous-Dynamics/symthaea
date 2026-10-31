@@ -430,7 +430,12 @@
     "burst_latency_p50_p95_p99",
     "quiet_idle_energy",
     "continuous_stream_latency_and_energy",
-    "joules_per_correct_decision"
+    "joules_per_correct_decision",
+    "eligibility_trace_bytes_by_neuron_count",
+    "eligibility_trace_bytes_by_sequence_length",
+    "online_update_compute_time_by_sequence_length",
+    "pp_prop_gradient_or_learning_trajectory_deviation_from_d_rtrl_or_bptt",
+    "time_to_target_quality_under_equal_online_feedback_budget"
   ],
   "statistical_design": {
     "pilot_paired_seeds_min": 10,
@@ -440,7 +445,15 @@
     "paired_comparison": true,
     "confidence_intervals": true,
     "multiple_comparison_control_required": true,
-    "preserve_failed_invalid_timed_out_runs": true
+    "preserve_failed_invalid_timed_out_runs": true,
+    "online_learning_controls": {
+      "paired_training_streams": true,
+      "explicit_independent_seed_resets": true,
+      "locked_confirmatory_trial_families": true,
+      "training_curve_separate_from_confirmatory_test": true,
+      "report_trace_decay_sensitivity": true,
+      "exact_gradient_reference_on_small_scale": true
+    }
   },
   "qualification_targets": [
     "zero_future_sample_leakage_on_exhaustive_synthetic_controls",
@@ -484,7 +497,20 @@
       "evidence_accumulation_data_blob": "2de7e924b458f51c2939653cf5e88fdff5fae349",
       "evidence_accumulation_training_blob": "a89a32bf18b520dba595d232dbbb153a4de64527",
       "paper_to_script_revision_verified": false,
-      "public_training_script_test_split_found": false
+      "public_training_script_test_split_found": false,
+      "paper_reported_complexity": {
+        "pp_prop_trace_memory": "O(B*N) for batch size B and neuron count N according to the Nature Communications article.",
+        "d_rtrl_trace_memory": "O(B*P) for batch size B and parameter count P; dense recurrent P may scale quadratically with neuron count.",
+        "pp_prop_vs_d_rtrl_lif_gesture": {
+          "pp_prop_memory_gb": 0.5,
+          "d_rtrl_memory_gb": 17.5,
+          "paper_reported_memory_ratio": 35,
+          "paper_reported_speedup_vs_d_rtrl": 10,
+          "scope": "Paper-specific LIF Gesture experiment. Literature reference only; not Symthaea measurements."
+        },
+        "bptt_sequence_memory": "Paper reports memory increasing with sequence length and a GPU run failure at 400 steps for its specific experiment.",
+        "caveat": "pp-prop is a factorized/approximated trace; its approximation quality can depend on firing statistics and network depth. Do not report it as an exact D-RTRL/BPTT gradient."
+      }
     }
   }
 }
