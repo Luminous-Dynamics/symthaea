@@ -1,0 +1,43 @@
+{
+  "schema":"symthaea-finite-state-crc-recertification-v1",
+  "status":"EXACT_TWO_TYPE_MATHEMATICAL_REPRODUCTION_NOT_CIFAR_REPLICATION",
+  "reference":"Bai & Ramdas (2026), arXiv:2610.35821, Sections 3.2-3.5 and Appendix B.5",
+  "local_reference_checks":{
+    "two_type_baseline_envelope_crc":{"HH":0.5,"HL":0.4,"LL":0.25},
+    "round_1":{"HH":0.5,"HL":0.38333333333333336,"LL":0.20000000000000004},
+    "round_2":{"HH":0.5,"HL":0.3777777777777778,"LL":0.17222222222222222},
+    "equal_share_limit":{"HH":0.5,"HL":0.375,"LL":0.125},
+    "alternate_coordinate_sweep":{"HH":0.5,"HL":0.4,"LL":0.1},
+    "pointwise_minimum_invalid":{"HH":0.5,"HL":0.375,"LL":0.1,"HLL_total":1.525,"budget":1.5},
+    "all_augmented_states_valid_for_equal_share_rounds":true,
+    "both_admissible_controllers_valid":true,
+    "multiple_risk_example_valid":true
+  },
+  "count_vector_scaling":{
+    "types_2_n_2_calibration_states":3,
+    "types_2_n_2_augmented_states":4,
+    "types_3_n_50_calibration_states":1326,
+    "types_3_n_50_augmented_states":1378
+  },
+  "cifar100_paper_reference":{
+    "n_calibration":50,
+    "paired_splits":300,
+    "test_images_per_split":16,
+    "alpha":[0.02,0.05,0.1,0.15],
+    "confidence_adaptive_alpha_0_10":{
+      "envelope_crc_correct_specificity_percent":67.572,
+      "recertified_500_correct_specificity_percent":68.235,
+      "envelope_crc_mean_node_size":19.4,
+      "recertified_500_mean_node_size":17.03,
+      "envelope_crc_risk":0.09052,
+      "recertified_500_risk":0.0988
+    },
+    "locally_reproduced":false
+  },
+  "implementation_limits":[
+    "committed engine supports finite types and linear-in-lambda losses",
+    "finite exchangeability validity only; not arbitrary distribution-shift validity",
+    "feature-adaptive test-time controller needs certification over every possible label",
+    "CIFAR cache and split manifest not yet located"
+  ]
+}
