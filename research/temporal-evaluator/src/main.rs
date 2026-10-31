@@ -1,0 +1,661 @@
+//! Evaluator-side counterfactual retention primitives.
+//!
+//! This is intentionally a separate package from the candidate benchmark
+//! crate. It contains evaluator-side outcome records and must not be linked
+//! into or executed by an untrusted candidate. Package separation is not an
+//! OS security boundary: #9437 still requires process/UID isolation, protected
+//! storage, evaluator-owned signing keys and replay-resistant receipts.
+//!
+//! No function here supplies evaluator outcomes to candidate-side policies.
+
+use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
+
+const MAX_EXHAUSTIVE_ITEMS: usize = 16;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EpisodeContext {
+    pub episode_id: u64,
+    pub task_sha256: [u8; 32],
+    pub future_stream_sha256: [u8; 32],
+    pub model_sha256: [u8; 32],
+    pub initial_state_sha256: [u8; 32],
+    /// Hash of the candidate-visible feature snapshot frozen before treatment.
+    pub candidate_feature_sha256: [u8; 32],
+    pub total_exposure_us: u64,
+    pub byte_budget: u64,
+    pub compute_budget: u64,
+    pub refresh_budget: u64,
+    pub observation_budget: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MemoryItem {
+    pub item_id: u64,
+    pub bytes: u64,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct ExposureOutcome {
+    pub wrong_belief_us: u64,
+    pub abstention_us: u64,
+    pub missing_output_us: u64,
+}
+
+impl ExposureOutcome {
+    fn validate(self, total_exposure_us: u64) -> Result<(), CounterfactualError> {
+        let total = self
+            .wrong_belief_us
+            .checked_add(self.abstention_us)
+            .and_then(|value| value.checked_add(self.missing_output_us))
+            .ok_or(CounterfactualError::ArithmeticOverflow)?;
+        if total > total_exposure_us {
+            return Err(CounterfactualError::ExposureExceedsEpisode {
+                exposure_us: total,
+                episode_us: total_exposure_us,
+            });
+        }
+        Ok(())
+    }
+}
+
+/// All three deltas are kept separate. Positive means retaining the treatment
+/// set reduced that exposure relative to evicting it.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ExposureDelta {
+    pub wrong_belief_us: i128,
+    pub abstention_us: i128,
+    pub missing_output_us: i128,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CounterfactualRun {
+    pub context: EpisodeContext,
+    pub run_id: u64,
+    /// Sorted, unique IDs of items retained during this run.
+    pub selected_item_ids: Vec<u64>,
+    pub bytes_used: u64,
+    pub outcome: ExposureOutcome,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CounterfactualEffect {
+    pub episode_id: u64,
+    pub intervention_item_ids: Vec<u64>,
+    pub retained_run_id: u64,
+    pub evicted_run_id: u64,
+    pub delta_evict_minus_retain: ExposureDelta,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SubsetSummary {
+    pub subset_mask: u64,
+    pub selected_item_ids: Vec<u64>,
+    pub bytes_used: u64,
+    pub outcome: ExposureOutcome,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SubsetRegret {
+    pub wrong_belief_us: u64,
+    pub abstention_us: u64,
+    pub missing_output_us: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExactSubsetQualification {
+    /// Nondominated subsets. No weighted scalar objective is applied.
+    pub pareto_frontier: Vec<SubsetSummary>,
+    /// Independent evaluator-only optimum for each exposure component.
+    pub best_wrong_belief: SubsetSummary,
+    pub best_abstention: SubsetSummary,
+    pub best_missing_output: SubsetSummary,
+    pub candidate_regret: SubsetRegret,
+    pub evaluated_subset_count: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CounterfactualError {
+    EmptyIntervention,
+    TooManyItems { requested: usize, maximum: usize },
+    DuplicateItemId { item_id: u64 },
+    ZeroItemSize { item_id: u64 },
+    UnsortedOrDuplicateSelection,
+    UnknownSelectedItem { item_id: u64 },
+    ContextMismatch,
+    RunIdCollision { run_id: u64 },
+    RetainedTreatmentMissingItem { item_id: u64 },
+    EvictedTreatmentStillContainsItem { item_id: u64 },
+    TreatmentDiffersByUnexpectedItems,
+    ByteCountMismatch { reported: u64, computed: u64 },
+    OutOfBudget { used: u64, budget: u64 },
+    ExposureExceedsEpisode { exposure_us: u64, episode_us: u64 },
+    IncompleteSubsetEnumeration { expected: usize, actual: usize },
+    DuplicateSubset { mask: u64 },
+    MissingSubset { mask: u64 },
+    CandidateSubsetMissing,
+    ArithmeticOverflow,
+}
+
+impl fmt::Display for CounterfactualError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptyIntervention => write!(f, "counterfactual intervention set must not be empty"),
+            Self::TooManyItems { requested, maximum } => write!(
+                f,
+                "exhaustive subset evaluation supports at most {maximum} items, received {requested}"
+            ),
+            Self::DuplicateItemId { item_id } => write!(f, "duplicate item ID {item_id}"),
+            Self::ZeroItemSize { item_id } => write!(f, "item {item_id} has zero bytes"),
+            Self::UnsortedOrDuplicateSelection => {
+                write!(f, "selected item IDs must be strictly ascending and unique")
+            }
+            Self::UnknownSelectedItem { item_id } => {
+                write!(f, "selected item ID {item_id} is not in the episode registry")
+            }
+            Self::ContextMismatch => write!(
+                f,
+                "paired runs do not share task, future stream, model, initial state, feature snapshot and resource budgets"
+            ),
+            Self::RunIdCollision { run_id } => write!(f, "duplicate evaluator run ID {run_id}"),
+            Self::RetainedTreatmentMissingItem { item_id } => {
+                write!(f, "retained treatment does not contain item {item_id}")
+            }
+            Self::EvictedTreatmentStillContainsItem { item_id } => {
+                write!(f, "evicted treatment still contains item {item_id}")
+            }
+            Self::TreatmentDiffersByUnexpectedItems => {
+                write!(f, "paired treatment runs differ by items outside the declared intervention set")
+            }
+            Self::ByteCountMismatch { reported, computed } => write!(
+                f,
+                "reported memory bytes {reported} differ from selected-item sum {computed}"
+            ),
+            Self::OutOfBudget { used, budget } => {
+                write!(f, "selected bytes {used} exceed byte budget {budget}")
+            }
+            Self::ExposureExceedsEpisode { exposure_us, episode_us } => write!(
+                f,
+                "wrong/abstention/missing exposure {exposure_us} exceeds episode duration {episode_us}"
+            ),
+            Self::IncompleteSubsetEnumeration { expected, actual } => write!(
+                f,
+                "exact subset oracle requires {expected} records, received {actual}"
+            ),
+            Self::DuplicateSubset { mask } => write!(f, "duplicate subset mask {mask:#x}"),
+            Self::MissingSubset { mask } => write!(f, "missing subset mask {mask:#x}"),
+            Self::CandidateSubsetMissing => write!(f, "candidate subset is absent from evaluator enumeration"),
+            Self::ArithmeticOverflow => write!(f, "counterfactual arithmetic overflowed"),
+        }
+    }
+}
+
+impl std::error::Error for CounterfactualError {}
+
+/// Evaluate one paired retain/evict intervention. The runs must be identical
+/// in all declared context fields and differ only in the intervention IDs.
+pub fn evaluate_paired_intervention(
+    items: &[MemoryItem],
+    retained: &CounterfactualRun,
+    evicted: &CounterfactualRun,
+    intervention_item_ids: &[u64],
+) -> Result<CounterfactualEffect, CounterfactualError> {
+    if intervention_item_ids.is_empty() {
+        return Err(CounterfactualError::EmptyIntervention);
+    }
+    validate_item_registry(items)?;
+    validate_run(items, retained)?;
+    validate_run(items, evicted)?;
+    validate_same_context(retained, evicted)?;
+
+    let intervention = sorted_unique_set(intervention_item_ids)?;
+    let retained_set = sorted_unique_set(&retained.selected_item_ids)?;
+    let evicted_set = sorted_unique_set(&evicted.selected_item_ids)?;
+
+    for item_id in &intervention {
+        if !retained_set.contains(item_id) {
+            return Err(CounterfactualError::RetainedTreatmentMissingItem { item_id: *item_id });
+        }
+        if evicted_set.contains(item_id) {
+            return Err(CounterfactualError::EvictedTreatmentStillContainsItem { item_id: *item_id });
+        }
+    }
+
+    let retained_without_intervention: BTreeSet<_> =
+        retained_set.difference(&intervention).copied().collect();
+    if retained_without_intervention != evicted_set {
+        return Err(CounterfactualError::TreatmentDiffersByUnexpectedItems);
+    }
+
+    Ok(CounterfactualEffect {
+        episode_id: retained.context.episode_id,
+        intervention_item_ids: intervention.into_iter().collect(),
+        retained_run_id: retained.run_id,
+        evicted_run_id: evicted.run_id,
+        delta_evict_minus_retain: ExposureDelta {
+            wrong_belief_us: i128::from(evicted.outcome.wrong_belief_us)
+                - i128::from(retained.outcome.wrong_belief_us),
+            abstention_us: i128::from(evicted.outcome.abstention_us)
+                - i128::from(retained.outcome.abstention_us),
+            missing_output_us: i128::from(evicted.outcome.missing_output_us)
+                - i128::from(retained.outcome.missing_output_us),
+        },
+    })
+}
+
+/// Exhaustively evaluate all subsets for at most 16 items. Each supplied run
+/// must use the same task, future stream, model, initial state, candidate
+/// feature snapshot and resource envelope. This is an evaluator-only
+/// clairvoyant upper bound, never a candidate policy.
+pub fn qualify_exact_subsets(
+    items: &[MemoryItem],
+    runs: &[CounterfactualRun],
+    candidate_selected_item_ids: &[u64],
+) -> Result<ExactSubsetQualification, CounterfactualError> {
+    validate_item_registry(items)?;
+    if items.len() > MAX_EXHAUSTIVE_ITEMS {
+        return Err(CounterfactualError::TooManyItems {
+            requested: items.len(),
+            maximum: MAX_EXHAUSTIVE_ITEMS,
+        });
+    }
+    let expected = 1_usize
+        .checked_shl(u32::try_from(items.len()).map_err(|_| CounterfactualError::ArithmeticOverflow)?)
+        .ok_or(CounterfactualError::ArithmeticOverflow)?;
+    if runs.len() != expected {
+        return Err(CounterfactualError::IncompleteSubsetEnumeration {
+            expected,
+            actual: runs.len(),
+        });
+    }
+
+    let mut ordered_items = items.to_vec();
+    ordered_items.sort_by_key(|item| item.item_id);
+    let item_index: BTreeMap<u64, usize> = ordered_items
+        .iter()
+        .enumerate()
+        .map(|(index, item)| (item.item_id, index))
+        .collect();
+
+    let mut by_mask = BTreeMap::<u64, SubsetSummary>::new();
+    let mut context_reference: Option<&EpisodeContext> = None;
+    let mut run_ids = BTreeSet::new();
+
+    for run in runs {
+        validate_run(items, run)?;
+        if let Some(reference) = context_reference {
+            if reference != &run.context {
+                return Err(CounterfactualError::ContextMismatch);
+            }
+        } else {
+            context_reference = Some(&run.context);
+        }
+        if !run_ids.insert(run.run_id) {
+            return Err(CounterfactualError::RunIdCollision { run_id: run.run_id });
+        }
+
+        let mut mask = 0_u64;
+        for item_id in &run.selected_item_ids {
+            let index = *item_index
+                .get(item_id)
+                .ok_or(CounterfactualError::UnknownSelectedItem { item_id: *item_id })?;
+            mask |= 1_u64 << index;
+        }
+        let summary = SubsetSummary {
+            subset_mask: mask,
+            selected_item_ids: run.selected_item_ids.clone(),
+            bytes_used: run.bytes_used,
+            outcome: run.outcome,
+        };
+        if by_mask.insert(mask, summary).is_some() {
+            return Err(CounterfactualError::DuplicateSubset { mask });
+        }
+    }
+
+    for mask in 0..u64::try_from(expected).map_err(|_| CounterfactualError::ArithmeticOverflow)? {
+        if !by_mask.contains_key(&mask) {
+            return Err(CounterfactualError::MissingSubset { mask });
+        }
+    }
+
+    let candidate_set = sorted_unique_set(candidate_selected_item_ids)?;
+    let candidate_mask = mask_for_set(&candidate_set, &item_index)?;
+    let candidate = by_mask
+        .get(&candidate_mask)
+        .ok_or(CounterfactualError::CandidateSubsetMissing)?;
+
+    let summaries: Vec<_> = by_mask.values().cloned().collect();
+    let best_wrong_belief = choose_minimum(&summaries, |o| o.wrong_belief_us);
+    let best_abstention = choose_minimum(&summaries, |o| o.abstention_us);
+    let best_missing_output = choose_minimum(&summaries, |o| o.missing_output_us);
+    let pareto_frontier = pareto_frontier(&summaries);
+
+    Ok(ExactSubsetQualification {
+        candidate_regret: SubsetRegret {
+            wrong_belief_us: candidate.outcome.wrong_belief_us
+                .saturating_sub(best_wrong_belief.outcome.wrong_belief_us),
+            abstention_us: candidate.outcome.abstention_us
+                .saturating_sub(best_abstention.outcome.abstention_us),
+            missing_output_us: candidate.outcome.missing_output_us
+                .saturating_sub(best_missing_output.outcome.missing_output_us),
+        },
+        pareto_frontier,
+        best_wrong_belief,
+        best_abstention,
+        best_missing_output,
+        evaluated_subset_count: summaries.len(),
+    })
+}
+
+fn validate_item_registry(items: &[MemoryItem]) -> Result<(), CounterfactualError> {
+    let mut seen = BTreeSet::new();
+    for item in items {
+        if !seen.insert(item.item_id) {
+            return Err(CounterfactualError::DuplicateItemId { item_id: item.item_id });
+        }
+        if item.bytes == 0 {
+            return Err(CounterfactualError::ZeroItemSize { item_id: item.item_id });
+        }
+    }
+    Ok(())
+}
+
+fn validate_run(
+    items: &[MemoryItem],
+    run: &CounterfactualRun,
+) -> Result<(), CounterfactualError> {
+    let selected = sorted_unique_set(&run.selected_item_ids)?;
+    let by_id: BTreeMap<_, _> = items.iter().map(|item| (item.item_id, item.bytes)).collect();
+    let mut computed = 0_u64;
+    for item_id in &selected {
+        let bytes = *by_id
+            .get(item_id)
+            .ok_or(CounterfactualError::UnknownSelectedItem { item_id: *item_id })?;
+        computed = computed
+            .checked_add(bytes)
+            .ok_or(CounterfactualError::ArithmeticOverflow)?;
+    }
+    if run.bytes_used != computed {
+        return Err(CounterfactualError::ByteCountMismatch {
+            reported: run.bytes_used,
+            computed,
+        });
+    }
+    if run.bytes_used > run.context.byte_budget {
+        return Err(CounterfactualError::OutOfBudget {
+            used: run.bytes_used,
+            budget: run.context.byte_budget,
+        });
+    }
+    run.outcome.validate(run.context.total_exposure_us)?;
+    Ok(())
+}
+
+fn validate_same_context(
+    left: &CounterfactualRun,
+    right: &CounterfactualRun,
+) -> Result<(), CounterfactualError> {
+    if left.context != right.context {
+        return Err(CounterfactualError::ContextMismatch);
+    }
+    if left.run_id == right.run_id {
+        return Err(CounterfactualError::RunIdCollision { run_id: left.run_id });
+    }
+    Ok(())
+}
+
+fn sorted_unique_set(values: &[u64]) -> Result<BTreeSet<u64>, CounterfactualError> {
+    if values.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err(CounterfactualError::UnsortedOrDuplicateSelection);
+    }
+    Ok(values.iter().copied().collect())
+}
+
+fn mask_for_set(
+    values: &BTreeSet<u64>,
+    item_index: &BTreeMap<u64, usize>,
+) -> Result<u64, CounterfactualError> {
+    let mut mask = 0_u64;
+    for item_id in values {
+        let index = *item_index
+            .get(item_id)
+            .ok_or(CounterfactualError::UnknownSelectedItem { item_id: *item_id })?;
+        mask |= 1_u64 << index;
+    }
+    Ok(mask)
+}
+
+fn choose_minimum(
+    summaries: &[SubsetSummary],
+    selector: impl Fn(ExposureOutcome) -> u64,
+) -> SubsetSummary {
+    summaries
+        .iter()
+        .min_by(|left, right| {
+            selector(left.outcome)
+                .cmp(&selector(right.outcome))
+                .then_with(|| left.bytes_used.cmp(&right.bytes_used))
+                .then_with(|| left.selected_item_ids.cmp(&right.selected_item_ids))
+        })
+        .expect("exact subset enumeration is non-empty")
+        .clone()
+}
+
+fn pareto_frontier(summaries: &[SubsetSummary]) -> Vec<SubsetSummary> {
+    let mut frontier = summaries
+        .iter()
+        .filter(|candidate| {
+            !summaries.iter().any(|other| {
+                other.subset_mask != candidate.subset_mask
+                    && dominates(other.outcome, candidate.outcome)
+            })
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    frontier.sort_by(|left, right| {
+        left.outcome
+            .wrong_belief_us
+            .cmp(&right.outcome.wrong_belief_us)
+            .then_with(|| left.outcome.abstention_us.cmp(&right.outcome.abstention_us))
+            .then_with(|| left.outcome.missing_output_us.cmp(&right.outcome.missing_output_us))
+            .then_with(|| left.bytes_used.cmp(&right.bytes_used))
+            .then_with(|| left.selected_item_ids.cmp(&right.selected_item_ids))
+    });
+    frontier
+}
+
+fn dominates(left: ExposureOutcome, right: ExposureOutcome) -> bool {
+    let no_worse = left.wrong_belief_us <= right.wrong_belief_us
+        && left.abstention_us <= right.abstention_us
+        && left.missing_output_us <= right.missing_output_us;
+    let strictly_better = left.wrong_belief_us < right.wrong_belief_us
+        || left.abstention_us < right.abstention_us
+        || left.missing_output_us < right.missing_output_us;
+    no_worse && strictly_better
+}
+
+fn main() {
+    println!(
+        "Evaluator-only counterfactual primitives. No candidate, hidden task or oracle data was loaded."
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn context() -> EpisodeContext {
+        EpisodeContext {
+            episode_id: 42,
+            task_sha256: [1; 32],
+            future_stream_sha256: [2; 32],
+            model_sha256: [3; 32],
+            initial_state_sha256: [4; 32],
+            candidate_feature_sha256: [5; 32],
+            total_exposure_us: 100,
+            byte_budget: 10,
+            compute_budget: 1_000,
+            refresh_budget: 20,
+            observation_budget: 30,
+        }
+    }
+
+    fn run(
+        run_id: u64,
+        selected_item_ids: Vec<u64>,
+        bytes_used: u64,
+        outcome: ExposureOutcome,
+    ) -> CounterfactualRun {
+        CounterfactualRun {
+            context: context(),
+            run_id,
+            selected_item_ids,
+            bytes_used,
+            outcome,
+        }
+    }
+
+    fn registry() -> Vec<MemoryItem> {
+        vec![
+            MemoryItem { item_id: 10, bytes: 2 },
+            MemoryItem { item_id: 20, bytes: 3 },
+        ]
+    }
+
+    #[test]
+    fn paired_single_item_retention_reports_componentwise_debt_reduction() {
+        let retained = run(1, vec![10], 2, ExposureOutcome {
+            wrong_belief_us: 2,
+            abstention_us: 3,
+            missing_output_us: 1,
+        });
+        let evicted = run(2, vec![], 0, ExposureOutcome {
+            wrong_belief_us: 10,
+            abstention_us: 5,
+            missing_output_us: 4,
+        });
+        let effect = evaluate_paired_intervention(&registry(), &retained, &evicted, &[10]).unwrap();
+        assert_eq!(effect.delta_evict_minus_retain, ExposureDelta {
+            wrong_belief_us: 8,
+            abstention_us: 2,
+            missing_output_us: 3,
+        });
+    }
+
+    #[test]
+    fn paired_intervention_rejects_different_future_stream() {
+        let retained = run(1, vec![10], 2, ExposureOutcome::default());
+        let mut evicted = run(2, vec![], 0, ExposureOutcome::default());
+        evicted.context.future_stream_sha256 = [9; 32];
+        assert_eq!(
+            evaluate_paired_intervention(&registry(), &retained, &evicted, &[10]),
+            Err(CounterfactualError::ContextMismatch)
+        );
+    }
+
+    #[test]
+    fn paired_intervention_rejects_other_selection_differences() {
+        let retained = run(1, vec![10, 20], 5, ExposureOutcome::default());
+        let evicted = run(2, vec![], 0, ExposureOutcome::default());
+        assert_eq!(
+            evaluate_paired_intervention(&registry(), &retained, &evicted, &[10]),
+            Err(CounterfactualError::TreatmentDiffersByUnexpectedItems)
+        );
+    }
+
+    #[test]
+    fn exact_subset_oracle_reports_separate_component_optima_and_regret() {
+        let items = registry();
+        let runs = vec![
+            run(0, vec![], 0, ExposureOutcome { wrong_belief_us: 10, abstention_us: 8, missing_output_us: 6 }),
+            run(1, vec![10], 2, ExposureOutcome { wrong_belief_us: 4, abstention_us: 8, missing_output_us: 5 }),
+            run(2, vec![20], 3, ExposureOutcome { wrong_belief_us: 7, abstention_us: 2, missing_output_us: 4 }),
+            run(3, vec![10, 20], 5, ExposureOutcome { wrong_belief_us: 3, abstention_us: 3, missing_output_us: 1 }),
+        ];
+        let result = qualify_exact_subsets(&items, &runs, &[10]).unwrap();
+        assert_eq!(result.evaluated_subset_count, 4);
+        assert_eq!(result.best_wrong_belief.selected_item_ids, vec![10, 20]);
+        assert_eq!(result.best_abstention.selected_item_ids, vec![20]);
+        assert_eq!(result.best_missing_output.selected_item_ids, vec![10, 20]);
+        assert_eq!(result.candidate_regret, SubsetRegret {
+            wrong_belief_us: 1,
+            abstention_us: 6,
+            missing_output_us: 4,
+        });
+    }
+
+    #[test]
+    fn exact_subset_oracle_rejects_incomplete_enumeration() {
+        let runs = vec![run(0, vec![], 0, ExposureOutcome::default())];
+        assert_eq!(
+            qualify_exact_subsets(&registry(), &runs, &[]),
+            Err(CounterfactualError::IncompleteSubsetEnumeration { expected: 4, actual: 1 })
+        );
+    }
+
+    #[test]
+    fn pareto_frontier_keeps_tradeoffs_and_removes_dominated_subsets() {
+        let items = registry();
+        let runs = vec![
+            run(0, vec![], 0, ExposureOutcome { wrong_belief_us: 8, abstention_us: 8, missing_output_us: 8 }),
+            run(1, vec![10], 2, ExposureOutcome { wrong_belief_us: 2, abstention_us: 7, missing_output_us: 7 }),
+            run(2, vec![20], 3, ExposureOutcome { wrong_belief_us: 7, abstention_us: 2, missing_output_us: 7 }),
+            run(3, vec![10, 20], 5, ExposureOutcome { wrong_belief_us: 1, abstention_us: 1, missing_output_us: 1 }),
+        ];
+        let result = qualify_exact_subsets(&items, &runs, &[10]).unwrap();
+        assert_eq!(result.pareto_frontier.len(), 1);
+        assert_eq!(result.pareto_frontier[0].selected_item_ids, vec![10, 20]);
+    }
+
+    #[test]
+    fn group_intervention_captures_nonadditive_memory_interaction() {
+        let retained = run(1, vec![10, 20], 5, ExposureOutcome {
+            wrong_belief_us: 2,
+            abstention_us: 0,
+            missing_output_us: 0,
+        });
+        let evicted = run(2, vec![], 0, ExposureOutcome {
+            wrong_belief_us: 7,
+            abstention_us: 0,
+            missing_output_us: 0,
+        });
+        let effect = evaluate_paired_intervention(&registry(), &retained, &evicted, &[10, 20]).unwrap();
+        assert_eq!(effect.delta_evict_minus_retain.wrong_belief_us, 5);
+    }
+
+    #[test]
+    fn over_budget_and_inconsistent_exposure_are_rejected() {
+        let mut over_budget = run(1, vec![10, 20], 5, ExposureOutcome::default());
+        over_budget.context.byte_budget = 4;
+        assert!(matches!(
+            validate_run(&registry(), &over_budget),
+            Err(CounterfactualError::OutOfBudget { .. })
+        ));
+        let invalid = run(2, vec![], 0, ExposureOutcome {
+            wrong_belief_us: 80,
+            abstention_us: 20,
+            missing_output_us: 1,
+        });
+        assert!(matches!(
+            validate_run(&registry(), &invalid),
+            Err(CounterfactualError::ExposureExceedsEpisode { .. })
+        ));
+    }
+
+    #[test]
+    fn duplicate_item_and_selection_ids_fail_closed() {
+        let duplicate_registry = vec![
+            MemoryItem { item_id: 1, bytes: 1 },
+            MemoryItem { item_id: 1, bytes: 2 },
+        ];
+        assert_eq!(
+            validate_item_registry(&duplicate_registry),
+            Err(CounterfactualError::DuplicateItemId { item_id: 1 })
+        );
+        let invalid_selection = run(1, vec![20, 10], 5, ExposureOutcome::default());
+        assert_eq!(
+            validate_run(&registry(), &invalid_selection),
+            Err(CounterfactualError::UnsortedOrDuplicateSelection)
+        );
+    }
+}
