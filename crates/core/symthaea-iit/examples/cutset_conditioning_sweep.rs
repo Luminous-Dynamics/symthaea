@@ -102,7 +102,8 @@ fn run() -> Result<(), String> {
         let eliminate = (0..variables)
             .filter(|variable| *variable != retained)
             .collect::<Vec<_>>();
-        let cutset = (side..(2 * side)).collect::<Vec<_>>();
+        let cutset_start = (side / 2) * side;
+        let cutset = (cutset_start..cutset_start + side).collect::<Vec<_>>();
         let branch_budget = 1usize << cutset.len();
 
         let baseline = min_fill_log_sum_product(
