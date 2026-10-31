@@ -1119,6 +1119,9 @@ mod tests {
     fn decision_change_metrics_capture_beneficial_and_harmful_outcomes() {
         let summary = evaluate_strategy(Strategy::Evoi, 4_242, 2, 1, 0.0, 0.0);
         assert!((0.0..=1.0).contains(&summary.mean_decision_flip_fraction));
+        assert!(summary.mean_decision_flip_fraction > 0.0);
+        assert!(summary.mean_decision_gain_vs_no_probe > 0.0);
+        assert!(summary.beneficial_flip_fraction > summary.harmful_flip_fraction);
         assert!(summary.beneficial_flip_fraction + summary.harmful_flip_fraction <= 1.0 + 1e-12);
         assert!(summary.mean_authorization_blocked_candidates > 0.0);
         assert!(summary.mean_posterior_safety_blocked_candidates >= 0.0);
