@@ -115,7 +115,6 @@ pub fn reconcile_mechanism_matched_campaign(
     let mut charged_budget_by_policy_microunits = BTreeMap::new();
     let mut candidate_records = BTreeMap::<String, CandidateRecord>::new();
     let mut proposal_records = BTreeMap::<String, ProposalRecord>::new();
-    let mut first_contract: Option<CommonContract<'_>> = None;
     let mut common_contract_sha256: Option<String> = None;
     let mut campaign_id: Option<String> = None;
     let mut all_execution_schedules_complete = true;
@@ -203,7 +202,6 @@ pub fn reconcile_mechanism_matched_campaign(
             }
         } else {
             common_contract_sha256 = Some(contract_sha);
-            first_contract = Some(contract);
         }
 
         for (event_index, envelope) in tape.events().iter().enumerate() {
@@ -275,9 +273,6 @@ pub fn reconcile_mechanism_matched_campaign(
             }
         }
     }
-
-    // Ensure we do not retain an otherwise-unused borrow of the first contract.
-    let _ = first_contract;
 
     let policy_count = policy_ids.len();
     let shared_candidate_identity_count = candidate_records
@@ -364,6 +359,24 @@ mod tests {
         score: f64,
         unknown_wall_time: bool,
     ) -> EventTape {
+        policy_tape_with_budget_model(
+            policy_id,
+            algorithm_id,
+            config_value,
+            score,
+            unknown_wall_time,
+            H2,
+        )
+    }
+
+    fn policy_tape_with_budget_model(
+        policy_id: &str,
+        algorithm_id: &str,
+        config_value: serde_json::Value,
+        score: f64,
+        unknown_wall_time: bool,
+        budget_model_sha256: &str,
+    ) -> EventTape {
         let config_sha256 = digest(&config_value);
         let header = EventTapeHeader {
             schema: "symthaea.ar5b4.event-tape".to_owned(),
@@ -379,7 +392,7 @@ mod tests {
             evaluator_sha256: H5.to_owned(),
             verifier_sha256: H1.to_owned(),
             budget_model_id: "microcost-v1".to_owned(),
-            budget_model_sha256: H2.to_owned(),
+            budget_model_sha256: budget_model_sha256.to_owned(),
             budget_limit_microunits: 1000,
             initial_direction_ids: vec!["A".to_owned()],
             execution: ExecutionContract {
@@ -492,8 +505,14 @@ mod tests {
     #[test]
     fn mismatched_budget_model_is_rejected() {
         let left = policy_tape("board", "board-build-1", json!({"alpha": 0.5}), 0.91, false);
-        let mut right = policy_tape("thompson", "thompson-build-1", json!({"prior": 1.0}), 0.91, false);
-        right.header_mut_for_test();
+        let right = policy_tape_with_budget_model(
+            "thompson",
+            "thompson-build-1",
+            json!({"prior": 1.0}),
+            0.91,
+            false,
+            H3,
+        );
         assert!(reconcile_mechanism_matched_campaign(&[left, right]).is_err());
     }
 }
