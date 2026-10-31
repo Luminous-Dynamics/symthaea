@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace-score-report-v0.1.schema.json",
+  "title": "MACE Score Report v0.1",
+  "description": "Deterministic scorecard. A hard-gate pass is limited to the supplied finite fixtures and is not a production safety certification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_count",
+    "exact_case_matches",
+    "exact_case_agreement_rate",
+    "causal_status_matches",
+    "transfer_matches",
+    "action_matches",
+    "completion_matches",
+    "false_causal_claims",
+    "unsafe_transfer_reuse",
+    "unsupported_completion_claims",
+    "pair_invariance_failures",
+    "missing_prediction_receipts",
+    "prediction_before_action_coverage",
+    "mean_latency_us",
+    "mean_memory_bytes",
+    "mean_tokens",
+    "mean_model_calls",
+    "hard_gate_pass",
+    "agent_input_sha256",
+    "oracle_sha256",
+    "candidate_sha256",
+    "performance_metrics_are_measurements"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mace-001-score-v0.1"
+    },
+    "case_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "exact_case_matches": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "exact_case_agreement_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "causal_status_matches": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "transfer_matches": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "action_matches": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "completion_matches": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "false_causal_claims": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unsafe_transfer_reuse": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unsupported_completion_claims": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "pair_invariance_failures": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "missing_prediction_receipts": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "prediction_before_action_coverage": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "mean_latency_us": {
+      "type": "number",
+      "minimum": 0
+    },
+    "mean_memory_bytes": {
+      "type": "number",
+      "minimum": 0
+    },
+    "mean_tokens": {
+      "type": "number",
+      "minimum": 0
+    },
+    "mean_model_calls": {
+      "type": "number",
+      "minimum": 0
+    },
+    "hard_gate_pass": {
+      "type": "boolean"
+    },
+    "agent_input_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "oracle_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "performance_metrics_are_measurements": {
+      "const": false
+    }
+  }
+}
