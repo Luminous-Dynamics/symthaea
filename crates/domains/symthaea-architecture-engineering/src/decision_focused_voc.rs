@@ -196,6 +196,20 @@ pub fn plan_decision_focused_voc(
     validate_manifest(manifest)?;
     validate_posterior(posterior)?;
     validate_config(config, posterior.candidate_ids.len())?;
+    if compute_posterior_model_sha256(posterior) != manifest.posterior_model_sha256 {
+        return Err(DecisionFocusedVoCError::new(
+            "posterior_model_sha256",
+            "manifest digest does not match the exact posterior particle set",
+        ));
+    }
+    if compute_observation_likelihood_model_sha256(actions, posterior)
+        != manifest.observation_likelihood_model_sha256
+    {
+        return Err(DecisionFocusedVoCError::new(
+            "observation_likelihood_model_sha256",
+            "manifest digest does not match the exact candidate action likelihood models",
+        ));
+    }
 
     if posterior.candidate_ids.len() < config.target_k {
         return Err(DecisionFocusedVoCError::new(
@@ -551,6 +565,21 @@ fn validate_action(
             "at least one possible observation outcome is required",
         ));
     }
+    if action.kind == VoCActionKind::SentinelAudit
+        && action.observation_outcomes.iter().any(|outcome| {
+            !matches!(
+                outcome.outcome_id.as_str(),
+                "continue_pruning"
+                    | "disable_pruning_insufficient_audit"
+                    | "disable_pruning_observed_risk"
+            )
+        })
+    {
+        return Err(DecisionFocusedVoCError::new(
+            format!("actions[{index}].observation_outcomes"),
+            "sentinel audit outcomes must be aggregate pruning dispositions, never candidate-level observations",
+        ));
+    }
     let particle_count = posterior.particles.len();
     let mut outcome_ids = HashSet::with_capacity(action.observation_outcomes.len());
     let mut sums = vec![0.0; particle_count];
@@ -742,6 +771,75 @@ fn approximately_equal(left: f64, right: f64) -> bool {
     (left - right).abs() <= 1e-10 * left.abs().max(right.abs()).max(1.0)
 }
 
+/// Compute the canonical digest for a joint posterior over final candidate utilities.
+pub fn compute_posterior_model_sha256(posterior: &PosteriorModel) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea.nas.final-performance-posterior.v0.1");
+    let mut candidate_indices: Vec<usize> = (0..posterior.candidate_ids.len()).collect();
+    candidate_indices.sort_by(|left, right| {
+        posterior.candidate_ids[*left].cmp(&posterior.candidate_ids[*right])
+    });
+    let mut particle_indices: Vec<usize> = (0..posterior.particles.len()).collect();
+    particle_indices.sort_by(|left, right| {
+        posterior.particles[*left].particle_id.cmp(&posterior.particles[*right].particle_id)
+    });
+    hasher.update((candidate_indices.len() as u64).to_be_bytes());
+    for index in &candidate_indices {
+        update_string(&mut hasher, &posterior.candidate_ids[*index]);
+    }
+    hasher.update((particle_indices.len() as u64).to_be_bytes());
+    for particle_index in particle_indices {
+        let particle = &posterior.particles[particle_index];
+        update_string(&mut hasher, &particle.particle_id);
+        hasher.update(particle.probability.to_bits().to_be_bytes());
+        for candidate_index in &candidate_indices {
+            hasher.update(particle.final_values[*candidate_index].to_bits().to_be_bytes());
+        }
+    }
+    hex_digest(hasher.finalize().as_slice())
+}
+
+/// Compute a canonical digest over all candidate actions and their discrete observation
+/// likelihoods. The posterior particle IDs are included so likelihood-vector positions cannot
+/// silently refer to a different particle ordering.
+pub fn compute_observation_likelihood_model_sha256(
+    actions: &[VoCAction],
+    posterior: &PosteriorModel,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea.nas.observation-likelihood-model.v0.1");
+    let mut action_indices: Vec<usize> = (0..actions.len()).collect();
+    action_indices.sort_by(|left, right| actions[*left].action_id.cmp(&actions[*right].action_id));
+    let mut particle_indices: Vec<usize> = (0..posterior.particles.len()).collect();
+    particle_indices.sort_by(|left, right| {
+        posterior.particles[*left].particle_id.cmp(&posterior.particles[*right].particle_id)
+    });
+    hasher.update((action_indices.len() as u64).to_be_bytes());
+    for action_index in action_indices {
+        let action = &actions[action_index];
+        update_string(&mut hasher, &action.action_id);
+        hasher.update([action_kind_tag(action.kind)]);
+        update_optional_string(&mut hasher, action.candidate_id.as_deref());
+        update_string(&mut hasher, &action.resource_unit);
+        hasher.update(action.incremental_cost_units.to_be_bytes());
+        update_string(&mut hasher, &action.source_artifact_sha256);
+        update_string(&mut hasher, &action.posterior_model_sha256);
+        let mut outcomes: Vec<&ObservationLikelihood> =
+            action.observation_outcomes.iter().collect();
+        outcomes.sort_by(|left, right| left.outcome_id.cmp(&right.outcome_id));
+        hasher.update((outcomes.len() as u64).to_be_bytes());
+        for outcome in outcomes {
+            update_string(&mut hasher, &outcome.outcome_id);
+            for particle_index in &particle_indices {
+                hasher.update(
+                    outcome.likelihood_by_particle[*particle_index].to_bits().to_be_bytes(),
+                );
+            }
+        }
+    }
+    hex_digest(hasher.finalize().as_slice())
+}
+
 fn digest_plan(
     manifest: &DecisionFocusedVoCModelManifest,
     posterior: &PosteriorModel,
@@ -756,6 +854,16 @@ fn digest_plan(
     update_string(&mut hasher, &manifest.benchmark_id);
     update_string(&mut hasher, &manifest.target_metric_id);
     update_string(&mut hasher, &manifest.evaluation_task_id);
+    hasher.update([match manifest.metric_direction {
+        MetricDirection::Maximize => 0,
+        MetricDirection::Minimize => 1,
+    }]);
+    let mut calibration_tasks: Vec<&String> = manifest.calibration_task_ids.iter().collect();
+    calibration_tasks.sort();
+    for task_id in calibration_tasks {
+        update_string(&mut hasher, task_id);
+    }
+    hasher.update([u8::from(manifest.task_calibration_qualified)]);
     update_string(&mut hasher, &manifest.source_artifact_sha256);
     update_string(&mut hasher, &manifest.posterior_model_sha256);
     update_string(&mut hasher, &manifest.observation_likelihood_model_sha256);
@@ -773,20 +881,7 @@ fn digest_plan(
         hasher.update([action_kind_tag(spend.kind)]);
         hasher.update(spend.spent_units.to_be_bytes());
     }
-    let mut candidates: Vec<&String> = posterior.candidate_ids.iter().collect();
-    candidates.sort();
-    for candidate in candidates {
-        update_string(&mut hasher, candidate);
-    }
-    let mut particles: Vec<&FinalPerformanceParticle> = posterior.particles.iter().collect();
-    particles.sort_by(|left, right| left.particle_id.cmp(&right.particle_id));
-    for particle in particles {
-        update_string(&mut hasher, &particle.particle_id);
-        hasher.update(particle.probability.to_bits().to_be_bytes());
-        for value in &particle.final_values {
-            hasher.update(value.to_bits().to_be_bytes());
-        }
-    }
+    update_string(&mut hasher, &compute_posterior_model_sha256(posterior));
     for evaluation in evaluations {
         update_string(&mut hasher, &evaluation.action_id);
         hasher.update([action_kind_tag(evaluation.kind)]);
@@ -1040,6 +1135,16 @@ mod tests {
         let mut action = query_action("audit", "A", 1);
         action.kind = VoCActionKind::SentinelAudit;
         action.candidate_id = None;
+        action.observation_outcomes = vec![
+            ObservationLikelihood {
+                outcome_id: "continue_pruning".to_owned(),
+                likelihood_by_particle: vec![0.9, 0.1],
+            },
+            ObservationLikelihood {
+                outcome_id: "disable_pruning_observed_risk".to_owned(),
+                likelihood_by_particle: vec![0.1, 0.9],
+            },
+        ];
         let plan = plan_decision_focused_voc(&manifest(), &posterior(), &[action], &config()).unwrap();
         assert_eq!(plan.selected_action_id.as_deref(), Some("audit"));
     }
