@@ -4,6 +4,8 @@ This is a separate, evaluator-side Rust package for paired retain/evict effects 
 
 The current source provides:
 
+- seeded, reproducible retain-first / evict-first order assignment using evaluator-held randomness (SplitMix64 for reproducibility only; not cryptographic secrecy);
+
 - paired intervention checks that require identical episode/task/future-stream/model/initial-state/candidate-feature digests and identical byte/compute/refresh/observation budgets;
 - componentwise wrong-belief, abstention and missing-output exposure differences;
 - group interventions to expose non-additive memory interactions;
