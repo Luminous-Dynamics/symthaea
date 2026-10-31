@@ -16,6 +16,7 @@ hardsec-adaptive-evasion-audit = []
 hardsec-benchmark-plan-audit = []
 hardsec-pmu-metrology-audit = []
 hardsec-context-sequential-monitor = []
+hardsec-context-cctm-monitor = []
 
 [dependencies]
 serde_json = "=1.0.150"
@@ -40,3 +41,8 @@ required-features = ["hardsec-pmu-metrology-audit"]
 name = "hardsec_context_sequential_monitor"
 path = "../../examples/hardsec_context_sequential_monitor.rs"
 required-features = ["hardsec-context-sequential-monitor"]
+
+[[example]]
+name = "hardsec_context_cctm_monitor"
+path = "../../examples/hardsec_context_cctm_monitor.rs"
+required-features = ["hardsec-context-cctm-monitor"]
