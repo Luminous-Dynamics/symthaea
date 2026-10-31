@@ -1,0 +1,89 @@
+{
+  "schema_version": "cmaq-011-external-baseline-lock-v0.1",
+  "baseline_id": "wimle",
+  "name": "WIMLE: Uncertainty-Aware World Models with IMLE for Sample-Efficient Continuous Control",
+  "paper_url": "https://arxiv.org/abs/2602.14351",
+  "project_url": "https://mehranagh20.github.io/wimle/",
+  "repository_url": "https://github.com/mehranagh20/wimle",
+  "source_commit": "be730d6e7cd1538ca5519b8f505feff126b92938",
+  "source_commit_url": "https://github.com/mehranagh20/wimle/commit/be730d6e7cd1538ca5519b8f505feff126b92938",
+  "source_commit_date": "2026-04-01T22:26:51Z",
+  "license": "MIT",
+  "algorithm_type": "stochastic multi-modal IMLE world-model ensemble; uncertainty-weighted synthetic transitions for model-based continuous control",
+  "reported_coverage": "40 continuous-control tasks across DeepMind Control Suite, HumanoidBench and MyoSuite",
+  "source_files": {
+    "task_matrix": {
+      "path": "scripts/train.sh",
+      "blob_sha": "5832c400cad81f993e2d135a83767e922f23e40b"
+    },
+    "dmc_adapter": {
+      "path": "jaxrl/envs/dmc_gym.py",
+      "blob_sha": "9a6130775c864e8912c83b0cb2b77d4aa7cba7ae"
+    },
+    "dmc_requirements": {
+      "path": "requirements_dmc.txt",
+      "blob_sha": "4128147bdcad72f3997c8f9a822442242d5bb5b3"
+    },
+    "training_entrypoint": {
+      "path": "train_parallel.py",
+      "blob_sha": "0fb459c176abda0be7a33e908269199b69ad199c"
+    }
+  },
+  "dmc_task_names": [
+    "acrobot-swingup",
+    "cheetah-run",
+    "dog-run",
+    "dog-stand",
+    "dog-trot",
+    "dog-walk",
+    "finger-turn_hard",
+    "fish-swim",
+    "hopper-hop",
+    "humanoid-run",
+    "humanoid-stand",
+    "humanoid-walk",
+    "pendulum-swingup",
+    "quadruped-run",
+    "reacher-hard",
+    "walker-run"
+  ],
+  "shared_mrsq_dmc_tasks": [
+    "Dmc-dog-run",
+    "Dmc-dog-stand",
+    "Dmc-dog-trot",
+    "Dmc-dog-walk",
+    "Dmc-humanoid-run",
+    "Dmc-humanoid-walk",
+    "Dmc-humanoid-stand",
+    "Dmc-quadruped-run"
+  ],
+  "dmc_native_environment_semantics": {
+    "underlying_step_per_policy_action": 1,
+    "episode_limit_policy_actions": 1000,
+    "action_wrapper": "Gym RescaleAction to [-1, 1]",
+    "observation_wrappers": [
+      "FlattenObservation for Dict observations",
+      "SinglePrecision"
+    ],
+    "reward_per_policy_action": "single dm_control suite step reward"
+  },
+  "training_horizon_overrides": {
+    "quadruped-run": 2,
+    "humanoid-run": 6,
+    "dog-run": 6
+  },
+  "upstream_result_artifacts": {
+    "results_csv": "results/wimle.csv",
+    "results_pickle": "results/wimle.pkl",
+    "per_suite_arrays": "results/np_results/{dmc,hb,myo}/",
+    "evaluation_points": 100,
+    "environment_step_spacing": 10000,
+    "total_training_steps": 1000000
+  },
+  "reproduction_policy": {
+    "status": "external_reference_only_not_reproduced",
+    "requirements": "Pin the source revision, task, model/config, JAX/CUDA stack, DMC package, exact environment seed manifest and wrapper stack. Treat result arrays as author-supplied reference artifacts, not a local reproduction.",
+    "no_vendoring": "Keep WIMLE as an isolated external runtime; the Symthaea harness consumes verified run artifacts."
+  },
+  "claim_ceiling": "Upstream code/results pinned for reproduction planning; no Symthaea reproduction or performance comparison."
+}
