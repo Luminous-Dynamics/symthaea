@@ -52,6 +52,8 @@ on:
       - "docs/neuroscience/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT_INPUT.schema.json"
       - "docs/neuroscience/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT_PROTOCOL_V1.md"
       - "docs/neuroscience/examples/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT.example.jsonl"
+      - "docs/neuroscience/CONNECTOME_DOMAIN_SPLIT_MANIFEST.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_PROOFREADING_DOMAIN_SPLIT.example.json"
       - "docs/neuroscience/examples/CONNECTOME_SPATIAL_FRAME_ELIGIBILITY_MASK.hex"
       - ".github/workflows/connectomics-intake-audit.yml"
   push:
@@ -106,6 +108,8 @@ on:
       - "docs/neuroscience/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT_INPUT.schema.json"
       - "docs/neuroscience/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT_PROTOCOL_V1.md"
       - "docs/neuroscience/examples/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT.example.jsonl"
+      - "docs/neuroscience/CONNECTOME_DOMAIN_SPLIT_MANIFEST.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_PROOFREADING_DOMAIN_SPLIT.example.json"
       - "docs/neuroscience/examples/CONNECTOME_SPATIAL_FRAME_ELIGIBILITY_MASK.hex"
       - ".github/workflows/connectomics-intake-audit.yml"
   workflow_dispatch:
@@ -125,5 +129,5 @@ jobs:
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Test intake, dataset lineage/modality cohorts, frozen-prediction scoring, domain-shift calibration/OOD cluster-bootstrap, query-impact, synaptic-completeness stopping, reviewer outcome, multi-rater, spatial-frame/mask, candidate-pool sampling, candidate-generation coverage, query-certificate, correction-portfolio, physical-arclength co-linear-boundary, and finite query-ensemble audits
+      - name: Test intake, dataset lineage/modality cohorts, frozen-prediction scoring, domain-shift calibration/OOD cluster-bootstrap and exact split-manifest membership/leakage, query-impact, synaptic-completeness stopping, reviewer outcome, multi-rater, spatial-frame/mask, candidate-pool sampling, candidate-generation coverage, query-certificate, correction-portfolio, physical-arclength co-linear-boundary, and finite query-ensemble audits
         run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml
