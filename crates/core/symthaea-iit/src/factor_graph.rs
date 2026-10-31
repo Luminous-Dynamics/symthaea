@@ -2226,7 +2226,7 @@ mod tests {
         assert_eq!(report.rejected_candidates.len(), 1);
         assert_eq!(report.rejected_candidates[0].candidate_index, 2);
         assert!(matches!(
-            report.rejected_candidates[0].error,
+            &report.rejected_candidates[0].error,
             FactorGraphError::CutsetAssignmentBudgetExceeded {
                 assignments: 32_768,
                 maximum: 1_024
@@ -2241,7 +2241,7 @@ mod tests {
         );
         assert_eq!(report.candidates[0].plan.predicted_peak_factor_entries(), 8);
 
-        assert_eq!(report.candidates[1].plan.cutset_variables(), &(4..12).collect::<Vec<_>>());
+        assert_eq!(report.candidates[1].plan.cutset_variables(), &[4, 5, 6, 7, 8, 9, 10, 11]);
         assert_eq!(report.candidates[1].plan.cutset_assignments(), 256);
         assert_eq!(
             report.candidates[1].plan.remaining_elimination_plan().induced_width,
