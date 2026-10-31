@@ -10,7 +10,9 @@
     "stream_id",
     "evaluation_group_id",
     "scoring_artifact_sha256",
-    "records"
+    "records",
+    "context_assignment_policy_id",
+    "context_assignment_artifact_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -81,6 +83,14 @@
           }
         }
       }
+    },
+    "context_assignment_policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "context_assignment_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
     }
   }
 }
