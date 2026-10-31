@@ -1,7 +1,7 @@
 # CMAQ-002: Active Causal Learning and Value of Information
 
-**Status:** small executable research prototype  
-**Version:** 0.1.0  
+**Status:** executable synthetic research benchmark v0.3  
+**Version:** report contract v0.3  
 **Validation:** source and test suite not yet Rust-compiled in this authoring environment  
 **Claim ceiling:** synthetic finite-hypothesis benchmark only; no SOTA or real-world causal-reasoning claim
 
@@ -22,7 +22,7 @@ Each mechanism yields deterministic reward and safety outcomes for three actions
 ## Run
 
     cargo test --locked
-    cargo run --locked -- --seed 4242 --probe-budget 2 --decision-horizon 1 --probe-cost 0.25
+    cargo run --locked -- --seed 4242 --probe-budget 2 --decision-horizon 1 --probe-cost 0.25 --allocator-cost 0.001
 
 The CLI prints a deterministic JSON report comparing no probe, fixed probes, seeded random probes, maximum expected information gain, expected value of information (EVoI), and an evaluator-only oracle that knows the true mechanism. The `--decision-horizon N` option (default 1) is the number of downstream decision rounds that can reuse the learned mechanism. EVoI buys a probe only when expected per-round decision improvement multiplied by this horizon exceeds probe cost; reported probe costs are amortized over the same horizon. This explicitly models information reuse rather than treating every problem as one-shot. The report also includes an open-class control: three evaluator-only parity mechanisms that the candidate catalog does not contain, with the number of probes required before the posterior becomes inconsistent with every candidate hypothesis. A separate Python mirror of the small finite-state equations produced a preliminary calibration-panel result of mean net regret 0.9444 for EVoI versus 1.5833 for maximum information gain and 3.5278 for no probes. This is exploratory validation of the toy design only, not execution of the Rust binary, not statistical evidence, and not an external benchmark score.
 
@@ -65,3 +65,61 @@ External benchmark alignment:
 - [World-In-World (ICLR 2026)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/5b4263be85820683d78675cc18d2efc7-Abstract-Conference.html) evaluates world models in closed-loop embodied settings.
 
 CMAQ-002 complements those suites; its synthetic scores are not comparable to their published leaderboard numbers.
+
+
+## v0.3: safe information acquisition and decision-value accounting
+
+This extension adds three distinct mechanisms to the earlier EVoI comparison.
+
+### 1. Two-layer probe safety
+
+An experiment is an intervention. It must be safe before its information value is considered.
+
+Every candidate probe must now satisfy both:
+- an **externally pre-authorized probe envelope** fixed in the task contract, independent of the candidate's learned posterior; and
+- a **posterior-robust safety check**: the probe must be safe in every remaining candidate mechanism.
+
+The synthetic task's six authorized context/action pairs are tested against every in-catalog mechanism and the evaluator-only parity family. Tests verify that all six remain safe across those fixtures. The report separately counts authorization-blocked candidates and candidates blocked by posterior safety. Selected unsafe probes are counted explicitly and the focused workflow requires zero in this controlled panel.
+
+This is a synthetic task guarantee only. It is not proof that a learned model can certify a real physical probe as safe. Real deployment needs a separately reviewed actuator/sensor envelope, independent interlocks and task-specific authorization. Under arbitrary unseen mechanisms, no posterior-only filter can establish safety.
+
+### 2. Charge the allocator
+
+\`--allocator-cost X\` specifies a **synthetic utility cost per normalized allocator work unit**. The allocator cost is charged even when the allocator evaluates candidates and then decides not to probe.
+
+- EVoI and maximum-information strategies incur one work unit for each eligible probe candidate they score.
+- Fixed and random strategies incur one selection work unit.
+- EVoI only purchases a probe when expected downstream decision value covers both physical probe cost and the work required to select the probe.
+- Reported net utility and net regret charge both probe cost and allocator cost, amortized over the declared downstream decision horizon.
+
+This is not measured FLOPs, latency, memory or energy. The work unit is a controlled synthetic accounting parameter, included so the benchmark can falsify systems that claim an allocator is free. Real hardware comparison should use the resource-profile/profiling-receipt approach from CMAQ-012 and charge measured allocator inference.
+
+The focused workflow runs both a low-cost case and an intentionally expensive allocator case. The latter must stop EVoI probing while still recording the work/cost spent to reach that decision.
+
+### 3. Did information change the decision—and was the change good?
+
+The report now separates:
+- \`mean_decision_gain_vs_no_probe\`: realized utility change after acquisition, against the same mechanism's pre-probe decision;
+- \`mean_decision_flip_fraction\`: fraction of context decisions changed by acquisition;
+- \`beneficial_flip_fraction\` and \`harmful_flip_fraction\`: evaluator-only classification of changed decisions using the true outcome;
+- \`mean_allocator_work_units\` and \`mean_allocator_cost\`;
+- authorization-blocked and posterior-safety-blocked candidate counts;
+- \`unsafe_probes\` independently of \`unsafe_actions\`.
+
+This makes it possible to identify an information policy that learns a great deal yet does not change the downstream action, or that changes an action in the wrong direction. The evaluator-only benefit/harm labels are never candidate-visible.
+
+## External frontier: DEEP and ActiveArena
+
+Two 2026 benchmarks inform the next adapters:
+
+- [DEEP: The Decision Value of Perception Compute](https://arxiv.org/abs/2609.35910) scores perception escalation by its effect on the downstream decision, under latency and energy budgets, and charges the allocator for its own computation. Its published experiments show that improved perception can produce harmful decision changes; allocator cost can eliminate the apparent benefit of heavier routing. CMAQ-002 adopts the decision-value and allocator-accounting principles, but its current synthetic work unit is not a reproduction of DEEP.
+- [ActiveArena](https://arxiv.org/abs/2609.24124) provides 35 active-perception manipulation tasks across five categories, with multi-round evidence acquisition, memory reasoning and ID/OOD scene splits. Its published ActiveArena-OFT results are 62.97% ID / 47.60% OOD macro success, while ActiveArena-Plan reports 60.97% / 45.54%. Those are task-specific published results, not numbers comparable to CMAQ's finite-mechanism simulator.
+
+The interfaces must remain distinct. CMAQ-002 currently chooses a causal intervention \`(context, action)\` and observes a safety/reward signal. ActiveArena chooses viewpoints, acquires images and manages memory; it is not the same action space or oracle. The correct next step is a separate visual active-perception adapter that reuses the report's decision-change, net-value, budget and provenance concepts, rather than pretending that a synthetic mechanism probe is a camera-motion result.
+
+## v0.3 claim ceiling
+
+- The external authorization envelope is a fixed synthetic task contract; it is not a real safety case.
+- Allocator work units and costs are declared synthetic quantities, not hardware-measured operations or energy.
+- Decision-flip benefit/harm uses evaluator-only true outcomes and does not imply candidate access to counterfactual labels.
+- The current benchmark still uses a finite, deterministic hypothesis catalogue. It is not a live Symthaea HDC/CfC-LTC/memory/planner integration, and it does not establish external generalization or SOTA.
