@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/dvd-item-report-v1.json",
+  "title": "Symthaea DVD item report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "item_id",
+    "benchmark_id",
+    "benchmark_version",
+    "model_provider",
+    "model_name",
+    "model_version",
+    "model_access_mode",
+    "log_probability_semantics",
+    "harness_revision_sha256",
+    "prompt_sha256",
+    "decoding_config_sha256",
+    "environment_sha256",
+    "temperature_milli",
+    "generation_count",
+    "tail_token_count",
+    "sampled_output_token_count",
+    "generation_seed_schedule_sha256",
+    "generation_seed_commitment_count",
+    "input_sha256",
+    "mean_synthetic_difficulty",
+    "dvd_population_variance",
+    "dvd_sample_variance",
+    "median_absolute_deviation",
+    "winsorized_variance_10_90",
+    "one_component_log_likelihood",
+    "one_component_bic",
+    "two_component",
+    "delta_bic_two_vs_one",
+    "score_semantics",
+    "calibration_status",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.dvd_item_report.v1"
+    },
+    "item_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_access_mode": {
+      "type": "string",
+      "minLength": 1
+    },
+    "log_probability_semantics": {
+      "const": "base_model_conditional_log_probability"
+    },
+    "harness_revision_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "prompt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "decoding_config_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "environment_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "temperature_milli": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5000
+    },
+    "generation_count": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 1000
+    },
+    "tail_token_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "sampled_output_token_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "generation_seed_schedule_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "generation_seed_commitment_count": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 1000
+    },
+    "input_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "mean_synthetic_difficulty": {
+      "type": "number",
+      "maximum": 0
+    },
+    "dvd_population_variance": {
+      "type": "number",
+      "minimum": 0
+    },
+    "dvd_sample_variance": {
+      "type": "number",
+      "minimum": 0
+    },
+    "median_absolute_deviation": {
+      "type": "number",
+      "minimum": 0
+    },
+    "winsorized_variance_10_90": {
+      "type": "number",
+      "minimum": 0
+    },
+    "one_component_log_likelihood": {
+      "type": "number"
+    },
+    "one_component_bic": {
+      "type": "number"
+    },
+    "two_component": {
+      "$ref": "#/$defs/mixtureDiagnostic"
+    },
+    "delta_bic_two_vs_one": {
+      "type": "number"
+    },
+    "score_semantics": {
+      "type": "string",
+      "minLength": 1
+    },
+    "calibration_status": {
+      "const": "not_calibrated_threshold_not_selected"
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "weight",
+        "mean",
+        "variance"
+      ],
+      "properties": {
+        "weight": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "mean": {
+          "type": "number",
+          "maximum": 0
+        },
+        "variance": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "mixtureDiagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "converged",
+        "iterations",
+        "log_likelihood",
+        "bic",
+        "components",
+        "standardized_mean_separation",
+        "mean_posterior_entropy_nats",
+        "minimum_component_weight_met"
+      ],
+      "properties": {
+        "converged": {
+          "type": "boolean"
+        },
+        "iterations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "log_likelihood": {
+          "type": "number"
+        },
+        "bic": {
+          "type": "number"
+        },
+        "components": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/component"
+          }
+        },
+        "standardized_mean_separation": {
+          "type": "number",
+          "minimum": 0
+        },
+        "mean_posterior_entropy_nats": {
+          "type": "number",
+          "minimum": 0
+        },
+        "minimum_component_weight_met": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
