@@ -787,7 +787,7 @@ BenchmarkComponentManifestV1 binds:
 - **User/Task:** exact instruction, goal, role, requirement ledger, capability requirements and prohibited capabilities.
 - **Environment:** immutable runtime image, initial-state fixture, tool manifest, setup/teardown receipts, provided capabilities, preconditions and nondeterminism policy.
 - **Ground Truth:** oracle, reference implementation, expected outcomes, provenance evidence and known limitations.
-- **Evaluation:** grader source/binary, rubric, metric definition, report schema, evaluator check IDs and aggregation policy.
+- **Evaluation:** grader source/binary, rubric, metric definition, explicit threshold digest, non-compensatory blocking-rule digest, report schema, evaluator check IDs and aggregation policy.
 - Four typed interfaces: user-to-environment, environment-to-ground-truth, ground-truth-to-evaluation and evaluation-to-user.
 - Evaluator checks mapping requirement IDs and environment precondition IDs.
 - Reviewer findings with component, defect class, severity, evidence digest, reviewer identity commitment, attestation digest, review method and disposition.
@@ -796,7 +796,7 @@ All artifacts and the exact manifest have domain-separated SHA-256 bindings. Raw
 
 ### Requirement-to-check coverage
 
-Every explicit user requirement must be mapped to at least one evaluator check. Each requirement's environment preconditions must be declared in the environment and covered by a check that also covers that exact requirement/precondition pair.
+Every explicit user requirement must be mapped to at least one evaluator check. Each requirement's environment preconditions must be declared in the environment and covered by a check that also covers that exact requirement/precondition pair. A check cannot make an unrelated requirement's precondition appear covered; orphan precondition mappings are reported separately.
 
 A check with no requirement mapping is an orphan check. A check or review finding that references an unknown requirement is rejected from qualification. A requirement that has no evaluator coverage remains in the report as uncovered; it is never silently dropped.
 
