@@ -1477,7 +1477,7 @@ mod tests {
     fn event_observation_tampering_is_detected_even_after_resigning_profile() {
         let key = signing_key();
         let attestation = topology_attestation("profile-publisher-v1", &key);
-        let mut profile = signed_test_profile(context(&attestation), "profile-publisher-v1", &key);
+        let mut profile = signed_test_profile(attestation.clone(), "profile-publisher-v1", &key);
         profile.event_observations[0].raw_measured_end_frame = Some(221);
         profile.event_evidence_set_sha256 = event_set_digest(&profile.event_observations);
         profile.lineage_summaries = lineage_summaries(&profile.event_observations).unwrap();
