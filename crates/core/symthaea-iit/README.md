@@ -338,6 +338,44 @@ Use two clearly separated upstream baselines:
   by full commit SHA and used only as a separate comparison until its packaged
   release and output artifacts are pinned.
 
+### Capability comparison (current, not a superiority claim)
+
+| Capability | PyPhi 2.0 line | Symthaea `symthaea-iit` branch |
+|---|---|---|
+| IIT 4.0 (2023) system `phi_s` | End-to-end analyzer | Bounded binary system search implemented; qualification still limited to named published anchors and dense/sparse reference fixtures |
+| IIT 4.0 (2026) system `phi_s` | Implemented, including intrinsic-information requirement | Formalism identity exists; 2026 calculation is not implemented |
+| Full cause-effect structure, distinctions, relations, big `Phi` | Full structure pipeline; analytical relation summaries avoid mandatory relation enumeration | Not implemented; no Composition-level tie escalation |
+| Heterogeneous multi-valued units | End-to-end support, including mixed alphabets and per-node factored TPMs | Binary-only; tracked in [#9596](https://github.com/Luminous-Dynamics/symthaea/issues/9596) |
+| Macro units and grain search | Coarse-graining, black-boxing, intrinsic-unit criteria, bounded grain search | Not implemented |
+| Actual causation | Dedicated pipeline | Not implemented |
+| Sparse exact inference | Factored TPM representation, caching and parallel execution | Sparse local-CPT model, log-domain min-fill, explicit cutset conditioning, factor-entry budgets, and posterior reuse |
+| Preflight/admission | Combinatorial `estimate_analysis()` | Exact partition-work estimate and factor/cutset planners; integrated full-search estimator tracked in [#9597](https://github.com/Luminous-Dynamics/symthaea/issues/9597) |
+
+The most defensible Symthaea differentiator today is **resource-bounded exact
+inference over sparse local-CPT substrates**: factor cost is governed by induced
+width and explicit table budgets, rather than allocating a global dense TPM.
+Current large-substrate examples evaluate a fixed four-unit candidate inside
+substrates up to 2,048 units. That is not a 2,048-unit integrated system, and
+must not be compared to PyPhi's 10–12-unit system-`phi_s` ceiling as though the
+workloads were equivalent.
+
+PyPhi's published practical ceilings are approximate workload observations for
+fully connected systems and differ by stage: roughly 10–12 units for system
+`phi_s`, versus 6–8 for the full IIT 4.0 cause-effect structure and relations.
+Connectivity, partition choices, and the exact requested quantity change the
+cost. A fair comparison must therefore report candidate-system size, substrate
+size, graph family, induced width, formalism, partition policy, and whether the
+complete cause-effect structure was constructed.
+
+The current upstream documentation states that PyPhi 2.0 supports mixed-alphabet
+multi-valued substrates, macro units/grain search, actual causation, and
+analytical relation queries. It also reports its own 18–20× partition-evaluation
+improvement versus its pre-2.0 implementation. Neither that upstream speedup nor
+Symthaea's structural scaling is a direct head-to-head result. Only identical
+inputs, quantities, partition policies, complete outputs, and pinned environments
+can establish comparative performance.
+
+
 ### Qualification gates
 
 1. **Input parity:** 100% agreement on model dimensions, all TPM cells within a
