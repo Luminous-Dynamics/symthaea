@@ -24,12 +24,16 @@ pub struct ChannelCounts {
 }
 
 impl ChannelCounts {
-    pub fn positive_calibration_total(self) -> u64 {
-        self.true_positive + self.false_negative
+    pub fn positive_calibration_total(self) -> Result<u64, String> {
+        self.true_positive
+            .checked_add(self.false_negative)
+            .ok_or_else(|| "positive calibration count overflow".to_owned())
     }
 
-    pub fn negative_calibration_total(self) -> u64 {
-        self.true_negative + self.false_positive
+    pub fn negative_calibration_total(self) -> Result<u64, String> {
+        self.true_negative
+            .checked_add(self.false_positive)
+            .ok_or_else(|| "negative calibration count overflow".to_owned())
     }
 }
 
@@ -42,6 +46,9 @@ pub struct ChannelBounds {
     pub fpr_upper: f64,
     pub test_positive_upper: f64,
     pub channel_separation_established: bool,
+    /// False when the simultaneous test-positive and FPR bounds are
+    /// incompatible with q = f + (t - f)p for any p in [0, 1].
+    pub measurement_channel_consistent: bool,
     /// None means measurement-channel inversion is not justified.
     pub failure_prevalence_upper: Option<f64>,
 }
@@ -152,8 +159,8 @@ pub fn measurement_channel_bounds(
         return Err("at least four one-sided streams are required per arm and family".to_owned());
     }
 
-    let positive_n = counts.positive_calibration_total();
-    let negative_n = counts.negative_calibration_total();
+    let positive_n = counts.positive_calibration_total()?;
+    let negative_n = counts.negative_calibration_total()?;
     let test_n = counts.test_total;
     if positive_n == 0 {
         return Err("positive-reference calibration stream is empty".to_owned());
@@ -182,15 +189,17 @@ pub fn measurement_channel_bounds(
     // Inversion is permitted only if every channel in the simultaneous
     // confidence set has TPR > FPR.
     let channel_separation_established = tpr_lower > fpr_upper;
-    let failure_prevalence_upper = if channel_separation_established {
-        let denominator = tpr_lower - fpr_lower;
-        if denominator <= 0.0 {
-            return Err("separation gate passed with a non-positive inversion denominator".to_owned());
-        }
-        Some(((test_positive_upper - fpr_lower) / denominator).clamp(0.0, 1.0))
-    } else {
-        None
-    };
+    let measurement_channel_consistent = test_positive_upper >= fpr_lower;
+    let failure_prevalence_upper =
+        if channel_separation_established && measurement_channel_consistent {
+            let denominator = tpr_lower - fpr_lower;
+            if denominator <= 0.0 {
+                return Err("separation gate passed with a non-positive inversion denominator".to_owned());
+            }
+            Some(((test_positive_upper - fpr_lower) / denominator).clamp(0.0, 1.0))
+        } else {
+            None
+        };
 
     Ok(ChannelBounds {
         counts,
@@ -200,6 +209,7 @@ pub fn measurement_channel_bounds(
         fpr_upper,
         test_positive_upper,
         channel_separation_established,
+        measurement_channel_consistent,
         failure_prevalence_upper,
     })
 }
@@ -220,8 +230,8 @@ pub fn decide_certification(
         return Err("target_failure_rate must be finite and strictly between zero and one".to_owned());
     }
 
-    let positive_n = bounds.counts.positive_calibration_total();
-    let negative_n = bounds.counts.negative_calibration_total();
+    let positive_n = bounds.counts.positive_calibration_total()?;
+    let negative_n = bounds.counts.negative_calibration_total()?;
     let test_n = bounds.counts.test_total;
     if positive_n < minimum_positive_calibration
         || negative_n < minimum_negative_calibration
@@ -241,6 +251,14 @@ pub fn decide_certification(
             failure_prevalence_upper: None,
             target_failure_rate,
             reason: "TPR lower bound does not exceed FPR upper bound".to_owned(),
+        });
+    }
+    if !bounds.measurement_channel_consistent {
+        return Ok(CertificationDecision {
+            status: CertificationStatus::Inconclusive,
+            failure_prevalence_upper: None,
+            target_failure_rate,
+            reason: "test-positive upper bound is below FPR lower bound; measurement channel is inconsistent".to_owned(),
         });
     }
 
@@ -320,6 +338,40 @@ mod tests {
         assert_eq!(bounds.failure_prevalence_upper, None);
         let decision = decide_certification(&bounds, 0.10, 1_000, 1_000, 1_000).unwrap();
         assert_eq!(decision.status, CertificationStatus::Inconclusive);
+    }
+
+    #[test]
+    fn incompatible_test_prevalence_and_fpr_are_inconclusive_not_zero_risk() {
+        let counts = ChannelCounts {
+            true_positive: 9_500,
+            false_negative: 500,
+            true_negative: 9_800,
+            false_positive: 200,
+            test_positive: 0,
+            test_total: 10_000,
+        };
+        let bounds = measurement_channel_bounds(counts, 0.05, 4).unwrap();
+        assert!(bounds.channel_separation_established);
+        assert!(!bounds.measurement_channel_consistent);
+        assert_eq!(bounds.failure_prevalence_upper, None);
+        let decision = decide_certification(&bounds, 0.12, 1, 1, 1).unwrap();
+        assert_eq!(decision.status, CertificationStatus::Inconclusive);
+        assert!(decision.reason.contains("inconsistent"));
+    }
+
+    #[test]
+    fn count_overflow_is_rejected() {
+        let counts = ChannelCounts {
+            true_positive: u64::MAX,
+            false_negative: 1,
+            true_negative: 1,
+            false_positive: 1,
+            test_positive: 0,
+            test_total: 1,
+        };
+        assert!(measurement_channel_bounds(counts, 0.05, 4)
+            .unwrap_err()
+            .contains("overflow"));
     }
 
     #[test]
