@@ -22,6 +22,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check "jsonschema==4.25.1"
       - name: Unit tests
         working-directory: research/cmaq-002
         run: cargo test --locked
@@ -30,30 +32,125 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo run --quiet --locked -- --seed 4242 --probe-budget 2 --decision-horizon 1 --probe-cost 0.25 > /tmp/cmaq-002-report.json
+          cargo run --quiet --locked -- --seed 4242 --probe-budget 2 --decision-horizon 1 --probe-cost 0.25 --allocator-cost 0.0 > /tmp/cmaq-002-report.json
+          cargo run --quiet --locked -- --seed 4242 --probe-budget 2 --decision-horizon 1 --probe-cost 0.25 --allocator-cost 100.0 > /tmp/cmaq-002-expensive-allocator.json
           python3 - <<'PY'
           import json
           from pathlib import Path
+          from jsonschema import Draft202012Validator, validate
+
+          schema = json.loads(Path("report.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          activearena_schema = json.loads(Path("activearena-baseline.schema.json").read_text())
+          Draft202012Validator.check_schema(activearena_schema)
+          activearena_lock = json.loads(Path("activearena-baseline.lock.json").read_text())
+          validate(instance=activearena_lock, schema=activearena_schema)
+          assert activearena_lock["source"]["repository_license"] == "MIT"
+          assert activearena_lock["dataset"]["observed_license"] == "Apache-2.0"
+          assert activearena_lock["dataset"]["immutable_revision"] is None
+          assert activearena_lock["dataset"]["download_status"] == "not_downloaded"
+          assert activearena_lock["assets"]["download_status"] == "not_downloaded"
+          assert activearena_lock["policy_baseline"]["checkpoint_bundle"]["status"] == "unpinned_not_downloaded"
+          assert activearena_lock["benchmark"]["candidate_visible_camera"] == "head"
+          assert activearena_lock["benchmark"]["action_dimension"] == 18
+
+          custody_schema = json.loads(Path("activearena-adapter-contract.schema.json").read_text())
+          Draft202012Validator.check_schema(custody_schema)
+          custody = json.loads(Path("fixtures/activearena-adapter-contract.example.json").read_text())
+          validate(instance=custody, schema=custody_schema)
+          assert custody["status"] == "metadata_only"
+          assert custody["candidate_observation"]["camera"] == "head"
+          assert all(event["camera"] == "head" for event in custody["observation_memory"])
+          assert all(event["memory_promoted"] is False for event in custody["forecasts"])
+          assert custody["evaluator_only"]["candidate_visible"] is False
+          assert custody["dataset"]["immutable_revision"] is None
+
+          hostile = json.loads(json.dumps(custody))
+          hostile["candidate_observation"]["camera"] = "side"
+          try:
+              validate(instance=hostile, schema=custody_schema)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError("ActiveArena custody admitted side-camera candidate observation")
+
+          hostile = json.loads(json.dumps(custody))
+          hostile["forecasts"][0]["memory_promoted"] = True
+          try:
+              validate(instance=hostile, schema=custody_schema)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError("ActiveArena custody admitted forecast promotion into observation memory")
+
+          hostile = json.loads(json.dumps(custody))
+          hostile["evaluator_only"]["candidate_visible"] = True
+          try:
+              validate(instance=hostile, schema=custody_schema)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError("ActiveArena custody admitted evaluator-only data to candidate")
+
+          hostile = json.loads(json.dumps(custody))
+          hostile["observation_memory"].append({
+              "event_type": "predicted_future",
+              "camera": "head",
+              "observation_sha256": "0" * 64,
+              "capture_timestamp_ms": 2000.0,
+              "action_chunk_id": 1,
+              "candidate_visible": True
+          })
+          try:
+              validate(instance=hostile, schema=custody_schema)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError("ActiveArena custody admitted predicted future as observation memory")
+
+          hostile = json.loads(json.dumps(custody))
+          hostile["status"] = "qualification_ready"
+          try:
+              validate(instance=hostile, schema=custody_schema)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError("ActiveArena custody admitted qualification without dataset/license gates")
 
           report = json.loads(Path("/tmp/cmaq-002-report.json").read_text())
-          assert report["schema_version"] == "cmaq-002-evoi-report-v0.2"
+          validate(instance=report, schema=schema)
+          assert report["schema_version"] == "cmaq-002-evoi-report-v0.3"
           assert report["mechanisms"] == 9
           assert report["families"] == 3
           assert report["contexts"] == 4
           assert report["actions"] == 3
           assert report["decision_horizon"] == 1
+          assert report["allocator_cost_per_work_unit"] == 0.0
           by_name = {row["strategy"]: row for row in report["results"]}
           assert set(by_name) == {
               "no_probe", "fixed", "random", "max_information", "evoi", "oracle"
           }
           assert by_name["oracle"]["mean_regret"] == 0
           assert all(row["unsafe_actions"] == 0 for row in report["results"])
+          assert all(row["unsafe_probes"] == 0 for row in report["results"])
           assert all(row["contradictions"] == 0 for row in report["results"])
+          for row in report["results"]:
+              assert 0.0 <= row["mean_decision_flip_fraction"] <= 1.0
+              assert 0.0 <= row["beneficial_flip_fraction"] <= 1.0
+              assert 0.0 <= row["harmful_flip_fraction"] <= 1.0
+              assert row["mean_allocator_work_units"] >= 0.0
+              assert row["mean_allocator_cost"] >= 0.0
           control = report["open_class_control"]
           assert control["tested_mechanisms"] == 3
           assert control["detected"] == control["tested_mechanisms"]
           assert control["max_queries_to_detection"] <= 12
           assert by_name["evoi"]["mean_net_regret"] < by_name["max_information"]["mean_net_regret"]
-          print("CMAQ-002 report schema, EVoI calibration, and open-class control valid")
+          expensive = json.loads(Path("/tmp/cmaq-002-expensive-allocator.json").read_text())
+          validate(instance=expensive, schema=schema)
+          expensive_by_name = {row["strategy"]: row for row in expensive["results"]}
+          assert expensive_by_name["evoi"]["mean_probes"] == 0
+          assert expensive_by_name["evoi"]["mean_allocator_work_units"] > 0
+          assert expensive_by_name["evoi"]["mean_allocator_cost"] > 0
+          print("CMAQ-002 v0.3 schemas, robust probe gates, decision-change metrics and allocator-cost sensitivity validated")
           print(json.dumps(by_name, sort_keys=True))
           PY

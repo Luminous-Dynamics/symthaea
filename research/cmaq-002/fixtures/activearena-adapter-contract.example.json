@@ -1,0 +1,89 @@
+{
+  "schema_version": "cmaq-002-activearena-adapter-contract-v0.1",
+  "status": "metadata_only",
+  "task": {
+    "task_id": "click_bell_rotate_view",
+    "split": "OOD",
+    "episode_count": 1,
+    "task_count": 35,
+    "category": "SS",
+    "action_dimension": 18,
+    "predicted_action_steps": 16
+  },
+  "source": {
+    "activearena_source_commit": "1bf2c77b8d3ab978fc5b4599a69d017f593edbe8",
+    "activearena_vla_source_commit": "abaea42b223d40f7b763cd879ce926c8c0c906a1",
+    "adapter_source_commit": "b1b46390af192f95cdb84655be607fbb3e9e2974"
+  },
+  "dataset": {
+    "repository": "https://huggingface.co/datasets/leeibo/ActiveArena-Data",
+    "license": "Apache-2.0",
+    "immutable_revision": null,
+    "checksum_manifest_sha256": null
+  },
+  "license_gates": {
+    "base_asset_license_reviewed": false,
+    "activearena_asset_license_reviewed": false,
+    "policy_checkpoint_terms_reviewed": false
+  },
+  "candidate_observation": {
+    "camera": "head",
+    "observation_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "capture_timestamp_ms": 1000,
+    "camera_pose_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "action_chunk_id": 0,
+    "provenance": "environment_acquired"
+  },
+  "observation_memory": [
+    {
+      "event_type": "acquired_observation",
+      "camera": "head",
+      "observation_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "capture_timestamp_ms": 1000,
+      "action_chunk_id": 0,
+      "candidate_visible": true
+    }
+  ],
+  "forecasts": [
+    {
+      "forecast_id": "future-0",
+      "provenance": "model_forecast",
+      "forecast_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "horizon_steps": 16,
+      "memory_promoted": false,
+      "candidate_visible": true
+    }
+  ],
+  "evaluator_only": {
+    "candidate_visible": false,
+    "side_camera_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "front_camera_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "ground_truth_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "success_label": false,
+    "scoring_artifact_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "integrity": {
+    "network_access": "disabled",
+    "agent_can_access_hidden_targets": false,
+    "agent_can_write_scoring_artifacts": false,
+    "outcome_verification": "environment_side",
+    "candidate_tool_allowlist": [
+      "get_head_camera_observation",
+      "get_robot_state",
+      "execute_action_chunk",
+      "reset_episode",
+      "retrieve_candidate_memory"
+    ]
+  },
+  "resource_accounting": {
+    "memory_capacity_frames": 6,
+    "peak_memory_bytes": 12345,
+    "allocator_work_units": 100,
+    "encoder_forward_calls": 30,
+    "retrieval_calls": 4,
+    "latency_p50_ms": 20,
+    "latency_p95_ms": 30,
+    "energy_millijoules": null
+  },
+  "claim_ceiling": "metadata_only_adapter_contract_fixture_no_dataset_or_policy_result"
+}
