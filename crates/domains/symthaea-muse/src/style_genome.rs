@@ -339,6 +339,7 @@ pub struct GenomeEvaluation {
     pub theory_validation_version: String,
     pub trace_reference_audit_version: String,
     pub fingerprint_version: String,
+    pub grammar_plan_fingerprint_version: String,
     pub compiled_spec_sha256: String,
     pub evaluation_config: GenomeEvaluationConfig,
     pub evaluation_config_sha256: String,
