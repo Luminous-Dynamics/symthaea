@@ -665,8 +665,10 @@ mod tests {
 
     #[test]
     fn checked_in_candidate_profile_parses_and_remains_unqualified() {
-        let profile_bytes = include_str!("../../benchmarks/basalt/coverage/linux-hermetic-candidate.v1.json").as_bytes();
-        let report = audit_bytes(profile_bytes, br#"{}"#);
+        let profile_text = include_str!("../../benchmarks/basalt/coverage/linux-hermetic-candidate.v1.json");
+        let checked_in: Value = serde_json::from_str(profile_text).unwrap();
+        assert_eq!(checked_in, profile_value(), "test profile must match the checked-in contract");
+        let report = audit_bytes(profile_text.as_bytes(), br#"{}"#);
         assert!(report.profile_valid);
         assert!(!report.profile_qualified);
         assert!(!report.qualification_eligible);
@@ -832,6 +834,15 @@ mod tests {
         assert!(report.coverage_claim_consistent);
         assert!(!report.coverage_complete_within_profile);
         assert!(!report.qualification_eligible);
+    }
+
+    #[test]
+    fn rejects_unsupported_label_without_an_out_of_profile_or_unresolved_reason() {
+        let (profile, receipt) = encoded_pair("unsupported");
+        let report = audit_bytes(&profile, &receipt);
+        assert!(report.receipt_well_formed);
+        assert!(!report.coverage_claim_consistent);
+        assert!(!report.coverage_complete_within_profile);
     }
 
     #[test]
