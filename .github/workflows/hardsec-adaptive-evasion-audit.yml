@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "examples/hardsec_adaptive_evasion_audit.rs"
+      - "docs/research/HARDSEC_012_ADAPTIVE_EVASION_AUDITOR.md"
       - "schemas/hardsec-adaptive-*.schema.json"
       - "tests/fixtures/hardsec/adaptive-evasion-v1/**"
       - "tools/hardsec-adaptive-evasion-audit-harness/**"
