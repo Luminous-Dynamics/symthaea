@@ -19,7 +19,7 @@ It binds:
 - classified-range count and ordered loss/discard chain root;
 - close-fence digest;
 - producer-quiescence evidence digest and monotonic timestamp;
-- consumer-drain evidence digest and monotonic timestamp;
+- consumer-drain evidence digest and monotonic timestamp; every published event's observation timestamp must be no later than this drain fence;
 - generation and previous-seal digest; `previous_seal_digest` must be explicitly present (null for generation 1), and later generations require a digest.
 
 ### Canonical chain encoding
@@ -64,7 +64,7 @@ BASALT should complement these tools: sensors generate telemetry; BASALT verifie
 
 ## Benchmark plan
 
-The versioned benchmark includes clean controls, raw-byte mutation, event-root mutation, range-root mutation, source substitution, terminal-high-water mutation, observer/close-fence substitution, generation-link corruption, close-order reversal, commitment mutation and omission of the required predecessor field (13 scenarios).
+The versioned benchmark includes clean controls, raw-byte mutation, event-root mutation, range-root mutation, source substitution, terminal-high-water mutation, observer/close-fence substitution, generation-link corruption, close-order reversal, commitment mutation omission of the required predecessor field and event-after-drain inconsistency (14 scenarios).
 
 Safety targets:
 - 100% rejection of every seeded ledger/chain/close/commitment mutation;
@@ -79,7 +79,7 @@ The independent unit is one source epoch from a pinned host boot, observer binar
 
 ## Current limitations
 
-V1 validates the close timestamps against the ledger capture window, but the evidence digests are references only; it does not retrieve or authenticate the underlying evidence bytes. The booleans in the ledger remain supplied assertions. The generation link is syntax-checked only; the predecessor field is mandatory but there is no durable checkpoint to verify its value against. There is no signature implementation in V1. Therefore all authenticity, authorization, anti-rollback and qualification fields are hard false.
+V1 validates the close timestamps against the ledger capture window and requires every event's observation timestamp to precede the consumer-drain acknowledgement, but the evidence digests are references only; it does not retrieve or authenticate the underlying evidence bytes. The booleans in the ledger remain supplied assertions. The generation link is syntax-checked only; the predecessor field is mandatory but there is no durable checkpoint to verify its value against. There is no signature implementation in V1. Therefore all authenticity, authorization, anti-rollback and qualification fields are hard false.
 
 ## Exit criteria for authenticated epoch seals
 
