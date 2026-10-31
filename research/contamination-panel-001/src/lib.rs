@@ -311,7 +311,7 @@ fn keyed_id(seed: &[u8], domain: &[u8], ordinal: u64, slot: u64) -> String {
 
 fn generation_subkey(seed: &[u8], generation_id: &str) -> [u8; 32] {
     let mut message = Vec::with_capacity(generation_id.len() + 24);
-    message.extend_from_slice(b"generation-scope.v1\\0");
+    message.extend_from_slice(b"generation-scope.v1\0");
     message.extend_from_slice(&(generation_id.len() as u64).to_be_bytes());
     message.extend_from_slice(generation_id.as_bytes());
     hmac_sha256(seed, &message)
