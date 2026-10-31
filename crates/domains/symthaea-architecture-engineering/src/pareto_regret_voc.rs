@@ -583,22 +583,24 @@ mod tests {
     }
 
     #[test]
-    fn posterior_recommendation_uses_expected_set_hypervolume_not_mean_vector() {
+    fn bayes_recommendation_uses_expected_hypervolume_not_hypervolume_of_mean_vectors() {
         let posterior = posterior(vec![
             ParetoPosteriorParticle {
                 particle_id: "p1".into(),
                 probability: 0.5,
-                objective_values: vec![[0.9, 0.2], [0.2, 0.9], [0.45, 0.45]],
+                objective_values: vec![[1.0, 0.2], [0.5, 0.5], [0.1, 0.1]],
             },
             ParetoPosteriorParticle {
                 particle_id: "p2".into(),
                 probability: 0.5,
-                objective_values: vec![[0.9, 0.2], [0.2, 0.9], [0.45, 0.45]],
+                objective_values: vec![[0.2, 1.0], [0.5, 0.5], [0.1, 0.1]],
             },
         ]);
-        let result = evaluate_pareto_decision(&posterior, reference(), 2).unwrap();
-        assert_eq!(result.recommended_candidate_ids, vec!["A-latency", "B-accuracy"]);
-        assert!(result.expected_hypervolume_regret.abs() < 1e-12);
+        // A's posterior mean is [0.6, 0.6], so HV(E[A])=0.36 > HV(E[B])=0.25.
+        // But E[HV(A)] = 0.20 < E[HV(B)] = 0.25: B is the correct Bayes action.
+        let result = evaluate_pareto_decision(&posterior, reference(), 1).unwrap();
+        assert_eq!(result.recommended_candidate_ids, vec!["B-accuracy"]);
+        assert!((result.expected_hypervolume_regret - 0.10).abs() < 1e-12);
     }
 
     #[test]
