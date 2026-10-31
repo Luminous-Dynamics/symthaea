@@ -282,8 +282,11 @@ fn validate_design(
     if design.target_exposure_fraction_permille > 1_000 {
         return Err("target_exposure_fraction_permille must be in [0, 1000]".to_owned());
     }
-    if design.treatment_training_corpus_sha256 == design.placebo_training_corpus_sha256 {
-        return Err("treatment and placebo training corpus digests must differ".to_owned());
+    if design.treatment_training_corpus_sha256 == design.placebo_training_corpus_sha256
+        || design.shared_training_corpus_sha256 == design.treatment_training_corpus_sha256
+        || design.shared_training_corpus_sha256 == design.placebo_training_corpus_sha256
+    {
+        return Err("shared, treatment and placebo training corpus digests must be pairwise distinct".to_owned());
     }
     if design.shared_training_token_count == 0
         || design.shared_training_token_count > design.total_training_token_budget
@@ -329,6 +332,12 @@ fn validate_design(
         }
         if !placebo_record_digests.insert(cluster.matched_placebo_record_sha256.as_str()) {
             return Err("matched placebo record digest is reused across source clusters".to_owned());
+        }
+        if cluster.exposure_variant_sha256 == cluster.matched_placebo_record_sha256 {
+            return Err(format!(
+                "cluster {} exposure variant and matched placebo record digests must differ",
+                cluster.cluster_id
+            ));
         }
         if cluster.item_ids.is_empty() || cluster.item_ids.len() > 10_000 {
             return Err(format!("cluster {} must contain 1..=10000 item IDs", cluster.cluster_id));
@@ -895,6 +904,26 @@ mod tests {
     }
 
     #[test]
+    fn identical_exposure_and_placebo_payloads_are_rejected() {
+        let mut invalid_design = design();
+        invalid_design.clusters[0].matched_placebo_record_sha256 =
+            invalid_design.clusters[0].exposure_variant_sha256.clone();
+        assert!(randomize_intervention(&invalid_design, &seed())
+            .unwrap_err()
+            .contains("exposure variant and matched placebo record digests must differ"));
+    }
+
+    #[test]
+    fn common_corpus_must_differ_from_both_arm_specific_corpora() {
+        let mut invalid_design = design();
+        invalid_design.shared_training_corpus_sha256 =
+            invalid_design.treatment_training_corpus_sha256.clone();
+        assert!(randomize_intervention(&invalid_design, &seed())
+            .unwrap_err()
+            .contains("must be pairwise distinct"));
+    }
+
+    #[test]
     fn duplicate_exposure_or_placebo_record_digest_is_rejected() {
         let mut invalid = design();
         invalid.clusters[1].exposure_variant_sha256 =
@@ -969,7 +998,7 @@ mod tests {
         manifest.manifest_sha256 = manifest_digest(&manifest).unwrap();
         assert!(audit_intervention(&design, &manifest, &seed())
             .unwrap_err()
-            .contains("differs from deterministic replay"));
+            .contains("does not match replayed allocation"));
     }
 
     #[test]
