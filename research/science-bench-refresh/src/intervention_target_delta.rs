@@ -1229,7 +1229,7 @@ mod tests {
 
     #[test]
     fn collateral_change_invalidates_an_otherwise_correct_target_delta() {
-        let (quality_plan, quality_receipt, target_plan, target_receipt, _, _) = fixtures();
+        let (quality_plan, quality_receipt, target_plan, target_receipt, _) = fixtures();
         let mut receipt = parse_receipt(&target_receipt);
         for reviewer in receipt["adjudications"][1]["reviewers"].as_array_mut().unwrap() {
             reviewer["collateral_change"] = json!("material_change_outside_allowed_scope");
@@ -1243,7 +1243,7 @@ mod tests {
 
     #[test]
     fn ambiguous_target_panel_remains_ambiguous() {
-        let (quality_plan, quality_receipt, target_plan, target_receipt, _, _) = fixtures();
+        let (quality_plan, quality_receipt, target_plan, target_receipt, _) = fixtures();
         let mut receipt = parse_receipt(&target_receipt);
         let reviewers = receipt["adjudications"][1]["reviewers"].as_array_mut().unwrap();
         reviewers[0]["observed_target_change"] = json!("support_increased");
@@ -1257,7 +1257,7 @@ mod tests {
 
     #[test]
     fn known_target_failure_is_not_hidden_by_ambiguous_global_relation() {
-        let (quality_plan, quality_receipt, target_plan, target_receipt, _, _) = fixtures();
+        let (quality_plan, quality_receipt, target_plan, target_receipt, _) = fixtures();
         let mut parent_receipt = parse_receipt(&quality_receipt);
         let parent_reviewers = parent_receipt["adjudications"][1]["reviewers"].as_array_mut().unwrap();
         parent_reviewers[0]["verdict"] = json!("meaning_changing");
@@ -1281,7 +1281,7 @@ mod tests {
 
     #[test]
     fn rejects_unblinded_reviewers_and_duplicate_or_missing_candidates() {
-        let (quality_plan, quality_receipt, target_plan, target_receipt, _, _) = fixtures();
+        let (quality_plan, quality_receipt, target_plan, target_receipt, _) = fixtures();
         let mut receipt = parse_receipt(&target_receipt);
         receipt["adjudications"][0]["reviewers"][0]["blind_to_expected_target_change"] = json!(false);
         let altered = serde_json::to_vec(&receipt).unwrap();
@@ -1365,7 +1365,7 @@ mod tests {
 
     #[test]
     fn report_is_deterministic_and_claims_remain_bounded() {
-        let (quality_plan, quality_receipt, target_plan, target_receipt, _, _) = fixtures();
+        let (quality_plan, quality_receipt, target_plan, target_receipt, _) = fixtures();
         let first = serde_json::to_vec(&report(&quality_plan,&quality_receipt,&target_plan,&target_receipt)).unwrap();
         let second = serde_json::to_vec(&report(&quality_plan,&quality_receipt,&target_plan,&target_receipt)).unwrap();
         assert_eq!(first, second);
