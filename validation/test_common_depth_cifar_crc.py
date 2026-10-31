@@ -87,7 +87,7 @@ class CommonDepthCRCTests(unittest.TestCase):
         self.assertTrue(row["methods"]["envelope_round_0"]["risk"]["mean"]>=0.)
         self.assertTrue(row["methods"]["envelope_round_3"]["risk"]["mean"]>=0.)
         self.assertIn("3",row["paired_specificity_gain_vs_envelope"])
-        self.assertIn("recert500_gain_vs_crc",row)
+        self.assertIn("final_gain_vs_crc",row)
         self.assertIn("ci95",row["paired_specificity_gain_vs_envelope"]["3"])
 
     def test_standard_and_envelope_baselines_are_valid_at_all_paper_levels(self):
