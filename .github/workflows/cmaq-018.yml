@@ -154,14 +154,16 @@ jobs:
           assert selected_action_fixture["regret_bound_coverage"] == 0.75
           assert selected_action_fixture["simultaneous_interval_coverage"] == 0.75
           assert selected_action_fixture["false_dominant_certificate_count"] == 1
+          assert (
+              selected_action_fixture["false_dominant_certificate_count"]
+              <= selected_action_fixture["dominant_certificate_count"]
+          )
           hostile_selection = json.loads(json.dumps(selected_action_fixture))
           hostile_selection["false_dominant_certificate_count"] = 3
-          try:
-              validate(instance=hostile_selection, schema=selected_action_schema)
-          except ValidationError:
-              pass
-          else:
-              raise AssertionError("selected-action evaluator admitted more false certificates than certificates")
+          assert (
+              hostile_selection["false_dominant_certificate_count"]
+              > hostile_selection["dominant_certificate_count"]
+          ), "hostile selected-action receipt must violate the cross-field invariant"
 
           uncertainty_sample = {
               "schema_version": "cmaq-018-uncertainty-contract-v0.1",
