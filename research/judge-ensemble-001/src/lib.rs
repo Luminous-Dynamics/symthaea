@@ -61,6 +61,15 @@ pub struct JudgeProfile {
     pub answered_trials: u64,
     pub scored_decisions: u64,
     pub correct_decisions: u64,
+    pub positive_reference_trials: u64,
+    pub negative_reference_trials: u64,
+    pub true_positive_count: u64,
+    pub false_negative_count: u64,
+    pub true_negative_count: u64,
+    pub false_positive_count: u64,
+    pub sensitivity_on_answered_positive: Option<f64>,
+    pub specificity_on_answered_negative: Option<f64>,
+    pub balanced_accuracy_on_answered: Option<f64>,
     pub abstentions: u64,
     pub failures: u64,
     pub missing_responses: u64,
@@ -87,6 +96,8 @@ pub struct PairwiseDependence {
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnsemblePolicy {
     pub calibration_trial_count: u64,
+    /// Exact calibration item IDs, used to reject calibration/evaluation leakage.
+    pub calibration_trial_ids: BTreeSet<String>,
     pub profiles: Vec<JudgeProfile>,
     pub pairwise_dependence: Vec<PairwiseDependence>,
     pub best_single_judge_id: String,
@@ -224,6 +235,12 @@ fn make_profile(judge: &JudgeSpec, trials: &[Trial]) -> JudgeProfile {
     let mut reference_known_trials = 0_u64;
     let mut scored_decisions = 0_u64;
     let mut correct_decisions = 0_u64;
+    let mut positive_reference_trials = 0_u64;
+    let mut negative_reference_trials = 0_u64;
+    let mut true_positive_count = 0_u64;
+    let mut false_negative_count = 0_u64;
+    let mut true_negative_count = 0_u64;
+    let mut false_positive_count = 0_u64;
     let mut abstentions = 0_u64;
     let mut failures = 0_u64;
     let mut missing_responses = 0_u64;
@@ -231,8 +248,16 @@ fn make_profile(judge: &JudgeSpec, trials: &[Trial]) -> JudgeProfile {
     let mut brier_sum = 0.0_f64;
 
     for trial in trials {
-        if trial.reference_label.is_some() {
-            reference_known_trials += 1;
+        match trial.reference_label {
+            Some(true) => {
+                reference_known_trials += 1;
+                positive_reference_trials += 1;
+            }
+            Some(false) => {
+                reference_known_trials += 1;
+                negative_reference_trials += 1;
+            }
+            None => {}
         }
         match response_for(trial, &judge.judge_id) {
             Response::Decision {
@@ -245,6 +270,12 @@ fn make_profile(judge: &JudgeSpec, trials: &[Trial]) -> JudgeProfile {
                     let correct = *label == reference;
                     if correct {
                         correct_decisions += 1;
+                    }
+                    match (reference, *label) {
+                        (true, true) => true_positive_count += 1,
+                        (true, false) => false_negative_count += 1,
+                        (false, false) => true_negative_count += 1,
+                        (false, true) => false_positive_count += 1,
                     }
                     if let Some(probability) = confidence_correct_probability {
                         let target = if correct { 1.0 } else { 0.0 };
@@ -261,17 +292,33 @@ fn make_profile(judge: &JudgeSpec, trials: &[Trial]) -> JudgeProfile {
 
     let accuracy = (scored_decisions > 0)
         .then_some(correct_decisions as f64 / scored_decisions as f64);
+    let sensitivity_denominator = true_positive_count + false_negative_count;
+    let specificity_denominator = true_negative_count + false_positive_count;
+    let sensitivity = (sensitivity_denominator > 0)
+        .then_some(true_positive_count as f64 / sensitivity_denominator as f64);
+    let specificity = (specificity_denominator > 0)
+        .then_some(true_negative_count as f64 / specificity_denominator as f64);
+    let balanced_accuracy = sensitivity.zip(specificity).map(|(tpr, tnr)| (tpr + tnr) / 2.0);
     let brier = (confidence_scored_decisions > 0)
         .then_some(brier_sum / confidence_scored_decisions as f64);
 
-    // Beta(1,1) smoothing avoids infinite weights at 0% or 100% observed
-    // accuracy. The lower half is clipped to zero rather than treated as a
-    // free inverse predictor; inverse prediction is a separate future arm.
-    let smoothed_accuracy =
-        (correct_decisions as f64 + 1.0) / (scored_decisions as f64 + 2.0);
-    let calibration_weight = (smoothed_accuracy / (1.0 - smoothed_accuracy))
-        .ln()
-        .max(0.0);
+    // Balanced-accuracy weighting avoids silently rewarding a judge simply
+    // because the calibration set over-represents its favored class. Each
+    // class-specific rate receives independent Beta(1,1) smoothing. This is
+    // still a simple comparator, not a fitted sensitivity/specificity model.
+    let calibration_weight = if sensitivity_denominator > 0 && specificity_denominator > 0 {
+        let smoothed_sensitivity =
+            (true_positive_count as f64 + 1.0) / (sensitivity_denominator as f64 + 2.0);
+        let smoothed_specificity =
+            (true_negative_count as f64 + 1.0) / (specificity_denominator as f64 + 2.0);
+        let smoothed_balanced_accuracy =
+            (smoothed_sensitivity + smoothed_specificity) / 2.0;
+        (smoothed_balanced_accuracy / (1.0 - smoothed_balanced_accuracy))
+            .ln()
+            .max(0.0)
+    } else {
+        0.0
+    };
 
     JudgeProfile {
         judge_id: judge.judge_id.clone(),
@@ -281,6 +328,15 @@ fn make_profile(judge: &JudgeSpec, trials: &[Trial]) -> JudgeProfile {
         answered_trials,
         scored_decisions,
         correct_decisions,
+        positive_reference_trials,
+        negative_reference_trials,
+        true_positive_count,
+        false_negative_count,
+        true_negative_count,
+        false_positive_count,
+        sensitivity_on_answered_positive: sensitivity,
+        specificity_on_answered_negative: specificity,
+        balanced_accuracy_on_answered: balanced_accuracy,
         abstentions,
         failures,
         missing_responses,
@@ -366,6 +422,17 @@ pub fn fit_ensemble(
     {
         return Err("fit_ensemble accepts calibration trials only".to_owned());
     }
+    let has_positive = calibration_trials
+        .iter()
+        .any(|trial| trial.reference_label == Some(true));
+    let has_negative = calibration_trials
+        .iter()
+        .any(|trial| trial.reference_label == Some(false));
+    if !has_positive || !has_negative {
+        return Err(
+            "calibration requires adjudicated positive and negative reference examples".to_owned(),
+        );
+    }
 
     let mut profiles: Vec<JudgeProfile> = judges
         .iter()
@@ -377,16 +444,22 @@ pub fn fit_ensemble(
         .iter()
         .filter(|profile| profile.scored_decisions > 0)
         .max_by(|left, right| {
-            left.accuracy_on_answered
+            left.balanced_accuracy_on_answered
                 .unwrap_or(-1.0)
-                .total_cmp(&right.accuracy_on_answered.unwrap_or(-1.0))
+                .total_cmp(&right.balanced_accuracy_on_answered.unwrap_or(-1.0))
                 .then_with(|| right.judge_id.cmp(&left.judge_id))
         })
         .map(|profile| profile.judge_id.clone())
         .ok_or_else(|| "no judge has a scored calibration decision".to_owned())?;
 
+    let calibration_trial_ids = calibration_trials
+        .iter()
+        .map(|trial| trial.trial_id.clone())
+        .collect();
+
     Ok(EnsemblePolicy {
         calibration_trial_count: calibration_trials.len() as u64,
+        calibration_trial_ids,
         profiles,
         pairwise_dependence: pairwise_dependence(judges, calibration_trials),
         best_single_judge_id,
@@ -555,8 +628,16 @@ pub fn evaluate_ensemble(
             ));
         }
     }
-    if policy.calibration_trial_count == 0 {
-        return Err("policy has no calibration trials".to_owned());
+    if policy.calibration_trial_count == 0
+        || policy.calibration_trial_ids.len() as u64 != policy.calibration_trial_count
+    {
+        return Err("policy calibration trial IDs do not match its committed count".to_owned());
+    }
+    if evaluation_trials
+        .iter()
+        .any(|trial| policy.calibration_trial_ids.contains(&trial.trial_id))
+    {
+        return Err("calibration/evaluation trial IDs overlap".to_owned());
     }
 
     let single_id = policy.best_single_judge_id.as_str();
@@ -631,33 +712,34 @@ mod tests {
         ]
     }
 
-    fn trial(
-        index: usize,
-        split: Split,
-        reference: Option<bool>,
-        clone_answer: bool,
-    ) -> Trial {
+    fn trial(index: usize, split: Split, reference: Option<bool>) -> Trial {
         let specs = judges();
         let observations = specs
             .iter()
             .map(|judge| {
+                // The shared family has a systematic positive-label bias. The
+                // two independent judges follow the known-answer reference.
                 let label = if judge.dependency_group_id == "shared-foundation" {
-                    clone_answer
-                } else {
                     true
+                } else {
+                    reference.unwrap_or(true)
                 };
                 Observation {
                     judge_id: judge.judge_id.clone(),
                     response: Response::Decision {
                         label,
-                        confidence_correct_probability: Some(if label { 0.95 } else { 0.90 }),
+                        confidence_correct_probability: Some(0.95),
                     },
                 }
             })
             .collect();
+        let split_prefix = match split {
+            Split::Calibration => "calibration",
+            Split::Evaluation => "evaluation",
+        };
         Trial {
-            trial_id: format!("item-{index:03}"),
-            task_family_id: if index % 2 == 0 {
+            trial_id: format!("{split_prefix}-item-{index:03}"),
+            task_family_id: if index % 4 < 2 {
                 "family-x".to_owned()
             } else {
                 "family-y".to_owned()
@@ -670,14 +752,11 @@ mod tests {
 
     fn data() -> (Vec<JudgeSpec>, Vec<Trial>, Vec<Trial>) {
         let panel = judges();
-        let calibration = (0..6)
-            .map(|index| {
-                // Three same-lineage judges share the same error on four items.
-                trial(index, Split::Calibration, Some(true), index >= 4)
-            })
+        let calibration = (0..12)
+            .map(|index| trial(index, Split::Calibration, Some(index % 2 == 0)))
             .collect();
-        let evaluation = (0..6)
-            .map(|index| trial(index, Split::Evaluation, Some(true), index >= 4))
+        let evaluation = (0..12)
+            .map(|index| trial(index, Split::Evaluation, Some(index % 2 == 0)))
             .collect();
         (panel, calibration, evaluation)
     }
@@ -701,13 +780,17 @@ mod tests {
         let weighted = summary(&report, AggregationMethod::CalibrationWeighted);
         let best_single = summary(&report, AggregationMethod::BestSingle);
 
-        assert_eq!(majority.incorrect_decisions, 4);
-        assert_eq!(majority.correct_decisions, 2);
+        assert_eq!(majority.incorrect_decisions, 6);
+        assert_eq!(majority.correct_decisions, 6);
         assert_eq!(family_capped.incorrect_decisions, 0);
+        assert_eq!(family_capped.correct_decisions, 12);
+        assert_eq!(family_capped.abstained_trials, 0);
         assert_eq!(weighted.incorrect_decisions, 0);
+        assert_eq!(weighted.correct_decisions, 12);
         assert_eq!(best_single.incorrect_decisions, 0);
-        assert_eq!(family_capped.planned_judge_calls, 30);
-        assert_eq!(best_single.planned_judge_calls, 6);
+        assert_eq!(best_single.correct_decisions, 12);
+        assert_eq!(family_capped.planned_judge_calls, 60);
+        assert_eq!(best_single.planned_judge_calls, 12);
     }
 
     #[test]
@@ -722,9 +805,9 @@ mod tests {
             })
             .unwrap();
         assert!(pair.shared_dependency_group);
-        assert_eq!(pair.co_observed_scored_decisions, 6);
-        assert_eq!(pair.double_faults, 4);
-        assert_eq!(pair.double_fault_rate, Some(4.0 / 6.0));
+        assert_eq!(pair.co_observed_scored_decisions, 12);
+        assert_eq!(pair.double_faults, 6);
+        assert_eq!(pair.double_fault_rate, Some(0.5));
         assert_eq!(pair.error_phi_correlation, Some(1.0));
     }
 
@@ -758,6 +841,27 @@ mod tests {
         assert!(evaluate_ensemble(&panel, &policy, &calibration)
             .unwrap_err()
             .contains("evaluation trials only"));
+    }
+
+    #[test]
+    fn evaluation_rejects_reused_calibration_item_ids() {
+        let (panel, calibration, mut evaluation) = data();
+        let policy = fit_ensemble(&panel, &calibration).unwrap();
+        evaluation[0].trial_id = calibration[0].trial_id.clone();
+        assert!(evaluate_ensemble(&panel, &policy, &evaluation)
+            .unwrap_err()
+            .contains("calibration/evaluation trial IDs overlap"));
+    }
+
+    #[test]
+    fn calibration_requires_both_reference_classes() {
+        let (panel, mut calibration, _) = data();
+        for trial in &mut calibration {
+            trial.reference_label = Some(true);
+        }
+        assert!(fit_ensemble(&panel, &calibration)
+            .unwrap_err()
+            .contains("positive and negative reference examples"));
     }
 
     #[test]
@@ -803,7 +907,20 @@ mod tests {
             .find(|profile| profile.judge_id == "independent-a")
             .unwrap();
         assert_eq!(good.accuracy_on_answered, Some(1.0));
+        assert_eq!(good.sensitivity_on_answered_positive, Some(1.0));
+        assert_eq!(good.specificity_on_answered_negative, Some(1.0));
+        assert_eq!(good.balanced_accuracy_on_answered, Some(1.0));
         let brier = good.confidence_brier_score.unwrap();
         assert!((brier - 0.05_f64.powi(2)).abs() < 1.0e-12);
+
+        let clone = policy
+            .profiles
+            .iter()
+            .find(|profile| profile.judge_id == "clone-a")
+            .unwrap();
+        assert_eq!(clone.sensitivity_on_answered_positive, Some(1.0));
+        assert_eq!(clone.specificity_on_answered_negative, Some(0.0));
+        assert_eq!(clone.balanced_accuracy_on_answered, Some(0.5));
+        assert_eq!(clone.calibration_weight, 0.0);
     }
 }
