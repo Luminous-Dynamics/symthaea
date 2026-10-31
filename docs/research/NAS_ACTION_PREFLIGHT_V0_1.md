@@ -24,7 +24,7 @@ The `NasMeasurementActionScope` commits to:
 - full QMC design digest and disjoint selection/validation replicate-set digests;
 - exact physical hardware-profile, measurement-protocol, and instrument-identity digests;
 - measurement action's likelihood-model digest;
-- resource registry, budget state (including spent values and protected reserves), and complete action-cost-vector digests.
+- resource registry, budget state (including spent values and protected reserves), complete action-cost-vector digest, and the exact compare-and-swap reservation-ledger head observed before preflight.
 
 The confidence stream ID is derived as `measurement:<scope_sha256>`. The manifest family ID must equal the run ID. This prevents replaying an otherwise valid confidence stream against another candidate configuration, device, protocol, posterior, QMC split, or resource budget.
 
@@ -66,7 +66,21 @@ Candidate promotion is deliberately rejected until #9388 supplies a private, non
 
 This PR does not implement a promotion bypass. It explicitly fails closed.
 
-## 6. Transactional execution is a separate gate
+## 6. Compare-and-swap reservation reference implementation
+
+The follow-on [#9485 / NAS-RESERVE-001](https://github.com/Luminous-Dynamics/symthaea/issues/9485) adds `resource_reservation.rs` and a private-field, non-serializable `VerifiedMeasurementReservation` capability issued only by `prepare_measurement_reservation` after full preflight. The measurement scope now includes the exact reservation-ledger head that the preflight observed.
+
+The reference ledger provides:
+- exact-head compare-and-swap reservation;
+- action-scope digest as idempotency key;
+- complete integer resource-vector accounting after base spend, protected reserves, active reservations and committed consumption;
+- one-way COMMITTED state, pre-commit RELEASED state, and monotone-epoch EXPIRED state;
+- domain-separated event chain, record/ledger digest, and independent replay;
+- stale competing preflight rejection and lost-response idempotency.
+
+This is still an in-process reference state machine. It is not a distributed or durable transaction service, does not authenticate callers, and does not provide trusted time or crash recovery. Production must move the expected-head check and all resource-coordinate reservations into one durable serializable transaction or dedicated service.
+
+## 7. Transactional execution is a separate gate
 
 Preflight reads the resource budget and verifies current headroom, but does not lock or debit it. Concurrent preflights could see the same remaining budget. Before any external action, a separate reservation service must implement an atomic or idempotent two-phase transition:
 
