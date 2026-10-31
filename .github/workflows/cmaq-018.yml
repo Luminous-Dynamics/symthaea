@@ -165,6 +165,29 @@ jobs:
               > hostile_selection["dominant_certificate_count"]
           ), "hostile selected-action receipt must violate the cross-field invariant"
 
+          net_value_schema = json.loads(
+              Path("net-decision-value.v0.1.schema.json").read_text()
+          )
+          Draft202012Validator.check_schema(net_value_schema)
+          net_value_fixture = json.loads(
+              Path("fixtures/net-decision-value.example.json").read_text()
+          )
+          validate(instance=net_value_fixture, schema=net_value_schema)
+          assert net_value_fixture["episode_count"] == 3
+          assert abs(net_value_fixture["mean_gross_advantage_vs_d0"] - 7.0 / 3.0) < 1e-12
+          assert abs(net_value_fixture["mean_net_advantage_vs_d0"] - 1.0 / 3.0) < 1e-12
+          assert abs(net_value_fixture["mean_net_advantage_vs_d1"] - 0.5 / 3.0) < 1e-12
+          assert net_value_fixture["net_win_rate_vs_d0"] == 2.0 / 3.0
+          assert net_value_fixture["net_win_rate_vs_d1"] == 1.0 / 3.0
+          hostile_net_value = json.loads(json.dumps(net_value_fixture))
+          hostile_net_value["net_win_rate_vs_d0"] = 1.1
+          try:
+              validate(instance=hostile_net_value, schema=net_value_schema)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError("net decision-value schema admitted a win rate above 1")
+
           uncertainty_sample = {
               "schema_version": "cmaq-018-uncertainty-contract-v0.1",
               "claim_ceiling": "design_contract_only_no_model_calibration_result",
