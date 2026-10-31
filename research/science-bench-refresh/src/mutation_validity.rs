@@ -153,7 +153,7 @@ impl MutationValidityPlanV1 {
     }
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum SemanticReviewDecisionV1 {
     PreservesSemantics,
@@ -247,6 +247,7 @@ pub struct MutationValiditySummaryV1 {
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct MutationValidityReportV1 {
+    pub report_commitment_sha256: String,
     pub schema: String,
     pub study_id: String,
     pub analyzer_source_revision: String,
@@ -778,6 +779,7 @@ pub fn analyze_mutation_validity(
     let unique_verified = verified_fingerprints.len() as u64;
 
     let fields = MutationValidityReportV1 {
+        report_commitment_sha256: String::new(),
         schema: MUTATION_REPORT_SCHEMA.to_owned(),
         study_id: plan.study_id,
         analyzer_source_revision: plan.analyzer_source_revision,
@@ -837,6 +839,8 @@ pub fn analyze_mutation_validity(
     };
     let payload = serde_json::to_vec(&fields)
         .map_err(|error| format!("cannot serialize mutation validity report: {error}"))?;
-    let _report_commitment = digest_domain(REPORT_DOMAIN, &payload)?;
-    Ok(fields)
+    let commitment = digest_domain(REPORT_DOMAIN, &payload)?;
+    let mut report = fields;
+    report.report_commitment_sha256 = commitment;
+    Ok(report)
 }
