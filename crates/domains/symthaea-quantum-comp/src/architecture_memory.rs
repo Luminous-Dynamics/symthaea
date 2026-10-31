@@ -590,7 +590,9 @@ pub fn validate_memory_topology(
         if !edge_ids.insert(edge.edge_id.as_str()) {
             return Err(MemoryTopologyError::DuplicateTransferEdgeId);
         }
-        if let Some(existing_edges) = boundary_edges.get_mut(edge.communication_boundary_id.as_str()) {
+        if let Some(existing_edges) =
+            boundary_edges.get_mut(edge.communication_boundary_id.as_str())
+        {
             if existing_edges.len() >= 2 {
                 return Err(MemoryTopologyError::DuplicateBoundaryAccounting);
             }
