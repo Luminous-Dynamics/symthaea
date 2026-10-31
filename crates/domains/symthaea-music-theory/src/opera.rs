@@ -374,8 +374,12 @@ pub(crate) fn verify_opera_plan(score: &Score, home_key: Key, plan: &OperaPlan) 
         VoiceRole::CounterMelody,
     ];
     let dialogue_alternates_one_bar_at_a_time =
-        plan.dialogue_voice_order.as_slice() == expected_dialogue
-        && plan.dialogue_voice_order.len() == 4
+        plan.dialogue_voice_order.len() == expected_dialogue.len()
+        && plan
+            .dialogue_voice_order
+            .iter()
+            .zip(expected_dialogue)
+            .all(|(actual, expected)| *actual == expected)
         && (0..4u8).all(|index| {
             let bar = 4 + index;
             let expected = plan.dialogue_voice_order[index as usize];
