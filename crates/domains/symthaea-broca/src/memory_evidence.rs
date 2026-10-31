@@ -1511,6 +1511,92 @@ mod tests {
         assert!(index.verify_exact_lexical_enumeration(&result).is_err());
     }
 
+    #[derive(Deserialize)]
+    struct EnumerationFixtureFile {
+        schema_version: String,
+        protocol_version: String,
+        records: Vec<EnumerationFixtureRecord>,
+        cases: Vec<EnumerationFixtureCase>,
+    }
+
+    #[derive(Deserialize)]
+    struct EnumerationFixtureRecord {
+        evidence_id: String,
+        hdc_id: u64,
+        trajectory_id: String,
+        step_id: String,
+        text: String,
+    }
+
+    #[derive(Deserialize)]
+    struct EnumerationFixtureCase {
+        case_id: String,
+        query: String,
+        required_speaker_role: Option<String>,
+        expected_evidence_ids: Vec<String>,
+        expected_matching_count: usize,
+        expected_distinct_sessions: usize,
+        expected_user_count: usize,
+        expected_assistant_count: usize,
+        expected_unknown_count: usize,
+    }
+
+    #[test]
+    fn versioned_exhaustive_enumeration_fixtures_match_full_index_scan() {
+        let raw = include_str!(
+            "../../../../research/broca-bitemporal-evaluation-v1/exhaustive-enumeration-fixtures-v1.json"
+        );
+        let fixture: EnumerationFixtureFile = serde_json::from_str(raw).unwrap();
+        assert_eq!(
+            fixture.schema_version,
+            "broca-exhaustive-enumeration-fixtures-v1"
+        );
+        assert_eq!(
+            fixture.protocol_version,
+            EXACT_LEXICAL_ENUMERATION_VERSION
+        );
+
+        let mut index = EvidenceIndex::new();
+        for source in fixture.records {
+            insert_attributed(
+                &mut index,
+                source.hdc_id,
+                &source.evidence_id,
+                &source.trajectory_id,
+                &source.step_id,
+                &source.text,
+            );
+        }
+
+        for case in fixture.cases {
+            let required_role = match case.required_speaker_role.as_deref() {
+                None => None,
+                Some("user") => Some(EvidenceSpeakerRole::User),
+                Some("assistant") => Some(EvidenceSpeakerRole::Assistant),
+                Some(other) => panic!("unexpected fixture speaker role {other:?}"),
+            };
+            let result = index.enumerate_exact_lexical_all_terms_at_snapshot(
+                &case.query,
+                "web",
+                200,
+                300,
+                required_role,
+            ).unwrap();
+            let evidence_ids: Vec<String> = result.matches
+                .iter()
+                .map(|item| item.evidence_id.clone())
+                .collect();
+
+            assert_eq!(evidence_ids, case.expected_evidence_ids, "{}", case.case_id);
+            assert_eq!(result.receipt.matching_record_count, case.expected_matching_count);
+            assert_eq!(result.receipt.distinct_session_count, case.expected_distinct_sessions);
+            assert_eq!(result.receipt.user_authored_match_count, case.expected_user_count);
+            assert_eq!(result.receipt.assistant_authored_match_count, case.expected_assistant_count);
+            assert_eq!(result.receipt.unknown_speaker_match_count, case.expected_unknown_count);
+            index.verify_exact_lexical_enumeration(&result).unwrap();
+        }
+    }
+
     #[test]
     fn speaker_role_parser_fails_closed_for_untrusted_step_id_shapes() {
         assert_eq!(
