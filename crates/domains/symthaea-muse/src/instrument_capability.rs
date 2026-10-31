@@ -18,10 +18,12 @@ pub enum InstrumentFamily {
     Keyboard,
     BowedStrings,
     PluckedStrings,
+    BassStrings,
     Woodwinds,
     Brass,
     FreeReed,
     StruckIdiophones,
+    PluckedIdiophones,
     MembranePercussion,
     Voice,
     Electronic,
@@ -85,6 +87,7 @@ pub struct InstrumentCapabilityProfile {
     pub instrument: Instrument,
     pub family: InstrumentFamily,
     pub native_synthesis: NativeSynthesisPath,
+    pub model_behavior_status: QualificationStatus,
     pub sustains_while_held: bool,
     pub attack_transient: Option<AttackTransientProfile>,
     pub vibrato: Option<VibratoProfile>,
@@ -159,17 +162,18 @@ pub const fn family(instrument: Instrument) -> InstrumentFamily {
         | I::Sitar
         | I::Koto
         | I::Oud
-        | I::UprightBass
         | I::Mandolin
-        | I::Banjo
-        | I::ElectricBass => InstrumentFamily::PluckedStrings,
+        | I::Banjo => InstrumentFamily::PluckedStrings,
+        I::UprightBass | I::ElectricBass => InstrumentFamily::BassStrings,
         I::Flute | I::Clarinet | I::Oboe | I::Bassoon | I::Ney | I::Duduk => {
             InstrumentFamily::Woodwinds
         }
         I::Trumpet | I::FrenchHorn | I::Trombone | I::Tuba => InstrumentFamily::Brass,
         I::Accordion => InstrumentFamily::FreeReed,
-        I::Bell | I::Marimba | I::Kalimba | I::Vibraphone | I::Celesta | I::MusicBox
-        | I::Xylophone => InstrumentFamily::StruckIdiophones,
+        I::Bell | I::Marimba | I::Vibraphone | I::Celesta | I::Xylophone => {
+            InstrumentFamily::StruckIdiophones
+        }
+        I::Kalimba | I::MusicBox => InstrumentFamily::PluckedIdiophones,
         I::Timpani => InstrumentFamily::MembranePercussion,
         I::ChoirAah | I::ChoirOoh => InstrumentFamily::Voice,
         I::Pad | I::SawLead => InstrumentFamily::Electronic,
@@ -220,6 +224,7 @@ pub fn capability_profile(instrument: Instrument) -> InstrumentCapabilityProfile
         instrument,
         family: family(instrument),
         native_synthesis,
+        model_behavior_status: QualificationStatus::CodeDeclared,
         sustains_while_held: instrument.sustains(),
         attack_transient,
         vibrato,
@@ -260,6 +265,7 @@ mod tests {
         for instrument in INSTRUMENT_INVENTORY {
             let profile = capability_profile(instrument);
             assert_eq!(profile.family, family(instrument));
+            assert_eq!(profile.model_behavior_status, QualificationStatus::CodeDeclared);
             assert_eq!(profile.sustains_while_held, instrument.sustains());
             assert_eq!(profile.gm_program, instrument.gm_program());
             assert_eq!(
@@ -325,6 +331,6 @@ mod tests {
     #[test]
     fn all_families_are_non_empty() {
         let families: HashSet<_> = inventory().into_iter().map(|p| p.family).collect();
-        assert_eq!(families.len(), 10);
+        assert_eq!(families.len(), 12);
     }
 }
