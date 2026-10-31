@@ -420,6 +420,42 @@ The same bucketed, log-domain kernel is used by the system-level Eq. 4 cause
 path; end-to-end system-search timing must still be measured separately.
 
 
+### Exact cutset conditioning under a factor-table ceiling
+
+The factor graph also exposes
+`min_fill_log_sum_product_with_cutset`. It conditions an explicit set of
+eliminated binary variables, enumerates every one of the (2^k) assignments,
+runs one preflighted min-fill plan on the residual factor graph, then combines
+branch outputs with log-sum-exp. The residual plan is computed once because all
+conditioned branches retain the same scopes.
+
+This is an exact alternative when ordinary min-fill exceeds the caller's
+largest-factor-table budget. It trades an explicit branch count for a lower
+residual induced width; it does not approximate, truncate, or silently change
+the factorization. A cutset variable absent from all factors is still enumerated
+and correctly contributes its factor-of-two summation. Both the maximum table
+entry count and the maximum number of conditioned branches have independent
+fail-closed budgets.
+
+The factor-entry ceiling bounds individual input/intermediate/output tables,
+not total process RSS. The caller still needs to measure process memory when
+making deployment-level memory claims. The current implementation streams one
+conditioned branch at a time and accumulates only the retained output factor.
+
+A 4x4 grid regression demonstrates the intended regime: full min-fill exceeds an
+eight-entry table ceiling, while conditioning one row leaves a residual graph of
+width at most two. The complete retained-state vector is checked against an
+independent full-joint log-domain enumeration. The separate scale sweep compares
+unconditioned and conditioned results on 4x4, 5x5, 6x6, and 8x8 grids; it records
+branch count, both induced widths, both peak table sizes, and timing. Its timing
+ratio is a cost tradeoff, not a speedup claim.
+
+Run:
+
+    cargo run --release --locked -p symthaea-iit --example cutset_conditioning_sweep
+    cargo run --release --locked -p symthaea-iit --example cutset_conditioning_sweep -- --repeats 15
+
+
 ### Proper-system Eq. 4 background sweep
 
 A second benchmark exercises the public production path
