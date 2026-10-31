@@ -224,6 +224,14 @@ fn parse_timestamp(value: &str, label: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn canonical_config_digest(config: &FreshChallengeConfigV1) -> Result<String, String> {
+    let mut normalized = config.clone();
+    normalized.generator_config_sha256.clear();
+    let bytes = serde_json::to_vec(&normalized)
+        .map_err(|error| format!("cannot serialize normalized generator config: {error}"))?;
+    Ok(hash_domain(b"fresh-generator-config.v1", &bytes))
+}
+
 fn validate_config(config: &FreshChallengeConfigV1, seed: &[u8]) -> Result<(), String> {
     if config.schema != FRESH_CONFIG_SCHEMA {
         return Err(format!("config schema must be {FRESH_CONFIG_SCHEMA}"));
@@ -248,6 +256,9 @@ fn validate_config(config: &FreshChallengeConfigV1, seed: &[u8]) -> Result<(), S
         (&config.generator_config_sha256, "generator_config_sha256"),
     ] {
         validate_digest(value, label)?;
+    }
+    if config.generator_config_sha256 != canonical_config_digest(config)? {
+        return Err("generator_config_sha256 does not match canonical configuration contents".to_owned());
     }
     parse_timestamp(&config.checkpoint_frozen_at_utc, "checkpoint_frozen_at_utc")?;
     parse_timestamp(&config.challenge_generated_at_utc, "challenge_generated_at_utc")?;
@@ -656,7 +667,7 @@ mod tests {
     }
 
     fn config() -> FreshChallengeConfigV1 {
-        FreshChallengeConfigV1 {
+        let mut config = FreshChallengeConfigV1 {
             schema: FRESH_CONFIG_SCHEMA.to_owned(),
             batch_id: "fresh-pilot-001".to_owned(),
             benchmark_id: "symthaea-fresh-instances".to_owned(),
@@ -675,8 +686,10 @@ mod tests {
             generator_source_sha256: digest("generator-source"),
             generator_binary_sha256: digest("generator-binary"),
             runtime_image_sha256: digest("runtime"),
-            generator_config_sha256: digest("generator-config"),
-        }
+            generator_config_sha256: String::new(),
+        };
+        config.generator_config_sha256 = canonical_config_digest(&config).unwrap();
+        config
     }
 
     fn seed() -> Vec<u8> {
@@ -750,6 +763,14 @@ mod tests {
             assert_eq!(b1, entry.parameters.b1);
             assert_eq!(b2, entry.parameters.b2);
         }
+    }
+
+    #[test]
+    fn generator_config_digest_is_bound_to_actual_config_fields() {
+        let mut invalid = config();
+        invalid.matrix_coefficient_max -= 1;
+        assert!(generate_fresh_challenge_bundle(&invalid, &seed())
+            .unwrap_err().contains("does not match canonical configuration"));
     }
 
     #[test]
