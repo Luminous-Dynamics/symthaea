@@ -1,0 +1,419 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-002-activearena-baseline-lock-v0.1.json",
+  "title": "CMAQ-002 ActiveArena external baseline lock",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "baseline_id",
+    "title",
+    "paper_url",
+    "source",
+    "benchmark",
+    "dataset",
+    "assets",
+    "runtime",
+    "policy_baseline",
+    "adapter_readiness",
+    "reproduction_status",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-002-activearena-baseline-lock-v0.1"
+    },
+    "baseline_id": {
+      "const": "activearena"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "paper_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "default_branch",
+        "pinned_commit",
+        "repository_license",
+        "source_file_blobs"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "format": "uri"
+        },
+        "default_branch": {
+          "type": "string"
+        },
+        "pinned_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "repository_license": {
+          "const": "MIT"
+        },
+        "source_file_blobs": {
+          "type": "object",
+          "minProperties": 5,
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          }
+        }
+      }
+    },
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "task_count",
+        "task_families",
+        "categories",
+        "action_dimension",
+        "candidate_visible_camera",
+        "id_configuration",
+        "ood_configuration",
+        "seed_entries_per_task_per_setting",
+        "evaluated_entries_per_task_per_setting",
+        "published_reference_scores"
+      ],
+      "properties": {
+        "task_count": {
+          "const": 35
+        },
+        "task_families": {
+          "const": 2
+        },
+        "categories": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "action_dimension": {
+          "const": 18
+        },
+        "candidate_visible_camera": {
+          "const": "head"
+        },
+        "id_configuration": {
+          "type": "string"
+        },
+        "ood_configuration": {
+          "type": "string"
+        },
+        "seed_entries_per_task_per_setting": {
+          "const": 100
+        },
+        "evaluated_entries_per_task_per_setting": {
+          "const": 50
+        },
+        "published_reference_scores": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "metric",
+            "activearena_oft",
+            "activearena_plan",
+            "source"
+          ],
+          "properties": {
+            "metric": {
+              "type": "string"
+            },
+            "activearena_oft": {
+              "type": "object",
+              "required": [
+                "id",
+                "ood"
+              ],
+              "properties": {
+                "id": {
+                  "type": "number"
+                },
+                "ood": {
+                  "type": "number"
+                }
+              }
+            },
+            "activearena_plan": {
+              "type": "object",
+              "required": [
+                "id",
+                "ood"
+              ],
+              "properties": {
+                "id": {
+                  "type": "number"
+                },
+                "ood": {
+                  "type": "number"
+                }
+              }
+            },
+            "source": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "repository",
+        "observed_status",
+        "observed_license",
+        "immutable_revision",
+        "revision_status",
+        "checksum_manifest_status",
+        "download_status"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "format": "uri"
+        },
+        "observed_status": {
+          "const": "publicly_listed"
+        },
+        "observed_license": {
+          "const": "Apache-2.0"
+        },
+        "immutable_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "revision_status": {
+          "const": "unpinned_metadata_only"
+        },
+        "checksum_manifest_status": {
+          "const": "not_yet_pinned"
+        },
+        "download_status": {
+          "const": "not_downloaded"
+        }
+      }
+    },
+    "assets": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "base_simulator_source",
+        "base_asset_dataset",
+        "activearena_asset_dataset",
+        "download_status",
+        "policy"
+      ],
+      "properties": {
+        "download_status": {
+          "const": "not_downloaded"
+        },
+        "base_asset_dataset": {
+          "type": "object",
+          "required": [
+            "pinned_revision",
+            "license_status"
+          ],
+          "properties": {
+            "pinned_revision": {
+              "type": "string",
+              "minLength": 7
+            },
+            "license_status": {
+              "const": "not_independently_verified_in_this_lock"
+            }
+          }
+        },
+        "activearena_asset_dataset": {
+          "type": "object",
+          "required": [
+            "pinned_revision",
+            "license_status"
+          ],
+          "properties": {
+            "pinned_revision": {
+              "type": "string",
+              "minLength": 7
+            },
+            "license_status": {
+              "const": "not_independently_verified_in_this_lock"
+            }
+          }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "os",
+        "python",
+        "torch",
+        "torchvision",
+        "sapien",
+        "requirements_blob",
+        "resolved_environment_lock"
+      ],
+      "properties": {
+        "os": {
+          "const": "Linux"
+        },
+        "python": {
+          "const": "3.10"
+        },
+        "torch": {
+          "type": "string"
+        },
+        "torchvision": {
+          "type": "string"
+        },
+        "sapien": {
+          "type": "string"
+        },
+        "requirements_blob": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "resolved_environment_lock": {
+          "const": "not_exported"
+        }
+      }
+    },
+    "policy_baseline": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "repository",
+        "pinned_commit",
+        "repository_license",
+        "source_file_blobs",
+        "released_oft_configurations",
+        "action_chunk",
+        "base_vlm",
+        "checkpoint_bundle"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "format": "uri"
+        },
+        "pinned_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "source_file_blobs": {
+          "type": "object",
+          "minProperties": 3,
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          }
+        },
+        "released_oft_configurations": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "action_chunk": {
+          "type": "object",
+          "required": [
+            "predicted_steps",
+            "action_dimension"
+          ],
+          "properties": {
+            "predicted_steps": {
+              "const": 16
+            },
+            "action_dimension": {
+              "const": 18
+            }
+          }
+        },
+        "base_vlm": {
+          "type": "object",
+          "required": [
+            "pinned_revision",
+            "weights_download_status"
+          ],
+          "properties": {
+            "pinned_revision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "weights_download_status": {
+              "const": "not_downloaded"
+            }
+          }
+        },
+        "checkpoint_bundle": {
+          "type": "object",
+          "required": [
+            "immutable_revision",
+            "manifest_sha256",
+            "status"
+          ],
+          "properties": {
+            "immutable_revision": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "manifest_sha256": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "const": "unpinned_not_downloaded"
+            }
+          }
+        }
+      }
+    },
+    "adapter_readiness": {
+      "type": "object",
+      "required": [
+        "status",
+        "required_before_reproduction"
+      ],
+      "properties": {
+        "status": {
+          "const": "protocol_and_source_pins_only"
+        },
+        "required_before_reproduction": {
+          "type": "array",
+          "minItems": 5,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "reproduction_status": {
+      "const": "source_and_evaluation_protocol_pinned_dataset_assets_and_checkpoints_not_frozen"
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
