@@ -132,8 +132,8 @@ impl CoralSeatRound {
             claims,
             round_sha256: String::new(),
         };
-        round.validate_against_board(source_board)?;
         round.round_sha256 = round.compute_digest()?;
+        round.validate_against_board(source_board)?;
         Ok(round)
     }
 
