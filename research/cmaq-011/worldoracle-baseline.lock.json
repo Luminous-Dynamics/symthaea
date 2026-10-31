@@ -1,0 +1,121 @@
+{
+  "schema_version": "cmaq-011-external-baseline-lock-v0.1",
+  "baseline_id": "worldoracle",
+  "name": "WorldOracle: Benchmarking Action-Conditioned World Models against Real-World Executions",
+  "paper": "https://arxiv.org/abs/2610.18826",
+  "paper_publication_date": "2026-10-13",
+  "official_repository": "https://github.com/WorldOracle-benchmark/WorldOracle",
+  "source_commit": "8636e00ba221ed031a8fba5f7384116a8b10b5fa",
+  "source_commit_url": "https://github.com/WorldOracle-benchmark/WorldOracle/commit/8636e00ba221ed031a8fba5f7384116a8b10b5fa",
+  "source_license": "Apache-2.0",
+  "source_files": {
+    "README.md": "c7d3c7e814ce99e86a304a8da5ae7d7027bf4717",
+    "VALIDATION_SET_EVALUATION_RESULTS.md": "db184e72e4eb7aa43c1272f5ba7048adb1c5e698",
+    "LICENSE": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64"
+  },
+  "release": {
+    "official_release_date": "2026-10-15",
+    "leaderboard_open_date": "2026-10-16",
+    "validation_dataset": "https://huggingface.co/datasets/WorldOracle/worldoracle-validation",
+    "observed_validation_dataset_revision": "0ada1ba08b905de0801b7ffd6bdfb4dc4da761ef",
+    "validation_dataset_license": "CC-BY-NC-SA-4.0",
+    "agibot_g2_human_operated_episodes": 20,
+    "agibot_g2_policy_rollout_episodes": 12,
+    "test_inputs": "https://huggingface.co/datasets/WorldOracle/worldoracle-testset",
+    "test_input_episode_count": 268,
+    "test_ground_truth_status": "withheld_and_official_service_scored",
+    "submission_portal": "https://worldoracle-benchmark.github.io/submission/",
+    "validation_dataset_revision": "0ada1ba08b905de0801b7ffd6bdfb4dc4da761ef",
+    "validation_dataset_access": {
+      "status": "access_unresolved_do_not_download",
+      "official_github_readme": "Announces validation release on 2026-10-15 and documents an AgiBot G2 subset.",
+      "current_huggingface_card": "Labels the validation dataset private as observed on 2026-10-31.",
+      "manifest_observed_revision": "0ada1ba08b905de0801b7ffd6bdfb4dc4da761ef",
+      "manifest_listed_episode_count": 67,
+      "manifest_platform_counts": {
+        "agibot": 20,
+        "yam": 15,
+        "human_hand": 20,
+        "policy": 12
+      },
+      "manifest_total_size_bytes_approx": 60600000000,
+      "data_license": "CC-BY-NC-SA-4.0",
+      "required_resolution": "Obtain explicit authorized access and reconcile the official GitHub release announcement with current Hugging Face visibility before any data download or use.",
+      "policy": "Do not download, mirror, train on, redistribute, or claim to have locally evaluated this dataset until access is explicitly authorized. The Apache-2.0 code license does not grant data rights."
+    },
+    "test_input_access": {
+      "status": "private",
+      "episode_count": 268,
+      "contains_ground_truth": false,
+      "policy": "Do not access or mirror. Hidden test ground truth remains withheld and official-service evaluated."
+    },
+    "validation_ground_truth_bytes_approx": null,
+    "access_discrepancy_note": "The official GitHub README describes a public validation release, while the current Hugging Face card labels the dataset private. Treat current effective access as unresolved/restricted; require authorized resolution before use."
+  },
+  "evaluation_contract": {
+    "input_conditioning": "Same initial observation and low-level action trajectory; predicted rollout is compared with its paired real-world execution.",
+    "action_distributions": [
+      "human_operated",
+      "policy_rollout"
+    ],
+    "dimensions": [
+      "physical_state_correctness",
+      "interaction_spatial_alignment",
+      "key_interaction_area_fidelity",
+      "multiview_action_coherence"
+    ],
+    "score_range": "0-100",
+    "aggregation": "Within-task episode averaging, followed by equal weighting across tasks.",
+    "physical_judge_paper_version": "GPT-5.5",
+    "physical_judge_live_leaderboard_version": "GPT-5.6 Luna",
+    "comparability_rule": "Do not mix paper and live leaderboard scores without matching the evaluator version and all metric settings."
+  },
+  "published_validation_scores": [
+    {
+      "track": "WorldOracle-Core",
+      "embodiment": "AgiBot G2",
+      "model": "GE-Sim 2.0",
+      "single_view": 72.25,
+      "multi_view": 78.5
+    },
+    {
+      "track": "WorldOracle-Core",
+      "embodiment": "YAM",
+      "model": "GE-Sim 2.0",
+      "single_view": 69.05,
+      "multi_view": 68.5
+    },
+    {
+      "track": "WorldOracle-Policy",
+      "embodiment": "AgiBot G2",
+      "model": "GE-Sim 2.0",
+      "single_view": 65.99,
+      "multi_view": 73.59
+    },
+    {
+      "track": "WorldOracle-Long",
+      "embodiment": "AgiBot G2",
+      "model": "GE-Sim 2.0",
+      "single_view": 61.04,
+      "multi_view": 69.98
+    },
+    {
+      "track": "WorldOracle-Long",
+      "embodiment": "YAM",
+      "model": "GE-Sim 2.0",
+      "single_view": 52.87,
+      "multi_view": 51.97
+    }
+  ],
+  "reproduction_constraints": {
+    "validation_claim_ceiling": "Official public-validation reference, smaller and less diverse than the hidden test set; expect high variance.",
+    "data_use": "CC BY-NC-SA 4.0 is non-commercial/share-alike. Do not infer commercial training rights from the Apache-2.0 source-code license.",
+    "resource_requirements": "Linux/Python 3.10; CUDA recommended for V-JEPA2, LPIPS and DINOv3. Public AgiBot G2 validation GT is approximately 18.6 GiB, excluding inference files, predictions and checkpoints.",
+    "physical_judge_cost": "Evaluation uses an OpenAI-compatible VLM endpoint. Pin endpoint/model version and account for inference cost.",
+    "no_test_leakage": "Do not use withheld test ground truth; use the official portal for test evaluation.",
+    "source_and_data_pinning": "Before a run, pin exact source, dataset commit, validation manifest, SHA-256 archives, evaluator checkpoints, VLM version, Python/CUDA dependency lock and local configuration."
+  },
+  "reproduction_status": "pinned_official_reference_not_reproduced",
+  "claim_ceiling": "Published validation scores are reference targets, not our measurements. No Symthaea result, matched comparison or SOTA claim exists yet.",
+  "published_validation_scores_note": "The official validation results file is indicative only; the authors warn that the validation set is substantially smaller and less diverse than the test set. It reports scores for selected platforms/tracks, not a complete table over all 67 validation episodes."
+}
