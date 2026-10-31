@@ -1097,7 +1097,6 @@ fn qualify_support_windows(
     let window_count = measurements.len() / channels;
     validate_support_policy(policy, total_frames, window_count)?;
 
-    let mut intervals = Vec::new();
     let mut qualified_channel_windows = 0usize;
     let mut bridged_channel_windows = 0usize;
     let mut qualified_intervals = Vec::new();
@@ -1191,7 +1190,6 @@ fn qualify_support_windows(
     // Keep raw interval diagnostics separate from temporally qualified
     // episode windows. Tail extension is applied after channel union so shared
     // stereo/channel frames are counted only once in the report.
-    let raw_measured = merge_intervals(intervals);
     let qualified_before_tail = merge_intervals(qualified_intervals);
     let baseline_support_frames: u64 = qualified_before_tail
         .iter()
