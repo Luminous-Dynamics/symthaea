@@ -360,6 +360,12 @@ pub fn audit_bytes(bytes: &[u8]) -> DeliveryAuditReport {
         let mut expected = source.first_attempted_sequence;
         let mut completed = false;
         for span in spans {
+            if completed {
+                push_error(&mut report, "E_SEQUENCE_OVERLAP", "$.source_epochs", "an additional published event or classified range appears after the terminal sequence was already accounted");
+                report.counts.overlapping_sequences = report.counts.overlapping_sequences.saturating_add(1);
+                sequence_ok = false;
+                continue;
+            }
             if span.first < expected {
                 push_error(&mut report, "E_SEQUENCE_OVERLAP", "$.source_epochs", "published event or classified range overlaps an earlier sequence span");
                 report.counts.overlapping_sequences = report.counts.overlapping_sequences.saturating_add(1);
@@ -378,7 +384,7 @@ pub fn audit_bytes(bytes: &[u8]) -> DeliveryAuditReport {
             }
             if span.last == source.last_attempted_sequence {
                 completed = true;
-                break;
+                continue;
             }
             match span.last.checked_add(1) {
                 Some(next) => expected = next,
@@ -612,6 +618,22 @@ mod tests {
         let report = audit(&input);
         assert!(!report.sequence_accounting_reconciled);
         assert!(report.errors.iter().any(|e| e.code == "E_SEQUENCE_OVERLAP"));
+    }
+
+
+    #[test]
+    fn classified_range_cannot_cover_sequences_already_published() {
+        let mut input = fixture();
+        input["source_epochs"][0]["reported_lost_count"] = json!(3);
+        input["classified_ranges"] = json!([{
+            "source_id":"bpf:process-exit","epoch_id":"attach-1","partition_id":"cpu:0",
+            "first_sequence":1,"last_sequence":3,
+            "disposition":"lost","reason":"ringbuf_reservation_failure_unknown"
+        }]);
+        let report = audit(&input);
+        assert!(!report.sequence_accounting_reconciled);
+        assert!(report.errors.iter().any(|e| e.code == "E_SEQUENCE_OVERLAP"));
+        assert!(!report.audit_passed);
     }
 
     #[test]
