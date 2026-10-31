@@ -412,6 +412,13 @@ impl ReplayLedger {
 
         let directory = open_absolute_directory(&self.directory)
             .map_err(ReplayError::Intake)?;
+        let directory_metadata = directory.metadata().map_err(|error| ReplayError::Io(error.kind()))?;
+        if !directory_metadata.file_type().is_dir()
+            || directory_metadata.uid() != unsafe { libc::geteuid() }
+            || directory_metadata.mode() & 0o077 != 0
+        {
+            return Err(ReplayError::LedgerDirectoryNotPrivate);
+        }
         let key = key_id(verifying_key);
         let counter_name = single_component(&format!("counter-{}.bin", hex(&key)))
             .map_err(ReplayError::Intake)?;
@@ -428,6 +435,7 @@ impl ReplayLedger {
         let counter_metadata = counter_file.metadata().map_err(ReplayError::Io)?;
         if !counter_metadata.file_type().is_file()
             || counter_metadata.nlink() != 1
+            || counter_metadata.uid() != unsafe { libc::geteuid() }
             || counter_metadata.mode() & 0o077 != 0
             || counter_metadata.len() > 8
         {
@@ -495,6 +503,7 @@ pub enum ReplayError {
     Intake(IntakeError),
     Io(std::io::ErrorKind),
     CounterLedgerCorrupt,
+    LedgerDirectoryNotPrivate,
     CounterNotMonotonic { previous: u64, supplied: u64 },
     AlreadyConsumed,
 }
@@ -506,6 +515,7 @@ impl fmt::Display for ReplayError {
             Self::Intake(error) => write!(f, "replay ledger path operation failed: {error}"),
             Self::Io(kind) => write!(f, "replay ledger I/O failed: {kind:?}"),
             Self::CounterLedgerCorrupt => write!(f, "replay counter ledger is malformed or not private"),
+            Self::LedgerDirectoryNotPrivate => write!(f, "replay ledger directory must be evaluator-owned and not accessible to group or other users"),
             Self::CounterNotMonotonic { previous, supplied } => write!(
                 f,
                 "receipt counter {supplied} is not greater than persisted counter {previous}"
@@ -802,6 +812,48 @@ mod tests {
         assert_eq!(
             ledger.verify_and_consume(&reused_run, &verifier),
             Err(ReplayError::AlreadyConsumed)
+        );
+    }
+
+    #[test]
+    fn replay_ledger_requires_evaluator_private_directory() {
+        let temp = tempfile::tempdir().unwrap();
+        let ledger_dir = temp.path().join("ledger");
+        std::fs::create_dir(&ledger_dir).unwrap();
+        std::fs::set_permissions(
+            &ledger_dir,
+            std::os::unix::fs::PermissionsExt::from_mode(0o755),
+        ).unwrap();
+        let signing_key = SigningKey::from_bytes(&[56_u8; 32]);
+        let receipt = sign_receipt(payload(), &signing_key).unwrap();
+        assert_eq!(
+            ReplayLedger::new(&ledger_dir).verify_and_consume(&receipt, &signing_key.verifying_key()),
+            Err(ReplayError::LedgerDirectoryNotPrivate)
+        );
+    }
+
+    #[test]
+    fn replay_ledger_rejects_counter_regression() {
+        let temp = tempfile::tempdir().unwrap();
+        let ledger_dir = temp.path().join("ledger");
+        std::fs::create_dir(&ledger_dir).unwrap();
+        let signing_key = SigningKey::from_bytes(&[57_u8; 32]);
+        let verifier = signing_key.verifying_key();
+        let ledger = ReplayLedger::new(&ledger_dir);
+
+        let mut first_payload = payload();
+        first_payload.monotonic_counter = 2;
+        let first = sign_receipt(first_payload, &signing_key).unwrap();
+        ledger.verify_and_consume(&first, &verifier).unwrap();
+
+        let mut older_payload = payload();
+        older_payload.monotonic_counter = 1;
+        older_payload.run_id = [8; 16];
+        older_payload.nonce = [9; 16];
+        let older = sign_receipt(older_payload, &signing_key).unwrap();
+        assert_eq!(
+            ledger.verify_and_consume(&older, &verifier),
+            Err(ReplayError::CounterNotMonotonic { previous: 2, supplied: 1 })
         );
     }
 
