@@ -669,23 +669,8 @@ mod tests {
 
     #[test]
     fn answer_oscillations_count_state_changes_without_new_evidence() {
-        let (oracle, windows) = fixture();
-        let candidate = predictions(
-            KnowledgeCandidateAnswer::Value(oracle.initial_value),
-            KnowledgeCandidateAnswer::Value(oracle.corrected_value),
-            KnowledgeCandidateAnswer::Value(oracle.corrected_value),
-            KnowledgeCandidateAnswer::NoFact,
-        );
-        let mut windows = windows;
-        // The current-query expected state changes at correction and retraction.
-        // Add a historical lane where the expected answer is invariant; changing
-        // its candidate state is an unsupported oscillation.
-        for window in windows.iter_mut() {
-            if window.query_id == 77 {
-                window.valid_at = oracle.correction_valid_from.saturating_sub(1);
-            }
-        }
-        let mut history = vec![
+        let (oracle, _) = fixture();
+        let windows = vec![
             KnowledgeExposureWindow {
                 query_id: 88,
                 checkpoint_index: 0,
@@ -701,9 +686,7 @@ mod tests {
                 duration: 8,
             },
         ];
-        windows.extend(history.drain(..));
-        let mut predictions = candidate;
-        predictions.extend([
+        let predictions = [
             KnowledgeTimedPrediction {
                 query_id: 88,
                 checkpoint_index: 0,
@@ -714,9 +697,12 @@ mod tests {
                 checkpoint_index: 1,
                 answer: KnowledgeCandidateAnswer::Value(oracle.corrected_value),
             },
-        ]);
+        ];
+        // This historical valid_at predates correction and retraction, so the
+        // expected answer is constant. A candidate changing it is an oscillation.
         let score = score_temporal_error_debt(&oracle, &windows, &predictions).unwrap();
         assert_eq!(score.answer_oscillations, 1);
+        assert_eq!(score.wrong_belief_exposure, 8);
     }
 
     #[test]
