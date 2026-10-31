@@ -22,13 +22,19 @@
 //!   binds it but does not re-tokenize source content.
 //! - A packet digest is an integrity commitment, not a digital signature.
 
-use crate::memory_evidence::EvidenceSpeakerRole;
+use crate::memory_evidence::{
+    EvidenceIndex, EvidenceSpeakerRole, ExactLexicalEnumerationResult,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 fn is_zero_u32(value: &u32) -> bool {
     *value == 0
+}
+
+fn is_empty_string_set(value: &BTreeSet<String>) -> bool {
+    value.is_empty()
 }
 
 fn require_non_empty(value: &str, field: &str) -> Result<(), String> {
@@ -224,8 +230,62 @@ pub struct ProofObligation {
     /// attributable to the user. Assistant/unknown sources never count.
     #[serde(default, skip_serializing_if = "is_zero_u32")]
     pub minimum_user_authored_evidence: u32,
+    /// Every evidence ID returned by this verified exhaustive enumeration
+    /// must be included in the selected proof. Empty is the legacy/non-count path.
+    #[serde(default, skip_serializing_if = "is_empty_string_set")]
+    pub required_complete_evidence_ids: BTreeSet<String>,
+    /// Digest of the exact enumeration receipt that produced the required IDs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enumeration_receipt_sha256: Option<String>,
     /// Token cost of this selected proof's conclusion/dependency envelope.
     pub selection_overhead_tokens: u32,
+}
+
+impl ProofObligation {
+    /// Bind this required claim to a complete, independently reverified lexical
+    /// enumeration. The generated proof alternative contains every match ID;
+    /// the optimizer and packet verifier enforce that none can be omitted.
+    ///
+    /// Empty enumerations are rejected here: Broca does not yet have a
+    /// separate proof-of-absence capability for zero-match answers.
+    pub fn bind_verified_complete_enumeration(
+        &mut self,
+        index: &EvidenceIndex,
+        enumeration: &ExactLexicalEnumerationResult,
+        justification_id: &str,
+    ) -> Result<(), String> {
+        require_non_empty(justification_id, "justification_id")?;
+        index.verify_exact_lexical_enumeration(enumeration)?;
+        if enumeration.matches.is_empty() {
+            return Err(
+                "empty enumeration cannot support an answer until proof-of-absence is implemented"
+                    .into(),
+            );
+        }
+        if !self.required_complete_evidence_ids.is_empty()
+            || self.enumeration_receipt_sha256.is_some()
+        {
+            return Err("proof obligation already has a complete-enumeration binding".into());
+        }
+        if self.alternatives.iter().any(|item| item.justification_id == justification_id) {
+            return Err("complete-enumeration justification ID is already in use".into());
+        }
+        let required_ids: BTreeSet<String> = enumeration.matches
+            .iter()
+            .map(|item| item.evidence_id.clone())
+            .collect();
+        if required_ids.len() != enumeration.matches.len() {
+            return Err("exact enumeration contains duplicate evidence IDs".into());
+        }
+        self.required_complete_evidence_ids = required_ids.clone();
+        self.enumeration_receipt_sha256 =
+            Some(enumeration.receipt.receipt_sha256.clone());
+        self.alternatives.push(ProofJustification {
+            justification_id: justification_id.into(),
+            evidence_dependencies: required_ids.into_iter().collect(),
+        });
+        Ok(())
+    }
 }
 
 /// Query contract for exact minimum-cost proof selection.
@@ -335,6 +395,23 @@ impl ProofBudgetRequest {
                     obligation.conclusion_id
                 ));
             }
+            if obligation.required_complete_evidence_ids.is_empty() {
+                if obligation.enumeration_receipt_sha256.is_some() {
+                    return Err("enumeration receipt digest cannot exist without required evidence IDs".into());
+                }
+            } else {
+                let receipt_digest = obligation.enumeration_receipt_sha256.as_deref()
+                    .ok_or_else(|| "complete enumeration IDs require an enumeration receipt digest".to_string())?;
+                valid_sha256(receipt_digest, "enumeration_receipt_sha256")?;
+                for evidence_id in &obligation.required_complete_evidence_ids {
+                    if !candidate_ids.contains(evidence_id.as_str()) {
+                        return Err(format!(
+                            "complete enumeration evidence {:?} is absent from proof candidates",
+                            evidence_id
+                        ));
+                    }
+                }
+            }
             if obligation.alternatives.is_empty() {
                 return Err(format!(
                     "proof obligation {:?} must have at least one alternative",
@@ -392,6 +469,7 @@ pub enum JustificationRejectionReason {
     SessionProvenanceMissing,
     DistinctSessionCountInsufficient,
     UserEvidenceCountInsufficient,
+    CompleteEnumerationEvidenceOmitted,
     ContradictoryEvidence,
 }
 
@@ -676,6 +754,18 @@ impl<'a> ExactSearch<'a> {
                 });
                 continue;
             }
+            if self.request.obligations[obligation_index]
+                .required_complete_evidence_ids
+                .iter()
+                .any(|required_id| !alternative.evidence_dependencies.contains(required_id))
+            {
+                self.justification_rejections.insert(JustificationRejection {
+                    conclusion_id: conclusion_id.clone(),
+                    justification_id: alternative.justification_id.clone(),
+                    reason: JustificationRejectionReason::CompleteEnumerationEvidenceOmitted,
+                });
+                continue;
+            }
 
             let mut next_evidence = selected_evidence_ids.clone();
             next_evidence.extend(alternative.evidence_dependencies.iter().cloned());
@@ -794,6 +884,9 @@ impl<'a> ExactSearch<'a> {
                     || families.len() < obligation.minimum_independent_families as usize
                     || sessions.len() < obligation.minimum_distinct_sessions as usize
                     || user_authored_evidence.len() < obligation.minimum_user_authored_evidence as usize
+                    || obligation.required_complete_evidence_ids
+                        .iter()
+                        .any(|required_id| !alternative.evidence_dependencies.contains(required_id))
                 {
                     continue;
                 }
@@ -1074,6 +1167,15 @@ pub fn verify_proof_packet(
                 selected.justification_id
             ));
         }
+        if obligation.required_complete_evidence_ids
+            .iter()
+            .any(|required_id| !justification.evidence_dependencies.contains(required_id))
+        {
+            return Err(format!(
+                "selected proof {:?} omits evidence required by its exact enumeration receipt",
+                selected.justification_id
+            ));
+        }
 
         let mut independent_families = BTreeSet::new();
         let mut distinct_sessions = BTreeSet::new();
@@ -1266,6 +1368,8 @@ mod tests {
             minimum_independent_families: 1,
             minimum_distinct_sessions: 0,
             minimum_user_authored_evidence: 0,
+            required_complete_evidence_ids: BTreeSet::new(),
+            enumeration_receipt_sha256: None,
             selection_overhead_tokens: 0,
         }
     }
