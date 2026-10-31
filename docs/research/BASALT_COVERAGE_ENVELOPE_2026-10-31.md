@@ -14,7 +14,7 @@ The coverage envelope adds a separate, run-level claim whose scope is bound to a
 - Auditor: `xtask/src/basalt_coverage.rs`
 - CLI: `basalt-coverage-envelope-audit --profile PROFILE.json --receipt ENVELOPE.json`
 
-The profile is explicitly `candidate_not_qualified`. It scopes Linux x86_64/aarch64 and names nine channels: filesystem, process, environment, generated artifacts, toolchain, cache, network, observer integrity, and snapshot consistency. It also lists the capture controls required before any complete-within-profile statement can be accepted.
+The profile is explicitly `candidate_not_qualified`. It scopes Linux x86_64/aarch64 and names nine channels with 33 required event kinds: filesystem, process, environment, generated artifacts, toolchain, cache, network, observer integrity, and snapshot consistency. It lists ten controls required before any complete-within-profile statement can be accepted, including hook-attachment inventory, sandbox-policy binding, and snapshot-manifest binding.
 
 ## Coverage claim contract
 
@@ -26,7 +26,7 @@ Each required channel appears exactly once in the envelope. Each required event 
 
 Missing or duplicate channel records, missing or duplicate event classifications, unprofiled channels/event kinds, malformed digests, root-path traversal, and profile-byte mismatch make the envelope invalid or unbound.
 
-A `complete_within_profile` claim is consistent only when all required event kinds are observed, all required controls are active, platform constraints match, kernel build identity and BTF digest are present when required, the capture interval is increasing, the process tree is closed, the snapshot is stable, monitored roots are explicit, and all event-loss/overflow/restart/unmonitored-child/root-escape counters are zero.
+A `complete_within_profile` claim is consistent only when all required event kinds are observed, all required controls are active, platform constraints match, kernel build identity and BTF digest are present when required, observer configuration/hook-set/sandbox-policy/snapshot-manifest digests are present, the capture interval is increasing, the process tree is closed, the snapshot is stable, monitored roots are explicit, and all event-loss/overflow/restart/unmonitored-child/root-escape counters are zero.
 
 An honest `incomplete` or `unsupported` claim is reportable but never becomes complete. Unsupported platform claims remain explicit; they cannot satisfy the complete gate.
 
