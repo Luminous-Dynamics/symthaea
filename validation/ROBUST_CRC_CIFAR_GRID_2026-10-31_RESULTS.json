@@ -1,0 +1,106 @@
+{
+  "schema": "symthaea-distributionally-robust-crc-grid-v1",
+  "status": "INDEPENDENT_REFERENCE_REPLAY_OF_171_SCENARIO_MAXIMIN_LP_NOT_CONTINUOUS_ROBUSTNESS_THEOREM",
+  "protocol": {
+    "n_calibration": 50,
+    "alpha": 0.1,
+    "population_total": 10000,
+    "min_count_per_type": 500,
+    "step": 500,
+    "scenario_count": 171,
+    "scenario_set": "all integer triples (N0,N1,N2) with each Ni>=500, sum=10000, and every Ni on a 500-count lattice",
+    "action_support": [
+      0,
+      1,
+      2
+    ],
+    "objective": "maximize the minimum expected correct specificity across all 171 finite-population scenarios",
+    "calibration_weights": "multivariate hypergeometric for each scenario",
+    "conditional_test_type_weights": "residual population after the calibration count vector",
+    "risk_constraints": "all 1,378 augmented count vectors, independent of scenario weights",
+    "lp_dimensions": {
+      "variables": 3979,
+      "inequalities": 1549,
+      "equalities": 1326
+    }
+  },
+  "results": {
+    "robust": {
+      "worst_specificity": 0.014454279425482811,
+      "worst_scenario": [
+        500,
+        500,
+        9000
+      ],
+      "worst_expected_risk": 0.09999997625017225,
+      "worst_node_size": 78.88912843736307,
+      "epigraph_t": 0.014454279425481033
+    },
+    "equal_share_500": {
+      "worst_specificity": 0.014454282809287395,
+      "worst_scenario": [
+        500,
+        500,
+        9000
+      ],
+      "worst_expected_risk": 0.10000000000001585,
+      "worst_node_size": 78.88912343073024
+    },
+    "nominal_oracle": {
+      "worst_specificity": 4.2978668120425827e-13,
+      "worst_scenario": [
+        500,
+        9000,
+        500
+      ],
+      "worst_expected_risk": 0.09999988584932118,
+      "worst_node_size": 99.99999999980973
+    },
+    "robust_minus_equal_share_specificity_pp": -3.3838045837564223e-7,
+    "robust_minus_nominal_specificity_pp": 1.445427942505762
+  },
+  "solver": {
+    "method": "HiGHS",
+    "solver_time_seconds": 1.6049808640000265,
+    "full_scenario_comparison_runtime_seconds": 16.333244363000176,
+    "kkt": {
+      "primal_inequality_violation": 5.3584692238928255e-11,
+      "primal_equality_residual": 2.220446049250313e-16,
+      "dual_sign_violation": 0,
+      "stationarity_max_abs": 9.743158229034389e-10,
+      "complementarity_max_abs": 1.7780915628762273e-15,
+      "duality_gap_abs": 0
+    }
+  },
+  "equal_share_verification": {
+    "rounds": 500,
+    "max_augmented_budget_excess": 2.6645352591003757e-15,
+    "all_augmented_states_checked": true
+  },
+  "interpretation": [
+    "The nominal oracle utility policy loses almost all specificity on the extreme mixture (500,9000,500), despite remaining risk-valid.",
+    "The robust maximin policy preserves a specificity floor of about 1.44543% across the 171-scenario grid.",
+    "Equal-share has essentially the same worst-case specificity floor; the difference is below solver tolerance. It appears maximin-optimal for this grid and common-depth family.",
+    "The value of the robust optimizer here is protection against nominal objective misspecification, not an improvement over equal-share.",
+    "The LP risk constraints cover all augmented states, not only the 171 scenarios."
+  ],
+  "local_validation": {
+    "tests_authored": 10,
+    "tests_executed_against_exact_committed_module": false,
+    "independent_reference_solver_execution": true,
+    "scenarios_solved": 171,
+    "all_augmented_states_checked": true,
+    "remote_ci": "not run; draft PR"
+  },
+  "digests": {
+    "robust_policy_sha256": "303272518e4486c166071ba55a04d371a30e0b0692a317edb4c13a8024ed48ce",
+    "scenario_set_sha256": "79237ce9fc94c82545cbbb19cb0c0fbb8013048f4f9a65e028ba0dc43dcb846c"
+  },
+  "limitations": [
+    "the set is a 5-percentage-point lattice, not the continuous simplex",
+    "no guarantee for mixtures outside the finite grid",
+    "finite-exchangeability expected-risk guarantee only, not a shift-robust risk theorem",
+    "common-depth only; no per-image confidence adaptation",
+    "exact committed source/tests not yet executed in a clean checkout"
+  ]
+}

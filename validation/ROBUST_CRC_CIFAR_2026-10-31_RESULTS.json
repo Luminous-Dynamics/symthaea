@@ -1,0 +1,191 @@
+{
+  "schema": "symthaea-distributionally-robust-crc-v1",
+  "status": "INDEPENDENT_FINITE_SCENARIO_MAXIMIN_REPLAY_NOT_DISTRIBUTION_SHIFT_GUARANTEE",
+  "reference": "Bai & Ramdas (2026), arXiv:2610.35821; common-depth CIFAR-100 family",
+  "protocol": {
+    "n_calibration": 50,
+    "alpha": 0.1,
+    "population_total": 10000,
+    "scenarios": {
+      "nominal": [
+        7300,
+        969,
+        1731
+      ],
+      "less_superclass_correct": [
+        7300,
+        500,
+        2200
+      ],
+      "more_fine_errors": [
+        6500,
+        1200,
+        2300
+      ],
+      "higher_accuracy": [
+        8000,
+        800,
+        1200
+      ],
+      "mixed_shift": [
+        7000,
+        1500,
+        1500
+      ]
+    },
+    "scenario_set_predeclared": true,
+    "action_support": [
+      0,
+      1,
+      2
+    ],
+    "objective": "maximize the minimum expected correct specificity across the five finite-population scenarios",
+    "calibration_weights": "multivariate hypergeometric for each scenario",
+    "conditional_test_type_weights": "residual finite population after the calibration count state",
+    "validity": "all 1,378 augmented count-vector constraints for the common-depth CRC risk are enforced independently of scenario weights"
+  },
+  "state_counts": {
+    "calibration": 1326,
+    "augmented": 1378
+  },
+  "results": {
+    "robust_epigraph_worst_case_specificity": 0.4159102891287924,
+    "robust_actual_min_scenario_specificity": 0.41591029333583857,
+    "nominal_oracle_min_scenario_specificity": 0.41591030144368635,
+    "equal_share_min_scenario_specificity": 0.4158355792322707,
+    "worst_case_gain_robust_vs_equal_share_pp": 0.007471410660787,
+    "robust_vs_nominal_minimax_gap_pp": -8.107837778e-7,
+    "scenario_metrics": {
+      "nominal": {
+        "robust": {
+          "risk": 0.09988542049954639,
+          "specificity": 0.5311682698385872,
+          "node_size": 10.3209248649739
+        },
+        "nominal_oracle": {
+          "risk": 0.09988545174891898,
+          "specificity": 0.5311683725558562,
+          "node_size": 10.320910868793854
+        },
+        "equal_share": {
+          "risk": 0.09979405103349023,
+          "specificity": 0.5310382212594941,
+          "node_size": 10.323619794922095
+        }
+      },
+      "less_superclass_correct": {
+        "robust": {
+          "risk": 0.09994944134672265,
+          "specificity": 0.4399504764737199,
+          "node_size": 19.591635841434176
+        },
+        "nominal_oracle": {
+          "risk": 0.09994947593399583,
+          "specificity": 0.4399505789872779,
+          "node_size": 19.591621890265607
+        },
+        "equal_share": {
+          "risk": 0.09992795847989117,
+          "specificity": 0.4399150952076785,
+          "node_size": 19.592259236404548
+        }
+      },
+      "more_fine_errors": {
+        "robust": {
+          "risk": 0.09999518260909963,
+          "specificity": 0.41591029333583857,
+          "node_size": 21.883930418152563
+        },
+        "nominal_oracle": {
+          "risk": 0.09999518353128628,
+          "specificity": 0.41591030144368635,
+          "node_size": 21.883928717380716
+        },
+        "equal_share": {
+          "risk": 0.09990744097546189,
+          "specificity": 0.4158355792322707,
+          "node_size": 21.885933157292087
+        }
+      },
+      "higher_accuracy": {
+        "robust": {
+          "risk": 0.09812771093225225,
+          "specificity": 0.6552342620565537,
+          "node_size": 4.29781696019696
+        },
+        "nominal_oracle": {
+          "risk": 0.09812993657012445,
+          "specificity": 0.6552453208747332,
+          "node_size": 4.296446694094406
+        },
+        "equal_share": {
+          "risk": 0.09809966320208588,
+          "specificity": 0.6551762704094812,
+          "node_size": 4.297659647572869
+        }
+      },
+      "mixed_shift": {
+        "robust": {
+          "risk": 0.0997888242489356,
+          "specificity": 0.5622940941966921,
+          "node_size": 7.229509449137556
+        },
+        "nominal_oracle": {
+          "risk": 0.0997888425815243,
+          "specificity": 0.562294821150555,
+          "node_size": 7.229371059974484
+        },
+        "equal_share": {
+          "risk": 0.09978595994244212,
+          "specificity": 0.5622923577367357,
+          "node_size": 7.229447944627005
+        }
+      }
+    },
+    "scenario_risk_max_robust": 0.09999518260909963
+  },
+  "solver": {
+    "method": "HiGHS",
+    "runtime_seconds": 0.03633033899996008,
+    "objective_t": 0.4159102891287924,
+    "kkt": {
+      "primal_inequality_violation": 8.881784197001252e-16,
+      "primal_equality_residual": 0,
+      "dual_sign_violation": 0,
+      "stationarity_max_abs": 9.989173915414722e-10,
+      "complementarity_max_abs": 4.207046266913039e-9,
+      "duality_gap_abs": 2.220446049250313e-16
+    }
+  },
+  "equal_share_replay": {
+    "rounds": 500,
+    "maximum_augmented_budget_excess": 2.6645352591003757e-15,
+    "all_augmented_states_valid": true
+  },
+  "digests": {
+    "robust_policy_sha256": "303272518e4486c166071ba55a04d371a30e0b0692a317edb4c13a8024ed48ce",
+    "scenario_set_sha256": "79237ce9fc94c82545cbbb19cb0c0fbb8013048f4f9a65e028ba0dc43dcb846c"
+  },
+  "local_validation": {
+    "tests_authored": 8,
+    "exact_committed_module_tests_executed": false,
+    "independent_reference_execution": true,
+    "scenario_LP_solved": true,
+    "all_1378_augmented_risk_constraints": true,
+    "robust_KKT_receipt_checked": true,
+    "remote_CI": "not run; PR is draft"
+  },
+  "interpretation": [
+    "The finite-scenario robust LP improves the minimum scenario specificity over equal-share by about 0.00747 percentage points.",
+    "The nominal-oracle policy is within about 8.1e-9 absolute specificity of the robust optimum on this five-scenario set, so robustness costs essentially nothing in this pilot.",
+    "All scenario risks remain at or below alpha=.10, but the formal finite-exchangeability certificate comes from all augmented states, not the five utility scenarios.",
+    "This does not provide distribution-shift validity outside the predeclared scenario set."
+  ],
+  "limitations": [
+    "only five finite population mixtures are optimized; the objective is not robust to arbitrary unseen populations",
+    "the scenarios are illustrative and must be frozen independently of test outcomes",
+    "common-depth three-type policy only; confidence-adaptive per-image breakpoints are separate",
+    "expected-risk finite-exchangeability only; no high-probability or conditional-risk guarantee",
+    "eight tests are authored but exact module/test bytes have not been executed in a clean checkout"
+  ]
+}
