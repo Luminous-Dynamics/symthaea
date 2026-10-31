@@ -1023,6 +1023,40 @@ mod tests {
         audit_bytes(value.to_string().as_bytes())
     }
 
+    fn make_seal(ledger_bytes: &[u8]) -> Vec<u8> {
+        let ledger: DeliveryLedger = serde_json::from_slice(ledger_bytes).unwrap();
+        let source = ledger.source_epochs.first().unwrap();
+        let key = source.key();
+        let events: Vec<&DeliveryEvent> = ledger.events.iter().filter(|event| event.key() == key).collect();
+        let ranges: Vec<&ClassifiedRange> = ledger.classified_ranges.iter().filter(|range| range.key() == key).collect();
+        let mut seal = SourceEpochSeal {
+            format_version: 1,
+            suite_id: "basalt-source-epoch-seal-v1".to_string(),
+            source_id: key.source_id,
+            epoch_id: key.epoch_id,
+            partition_id: key.partition_id,
+            observer_binary_digest: ledger.observer_binary_digest,
+            observer_configuration_digest: ledger.observer_configuration_digest,
+            first_attempted_sequence: source.first_attempted_sequence,
+            last_attempted_sequence: source.last_attempted_sequence,
+            published_event_count: events.len() as u64,
+            published_event_chain_root: event_chain_root(&source.key(), &events).unwrap(),
+            classified_range_count: ranges.len() as u64,
+            classified_range_chain_root: classified_range_chain_root(&source.key(), &ranges).unwrap(),
+            close_fence_digest: source.close_fence_digest.clone(),
+            producer_quiescence_evidence_digest: digest(7),
+            producer_quiesced_at_monotonic_ns: 800,
+            consumer_drain_evidence_digest: digest(8),
+            consumer_drained_at_monotonic_ns: 900,
+            generation: 1,
+            previous_seal_digest: None,
+            ledger_digest: sha256_tagged(ledger_bytes),
+            commitment_digest: digest(9),
+        };
+        seal.commitment_digest = compute_seal_commitment(&seal).unwrap();
+        serde_json::to_vec(&seal).unwrap()
+    }
+
     fn add_lost_tail(value: &mut Value) {
         value["events"].as_array_mut().unwrap().pop();
         value["source_epochs"][0]["reported_published_count"] = json!(2);
@@ -1238,6 +1272,97 @@ mod tests {
         assert!(!report.ledger_well_formed);
         assert!(!report.audit_passed);
         assert!(report.errors.iter().any(|e| e.code == "E_AGGREGATE_COUNT_OVERFLOW"));
+    }
+
+    #[test]
+    fn matching_epoch_seal_passes_integrity_but_never_qualifies_trust() {
+        let ledger = fixture().to_string().into_bytes();
+        let seal = make_seal(&ledger);
+        let report = audit_seal_bytes(&ledger, &seal);
+        assert!(report.integrity_passed, "{:?}", report.errors);
+        assert!(!report.signature_verified);
+        assert!(!report.signer_authorized);
+        assert!(!report.anti_rollback_verified);
+        assert!(!report.close_coordinator_qualified);
+        assert!(!report.observer_delivery_qualified);
+        assert!(!report.qualification_eligible);
+    }
+
+    #[test]
+    fn byte_level_ledger_mutation_breaks_exact_seal_binding() {
+        let ledger = fixture().to_string().into_bytes();
+        let seal = make_seal(&ledger);
+        let mut mutated = ledger.clone();
+        mutated.push(b' ');
+        let report = audit_seal_bytes(&mutated, &seal);
+        assert!(!report.integrity_passed);
+        assert!(!report.ledger_binding_matches);
+        assert!(report.errors.iter().any(|error| error.code == "E_SEAL_LEDGER_BINDING"));
+    }
+
+    #[test]
+    fn recomputed_ledger_digest_does_not_hide_mutated_event_chain() {
+        let original = fixture().to_string().into_bytes();
+        let original_seal = make_seal(&original);
+        let mut seal: SourceEpochSeal = serde_json::from_slice(&original_seal).unwrap();
+        let mut changed: Value = serde_json::from_slice(&original).unwrap();
+        changed["events"][0]["event_digest"] = json!(digest(99));
+        let changed_bytes = changed.to_string().into_bytes();
+        seal.ledger_digest = sha256_tagged(&changed_bytes);
+        seal.commitment_digest = compute_seal_commitment(&seal).unwrap();
+        let report = audit_seal_bytes(&changed_bytes, &serde_json::to_vec(&seal).unwrap());
+        assert!(report.ledger_binding_matches);
+        assert!(!report.event_chain_matches);
+        assert!(!report.integrity_passed);
+        assert!(report.errors.iter().any(|error| error.code == "E_SEAL_EVENT_CHAIN"));
+    }
+
+    #[test]
+    fn seal_commitment_tampering_is_rejected() {
+        let ledger = fixture().to_string().into_bytes();
+        let seal_bytes = make_seal(&ledger);
+        let mut seal: Value = serde_json::from_slice(&seal_bytes).unwrap();
+        seal["consumer_drain_evidence_digest"] = json!(digest(77));
+        let report = audit_seal_bytes(&ledger, seal.to_string().as_bytes());
+        assert!(!report.commitment_matches);
+        assert!(!report.integrity_passed);
+    }
+
+    #[test]
+    fn later_generation_requires_a_predecessor_digest() {
+        let ledger = fixture().to_string().into_bytes();
+        let seal_bytes = make_seal(&ledger);
+        let mut seal: SourceEpochSeal = serde_json::from_slice(&seal_bytes).unwrap();
+        seal.generation = 2;
+        seal.commitment_digest = compute_seal_commitment(&seal).unwrap();
+        let report = audit_seal_bytes(&ledger, &serde_json::to_vec(&seal).unwrap());
+        assert!(!report.seal_well_formed);
+        assert!(report.errors.iter().any(|error| error.code == "E_SEAL_GENERATION_LINK"));
+    }
+
+    #[test]
+    fn consumer_drain_cannot_precede_producer_quiescence() {
+        let ledger = fixture().to_string().into_bytes();
+        let seal_bytes = make_seal(&ledger);
+        let mut seal: SourceEpochSeal = serde_json::from_slice(&seal_bytes).unwrap();
+        seal.producer_quiesced_at_monotonic_ns = 900;
+        seal.consumer_drained_at_monotonic_ns = 800;
+        seal.commitment_digest = compute_seal_commitment(&seal).unwrap();
+        let report = audit_seal_bytes(&ledger, &serde_json::to_vec(&seal).unwrap());
+        assert!(!report.source_close_claims_match);
+        assert!(!report.integrity_passed);
+    }
+
+    #[test]
+    fn seal_cannot_be_retargeted_to_an_unknown_source() {
+        let ledger = fixture().to_string().into_bytes();
+        let seal_bytes = make_seal(&ledger);
+        let mut seal: SourceEpochSeal = serde_json::from_slice(&seal_bytes).unwrap();
+        seal.source_id = "different-source".to_string();
+        seal.commitment_digest = compute_seal_commitment(&seal).unwrap();
+        let report = audit_seal_bytes(&ledger, &serde_json::to_vec(&seal).unwrap());
+        assert!(!report.integrity_passed);
+        assert!(report.errors.iter().any(|error| error.code == "E_SEAL_SOURCE_UNKNOWN"));
     }
 
     #[test]
