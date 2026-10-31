@@ -23,19 +23,22 @@
     "config_sha256": "49fe170c255c14b93808ad8de22f1300cdc2e342374295e0ed0990be5f0f7b11",
     "weights_sha256": null,
     "adapter_sha256": null,
-    "build_status": "source_only_not_compiled"
+    "build_status": "source_only_not_compiled",
+    "config_path": "research/cmaq-common/examples/assets/cmaq018/candidate-config.v0.1.json"
   },
   "generator": {
     "name": "CMAQ-018 deterministic same-history branch generator",
     "source_commit": "836a418b8ca2f9c0c61f5b7ef212ff09817ccbc0",
-    "config_sha256": "cdc87841a4a5de86ebfe96e67de32695e685aec87b6fc9dde56d5162af9151e6"
+    "config_sha256": "cdc87841a4a5de86ebfe96e67de32695e685aec87b6fc9dde56d5162af9151e6",
+    "config_path": "research/cmaq-common/examples/assets/cmaq018/generator-config.v0.1.json"
   },
   "evaluator": {
     "name": "CMAQ-018 branch-fidelity evaluator",
     "source_commit": "836a418b8ca2f9c0c61f5b7ef212ff09817ccbc0",
     "metric_bundle_sha256": "e031f529ddbb7e489c1875e98973d6d2f451d9fd06cee501701a45f167775f9a",
     "version": "0.1.0",
-    "external_judge": null
+    "external_judge": null,
+    "metric_bundle_path": "research/cmaq-common/examples/assets/cmaq018/metric-bundle.v0.1.json"
   },
   "data_sources": [
     {
@@ -53,7 +56,8 @@
         "canonical_action.id",
         "canonical_action.force",
         "canonical_action.grip"
-      ]
+      ],
+      "manifest_path": "research/cmaq-common/examples/assets/cmaq018/data-manifest.v0.1.json"
     }
   ],
   "task_contract": {
@@ -74,7 +78,11 @@
     "controller_horizon": 1,
     "base_simulator_horizon": 1,
     "reward_aggregation": "single_step",
-    "termination_semantics": "terminal branch is retained and charged its explicit terminal utility penalty"
+    "termination_semantics": "terminal branch is retained and charged its explicit terminal utility penalty",
+    "observation_schema_path": "research/cmaq-common/examples/assets/cmaq018/observation-schema.v0.1.json",
+    "action_schema_path": "research/cmaq-common/examples/assets/cmaq018/action-schema.v0.1.json",
+    "reward_definition_path": "research/cmaq-common/examples/assets/cmaq018/reward-definition.v0.1.json",
+    "wrapper_stack_path": "research/cmaq-common/examples/assets/cmaq018/wrapper-stack.v0.1.json"
   },
   "sample": {
     "episode_count": 64,
