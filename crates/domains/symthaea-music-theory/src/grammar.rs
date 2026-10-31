@@ -388,7 +388,8 @@ pub fn compose_with_grammar_plan(
     // Universal safety net: every dedicated engine (GrooveCycle,
     // ProcessAdditive, RagaModalArc, Blues/Jazz, ProgSuite, Sonata,
     // Renaissance, Fugue, and the shared period pipeline) receives the same
-    // pipeline applies internally, so the trace below and the debug gate
+    // de-overlap/metadata-sync pass used by the canonical composer, so the
+    // trace below and the debug gate
     // after it both see the corrected score, not a pre-correction one.
     crate::composer::deoverlap_all_voices(&mut realized.score);
     crate::composer::sync_total_beats(&mut realized.score);
