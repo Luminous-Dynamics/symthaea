@@ -797,7 +797,7 @@ mod tests {
                     scale_upper: 10.0,
                 },
             ],
-            reference_point_utility: vec![0.0, 0.0],
+            reference_point_utility: vec![-0.1, -0.1],
             crossover_probability: 0.9,
             mutation_probability: 0.1,
             crossover_distribution_index: 15.0,
@@ -830,7 +830,7 @@ mod tests {
                     scale_upper: 2.0,
                 },
             ],
-            reference_point_utility: vec![0.0, 0.0, 0.0],
+            reference_point_utility: vec![-0.1, -0.1, -0.1],
             crossover_probability: 0.9,
             mutation_probability: 0.1,
             crossover_distribution_index: 15.0,
@@ -878,15 +878,15 @@ mod tests {
 
     #[test]
     fn hypervolume_contribution_removes_the_least_contributing_point() {
-        let mut population = vec![
-            Individual { decision: vec![0.0], objectives: vec![0.8, 0.2], utility: vec![0.8, 0.8], rank: 0, crowding_distance: 0.0, ordinal: 0 },
-            Individual { decision: vec![0.1], objectives: vec![0.2, 0.8], utility: vec![0.2, 0.2], rank: 0, crowding_distance: 0.0, ordinal: 1 },
-            Individual { decision: vec![0.2], objectives: vec![0.4, 0.4], utility: vec![0.4, 0.6], rank: 0, crowding_distance: 0.0, ordinal: 2 },
-            Individual { decision: vec![0.3], objectives: vec![0.6, 0.3], utility: vec![0.6, 0.7], rank: 0, crowding_distance: 0.0, ordinal: 3 },
+        let population = vec![
+            Individual { decision: vec![0.0], objectives: vec![0.2, 0.8], utility: vec![0.8, 0.2], rank: 0, crowding_distance: 0.0, ordinal: 0 },
+            Individual { decision: vec![0.1], objectives: vec![0.8, 0.2], utility: vec![0.2, 0.8], rank: 0, crowding_distance: 0.0, ordinal: 1 },
+            Individual { decision: vec![0.2], objectives: vec![0.6, 0.45], utility: vec![0.4, 0.55], rank: 0, crowding_distance: 0.0, ordinal: 2 },
+            Individual { decision: vec![0.3], objectives: vec![0.45, 0.6], utility: vec![0.55, 0.4], rank: 0, crowding_distance: 0.0, ordinal: 3 },
         ];
-        let selected = environmental_selection(population.clone(), 3, &[0.0, 0.0]).unwrap();
+        let selected = environmental_selection(population, 3, &[0.0, 0.0]).unwrap();
         assert_eq!(selected.len(), 3);
-        assert!(population.iter().any(|individual| !selected.iter().any(|selected| selected.ordinal == individual.ordinal)));
+        assert!(!selected.iter().any(|individual| individual.ordinal == 3));
     }
 
     #[test]
