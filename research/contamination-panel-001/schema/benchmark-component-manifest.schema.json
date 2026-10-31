@@ -287,6 +287,8 @@
         "grader_source_sha256",
         "rubric_sha256",
         "metric_definition_sha256",
+        "thresholds_sha256",
+        "blocking_rules_sha256",
         "score_report_schema_sha256",
         "check_ids",
         "aggregation_policy_sha256"
@@ -335,6 +337,14 @@
           }
         },
         "aggregation_policy_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "thresholds_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "blocking_rules_sha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         }
