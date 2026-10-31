@@ -18,6 +18,10 @@ The machine-readable registry is \`industry-baseline-ledger-v1.json\`.
 | Mem0 Platform | LongMemEval | 94.4% | Vendor result / third-party method audit | 472/500; original LongMemEval, not LongMemEval-V2 |
 | AgentRunbook-C | LongMemEval-V2 | 74.9% Small / 70.1% Medium | Benchmark reference | Separate V2 protocol, latency 108.3s / 139.9s |
 | TSHMem | LongMemEval S* | 66.3% (+18.6 pp vs paper's strongest baseline) | Peer-reviewed EMNLP 2026 | Paper-specific S* variant; do not pool with original or V2 LongMemEval without matching protocol |
+| AMA-Agent | AMA-Bench | 57.22% (+11.16 pp vs paper's strongest baseline) | Peer-reviewed ICML 2026 | Agent-environment trajectories; distinct from conversational QA benchmarks |
+| MemoryArena | Interdependent multi-session agent tasks | Benchmark profile | Peer-reviewed ICML 2026 | Tests learning from earlier actions and reuse on dependent later subtasks; not one aggregate score |
+| UltraHorizon | Partially-observable ultra-long exploration | 200K+ tokens / 400+ tool calls in heavy setting | Peer-reviewed ICML 2026 | Scale descriptor, not accuracy; human performance substantially exceeds current agents in paper |
+| agent_memory state-packet system | MemoryArena formal_reasoning_phys | 100% final-paper success (20/20) | Public project self-report | 14 Oct run; gpt-5.6-sol; small 20-paper sample, not a general SOTA claim |
 | TimlMemBench | Governed memory use | 208 reviewed samples / 1,715 questions / 1,821 governance cases | Peer-reviewed Findings benchmark | Distinguishes canonical-pool QA from raw-native ingestion; not a system accuracy score |
 | UTILMEM | Evidence utilization | 1,717 instances across 5 domains | Peer-reviewed EMNLP 2026 benchmark | Tests distributed evidence synthesis and distractor resistance; not a system leaderboard score |
 | LOCOMO-CONV | In-situ conversational memory | Dialog / implicit / counterfactual / composed | Peer-reviewed Findings benchmark | LoCoMo-derived; QA-only recall misses implicit and composed usage failures |
