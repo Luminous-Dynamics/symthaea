@@ -99,6 +99,7 @@ pub enum IntervalError {
     InvalidActionManifestDigest,
     EmptyOutcomeChannel,
     InvalidJointDrawDigest,
+    JointDrawBankDigestMismatch,
     InsufficientJointDraws,
     DuplicateActionId,
     DuplicateJointDrawId,
@@ -187,6 +188,17 @@ pub fn paired_effect_interval(
 pub fn validate_joint_action_set(
     bank: &JointActionSetSamples,
 ) -> Result<(), IntervalError> {
+    validate_joint_action_set_shape(bank)?;
+    let expected_digest = compute_joint_draw_bank_sha256(bank)?;
+    if expected_digest != bank.joint_draw_bank_sha256 {
+        return Err(IntervalError::JointDrawBankDigestMismatch);
+    }
+    Ok(())
+}
+
+fn validate_joint_action_set_shape(
+    bank: &JointActionSetSamples,
+) -> Result<(), IntervalError> {
     if bank.horizon_steps == 0 {
         return Err(IntervalError::InvalidHorizon);
     }
@@ -230,6 +242,96 @@ pub fn validate_joint_action_set(
         }
     }
     Ok(())
+}
+
+
+fn append_len_prefixed(buffer: &mut Vec<u8>, bytes: &[u8]) {
+    buffer.extend_from_slice(&(bytes.len() as u64).to_le_bytes());
+    buffer.extend_from_slice(bytes);
+}
+
+fn append_u64_values(buffer: &mut Vec<u8>, values: &[u64]) {
+    buffer.extend_from_slice(&(values.len() as u64).to_le_bytes());
+    for value in values {
+        buffer.extend_from_slice(&value.to_le_bytes());
+    }
+}
+
+/// Canonical SHA-256 of the action/draw/sample content. The digest excludes
+/// the digest field itself and includes action order, so a row permutation
+/// must also permute the sample rows and recompute the bank digest.
+pub fn compute_joint_draw_bank_sha256(
+    bank: &JointActionSetSamples,
+) -> Result<String, IntervalError> {
+    validate_joint_action_set_shape(bank)?;
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"cmaq-018-joint-action-bank-v0.1\0");
+    append_len_prefixed(&mut bytes, bank.history_sha256.as_bytes());
+    bytes.extend_from_slice(&(bank.horizon_steps as u64).to_le_bytes());
+    append_len_prefixed(&mut bytes, bank.action_manifest_sha256.as_bytes());
+    append_len_prefixed(&mut bytes, bank.outcome_channel.as_bytes());
+    append_u64_values(&mut bytes, &bank.action_ids);
+    append_u64_values(&mut bytes, &bank.joint_draw_ids);
+    bytes.push(match bank.coupling {
+        JointDrawCoupling::SharedPosteriorAndWorldNoise => 0,
+        JointDrawCoupling::PairedExogenousDisturbance => 1,
+        JointDrawCoupling::DeterministicSharedLatent => 2,
+    });
+    bytes.extend_from_slice(&(bank.outcome_samples.len() as u64).to_le_bytes());
+    for samples in &bank.outcome_samples {
+        bytes.extend_from_slice(&(samples.len() as u64).to_le_bytes());
+        for sample in samples {
+            bytes.extend_from_slice(&sample.to_bits().to_le_bytes());
+        }
+    }
+    Ok(sha256_hex(&bytes))
+}
+
+fn sha256_hex(input: &[u8]) -> String {
+    const K: [u32; 64] = [
+        0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+        0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+        0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+        0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+        0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+        0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+        0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+        0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2,
+    ];
+    let mut h = [0x6a09e667u32,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+    let bit_len = (input.len() as u64).wrapping_mul(8);
+    let mut message = input.to_vec();
+    message.push(0x80);
+    while message.len() % 64 != 56 { message.push(0); }
+    message.extend_from_slice(&bit_len.to_be_bytes());
+    for chunk in message.chunks_exact(64) {
+        let mut w = [0u32; 64];
+        for i in 0..16 {
+            let start = i * 4;
+            w[i] = u32::from_be_bytes([chunk[start], chunk[start+1], chunk[start+2], chunk[start+3]]);
+        }
+        for i in 16..64 {
+            let s0 = w[i-15].rotate_right(7) ^ w[i-15].rotate_right(18) ^ (w[i-15] >> 3);
+            let s1 = w[i-2].rotate_right(17) ^ w[i-2].rotate_right(19) ^ (w[i-2] >> 10);
+            w[i] = w[i-16].wrapping_add(s0).wrapping_add(w[i-7]).wrapping_add(s1);
+        }
+        let [mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut hh] = h;
+        for i in 0..64 {
+            let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
+            let choice = (e & f) ^ ((!e) & g);
+            let temp1 = hh.wrapping_add(s1).wrapping_add(choice).wrapping_add(K[i]).wrapping_add(w[i]);
+            let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
+            let majority = (a & b) ^ (a & c) ^ (b & c);
+            let temp2 = s0.wrapping_add(majority);
+            hh = g; g = f; f = e; e = d.wrapping_add(temp1);
+            d = c; c = b; b = a; a = temp1.wrapping_add(temp2);
+        }
+        h[0]=h[0].wrapping_add(a); h[1]=h[1].wrapping_add(b); h[2]=h[2].wrapping_add(c); h[3]=h[3].wrapping_add(d);
+        h[4]=h[4].wrapping_add(e); h[5]=h[5].wrapping_add(f); h[6]=h[6].wrapping_add(g); h[7]=h[7].wrapping_add(hh);
+    }
+    let mut output = String::with_capacity(64);
+    for word in h { write!(&mut output, "{word:08x}").unwrap(); }
+    output
 }
 
 fn is_lower_hex_sha256(value: &str) -> bool {
@@ -518,7 +620,7 @@ mod tests {
 
 
     fn joint_bank_fixture() -> JointActionSetSamples {
-        JointActionSetSamples {
+        let mut bank = JointActionSetSamples {
             history_sha256: "a".repeat(64),
             horizon_steps: 5,
             action_manifest_sha256: "c".repeat(64),
@@ -532,7 +634,9 @@ mod tests {
                 vec![99.0, 109.0, 119.0, 129.0, 139.0],
                 vec![97.0, 107.0, 117.0, 127.0, 137.0],
             ],
-        }
+        };
+        bank.joint_draw_bank_sha256 = compute_joint_draw_bank_sha256(&bank).unwrap();
+        bank
     }
 
     #[test]
@@ -567,6 +671,32 @@ mod tests {
             all.iter().map(|effect| (effect.left_action_id, effect.right_action_id)).collect::<Vec<_>>(),
             vec![(3, 9), (3, 17), (9, 17)]
         );
+    }
+
+    #[test]
+    fn joint_draw_bank_digest_has_sha256_known_answer_and_binds_samples() {
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        let mut bank = joint_bank_fixture();
+        let digest = bank.joint_draw_bank_sha256.clone();
+        assert_eq!(compute_joint_draw_bank_sha256(&bank).unwrap(), digest);
+        bank.outcome_samples[0][0] += 0.25;
+        assert_eq!(validate_joint_action_set(&bank), Err(IntervalError::JointDrawBankDigestMismatch));
+    }
+
+    #[test]
+    fn joint_draw_bank_hash_binds_action_identity_and_coupling() {
+        let bank = joint_bank_fixture();
+        let digest = bank.joint_draw_bank_sha256.clone();
+        let mut changed = bank.clone();
+        changed.action_ids.swap(0, 1);
+        changed.outcome_samples.swap(0, 1);
+        assert_ne!(compute_joint_draw_bank_sha256(&changed).unwrap(), digest);
+        changed = bank.clone();
+        changed.coupling = JointDrawCoupling::PairedExogenousDisturbance;
+        assert_ne!(compute_joint_draw_bank_sha256(&changed).unwrap(), digest);
     }
 
     #[test]
