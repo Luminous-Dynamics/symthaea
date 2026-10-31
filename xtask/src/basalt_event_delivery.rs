@@ -772,16 +772,20 @@ fn audit_seal_bytes(ledger_bytes: &[u8], seal_bytes: &[u8]) -> EpochSealReport {
     let capture_window_valid = seal.producer_quiesced_at_monotonic_ns >= ledger.capture_start_monotonic_ns
         && seal.consumer_drained_at_monotonic_ns >= seal.producer_quiesced_at_monotonic_ns
         && seal.consumer_drained_at_monotonic_ns <= ledger.capture_end_monotonic_ns;
+    let all_events_precede_drain = events
+        .iter()
+        .all(|event| event.observed_at_monotonic_ns <= seal.consumer_drained_at_monotonic_ns);
     report.source_close_claims_match = source.producer_quiesced
         && source.consumer_drained
         && source.restart_count == 0
         && source.unmonitored_producer_count == 0
-        && capture_window_valid;
+        && capture_window_valid
+        && all_events_precede_drain;
     if !report.source_close_claims_match {
         report.errors.push(DeliveryAuditError {
             code: "E_SEAL_CLOSE_CLAIMS".to_string(),
             path: "$.seal".to_string(),
-            message: "ledger close assertions or monotonic quiescence/drain ordering do not support this seal".to_string(),
+            message: "ledger close assertions, monotonic quiescence/drain ordering or event-before-drain ordering do not support this seal".to_string(),
         });
     }
 
@@ -1394,6 +1398,19 @@ mod tests {
         assert!(!report.seal_well_formed);
         assert!(!report.integrity_passed);
         assert!(report.errors.iter().any(|error| error.code == "E_SEAL_REQUIRED_FIELD"));
+    }
+
+    #[test]
+    fn event_observed_after_consumer_drain_prevents_seal() {
+        let mut input = fixture();
+        input["events"][2]["observed_at_monotonic_ns"] = json!(950);
+        let ledger = input.to_string().into_bytes();
+        let seal = make_seal(&ledger);
+        let report = audit_seal_bytes(&ledger, &seal);
+        assert!(report.event_chain_matches, "{:?}", report.errors);
+        assert!(!report.source_close_claims_match);
+        assert!(!report.integrity_passed);
+        assert!(report.errors.iter().any(|error| error.code == "E_SEAL_CLOSE_CLAIMS"));
     }
 
     #[test]
