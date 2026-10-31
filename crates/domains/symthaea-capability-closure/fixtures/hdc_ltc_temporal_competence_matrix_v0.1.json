@@ -66,7 +66,7 @@
     "rust_tests_authored": true,
     "oracle_trace_verifier_implemented": true,
     "oracle_process_isolation_implemented": false,
-    "rust_tests_authored_count": 170,
+    "rust_tests_authored_count": 175,
     "rust_tests_by_file": {
       "research/temporal-bench/src/digest.rs": 2,
       "research/temporal-bench/src/lib.rs": 18,
@@ -76,7 +76,7 @@
       "research/temporal-bench/src/irregular.rs": 14,
       "research/temporal-bench/src/retention.rs": 16,
       "research/temporal-bench/src/fast_event.rs": 22,
-      "research/temporal-bench/src/phase.rs": 18,
+      "research/temporal-bench/src/phase.rs": 24,
       "research/temporal-bench/src/knowledge_stream.rs": 20
     },
     "cryptographic_stream_digest_implemented": true,
@@ -107,7 +107,9 @@
     },
     "oaks_dataset_adapter_implemented": false,
     "knowledge_stream_scoring_implemented": true,
-    "knowledge_stream_seed_replay_implemented": true
+    "knowledge_stream_seed_replay_implemented": true,
+    "phase_time_dilation_transform_implemented": true,
+    "phase_missing_prediction_accounting_implemented": true
   },
   "workload_contract": {
     "sample_semantics": "Causal observations; no future samples; elapsed simulated time is explicit.",
@@ -352,13 +354,26 @@
           "phase_shift",
           "frequency_shift",
           "mixed_period"
-        ]
+        ],
+        "affine_time_dilation": {
+          "tested_exact_ratio": [
+            2,
+            1
+          ],
+          "contract": "Same normalized phase and signal values; all timestamps, periods, phase offsets, and crossing deadlines scale by the same exact rational factor.",
+          "integer_microsecond_only": true,
+          "non_integral_transform": "reject"
+        }
       },
       "primary_metrics": [
         "circular_phase_error_p50_p95_p99_permille",
         "next_rising_crossing_absolute_error_p50_p95_p99_us",
         "worst_case_phase_error",
-        "worst_case_next_event_error_us"
+        "worst_case_next_event_error_us",
+        "prediction_coverage_ppm_over_full_stream",
+        "missing_prediction_count",
+        "affine_time_dilation_phase_equivariance",
+        "affine_time_dilation_crossing_time_scaling_error"
       ],
       "oracle": "Exact oscillator phase and event times",
       "implementation_status": "Rust fixed-point periodic/phase/frequency-shift generator, exact next-crossing oracle, SHA-256 task/oracle digests, semantic verifier, circular phase/absolute crossing-error scorer authored; not compiled or executed",
@@ -637,7 +652,11 @@
     "correction_propagation_latency",
     "historical_as_known_answer_preservation",
     "oaks_per_chunk_accuracy_trajectory",
-    "oaks_answer_change_precision_recall"
+    "oaks_answer_change_precision_recall",
+    "phase_prediction_coverage_against_full_stream",
+    "missing_phase_prediction_count",
+    "affine_time_dilation_normalized_phase_error",
+    "affine_time_dilation_physical_crossing_time_error"
   ],
   "statistical_design": {
     "pilot_paired_seeds_min": 10,
@@ -671,7 +690,9 @@
     "zero_transaction_time_leakage_on_exhaustive_late_correction_fixtures",
     "exact_bitemporal_answer_parity_at_all_preregistered_valid_at_known_at_coordinates",
     "historical_as_known_answers_survive_later_corrections_and_retractions",
-    "official_oaks_evaluation_reproduced_only_under_compatible_license_and_pinned_manifest"
+    "official_oaks_evaluation_reproduced_only_under_compatible_license_and_pinned_manifest",
+    "phase_predictions_are_scored_against_the_full_public_stream_denominator",
+    "affine_time_dilation_preserves_normalized_phase_and_signal_and_scales_physical_times_exactly"
   ],
   "claim_ceiling": "Results apply only to declared workloads, splits, implementations, and hardware. They do not establish consciousness, general intelligence, universal superiority, or neuromorphic efficiency when measured only on conventional CPU/GPU.",
   "baseline_registry": {
