@@ -34,7 +34,7 @@ jobs:
         working-directory: research/cmaq-017
         run: cargo clippy --locked --all-targets -- -D warnings
       - name: Install JSON Schema validator
-        run: python3 -m pip install --disable-pip-version-check jsonschema
+        run: python3 -m pip install --disable-pip-version-check "jsonschema==4.25.1"
       - name: Generate and validate deterministic report
         working-directory: research/cmaq-017
         shell: bash
