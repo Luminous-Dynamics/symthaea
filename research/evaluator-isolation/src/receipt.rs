@@ -115,7 +115,10 @@ impl ReceiptPayload {
         if exposure_total > self.total_exposure_us {
             return Err(ReceiptError::ExposureExceedsEpisode);
         }
-        if self.energy_budget_nj.is_some() && self.measured_energy_nj.is_none() {
+        if self.disposition == ReceiptDisposition::Completed
+            && self.energy_budget_nj.is_some()
+            && self.measured_energy_nj.is_none()
+        {
             return Err(ReceiptError::EnergyMeasurementMissing);
         }
         let energy_over_budget = matches!(
