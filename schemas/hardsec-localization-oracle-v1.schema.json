@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/hardsec-localization-oracle-v1.schema.json",
+  "title": "HARDSEC localization evaluator oracle v1",
+  "description": "Evaluator-controlled data. Never supply this file or its labels to the model or explainer being evaluated.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "design_id",
+    "source_sha256",
+    "label_semantics",
+    "reference_paths_complete",
+    "positive_node_ids",
+    "reference_paths"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-localization-oracle-v1"
+    },
+    "design_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "label_semantics": {
+      "const": "insertion_footprint"
+    },
+    "reference_paths_complete": {
+      "type": "boolean"
+    },
+    "positive_node_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "reference_paths": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path_id",
+          "edge_ids"
+        ],
+        "properties": {
+          "path_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "edge_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  },
+  "$comment": "The oracle's truth and path completeness remain caller-supplied evidence. The semantic auditor binds them to the exact graph bytes and validates referenced IDs/continuity, but cannot authenticate oracle authority or completeness."
+}
