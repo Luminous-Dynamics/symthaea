@@ -560,6 +560,7 @@ mod tests {
             SensingDecision::BudgetBlocked {
                 reason: BudgetBlock::EnergyInsufficient,
                 must_observe_by_us: 100,
+                deadline_missed: true,
             }
         ));
     }
@@ -616,6 +617,19 @@ mod tests {
                 features(),
             ),
             Err(SensingError::ZeroInterval)
+        );
+
+        assert_eq!(
+            decide_next_observation(
+                SensingPolicy::JitteredInterval {
+                    interval_us: 100,
+                    jitter_per_mille: 1_000,
+                    seed: 7,
+                },
+                context(5),
+                features(),
+            ),
+            Err(SensingError::InvalidJitter { jitter_per_mille: 1_000 })
         );
 
         let mut overflow = context(u64::MAX - 5);
