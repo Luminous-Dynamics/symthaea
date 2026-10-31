@@ -89,6 +89,8 @@ pub struct RandomizedInterventionDesignV1 {
     /// Target fraction of eligible source clusters assigned to treatment.
     pub target_exposure_fraction_permille: u16,
     /// The treatment and placebo models must use the same total token budget.
+    pub shared_training_corpus_sha256: String,
+    pub shared_training_token_count: u64,
     pub total_training_token_budget: u64,
     pub training_steps: u64,
     pub training_hyperparameters_sha256: String,
@@ -163,6 +165,10 @@ pub struct InterventionAuditReportV1 {
     pub exposed_item_count: u64,
     pub exposed_training_token_count: u64,
     pub matched_placebo_token_count: u64,
+    pub shared_training_token_count: u64,
+    pub total_training_token_budget: u64,
+    pub treatment_token_budget_conserved: bool,
+    pub placebo_token_budget_conserved: bool,
     pub token_budget_match: bool,
     pub task_family_stratification_complete: bool,
     pub source_cluster_integrity: bool,
@@ -240,6 +246,7 @@ fn validate_design(
     for (value, label) in [
         (&design.benchmark_task_set_sha256, "benchmark_task_set_sha256"),
         (&design.model_base_checkpoint_sha256, "model_base_checkpoint_sha256"),
+        (&design.shared_training_corpus_sha256, "shared_training_corpus_sha256"),
         (&design.training_hyperparameters_sha256, "training_hyperparameters_sha256"),
         (&design.optimizer_schedule_sha256, "optimizer_schedule_sha256"),
         (&design.treatment_training_corpus_sha256, "treatment_training_corpus_sha256"),
@@ -264,6 +271,11 @@ fn validate_design(
     }
     if design.treatment_training_corpus_sha256 == design.placebo_training_corpus_sha256 {
         return Err("treatment and placebo training corpus digests must differ".to_owned());
+    }
+    if design.shared_training_token_count == 0
+        || design.shared_training_token_count >= design.total_training_token_budget
+    {
+        return Err("shared_training_token_count must be positive and below total budget".to_owned());
     }
     if !(2..=MAX_INTERVENTION_CLUSTERS).contains(&design.clusters.len()) {
         return Err(format!(
@@ -465,6 +477,17 @@ pub fn randomize_intervention(
     if matched_placebo_token_count != exposed_training_token_count {
         return Err("matched placebo token budget does not equal exposed benchmark token budget".to_owned());
     }
+    let treatment_total = design.shared_training_token_count
+        .checked_add(exposed_training_token_count)
+        .ok_or_else(|| "treatment total training token count overflows u64".to_owned())?;
+    let placebo_total = design.shared_training_token_count
+        .checked_add(matched_placebo_token_count)
+        .ok_or_else(|| "placebo total training token count overflows u64".to_owned())?;
+    if treatment_total != design.total_training_token_budget
+        || placebo_total != design.total_training_token_budget
+    {
+        return Err("shared corpus plus matched intervention tokens must equal total training token budget in both arms".to_owned());
+    }
     assignments.sort_by(|left, right| left.cluster_id.cmp(&right.cluster_id));
     allocation_strata.sort_by(|left, right| {
         left.task_family
@@ -559,6 +582,14 @@ pub fn audit_intervention(
         exposed_item_count: manifest.exposed_item_count,
         exposed_training_token_count: manifest.exposed_training_token_count,
         matched_placebo_token_count: manifest.matched_placebo_token_count,
+        shared_training_token_count: design.shared_training_token_count,
+        total_training_token_budget: design.total_training_token_budget,
+        treatment_token_budget_conserved: design.shared_training_token_count
+            .checked_add(manifest.exposed_training_token_count)
+            == Some(design.total_training_token_budget),
+        placebo_token_budget_conserved: design.shared_training_token_count
+            .checked_add(manifest.matched_placebo_token_count)
+            == Some(design.total_training_token_budget),
         token_budget_match: manifest.exposed_training_token_count
             == manifest.matched_placebo_token_count,
         task_family_stratification_complete,
@@ -606,6 +637,8 @@ mod tests {
             training_stage: TrainingStageV1::InstructionSft,
             exposure_mechanism: ExposureMechanismV1::SemanticVariant,
             target_exposure_fraction_permille: 500,
+            shared_training_corpus_sha256: digest("shared-corpus"),
+            shared_training_token_count: 1_991_440,
             total_training_token_budget: 2_000_000,
             training_steps: 5_000,
             training_hyperparameters_sha256: digest("hyperparameters"),
