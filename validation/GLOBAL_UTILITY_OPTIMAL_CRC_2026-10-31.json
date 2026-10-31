@@ -1,0 +1,110 @@
+{
+  "schema": "symthaea-global-utility-optimal-crc-v1",
+  "status": "LOCAL_FINITE_STATE_LP_RESEARCH_PROTOTYPE_NOT_CIFAR_BENCHMARK",
+  "model": {
+    "n_calibration": 2,
+    "risk_coefficients": [
+      1,
+      0.5
+    ],
+    "alpha": 0.5,
+    "loss": "L(z,a)=g_z*(1-a), a in [0,1]",
+    "utility": "U(a)=1-a",
+    "equal_share_limit": {
+      "(0,2)": 0.125,
+      "(1,1)": 0.375,
+      "(2,0)": 0.5
+    },
+    "validity": "all four augmented count-vector constraints checked"
+  },
+  "reference_weighted_results": [
+    {
+      "p_H": 0.1,
+      "equal_share_utility": 0.82625,
+      "global_lp_utility": 0.905,
+      "gain": 0.07875,
+      "actions": {
+        "(0,2)": 0,
+        "(1,1)": 0.5,
+        "(2,0)": 0.5
+      }
+    },
+    {
+      "p_H": 0.2,
+      "equal_share_utility": 0.78,
+      "global_lp_utility": 0.82,
+      "gain": 0.04,
+      "actions": {
+        "(0,2)": 0,
+        "(1,1)": 0.5,
+        "(2,0)": 0.5
+      }
+    },
+    {
+      "p_H": 0.5,
+      "equal_share_utility": 0.65625,
+      "global_lp_utility": 0.65625,
+      "gain": 0,
+      "actions": {
+        "(0,2)": 0.125,
+        "(1,1)": 0.375,
+        "(2,0)": 0.5
+      }
+    },
+    {
+      "p_H": 0.8,
+      "equal_share_utility": 0.555,
+      "global_lp_utility": 0.555,
+      "gain": 0,
+      "actions": {
+        "(0,2)": 0.125,
+        "(1,1)": 0.375,
+        "(2,0)": 0.5
+      }
+    },
+    {
+      "p_H": 0.9,
+      "equal_share_utility": 0.52625,
+      "global_lp_utility": 0.52625,
+      "gain": 0,
+      "actions": {
+        "(0,2)": 0.125,
+        "(1,1)": 0.375,
+        "(2,0)": 0.5
+      }
+    }
+  ],
+  "maximin": {
+    "worst_state_utility": 0.5,
+    "actions": {
+      "(0,2)": 0.125,
+      "(1,1)": 0.375,
+      "(2,0)": 0.5
+    },
+    "valid": true
+  },
+  "local_validation": {
+    "tests_passed": 8,
+    "total": 8,
+    "randomized_reference_weight_vectors": 40,
+    "all_controllers_passed_all_augmented_states": true,
+    "multi_risk_two_constraint_example_passed": true,
+    "input_negative_controls": 3,
+    "direct_expected_utility_parity": true,
+    "execution": "independent local Python reference copy implementing the committed LP equations; exact Git blob not fetched into runtime",
+    "remote_ci": "not awaited; no pass claim"
+  },
+  "interpretation": [
+    "Reference weights alter only the utility objective. Exact all-augmented-sample risk constraints remain unchanged.",
+    "For p_H=.1 the global utility optimum reallocates risk budget and raises expected utility by 0.07875 over equal-share.",
+    "The improvement is not pointwise: the (0,2) state receives a lower action while the (1,1) state receives a higher, more conservative action.",
+    "For p_H=.5,.8,.9 this example has no objective gain over equal-share.",
+    "The distribution-free maximin objective obtains worst-state utility 0.5 and does not share the skewed-reference gain."
+  ],
+  "limitations": [
+    "Two-type synthetic example only; utility is a linear proxy, not CIFAR specificity.",
+    "Weights must be fixed before calibration or learned from independent data unless an additional adaptation proof is supplied.",
+    "Global optimization is exact only for the specified finite state space, linear risk family and chosen utility objective.",
+    "This is a new optimizer, not a replacement for all recertification theorems and not a SOTA result."
+  ]
+}
