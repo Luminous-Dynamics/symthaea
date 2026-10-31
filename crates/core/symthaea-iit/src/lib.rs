@@ -64,7 +64,7 @@ const ANALYSIS_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-ANALYSIS-REQUEST\0v0.1\0";
 /// Stable algorithm identity included in every IIT 4.0 (2023) system-search receipt.
 pub const IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID: &str =
     "symthaea-iit/iit4-2023-system-phi-eq4-minfill/0.2.0";
-const SYSTEM_PHI_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SYSTEM-PHI-RECEIPT\0v0.2\0";
+const SYSTEM_PHI_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SYSTEM-PHI-RECEIPT\0v0.3\0";
 
 /// Errors caused by invalid model inputs or invalid state requests.
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -330,6 +330,8 @@ pub struct Iit4SystemPhiAnalysis {
     pub formalism: FormalismProfile,
     pub candidate_system: Vec<usize>,
     pub request_sha256: String,
+    /// Exact implementation path that produced this result; bound by the receipt.
+    pub algorithm_id: &'static str,
     /// All caller-selected numeric and search-budget settings, bound by the receipt.
     pub search_config: Iit4SystemPhiSearchConfig,
     /// Certified Table 2 ceiling when the theorem's assumptions hold; None outside that domain.
@@ -358,7 +360,7 @@ impl Iit4SystemPhiAnalysis {
     pub fn receipt_sha256(&self) -> Result<String, Iit4SystemPhiReceiptError> {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(SYSTEM_PHI_RECEIPT_MAGIC);
-        receipt_string(&mut bytes, IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID);
+        receipt_string(&mut bytes, self.algorithm_id);
         receipt_string(&mut bytes, self.formalism.id());
         receipt_string(&mut bytes, &self.request_sha256);
 
@@ -2525,6 +2527,7 @@ impl BinaryCausalModel {
             formalism: FormalismProfile::Iit4_0_2023,
             candidate_system: candidate_system.to_vec(),
             request_sha256: request_sha256.clone(),
+            algorithm_id: IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID,
             search_config: config,
             certified_upper_bound: certified_iit4_2023_system_phi_upper_bound(
                 candidate_system.len(),
@@ -2707,6 +2710,7 @@ impl BinaryCausalModel {
             formalism: FormalismProfile::Iit4_0_2023,
             candidate_system: candidate_system.to_vec(),
             request_sha256,
+            algorithm_id: IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID,
             search_config: config,
             certified_upper_bound: certified_iit4_2023_system_phi_upper_bound(
                 candidate_system.len(),
