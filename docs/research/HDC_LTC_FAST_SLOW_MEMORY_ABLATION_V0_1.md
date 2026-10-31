@@ -202,6 +202,41 @@ Canonical owners to compose:
 - QARCH-021 #9317 workload regime descriptors;
 - QARCH-022 #9341 memory topology and state placement.
 
+## 12. External DFA-CfNs reference-code audit and fair-reproduction controls
+
+The authors' public reference repository is `https://github.com/nuist-xf/DFA-CfNs`. At this inspection the only returned branch is `main`, at commit `f0e77101e6a22f1c87eae9b105b8cc4e1b3175b7`, whose latest commit date is **17 August 2025**. The paper's IEEE Xplore record lists online publication on **6 March 2026** and journal issue September 2026 (DOI `10.1109/TNNLS.2026.3669345`). The code is author-linked by the paper, but this repository snapshot has no independently verified release/tag tying it to the exact final journal revision. Pin it as a public reference snapshot, not as a proven byte-for-byte final-paper release.
+
+Pinned file blob identities at this main revision:
+- PyTorch DFA: `torch_cfc_DFA.py` — `4cc687d49655ea6d4ef5542ed9a1b318fa302d6e`.
+- PyTorch PRDFA: `torch_cfc_PRDFA.py` — `a03de948e047a555f0f30c7cc11032c61d559f22`.
+- TensorFlow DFA: `tf_cfc_DFA.py` — `702bd2a6f4dc112c173bdfbafaeb255852bd90c5`.
+- TensorFlow PRDFA: `tf_cfc_PRDFA.py` — `6930fdb3fa719addd6057fc05e32c27cbf8c7899`.
+- Irregular dataset helpers: `irregular_sampled_datasets.py` — `a7ba93f14787bd888077594dd3d34965be4109c4`.
+- Actual Person Activity loader: `duv_person_activity.py` — `ee684aef95386d680ea8306abf14c05a5eb1bec7`.
+- Human activity DFA/PRDFA scripts: `train_person_activity_DFA.py` — `1dff77bb84966ef64130fb223c0325917995899c`; `train_person_activity_PRDFA.py` — `86cfd6fb7e566b3b3289f9cda0d769c62980765a`.
+- PhysioNet training script: `train_physio.py` — `6f9d12b213020f3a89cecac8c3f773f0cf8c1265`.
+- IMDb DFA script: `train_imdb_DFA.py` — `edb50b789fc602f34b3f3964f4dbab426850aeab`.
+
+### Source-level observations that affect a fair bake-off
+
+1. **DFA vs PRDFA are not the same pipeline with only a different cell flag.** The PyTorch DFA model leaves the multi-period encoder disabled/commented; PRDFA constructs `Multi_period_predication` and calls it before the recurrent loop. The PRDFA wall-clock/memory boundary must include this pre-reconstruction stage, its parameters, and intermediate tensors. Report an extra ablation with encoder cost separated, but never omit it from end-to-end totals.
+2. **Framework implementations are not algebraically text-identical.** The public PyTorch cells form `t_sum = t_a * w_ts + t_b`; the TensorFlow cells form `t_sum = -t_a * w_ts + t_b`. Do not pool PyTorch and TensorFlow results as one implementation. Pin one framework, source files, library versions and checkpoint; if claiming parity, first explain/test this sign difference and compare outputs on shared fixtures.
+3. **Human Activity windows overlap before the public split.** The actual scripts import `get_person_dataset` from `duv_person_activity.py`, not the similarly named auxiliary `PersonData` helper in `irregular_sampled_datasets.py`. In `PersonActivity.save_record`, windows are length 50 with stride 25 (50% overlap). `get_person_dataset` then calls `train_test_split` on the resulting window list, not on recording/person groups. Adjacent windows from one original record can therefore appear in both train and test. This is a leakage *risk in the public reference code path*, not proof that the paper used a different hidden split or that its published score is invalid. Our reproduction must split by original record/subject before windowing, and then create windows within each partition; report both original-like and grouped holdout only if the latter is the primary confirmatory result.
+4. **The public Human Activity scripts reuse test data during training.** Both DFA and PRDFA training scripts use `test_loader` for a per-epoch validation loop and again for final testing. There is no distinct validation loader in those scripts. Use train/dev/confirmatory-test partitions in our reproduction; confirmatory results are one-shot and never drive scheduler, checkpoint selection, or hyperparameter choice.
+5. **The reference seed loops are not five independent seed resets.** The DFA script calls `fix_seed(0)` once before a list comprehension of five `eval` calls; PRDFA calls `fix_seed(2)` once before its five runs. Each call may advance RNG state, but these are not five explicitly reset independent seed blocks. Our replication must reset and record each run seed separately, including dataset split seeds, model initialization, dataloader sampling and any augmentation.
+6. **The PyTorch cell appends per-step `memory` tensors.** The model clears this list per forward sequence. With `return_sequences=True`, the list is consumed by the additional readout; with `return_sequences=False`, it still appears to append at each step although that list is not used by the final-output branch. Do not patch this in the primary source-faithful reproduction; count its transient peak memory. A separately optimized implementation may be compared only as a labelled modified baseline.
+7. **PhysioNet timing and missingness matter.** The public PhysioNet script derives elapsed times from timestamp differences and supplies masks. Preserve the exact timestamp, mask and quantization path when recreating the published result; do not replace irregular dt with fixed step count.
+
+### Mandatory external-baseline reproduction gates
+
+- Pin the repository commit and all relevant file blob hashes above; create an immutable source archive and record dependency/runtime versions. Treat paper-to-repository method correspondence as `unverified` until the original paper's supplementary specification or authors confirm the exact revision.
+- Reproduce one backend first (PyTorch or TensorFlow) and record the sign convention. Only add a second backend after a shared numeric parity fixture passes or the divergence is explicitly explained.
+- For Human Activity, report the source-like random-window split as a diagnostic only, then use record-/subject-group holdout as the confirmatory measure. No overlapping windows from one original record may cross partitions.
+- Create distinct train, development and confirmatory test partitions. Report all preprocessing, filtering, quantization, masks, dropped records, and class/subject balance.
+- Independently reset each run's seeds. Store per-seed outputs and raw observations; do not use the reference code's five sequential evaluations as independent seed replicates.
+- Benchmark DFA and PRDFA both end-to-end and by stage. Include PRDFA pre-reconstruction, all intermediate memory, and the per-step accumulation readout; do not compare a PRDFA recurrent-cell-only time to a Symthaea full-path time.
+- If public source and the 2026 paper's exact equations/configuration cannot be reconciled, label the code result a *reference implementation reproduction*, not a definitive reproduction of the final paper claim.
+
 ## Non-claims
 
 This protocol does not show that slow context improves HDC-LTC, that event-triggered cadence is better than fixed cadence, that NIALIM/DFA-CfN results have been replicated, or that a hardware efficiency gain exists. It authorizes no production default or dimension promotion. It is a falsifiable experimental contract only.
