@@ -1,0 +1,976 @@
+//! Independently blinded verification of the declared target delta in evaluator interventions.
+//!
+//! This module composes with intervention_quality v1. It distinguishes a global
+//! meaning-preserving/meaning-changing judgment from evidence that the *declared*
+//! target claim, direction and affected scope changed as intended. Reviewers report
+//! observed changes without seeing the expected direction or allowed-scope list.
+//!
+//! Hashes bind declarations, not reviewer independence, semantic truth or raw custody.
+
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet};
+
+use crate::intervention_quality::analyze_intervention_quality;
+
+pub const TARGET_DELTA_PLAN_SCHEMA: &str =
+    "symthaea.science_bench_refresh_intervention_target_delta_plan.v1";
+pub const TARGET_DELTA_RECEIPT_SCHEMA: &str =
+    "symthaea.science_bench_refresh_intervention_target_delta_receipt.v1";
+pub const TARGET_DELTA_REPORT_SCHEMA: &str =
+    "symthaea.science_bench_refresh_intervention_target_delta_report.v1";
+
+const PLAN_DOMAIN: &[u8] = b"symthaea.intervention_target_delta.plan.v1\0";
+const REPORT_DOMAIN: &[u8] = b"symthaea.intervention_target_delta.report.v1\0";
+const MAX_CANDIDATES: usize = 100_000;
+const MAX_PANEL: u32 = 7;
+const MAX_SCOPE_IDS: usize = 10_000;
+const MAX_LABEL: usize = 128;
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TargetDeltaPurposeV1 {
+    ExampleOnly,
+    QualifiedRun,
+}
+
+impl TargetDeltaPurposeV1 {
+    fn qualified(self) -> bool {
+        self == Self::QualifiedRun
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum TargetChangeKindV1 {
+    Unchanged,
+    SupportIncreased,
+    SupportDecreased,
+    ContradictionIntroduced,
+    ScopeChanged,
+    TemporalValidityChanged,
+    UnitChanged,
+    IdentityChanged,
+    SourceWithdrawn,
+    SourceSuperseded,
+    OtherDeclaredChange,
+}
+
+impl TargetChangeKindV1 {
+    fn changed(self) -> bool {
+        self != Self::Unchanged
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum CollateralChangeV1 {
+    NoneObserved,
+    MaterialChangeOutsideAllowedScope,
+    Ambiguous,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum QualityDispositionV1 {
+    Accepted,
+    Rejected,
+    Abstained,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum QualityRelationV1 {
+    SemanticInvariant,
+    SemanticChange,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum FinalCandidateValidityV1 {
+    Valid,
+    Invalid,
+    Ambiguous,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TargetDeltaCandidateV1 {
+    pub candidate_id: String,
+    /// Identity of the target claim/entity/scope being evaluated.
+    pub target_identity_sha256: String,
+    pub baseline_target_state_sha256: String,
+    pub variant_target_state_sha256: String,
+    pub expected_target_change: TargetChangeKindV1,
+    /// Exact canonical set of claim/scope identities allowed to change.
+    pub expected_changed_claim_ids_sha256: Vec<String>,
+    /// Exact canonical set of preserved control claims/scopes.
+    pub preserved_claim_ids_sha256: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TargetDeltaPlanFieldsV1 {
+    pub schema: String,
+    pub analyzer_source_revision: String,
+    pub purpose: TargetDeltaPurposeV1,
+    pub study_id: String,
+    pub quality_plan_sha256: String,
+    pub quality_plan_commitment_sha256: String,
+    pub reviewers_per_candidate: u32,
+    pub consensus_threshold_permille: u16,
+    pub candidates: Vec<TargetDeltaCandidateV1>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TargetDeltaPlanV1 {
+    pub schema: String,
+    pub analyzer_source_revision: String,
+    pub purpose: TargetDeltaPurposeV1,
+    pub study_id: String,
+    pub quality_plan_sha256: String,
+    pub quality_plan_commitment_sha256: String,
+    pub reviewers_per_candidate: u32,
+    pub consensus_threshold_permille: u16,
+    pub candidates: Vec<TargetDeltaCandidateV1>,
+    pub plan_commitment_sha256: String,
+}
+
+impl TargetDeltaPlanV1 {
+    fn fields(&self) -> TargetDeltaPlanFieldsV1 {
+        TargetDeltaPlanFieldsV1 {
+            schema: self.schema.clone(),
+            analyzer_source_revision: self.analyzer_source_revision.clone(),
+            purpose: self.purpose,
+            study_id: self.study_id.clone(),
+            quality_plan_sha256: self.quality_plan_sha256.clone(),
+            quality_plan_commitment_sha256: self.quality_plan_commitment_sha256.clone(),
+            reviewers_per_candidate: self.reviewers_per_candidate,
+            consensus_threshold_permille: self.consensus_threshold_permille,
+            candidates: self.candidates.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TargetDeltaReviewerObservationV1 {
+    pub reviewer_id_sha256: String,
+    /// Reviewers describe what they observed; they do not see the expected transition.
+    pub observed_target_change: TargetChangeKindV1,
+    /// Canonically sorted unique identity commitments observed to have changed.
+    pub observed_changed_claim_ids_sha256: Vec<String>,
+    pub collateral_change: CollateralChangeV1,
+    pub blind_to_generator_identity: bool,
+    pub blind_to_intended_relation: bool,
+    pub blind_to_pipeline_disposition: bool,
+    pub blind_to_evaluator_outcome: bool,
+    pub blind_to_expected_target_change: bool,
+    pub blind_to_allowed_changed_claims: bool,
+    pub adjudication_artifact_sha256: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TargetDeltaCandidateAdjudicationV1 {
+    pub candidate_id: String,
+    pub reviewers: Vec<TargetDeltaReviewerObservationV1>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TargetDeltaReceiptV1 {
+    pub schema: String,
+    pub analyzer_source_revision: String,
+    pub purpose: TargetDeltaPurposeV1,
+    pub run_id: String,
+    pub target_plan_sha256: String,
+    pub target_plan_commitment_sha256: String,
+    pub quality_plan_sha256: String,
+    pub quality_receipt_sha256: String,
+    pub adjudications: Vec<TargetDeltaCandidateAdjudicationV1>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct TargetDeltaCandidateResultV1 {
+    pub candidate_id: String,
+    pub transformation_family: String,
+    pub target_failure_mode: String,
+    pub pipeline_disposition: QualityDispositionV1,
+    pub intended_relation: QualityRelationV1,
+    pub expected_target_change: TargetChangeKindV1,
+    pub observed_target_change: Option<TargetChangeKindV1>,
+    pub expected_changed_claim_count: u64,
+    pub observed_changed_claim_count: u64,
+    pub exact_changed_scope_match: bool,
+    pub collateral_change: Option<CollateralChangeV1>,
+    pub global_relation_validity: FinalCandidateValidityV1,
+    pub target_delta_validity: FinalCandidateValidityV1,
+    pub final_validity: FinalCandidateValidityV1,
+    pub reviewer_consensus_ppm: Option<u32>,
+    pub reviewer_count: u64,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct TargetDeltaFamilyMetricsV1 {
+    pub transformation_family: String,
+    pub candidate_count: u64,
+    pub valid_count: u64,
+    pub invalid_count: u64,
+    pub ambiguous_count: u64,
+    pub accepted_valid_count: u64,
+    pub accepted_invalid_count: u64,
+    pub accepted_ambiguous_count: u64,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct TargetDeltaReportFieldsV1 {
+    pub schema: String,
+    pub study_id: String,
+    pub analyzer_source_revision: String,
+    pub quality_plan_sha256: String,
+    pub quality_receipt_sha256: String,
+    pub target_plan_sha256: String,
+    pub target_receipt_sha256: String,
+    pub candidate_count: u64,
+    pub adjudicated_candidate_count: u64,
+    pub global_relation_valid_count: u64,
+    pub global_relation_invalid_count: u64,
+    pub global_relation_ambiguous_count: u64,
+    pub target_delta_valid_count: u64,
+    pub target_delta_invalid_count: u64,
+    pub target_delta_ambiguous_count: u64,
+    pub final_valid_count: u64,
+    pub final_invalid_count: u64,
+    pub final_ambiguous_count: u64,
+    pub accepted_valid_count: u64,
+    pub accepted_invalid_count: u64,
+    pub accepted_ambiguous_count: u64,
+    pub rejected_valid_count: u64,
+    pub rejected_invalid_count: u64,
+    pub rejected_ambiguous_count: u64,
+    pub abstained_valid_count: u64,
+    pub abstained_invalid_count: u64,
+    pub abstained_ambiguous_count: u64,
+    pub exact_changed_scope_match_count: u64,
+    pub collateral_material_change_count: u64,
+    pub reviewer_pairwise_agreement_ppm: Option<u32>,
+    pub reviewer_pairwise_comparison_count: u64,
+    pub reviewer_target_transition_agreement_ppm: Option<u32>,
+    pub reviewer_target_transition_comparison_count: u64,
+    pub generation_tokens: u64,
+    pub generation_cost_micro_usd: u64,
+    pub generation_wall_clock_ms: u64,
+    pub final_valid_accepted_unique_per_1000_tokens: Option<f64>,
+    pub final_valid_accepted_unique_per_usd: Option<f64>,
+    pub family_metrics: Vec<TargetDeltaFamilyMetricsV1>,
+    pub candidate_results: Vec<TargetDeltaCandidateResultV1>,
+    pub reviewer_independence_proven: bool,
+    pub reviewer_competence_proven: bool,
+    pub semantic_truth_proven: bool,
+    pub raw_artifact_custody_proven: bool,
+    pub execution_authenticity_proven: bool,
+    pub external_anchor_required: bool,
+    pub scoring_eligible_declared: bool,
+    pub claim_boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct TargetDeltaReportV1 {
+    #[serde(flatten)]
+    pub fields: TargetDeltaReportFieldsV1,
+    pub report_commitment_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct ObservedTargetTuple {
+    change: TargetChangeKindV1,
+    changed_claims: Vec<String>,
+    collateral: CollateralChangeV1,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RelationValidity {
+    Valid,
+    Invalid,
+    Ambiguous,
+}
+
+#[derive(Debug, Clone)]
+struct QualityCandidateSnapshot {
+    candidate_id: String,
+    transformation_family: String,
+    target_failure_mode: String,
+    intended_relation: QualityRelationV1,
+    disposition: QualityDispositionV1,
+    generation_tokens: u64,
+    generation_cost_micro_usd: u64,
+    generation_wall_clock_ms: u64,
+}
+
+#[derive(Debug, Clone)]
+struct TargetCandidateDecision {
+    validity: FinalCandidateValidityV1,
+    consensus: Option<ObservedTargetTuple>,
+    consensus_ppm: Option<u32>,
+    reviewer_count: u64,
+    exact_scope_match: bool,
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn digest_domain(domain: &[u8], payload: &[u8]) -> Result<String, String> {
+    let length = u64::try_from(payload.len())
+        .map_err(|_| "target-delta payload exceeds u64 length".to_owned())?;
+    let mut hasher = Sha256::new();
+    hasher.update(domain);
+    hasher.update(length.to_be_bytes());
+    hasher.update(payload);
+    Ok(sha256_hex(&hasher.finalize()))
+}
+
+fn valid_digest(value: &str, allow_zero: bool) -> bool {
+    value.len() == 64
+        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && (allow_zero || value.bytes().any(|byte| byte != b'0'))
+}
+
+fn valid_revision(value: &str) -> bool {
+    value.len() == 40
+        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && value.bytes().any(|byte| byte != b'0')
+}
+
+fn nonempty(value: &str, max: usize) -> bool {
+    !value.trim().is_empty() && value.len() <= max
+}
+
+fn sorted_unique_digests(values: &[String], label: &str) -> Result<BTreeSet<String>, String> {
+    if values.len() > MAX_SCOPE_IDS {
+        return Err(format!("{label} exceeds {MAX_SCOPE_IDS} identities"));
+    }
+    let mut set = BTreeSet::new();
+    let mut previous: Option<&str> = None;
+    for value in values {
+        if !valid_digest(value, false) {
+            return Err(format!("{label} contains an invalid identity digest"));
+        }
+        if previous.is_some_and(|last| last >= value.as_str()) {
+            return Err(format!("{label} must be strictly sorted and unique"));
+        }
+        previous = Some(value);
+        set.insert(value.clone());
+    }
+    Ok(set)
+}
+
+fn plan_fields_commitment(fields: &TargetDeltaPlanFieldsV1) -> Result<String, String> {
+    let payload = serde_json::to_vec(fields)
+        .map_err(|error| format!("cannot serialize target-delta plan: {error}"))?;
+    digest_domain(PLAN_DOMAIN, &payload)
+}
+
+/// Validate the target-delta specification and its correspondence to the parent quality plan.
+pub fn validate_target_delta_plan_fields(
+    fields: &TargetDeltaPlanFieldsV1,
+    quality_plan_bytes: &[u8],
+) -> Result<(), Vec<String>> {
+    let mut issues = Vec::new();
+    let allow_zero = !fields.purpose.qualified();
+    if fields.schema != TARGET_DELTA_PLAN_SCHEMA {
+        issues.push("unsupported target-delta plan schema".to_owned());
+    }
+    if !valid_revision(&fields.analyzer_source_revision)
+        || fields.analyzer_source_revision != crate::BUILT_GENERATOR_SOURCE_REVISION
+    {
+        issues.push("analyzer_source_revision must match the exact compiled validator revision".to_owned());
+    }
+    if fields.purpose.qualified() && crate::BUILT_GENERATOR_WORKTREE_CLEAN != "true" {
+        issues.push("qualified target-delta plans require a clean analyzer worktree".to_owned());
+    }
+    if !nonempty(&fields.study_id, MAX_LABEL) {
+        issues.push("study_id must be non-empty and bounded".to_owned());
+    }
+    if !valid_digest(&fields.quality_plan_sha256, allow_zero)
+        || fields.quality_plan_sha256 != sha256_hex(quality_plan_bytes)
+    {
+        issues.push("quality_plan_sha256 must bind the exact parent quality-plan bytes".to_owned());
+    }
+
+    let quality_plan: Value = match serde_json::from_slice(quality_plan_bytes) {
+        Ok(value) => value,
+        Err(error) => {
+            issues.push(format!("parent quality plan is malformed: {error}"));
+            Value::Null
+        }
+    };
+    let parent_commitment = quality_plan.get("plan_commitment_sha256").and_then(Value::as_str).unwrap_or("");
+    if !valid_digest(&fields.quality_plan_commitment_sha256, allow_zero)
+        || fields.quality_plan_commitment_sha256 != parent_commitment
+    {
+        issues.push("quality_plan_commitment_sha256 differs from the parent quality plan".to_owned());
+    }
+    let parent_revision = quality_plan.get("analyzer_source_revision").and_then(Value::as_str).unwrap_or("");
+    if parent_revision != fields.analyzer_source_revision {
+        issues.push("parent quality plan was committed by a different analyzer revision".to_owned());
+    }
+    let parent_candidates = quality_plan.get("candidates").and_then(Value::as_array);
+    let Some(parent_candidates) = parent_candidates else {
+        issues.push("parent quality plan has no candidate census".to_owned());
+        return Err(issues);
+    };
+    if fields.reviewers_per_candidate < 3 || fields.reviewers_per_candidate > MAX_PANEL {
+        issues.push(format!("reviewers_per_candidate must be in 3..={MAX_PANEL}"));
+    }
+    if !(501..=1_000).contains(&fields.consensus_threshold_permille) {
+        issues.push("consensus_threshold_permille must be in 501..=1000".to_owned());
+    }
+    if fields.candidates.len() != parent_candidates.len()
+        || fields.candidates.is_empty()
+        || fields.candidates.len() > MAX_CANDIDATES
+    {
+        issues.push("target-delta candidates must cover the exact parent quality-plan census".to_owned());
+    }
+
+    let mut parent_by_id = BTreeMap::new();
+    for candidate in parent_candidates {
+        let id = candidate.get("candidate_id").and_then(Value::as_str).unwrap_or("");
+        let intended = candidate.get("intended_relation").and_then(Value::as_str).unwrap_or("");
+        if id.is_empty() || parent_by_id.insert(id.to_owned(), intended.to_owned()).is_some() {
+            issues.push("parent quality plan contains duplicate or empty candidate IDs".to_owned());
+        }
+    }
+    let mut seen = BTreeSet::new();
+    for candidate in &fields.candidates {
+        if !nonempty(&candidate.candidate_id, MAX_LABEL) || !seen.insert(candidate.candidate_id.as_str()) {
+            issues.push("target-delta candidate IDs must be non-empty, bounded and unique".to_owned());
+        }
+        let intended = parent_by_id.get(&candidate.candidate_id).map(String::as_str).unwrap_or("");
+        if intended != "semantic_invariant" && intended != "semantic_change" {
+            issues.push(format!("candidate {} does not exist in the parent quality plan", candidate.candidate_id));
+        }
+        if !valid_digest(&candidate.target_identity_sha256, allow_zero)
+            || !valid_digest(&candidate.baseline_target_state_sha256, allow_zero)
+            || !valid_digest(&candidate.variant_target_state_sha256, allow_zero)
+        {
+            issues.push(format!("candidate {} has invalid target-state commitments", candidate.candidate_id));
+        }
+        let expected_changed = sorted_unique_digests(
+            &candidate.expected_changed_claim_ids_sha256,
+            "expected_changed_claim_ids_sha256",
+        );
+        let preserved = sorted_unique_digests(
+            &candidate.preserved_claim_ids_sha256,
+            "preserved_claim_ids_sha256",
+        );
+        match (expected_changed, preserved) {
+            (Ok(changed), Ok(unchanged)) => {
+                if !changed.is_disjoint(&unchanged) {
+                    issues.push(format!("candidate {} changed/preserved claim sets overlap", candidate.candidate_id));
+                }
+                if candidate.expected_target_change == TargetChangeKindV1::Unchanged {
+                    if !changed.is_empty()
+                        || !unchanged.contains(&candidate.target_identity_sha256)
+                        || candidate.baseline_target_state_sha256 != candidate.variant_target_state_sha256
+                    {
+                        issues.push(format!("candidate {} unchanged target must preserve target state and declare no changed IDs", candidate.candidate_id));
+                    }
+                } else if !changed.contains(&candidate.target_identity_sha256)
+                    || unchanged.contains(&candidate.target_identity_sha256)
+                    || candidate.baseline_target_state_sha256 == candidate.variant_target_state_sha256
+                {
+                    issues.push(format!("candidate {} changed target must include target identity, exclude it from preserved IDs and change its state digest", candidate.candidate_id));
+                }
+            }
+            (Err(error), _) | (_, Err(error)) => issues.push(format!("candidate {}: {error}", candidate.candidate_id)),
+        }
+        if intended == "semantic_invariant" && candidate.expected_target_change != TargetChangeKindV1::Unchanged {
+            issues.push(format!("candidate {} conflicts with parent semantic_invariant relation", candidate.candidate_id));
+        }
+        if intended == "semantic_change" && !candidate.expected_target_change.changed() {
+            issues.push(format!("candidate {} conflicts with parent semantic_change relation", candidate.candidate_id));
+        }
+    }
+    if seen.len() != parent_by_id.len()
+        || parent_by_id.keys().any(|id| !seen.contains(id.as_str()))
+    {
+        issues.push("target-delta plan omits or adds parent candidate IDs".to_owned());
+    }
+    if issues.is_empty() { Ok(()) } else { Err(issues) }
+}
+
+/// Commit a target-delta plan fields object after validating it against the parent plan.
+pub fn compute_target_delta_plan_commitment(
+    fields_bytes: &[u8],
+    quality_plan_bytes: &[u8],
+) -> Result<String, String> {
+    let fields: TargetDeltaPlanFieldsV1 = serde_json::from_slice(fields_bytes)
+        .map_err(|error| format!("target-delta plan fields invalid: {error}"))?;
+    validate_target_delta_plan_fields(&fields, quality_plan_bytes)
+        .map_err(|issues| issues.join("; "))?;
+    plan_fields_commitment(&fields)
+}
+
+fn verify_target_delta_plan(
+    plan_bytes: &[u8],
+    quality_plan_bytes: &[u8],
+) -> Result<(TargetDeltaPlanV1, String), String> {
+    let plan: TargetDeltaPlanV1 = serde_json::from_slice(plan_bytes)
+        .map_err(|error| format!("target-delta plan invalid: {error}"))?;
+    let fields = plan.fields();
+    validate_target_delta_plan_fields(&fields, quality_plan_bytes)
+        .map_err(|issues| issues.join("; "))?;
+    let expected = plan_fields_commitment(&fields)?;
+    if !valid_digest(&plan.plan_commitment_sha256, !plan.purpose.qualified())
+        || plan.plan_commitment_sha256 != expected
+    {
+        return Err("target-delta plan commitment mismatch".to_owned());
+    }
+    Ok((plan, sha256_hex(plan_bytes)))
+}
+
+fn relation_validity_from_parent(
+    intended: QualityRelationV1,
+    votes: &[crate::intervention_quality::HumanAdjudicationV1],
+    threshold_permille: u16,
+) -> RelationValidity {
+    let total = votes.len() as u64;
+    if total == 0 { return RelationValidity::Ambiguous; }
+    let preserving = votes.iter().filter(|vote| vote.verdict == crate::intervention_quality::ReviewerVerdictV1::MeaningPreserving).count() as u64;
+    let changing = votes.iter().filter(|vote| vote.verdict == crate::intervention_quality::ReviewerVerdictV1::MeaningChanging).count() as u64;
+    let ambiguous = total - preserving - changing;
+    let (expected, opposite) = match intended {
+        QualityRelationV1::SemanticInvariant => (preserving, changing),
+        QualityRelationV1::SemanticChange => (changing, preserving),
+    };
+    if expected * 1_000 >= total * u64::from(threshold_permille) {
+        RelationValidity::Valid
+    } else if opposite * 1_000 >= total * u64::from(threshold_permille) {
+        RelationValidity::Invalid
+    } else {
+        let _ = ambiguous;
+        RelationValidity::Ambiguous
+    }
+}
+
+fn target_tuple_consensus(
+    reviewers: &[TargetDeltaReviewerObservationV1],
+    threshold_permille: u16,
+) -> (Option<ObservedTargetTuple>, Option<u32>, u64, u64) {
+    let mut votes: BTreeMap<ObservedTargetTuple, u64> = BTreeMap::new();
+    let mut agreement_comparisons = 0_u64;
+    let mut agreement_matches = 0_u64;
+    for (index, reviewer) in reviewers.iter().enumerate() {
+        let tuple = ObservedTargetTuple {
+            change: reviewer.observed_target_change,
+            changed_claims: reviewer.observed_changed_claim_ids_sha256.clone(),
+            collateral: reviewer.collateral_change,
+        };
+        *votes.entry(tuple).or_default() += 1;
+        for other in reviewers.iter().skip(index + 1) {
+            agreement_comparisons += 1;
+            if reviewer.observed_target_change == other.observed_target_change {
+                agreement_matches += 1;
+            }
+        }
+    }
+    let mut ranked: Vec<(ObservedTargetTuple, u64)> = votes.into_iter().collect();
+    ranked.sort_by(|left, right| right.1.cmp(&left.1).then_with(|| left.0.cmp(&right.0)));
+    let Some((tuple, count)) = ranked.into_iter().next() else {
+        return (None, None, agreement_matches, agreement_comparisons);
+    };
+    let total = reviewers.len() as u64;
+    let ppm = ((count * 1_000_000) / total) as u32;
+    if count * 1_000 < total * u64::from(threshold_permille) {
+        return (None, Some(ppm), agreement_matches, agreement_comparisons);
+    }
+    (Some(tuple), Some(ppm), agreement_matches, agreement_comparisons)
+}
+
+fn final_validity(
+    global: RelationValidity,
+    target: Option<&ObservedTargetTuple>,
+    candidate: &TargetDeltaCandidateV1,
+) -> (FinalCandidateValidityV1, bool) {
+    if global == RelationValidity::Invalid {
+        return (FinalCandidateValidityV1::Invalid, false);
+    }
+    if global == RelationValidity::Ambiguous || target.is_none() {
+        return (FinalCandidateValidityV1::Ambiguous, false);
+    }
+    let observed = target.expect("checked some");
+    let scope_matches = observed.changed_claims == candidate.expected_changed_claim_ids_sha256;
+    if observed.change == candidate.expected_target_change
+        && scope_matches
+        && observed.collateral == CollateralChangeV1::NoneObserved
+    {
+        (FinalCandidateValidityV1::Valid, true)
+    } else if observed.change == TargetChangeKindV1::OtherDeclaredChange
+        || observed.collateral == CollateralChangeV1::Ambiguous
+    {
+        (FinalCandidateValidityV1::Ambiguous, scope_matches)
+    } else {
+        (FinalCandidateValidityV1::Invalid, scope_matches)
+    }
+}
+
+fn report_commitment(fields: &TargetDeltaReportFieldsV1) -> Result<String, String> {
+    let payload = serde_json::to_vec(fields)
+        .map_err(|error| format!("cannot serialize target-delta report: {error}"))?;
+    digest_domain(REPORT_DOMAIN, &payload)
+}
+
+fn ppm(numerator: u64, denominator: u64) -> Option<u32> {
+    (denominator > 0).then(|| ((numerator * 1_000_000) / denominator) as u32)
+}
+
+fn per_1000_tokens(count: u64, tokens: u64) -> Option<f64> {
+    (tokens > 0).then(|| count as f64 * 1_000.0 / tokens as f64)
+}
+
+fn per_usd(count: u64, cost_micro_usd: u64) -> Option<f64> {
+    (cost_micro_usd > 0).then(|| count as f64 * 1_000_000.0 / cost_micro_usd as f64)
+}
+
+/// Analyze v1 global relation adjudications and v2 blinded target-delta observations together.
+pub fn analyze_intervention_target_delta(
+    quality_plan_bytes: &[u8],
+    quality_receipt_bytes: &[u8],
+    target_plan_bytes: &[u8],
+    target_receipt_bytes: &[u8],
+) -> Result<TargetDeltaReportV1, String> {
+    let quality_report = analyze_intervention_quality(quality_plan_bytes, quality_receipt_bytes)?;
+    let (target_plan, target_plan_sha256) =
+        verify_target_delta_plan(target_plan_bytes, quality_plan_bytes)?;
+    let quality_plan: Value = serde_json::from_slice(quality_plan_bytes)
+        .map_err(|error| format!("parent quality plan invalid: {error}"))?;
+    let quality_receipt: Value = serde_json::from_slice(quality_receipt_bytes)
+        .map_err(|error| format!("parent quality receipt invalid: {error}"))?;
+    let target_receipt: TargetDeltaReceiptV1 = serde_json::from_slice(target_receipt_bytes)
+        .map_err(|error| format!("target-delta receipt invalid: {error}"))?;
+
+    if target_receipt.schema != TARGET_DELTA_RECEIPT_SCHEMA {
+        return Err("unsupported target-delta receipt schema".to_owned());
+    }
+    if target_receipt.purpose != target_plan.purpose {
+        return Err("target-delta receipt purpose differs from plan".to_owned());
+    }
+    if !nonempty(&target_receipt.run_id, MAX_LABEL) {
+        return Err("target-delta receipt run_id must be non-empty and bounded".to_owned());
+    }
+    if !valid_revision(&target_receipt.analyzer_source_revision)
+        || target_receipt.analyzer_source_revision != crate::BUILT_GENERATOR_SOURCE_REVISION
+        || target_receipt.analyzer_source_revision != target_plan.analyzer_source_revision
+    {
+        return Err("target-delta receipt analyzer revision differs from exact compiled revision".to_owned());
+    }
+    if target_receipt.target_plan_sha256 != target_plan_sha256
+        || target_receipt.target_plan_commitment_sha256 != target_plan.plan_commitment_sha256
+        || target_receipt.quality_plan_sha256 != target_plan.quality_plan_sha256
+        || target_receipt.quality_receipt_sha256 != sha256_hex(quality_receipt_bytes)
+    {
+        return Err("target-delta receipt does not bind exact target and parent quality artifacts".to_owned());
+    }
+    if target_receipt.quality_plan_sha256 != sha256_hex(quality_plan_bytes) {
+        return Err("target-delta receipt quality plan digest mismatch".to_owned());
+    }
+    let quality_commitment = quality_plan.get("plan_commitment_sha256").and_then(Value::as_str).unwrap_or("");
+    if target_plan.quality_plan_commitment_sha256 != quality_commitment {
+        return Err("target-delta plan parent commitment mismatch".to_owned());
+    }
+
+    let quality_candidates = quality_plan.get("candidates").and_then(Value::as_array)
+        .ok_or_else(|| "parent quality plan candidate census missing".to_owned())?;
+    let quality_adjudications = quality_receipt.get("adjudications").and_then(Value::as_array)
+        .ok_or_else(|| "parent quality receipt adjudications missing".to_owned())?;
+    let mut quality_adjudications_by_id = BTreeMap::new();
+    for row in quality_adjudications {
+        let id = row.get("candidate_id").and_then(Value::as_str).unwrap_or("");
+        if quality_adjudications_by_id.insert(id.to_owned(), row).is_some() {
+            return Err("parent quality receipt contains duplicate candidate adjudication".to_owned());
+        }
+    }
+    let mut quality_candidates_by_id = BTreeMap::new();
+    for row in quality_candidates {
+        let id = row.get("candidate_id").and_then(Value::as_str).unwrap_or("");
+        if quality_candidates_by_id.insert(id.to_owned(), row).is_some() {
+            return Err("parent quality plan contains duplicate candidate".to_owned());
+        }
+    }
+
+    let mut target_specs_by_id = BTreeMap::new();
+    for candidate in &target_plan.candidates {
+        target_specs_by_id.insert(candidate.candidate_id.as_str(), candidate);
+    }
+    let mut target_adjudications_by_id = BTreeMap::new();
+    for adjudication in &target_receipt.adjudications {
+        if target_adjudications_by_id.insert(adjudication.candidate_id.as_str(), adjudication).is_some() {
+            return Err(format!("duplicate target-delta adjudication {}", adjudication.candidate_id));
+        }
+    }
+    if target_adjudications_by_id.len() != target_specs_by_id.len()
+        || target_specs_by_id.keys().any(|id| !target_adjudications_by_id.contains_key(id))
+    {
+        return Err("target-delta receipt must contain exactly one adjudication for every planned candidate".to_owned());
+    }
+
+    let mut reviewer_matches = 0_u64;
+    let mut reviewer_comparisons = 0_u64;
+    let mut transition_matches = 0_u64;
+    let mut transition_comparisons = 0_u64;
+    let mut candidate_results = Vec::new();
+    let mut family = BTreeMap::<String, TargetDeltaFamilyMetricsV1>::new();
+    let mut global_valid = 0_u64;
+    let mut global_invalid = 0_u64;
+    let mut global_ambiguous = 0_u64;
+    let mut target_valid = 0_u64;
+    let mut target_invalid = 0_u64;
+    let mut target_ambiguous = 0_u64;
+    let mut final_valid = 0_u64;
+    let mut final_invalid = 0_u64;
+    let mut final_ambiguous = 0_u64;
+    let mut exact_scope_matches = 0_u64;
+    let mut collateral_changes = 0_u64;
+    let mut accepted_valid = 0_u64;
+    let mut accepted_invalid = 0_u64;
+    let mut accepted_ambiguous = 0_u64;
+    let mut rejected_valid = 0_u64;
+    let mut rejected_invalid = 0_u64;
+    let mut rejected_ambiguous = 0_u64;
+    let mut abstained_valid = 0_u64;
+    let mut abstained_invalid = 0_u64;
+    let mut abstained_ambiguous = 0_u64;
+    let mut tokens = 0_u64;
+    let mut cost = 0_u64;
+    let mut wall = 0_u64;
+    let mut family_cluster_ids = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut valid_accepted_clusters = BTreeSet::new();
+
+    for quality_candidate in quality_candidates {
+        let id = quality_candidate.get("candidate_id").and_then(Value::as_str).unwrap_or("");
+        let intended_relation = match quality_candidate.get("intended_relation").and_then(Value::as_str).unwrap_or("") {
+            "semantic_invariant" => QualityRelationV1::SemanticInvariant,
+            "semantic_change" => QualityRelationV1::SemanticChange,
+            _ => return Err(format!("candidate {id} has unknown parent intended_relation")),
+        };
+        let disposition = match quality_candidate.get("pipeline_disposition").and_then(Value::as_str).unwrap_or("") {
+            "accepted" => QualityDispositionV1::Accepted,
+            "rejected" => QualityDispositionV1::Rejected,
+            "abstained" => QualityDispositionV1::Abstained,
+            _ => return Err(format!("candidate {id} has unknown parent pipeline disposition")),
+        };
+        let family_name = quality_candidate.get("transformation_family").and_then(Value::as_str).unwrap_or("").to_owned();
+        let failure_mode = quality_candidate.get("target_failure_mode").and_then(Value::as_str).unwrap_or("").to_owned();
+        let cluster = quality_candidate.get("semantic_cluster_sha256").and_then(Value::as_str).unwrap_or("").to_owned();
+        let generation_tokens = quality_candidate.get("generation_tokens").and_then(Value::as_u64).unwrap_or(0);
+        let generation_cost = quality_candidate.get("generation_cost_micro_usd").and_then(Value::as_u64).unwrap_or(0);
+        let generation_wall = quality_candidate.get("generation_wall_clock_ms").and_then(Value::as_u64).unwrap_or(0);
+        tokens = tokens.checked_add(generation_tokens).ok_or_else(|| "generation token total overflow".to_owned())?;
+        cost = cost.checked_add(generation_cost).ok_or_else(|| "generation cost total overflow".to_owned())?;
+        wall = wall.checked_add(generation_wall).ok_or_else(|| "generation wall total overflow".to_owned())?;
+
+        let target_spec = target_specs_by_id.get(id).ok_or_else(|| format!("target-delta plan omitted candidate {id}"))?;
+        let target_adjudication = target_adjudications_by_id.get(id).ok_or_else(|| format!("target-delta receipt omitted candidate {id}"))?;
+        let parent_adjudication = quality_adjudications_by_id.get(id).ok_or_else(|| format!("parent quality receipt omitted candidate {id}"))?;
+        let parent_reviewers = parent_adjudication.get("reviewers").and_then(Value::as_array)
+            .ok_or_else(|| format!("parent quality receipt candidate {id} has no reviewer panel"))?;
+        let parent_votes: Vec<crate::intervention_quality::HumanAdjudicationV1> =
+            serde_json::from_value(Value::Array(parent_reviewers.clone()))
+                .map_err(|error| format!("parent quality receipt reviewer panel invalid for {id}: {error}"))?;
+        let parent_policy = quality_plan.get("adjudication_policy")
+            .ok_or_else(|| "parent quality plan adjudication_policy missing".to_owned())?;
+        let parent_threshold = parent_policy.get("consensus_threshold_permille").and_then(Value::as_u64).unwrap_or(0) as u16;
+        let global_validity = relation_validity_from_parent(intended_relation, &parent_votes, parent_threshold);
+        match global_validity {
+            RelationValidity::Valid => global_valid += 1,
+            RelationValidity::Invalid => global_invalid += 1,
+            RelationValidity::Ambiguous => global_ambiguous += 1,
+        }
+
+        let reviewers = &target_adjudication.reviewers;
+        if reviewers.len() != target_plan.reviewers_per_candidate as usize {
+            return Err(format!("candidate {id} requires exactly {} target-delta reviewers", target_plan.reviewers_per_candidate));
+        }
+        let mut reviewer_ids = BTreeSet::new();
+        for reviewer in reviewers {
+            if !valid_digest(&reviewer.reviewer_id_sha256, false)
+                || !reviewer_ids.insert(reviewer.reviewer_id_sha256.as_str())
+            {
+                return Err(format!("candidate {id} has invalid or duplicate target-delta reviewer ID"));
+            }
+            if !valid_digest(&reviewer.adjudication_artifact_sha256, false) {
+                return Err(format!("candidate {id} has invalid target-delta adjudication artifact digest"));
+            }
+            if !reviewer.blind_to_generator_identity
+                || !reviewer.blind_to_intended_relation
+                || !reviewer.blind_to_pipeline_disposition
+                || !reviewer.blind_to_evaluator_outcome
+                || !reviewer.blind_to_expected_target_change
+                || !reviewer.blind_to_allowed_changed_claims
+            {
+                return Err(format!("candidate {id} contains a non-blinded target-delta reviewer"));
+            }
+            let observed = sorted_unique_digests(
+                &reviewer.observed_changed_claim_ids_sha256,
+                "observed_changed_claim_ids_sha256",
+            ).map_err(|error| format!("candidate {id}: {error}"))?;
+            if !observed.is_disjoint(&target_spec.preserved_claim_ids_sha256.iter().cloned().collect()) {
+                if reviewer.collateral_change != CollateralChangeV1::MaterialChangeOutsideAllowedScope {
+                    return Err(format!("candidate {id} reviewer failed to flag a preserved-scope change as collateral"));
+                }
+            }
+        }
+        let (observed_tuple, consensus_ppm, matches, comparisons) =
+            target_tuple_consensus(reviewers, target_plan.consensus_threshold_permille);
+        reviewer_matches += matches;
+        reviewer_comparisons += comparisons;
+        for left in 0..reviewers.len() {
+            for right in (left + 1)..reviewers.len() {
+                transition_comparisons += 1;
+                if reviewers[left].observed_target_change == reviewers[right].observed_target_change {
+                    transition_matches += 1;
+                }
+            }
+        }
+        let (target_validity, scope_matches) =
+            final_validity(RelationValidity::Valid, observed_tuple.as_ref(), target_spec);
+        match target_validity {
+            FinalCandidateValidityV1::Valid => target_valid += 1,
+            FinalCandidateValidityV1::Invalid => target_invalid += 1,
+            FinalCandidateValidityV1::Ambiguous => target_ambiguous += 1,
+        }
+        if scope_matches { exact_scope_matches += 1; }
+        if observed_tuple.as_ref().is_some_and(|tuple| tuple.collateral == CollateralChangeV1::MaterialChangeOutsideAllowedScope) {
+            collateral_changes += 1;
+        }
+        let (finality, _) = final_validity(global_validity, observed_tuple.as_ref(), target_spec);
+        match finality {
+            FinalCandidateValidityV1::Valid => final_valid += 1,
+            FinalCandidateValidityV1::Invalid => final_invalid += 1,
+            FinalCandidateValidityV1::Ambiguous => final_ambiguous += 1,
+        }
+        let metrics = family.entry(family_name.clone()).or_insert_with(|| TargetDeltaFamilyMetricsV1 {
+            transformation_family: family_name.clone(),
+            candidate_count: 0,
+            valid_count: 0,
+            invalid_count: 0,
+            ambiguous_count: 0,
+            accepted_valid_count: 0,
+            accepted_invalid_count: 0,
+            accepted_ambiguous_count: 0,
+        });
+        metrics.candidate_count += 1;
+        match finality {
+            FinalCandidateValidityV1::Valid => metrics.valid_count += 1,
+            FinalCandidateValidityV1::Invalid => metrics.invalid_count += 1,
+            FinalCandidateValidityV1::Ambiguous => metrics.ambiguous_count += 1,
+        }
+        match disposition {
+            QualityDispositionV1::Accepted => match finality {
+                FinalCandidateValidityV1::Valid => { accepted_valid += 1; metrics.accepted_valid_count += 1; valid_accepted_clusters.insert(cluster.clone()); }
+                FinalCandidateValidityV1::Invalid => { accepted_invalid += 1; metrics.accepted_invalid_count += 1; }
+                FinalCandidateValidityV1::Ambiguous => { accepted_ambiguous += 1; metrics.accepted_ambiguous_count += 1; }
+            },
+            QualityDispositionV1::Rejected => match finality {
+                FinalCandidateValidityV1::Valid => rejected_valid += 1,
+                FinalCandidateValidityV1::Invalid => rejected_invalid += 1,
+                FinalCandidateValidityV1::Ambiguous => rejected_ambiguous += 1,
+            },
+            QualityDispositionV1::Abstained => match finality {
+                FinalCandidateValidityV1::Valid => abstained_valid += 1,
+                FinalCandidateValidityV1::Invalid => abstained_invalid += 1,
+                FinalCandidateValidityV1::Ambiguous => abstained_ambiguous += 1,
+            },
+        }
+        family_cluster_ids.entry(family_name.clone()).or_default().insert(cluster);
+        candidate_results.push(TargetDeltaCandidateResultV1 {
+            candidate_id: id.to_owned(),
+            transformation_family: family_name,
+            target_failure_mode: failure_mode,
+            pipeline_disposition: disposition,
+            intended_relation,
+            expected_target_change: target_spec.expected_target_change,
+            observed_target_change: observed_tuple.as_ref().map(|tuple| tuple.change),
+            expected_changed_claim_count: target_spec.expected_changed_claim_ids_sha256.len() as u64,
+            observed_changed_claim_count: observed_tuple.as_ref().map(|tuple| tuple.changed_claims.len() as u64).unwrap_or(0),
+            exact_changed_scope_match: scope_matches,
+            collateral_change: observed_tuple.as_ref().map(|tuple| tuple.collateral),
+            global_relation_validity: match global_validity {
+                RelationValidity::Valid => FinalCandidateValidityV1::Valid,
+                RelationValidity::Invalid => FinalCandidateValidityV1::Invalid,
+                RelationValidity::Ambiguous => FinalCandidateValidityV1::Ambiguous,
+            },
+            target_delta_validity: target_validity,
+            final_validity: finality,
+            reviewer_consensus_ppm: consensus_ppm,
+            reviewer_count: reviewers.len() as u64,
+        });
+    }
+
+    if candidate_results.len() != quality_report.fields.candidate_count as usize {
+        return Err("target-delta result coverage differs from parent quality census".to_owned());
+    }
+    let unique_clusters: BTreeSet<String> = target_plan.candidates.iter()
+        .flat_map(|candidate| candidate.preserved_claim_ids_sha256.iter().cloned())
+        .collect();
+    let final_valid_accepted_unique = valid_accepted_clusters.len() as u64;
+    let fields = TargetDeltaReportFieldsV1 {
+        schema: TARGET_DELTA_REPORT_SCHEMA.to_owned(),
+        study_id: target_plan.study_id,
+        analyzer_source_revision: target_plan.analyzer_source_revision,
+        quality_plan_sha256: target_plan.quality_plan_sha256,
+        quality_receipt_sha256: sha256_hex(quality_receipt_bytes),
+        target_plan_sha256,
+        target_receipt_sha256: sha256_hex(target_receipt_bytes),
+        candidate_count: candidate_results.len() as u64,
+        adjudicated_candidate_count: candidate_results.len() as u64,
+        global_relation_valid_count: global_valid,
+        global_relation_invalid_count: global_invalid,
+        global_relation_ambiguous_count: global_ambiguous,
+        target_delta_valid_count: target_valid,
+        target_delta_invalid_count: target_invalid,
+        target_delta_ambiguous_count: target_ambiguous,
+        final_valid_count: final_valid,
+        final_invalid_count: final_invalid,
+        final_ambiguous_count: final_ambiguous,
+        accepted_valid_count: accepted_valid,
+        accepted_invalid_count: accepted_invalid,
+        accepted_ambiguous_count: accepted_ambiguous,
+        rejected_valid_count: rejected_valid,
+        rejected_invalid_count: rejected_invalid,
+        rejected_ambiguous_count: rejected_ambiguous,
+        abstained_valid_count: abstained_valid,
+        abstained_invalid_count: abstained_invalid,
+        abstained_ambiguous_count: abstained_ambiguous,
+        exact_changed_scope_match_count: exact_scope_matches,
+        collateral_material_change_count: collateral_changes,
+        reviewer_pairwise_agreement_ppm: ppm(reviewer_matches, reviewer_comparisons),
+        reviewer_pairwise_comparison_count: reviewer_comparisons,
+        reviewer_target_transition_agreement_ppm: ppm(transition_matches, transition_comparisons),
+        reviewer_target_transition_comparison_count: transition_comparisons,
+        generation_tokens: tokens,
+        generation_cost_micro_usd: cost,
+        generation_wall_clock_ms: wall,
+        final_valid_accepted_unique_per_1000_tokens: per_1000_tokens(final_valid_accepted_unique, tokens),
+        final_valid_accepted_unique_per_usd: per_usd(final_valid_accepted_unique, cost),
+        family_metrics: family.into_values().collect(),
+        candidate_results,
+        reviewer_independence_proven: false,
+        reviewer_competence_proven: false,
+        semantic_truth_proven: false,
+        raw_artifact_custody_proven: false,
+        execution_authenticity_proven: false,
+        external_anchor_required: true,
+        scoring_eligible_declared: false,
+        claim_boundary: "Compares blinded reviewer observations to a target-delta specification bound to the parent intervention-quality census. It does not prove reviewer independence/competence, semantic truth, raw artifact custody, execution authenticity or downstream judge failure induction.".to_owned(),
+    };
+    let payload = serde_json::to_vec(&fields).map_err(|error| format!("cannot serialize target-delta report: {error}"))?;
+    let report_commitment_sha256 = digest_domain(REPORT_DOMAIN, &payload)?;
+    Ok(TargetDeltaReportV1 { fields, report_commitment_sha256 })
+}
+
