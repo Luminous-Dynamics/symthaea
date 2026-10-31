@@ -630,8 +630,11 @@ mod tests {
         let unknown = |reason: &str| MeterValue::Unknown {
             reason: reason.to_owned(),
         };
+        if budget_model_weight == 0 || charge % budget_model_weight != 0 {
+            panic!("test fixture charge must be divisible by its positive budget weight");
+        }
         let mut resources = ResourceReceipt {
-            host_cpu_millis: meter(charge),
+            host_cpu_millis: meter(charge / budget_model_weight),
             wall_millis: meter(5),
             accelerator_millis: meter(0),
             peak_memory_bytes: meter(1024),
