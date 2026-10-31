@@ -1,21 +1,21 @@
-//! HARDSEC-019 DKW-corrected Conditional Conformal Test Martingale (CCTM).
+//! HARDSEC-021 restarted, DKW-corrected fixed-reference CCTM.
 //!
-//! Implements the published fixed-reference CCTM construction:
-//! - fixed empirical CDF per predeclared workload context;
-//! - DKW uniform confidence band for finite-reference CDF error;
-//! - corrected smoothed betting function;
-//! - predictable Online Newton Step update of eta;
-//! - context-level alpha/delta allocation with union bounds.
+//! Adds deterministic weighted restart aggregation to the per-context DKW-CCTM:
+//! - immutable context-specific empirical CDF and DKW reference band;
+//! - a fresh ONS-local CCTM process at each accepted context observation;
+//! - summable near-harmonic start weights with an unallocated capital reserve;
+//! - deterministic bounded lifetime and explicit local-state expiry receipts;
+//! - mandatory truth-free HARDSEC-020 context-assignment receipt.
 //!
-//! The published theorem assumes the reference samples and the null test-score
-//! sequence are i.i.d. within each context, the score function is fixed, and
-//! context assignment does not depend on the anomaly score. The tool records
-//! these assumptions as unverified; identity digests and unique caller-declared
-//! group IDs do not prove them.
+//! The probability guarantee is conditional on the published CCTM assumptions:
+//! i.i.d. calibration and null scores within each predeclared context, fixed
+//! score function, and exogenous context assignment. These assumptions are not
+//! established by this receipt and do not cover arbitrary dependent PMU windows.
 //!
 //! Usage:
-//!   hardsec_context_cctm_monitor --plan plan.json \
-//!     --stream stream.json --receipt receipt.json
+//!   hardsec_context_restarted_cctm_monitor --plan plan.json \
+//!     --stream stream.json --context-receipt context-receipt.json \
+//!     --receipt receipt.json
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -601,9 +601,11 @@ struct RestartUpdate {
     restart_weight: f64,
     reserve: f64,
     log_e_value: f64,
-    live_state_count: usize,
+    live_state_count_before_expiry: usize,
+    live_state_count_after_expiry: usize,
     expired_this_observation: usize,
     total_expired_state_count: usize,
+    candidate_starts: Vec<Value>,
 }
 
 fn update_restarted_processes(
@@ -672,14 +674,38 @@ fn update_restarted_processes(
     let log_e_value = log_sum_exp(&log_terms)?;
     context_state.restart_log_e_value = log_e_value;
 
-    // The local process is stopped after exactly maximum_restart_age accepted
-    // observations. Removing its nonnegative capital at the predictable age
-    // is an absorbing kill; it cannot increase the aggregate e-process.
+    // Capture every candidate start before deterministic expiry so the receipt
+    // carries per-start weight, age, current log wealth and kill disposition.
     let before_expiry = context_state.restart_states.len();
+    let candidate_starts: Vec<Value> = context_state.restart_states.iter().map(|local| {
+        let age = observation_index.saturating_sub(local.start_index) + 1;
+        let status = if local.log_wealth.is_none() {
+            "zero_wealth_killed"
+        } else if age >= maximum_restart_age {
+            "expires_after_current_update"
+        } else {
+            "active"
+        };
+        json!({
+            "start_index":local.start_index,
+            "weight":restart_weight(local.start_index, scale_c),
+            "age":age,
+            "local_log_wealth":local.log_wealth,
+            "status":status
+        })
+    }).collect();
+
+    // After its maximum_restart_age-th update, a local component is set to
+    // zero on the next context observation. This predictable deterministic
+    // downward kill preserves nonnegative-supermartingale validity and caps
+    // active memory at maximum_restart_age.
     context_state.restart_states.retain(|local| {
-        observation_index.saturating_sub(local.start_index) + 1 < maximum_restart_age
+        local.log_wealth.is_some()
+            && observation_index.saturating_sub(local.start_index) + 1 < maximum_restart_age
     });
-    let expired = before_expiry - context_state.restart_states.len();
+    let expired = candidate_starts.iter()
+        .filter(|state| state["status"] == "expires_after_current_update")
+        .count();
     context_state.restart_expired_state_count += expired;
 
     // Sequence index is carried for audit readability and is not part of
@@ -690,9 +716,11 @@ fn update_restarted_processes(
         restart_weight: new_weight,
         reserve,
         log_e_value,
-        live_state_count: before_expiry,
+        live_state_count_before_expiry: before_expiry,
+        live_state_count_after_expiry: context_state.restart_states.len(),
         expired_this_observation: expired,
         total_expired_state_count: context_state.restart_expired_state_count,
+        candidate_starts,
     })
 }
 
@@ -841,9 +869,11 @@ fn audit_values_with_context_receipt(
                 "context_observation_index":restarted.context_observation_index,
                 "new_start_weight":restarted.restart_weight,
                 "unallocated_capital_reserve":restarted.reserve,
-                "live_state_count":restarted.live_state_count,
+                "live_state_count_before_expiry":restarted.live_state_count_before_expiry,
+                "live_state_count_after_expiry":restarted.live_state_count_after_expiry,
                 "expired_state_count":restarted.expired_this_observation,
                 "total_expired_state_count":restarted.total_expired_state_count,
+                "candidate_starts":restarted.candidate_starts,
                 "log_e_value":restarted.log_e_value,
                 "crossing_now":restart_crossing_now,
                 "threshold_log_e_value":threshold,
