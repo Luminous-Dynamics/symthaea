@@ -586,3 +586,19 @@ Issue [SCI-CONNECTOMICS-017 / #9282](https://github.com/Luminous-Dynamics/symtha
 ### Current implementation test inventory
 
 Authored source tests at the current branch state: spatial-frame/mask 22; candidate-generation coverage with downstream geometry/mask re-derivation 35; correction portfolio 11; co-linear baseline/evaluator 9; query certificate and dependency DAG 23. **100 authored tests total; not yet compiled or executed.** The presence of these tests is not a passing CI result.
+
+## Domain-shift calibration and abstention (SCI-CONNECTOMICS-023)
+
+Issue [#9403](https://github.com/Luminous-Dynamics/symthaea/issues/9403) adds an optional domain-conditional evaluation path to the frozen proofreading-score tool. This closes a gap between pooled calibration and safe transfer: a model may remain well-ranked while becoming overconfident on a held-out species, source volume, region, acquisition protocol, segmentation lineage, modality-availability regime or morphology regime.
+
+The scoring contract separates four quantities:
+- p_error: calibrated probability of a genuine reconstruction error;
+- review_priority_score: frozen queue-ordering score;
+- ood_score: distinct novelty score;
+- is_ood_domain: predeclared held-out status derived from the split protocol, never inferred from model confidence.
+
+One run is restricted to one shift axis. Every row must carry the complete domain tuple or none; partial domain metadata, inconsistent held-out status within a domain, multiple axes in one file, and partial novelty scores fail closed. Per-domain reliability bins, ECE/MCE, Brier/log loss, high-confidence false-accept rates and low-confidence missed-error mass are emitted separately. OOD AUROC/AUPRC are computed only when every row has a novelty score; an optional fixed OOD threshold reports its false-referral and missed-OOD operating point.
+
+This is an evaluator extension, not an OOD-aware production router. The current report includes independent cluster counts but does not yet add cluster-bootstrap intervals for ECE/MCE/OOD AUROC. Those point estimates are descriptive and cannot promote a policy. Next gates are a cluster-aware uncertainty implementation, known-finite-population shift simulations, and locked source-volume/species evaluation with no calibration leakage. No natural-data transfer or SOTA win is claimed.
+
+Protocol: [CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT_PROTOCOL_V1.md](CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT_PROTOCOL_V1.md). Input schema: [CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT_INPUT.schema.json](CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT_INPUT.schema.json). Synthetic regression input: [example JSONL](examples/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT.example.jsonl).
