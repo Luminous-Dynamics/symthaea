@@ -753,8 +753,9 @@ pub fn build_grammar_trace(
             let checks = [
                 (
                     "renaissance-equal-voices",
-                    evidence.verification.equal_voices_present
-                        && evidence.verification.no_chordal_harmony_voice,
+                    evidence.verification.three_independent_voices_present
+                        && evidence.verification.no_chordal_harmony_voice
+                        && evidence.verification.meter_and_duration_match,
                 ),
                 (
                     "renaissance-point-one-entry-order",
