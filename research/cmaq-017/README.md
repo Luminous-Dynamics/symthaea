@@ -32,7 +32,7 @@ The v0.1 candidate ceiling is deliberately 64 so the first mechanism slice remai
 ## Policy arms
 
 - `direct_policy`: feedback controller with no planner candidate/model queries (D0-style baseline).
-- `compute_matched_direct_search`: action-sequence search around a fixed direct-control prior; it consumes the same candidate-query budget but does not call a world model (D1-style synthetic control, not a named industry algorithm).
+- `direct_search_control`: action-sequence search around a fixed direct-control prior; it consumes the same candidate-sequence count but does not call a world model. This is a candidate-budget control only, not a true compute-matched D1 baseline because FLOPs, latency, and hardware work are not equalized.
 - `random_point_search`: random candidate sequences scored by the point model.
 - `adaptive_point_cem`: cross-entropy search using the point model.
 - `pessimistic_ensemble_cem`: minimum predicted return across three heads.
@@ -48,7 +48,7 @@ Every row is keyed by scenario, horizon, execution block, candidate budget, and 
 
 - Realized episode return and a paired-episode 95% normal-approximation interval.
 - Lower-decile mean and worst-episode return. Sixteen episodes are not enough to make a stable CVaR95 estimate; these are tail diagnostics, not a CVaR95 claim.
-- Paired return deltas versus the direct, compute-matched direct, and shuffled-future negative-control arms (D0, D1, and W2 contrasts).
+- Paired return deltas versus the direct policy (D0), candidate-budget direct-search control, and shuffled-future negative-control (W2). True D1 compute matching remains unimplemented and requires measured FLOPs/forward passes/wall-clock budgets.
 - Paired return gap to the oracle arm.
 - Predicted-minus-realized return over the executed block, where the planner emitted a model prediction.
 - Fraction of visited states outside a declared rectangular training-support proxy.
@@ -74,7 +74,7 @@ The focused workflow runs formatting, tests, Clippy, report generation, and stru
 - All policies receive paired episode seeds, the same true environment law, action bounds, environment horizon, and candidate-sequence budget where they use search.
 - Candidate-query counts are separate from model-head evaluations. A three-head ensemble costs three model-head evaluations per candidate.
 - Oracle transition calls are separate from learned-model calls.
-- Direct and compute-matched direct arms report no model forecast or optimism gap; they are not assigned invented prediction scores.
+- Direct and direct-search control arms report no model forecast or optimism gap; they are not assigned invented prediction scores. The direct-search arm matches the number of candidate sequences, not actual compute; do not cite it as D1.
 - Early termination is retained in the episode denominator. No failed/terminal rollout is silently dropped.
 - The benchmark emits each error-family/horizon/execution-block slice separately. A strong mean cannot hide a failed slice.
 - The benchmark is synthetic and does not include a trained Symthaea model, a real simulator, hardware timing, a robot, or an external baseline reproduction.
