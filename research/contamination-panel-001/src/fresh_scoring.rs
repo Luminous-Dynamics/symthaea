@@ -903,6 +903,19 @@ mod tests {
     }
 
     #[test]
+    fn rehashed_report_with_false_summary_counts_is_rejected() {
+        let bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
+        let mut report = score(&bundle, exact_responses(&bundle));
+        report.correct_count -= 1;
+        report.incorrect_count += 1;
+        report.report_sha256.clear();
+        let bytes = serde_json::to_vec(&report).unwrap();
+        report.report_sha256 = hash_domain(b"fresh-instance-score-report.v1", &bytes);
+        assert!(verify_fresh_score_report_integrity(&report)
+            .unwrap_err().contains("item statuses, summary counts/rates"));
+    }
+
+    #[test]
     fn no_answered_items_yields_absent_conditional_accuracy() {
         let bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
         let mut responses = exact_responses(&bundle);
