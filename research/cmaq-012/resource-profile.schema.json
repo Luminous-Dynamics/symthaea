@@ -182,7 +182,9 @@
           "items": {
             "enum": [
               "operator_trace",
-              "hardware_counter"
+              "hardware_counter",
+              "static_estimate",
+              "unavailable"
             ]
           }
         },
