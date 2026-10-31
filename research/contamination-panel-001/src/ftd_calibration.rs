@@ -198,39 +198,28 @@ fn build_item_scores(
     let cluster_size = usize::from(config.item_cluster_size).max(1);
     for cluster_start in (0..n).step_by(cluster_size) {
         let cluster_end = (cluster_start + cluster_size).min(n);
-        let shared_cluster_value = rng.uniform_open();
         let share_cluster = rng.choose_permille(config.item_cluster_correlation_permille);
+        let shared_cluster_feature_values: Vec<f64> =
+            (0..k).map(|_| rng.uniform_open()).collect();
+
         for item_index in cluster_start..cluster_end {
-            let item_value = if share_cluster {
-                shared_cluster_value
-            } else {
-                rng.uniform_open()
-            };
-            let shared_feature_value = rng.uniform_open();
             let share_features = rng.choose_permille(config.feature_correlation_permille);
+            let shared_item_feature_value = rng.uniform_open();
+
             for feature_index in 0..k {
-                let raw_score = if share_features {
-                    shared_feature_value
+                let raw_score = if share_cluster {
+                    shared_cluster_feature_values[feature_index]
+                } else if share_features {
+                    shared_item_feature_value
                 } else {
                     rng.uniform_open()
                 };
-                let correlated_score = if share_cluster {
-                    if share_features {
-                        item_value
-                    } else if rng.choose_permille(config.feature_correlation_permille) {
-                        item_value
-                    } else {
-                        raw_score
-                    }
-                } else if share_features {
-                    shared_feature_value
+                // Mixture dependence preserves each detector/item marginal as
+                // Uniform(0,1), unlike a weighted average of uniforms.
+                scores[feature_index][item_index] = if is_clean[item_index] {
+                    raw_score.sqrt()
                 } else {
                     raw_score
-                };
-                scores[feature_index][item_index] = if is_clean[item_index] {
-                    correlated_score.sqrt()
-                } else {
-                    correlated_score
                 };
             }
         }
@@ -547,6 +536,27 @@ mod tests {
         cfg.hypothesis_count = 10_000;
         cfg.reference_count_per_hypothesis = 10_000;
         assert!(run_ftd_calibration(&cfg, &[0x56; 32]).is_err());
+    }
+
+    #[test]
+    fn high_score_clean_alternative_has_greater_power_under_upper_tail() {
+        let mut upper = config();
+        upper.repetitions = 100;
+        upper.hypothesis_count = 128;
+        upper.reference_count_per_hypothesis = 128;
+        upper.clean_fraction_permille = 500;
+        upper.reference_design = ReferenceDesignV1::IndependentPerHypothesis;
+        upper.tail_direction = ReferenceTailV1::Greater;
+        let upper_report = run_ftd_calibration(&upper, &[0x58; 32]).unwrap();
+
+        let mut lower = upper.clone();
+        lower.tail_direction = ReferenceTailV1::Less;
+        let lower_report = run_ftd_calibration(&lower, &[0x58; 32]).unwrap();
+
+        assert!(
+            upper_report.mean_clean_sample_power.unwrap().estimate
+                > lower_report.mean_clean_sample_power.unwrap().estimate
+        );
     }
 
     #[test]
