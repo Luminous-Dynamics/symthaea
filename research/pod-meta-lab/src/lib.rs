@@ -6,6 +6,7 @@
 
 pub mod graph;
 pub mod poar;
+pub mod recovery;
 
 use std::collections::{BTreeMap, BTreeSet};
 
