@@ -107,7 +107,7 @@ The standalone Rust module exposes:
 
 The scorer rejects empty schedules, zero-duration windows, time overflow, non-contiguous intervals, changing valid_at coordinates, duplicate predictions and unknown prediction keys. Missing predictions are inferred from the expected window schedule and counted in both the missing count and missing exposure. Full-stream coverage uses all scheduled windows as the denominator.
 
-Twelve unit tests are authored for event-aligned correctness, delayed correction, premature NoFact, stale state after retraction, abstention vs missing, future correction leakage, future retraction leakage, contiguous windows, fixed valid time, zero durations, duplicate/unknown predictions, and equal final answer with different time-integrated debt.
+Twelve unit tests are authored for event-aligned correctness, delayed correction, premature NoFact, stale state after retraction, abstention vs missing, future correction leakage, future retraction leakage, contiguous windows, fixed valid time, zero durations, duplicate/unknown predictions, equal final answer with different time-integrated debt, and exposure partition conservation. The Rust tests have not been compiled or executed in this environment.
 
 ## 7. What remains
 
