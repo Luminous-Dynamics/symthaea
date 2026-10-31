@@ -97,7 +97,8 @@ pub struct GrammarProfile {
 
 /// Auditable plan emitted beside a symbolic score. `Compatibility` is honest
 /// about families that still use the established period-centered composer;
-/// flagship bypass engines expose their real cycle/process/modal plan.
+/// dedicated bypass engines expose their real cycle, process, contrapuntal,
+/// developmental, modal, or call/response plans.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "plan", rename_all = "snake_case")]
 pub enum GrammarPlanEvidence {
