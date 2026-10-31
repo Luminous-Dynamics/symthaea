@@ -169,7 +169,9 @@ struct Summary {
     null_false_effect_rate_ci95_upper: Option<f64>,
     mean_branch_coverage: f64,
     mean_branch_outcome_mae: Option<f64>,
+    branch_outcome_mae_episode_count: usize,
     mean_branch_state_mae: Option<f64>,
+    branch_state_mae_episode_count: usize,
     mean_terminal_false_safe_rate: Option<f64>,
     terminal_false_safe_rate_episode_count: usize,
     terminal_false_safe_rate_ci95_lower: Option<f64>,
@@ -796,7 +798,13 @@ fn summarize(scenario: Scenario, model: Model) -> Summary {
         mean_branch_outcome_mae: mean_optional(
             &rows.iter().map(|row| row.branch_outcome_mae).collect::<Vec<_>>(),
         ),
+        branch_outcome_mae_episode_count: optional_sample_count(
+            &rows.iter().map(|row| row.branch_outcome_mae).collect::<Vec<_>>(),
+        ),
         mean_branch_state_mae: mean_optional(
+            &rows.iter().map(|row| row.branch_state_mae).collect::<Vec<_>>(),
+        ),
+        branch_state_mae_episode_count: optional_sample_count(
             &rows.iter().map(|row| row.branch_state_mae).collect::<Vec<_>>(),
         ),
         mean_terminal_false_safe_rate: mean_optional(
@@ -948,8 +956,20 @@ fn render_report() -> String {
             )
             .expect("writing to String cannot fail");
             write_optional(&mut output, row.mean_branch_outcome_mae);
+            write!(
+                &mut output,
+                ",\"branch_outcome_mae_episode_count\":{}",
+                row.branch_outcome_mae_episode_count
+            )
+            .expect("writing to String cannot fail");
             output.push_str(",\"mean_branch_state_mae\":");
             write_optional(&mut output, row.mean_branch_state_mae);
+            write!(
+                &mut output,
+                ",\"branch_state_mae_episode_count\":{}",
+                row.branch_state_mae_episode_count
+            )
+            .expect("writing to String cannot fail");
             output.push_str(",\"mean_terminal_false_safe_rate\":");
             write_optional(&mut output, row.mean_terminal_false_safe_rate);
             write!(
@@ -1259,6 +1279,20 @@ mod tests {
         assert_eq!(metrics.branch_state_mae.unwrap(), 0.0);
         assert_eq!(metrics.top1_regret.unwrap(), 0.0);
         assert_eq!(metrics.pair_coverage, 1.0);
+    }
+
+
+    #[test]
+    fn explicit_effect_head_has_no_absolute_branch_error_denominator() {
+        let case = make_episode_case(BASE_SEED);
+        let metrics = evaluate_episode(
+            Scenario::Monotone,
+            Model::ExplicitEffectHead,
+            case,
+            &ACTIONS,
+        );
+        assert_eq!(metrics.branch_outcome_mae, None);
+        assert_eq!(metrics.branch_state_mae, None);
     }
 
     #[test]
