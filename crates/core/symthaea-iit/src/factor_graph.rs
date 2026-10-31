@@ -1494,6 +1494,139 @@ mod tests {
     }
 
     #[test]
+    fn log_factor_conditioning_removes_a_variable_and_preserves_scope_bit_order() {
+        let factor = BinaryLogFactor::new(
+            vec![1, 3],
+            vec![0.0_f64.ln(), 2.0_f64.ln(), 3.0_f64.ln(), 4.0_f64.ln()],
+        ).unwrap();
+
+        let variable_three_on = factor.condition(3, true).unwrap();
+        assert_eq!(variable_three_on.variables(), &[1]);
+        assert_eq!(variable_three_on.log_values(), &[3.0_f64.ln(), 4.0_f64.ln()]);
+
+        let variable_one_off = factor.condition(1, false).unwrap();
+        assert_eq!(variable_one_off.variables(), &[3]);
+        assert_eq!(variable_one_off.log_values(), &[1.0_f64.ln(), 3.0_f64.ln()]);
+
+        assert_eq!(factor.condition(99, true).unwrap(), factor);
+    }
+
+    #[test]
+    fn cutset_conditioning_matches_full_joint_oracle_when_min_fill_exceeds_budget() {
+        // A 4x4 grid has treewidth four. Removing the second row as a cutset
+        // leaves a chain plus a 2x4 ladder (treewidth two), so exact contraction
+        // fits in eight-entry factors although unconditioned min-fill does not.
+        const WIDTH: usize = 4;
+        const HEIGHT: usize = 4;
+        const VARIABLES: usize = WIDTH * HEIGHT;
+        const RETAINED: usize = VARIABLES - 1;
+        const MAX_FACTOR_ENTRIES: usize = 8;
+        const PAIR_VALUES: [f64; 4] = [0.83, 0.17, 0.29, 0.71];
+
+        let mut factors = Vec::new();
+        for row in 0..HEIGHT {
+            for column in 0..WIDTH {
+                let here = row * WIDTH + column;
+                if column + 1 < WIDTH {
+                    factors.push(BinaryLogFactor::new(
+                        vec![here, here + 1],
+                        PAIR_VALUES.iter().map(|value| value.ln()).collect(),
+                    ).unwrap());
+                }
+                if row + 1 < HEIGHT {
+                    factors.push(BinaryLogFactor::new(
+                        vec![here, here + WIDTH],
+                        PAIR_VALUES.iter().map(|value| value.ln()).collect(),
+                    ).unwrap());
+                }
+            }
+        }
+
+        let eliminate = (0..VARIABLES)
+            .filter(|variable| *variable != RETAINED)
+            .collect::<Vec<_>>();
+        let cutset = [4, 5, 6, 7]; // Entire second row.
+        assert!(matches!(
+            min_fill_log_sum_product(&factors, &eliminate, MAX_FACTOR_ENTRIES),
+            Err(FactorGraphError::IntermediateTooLarge { limit: MAX_FACTOR_ENTRIES, .. })
+        ));
+
+        let report = min_fill_log_sum_product_with_cutset(
+            &factors,
+            &eliminate,
+            &cutset,
+            MAX_FACTOR_ENTRIES,
+            1 << cutset.len(),
+        ).unwrap();
+        assert_eq!(report.factor.variables(), &[RETAINED]);
+        assert_eq!(report.cutset_variables, cutset);
+        assert_eq!(report.cutset_assignments_evaluated, 1 << cutset.len());
+        assert!(report.induced_width <= 2);
+        assert_eq!(report.predicted_peak_factor_entries, report.peak_factor_entries);
+        assert!(report.peak_factor_entries <= MAX_FACTOR_ENTRIES);
+
+        // Independent full-joint enumeration is intentionally exponential and
+        // used only as a small-system oracle for the conditioned contraction.
+        let mut expected = vec![f64::NEG_INFINITY; 2];
+        for assignment in 0..(1usize << VARIABLES) {
+            let mut log_weight = 0.0;
+            for factor in &factors {
+                let scope = factor.variables();
+                let local_index = usize::from((assignment >> scope[0]) & 1)
+                    | (usize::from((assignment >> scope[1]) & 1) << 1);
+                log_weight += factor.log_values()[local_index];
+            }
+            let retained_state = (assignment >> RETAINED) & 1;
+            expected[retained_state] = log_add_exp(expected[retained_state], log_weight);
+        }
+
+        for (index, (actual, expected)) in report.factor.log_values()
+            .iter()
+            .copied()
+            .zip(expected)
+            .enumerate()
+        {
+            assert!(
+                (actual - expected).abs() <= 1e-11,
+                "retained state {index}: cutset={actual:.17}, brute_force={expected:.17}"
+            );
+        }
+    }
+
+    #[test]
+    fn cutset_conditioning_counts_absent_variables_and_rejects_invalid_budgets() {
+        let factor = BinaryLogFactor::new(vec![0], vec![0.25_f64.ln(), 0.75_f64.ln()]).unwrap();
+        let ordinary = min_fill_log_sum_product(&[factor.clone()], &[1], 2).unwrap();
+        let conditioned = min_fill_log_sum_product_with_cutset(
+            &[factor.clone()],
+            &[1],
+            &[1],
+            2,
+            2,
+        ).unwrap();
+        assert_eq!(conditioned.factor.variables(), ordinary.factor.variables());
+        for (actual, expected) in conditioned.factor.log_values()
+            .iter()
+            .zip(ordinary.factor.log_values())
+        {
+            close(*actual, *expected);
+        }
+
+        assert!(matches!(
+            min_fill_log_sum_product_with_cutset(&[factor.clone()], &[1], &[1, 1], 2, 4),
+            Err(FactorGraphError::DuplicateCutsetVariable { variable: 1 })
+        ));
+        assert!(matches!(
+            min_fill_log_sum_product_with_cutset(&[factor.clone()], &[1], &[0], 2, 2),
+            Err(FactorGraphError::CutsetVariableNotEliminated { variable: 0 })
+        ));
+        assert!(matches!(
+            min_fill_log_sum_product_with_cutset(&[factor], &[1, 2], &[1, 2], 2, 3),
+            Err(FactorGraphError::CutsetAssignmentBudgetExceeded { assignments: 4, maximum: 3 })
+        ));
+    }
+
+    #[test]
     fn absent_elimination_variable_contributes_binary_sum_factor() {
         let factor = BinaryFactor::new(vec![0], vec![0.25, 0.75]).unwrap();
         let report = min_fill_sum_product(&[factor], &[1], 2).unwrap();
