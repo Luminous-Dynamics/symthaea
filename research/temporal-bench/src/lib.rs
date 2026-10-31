@@ -130,6 +130,7 @@ pub enum DelayedCueVerificationError {
     StreamIdMismatch,
     PublicDigestMismatch,
     OracleDigestMismatch,
+    SeedReplayMismatch,
     InvalidEventCount,
     InvalidTargetBinding,
     InvalidProbe,
@@ -143,6 +144,7 @@ impl fmt::Display for DelayedCueVerificationError {
             Self::StreamIdMismatch => write!(f, "delayed-cue task and oracle stream IDs differ"),
             Self::PublicDigestMismatch => write!(f, "delayed-cue public SHA-256 digest mismatch"),
             Self::OracleDigestMismatch => write!(f, "delayed-cue oracle SHA-256 digest mismatch"),
+            Self::SeedReplayMismatch => write!(f, "delayed-cue task/oracle do not match the supplied seed and configuration"),
             Self::InvalidEventCount => write!(f, "delayed-cue event count is inconsistent"),
             Self::InvalidTargetBinding => write!(f, "target cue binding is missing or inconsistent"),
             Self::InvalidProbe => write!(f, "delayed-cue probe is invalid"),
@@ -241,6 +243,22 @@ pub fn verify_delayed_cue_trace(
         if current <= previous {
             return Err(DelayedCueVerificationError::InvalidEventOrder { index: index + 1 });
         }
+    }
+    Ok(())
+}
+
+/// Verify the delayed-cue stream by rebuilding it from evaluator-held
+/// seed/configuration. This detects recommitted but seed-inconsistent changes.
+pub fn verify_delayed_cue_trace_seeded(
+    task: &PublicTask,
+    oracle: &OracleRecord,
+    config: DelayedCueConfig,
+) -> Result<(), DelayedCueVerificationError> {
+    verify_delayed_cue_trace(task, oracle)?;
+    let (expected_task, expected_oracle) = generate_delayed_cue(config)
+        .map_err(|_| DelayedCueVerificationError::SeedReplayMismatch)?;
+    if task != &expected_task || oracle != &expected_oracle {
+        return Err(DelayedCueVerificationError::SeedReplayMismatch);
     }
     Ok(())
 }
@@ -512,6 +530,20 @@ mod tests {
         assert_eq!(
             verify_delayed_cue_trace(&task, &oracle),
             Err(DelayedCueVerificationError::InvalidProbe)
+        );
+    }
+
+    #[test]
+    fn seeded_verifier_rejects_recommitted_target_value_change() {
+        let cfg = config(DistractorSimilarity::High);
+        let (mut task, oracle) = generate_delayed_cue(cfg).unwrap();
+        if let EventKind::Associate { value, .. } = &mut task.events[0].kind {
+            *value ^= 1;
+        }
+        task.content_sha256 = delayed_cue_content_digest(&task);
+        assert_eq!(
+            verify_delayed_cue_trace_seeded(&task, &oracle, cfg),
+            Err(DelayedCueVerificationError::SeedReplayMismatch)
         );
     }
 
