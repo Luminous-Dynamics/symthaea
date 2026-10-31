@@ -2,6 +2,7 @@ use std::fmt::Write as _;
 
 const SCHEMA: &str = "cmaq-016-search-exploitability-v0.1";
 const EPISODES: usize = 256;
+const EVALUATOR_DIAGNOSTIC_GRID_POINTS: usize = 201;
 const BASE_SEED: u64 = 0xC0A9_0016_2026_1031;
 const POCKET_CENTER: f64 = 0.72;
 const POCKET_WIDTH: f64 = 0.018;
@@ -288,7 +289,7 @@ fn cem_search(
 }
 
 fn uniform_grid_point_model_mse(scenario: Scenario, seed: u64) -> f64 {
-    let points = 201usize;
+    let points = EVALUATOR_DIAGNOSTIC_GRID_POINTS;
     (0..points)
         .map(|index| {
             let action = -1.0 + 2.0 * index as f64 / (points - 1) as f64;
@@ -390,7 +391,7 @@ fn render_report() -> String {
     )
     .expect("writing to String cannot fail");
     output.push_str(
-        "\"candidate_budgets\":[8,32,128,512],\"scenarios\":[\"benign_iid_noise\",\"narrow_optimism_pocket\"],\"policies\":[\"direct_policy\",\"random_search\",\"adaptive_cem\",\"pessimistic_ensemble_cem\",\"oracle\"],\"summary\":[",
+        "\"evaluator_diagnostic_grid_points\":201,\"candidate_budgets\":[8,32,128,512],\"scenarios\":[\"benign_iid_noise\",\"narrow_optimism_pocket\"],\"policies\":[\"direct_policy\",\"random_search\",\"adaptive_cem\",\"pessimistic_ensemble_cem\",\"oracle\"],\"summary\":[",
     );
 
     for (index, row) in summaries.iter().enumerate() {
