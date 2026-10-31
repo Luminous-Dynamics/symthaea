@@ -161,6 +161,12 @@ struct LowConfidenceErrorMass {
 #[derive(Debug, Serialize)]
 struct CalibrationDiagnostics {
     fixed_bin_count: usize,
+    adaptive_confidence_bin_count_requested: usize,
+    adaptive_confidence_bins: Vec<ConfidenceCalibrationBin>,
+    adaptive_confidence_expected_calibration_error: Option<f64>,
+    adaptive_confidence_maximum_calibration_error: Option<f64>,
+    reliability_curve_bin_count_requested: usize,
+    reliability_curve_bins: Vec<ConfidenceCalibrationBin>,
     brier_score: Option<f64>,
     log_loss: Option<f64>,
     expected_calibration_error: Option<f64>,
@@ -172,12 +178,25 @@ struct CalibrationDiagnostics {
 }
 
 #[derive(Debug, Serialize)]
+struct ConfidenceCalibrationBin {
+    index: usize,
+    count: usize,
+    minimum_confidence: f64,
+    maximum_confidence: f64,
+    mean_confidence: f64,
+    observed_accuracy: f64,
+    absolute_calibration_gap: f64,
+}
+
+#[derive(Debug, Serialize)]
 struct CalibrationClusterBootstrap {
     requested_replicates: usize,
     valid_replicates: usize,
     minimum_valid_replicates_for_interval: usize,
     expected_calibration_error_95: Option<Interval>,
     maximum_calibration_error_95: Option<Interval>,
+    adaptive_confidence_ece_15_95: Option<Interval>,
+    reliability_curve_ece_12_95: Option<Interval>,
     brier_score_95: Option<Interval>,
 }
 
@@ -725,6 +744,8 @@ fn calibration_cluster_bootstrap(
             minimum_valid_replicates_for_interval: minimum_valid,
             expected_calibration_error_95: None,
             maximum_calibration_error_95: None,
+            adaptive_confidence_ece_15_95: None,
+            reliability_curve_ece_12_95: None,
             brier_score_95: None,
         };
     }
@@ -734,6 +755,8 @@ fn calibration_cluster_bootstrap(
     if state == 0 { state = 1; }
     let mut ece = Vec::with_capacity(replicates);
     let mut mce = Vec::with_capacity(replicates);
+    let mut adaptive_ece = Vec::with_capacity(replicates);
+    let mut reliability_ece = Vec::with_capacity(replicates);
     let mut brier = Vec::with_capacity(replicates);
     for _ in 0..replicates {
         let mut sample = Vec::with_capacity(rows.len());
@@ -742,14 +765,22 @@ fn calibration_cluster_bootstrap(
             sample.extend(cluster_rows[index].iter().copied());
         }
         let metrics = calibration_diagnostics(&sample);
-        if let (Some(e), Some(m), Some(b)) = (
+        if let (Some(e), Some(m), Some(a), Some(r), Some(b)) = (
             metrics.expected_calibration_error,
             metrics.maximum_calibration_error,
+            metrics.adaptive_confidence_expected_calibration_error,
+            metrics.reliability_curve_bins.first().map(|_| {
+                metrics.reliability_curve_bins.iter()
+                    .map(|bin| bin.count as f64 / sample.len() as f64 * bin.absolute_calibration_gap)
+                    .sum::<f64>()
+            }),
             metrics.brier_score,
         ) {
-            if e.is_finite() && m.is_finite() && b.is_finite() {
+            if e.is_finite() && m.is_finite() && a.is_finite() && r.is_finite() && b.is_finite() {
                 ece.push(e);
                 mce.push(m);
+                adaptive_ece.push(a);
+                reliability_ece.push(r);
                 brier.push(b);
             }
         }
@@ -760,6 +791,8 @@ fn calibration_cluster_bootstrap(
         minimum_valid_replicates_for_interval: minimum_valid,
         expected_calibration_error_95: scalar_percentile_interval(ece, replicates),
         maximum_calibration_error_95: scalar_percentile_interval(mce, replicates),
+        adaptive_confidence_ece_15_95: scalar_percentile_interval(adaptive_ece, replicates),
+        reliability_curve_ece_12_95: scalar_percentile_interval(reliability_ece, replicates),
         brier_score_95: scalar_percentile_interval(brier, replicates),
     }
 }
@@ -1176,6 +1209,89 @@ fn calibration_threshold_risk(rows: &[&Prediction], threshold: f64) -> Confidenc
     }
 }
 
+fn predicted_confidence(row: &Prediction) -> f64 {
+    row.p_error.max(1.0 - row.p_error)
+}
+
+fn confidence_calibration_bin(
+    rows: &[&Prediction],
+    index: usize,
+) -> ConfidenceCalibrationBin {
+    let minimum_confidence = rows.iter()
+        .map(|row| predicted_confidence(row))
+        .fold(f64::INFINITY, f64::min);
+    let maximum_confidence = rows.iter()
+        .map(|row| predicted_confidence(row))
+        .fold(f64::NEG_INFINITY, f64::max);
+    let confidence_sum = rows.iter().map(|row| predicted_confidence(row)).sum::<f64>();
+    let correct_count = rows.iter().filter(|row| {
+        (row.p_error >= 0.5) == row.label_is_error
+    }).count();
+    let mean_confidence = confidence_sum / rows.len() as f64;
+    let observed_accuracy = correct_count as f64 / rows.len() as f64;
+    ConfidenceCalibrationBin {
+        index,
+        count: rows.len(),
+        minimum_confidence,
+        maximum_confidence,
+        mean_confidence,
+        observed_accuracy,
+        absolute_calibration_gap: (mean_confidence - observed_accuracy).abs(),
+    }
+}
+
+fn adaptive_confidence_bins(
+    rows: &[&Prediction],
+    requested_bins: usize,
+) -> Vec<ConfidenceCalibrationBin> {
+    if rows.is_empty() || requested_bins == 0 {
+        return Vec::new();
+    }
+    let mut ordered = rows.to_vec();
+    ordered.sort_by(|a, b| {
+        predicted_confidence(a).total_cmp(&predicted_confidence(b))
+            .then_with(|| a.sample_id.cmp(&b.sample_id))
+    });
+    let mut bins = Vec::with_capacity(requested_bins.min(rows.len()));
+    let mut start = 0_usize;
+    for bin_number in 1..=requested_bins {
+        if start >= ordered.len() {
+            break;
+        }
+        // ceil(N * k / B) without multiplying N*k directly.
+        let quotient = ordered.len() / requested_bins;
+        let remainder = ordered.len() % requested_bins;
+        let target = quotient * bin_number
+            + (remainder * bin_number + requested_bins - 1) / requested_bins;
+        if target <= start {
+            continue;
+        }
+        let mut end = target.min(ordered.len());
+        // Never split equal-confidence ties across quantile bins. Tied predictions
+        // cannot acquire different calibration treatment from sample-ID ordering.
+        while end < ordered.len()
+            && predicted_confidence(ordered[end - 1]).total_cmp(&predicted_confidence(ordered[end])).is_eq()
+        {
+            end += 1;
+        }
+        bins.push(confidence_calibration_bin(&ordered[start..end], bins.len()));
+        start = end;
+    }
+    if start < ordered.len() {
+        bins.push(confidence_calibration_bin(&ordered[start..], bins.len()));
+    }
+    bins
+}
+
+fn confidence_bins_ece(bins: &[ConfidenceCalibrationBin], total_rows: usize) -> Option<f64> {
+    if total_rows == 0 || bins.is_empty() {
+        return None;
+    }
+    Some(bins.iter()
+        .map(|bin| bin.count as f64 / total_rows as f64 * bin.absolute_calibration_gap)
+        .sum())
+}
+
 fn calibration_diagnostics(rows: &[&Prediction]) -> CalibrationDiagnostics {
     const BIN_COUNT: usize = 10;
     let mut counts = [0_usize; BIN_COUNT];
@@ -1202,6 +1318,13 @@ fn calibration_diagnostics(rows: &[&Prediction]) -> CalibrationDiagnostics {
             low_confidence_error_impact += row.impact_weight;
         }
     }
+
+    let adaptive_confidence_bins_15 = adaptive_confidence_bins(rows, 15);
+    let reliability_curve_bins_12 = adaptive_confidence_bins(rows, 12);
+    let adaptive_confidence_ece = confidence_bins_ece(&adaptive_confidence_bins_15, rows.len());
+    let adaptive_confidence_mce = adaptive_confidence_bins_15.iter()
+        .map(|bin| bin.absolute_calibration_gap)
+        .reduce(f64::max);
 
     let mut bins = Vec::with_capacity(BIN_COUNT);
     let mut ece = 0.0_f64;
@@ -1233,6 +1356,12 @@ fn calibration_diagnostics(rows: &[&Prediction]) -> CalibrationDiagnostics {
 
     CalibrationDiagnostics {
         fixed_bin_count: BIN_COUNT,
+        adaptive_confidence_bin_count_requested: 15,
+        adaptive_confidence_bins: adaptive_confidence_bins_15,
+        adaptive_confidence_expected_calibration_error: adaptive_confidence_ece,
+        adaptive_confidence_maximum_calibration_error: adaptive_confidence_mce,
+        reliability_curve_bin_count_requested: 12,
+        reliability_curve_bins: reliability_curve_bins_12,
         brier_score: if rows.is_empty() { None } else { Some(brier_sum / rows.len() as f64) },
         log_loss: if rows.is_empty() { None } else { Some(log_loss_sum / rows.len() as f64) },
         expected_calibration_error: if rows.is_empty() { None } else { Some(ece) },
@@ -1648,6 +1777,8 @@ mod tests {
             second.expected_calibration_error_95.map(|x| (x.lower, x.upper))
         );
         assert_eq!(first.brier_score_95, Some(Interval { lower: 0.04, upper: 0.04 }));
+        assert_eq!(first.adaptive_confidence_ece_15_95, Some(Interval { lower: 0.0, upper: 0.0 }));
+        assert_eq!(first.reliability_curve_ece_12_95, Some(Interval { lower: 0.0, upper: 0.0 }));
     }
 
     #[test]
@@ -1683,6 +1814,44 @@ mod tests {
     }
 
     #[test]
+    fn confidence_reliability_bins_never_split_equal_confidence_ties() {
+        let mut rows = Vec::new();
+        for i in 0..6 {
+            let label = i % 2 == 0;
+            let probability = if label { 0.9 } else { 0.1 };
+            rows.push(row(&format!("tie-{i}"), label, probability, 0.5, 1.0, 1.0, "merge"));
+        }
+        let refs = rows.iter().collect::<Vec<_>>();
+        let bins = adaptive_confidence_bins(&refs, 12);
+        assert_eq!(bins.len(), 1);
+        assert_eq!(bins[0].count, 6);
+        assert_eq!(bins[0].mean_confidence, 0.9);
+        assert_eq!(bins[0].observed_accuracy, 1.0);
+        assert!((bins[0].absolute_calibration_gap - 0.1).abs() < 1e-12);
+    }
+
+    #[test]
+    fn confidence_reliability_bins_are_deterministic_and_cover_every_row() {
+        let rows = vec![
+            row("q1", true, 0.99, 0.5, 1.0, 1.0, "merge"),
+            row("q2", false, 0.95, 0.5, 1.0, 1.0, "merge"),
+            row("q3", false, 0.80, 0.5, 1.0, 1.0, "merge"),
+            row("q4", true, 0.20, 0.5, 1.0, 1.0, "merge"),
+            row("q5", true, 0.05, 0.5, 1.0, 1.0, "merge"),
+            row("q6", false, 0.01, 0.5, 1.0, 1.0, "merge"),
+        ];
+        let refs = rows.iter().collect::<Vec<_>>();
+        let first = adaptive_confidence_bins(&refs, 15);
+        let second = adaptive_confidence_bins(&refs, 15);
+        assert_eq!(first.len(), second.len());
+        assert_eq!(first.iter().map(|bin| bin.count).sum::<usize>(), rows.len());
+        assert_eq!(
+            first.iter().map(|bin| bin.mean_confidence).collect::<Vec<_>>(),
+            second.iter().map(|bin| bin.mean_confidence).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
     fn calibration_bins_expose_counts_and_expected_error() {
         let rows = vec![
             row("c1", true, 0.95, 0.5, 1.0, 1.0, "merge"),
@@ -1693,6 +1862,10 @@ mod tests {
         let refs = rows.iter().collect::<Vec<_>>();
         let diagnostics = calibration_diagnostics(&refs);
         assert_eq!(diagnostics.fixed_bin_count, 10);
+        assert_eq!(diagnostics.adaptive_confidence_bin_count_requested, 15);
+        assert_eq!(diagnostics.reliability_curve_bin_count_requested, 12);
+        assert_eq!(diagnostics.adaptive_confidence_bins.iter().map(|bin| bin.count).sum::<usize>(), 4);
+        assert_eq!(diagnostics.reliability_curve_bins.iter().map(|bin| bin.count).sum::<usize>(), 4);
         assert_eq!(diagnostics.bins.iter().map(|bin| bin.count).sum::<usize>(), 4);
         assert!((diagnostics.expected_calibration_error.unwrap() - 0.10).abs() < 1e-12);
         assert_eq!(diagnostics.high_confidence_at_90.false_accept_count, 0);
