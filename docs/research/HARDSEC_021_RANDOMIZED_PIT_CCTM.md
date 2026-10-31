@@ -91,7 +91,7 @@ The receipt reports:
 - the randomizer-source artifact digest and unverified independence assumption;
 - the CCTM's DKW/alpha allocations and theorem assumptions.
 
-Twenty-eight authored Rust tests cover the randomized-PIT algebra, atom interpolation, DKW/ONS mechanics, context receipt binding, invalid randomizer ranges, duplicate randomizer IDs, randomizer artifact mismatch and prior CCTM failure cases.
+Thirty authored Rust tests cover the randomized-PIT algebra, atom interpolation, DKW/ONS mechanics, context receipt binding, invalid randomizer ranges, duplicate randomizer IDs, randomizer artifact mismatch and prior CCTM failure cases.
 
 ## 6. Run
 
@@ -110,6 +110,13 @@ cargo run --locked \
   --context-receipt /path/to/hardsec-020-runtime-receipt.json \
   --receipt /tmp/hardsec-021-rpit-cctm-receipt.json
 ```
+
+
+## 6. Exact atomic-score control
+
+The Rust suite includes an exact stratified probability-integral-transform control for a discrete null with atom masses 0.5, 0.3 and 0.2. It allocates 5,000, 3,000 and 2,000 deterministic stratification points to the respective atoms. Under the randomized PIT, those atom intervals partition ([0,1]), yielding 10,000 equally spaced transformed midpoints with maximum empirical CDF discrepancy below (5.1\times10^{-5}). The deterministic non-randomized transform instead takes only the three upper-endpoint values 0.5, 0.8 and 1.0.
+
+This is an exact algebra/stratification control, not Monte Carlo evidence and not a test of the randomizer source. It demonstrates why randomized interpolation is the appropriate PIT construction for score distributions with atoms.
 
 ## 7. Required benchmark comparisons
 
