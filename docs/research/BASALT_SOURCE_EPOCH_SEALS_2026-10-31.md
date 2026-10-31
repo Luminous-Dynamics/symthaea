@@ -48,6 +48,8 @@ The raw ledger-byte digest deliberately avoids signing a normalized or canonical
 | Close procedure qualification | Always false | Independent quiescence/drain coordinator and positive/negative controls |
 | Observer delivery qualification | Always false | Held-out transport fault injection and sensor-profile qualification |
 
+The report carries separate fields for `integrity_passed` and `ledger_loss_free`. A fully reconciled ledger with a correctly classified lost event can have a valid integrity seal while `ledger_loss_free` remains false; sealing an event ledger is not a claim that its sensor delivered every event.
+
 A hash chain proves order and mutation sensitivity, not origin. A predecessor digest proves only a claimed link unless the verifier also has a trusted latest checkpoint. An attacker able to rewrite the ledger and recompute all unkeyed digests can create a new self-consistent record; a signature and trusted monotonic witness are still required.
 
 ## Industry comparison and integration
@@ -64,7 +66,7 @@ BASALT should complement these tools: sensors generate telemetry; BASALT verifie
 
 ## Benchmark plan
 
-The versioned benchmark includes clean controls, raw-byte mutation, event-root mutation, range-root mutation, source substitution, terminal-high-water mutation, observer/close-fence substitution, generation-link corruption, close-order reversal, commitment mutation omission of the required predecessor field and event-after-drain inconsistency (14 scenarios).
+The versioned benchmark includes clean controls, raw-byte mutation, event-root mutation, range-root mutation, source substitution, terminal-high-water mutation, observer/close-fence substitution, generation-link corruption, close-order reversal, commitment mutation omission of the required predecessor field and event-after-drain inconsistency and a reconciled-but-lossy seal control (15 scenarios).
 
 Safety targets:
 - 100% rejection of every seeded ledger/chain/close/commitment mutation;
