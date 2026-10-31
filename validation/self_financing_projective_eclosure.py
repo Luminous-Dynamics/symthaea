@@ -325,13 +325,14 @@ def _closure_check(
 
 def _prefix_digest(
     x, active, scores, alpha, values, costs, capacities, thresholds,
-    increments, t,
+    increments, t, share_policy,
 ):
     active_universe = set()
     for mask in active[: t + 1]:
         active_universe.update(i for i in range(len(scores)) if (mask >> i) & 1)
     payload = {
         "time": t,
+        "share_policy": share_policy,
         "active_masks": list(active[: t + 1]),
         "active_coordinate_increments": {
             str(i): [fraction_pair(x[i][u]) for u in range(t + 1)
@@ -363,6 +364,7 @@ def select_self_financing_capacity_actions(
     adjuster_increments,
     *,
     exhaustive_limit: int = 8,
+    share_policy: str = "static_priority",
 ) -> dict:
     x, active, scores, level, vals, c, capacity = _normalise(
         increment_paths, active_masks, priority_scores, alpha, values, costs,
@@ -371,7 +373,9 @@ def select_self_financing_capacity_actions(
     n = len(x)
     if n > exhaustive_limit:
         raise ValueError(f"exact self-financing oracle limited to {exhaustive_limit} hypotheses")
-    raw, shares = build_self_financing_intersection_paths(x, active, scores)
+    raw, shares = build_self_financing_intersection_paths(
+        x, active, scores, share_policy=share_policy
+    )
     adjusted, adjuster_budget = _adjust_paths(raw, thresholds, adjuster_increments)
     collection = _verify_dynamic_collection(adjusted, active)
     if not collection["valid"]:
@@ -434,14 +438,14 @@ def select_self_financing_capacity_actions(
             "shares": [fraction_pair(v) for v in shares[t]],
             "prefix_sha256": _prefix_digest(
                 x, active, scores, level, vals, c, capacity, c_thresholds,
-                a_increments, t,
+                a_increments, t, share_policy,
             ),
         })
         previous = best
 
     verification = verify_self_financing_sequence(
         decisions, x, active, scores, level, vals, c, capacity,
-        c_thresholds, a_increments,
+        c_thresholds, a_increments, share_policy=share_policy,
     )
     if not verification["valid"]:
         raise ArithmeticError(f"independent replay failed: {verification}")
@@ -456,6 +460,7 @@ def select_self_financing_capacity_actions(
             "projective e-processes; dynamic e-closure then supplies SupFDR."
         ),
         "priority_scores": [fraction_pair(v) for v in scores],
+        "share_policy": share_policy,
         "alpha": fraction_pair(level),
         "adjuster_integral_budget": fraction_pair(adjuster_budget),
         "dynamic_collection": collection,
@@ -465,7 +470,7 @@ def select_self_financing_capacity_actions(
             "one-step conditional e-value expectation is assumed, not proved from the observed paths",
             "requires one common global filtration",
             "active sets are deterministic and nested",
-            "scores are fixed; future adaptive score policies need a predictable-measurability proof",
+            "share policies are predictable functions of the pre-update history; their stochastic contract remains external",
             "cumulative capacity only; no per-period queue-service guarantee",
             "finite exhaustive oracle with exponential complexity",
         ],
@@ -474,10 +479,15 @@ def select_self_financing_capacity_actions(
 
 def verify_self_financing_sequence(
     decisions, x, active, scores, alpha, values, costs, capacities,
-    thresholds, adjuster_increments,
+    thresholds, adjuster_increments, *, share_policy="static_priority",
 ) -> dict:
     """Independent deterministic replay of all certificates and optimum choices."""
-    raw, shares = build_self_financing_intersection_paths(x, scores, active)
+    x, active, scores, alpha, values, costs, capacities = _normalise(
+        x, active, scores, alpha, values, costs, capacities
+    )
+    raw, shares = build_self_financing_intersection_paths(
+        x, active, scores, share_policy=share_policy
+    )
     adjusted, budget = _adjust_paths(raw, thresholds, adjuster_increments)
     collection = _verify_dynamic_collection(adjusted, active)
     failures = []
@@ -523,6 +533,7 @@ def verify_self_financing_sequence(
                 x, active, scores, alpha, values, costs, capacities,
                 tuple(as_fraction(v) for v in thresholds),
                 tuple(as_fraction(v) for v in adjuster_increments), t,
+                share_policy,
             ),
         }
         for field, expected_value in expected.items():
