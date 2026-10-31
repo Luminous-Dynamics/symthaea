@@ -300,22 +300,31 @@ class RandomizedCommonDepthCRC:
         dual_witness=optimization.get("dual_witness")
         if not isinstance(kkt_summary,dict) or not isinstance(dual_witness,dict):
             return {"valid":False,"reason":"LP optimality evidence is malformed"}
+        scope=certificate.get("scope")
+        risk_target=certificate.get("risk_target")
+        evidence_digests=certificate.get("evidence_digests")
+        if not isinstance(scope,dict) or not isinstance(risk_target,dict):
+            return {"valid":False,"reason":"scope or risk target metadata is malformed"}
+        if not isinstance(evidence_digests,dict):
+            return {"valid":False,"reason":"evidence digest metadata is malformed"}
         try:
-            if certificate.get("scope",{}).get("n_calibration")!=self.n:
+            if scope.get("n_calibration")!=self.n:
                 return {"valid":False,"reason":"calibration scope mismatch"}
-            if certificate.get("risk_target",{}).get("level")!=self.alpha:
+            if risk_target.get("level")!=self.alpha:
                 return {"valid":False,"reason":"risk target mismatch"}
             verification=self.verify(probabilities)
-        except (TypeError,ValueError,KeyError,IndexError) as exc:
+        except (TypeError,ValueError,KeyError,IndexError,AttributeError) as exc:
             return {"valid":False,"reason":f"invalid certificate policy or scope: {exc}"}
         if not verification["valid"]:
             return {"valid":False,"reason":"exact augmented-state verification failed",
                     "verification":verification}
+        # Build expected identity fields without trusting the supplied KKT
+        # summary to be complete or well-formed.
         expected=self.build_certificate(
-            probabilities,verification,kkt_summary,dual_witness
+            probabilities,verification,{"duality_gap_abs":0.0},dual_witness
         )
         for name,value in expected["evidence_digests"].items():
-            if certificate.get("evidence_digests",{}).get(name)!=value:
+            if evidence_digests.get(name)!=value:
                 return {"valid":False,"reason":f"evidence digest mismatch: {name}"}
         for field in ("proof_lane","risk_target","assumption_contract","scope","verifier_receipt"):
             if certificate.get(field)!=expected.get(field):
