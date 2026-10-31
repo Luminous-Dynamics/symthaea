@@ -288,6 +288,10 @@ pub fn admit_lexical_hits_for_proof_budget(
             source_span_start: 0,
             source_span_end: span_len,
             source_family_id: admission.source_family_id.clone(),
+            // Session identity is derived from the exact source trajectory
+            // returned by the index and matched against the trusted admission.
+            // AML ingestion sets trajectory_id directly from Add.session_id.
+            source_session_id: Some(admission.source_trajectory_id.clone()),
             scope_id: admission.scope_id.clone(),
             payload_sha256: hit.content_sha256.clone(),
             source_span_sha256: resolved_digest.clone(),
@@ -423,6 +427,7 @@ mod tests {
                     evidence_dependencies: vec!["A".into()],
                 }],
                 minimum_independent_families: 1,
+                minimum_distinct_sessions: 0,
                 selection_overhead_tokens: 3,
             }],
         }
@@ -515,6 +520,77 @@ mod tests {
 
         assert_eq!(result.status, ProofBudgetStatus::Supported);
         assert_eq!(result.evidence[0].source_span_text, text);
+    }
+
+    #[test]
+    fn trusted_session_provenance_flows_from_admission_into_multisession_proof_packet() {
+        let mut proof_request = request();
+        proof_request.obligations[0].minimum_independent_families = 2;
+        proof_request.obligations[0].minimum_distinct_sessions = 2;
+        proof_request.obligations[0].alternatives = vec![ProofJustification {
+            justification_id: "two-session-proof".into(),
+            evidence_dependencies: vec!["A".into(), "B".into()],
+        }];
+
+        let mut hit_a = hit("A", "evidence from first session", 1.0);
+        hit_a.source.trajectory_id = "session-1".into();
+        let mut hit_b = hit("B", "evidence from second session", 0.9);
+        hit_b.source.trajectory_id = "session-2".into();
+
+        // AML ingestion binds trajectory_id to the Add request's session_id.
+        // The trusted admission envelope must preserve that exact mapping.
+        let mut admission_a = admission("A");
+        admission_a.source_trajectory_id = hit_a.source.trajectory_id.clone();
+        let mut admission_b = admission("B");
+        admission_b.source_trajectory_id = "session-2".into();
+        admission_b.source_sha256 = hit_b.source.source_sha256.clone();
+        admission_b.source_pointer = hit_b.source.source_pointer.clone();
+        admission_b.source_step_id = hit_b.source.step_id.clone();
+        admission_b.source_step_index = hit_b.source.step_index;
+
+        let admitted = admit_lexical_hits_for_proof_budget(
+            proof_request,
+            &[hit_a, hit_b],
+            &[admission_a, admission_b],
+            &snapshot_receipt(),
+        ).unwrap();
+        let result = solve_proof_budget(admitted).unwrap();
+
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        assert_eq!(
+            result.evidence
+                .iter()
+                .map(|evidence| evidence.source_session_id.as_deref().unwrap())
+                .collect::<Vec<_>>(),
+            vec!["session-1", "session-2"]
+        );
+    }
+
+    #[test]
+    fn session_provenance_is_derived_from_indexed_trajectory_not_admission_guess() {
+        let mut proof_request = request();
+        proof_request.obligations[0].minimum_distinct_sessions = 1;
+        let indexed_hit = hit("A", "evidence", 1.0);
+        let mut mismatched_admission = admission("A");
+        mismatched_admission.source_trajectory_id = "forged-other-session".into();
+
+        let error = admit_lexical_hits_for_proof_budget(
+            proof_request.clone(),
+            &[indexed_hit],
+            &[mismatched_admission],
+            &snapshot_receipt(),
+        ).unwrap_err();
+        assert!(error.contains("trajectory"));
+
+        let admitted = admit_lexical_hits_for_proof_budget(
+            proof_request,
+            &[hit("A", "evidence", 1.0)],
+            &[admission("A")],
+            &snapshot_receipt(),
+        ).unwrap();
+        let result = solve_proof_budget(admitted).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        assert_eq!(result.evidence[0].source_session_id.as_deref(), Some("trajectory-1"));
     }
 
     #[test]
@@ -741,6 +817,7 @@ mod tests {
             source_span_start: 0,
             source_span_end: 3,
             source_family_id: "family-old".into(),
+            source_session_id: Some("session-old".into()),
             scope_id: "scope-1".into(),
             payload_sha256: digest("old"),
             source_span_sha256: digest("old"),

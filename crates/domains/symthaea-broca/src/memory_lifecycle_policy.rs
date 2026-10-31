@@ -108,7 +108,10 @@ pub struct VerifiedLifecycleProofToken {
     known_at_unix_ms: u64,
     request_sha256: String,
     packet_sha256: String,
-    selected_proofs: std::collections::BTreeMap<String, (String, BTreeSet<String>)>,
+    selected_proofs: std::collections::BTreeMap<
+        String,
+        (String, BTreeSet<String>, BTreeSet<String>),
+    >,
 }
 
 impl VerifiedLifecycleProofToken {
@@ -157,7 +160,7 @@ impl VerifiedLifecycleProofToken {
             if claim.state != ClaimLifecycleState::SupportedCurrent {
                 return Err("verified proof token cannot be used with a non-current claim".into());
             }
-            let (justification_id, dependencies) = self
+            let (justification_id, dependencies, session_ids) = self
                 .selected_proofs
                 .get(&claim.conclusion_id)
                 .ok_or_else(|| format!(
@@ -166,9 +169,10 @@ impl VerifiedLifecycleProofToken {
                 ))?;
             if claim.selected_justification_id.as_deref() != Some(justification_id.as_str())
                 || &claim.current_evidence_ids != dependencies
+                || &claim.source_session_ids != session_ids
             {
                 return Err(format!(
-                    "lifecycle claim {:?} does not match the independently verified selected proof",
+                    "lifecycle claim {:?} does not match the independently verified selected proof or session coverage",
                     claim.conclusion_id
                 ));
             }
@@ -185,15 +189,32 @@ pub fn verify_proof_packet_for_lifecycle(
 ) -> Result<VerifiedLifecycleProofToken, String> {
     let context = build_verified_proof_reader_context(request, result)?;
     context.verify_internal_consistency()?;
+    let session_by_evidence_id: std::collections::BTreeMap<String, Option<String>> =
+        context.evidence
+            .iter()
+            .map(|evidence| (evidence.evidence_id.clone(), evidence.source_session_id.clone()))
+            .collect();
     let selected_proofs = context
         .claim_proofs
         .iter()
         .map(|proof| {
+            let dependencies: BTreeSet<String> =
+                proof.evidence_dependencies.iter().cloned().collect();
+            let session_ids: BTreeSet<String> = proof.evidence_dependencies
+                .iter()
+                .filter_map(|evidence_id| {
+                    session_by_evidence_id
+                        .get(evidence_id)
+                        .cloned()
+                        .flatten()
+                })
+                .collect();
             (
                 proof.conclusion_id.clone(),
                 (
                     proof.justification_id.clone(),
-                    proof.evidence_dependencies.iter().cloned().collect(),
+                    dependencies,
+                    session_ids,
                 ),
             )
         })
@@ -222,6 +243,9 @@ pub struct ClaimLifecycleLedgerEntry {
     pub stale_evidence_ids: BTreeSet<String>,
     pub conflicting_evidence_ids: BTreeSet<String>,
     pub rejected_evidence_ids: BTreeSet<String>,
+    /// Exact distinct source-session IDs supporting the selected proof.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub source_session_ids: BTreeSet<String>,
 }
 
 impl ClaimLifecycleLedgerEntry {
@@ -247,6 +271,10 @@ impl ClaimLifecycleLedgerEntry {
                     ));
                 }
             }
+        }
+
+        for session_id in &self.source_session_ids {
+            require_non_empty(session_id, "source_session_id")?;
         }
 
         match self.state {
@@ -555,7 +583,7 @@ impl LifecycleActionDecision {
     }
 }
 
-pub const LIFECYCLE_POLICY_VERSION: &str = "BROCA-LIFECYCLE-ACTION-V1";
+pub const LIFECYCLE_POLICY_VERSION: &str = "BROCA-LIFECYCLE-ACTION-V2";
 
 /// Select an action from the complete claim lifecycle ledger.
 ///
@@ -754,6 +782,7 @@ mod tests {
             stale_evidence_ids: BTreeSet::new(),
             conflicting_evidence_ids: BTreeSet::new(),
             rejected_evidence_ids: BTreeSet::new(),
+            source_session_ids: BTreeSet::new(),
         }
     }
 
@@ -766,6 +795,7 @@ mod tests {
             stale_evidence_ids: BTreeSet::from([format!("stale-{id}")]),
             conflicting_evidence_ids: BTreeSet::new(),
             rejected_evidence_ids: BTreeSet::new(),
+            source_session_ids: BTreeSet::new(),
         }
     }
 
@@ -781,6 +811,7 @@ mod tests {
                 format!("conflict-{id}-b"),
             ]),
             rejected_evidence_ids: BTreeSet::new(),
+            source_session_ids: BTreeSet::new(),
         }
     }
 
@@ -793,6 +824,7 @@ mod tests {
             stale_evidence_ids: BTreeSet::new(),
             conflicting_evidence_ids: BTreeSet::new(),
             rejected_evidence_ids: BTreeSet::new(),
+            source_session_ids: BTreeSet::new(),
         }
     }
 
@@ -805,6 +837,7 @@ mod tests {
             stale_evidence_ids: BTreeSet::new(),
             conflicting_evidence_ids: BTreeSet::new(),
             rejected_evidence_ids: BTreeSet::from([format!("rejected-{id}")]),
+            source_session_ids: BTreeSet::new(),
         }
     }
 
@@ -825,6 +858,7 @@ mod tests {
                     (
                         claim.selected_justification_id.clone().unwrap(),
                         claim.current_evidence_ids.clone(),
+                        claim.source_session_ids.clone(),
                     ),
                 )
             })
@@ -875,7 +909,8 @@ mod tests {
     }
 
     fn real_proof_request() -> ProofBudgetRequest {
-        let excerpt = "verified current evidence";
+        let excerpt_a = "verified evidence from the first session";
+        let excerpt_b = "independent confirmation from the second session";
         ProofBudgetRequest {
             decision_id: "decision-real".into(),
             principal_id: "principal-1".into(),
@@ -891,36 +926,64 @@ mod tests {
             tokenizer_version: "1".into(),
             tokenizer_sha256: digest("tokenizer"),
             packet_renderer_sha256: digest("renderer"),
-            candidates: vec![ProofEvidenceCandidate {
-                evidence_id: "E1".into(),
-                source_revision_id: "REV-E1".into(),
-                source_pointer: "/messages/0/content".into(),
-                source_span_text: excerpt.into(),
-                source_span_start: 0,
-                source_span_end: excerpt.len() as u64,
-                source_family_id: "family-1".into(),
-                scope_id: "scope-1".into(),
-                payload_sha256: digest("payload"),
-                source_span_sha256: digest(excerpt),
-                resolved_span_sha256: digest(excerpt),
-                conflicts_with: BTreeSet::new(),
-                recorded_at_unix_ms: 100,
-                retracted_at_unix_ms: None,
-                valid_from_unix_ms: Some(10),
-                valid_until_unix_ms: None,
-                authorized_principal_id: "principal-1".into(),
-                authorization_accepted: true,
-                authorization_receipt_sha256: digest("authorization receipt"),
-                retrieval_rank: 1,
-                token_cost: 3,
-            }],
+            candidates: vec![
+                ProofEvidenceCandidate {
+                    evidence_id: "E1".into(),
+                    source_revision_id: "REV-E1".into(),
+                    source_pointer: "/messages/0/content".into(),
+                    source_span_text: excerpt_a.into(),
+                    source_span_start: 0,
+                    source_span_end: excerpt_a.len() as u64,
+                    source_family_id: "family-1".into(),
+                    source_session_id: Some("session-1".into()),
+                    scope_id: "scope-1".into(),
+                    payload_sha256: digest("payload-1"),
+                    source_span_sha256: digest(excerpt_a),
+                    resolved_span_sha256: digest(excerpt_a),
+                    conflicts_with: BTreeSet::new(),
+                    recorded_at_unix_ms: 100,
+                    retracted_at_unix_ms: None,
+                    valid_from_unix_ms: Some(10),
+                    valid_until_unix_ms: None,
+                    authorized_principal_id: "principal-1".into(),
+                    authorization_accepted: true,
+                    authorization_receipt_sha256: digest("authorization receipt-1"),
+                    retrieval_rank: 1,
+                    token_cost: 3,
+                },
+                ProofEvidenceCandidate {
+                    evidence_id: "E2".into(),
+                    source_revision_id: "REV-E2".into(),
+                    source_pointer: "/messages/1/content".into(),
+                    source_span_text: excerpt_b.into(),
+                    source_span_start: 0,
+                    source_span_end: excerpt_b.len() as u64,
+                    source_family_id: "family-2".into(),
+                    source_session_id: Some("session-2".into()),
+                    scope_id: "scope-1".into(),
+                    payload_sha256: digest("payload-2"),
+                    source_span_sha256: digest(excerpt_b),
+                    resolved_span_sha256: digest(excerpt_b),
+                    conflicts_with: BTreeSet::new(),
+                    recorded_at_unix_ms: 150,
+                    retracted_at_unix_ms: None,
+                    valid_from_unix_ms: Some(10),
+                    valid_until_unix_ms: None,
+                    authorized_principal_id: "principal-1".into(),
+                    authorization_accepted: true,
+                    authorization_receipt_sha256: digest("authorization receipt-2"),
+                    retrieval_rank: 2,
+                    token_cost: 4,
+                },
+            ],
             obligations: vec![ProofObligation {
                 conclusion_id: "C1".into(),
                 alternatives: vec![ProofJustification {
                     justification_id: "proof-C1".into(),
-                    evidence_dependencies: vec!["E1".into()],
+                    evidence_dependencies: vec!["E1".into(), "E2".into()],
                 }],
-                minimum_independent_families: 1,
+                minimum_independent_families: 2,
+                minimum_distinct_sessions: 2,
                 selection_overhead_tokens: 1,
             }],
         }
@@ -945,10 +1008,11 @@ mod tests {
                 conclusion_id: "C1".into(),
                 state: ClaimLifecycleState::SupportedCurrent,
                 selected_justification_id: Some("proof-C1".into()),
-                current_evidence_ids: BTreeSet::from(["E1".into()]),
+                current_evidence_ids: BTreeSet::from(["E1".into(), "E2".into()]),
                 stale_evidence_ids: BTreeSet::new(),
                 conflicting_evidence_ids: BTreeSet::new(),
                 rejected_evidence_ids: BTreeSet::new(),
+                source_session_ids: BTreeSet::from(["session-1".into(), "session-2".into()]),
             }],
         };
         lifecycle_request.principal_id = "other-principal".into();
@@ -982,10 +1046,11 @@ mod tests {
                 conclusion_id: "C1".into(),
                 state: ClaimLifecycleState::SupportedCurrent,
                 selected_justification_id: Some("proof-C1".into()),
-                current_evidence_ids: BTreeSet::from(["E1".into()]),
+                current_evidence_ids: BTreeSet::from(["E1".into(), "E2".into()]),
                 stale_evidence_ids: BTreeSet::new(),
                 conflicting_evidence_ids: BTreeSet::new(),
                 rejected_evidence_ids: BTreeSet::new(),
+                source_session_ids: BTreeSet::from(["session-1".into(), "session-2".into()]),
             }],
         };
         let decision = decide_lifecycle_action(lifecycle_request, Some(&token)).unwrap();
@@ -1046,6 +1111,25 @@ mod tests {
         let error = decide_lifecycle_action(req, Some(&token)).unwrap_err();
         assert!(error.contains("does not match the independently verified selected proof"));
     }
+
+    #[test]
+    fn opaque_proof_token_rejects_tampered_session_coverage() {
+        let req = request(
+            ProofVerificationState::VerifiedOptimal,
+            vec![supported_claim("C1")],
+            progress(true, false),
+        );
+        let mut token = token_for(&req);
+        token
+            .selected_proofs
+            .get_mut("C1")
+            .unwrap()
+            .2 = BTreeSet::from(["session-forged".into()]);
+
+        let error = decide_lifecycle_action(req, Some(&token)).unwrap_err();
+        assert!(error.contains("session coverage"));
+    }
+
 
     #[test]
     fn all_current_looking_claims_without_independent_verification_cannot_answer() {

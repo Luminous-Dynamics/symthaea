@@ -1,6 +1,6 @@
 # Broca lifecycle-aware action policy
 
-**Policy version:** BROCA-LIFECYCLE-ACTION-V1  
+**Policy version:** BROCA-LIFECYCLE-ACTION-V2  
 **Status:** deterministic reference controller; Rust tests authored, not compiled/executed here.  
 **Research comparator:** Vera-Life-Eval (GroundLM 2026, 8,500 questions / 41,203 versioned evidence items).
 
@@ -130,8 +130,18 @@ The fixture corpus is a policy-conformance suite, not a substitute for Vera-Life
 
 ## Long-horizon extension: BEAM
 
+The implementation-level cross-session proof contract is documented in [CROSS_SESSION_PROOF_COVERAGE.md](CROSS_SESSION_PROOF_COVERAGE.md). The opaque proof token now binds per-claim distinct session IDs as well as selected justification and evidence dependencies; changes to session coverage invalidate the token.
+
+
 Vera-Life measures lifecycle faithfulness, but Broca also needs a scale stress test for long histories and cross-session evidence. BEAM (ICLR 2026) has 100 conversations / 2,000 validated questions over 100K, 500K, 1M and 10M token histories, testing ten abilities including multi-session reasoning, temporal ordering, contradiction resolution, knowledge update and abstention. The LIGHT baseline combines episodic memory, working memory and scratchpad, with reported 3.5–12.69 pp gains over strongest baselines depending on backbone.
 
 A public past.dev BEAM result reports 85.03% overall at 10M tokens, but only 28.17% multi-session reasoning on its 20-question ability slice. This small per-ability sample and the vendor's separately-run competitor comparison must be treated as diagnostic, not a common-harness rank. Broca should report the official aggregate and every ability separately, with priority on cross-session complete proof coverage, exact source-family diversity, claim-level conflict closure and correct action selection. A prospective 10M multi-session target of at least 70% is an engineering ambition, not a published result; any gain must retain or improve the other nine ability scores and the lifecycle action score.
 
 Sources: [BEAM ICLR 2026 paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/d7f0cfa0fe759b033d5262e1bb7d4065-Abstract-Conference.html); [BEAM leaderboard and ability breakdown](https://www.past.dev/benchmarks/beam).
+
+
+## Policy V2: cross-session proof coverage
+
+V2 extends the opaque proof capability and claim ledger to bind the exact distinct session IDs behind each selected claim proof. A session threshold is a separate constraint from independent source-family count: two families in one session do not count as multi-session coverage, and two sessions from one family do not establish independent-source diversity. The capability checks the session set again at the final ANSWER gate. See [CROSS_SESSION_PROOF_COVERAGE.md](CROSS_SESSION_PROOF_COVERAGE.md) and [cross-session-proof-fixtures-v1.json](cross-session-proof-fixtures-v1.json).
+
+The V2 proof capability is derived only after the verified reader context's canonical `context_sha256` has been recomputed and checked. That digest commits to the session provenance handed to the reader; the final answer gate still requires the original in-process capability.

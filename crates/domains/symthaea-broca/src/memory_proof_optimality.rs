@@ -218,12 +218,15 @@ impl Enumeration<'_> {
         let conclusion_id = self.request.obligations[obligation_index].conclusion_id.clone();
         let minimum_independent_families =
             self.request.obligations[obligation_index].minimum_independent_families;
+        let minimum_distinct_sessions =
+            self.request.obligations[obligation_index].minimum_distinct_sessions;
         let selection_overhead_tokens =
             self.request.obligations[obligation_index].selection_overhead_tokens;
         let alternatives = self.request.obligations[obligation_index].alternatives.clone();
 
         for alternative in &alternatives {
             let mut families = BTreeSet::<String>::new();
+            let mut sessions = BTreeSet::<String>::new();
             let mut alternative_is_admissible = true;
 
             for evidence_id in &alternative.evidence_dependencies {
@@ -236,10 +239,18 @@ impl Enumeration<'_> {
                     break;
                 }
                 families.insert(candidate.source_family_id.clone());
+                if minimum_distinct_sessions > 0 {
+                    let Some(session_id) = &candidate.source_session_id else {
+                        alternative_is_admissible = false;
+                        break;
+                    };
+                    sessions.insert(session_id.clone());
+                }
             }
 
             if !alternative_is_admissible
                 || families.len() < minimum_independent_families as usize
+                || sessions.len() < minimum_distinct_sessions as usize
             {
                 continue;
             }
@@ -384,6 +395,7 @@ mod tests {
             source_span_start: 0,
             source_span_end: excerpt.len() as u64,
             source_family_id: family.into(),
+            source_session_id: Some(format!("session-{id}")),
             scope_id: "scope-1".into(),
             payload_sha256: digest("payload"),
             source_span_sha256: span_digest.clone(),
@@ -434,6 +446,7 @@ mod tests {
                     },
                 ],
                 minimum_independent_families: 1,
+                minimum_distinct_sessions: 0,
                 selection_overhead_tokens: 2,
             }],
         }
@@ -514,6 +527,7 @@ mod tests {
             source_span_start: candidate.source_span_start,
             source_span_end: candidate.source_span_end,
             source_family_id: candidate.source_family_id.clone(),
+            source_session_id: candidate.source_session_id.clone(),
             payload_sha256: candidate.payload_sha256.clone(),
             source_span_sha256: candidate.source_span_sha256.clone(),
             authorization_receipt_sha256: candidate.authorization_receipt_sha256.clone(),

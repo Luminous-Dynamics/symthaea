@@ -135,6 +135,9 @@ The deterministic policy truth table is also versioned at [lifecycle-action-fixt
 
 ## BEAM long-horizon memory and multi-session reasoning
 
+See [CROSS_SESSION_PROOF_COVERAGE.md](CROSS_SESSION_PROOF_COVERAGE.md) and [cross-session-proof-fixtures-v1.json](cross-session-proof-fixtures-v1.json) for the exact distinct-session proof constraint, independent source-family constraint, packet/lifecycle binding and four-case conformance corpus. The two constraints are intentionally non-substitutable.
+
+
 BEAM (ICLR 2026) provides a second scale axis alongside LongMemEval and Vera-Life: 100 conversations, 2,000 validated questions, four history sizes (100K, 500K, 1M, 10M) and ten abilities, including multi-session reasoning, event ordering, contradiction resolution, knowledge update, temporal reasoning and abstention. Its LIGHT architecture combines long-term episodic memory, short-term working memory and a scratchpad, reporting 3.5–12.69 percentage-point gains over strongest baselines depending on backbone.
 
 The published past.dev 10M slice reports 85.03% overall across 200 questions / 10 conversations, but 28.17% multi-session reasoning across just 20 questions. The latter is a useful diagnostic target, not a precise population estimate. Published provider values are separately run, with reader/judge/configuration differences; do not treat the leaderboard as a matched head-to-head. Broca should replicate official splits first, then target better multi-session proof coverage while keeping the exact claim lifecycle and action policy in the loop.

@@ -26,6 +26,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
+fn is_zero_u32(value: &u32) -> bool {
+    *value == 0
+}
+
 fn require_non_empty(value: &str, field: &str) -> Result<(), String> {
     if value.trim().is_empty() || value.trim() != value {
         return Err(format!("{field} must be non-empty and trimmed"));
@@ -66,6 +70,10 @@ pub struct ProofEvidenceCandidate {
     pub source_span_start: u64,
     pub source_span_end: u64,
     pub source_family_id: String,
+    /// Trusted session identity; distinct from source-family independence.
+    /// Required for any obligation with minimum_distinct_sessions > 0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_session_id: Option<String>,
     pub scope_id: String,
     pub payload_sha256: String,
     pub source_span_sha256: String,
@@ -106,6 +114,9 @@ impl ProofEvidenceCandidate {
         }
         if self.source_span_text.is_empty() {
             return Err("source_span_text must not be empty".into());
+        }
+        if let Some(session_id) = &self.source_session_id {
+            require_non_empty(session_id, "source_session_id")?;
         }
         valid_sha256(&self.payload_sha256, "payload_sha256")?;
         valid_sha256(&self.source_span_sha256, "source_span_sha256")?;
@@ -200,6 +211,11 @@ pub struct ProofObligation {
     pub alternatives: Vec<ProofJustification>,
     /// Count distinct source families within the selected proof, not revisions.
     pub minimum_independent_families: u32,
+    /// Require evidence from this many distinct trusted conversation sessions.
+    /// Zero disables the session constraint; it never changes source-family checks.
+    /// Defaults to zero when deserializing legacy proof requests.
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub minimum_distinct_sessions: u32,
     /// Token cost of this selected proof's conclusion/dependency envelope.
     pub selection_overhead_tokens: u32,
 }
@@ -295,6 +311,14 @@ impl ProofBudgetRequest {
             if obligation.minimum_independent_families == 0 {
                 return Err("minimum_independent_families must be greater than zero".into());
             }
+            if obligation.minimum_distinct_sessions > 0
+                && obligation.minimum_distinct_sessions as usize > self.candidates.len()
+            {
+                return Err(format!(
+                    "minimum_distinct_sessions for {:?} exceeds candidate count",
+                    obligation.conclusion_id
+                ));
+            }
             if obligation.alternatives.is_empty() {
                 return Err(format!(
                     "proof obligation {:?} must have at least one alternative",
@@ -349,6 +373,8 @@ pub enum JustificationRejectionReason {
     MissingEvidenceReference,
     CandidateIneligible,
     IndependentFamilyCountInsufficient,
+    SessionProvenanceMissing,
+    DistinctSessionCountInsufficient,
     ContradictoryEvidence,
 }
 
@@ -387,6 +413,8 @@ pub struct ProofPacketEvidenceRef {
     pub source_span_start: u64,
     pub source_span_end: u64,
     pub source_family_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_session_id: Option<String>,
     pub payload_sha256: String,
     pub source_span_sha256: String,
     pub authorization_receipt_sha256: String,
@@ -547,6 +575,8 @@ impl<'a> ExactSearch<'a> {
         let conclusion_id = self.request.obligations[obligation_index].conclusion_id.clone();
         let minimum_independent_families =
             self.request.obligations[obligation_index].minimum_independent_families;
+        let minimum_distinct_sessions =
+            self.request.obligations[obligation_index].minimum_distinct_sessions;
         let alternatives = self.request.obligations[obligation_index].alternatives.clone();
         for alternative in &alternatives {
             if self.search_limit_reached {
@@ -555,7 +585,9 @@ impl<'a> ExactSearch<'a> {
 
             let mut missing = false;
             let mut ineligible = false;
+            let mut missing_session_provenance = false;
             let mut families = BTreeSet::<String>::new();
+            let mut sessions = BTreeSet::<String>::new();
             for evidence_id in &alternative.evidence_dependencies {
                 let Some(candidate) = self.candidate_by_id.get(evidence_id.as_str()) else {
                     missing = true;
@@ -566,6 +598,13 @@ impl<'a> ExactSearch<'a> {
                     continue;
                 }
                 families.insert(candidate.source_family_id.clone());
+                if minimum_distinct_sessions > 0 {
+                    if let Some(session_id) = &candidate.source_session_id {
+                        sessions.insert(session_id.clone());
+                    } else {
+                        missing_session_provenance = true;
+                    }
+                }
             }
 
             if missing || ineligible {
@@ -585,6 +624,22 @@ impl<'a> ExactSearch<'a> {
                     conclusion_id: conclusion_id.clone(),
                     justification_id: alternative.justification_id.clone(),
                     reason: JustificationRejectionReason::IndependentFamilyCountInsufficient,
+                });
+                continue;
+            }
+            if minimum_distinct_sessions > 0 && missing_session_provenance {
+                self.justification_rejections.insert(JustificationRejection {
+                    conclusion_id: conclusion_id.clone(),
+                    justification_id: alternative.justification_id.clone(),
+                    reason: JustificationRejectionReason::SessionProvenanceMissing,
+                });
+                continue;
+            }
+            if sessions.len() < minimum_distinct_sessions as usize {
+                self.justification_rejections.insert(JustificationRejection {
+                    conclusion_id: conclusion_id.clone(),
+                    justification_id: alternative.justification_id.clone(),
+                    reason: JustificationRejectionReason::DistinctSessionCountInsufficient,
                 });
                 continue;
             }
@@ -677,6 +732,7 @@ impl<'a> ExactSearch<'a> {
             let mut minimum_for_obligation: Option<u64> = None;
             for alternative in &obligation.alternatives {
                 let mut families = BTreeSet::new();
+                let mut sessions = BTreeSet::new();
                 let mut admissible = true;
                 for evidence_id in &alternative.evidence_dependencies {
                     let Some(candidate) = self.candidate_by_id.get(evidence_id.as_str()) else {
@@ -688,9 +744,18 @@ impl<'a> ExactSearch<'a> {
                         break;
                     }
                     families.insert(candidate.source_family_id.as_str());
+                    if obligation.minimum_distinct_sessions > 0 {
+                        if let Some(session_id) = &candidate.source_session_id {
+                            sessions.insert(session_id.as_str());
+                        } else {
+                            admissible = false;
+                            break;
+                        }
+                    }
                 }
                 if !admissible
                     || families.len() < obligation.minimum_independent_families as usize
+                    || sessions.len() < obligation.minimum_distinct_sessions as usize
                 {
                     continue;
                 }
@@ -866,6 +931,7 @@ pub fn solve_proof_budget(
                 source_span_start: candidate.source_span_start,
                 source_span_end: candidate.source_span_end,
                 source_family_id: candidate.source_family_id.clone(),
+                source_session_id: candidate.source_session_id.clone(),
                 payload_sha256: candidate.payload_sha256.clone(),
                 source_span_sha256: candidate.source_span_sha256.clone(),
                 authorization_receipt_sha256: candidate.authorization_receipt_sha256.clone(),
@@ -971,6 +1037,7 @@ pub fn verify_proof_packet(
         }
 
         let mut independent_families = BTreeSet::new();
+        let mut distinct_sessions = BTreeSet::new();
         for evidence_id in &justification.evidence_dependencies {
             let candidate = candidate_by_id
                 .get(evidence_id.as_str())
@@ -982,11 +1049,23 @@ pub fn verify_proof_packet(
                 ));
             }
             independent_families.insert(candidate.source_family_id.as_str());
+            if obligation.minimum_distinct_sessions > 0 {
+                let session_id = candidate.source_session_id.as_deref().ok_or_else(|| {
+                    format!("selected proof {:?} lacks trusted session provenance", selected.justification_id)
+                })?;
+                distinct_sessions.insert(session_id);
+            }
             selected_evidence_ids.insert(evidence_id.clone());
         }
         if independent_families.len() < obligation.minimum_independent_families as usize {
             return Err(format!(
                 "selected proof {:?} does not meet the independent-family threshold",
+                selected.justification_id
+            ));
+        }
+        if distinct_sessions.len() < obligation.minimum_distinct_sessions as usize {
+            return Err(format!(
+                "selected proof {:?} does not meet the distinct-session threshold",
                 selected.justification_id
             ));
         }
@@ -1021,6 +1100,7 @@ pub fn verify_proof_packet(
             source_span_start: candidate.source_span_start,
             source_span_end: candidate.source_span_end,
             source_family_id: candidate.source_family_id.clone(),
+            source_session_id: candidate.source_session_id.clone(),
             payload_sha256: candidate.payload_sha256.clone(),
             source_span_sha256: candidate.source_span_sha256.clone(),
             authorization_receipt_sha256: candidate.authorization_receipt_sha256.clone(),
@@ -1103,6 +1183,7 @@ mod tests {
             source_span_start: 0,
             source_span_end: 10,
             source_family_id: family.into(),
+            source_session_id: Some(format!("session-{id}")),
             scope_id: "scope-1".into(),
             payload_sha256: digest('a'),
             source_span_sha256: sha256_hex(b"0123456789"),
@@ -1132,6 +1213,7 @@ mod tests {
             conclusion_id: id.into(),
             alternatives,
             minimum_independent_families: 1,
+            minimum_distinct_sessions: 0,
             selection_overhead_tokens: 0,
         }
     }
@@ -1321,6 +1403,308 @@ mod tests {
         assert!(result.justification_rejections.iter().any(|reason| {
             reason.reason == JustificationRejectionReason::IndependentFamilyCountInsufficient
         }));
+    }
+
+    #[test]
+    fn optimizer_selects_higher_cost_cross_session_proof_over_cheaper_single_session_proof() {
+        let mut same_session_a = candidate("A", "family-A", 1);
+        same_session_a.source_session_id = Some("session-1".into());
+        let mut same_session_b = candidate("B", "family-B", 1);
+        same_session_b.source_session_id = Some("session-1".into());
+        let mut cross_session_c = candidate("C", "family-C", 5);
+        cross_session_c.source_session_id = Some("session-2".into());
+
+        let mut obligation = obligation(
+            "claim-cross-session",
+            vec![
+                justification("cheap-single-session", &["A", "B"]),
+                justification("verified-cross-session", &["A", "C"]),
+            ],
+        );
+        obligation.minimum_independent_families = 2;
+        obligation.minimum_distinct_sessions = 2;
+
+        let req = request(
+            vec![same_session_a, same_session_b, cross_session_c],
+            vec![obligation],
+            64,
+        );
+        let result = solve_proof_budget(req.clone()).unwrap();
+
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        assert_eq!(result.total_token_cost, 6);
+        assert_eq!(
+            result.selected_proofs[0].justification_id,
+            "verified-cross-session"
+        );
+        assert_eq!(
+            result.evidence
+                .iter()
+                .map(|item| item.source_session_id.as_deref().unwrap())
+                .collect::<Vec<_>>(),
+            vec!["session-1", "session-2"]
+        );
+        assert!(result.justification_rejections.iter().any(|rejection| {
+            rejection.justification_id == "cheap-single-session"
+                && rejection.reason == JustificationRejectionReason::DistinctSessionCountInsufficient
+        }));
+
+        // The independent, exhaustive verifier must agree with the constrained
+        // optimizer and validate the session provenance carried by the packet.
+        verify_proof_budget_result(&req, &result).unwrap();
+    }
+
+    #[test]
+    fn multiple_independent_sources_from_one_session_do_not_satisfy_multisession_requirement() {
+        let mut a = candidate("A", "family-A", 1);
+        let mut b = candidate("B", "family-B", 1);
+        a.source_session_id = Some("session-one".into());
+        b.source_session_id = Some("session-one".into());
+
+        let mut obligation = obligation(
+            "claim-1",
+            vec![justification("two-source-one-session", &["A", "B"])],
+        );
+        obligation.minimum_independent_families = 2;
+        obligation.minimum_distinct_sessions = 2;
+
+        let result = solve_proof_budget(
+            request(vec![a, b], vec![obligation], 10)
+        ).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::NoEligibleProof);
+        assert!(result.justification_rejections.iter().any(|rejection| {
+            rejection.reason == JustificationRejectionReason::DistinctSessionCountInsufficient
+        }));
+    }
+
+    #[test]
+    fn sessions_do_not_substitute_for_independent_source_families() {
+        let mut a = candidate("A", "family-same", 1);
+        let mut b = candidate("B", "family-same", 1);
+        a.source_session_id = Some("session-one".into());
+        b.source_session_id = Some("session-two".into());
+
+        let mut obligation = obligation(
+            "claim-1",
+            vec![justification("two-sessions-one-family", &["A", "B"])],
+        );
+        obligation.minimum_independent_families = 2;
+        obligation.minimum_distinct_sessions = 2;
+
+        let result = solve_proof_budget(
+            request(vec![a, b], vec![obligation], 10)
+        ).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::NoEligibleProof);
+        assert!(result.justification_rejections.iter().any(|rejection| {
+            rejection.reason == JustificationRejectionReason::IndependentFamilyCountInsufficient
+        }));
+    }
+
+    #[test]
+    fn missing_trusted_session_provenance_cannot_satisfy_session_requirement() {
+        let mut a = candidate("A", "family-A", 1);
+        a.source_session_id = None;
+        let mut obligation = obligation(
+            "claim-1",
+            vec![justification("missing-session", &["A"])],
+        );
+        obligation.minimum_distinct_sessions = 1;
+
+        let result = solve_proof_budget(
+            request(vec![a], vec![obligation], 10)
+        ).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::NoEligibleProof);
+        assert!(result.justification_rejections.iter().any(|rejection| {
+            rejection.reason == JustificationRejectionReason::SessionProvenanceMissing
+        }));
+    }
+
+
+
+
+
+    #[derive(Deserialize)]
+    struct CrossSessionFixtureFile {
+        schema_version: String,
+        protocol_version: String,
+        case_count: usize,
+        cases: Vec<CrossSessionFixtureCase>,
+    }
+
+    #[derive(Deserialize)]
+    struct CrossSessionFixtureCase {
+        case_id: String,
+        minimum_independent_families: u32,
+        minimum_distinct_sessions: u32,
+        candidates: Vec<CrossSessionFixtureCandidate>,
+        alternatives: Vec<CrossSessionFixtureAlternative>,
+        expected_status: ProofBudgetStatus,
+        expected_selected_justification_id: Option<String>,
+        expected_rejection: Option<JustificationRejectionReason>,
+    }
+
+    #[derive(Deserialize)]
+    struct CrossSessionFixtureCandidate {
+        evidence_id: String,
+        source_family_id: String,
+        source_session_id: Option<String>,
+        token_cost: u32,
+    }
+
+    #[derive(Deserialize)]
+    struct CrossSessionFixtureAlternative {
+        justification_id: String,
+        evidence_dependencies: Vec<String>,
+    }
+
+    #[test]
+    fn legacy_single_session_serialization_omits_new_zero_and_absent_fields() {
+        let mut legacy_candidate = candidate("A", "family-A", 2);
+        legacy_candidate.source_session_id = None;
+        let candidate_json = serde_json::to_value(&legacy_candidate).unwrap();
+        assert!(candidate_json.get("source_session_id").is_none());
+
+        let req = request(
+            vec![legacy_candidate],
+            vec![obligation(
+                "claim-1",
+                vec![justification("legacy-proof", &["A"])],
+            )],
+            32,
+        );
+        let request_json = serde_json::to_value(&req).unwrap();
+        assert!(
+            request_json["obligations"][0]
+                .get("minimum_distinct_sessions")
+                .is_none()
+        );
+        assert_eq!(
+            request_json["obligations"][0]["minimum_independent_families"],
+            serde_json::json!(1)
+        );
+    }
+
+    #[test]
+    fn proof_packet_rejects_mutated_source_session_identity() {
+        let mut a = candidate("A", "family-A", 2);
+        let mut b = candidate("B", "family-B", 4);
+        a.source_session_id = Some("session-1".into());
+        b.source_session_id = Some("session-2".into());
+        let mut obligation = obligation(
+            "claim-1",
+            vec![justification("two-session-proof", &["A", "B"])],
+        );
+        obligation.minimum_independent_families = 2;
+        obligation.minimum_distinct_sessions = 2;
+        let req = request(vec![a, b], vec![obligation], 32);
+        let mut result = solve_proof_budget(req.clone()).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+
+        result.evidence[0].source_session_id = Some("forged-session".into());
+        assert!(verify_proof_budget_result(&req, &result).is_err());
+    }
+
+    #[test]
+    fn versioned_cross_session_proof_fixtures_match_optimizer_and_verifier() {
+        let raw = include_str!(
+            "../../../../research/broca-bitemporal-evaluation-v1/cross-session-proof-fixtures-v1.json"
+        );
+        let fixture: CrossSessionFixtureFile = serde_json::from_str(raw).unwrap();
+        assert_eq!(fixture.schema_version, "broca-cross-session-proof-fixtures-v1");
+        assert_eq!(fixture.protocol_version, "BROCA-CROSS-SESSION-PROOF-V1");
+        assert_eq!(fixture.case_count, fixture.cases.len());
+        assert_eq!(fixture.case_count, 4);
+
+        for case in fixture.cases {
+            let candidates = case.candidates
+                .into_iter()
+                .map(|source| {
+                    let mut item = candidate(
+                        &source.evidence_id,
+                        &source.source_family_id,
+                        source.token_cost,
+                    );
+                    item.source_session_id = source.source_session_id;
+                    item
+                })
+                .collect();
+            let alternatives = case.alternatives
+                .into_iter()
+                .map(|alternative| ProofJustification {
+                    justification_id: alternative.justification_id,
+                    evidence_dependencies: alternative.evidence_dependencies,
+                })
+                .collect();
+            let mut proof_obligation = obligation(&case.case_id, alternatives);
+            proof_obligation.minimum_independent_families =
+                case.minimum_independent_families;
+            proof_obligation.minimum_distinct_sessions =
+                case.minimum_distinct_sessions;
+            let req = request(candidates, vec![proof_obligation], 128);
+            let result = solve_proof_budget(req.clone()).unwrap();
+
+            assert_eq!(
+                result.status,
+                case.expected_status,
+                "proof status mismatch in fixture {}",
+                case.case_id
+            );
+            if let Some(expected_id) = case.expected_selected_justification_id {
+                assert_eq!(result.selected_proofs.len(), 1);
+                assert_eq!(
+                    result.selected_proofs[0].justification_id,
+                    expected_id,
+                    "selected proof mismatch in fixture {}",
+                    case.case_id
+                );
+                verify_proof_budget_result(&req, &result).unwrap();
+            } else {
+                assert!(result.selected_proofs.is_empty());
+                let expected_rejection = case.expected_rejection.unwrap();
+                assert!(
+                    result.justification_rejections.iter().any(|rejection| {
+                        rejection.reason == expected_rejection
+                    }),
+                    "expected rejection {:?} in fixture {}",
+                    expected_rejection,
+                    case.case_id
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn legacy_single_session_requests_and_packets_keep_canonical_json_shape() {
+        let mut candidate_without_session = candidate("legacy", "family-legacy", 2);
+        candidate_without_session.source_session_id = None;
+        let req = request(
+            vec![candidate_without_session],
+            vec![obligation(
+                "legacy-claim",
+                vec![justification("legacy-proof", &["legacy"])],
+            )],
+            64,
+        );
+
+        let request_json = serde_json::to_value(&req).unwrap();
+        assert!(
+            request_json["candidates"][0].get("source_session_id").is_none(),
+            "absent session metadata must not change legacy canonical request JSON"
+        );
+        assert!(
+            request_json["obligations"][0]
+                .get("minimum_distinct_sessions")
+                .is_none(),
+            "zero session threshold must not change legacy canonical request JSON"
+        );
+
+        let result = solve_proof_budget(req).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        let packet_json = serde_json::to_value(&result).unwrap();
+        assert!(
+            packet_json["evidence"][0].get("source_session_id").is_none(),
+            "absent session metadata must not change legacy packet JSON"
+        );
     }
 
     #[test]
@@ -1589,6 +1973,7 @@ mod tests {
             source_span_start: candidate.source_span_start,
             source_span_end: candidate.source_span_end,
             source_family_id: candidate.source_family_id.clone(),
+            source_session_id: candidate.source_session_id.clone(),
             payload_sha256: candidate.payload_sha256.clone(),
             source_span_sha256: candidate.source_span_sha256.clone(),
             authorization_receipt_sha256: candidate.authorization_receipt_sha256.clone(),

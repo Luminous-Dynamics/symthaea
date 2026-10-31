@@ -33,6 +33,8 @@ pub struct VerifiedReaderEvidence {
     pub source_span_start: u64,
     pub source_span_end: u64,
     pub source_family_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_session_id: Option<String>,
     pub payload_sha256: String,
     pub source_span_sha256: String,
     pub authorization_receipt_sha256: String,
@@ -75,6 +77,10 @@ pub struct VerifiedProofReaderContext {
     pub known_at_unix_ms: u64,
     pub request_sha256: String,
     pub packet_sha256: String,
+    /// Canonical digest over this exact reader/control-plane context, including
+    /// source session provenance and claim-proof dependencies.
+    #[serde(default)]
+    pub context_sha256: String,
     pub tokenizer_id: String,
     pub tokenizer_version: String,
     pub tokenizer_sha256: String,
@@ -88,6 +94,16 @@ pub struct VerifiedProofReaderContext {
 }
 
 impl VerifiedProofReaderContext {
+    /// Canonical integrity digest for the exact reader context. The digest
+    /// field is blanked before serialization so the operation is stable.
+    pub fn computed_context_sha256(&self) -> Result<String, String> {
+        let mut canonical = self.clone();
+        canonical.context_sha256.clear();
+        let bytes = serde_json::to_vec(&canonical)
+            .map_err(|error| format!("cannot serialize verified reader context: {error}"))?;
+        Ok(format!("{:x}", Sha256::digest(bytes)))
+    }
+
     /// Borrow the exact reader context without changing its order or contents.
     pub fn memory_context_items(&self) -> &[MemoryContextItem] {
         &self.context_items
@@ -200,6 +216,7 @@ impl VerifiedProofReaderContext {
         for (field, value) in [
             ("request_sha256", self.request_sha256.as_str()),
             ("packet_sha256", self.packet_sha256.as_str()),
+            ("context_sha256", self.context_sha256.as_str()),
             ("tokenizer_sha256", self.tokenizer_sha256.as_str()),
             ("packet_renderer_sha256", self.packet_renderer_sha256.as_str()),
         ] {
@@ -264,6 +281,11 @@ impl VerifiedProofReaderContext {
             {
                 return Err(format!("reader evidence item {index} has incomplete provenance"));
             }
+            if evidence.source_session_id.as_ref().is_some_and(|session_id| {
+                session_id.trim().is_empty() || session_id.trim() != session_id
+            }) {
+                return Err(format!("reader evidence item {index} has invalid session provenance"));
+            }
             if evidence.source_span_end <= evidence.source_span_start
                 || evidence.source_span_end - evidence.source_span_start != item.value.len() as u64
             {
@@ -325,6 +347,10 @@ impl VerifiedProofReaderContext {
                 self.total_token_cost, total_cost
             ));
         }
+        let expected_context_sha256 = self.computed_context_sha256()?;
+        if expected_context_sha256 != self.context_sha256 {
+            return Err("verified reader context SHA-256 mismatch".into());
+        }
         Ok(())
     }
 }
@@ -365,6 +391,7 @@ pub fn build_verified_proof_reader_context(
             source_span_start: evidence.source_span_start,
             source_span_end: evidence.source_span_end,
             source_family_id: evidence.source_family_id.clone(),
+            source_session_id: evidence.source_session_id.clone(),
             payload_sha256: evidence.payload_sha256.clone(),
             source_span_sha256: evidence.source_span_sha256.clone(),
             authorization_receipt_sha256: evidence.authorization_receipt_sha256.clone(),
@@ -383,7 +410,7 @@ pub fn build_verified_proof_reader_context(
         })
         .collect();
 
-    let context = VerifiedProofReaderContext {
+    let mut context = VerifiedProofReaderContext {
         decision_id: request.decision_id.clone(),
         principal_id: request.principal_id.clone(),
         scope_id: request.scope_id.clone(),
@@ -394,6 +421,7 @@ pub fn build_verified_proof_reader_context(
             .packet_sha256
             .clone()
             .ok_or_else(|| "Supported packet is missing packet_sha256".to_string())?,
+        context_sha256: String::new(),
         tokenizer_id: request.tokenizer_id.clone(),
         tokenizer_version: request.tokenizer_version.clone(),
         tokenizer_sha256: request.tokenizer_sha256.clone(),
@@ -405,6 +433,7 @@ pub fn build_verified_proof_reader_context(
         evidence,
         claim_proofs,
     };
+    context.context_sha256 = context.computed_context_sha256()?;
     context.verify_internal_consistency()?;
     Ok(context)
 }
@@ -433,6 +462,7 @@ mod tests {
             source_span_start: 0,
             source_span_end: excerpt.len() as u64,
             source_family_id: format!("family-{id}"),
+            source_session_id: Some(format!("session-{id}")),
             scope_id: "scope-1".into(),
             payload_sha256: digest("payload"),
             source_span_sha256: span_sha256.clone(),
@@ -480,6 +510,7 @@ mod tests {
                     },
                 ],
                 minimum_independent_families: 1,
+                minimum_distinct_sessions: 0,
                 selection_overhead_tokens: 2,
             }],
         }
@@ -498,6 +529,54 @@ mod tests {
         assert_eq!(context.claim_proofs[0].justification_id, "proof-A");
         assert_eq!(context.total_token_cost, 7);
         context.verify_internal_consistency().unwrap();
+    }
+
+    #[test]
+    fn verified_reader_context_retains_exact_cross_session_proof_coverage() {
+        let mut req = request();
+        req.obligations[0].alternatives = vec![ProofJustification {
+            justification_id: "cross-session-proof".into(),
+            evidence_dependencies: vec!["A".into(), "B".into()],
+        }];
+        req.obligations[0].minimum_independent_families = 2;
+        req.obligations[0].minimum_distinct_sessions = 2;
+
+        let result = solve_proof_budget(req.clone()).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+
+        let context = build_verified_proof_reader_context(&req, &result).unwrap();
+        assert_eq!(
+            context.evidence
+                .iter()
+                .map(|evidence| evidence.source_session_id.as_deref().unwrap())
+                .collect::<Vec<_>>(),
+            vec!["session-A", "session-B"]
+        );
+        assert_eq!(
+            context.claim_proofs[0].evidence_dependencies,
+            vec!["A", "B"]
+        );
+        context.verify_internal_consistency().unwrap();
+    }
+
+
+    #[test]
+    fn reader_context_digest_detects_session_provenance_mutation() {
+        let mut req = request();
+        req.obligations[0].alternatives = vec![ProofJustification {
+            justification_id: "cross-session-proof".into(),
+            evidence_dependencies: vec!["A".into(), "B".into()],
+        }];
+        req.obligations[0].minimum_independent_families = 2;
+        req.obligations[0].minimum_distinct_sessions = 2;
+        let result = solve_proof_budget(req.clone()).unwrap();
+        let mut context = build_verified_proof_reader_context(&req, &result).unwrap();
+        context.evidence[0].source_session_id = Some("forged-session".into());
+
+        assert!(context
+            .verify_internal_consistency()
+            .unwrap_err()
+            .contains("reader context SHA-256 mismatch"));
     }
 
     #[test]
