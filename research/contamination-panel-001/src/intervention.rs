@@ -485,7 +485,7 @@ pub fn randomize_intervention(
             stratum_count
         } else {
             // Any interior dose must contain both treatment and placebo clusters.
-            rounded_exposed_count.max(1).min(stratum_count - 1)
+            rounded_exposed_count.clamp(1, stratum_count - 1)
         };
         allocation_strata.push(AllocationStratumV1 {
             task_family,
