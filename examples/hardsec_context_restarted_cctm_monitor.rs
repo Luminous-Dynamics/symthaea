@@ -202,6 +202,7 @@ fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> 
         "null_stream_assumption_status",
         "reference_iid_assumption_status",
         "context_assignment_assumption_status",
+        "accepted_observation_selection_assumption_status",
     ] {
         if string_field(value, key, "plan")? != "assumption_not_verified" {
             return Err(format!("{key} must remain assumption_not_verified"));
@@ -984,6 +985,7 @@ fn audit_values_with_context_receipt(
             "null_stream_iid_assumption_status":"assumption_not_verified",
             "reference_sample_iid_assumption_status":"assumption_not_verified",
             "context_assignment_exogeneity_status":"assumption_not_verified",
+            "accepted_observation_selection_status":"assumption_not_verified",
             "scoring_function_fixed_status":"artifact_digest_bound_not_authenticated",
             "theorem_guarantee_status":"not_established_from_input_receipts",
             "effective_sample_size_estimate":null,
@@ -1004,6 +1006,7 @@ fn audit_values_with_context_receipt(
             "The published CCTM theorem assumes i.i.d. null test scores and i.i.d. calibration scores within each context; it does not provide a guarantee for arbitrary autocorrelated or adversarially dependent PMU windows.",
             "Unique reference group IDs and input digests are caller-declared; the receipt cannot authenticate group identity, independence or the actual scoring implementation.",
             "Context assignment must be external to, and not selected from, the same anomaly score being tested; this assumption is not verified.",
+            "Skipping invalid or abstained windows changes the accepted-observation subsequence; no guarantee follows unless the admission/abstention mechanism is predictable and appropriately exogenous to the current null score or a separate conditional validity result is established.",
             "The single-start DKW-CCTM is retained as an ablation; the restarted sum is a derived composition of local DKW-CCTM processes and deterministic weights, not a direct reproduction of the Bhattacharyya-Ramdas conformal CMM algorithm.",
             "The restarted PFA argument requires each local fixed-reference CCTM process to be a nonnegative supermartingale under the same conditional i.i.d. assumptions; those assumptions are not established by this receipt.",
             "Finite restart expiry is a predictable absorbing kill of local nonnegative processes; it can reduce power and must not be described as a restart/reset of accumulated capital.",
@@ -1150,6 +1153,7 @@ mod tests {
         assert_eq!(receipt["statistical_guarantees"]["null_stream_iid_assumption_status"], "assumption_not_verified");
         assert_eq!(receipt["statistical_guarantees"]["reference_sample_iid_assumption_status"], "assumption_not_verified");
         assert_eq!(receipt["statistical_guarantees"]["theorem_guarantee_status"], "not_established_from_input_receipts");
+        assert_eq!(receipt["statistical_guarantees"]["accepted_observation_selection_status"], "assumption_not_verified");
         let unconditional = receipt["statistical_guarantees"]["unconditional_type_i_upper_bound_if_all_paper_assumptions_hold"].as_f64().unwrap();
         assert!((unconditional - 0.05).abs() < 1e-12);
         assert_eq!(receipt["statistical_guarantees"]["effective_sample_size_estimate"], Value::Null);
