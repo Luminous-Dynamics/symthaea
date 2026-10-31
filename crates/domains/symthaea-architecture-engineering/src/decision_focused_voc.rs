@@ -792,8 +792,15 @@ pub fn compute_posterior_model_sha256(posterior: &PosteriorModel) -> String {
         let particle = &posterior.particles[particle_index];
         update_string(&mut hasher, &particle.particle_id);
         hasher.update(particle.probability.to_bits().to_be_bytes());
+        hasher.update((particle.final_values.len() as u64).to_be_bytes());
         for candidate_index in &candidate_indices {
-            hasher.update(particle.final_values[*candidate_index].to_bits().to_be_bytes());
+            match particle.final_values.get(*candidate_index) {
+                Some(value) => {
+                    hasher.update([1]);
+                    hasher.update(value.to_bits().to_be_bytes());
+                }
+                None => hasher.update([0]),
+            }
         }
     }
     hex_digest(hasher.finalize().as_slice())
@@ -830,10 +837,15 @@ pub fn compute_observation_likelihood_model_sha256(
         hasher.update((outcomes.len() as u64).to_be_bytes());
         for outcome in outcomes {
             update_string(&mut hasher, &outcome.outcome_id);
+            hasher.update((outcome.likelihood_by_particle.len() as u64).to_be_bytes());
             for particle_index in &particle_indices {
-                hasher.update(
-                    outcome.likelihood_by_particle[*particle_index].to_bits().to_be_bytes(),
-                );
+                match outcome.likelihood_by_particle.get(*particle_index) {
+                    Some(likelihood) => {
+                        hasher.update([1]);
+                        hasher.update(likelihood.to_bits().to_be_bytes());
+                    }
+                    None => hasher.update([0]),
+                }
             }
         }
     }
@@ -873,16 +885,22 @@ fn digest_plan(
     hasher.update(config.already_spent_units.to_be_bytes());
     hasher.update(config.cost_penalty_per_unit.to_bits().to_be_bytes());
     hasher.update(current_expected_regret.to_bits().to_be_bytes());
-    for reserve in &config.reserves {
+    let mut reserves: Vec<&VoCActionReserve> = config.reserves.iter().collect();
+    reserves.sort_by_key(|reserve| action_kind_tag(reserve.kind));
+    for reserve in reserves {
         hasher.update([action_kind_tag(reserve.kind)]);
         hasher.update(reserve.reserve_units.to_be_bytes());
     }
-    for spend in &config.spend_by_kind {
+    let mut spends: Vec<&VoCSpendByKind> = config.spend_by_kind.iter().collect();
+    spends.sort_by_key(|spend| action_kind_tag(spend.kind));
+    for spend in spends {
         hasher.update([action_kind_tag(spend.kind)]);
         hasher.update(spend.spent_units.to_be_bytes());
     }
     update_string(&mut hasher, &compute_posterior_model_sha256(posterior));
-    for evaluation in evaluations {
+    let mut ordered_evaluations: Vec<&VoCActionEvaluation> = evaluations.iter().collect();
+    ordered_evaluations.sort_by(|left, right| left.action_id.cmp(&right.action_id));
+    for evaluation in ordered_evaluations {
         update_string(&mut hasher, &evaluation.action_id);
         hasher.update([action_kind_tag(evaluation.kind)]);
         update_optional_string(&mut hasher, evaluation.candidate_id.as_deref());
@@ -1251,6 +1269,29 @@ mod tests {
             compute_posterior_model_sha256(&p),
             compute_posterior_model_sha256(&reversed)
         );
+    }
+
+    #[test]
+    fn malformed_likelihood_dimensions_return_an_error_without_panicking() {
+        let p = posterior();
+        let mut actions = vec![query_action("query", "A", 1)];
+        actions[0].observation_outcomes[0].likelihood_by_particle.pop();
+        let manifest = bind_manifest(&p, &mut actions, MetricDirection::Maximize);
+        assert!(plan_decision_focused_voc(&manifest, &p, &actions, &config()).is_err());
+    }
+
+    #[test]
+    fn plan_digest_is_invariant_to_action_input_order() {
+        let p = posterior();
+        let left = vec![
+            query_action("a-query", "A", 1),
+            query_action("b-query", "B", 1),
+        ];
+        let right = vec![left[1].clone(), left[0].clone()];
+        let left_plan = evaluate(&p, left, &config(), MetricDirection::Maximize).unwrap();
+        let right_plan = evaluate(&p, right, &config(), MetricDirection::Maximize).unwrap();
+        assert_eq!(left_plan.selected_action_id, right_plan.selected_action_id);
+        assert_eq!(left_plan.plan_sha256, right_plan.plan_sha256);
     }
 
     #[test]
