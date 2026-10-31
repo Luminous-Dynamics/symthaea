@@ -289,3 +289,13 @@ Use explicit, non-interchangeable states:
 - `CONDITIONAL`, `SENSITIVE`, `NOT_IDENTIFIABLE`, `NOT_ESTIMABLE`, `OOD_ABSTAIN`, `INVALIDATED_BY_REVISION`: explicit limitation/failure states.
 
 No state may be inferred from a stronger-looking but different state. A source digest proves identity; it does not prove biology.
+
+## 2.9 From confidence transfer to domain-conditional reliability and referral
+
+[SCI-CONNECTOMICS-023 / #9403](https://github.com/Luminous-Dynamics/symthaea/issues/9403) makes model calibration and domain novelty separate evaluation axes. ConnectomeBench2 and the 2026 VLM work provide strong operation-level classification comparisons, but a pooled score does not prove that confidence is portable to a held-out species, region, source volume, acquisition protocol, segmentation lineage or modality regime.
+
+The frozen scorer now accepts a complete optional domain tuple and a separate novelty score. It reports per-domain reliability bins, ECE/MCE alongside Brier/log loss, false-accept rates at high error-probability thresholds, low-confidence missed-error mass, and novelty AUROC/AUPRC. OOD labels come from a predeclared domain split, not from the model's own score. Inputs with partial domain/novelty metadata or mixed axes fail closed.
+
+The initial implementation is descriptive: it includes per-domain sample and cluster counts but does not yet calculate cluster-bootstrap intervals for calibration or novelty metrics. It is not an automatic referral service and it makes no biological transfer claim. The next promotion step is repeated-seed finite-population simulation and cluster-aware uncertainty, followed by a locked volume/species transfer evaluation. The synthetic fixture deliberately includes confident false positives and missed positives in held-out domains to ensure aggregate scores cannot hide failure.
+
+See the protocol, input schema and synthetic input fixture.
