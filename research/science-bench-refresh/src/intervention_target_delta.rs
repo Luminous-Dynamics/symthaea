@@ -298,27 +298,6 @@ enum RelationValidity {
     Ambiguous,
 }
 
-#[derive(Debug, Clone)]
-struct QualityCandidateSnapshot {
-    candidate_id: String,
-    transformation_family: String,
-    target_failure_mode: String,
-    intended_relation: QualityRelationV1,
-    disposition: QualityDispositionV1,
-    generation_tokens: u64,
-    generation_cost_micro_usd: u64,
-    generation_wall_clock_ms: u64,
-}
-
-#[derive(Debug, Clone)]
-struct TargetCandidateDecision {
-    validity: FinalCandidateValidityV1,
-    consensus: Option<ObservedTargetTuple>,
-    consensus_ppm: Option<u32>,
-    reviewer_count: u64,
-    exact_scope_match: bool,
-}
-
 fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
@@ -561,35 +540,44 @@ fn relation_validity_from_parent(
 fn target_tuple_consensus(
     reviewers: &[TargetDeltaReviewerObservationV1],
     threshold_permille: u16,
-) -> (Option<ObservedTargetTuple>, Option<u32>, u64, u64) {
+) -> (Option<ObservedTargetTuple>, Option<u32>, u64, u64, u64, u64) {
     let mut votes: BTreeMap<ObservedTargetTuple, u64> = BTreeMap::new();
-    let mut agreement_comparisons = 0_u64;
-    let mut agreement_matches = 0_u64;
+    let mut tuple_matches = 0_u64;
+    let mut transition_matches = 0_u64;
+    let mut comparisons = 0_u64;
     for (index, reviewer) in reviewers.iter().enumerate() {
         let tuple = ObservedTargetTuple {
             change: reviewer.observed_target_change,
             changed_claims: reviewer.observed_changed_claim_ids_sha256.clone(),
             collateral: reviewer.collateral_change,
         };
-        *votes.entry(tuple).or_default() += 1;
+        *votes.entry(tuple.clone()).or_default() += 1;
         for other in reviewers.iter().skip(index + 1) {
-            agreement_comparisons += 1;
+            comparisons += 1;
+            let other_tuple = ObservedTargetTuple {
+                change: other.observed_target_change,
+                changed_claims: other.observed_changed_claim_ids_sha256.clone(),
+                collateral: other.collateral_change,
+            };
+            if tuple == other_tuple {
+                tuple_matches += 1;
+            }
             if reviewer.observed_target_change == other.observed_target_change {
-                agreement_matches += 1;
+                transition_matches += 1;
             }
         }
     }
     let mut ranked: Vec<(ObservedTargetTuple, u64)> = votes.into_iter().collect();
     ranked.sort_by(|left, right| right.1.cmp(&left.1).then_with(|| left.0.cmp(&right.0)));
     let Some((tuple, count)) = ranked.into_iter().next() else {
-        return (None, None, agreement_matches, agreement_comparisons);
+        return (None, None, tuple_matches, comparisons, transition_matches, comparisons);
     };
     let total = reviewers.len() as u64;
-    let ppm = ((count * 1_000_000) / total) as u32;
+    let consensus_ppm = ((count * 1_000_000) / total) as u32;
     if count * 1_000 < total * u64::from(threshold_permille) {
-        return (None, Some(ppm), agreement_matches, agreement_comparisons);
+        return (None, Some(consensus_ppm), tuple_matches, comparisons, transition_matches, comparisons);
     }
-    (Some(tuple), Some(ppm), agreement_matches, agreement_comparisons)
+    (Some(tuple), Some(consensus_ppm), tuple_matches, comparisons, transition_matches, comparisons)
 }
 
 fn final_validity(
@@ -695,14 +683,6 @@ pub fn analyze_intervention_target_delta(
             return Err("parent quality receipt contains duplicate candidate adjudication".to_owned());
         }
     }
-    let mut quality_candidates_by_id = BTreeMap::new();
-    for row in quality_candidates {
-        let id = row.get("candidate_id").and_then(Value::as_str).unwrap_or("");
-        if quality_candidates_by_id.insert(id.to_owned(), row).is_some() {
-            return Err("parent quality plan contains duplicate candidate".to_owned());
-        }
-    }
-
     let mut target_specs_by_id = BTreeMap::new();
     for candidate in &target_plan.candidates {
         target_specs_by_id.insert(candidate.candidate_id.as_str(), candidate);
@@ -825,18 +805,18 @@ pub fn analyze_intervention_target_delta(
                 }
             }
         }
-        let (observed_tuple, consensus_ppm, matches, comparisons) =
-            target_tuple_consensus(reviewers, target_plan.consensus_threshold_permille);
-        reviewer_matches += matches;
-        reviewer_comparisons += comparisons;
-        for left in 0..reviewers.len() {
-            for right in (left + 1)..reviewers.len() {
-                transition_comparisons += 1;
-                if reviewers[left].observed_target_change == reviewers[right].observed_target_change {
-                    transition_matches += 1;
-                }
-            }
-        }
+        let (
+            observed_tuple,
+            consensus_ppm,
+            tuple_matches,
+            tuple_comparisons,
+            transition_pair_matches,
+            transition_pair_comparisons,
+        ) = target_tuple_consensus(reviewers, target_plan.consensus_threshold_permille);
+        reviewer_matches += tuple_matches;
+        reviewer_comparisons += tuple_comparisons;
+        transition_matches += transition_pair_matches;
+        transition_comparisons += transition_pair_comparisons;
         let (target_validity, scope_matches) =
             final_validity(RelationValidity::Valid, observed_tuple.as_ref(), target_spec);
         match target_validity {
@@ -915,9 +895,6 @@ pub fn analyze_intervention_target_delta(
     if candidate_results.len() != quality_report.fields.candidate_count as usize {
         return Err("target-delta result coverage differs from parent quality census".to_owned());
     }
-    let unique_clusters: BTreeSet<String> = target_plan.candidates.iter()
-        .flat_map(|candidate| candidate.preserved_claim_ids_sha256.iter().cloned())
-        .collect();
     let final_valid_accepted_unique = valid_accepted_clusters.len() as u64;
     let fields = TargetDeltaReportFieldsV1 {
         schema: TARGET_DELTA_REPORT_SCHEMA.to_owned(),
