@@ -547,6 +547,142 @@ pub fn intervention_effect(
     Ok(Trajectory { values: delta })
 }
 
+
+/// Exact synthetic factorial-interaction case.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InteractionCaseResult {
+    pub id: &'static str,
+    pub context: &'static str,
+    pub interaction: Vec<f64>,
+    pub expected: Vec<f64>,
+    pub passed: bool,
+}
+
+/// Six known-answer nonlinear cases: threshold synergy, additive null,
+/// saturation, third-order synergy, and a state-gated edge in resting/active
+/// contexts. These cases are mathematical fixtures, not biological claims.
+pub fn interaction_suite() -> Result<Vec<InteractionCaseResult>, OracleError> {
+    let both = EdgeScope::Both;
+    let identity = NodeTransfer::Identity;
+    let input_a = Injection { node: 0, epoch: 0, amplitude: 1.0 };
+    let input_b = Injection { node: 1, epoch: 0, amplitude: 1.0 };
+    let input_c = Injection { node: 2, epoch: 0, amplitude: 1.0 };
+
+    let threshold_pair = ContextualNetwork {
+        node_count: 3,
+        edges: vec![
+            ContextualEdge { edge: Edge { source: 0, target: 2, weight: 0.5, delay: 1 }, scope: both },
+            ContextualEdge { edge: Edge { source: 1, target: 2, weight: 0.5, delay: 1 }, scope: both },
+        ],
+        transfers: vec![identity, identity, NodeTransfer::Threshold { threshold: 1.0 }],
+    };
+    let threshold_interaction = factorial_interaction_trace(
+        &threshold_pair, CircuitState::Resting, 3, &[], input_a, input_b, 2,
+    )?;
+
+    let additive_pair = ContextualNetwork {
+        node_count: 3,
+        edges: threshold_pair.edges.clone(),
+        transfers: vec![identity; 3],
+    };
+    let additive_interaction = factorial_interaction_trace(
+        &additive_pair, CircuitState::Resting, 3, &[], input_a, input_b, 2,
+    )?;
+
+    let saturation = ContextualNetwork {
+        node_count: 3,
+        edges: vec![
+            ContextualEdge { edge: Edge { source: 0, target: 2, weight: 1.0, delay: 1 }, scope: both },
+            ContextualEdge { edge: Edge { source: 1, target: 2, weight: 1.0, delay: 1 }, scope: both },
+        ],
+        transfers: vec![
+            identity,
+            identity,
+            NodeTransfer::Clamp { minimum: 0.0, maximum: 1.0 },
+        ],
+    };
+    let saturation_interaction = factorial_interaction_trace(
+        &saturation, CircuitState::Resting, 3, &[], input_a, input_b, 2,
+    )?;
+
+    let threshold_triple = ContextualNetwork {
+        node_count: 4,
+        edges: vec![
+            ContextualEdge { edge: Edge { source: 0, target: 3, weight: 0.5, delay: 1 }, scope: both },
+            ContextualEdge { edge: Edge { source: 1, target: 3, weight: 0.5, delay: 1 }, scope: both },
+            ContextualEdge { edge: Edge { source: 2, target: 3, weight: 0.5, delay: 1 }, scope: both },
+        ],
+        transfers: vec![
+            identity, identity, identity,
+            NodeTransfer::Threshold { threshold: 1.5 },
+        ],
+    };
+    let third_order = third_order_interaction_trace(
+        &threshold_triple,
+        CircuitState::Active,
+        3,
+        &[],
+        input_a,
+        input_b,
+        input_c,
+        3,
+    )?;
+
+    let state_gated = ContextualNetwork {
+        node_count: 2,
+        edges: vec![ContextualEdge {
+            edge: Edge { source: 0, target: 1, weight: 0.75, delay: 1 },
+            scope: EdgeScope::ActiveOnly,
+        }],
+        transfers: vec![identity; 2],
+    };
+    let state_input = [Injection { node: 0, epoch: 0, amplitude: 1.0 }];
+    let resting = simulate_contextual(
+        &state_gated, CircuitState::Resting, 3, &state_input,
+    )?.node_trace(1)?;
+    let active = simulate_contextual(
+        &state_gated, CircuitState::Active, 3, &state_input,
+    )?.node_trace(1)?;
+
+    let mut cases = vec![
+        ("pairwise_threshold_synergy", "resting", threshold_interaction, vec![0.0, 1.0, 0.0]),
+        ("pairwise_additive_null", "resting", additive_interaction, vec![0.0, 0.0, 0.0]),
+        ("saturation_subadditivity", "resting", saturation_interaction, vec![0.0, -1.0, 0.0]),
+        ("third_order_threshold_synergy", "active", third_order, vec![0.0, 1.0, 0.0]),
+        ("state_gated_edge_resting", "resting", resting, vec![0.0, 0.0, 0.0]),
+        ("state_gated_edge_active", "active", active, vec![0.0, 0.75, 0.0]),
+    ];
+
+    Ok(cases
+        .drain(..)
+        .map(|(id, context, interaction, expected)| {
+            let passed = interaction.len() == expected.len()
+                && interaction.iter().zip(&expected)
+                    .all(|(actual, expected)| (actual - expected).abs() <= 1.0e-12);
+            InteractionCaseResult { id, context, interaction, expected, passed }
+        })
+        .collect())
+}
+
+/// Deterministic JSON for the nonlinear/state-conditioned factorial suite.
+pub fn interaction_suite_json() -> Result<String, OracleError> {
+    let cases = interaction_suite()?;
+    let mut json = String::from(
+        "{\n  \"schema_version\": 1,\n  \"evidence_class\": \"synthetic_known_answer\",\n  \"claim_ceiling\": \"SYNTHETIC_ONLY\",\n  \"cases\": [\n",
+    );
+    for (index, case) in cases.iter().enumerate() {
+        if index > 0 { json.push_str(",\n"); }
+        let status = if case.passed { "PASS" } else { "FAIL" };
+        json.push_str(&format!(
+            "    {{\"id\":\"{}\",\"context\":\"{}\",\"interaction\":{},\"expected\":{},\"status\":\"{}\"}}",
+            case.id, case.context, vector_json(&case.interaction),
+            vector_json(&case.expected), status
+        ));
+    }
+    json.push_str("\n  ]\n}\n");
+    Ok(json)
+}
+
 /// Root-mean-square error for one node's complete finite-horizon response.
 pub fn node_rmse(
     reference: &Trajectory,
@@ -1391,6 +1527,19 @@ mod tests {
             simulate_contextual(&bad_clamp, CircuitState::Resting, 2, &[]),
             Err(OracleError::InvalidTransferParameters)
         );
+    }
+
+
+    #[test]
+    fn nonlinear_interaction_suite_matches_all_known_answers() {
+        let cases = interaction_suite().expect("interaction suite is valid");
+        assert_eq!(cases.len(), 6);
+        assert!(cases.iter().all(|case| case.passed));
+    }
+
+    #[test]
+    fn nonlinear_interaction_report_is_byte_deterministic() {
+        assert_eq!(interaction_suite_json().unwrap(), interaction_suite_json().unwrap());
     }
 
     #[test]
