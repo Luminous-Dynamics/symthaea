@@ -128,6 +128,8 @@ The query suite includes same-valid-time queries before and after correction arr
 
 This task is an executable synthetic adapter to the existing bitemporal source-event and proof-DAG work (#9075, #9149, #9427), not a replacement for those runtime/persistence implementations. It adds no production ledger or proof-DAG code.
 
+A further proposed metric, **Temporal Error Debt**, is tracked separately in #9492. It integrates wrong-belief exposure over time after each correction/retraction and reports abstention exposure and missing-prediction exposure separately. The current T10 v0.1 generator has five anchor queries and does not yet provide the repeated query checkpoints needed to calculate a full exposure integral; no TED result is claimed.
+
 ### OAKS continual-knowledge benchmark alignment
 
 Kim et al., ACL 2026, introduce OAKS with OAKS-BABI and OAKS-Novel, evaluating answers at each context interval as facts evolve. The paper reports state-tracking delays and distraction susceptibility across 14 evaluated models. The official code repository is `kaistAI/OAKS` and the dataset repository is `adobe-research/OAKS`; pinned repository snapshots, README blob hashes, and the data-license digest are recorded in the machine-readable fixture.
