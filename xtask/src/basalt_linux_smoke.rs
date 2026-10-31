@@ -12,8 +12,8 @@
 
 use anyhow::{Context, bail};
 use serde::Serialize;
-use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::fs::{self, File, OpenOptions};
+use std::io::{Read, Write};
 #[cfg(target_os = "linux")]
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
@@ -63,7 +63,19 @@ pub struct KernelIdentity {
     pub release: Option<String>,
     pub architecture: &'static str,
     pub boot_id_digest: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ProcessSecurityContext {
+    pub effective_uid: Option<u32>,
+    pub effective_gid: Option<u32>,
+    pub cap_eff_hex: Option<String>,
+    pub cap_bnd_hex: Option<String>,
+    pub no_new_privs: Option<u8>,
+    pub seccomp_mode: Option<u8>,
     pub mount_namespace_inode: Option<u64>,
+    pub user_namespace_inode: Option<u64>,
+    pub pid_namespace_inode: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -73,6 +85,7 @@ pub struct RuntimeSmokeReport {
     pub probe_id: String,
     pub observed_at_unix_ns: u64,
     pub kernel: KernelIdentity,
+    pub process_context: ProcessSecurityContext,
     pub permission_class_probe_requested: bool,
     pub probes: Vec<ProbeObservation>,
     pub side_effects: SideEffectClaims,
