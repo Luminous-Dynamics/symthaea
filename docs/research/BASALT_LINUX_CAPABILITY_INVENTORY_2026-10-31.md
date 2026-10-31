@@ -11,13 +11,14 @@ cargo run -p xtask --bin xtask -- basalt-linux-capability-probe \
   --out reports/basalt/linux-capability-inventory.v1.json
 ```
 
-It records kernel release and architecture, active Linux Security Modules, a digest of `/sys/kernel/btf/vmlinux`, a digest of an accessible kernel config, relevant mount types, process scheduler tracepoint IDs, bpftool binary/version identity, and cgroup membership. Kernel configuration is read only from well-known config files; absence or unreadability is `unknown`, not `disabled`.
+It records kernel release and architecture, active Linux Security Modules, a digest of `/sys/kernel/btf/vmlinux`, a digest of an accessible kernel config, relevant mount types, process scheduler tracepoint IDs, bpftool executable presence and binary digest, and cgroup membership. Kernel configuration is read only from well-known config files; absence or unreadability is `unknown`, not `disabled`.
 
 The report distinguishes `candidate_available`, `not_available`, `unknown`, and `inaccessible`. It stores a digest and bounded summary of `/proc/self/mountinfo`, not unrelated host mount paths. It writes the report using create-new semantics and does not overwrite an earlier report.
 
 ## Non-goals and safety boundary
 
 The probe does **not**:
+- execute bpftool or any other discovered host tool (it records only the bpftool executable digest);
 - load or attach BPF programs;
 - attach or enable tracepoints;
 - create cgroups, namespaces, mounts, Landlock rulesets, or fanotify groups;
@@ -59,7 +60,7 @@ Primary Linux references:
 
 The capability inventory itself should be evaluated separately from observer qualification.
 
-1. **Truthfulness:** compare every status against a controlled syscall/attach smoke test on the same kernel. A configured-but- unusable feature must never be reported as runtime-ready.
+1. **Truthfulness:** compare every status against a controlled syscall/attach smoke test on the same kernel. A configured-but-unusable feature must never be reported as runtime-ready.
 2. **Unknown handling:** inaccessible or missing config must remain unknown, and must not be inferred disabled or enabled.
 3. **Profile prediction:** measure precision and recall for selecting a candidate adapter profile; false-positive capability selection is more costly than conservative unknown.
 4. **Host drift:** compare inventory digests across kernel updates, boot configuration changes, LSM order changes, BTF changes, mount namespace changes and toolchain updates.
@@ -71,7 +72,7 @@ Proposed targets (not results or external standards):
 - 100% precision for any `candidate_available` finding when compared to an actual later runtime smoke test;
 - 100% unknown classification for capabilities whose evidence is inaccessible or insufficient;
 - zero side effects on host policy, mount, cgroup and BPF attachment state;
-- p95 preflight below 250 ms on a warm host, excluding slow external tool startup;
+- p95 preflight below 250 ms on a warm host;
 - deterministic stable-field report digest for repeated inventories on the same boot and namespace.
 
 ## Next step after this inventory
