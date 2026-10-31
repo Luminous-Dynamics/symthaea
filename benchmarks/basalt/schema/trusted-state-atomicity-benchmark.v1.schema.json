@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT trusted-state atomicity benchmark v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "suite_id",
+    "benchmark_version",
+    "claim_ceiling",
+    "independent_unit",
+    "scenarios",
+    "metrics",
+    "benchmark_policy"
+  ],
+  "properties": {
+    "suite_id": {
+      "const": "basalt-trusted-state-atomicity-benchmark-v1"
+    },
+    "benchmark_version": {
+      "const": 1
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "independent_unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 80,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "phase",
+          "mutation",
+          "expected"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^TSTATE-[0-9]{3}$"
+          },
+          "phase": {
+            "enum": [
+              "baseline",
+              "source_cursor",
+              "log_cursor",
+              "concurrency",
+              "crash_recovery",
+              "rollback",
+              "offline",
+              "policy_lifecycle",
+              "boot_lifecycle"
+            ]
+          },
+          "mutation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "class",
+          "unit",
+          "target"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "class": {
+            "enum": [
+              "safety",
+              "efficiency"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "benchmark_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "all_safety_gates_before_efficiency",
+        "record_every_crash_point",
+        "no_event_level_pseudoreplication",
+        "local_atomicity_is_not_anti_rollback",
+        "unknown_is_not_pass",
+        "held_out_confirmatory_lineages"
+      ],
+      "properties": {
+        "all_safety_gates_before_efficiency": {
+          "const": true
+        },
+        "record_every_crash_point": {
+          "const": true
+        },
+        "no_event_level_pseudoreplication": {
+          "const": true
+        },
+        "local_atomicity_is_not_anti_rollback": {
+          "const": true
+        },
+        "unknown_is_not_pass": {
+          "const": true
+        },
+        "held_out_confirmatory_lineages": {
+          "const": true
+        }
+      }
+    }
+  }
+}
