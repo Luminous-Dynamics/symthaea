@@ -60,7 +60,7 @@ The evaluator unit requires the candidate unit; candidate requires taskgen. Star
 | evaluator-private | evaluator / evaluator | 0700 | inaccessible | inaccessible | read/write |
 | receipts | evaluator / evaluator | 0700 | inaccessible | inaccessible | read/write |
 
-The candidate is not a member of the oracle group and does not receive the evaluator signing credential or generator seed. The exchange directory is intentionally group execute-only to the evaluator: the evaluator opens a run-bound filename supplied by trusted metadata instead of listing candidate-controlled filenames. Candidate artifacts are expected to be created with mode 0640 under the setgid exchange directory (the unit uses umask 0027).
+The candidate is not a member of the oracle group and does not receive the evaluator signing credential or generator seed. The module also places each service in a private IPC namespace, restricts address families to AF_UNIX, and hides common host AF_UNIX endpoints including the Nix daemon socket. The exchange directory is intentionally group execute-only to the evaluator: the evaluator opens a run-bound filename supplied by trusted metadata instead of listing candidate-controlled filenames. Candidate artifacts are expected to be created with mode 0640 under the setgid exchange directory (the unit uses umask 0027).
 
 The NixOS module currently uses fixed directories and is intended for one serial research run at a time. It is not yet a multi-tenant or concurrent-run scheduler. The calling executables must bind exact run IDs, filenames and task/model/config digests. A later revision should add run-scoped subdirectories with trusted creation and cleanup.
 
@@ -93,4 +93,4 @@ Systemd's private network namespace does not block every AF_UNIX connection. The
 
 ## Claim ceiling
 
-This is an isolation deployment prototype and source-level artifact intake library. It is not yet a working end-to-end taskgen/candidate/evaluator pipeline, a signed receipt implementation, or a verified sandbox. It does not protect against kernel/host-root compromise, hardware side channels, privileged operators or a malicious hypervisor. No security claim is made until the attack suite passes on the target host.
+This is an isolation deployment prototype and source-level artifact intake library. It is not yet a working end-to-end taskgen/candidate/evaluator pipeline, a signed receipt implementation, or a verified sandbox. It does not protect against kernel/host-root compromise, hardware side channels, privileged operators or a malicious hypervisor. The Ed25519 receipt module and replay ledger are source-authored; no signature or replay tests have run. No security claim is made until the attack suite passes on the target host.
