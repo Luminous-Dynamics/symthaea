@@ -598,8 +598,13 @@ mod tests {
     fn verifier_rejects_recommitted_seed_inconsistent_sample() {
         let config = DmsConfig::braintrace_reference(93);
         let (mut task, oracle) = generate_dms_task(config).unwrap();
-        task.observations[0].active_channels.push(0);
-        task.observations[0].active_channels.sort_unstable();
+        let first = &mut task.observations[0].active_channels;
+        if first.contains(&0) {
+            first.retain(|channel| *channel != 0);
+        } else {
+            first.push(0);
+            first.sort_unstable();
+        }
         task.content_sha256 = dms_content_digest(&task);
         assert_eq!(
             verify_dms_trace(&task, &oracle),
@@ -644,7 +649,8 @@ mod tests {
     fn verifier_rejects_wrong_direction_relation() {
         let config = DmsConfig::braintrace_reference(93);
         let (task, mut oracle) = generate_dms_task(config).unwrap();
-        oracle.test_direction = (oracle.test_direction + 1) % MOTION_CHOICES;
+        oracle.test_direction =
+            (oracle.sample_direction + config.rotation_steps) % MOTION_CHOICES;
         oracle.content_sha256 = dms_oracle_digest(&oracle);
         assert_eq!(
             verify_dms_trace(&task, &oracle),
