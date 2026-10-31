@@ -143,3 +143,10 @@ This is the interface seam VIS-005 needs for CfC/vision dynamics or a later lear
 ### Canonical joint-draw content digest
 
 The action-bank digest is no longer a digest-shaped declaration: Rust recomputes SHA-256 from a canonical encoding of the bank's history, horizon, action manifest, outcome channel, ordered IDs, coupling mode and exact f64 sample bits. Validation rejects changed values with a stale digest. The schema fixture's digest is checked independently in Python and pinned by a Rust known-answer test. A row permutation preserves a named pair's numerical effect but must receive a newly computed content digest.
+
+
+### Selected-action regret and false-dominance diagnostics
+
+CMAQ-018 now evaluates the decision event that follows interval prediction. The new `SelectionEpisode` / `evaluate_selected_action_sets` API reports episode-level realized regret, conditional regret-bound coverage, full action-set simultaneous coverage, and false interval-dominance certificates. A false certificate is counted when the chosen action's lower bound exceeds every competitor's upper bound but the evaluator's realized outcomes still show positive regret.
+
+The synthetic known-answer fixture has mean realized regret 1.25, mean bound 1.25, 75% bound coverage, 75% simultaneous coverage, two dominance certificates and one false certificate. It exists to test accounting and hostile behavior; it is not model calibration. The schema and fixture are `selected-action-evaluation.v0.1.schema.json` and `fixtures/selected-action-evaluation.example.json`.
