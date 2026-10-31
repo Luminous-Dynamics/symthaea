@@ -1,0 +1,426 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "symthaea.quantum_comp.architecture_memory_topology.v1",
+  "title": "QARCH architecture memory-topology and state-placement evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "topology_record_id",
+    "architecture_id",
+    "observation_record_id",
+    "workload_fingerprint",
+    "workload_regime_profile_id",
+    "comparison_contract_fingerprint",
+    "architecture_evidence_receipt_id",
+    "source",
+    "memory_regions",
+    "transfer_edges",
+    "state_placements",
+    "scenarios"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea.quantum_comp.architecture_memory_topology.v1"
+    },
+    "topology_record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "architecture_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observation_record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workload_fingerprint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workload_regime_profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "comparison_contract_fingerprint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "architecture_evidence_receipt_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "origin",
+        "source_reference",
+        "source_artifact_sha256"
+      ],
+      "properties": {
+        "origin": {
+          "enum": [
+            "declared_architecture",
+            "published_specification",
+            "direct_measurement",
+            "simulation",
+            "synthesis",
+            "analytical_model",
+            "synthetic_fixture"
+          ]
+        },
+        "source_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "extraction_procedure_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "origin": {
+                "enum": [
+                  "direct_measurement",
+                  "simulation",
+                  "synthesis",
+                  "analytical_model"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "extraction_procedure_sha256"
+            ]
+          }
+        }
+      ]
+    },
+    "memory_regions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/memory_region"
+      }
+    },
+    "transfer_edges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/transfer_edge"
+      }
+    },
+    "state_placements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/state_placement"
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "cold_start",
+          "warm_steady_state",
+          "concurrent_pressure",
+          "capacity_overflow",
+          "migration",
+          "recovery"
+        ]
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "non_negative_interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number",
+          "minimum": 0
+        },
+        "upper": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "positive_interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "upper": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "byte_interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower_bytes",
+        "upper_bytes"
+      ],
+      "properties": {
+        "lower_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "upper_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "memory_region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "region_id",
+        "tier",
+        "scope"
+      ],
+      "properties": {
+        "region_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tier": {
+          "enum": [
+            "registers",
+            "scratchpad",
+            "l1_cache",
+            "l2_cache",
+            "l3_cache",
+            "sram",
+            "hbm",
+            "ddr",
+            "lpddr",
+            "cxl_memory",
+            "persistent_storage",
+            "remote_memory",
+            "other"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "thread",
+            "core",
+            "cluster",
+            "package",
+            "device",
+            "host",
+            "rack",
+            "remote"
+          ]
+        },
+        "capacity_bytes": {
+          "$ref": "#/$defs/byte_interval"
+        },
+        "occupancy_bytes": {
+          "$ref": "#/$defs/byte_interval"
+        },
+        "read_latency_seconds": {
+          "$ref": "#/$defs/positive_interval"
+        },
+        "write_latency_seconds": {
+          "$ref": "#/$defs/positive_interval"
+        },
+        "read_bandwidth_bytes_per_second": {
+          "$ref": "#/$defs/positive_interval"
+        },
+        "write_bandwidth_bytes_per_second": {
+          "$ref": "#/$defs/positive_interval"
+        },
+        "read_energy_joules_per_byte": {
+          "$ref": "#/$defs/non_negative_interval"
+        },
+        "write_energy_joules_per_byte": {
+          "$ref": "#/$defs/non_negative_interval"
+        },
+        "access_granularity_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "persistence": {
+          "enum": [
+            "volatile",
+            "non_volatile",
+            "persistent"
+          ]
+        },
+        "coherence_model": {
+          "enum": [
+            "none",
+            "single_writer",
+            "directory",
+            "mesi",
+            "moesi",
+            "message_passing",
+            "other"
+          ]
+        }
+      }
+    },
+    "transfer_edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "edge_id",
+        "source_region_id",
+        "destination_region_id",
+        "direction",
+        "fabric",
+        "communication_boundary_id"
+      ],
+      "properties": {
+        "edge_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_region_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "destination_region_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "direction": {
+          "enum": [
+            "read",
+            "write",
+            "bidirectional"
+          ]
+        },
+        "fabric": {
+          "enum": [
+            "on_chip_network",
+            "ddr_memory_channel",
+            "hbm_memory_channel",
+            "pcie",
+            "cxl",
+            "ethernet",
+            "infiniband",
+            "optical_chip_to_chip",
+            "event_address_network",
+            "other"
+          ]
+        },
+        "communication_boundary_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conversion_latency_seconds": {
+          "$ref": "#/$defs/positive_interval"
+        },
+        "conversion_energy_joules_per_bit": {
+          "$ref": "#/$defs/non_negative_interval"
+        }
+      }
+    },
+    "state_placement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state_class_id",
+        "region_id",
+        "placement_mode",
+        "residency_mode",
+        "precision_contract_id",
+        "consistency_model"
+      ],
+      "properties": {
+        "state_class_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "region_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "placement_mode": {
+          "enum": [
+            "pinned",
+            "cache_managed",
+            "streamed",
+            "replicated",
+            "spillable",
+            "reconstructed"
+          ]
+        },
+        "residency_mode": {
+          "enum": [
+            "guaranteed",
+            "best_effort",
+            "on_demand",
+            "streamed",
+            "replicated"
+          ]
+        },
+        "live_bytes": {
+          "$ref": "#/$defs/byte_interval"
+        },
+        "read_rate_per_second": {
+          "$ref": "#/$defs/non_negative_interval"
+        },
+        "write_rate_per_second": {
+          "$ref": "#/$defs/non_negative_interval"
+        },
+        "update_rate_hz": {
+          "$ref": "#/$defs/non_negative_interval"
+        },
+        "migration_bytes_per_event": {
+          "$ref": "#/$defs/byte_interval"
+        },
+        "migration_latency_seconds": {
+          "$ref": "#/$defs/positive_interval"
+        },
+        "precision_contract_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "consistency_model": {
+          "enum": [
+            "single_writer",
+            "multi_writer",
+            "eventual",
+            "sequentially_consistent",
+            "transactional",
+            "not_applicable"
+          ]
+        }
+      }
+    }
+  }
+}

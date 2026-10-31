@@ -86,6 +86,7 @@ The crate remains conservative: local reports are not publishable proof, hardwar
 - `architecture_routing` — deterministic selection over exact-workload measured candidates, with hard quality/resource constraints, explicit lexicographic priorities, auditable exclusions and abstention; not a learned or runtime-switching router.
 - `architecture_evidence` — content-addressed evidence receipts bound to exact observations, workload and comparison contracts; validates source origin and admits only receipt-checked records to comparison/selection. Digests are not signatures or chain-of-custody proof.
 - `architecture_regime` — workload-side operating-region descriptors for event/temporal behaviour, working sets, communication traffic and precision; supports regime slicing and workload-family holdout leakage checks. It describes workload conditions, not architecture performance.
+- QARCH-022 memory-topology contract (schema-first proposal) — see `docs/QARCH_022_MEMORY_TOPOLOGY.md`, `schemas/architecture_memory_topology.v1.schema.json`, and synthetic fixtures. This proposal separates candidate memory placement/topology from workload demand; it is not yet a typed Rust runtime API or measured benchmark.
 - `audit` — conservative local claim-audit helpers.
 - `preflight` — local configuration checks before running experiments.
 - `presets` — stable local run presets for examples and CLI use.

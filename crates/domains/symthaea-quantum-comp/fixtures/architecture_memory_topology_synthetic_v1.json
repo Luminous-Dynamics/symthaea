@@ -1,0 +1,384 @@
+{
+  "fixture_set_schema_version": "symthaea.quantum_comp.architecture_memory_topology_fixtures.v1",
+  "generated_for": "QARCH-022 #9341",
+  "synthetic_only": true,
+  "records": [
+    {
+      "schema_version": "symthaea.quantum_comp.architecture_memory_topology.v1",
+      "topology_record_id": "synthetic-qarch-022-cpu",
+      "architecture_id": "synthetic-cpu-simd",
+      "observation_record_id": "synthetic-observation-cpu",
+      "workload_fingerprint": "synthetic-hdc-retrieval-workload-v1",
+      "workload_regime_profile_id": "synthetic-regime-hdc-retrieval-v1",
+      "comparison_contract_fingerprint": "synthetic-comparison-contract-v1",
+      "architecture_evidence_receipt_id": "synthetic-evidence-receipt-cpu",
+      "source": {
+        "origin": "synthetic_fixture",
+        "source_reference": "synthetic://qarch-022/cpu",
+        "source_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "memory_regions": [
+        {
+          "region_id": "cpu_l3",
+          "tier": "l3_cache",
+          "scope": "package",
+          "capacity_bytes": {
+            "lower_bytes": 33554432,
+            "upper_bytes": 33554432
+          },
+          "occupancy_bytes": {
+            "lower_bytes": 4194304,
+            "upper_bytes": 16777216
+          },
+          "read_latency_seconds": {
+            "lower": 1e-8,
+            "upper": 3e-8
+          },
+          "write_latency_seconds": {
+            "lower": 1e-8,
+            "upper": 3e-8
+          },
+          "read_bandwidth_bytes_per_second": {
+            "lower": 50000000000,
+            "upper": 100000000000
+          },
+          "write_bandwidth_bytes_per_second": {
+            "lower": 30000000000,
+            "upper": 80000000000
+          },
+          "access_granularity_bytes": 64,
+          "persistence": "volatile",
+          "coherence_model": "mesi"
+        },
+        {
+          "region_id": "cpu_ddr",
+          "tier": "ddr",
+          "scope": "host",
+          "capacity_bytes": {
+            "lower_bytes": 34359738368,
+            "upper_bytes": 34359738368
+          },
+          "occupancy_bytes": {
+            "lower_bytes": 0,
+            "upper_bytes": 17179869184
+          },
+          "read_latency_seconds": {
+            "lower": 6e-8,
+            "upper": 1.2e-7
+          },
+          "write_latency_seconds": {
+            "lower": 6e-8,
+            "upper": 1.5e-7
+          },
+          "read_bandwidth_bytes_per_second": {
+            "lower": 20000000000,
+            "upper": 40000000000
+          },
+          "write_bandwidth_bytes_per_second": {
+            "lower": 15000000000,
+            "upper": 30000000000
+          },
+          "access_granularity_bytes": 64,
+          "persistence": "volatile",
+          "coherence_model": "mesi"
+        }
+      ],
+      "transfer_edges": [
+        {
+          "edge_id": "cpu-ddr-to-l3",
+          "source_region_id": "cpu_ddr",
+          "destination_region_id": "cpu_l3",
+          "direction": "read",
+          "fabric": "ddr_memory_channel",
+          "communication_boundary_id": "synthetic-boundary-ddr-to-l3"
+        },
+        {
+          "edge_id": "cpu-l3-to-ddr",
+          "source_region_id": "cpu_l3",
+          "destination_region_id": "cpu_ddr",
+          "direction": "write",
+          "fabric": "ddr_memory_channel",
+          "communication_boundary_id": "synthetic-boundary-l3-to-ddr"
+        }
+      ],
+      "state_placements": [
+        {
+          "state_class_id": "hdc_codebook",
+          "region_id": "cpu_ddr",
+          "placement_mode": "cache_managed",
+          "residency_mode": "best_effort",
+          "live_bytes": {
+            "lower_bytes": 2097152,
+            "upper_bytes": 8388608
+          },
+          "read_rate_per_second": {
+            "lower": 100000,
+            "upper": 500000
+          },
+          "write_rate_per_second": {
+            "lower": 0,
+            "upper": 100
+          },
+          "precision_contract_id": "binaryhv-exact-v1",
+          "consistency_model": "single_writer"
+        },
+        {
+          "state_class_id": "query_fast_state",
+          "region_id": "cpu_l3",
+          "placement_mode": "pinned",
+          "residency_mode": "guaranteed",
+          "live_bytes": {
+            "lower_bytes": 2048,
+            "upper_bytes": 8192
+          },
+          "read_rate_per_second": {
+            "lower": 10000,
+            "upper": 100000
+          },
+          "write_rate_per_second": {
+            "lower": 10000,
+            "upper": 100000
+          },
+          "update_rate_hz": {
+            "lower": 100,
+            "upper": 1000
+          },
+          "precision_contract_id": "binaryhv-exact-v1",
+          "consistency_model": "single_writer"
+        }
+      ],
+      "scenarios": [
+        "cold_start",
+        "warm_steady_state",
+        "capacity_overflow"
+      ],
+      "notes": "Synthetic fixture only. Does not represent measured hardware, published specifications, or achieved performance."
+    },
+    {
+      "schema_version": "symthaea.quantum_comp.architecture_memory_topology.v1",
+      "topology_record_id": "synthetic-qarch-022-gpu",
+      "architecture_id": "synthetic-gpu-hbm",
+      "observation_record_id": "synthetic-observation-gpu",
+      "workload_fingerprint": "synthetic-hdc-retrieval-workload-v1",
+      "workload_regime_profile_id": "synthetic-regime-hdc-retrieval-v1",
+      "comparison_contract_fingerprint": "synthetic-comparison-contract-v1",
+      "architecture_evidence_receipt_id": "synthetic-evidence-receipt-gpu",
+      "source": {
+        "origin": "synthetic_fixture",
+        "source_reference": "synthetic://qarch-022/gpu",
+        "source_artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "memory_regions": [
+        {
+          "region_id": "gpu_sram",
+          "tier": "sram",
+          "scope": "device",
+          "capacity_bytes": {
+            "lower_bytes": 16777216,
+            "upper_bytes": 16777216
+          },
+          "occupancy_bytes": {
+            "lower_bytes": 2097152,
+            "upper_bytes": 12582912
+          },
+          "read_latency_seconds": {
+            "lower": 2e-9,
+            "upper": 8e-9
+          },
+          "write_latency_seconds": {
+            "lower": 2e-9,
+            "upper": 8e-9
+          },
+          "read_bandwidth_bytes_per_second": {
+            "lower": 100000000000,
+            "upper": 500000000000
+          },
+          "write_bandwidth_bytes_per_second": {
+            "lower": 100000000000,
+            "upper": 400000000000
+          },
+          "access_granularity_bytes": 32,
+          "persistence": "volatile",
+          "coherence_model": "none"
+        },
+        {
+          "region_id": "gpu_hbm",
+          "tier": "hbm",
+          "scope": "device",
+          "capacity_bytes": {
+            "lower_bytes": 17179869184,
+            "upper_bytes": 17179869184
+          },
+          "occupancy_bytes": {
+            "lower_bytes": 1073741824,
+            "upper_bytes": 12884901888
+          },
+          "read_latency_seconds": {
+            "lower": 8e-8,
+            "upper": 2e-7
+          },
+          "write_latency_seconds": {
+            "lower": 8e-8,
+            "upper": 2e-7
+          },
+          "read_bandwidth_bytes_per_second": {
+            "lower": 500000000000,
+            "upper": 1000000000000
+          },
+          "write_bandwidth_bytes_per_second": {
+            "lower": 300000000000,
+            "upper": 800000000000
+          },
+          "access_granularity_bytes": 256,
+          "persistence": "volatile",
+          "coherence_model": "none"
+        }
+      ],
+      "transfer_edges": [
+        {
+          "edge_id": "gpu-hbm-to-sram",
+          "source_region_id": "gpu_hbm",
+          "destination_region_id": "gpu_sram",
+          "direction": "read",
+          "fabric": "hbm_memory_channel",
+          "communication_boundary_id": "synthetic-boundary-hbm-to-sram"
+        },
+        {
+          "edge_id": "gpu-sram-to-hbm",
+          "source_region_id": "gpu_sram",
+          "destination_region_id": "gpu_hbm",
+          "direction": "write",
+          "fabric": "hbm_memory_channel",
+          "communication_boundary_id": "synthetic-boundary-sram-to-hbm"
+        }
+      ],
+      "state_placements": [
+        {
+          "state_class_id": "hdc_codebook",
+          "region_id": "gpu_hbm",
+          "placement_mode": "pinned",
+          "residency_mode": "guaranteed",
+          "live_bytes": {
+            "lower_bytes": 2097152,
+            "upper_bytes": 8388608
+          },
+          "read_rate_per_second": {
+            "lower": 100000,
+            "upper": 500000
+          },
+          "write_rate_per_second": {
+            "lower": 0,
+            "upper": 100
+          },
+          "precision_contract_id": "binaryhv-exact-v1",
+          "consistency_model": "single_writer"
+        },
+        {
+          "state_class_id": "query_fast_state",
+          "region_id": "gpu_sram",
+          "placement_mode": "pinned",
+          "residency_mode": "guaranteed",
+          "live_bytes": {
+            "lower_bytes": 2048,
+            "upper_bytes": 8192
+          },
+          "read_rate_per_second": {
+            "lower": 10000,
+            "upper": 100000
+          },
+          "write_rate_per_second": {
+            "lower": 10000,
+            "upper": 100000
+          },
+          "update_rate_hz": {
+            "lower": 100,
+            "upper": 1000
+          },
+          "precision_contract_id": "binaryhv-exact-v1",
+          "consistency_model": "single_writer"
+        }
+      ],
+      "scenarios": [
+        "cold_start",
+        "warm_steady_state",
+        "capacity_overflow"
+      ],
+      "notes": "Synthetic fixture only. Does not represent measured hardware, published specifications, or achieved performance."
+    }
+  ],
+  "expected_semantic_rejections": [
+    {
+      "case_id": "missing-edge-endpoint",
+      "mutation": "Change an edge destination_region_id to a region ID not present in memory_regions.",
+      "expected_error": "UnknownMemoryRegion"
+    },
+    {
+      "case_id": "duplicate-region-id",
+      "mutation": "Duplicate a memory_regions[].region_id value.",
+      "expected_error": "DuplicateMemoryRegionId"
+    },
+    {
+      "case_id": "duplicate-edge-id",
+      "mutation": "Duplicate a transfer_edges[].edge_id value.",
+      "expected_error": "DuplicateTransferEdgeId"
+    },
+    {
+      "case_id": "disconnected-route",
+      "mutation": "Declare a route whose next edge source does not equal the previous edge destination.",
+      "expected_error": "DisconnectedMemoryRoute"
+    },
+    {
+      "case_id": "prohibited-route-cycle",
+      "mutation": "Declare an acyclic route containing a repeated region.",
+      "expected_error": "MemoryRouteCycle"
+    },
+    {
+      "case_id": "capacity-overflow",
+      "mutation": "Place an admitted live set above the region capacity/headroom contract.",
+      "expected_error": "MemoryCapacityExceeded"
+    },
+    {
+      "case_id": "unknown-capacity",
+      "mutation": "Omit capacity_bytes while requesting guaranteed-capacity admission.",
+      "expected_error": "UnknownCapacityCannotProveFit"
+    },
+    {
+      "case_id": "duplicate-boundary-accounting",
+      "mutation": "Count the same source/destination bytes twice under one communication boundary.",
+      "expected_error": "DuplicateBoundaryAccounting"
+    },
+    {
+      "case_id": "precision-mismatch",
+      "mutation": "Place a state object under a different precision_contract_id than the workload requirement.",
+      "expected_error": "PrecisionContractMismatch"
+    },
+    {
+      "case_id": "state-region-mismatch",
+      "mutation": "Reference a missing state-class or memory region.",
+      "expected_error": "UnknownStateOrMemoryRegion"
+    },
+    {
+      "case_id": "unmeasured-energy-claim",
+      "mutation": "Promote an analytical/model estimate as directly measured joules.",
+      "expected_error": "EvidenceOriginMismatch"
+    }
+  ],
+  "note": "All sample numeric values, region capacities and rates are invented to exercise the proposed schema. They must never be used in architecture rankings, papers, hardware claims, or product comparisons.",
+  "companion_regime_profile": {
+    "profile_id": "synthetic-regime-hdc-retrieval-v1",
+    "observation_record_id": "synthetic-observation-cpu-and-gpu-comparison",
+    "workload_fingerprint": "synthetic-hdc-retrieval-workload-v1",
+    "comparison_contract_fingerprint": "synthetic-comparison-contract-v1",
+    "communication_boundary_ids": [
+      "synthetic-boundary-ddr-to-l3",
+      "synthetic-boundary-l3-to-ddr",
+      "synthetic-boundary-hbm-to-sram",
+      "synthetic-boundary-sram-to-hbm"
+    ],
+    "state_class_ids": [
+      "hdc_codebook",
+      "query_fast_state"
+    ],
+    "note": "Synthetic companion only. A production validator must check these identities against the QARCH-021 profile and exact observation rather than trusting this fixture registry."
+  }
+}
