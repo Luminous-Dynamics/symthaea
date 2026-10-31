@@ -2321,6 +2321,20 @@ mod tests {
         };
 
         let report = measure_counterfactual_influence(&experiment, &calibration).unwrap();
+        let strict_policy = InfluenceSupportPolicy {
+            minimum_active_windows: 2,
+            maximum_gap_windows: 0,
+            ..InfluenceSupportPolicy::default()
+        };
+        let strict_report = measure_counterfactual_influence_with_policy(
+            &experiment,
+            &calibration,
+            &strict_policy,
+        )
+        .unwrap();
+        assert_eq!(strict_report.support_policy, strict_policy);
+        assert_ne!(strict_report.receipt_sha256, report.receipt_sha256);
+        assert!(verify_counterfactual_influence(&strict_report, &experiment, &calibration).unwrap());
         assert_eq!(report.source_event_id, "score_event_index:0");
         assert_eq!(report.disposition, InfluenceDisposition::EffectDetected);
         assert!(report.affected_channel_windows > 0);
@@ -2596,6 +2610,26 @@ mod tests {
             vec![FrameInterval { start_frame: 0, end_frame: 30 }],
         );
         assert_eq!(counts.qualified_channel_windows, 3);
+    }
+
+
+    #[test]
+    fn shared_channel_tail_extension_counts_unique_output_frames_once() {
+        let mut measurements = vec![
+            support_window(0, 0, true, true),
+            support_window(0, 1, true, true),
+            support_window(1, 0, false, true),
+            support_window(1, 1, false, true),
+        ];
+        let (intervals, counts) = qualify_support_windows(
+            &mut measurements,
+            2,
+            30,
+            &support_policy(2, 0, 10),
+        )
+        .unwrap();
+        assert_eq!(intervals, vec![FrameInterval { start_frame: 0, end_frame: 30 }]);
+        assert_eq!(counts.tail_extension_frames_applied, 10);
     }
 
     #[test]
