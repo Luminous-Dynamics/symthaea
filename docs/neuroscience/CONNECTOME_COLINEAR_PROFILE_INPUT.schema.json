@@ -48,7 +48,7 @@
         "resample_interval_nm": {
           "type": "number",
           "exclusiveMinimum": 0,
-          "description": "Optional physical-arclength V2 mode. Resample each track on this fixed uniform nanometre grid using piecewise-linear interpolation."
+          "description": "Optional physical-arclength V2 mode. If set with half_window_nm, the evaluator runs deterministic piecewise-linear and nearest-source-observation resampling on this uniform nanometre grid."
         },
         "half_window_nm": {
           "type": "number",
@@ -56,7 +56,7 @@
           "description": "Required with resample_interval_nm. Physical half-window in nanometres; Rust validation requires an integer multiple of resample_interval_nm and at least three resampled samples."
         }
       },
-      "description": "V1 uses half_window_samples. Optional V2 physical-arclength mode requires both resample_interval_nm and half_window_nm; do not mix one physical parameter with one absent parameter."
+      "description": "V1 uses half_window_samples. Optional V2 physical-arclength mode requires both resample_interval_nm and half_window_nm; the evaluator compares piecewise-linear and nearest-source-observation policies. Rust validation enforces the pair and safe integer grid ratio."
     },
     "noise": {
       "type": "object",
