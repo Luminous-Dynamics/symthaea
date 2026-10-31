@@ -1038,6 +1038,8 @@ mod tests {
                 parent_candidate_sha256: A.to_owned(),
                 semantic_delta_sha256: B.to_owned(),
                 direction_id: direction.to_owned(),
+                parent_score: None,
+                inspired_by_scores: Vec::new(),
                 disposition: CandidateDisposition::Verified,
                 score: Some(0.75),
             },
@@ -1094,39 +1096,13 @@ mod tests {
                 semantic_delta_sha256: B.to_owned(),
                 proposal_sha256: C.to_owned(),
                 descriptor_sha256: D.to_owned(),
-                disposition,
-                score,
-            },
-            resource_usage: usage(),
-            previous_event_sha256: String::new(),
-            event_sha256: String::new(),
-        }
-    }
-
-    fn novel_candidate_event(
-        event_id: &str,
-        round: u64,
-        worker: &str,
-        cutoff: u64,
-        disposition: DirectionProposalDisposition,
-        score: Option<f64>,
-    ) -> CampaignEvent {
-        CampaignEvent {
-            event_id: event_id.to_owned(),
-            sequence_number: 0,
-            round_id: round,
-            worker_id: worker.to_owned(),
-            policy_visible_through_sequence: cutoff,
-            claimed_arm: ArmClaim::NewDirection,
-            task_recipe_sha256: A.to_owned(),
-            evaluator_sha256: B.to_owned(),
-            comparison_profile_sha256: C.to_owned(),
-            payload: CampaignEventPayload::NovelCandidateEvaluation {
-                candidate_sha256: D.to_owned(),
-                parent_candidate_sha256: A.to_owned(),
-                semantic_delta_sha256: B.to_owned(),
-                proposal_sha256: C.to_owned(),
-                descriptor_sha256: D.to_owned(),
+                parent_score: None,
+                inspired_by_scores: Vec::new(),
+                opening_evaluation_count: if matches!(
+                    disposition,
+                    DirectionProposalDisposition::Admitted { .. }
+                ) { Some(0) } else { None },
+                opening_global_best: None,
                 disposition,
                 score,
             },
