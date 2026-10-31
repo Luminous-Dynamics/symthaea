@@ -578,7 +578,7 @@ fn evaluate_strategy(
     let mut decision_flip_total = 0usize;
     let mut beneficial_flip_total = 0usize;
     let mut harmful_flip_total = 0usize;
-    let mut allocator_score_evaluation_total = 0usize;
+    let mut allocator_work_unit_total = 0usize;
     let mut allocator_cost_total = 0.0;
     let mut authorization_blocked_candidate_total = 0usize;
     let mut posterior_safety_blocked_candidate_total = 0usize;
@@ -606,8 +606,8 @@ fn evaluate_strategy(
                     available_probe_queries(&worlds, &posterior, &used);
                 authorization_blocked_candidate_total += authorization_blocked;
                 posterior_safety_blocked_candidate_total += posterior_safety_blocked;
-                let score_evaluations = allocator_score_evaluations(strategy, safe_candidates.len());
-                allocator_score_evaluation_total += score_evaluations;
+                let score_evaluations = allocator_work_units(strategy, safe_candidates.len());
+                allocator_work_unit_total += score_evaluations;
                 let selection_cost = score_evaluations as f64 * allocator_cost_per_evaluation;
                 allocator_cost_total += selection_cost;
 
@@ -694,7 +694,7 @@ fn evaluate_strategy(
         } else {
             harmful_flip_total as f64 / decision_flip_total as f64
         },
-        mean_allocator_score_evaluations: allocator_score_evaluation_total as f64 / count,
+        mean_allocator_work_units: allocator_work_unit_total as f64 / count,
         mean_allocator_cost: allocator_cost_total / count,
         mean_authorization_blocked_candidates: authorization_blocked_candidate_total as f64 / count,
         mean_posterior_safety_blocked_candidates: posterior_safety_blocked_candidate_total as f64 / count,
@@ -791,7 +791,7 @@ fn run() -> Result<(), String> {
             print!(",");
         }
         print!(
-            "{{\"strategy\":\"{}\",\"mean_probes\":{:.4},\"mean_posterior_size\":{:.4},\"mean_decision_utility\":{:.4},\"mean_net_utility\":{:.4},\"mean_regret\":{:.4},\"mean_net_regret\":{:.4},\"mean_decision_gain_vs_no_probe\":{:.4},\"mean_decision_flip_fraction\":{:.4},\"beneficial_flip_fraction\":{:.4},\"harmful_flip_fraction\":{:.4},\"mean_allocator_score_evaluations\":{:.4},\"mean_allocator_cost\":{:.4},\"mean_authorization_blocked_candidates\":{:.4},\"mean_posterior_safety_blocked_candidates\":{:.4},\"unsafe_actions\":{},\"unsafe_probes\":{},\"contradictions\":{}}}",
+            "{{\"strategy\":\"{}\",\"mean_probes\":{:.4},\"mean_posterior_size\":{:.4},\"mean_decision_utility\":{:.4},\"mean_net_utility\":{:.4},\"mean_regret\":{:.4},\"mean_net_regret\":{:.4},\"mean_decision_gain_vs_no_probe\":{:.4},\"mean_decision_flip_fraction\":{:.4},\"beneficial_flip_fraction\":{:.4},\"harmful_flip_fraction\":{:.4},\"mean_allocator_work_units\":{:.4},\"mean_allocator_cost\":{:.4},\"mean_authorization_blocked_candidates\":{:.4},\"mean_posterior_safety_blocked_candidates\":{:.4},\"unsafe_actions\":{},\"unsafe_probes\":{},\"contradictions\":{}}}",
             summary.strategy,
             summary.mean_probes,
             summary.mean_posterior_size,
@@ -803,7 +803,7 @@ fn run() -> Result<(), String> {
             summary.mean_decision_flip_fraction,
             summary.beneficial_flip_fraction,
             summary.harmful_flip_fraction,
-            summary.mean_allocator_score_evaluations,
+            summary.mean_allocator_work_units,
             summary.mean_allocator_cost,
             summary.mean_authorization_blocked_candidates,
             summary.mean_posterior_safety_blocked_candidates,
@@ -1104,7 +1104,7 @@ mod tests {
     fn allocator_evaluation_cost_is_charged_and_can_stop_evoi() {
         let no_allocator_cost = evaluate_strategy(Strategy::Evoi, 4_242, 2, 1, 0.25, 0.0);
         let expensive_allocator = evaluate_strategy(Strategy::Evoi, 4_242, 2, 1, 0.25, 100.0);
-        assert!(no_allocator_cost.mean_allocator_score_evaluations > 0.0);
+        assert!(no_allocator_cost.mean_allocator_work_units > 0.0);
         assert_eq!(expensive_allocator.mean_probes, 0.0);
         assert!(expensive_allocator.mean_allocator_cost > 0.0);
         assert!(expensive_allocator.mean_net_regret >= no_allocator_cost.mean_net_regret);
