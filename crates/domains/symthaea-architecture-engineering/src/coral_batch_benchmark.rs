@@ -61,6 +61,8 @@ pub struct CoralBatchCampaignRun {
     pub action_budget_units: u64,
     pub total_action_units: u64,
     pub bootstrap_actions: usize,
+    /// Global best captured when the verifier opened D, before the admitting batch had results.
+    pub new_direction_opening_global_best: Option<f64>,
     pub scheduled_rounds: Vec<CoralBatchRound>,
     pub best_direction: String,
     pub best_score: f64,
@@ -92,6 +94,21 @@ impl CoralBatchCampaignRun {
             || self.tape.config.new_direction_claim_cap != 4
         {
             return Err("Coral run does not preserve the four-seat reference contract".to_owned());
+        }
+        if self.bootstrap_actions != 3 {
+            return Err("Coral run must retain the three shared bootstrap evaluations".to_owned());
+        }
+        let bootstrap_best = self.tape.events.iter()
+            .take(self.bootstrap_actions)
+            .filter_map(|event| match &event.payload {
+                CampaignEventPayload::CandidateEvaluation { score, .. } => *score,
+                _ => None,
+            })
+            .max_by(f64::total_cmp);
+        if self.new_direction_opening_global_best != bootstrap_best
+            && self.new_direction_opening_global_best.is_some()
+        {
+            return Err("new-direction opening best differs from the pre-allocation bootstrap best".to_owned());
         }
         let totals = self.tape.totals().map_err(|error| error.to_string())?;
         if totals.action_units != self.total_action_units
@@ -495,6 +512,8 @@ pub fn run_coral_batch_campaign(
         }
     }
 
+    let new_direction_opening_global_best = board.directions.get("D")
+        .and_then(|state| state.global_best_at_open);
     let board_bytes = serde_json::to_vec(&board)
         .map_err(|error| format!("Coral board serialization failed: {error}"))?;
     let board_sha256 = digest_bytes(&board_bytes);
@@ -512,6 +531,7 @@ pub fn run_coral_batch_campaign(
         action_budget_units,
         total_action_units,
         bootstrap_actions,
+        new_direction_opening_global_best,
         scheduled_rounds,
         best_direction,
         best_score,
