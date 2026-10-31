@@ -249,9 +249,19 @@ pub fn run_coral_batch_campaign(
         }
         let first_coral_allocation_round = scheduled_round == 1;
         let mut direction_claims: BTreeMap<String, usize> = BTreeMap::new();
+        let round_parent_scores: BTreeMap<String, Option<f64>> = board.directions.iter()
+            .map(|(direction_id, state)| {
+                let best = state.evaluations.iter()
+                    .filter_map(|evaluation| evaluation.score)
+                    .max_by(f64::total_cmp);
+                (direction_id.clone(), best.or(Some(0.0)))
+            })
+            .collect();
+        let global_best_at_batch_start = board.global_best_score.or(Some(0.0));
         let mut round_actions = Vec::new();
         let mut staged_events = Vec::new();
         let mut round_eval_offsets: BTreeMap<String, usize> = BTreeMap::new();
+        let mut round_new_eval_offsets = 0usize;
 
         for (seat_index, assigned_arm) in selected_arms.iter().enumerate() {
             let worker_id = format!("coral-round-{scheduled_round}-worker-{}", seat_index + 1);
@@ -269,9 +279,9 @@ pub fn run_coral_batch_campaign(
                     *direction_claims.entry(direction_id.clone()).or_default() += 1;
                     let state = board.directions.get(direction_id)
                         .ok_or_else(|| format!("Coral recommended unregistered direction {direction_id}"))?;
-                    let parent_score = state.evaluations.iter()
-                        .filter_map(|evaluation| evaluation.score)
-                        .max_by(f64::total_cmp)
+                    let parent_score = round_parent_scores.get(direction_id)
+                        .copied()
+                        .flatten()
                         .or(Some(0.0));
                     let offset = round_eval_offsets.entry(direction_id.clone()).or_default();
                     let eval_index = direction_eval_counts.get(direction_id).copied().unwrap_or(0) + *offset;
@@ -325,11 +335,13 @@ pub fn run_coral_batch_campaign(
                             let direction_id = "D";
                             let state = board.directions.get(direction_id)
                                 .ok_or_else(|| "D direction disappeared after verifier admission".to_owned())?;
-                            let parent_score = state.evaluations.iter()
-                                .filter_map(|evaluation| evaluation.score)
-                                .max_by(f64::total_cmp)
-                                .or(Some(0.0));
-                            let eval_index = direction_eval_counts.get(direction_id).copied().unwrap_or(0);
+                            let parent_score = round_parent_scores.get(direction_id)
+                                .copied()
+                                .flatten()
+                                .or(global_best_at_batch_start);
+                            let eval_index = direction_eval_counts.get(direction_id).copied().unwrap_or(0)
+                                + round_new_eval_offsets;
+                            round_new_eval_offsets += 1;
                             let score = payoff(landscape, direction_id, eval_index);
                             (
                                 DirectionProposalDisposition::Duplicate {
@@ -340,9 +352,11 @@ pub fn run_coral_batch_campaign(
                             )
                         } else {
                             let direction_id = "D";
-                            let global_best_before = board.global_best_score.or(Some(0.0));
+                            let global_best_before = global_best_at_batch_start;
                             board.register_direction(direction_id).map_err(|error| error.to_string())?;
-                            let eval_index = direction_eval_counts.get(direction_id).copied().unwrap_or(0);
+                            let eval_index = direction_eval_counts.get(direction_id).copied().unwrap_or(0)
+                                + round_new_eval_offsets;
+                            round_new_eval_offsets += 1;
                             let score = payoff(landscape, direction_id, eval_index);
                             let attempt_id = format!("{action_id}-evaluation");
                             board.record_evaluation(
@@ -402,13 +416,10 @@ pub fn run_coral_batch_campaign(
 
                     let attempt_id = format!("{action_id}-novel-attempt");
                     if let Some(direction_id) = canonical.as_deref() {
-                        let state = board.directions.get(direction_id)
-                            .ok_or_else(|| "duplicate destination is not registered".to_owned())?;
-                        let parent_score = state.evaluations.iter()
-                            .filter_map(|evaluation| evaluation.score)
-                            .max_by(f64::total_cmp)
-                            .or(Some(0.0));
-                        let eval_index = direction_eval_counts.get(direction_id).copied().unwrap_or(0);
+                        let parent_score = round_parent_scores.get(direction_id)
+                            .copied()
+                            .flatten()
+                            .or(global_best_at_batch_start);
                         let score_value = score.ok_or_else(|| "duplicate needs a score".to_owned())?;
                         board.record_evaluation(
                             &attempt_id,
@@ -433,7 +444,7 @@ pub fn run_coral_batch_campaign(
                             landscape,
                             seed,
                             &attempt_id,
-                            proposal_index(new_attempt_index),
+                            new_attempt_index,
                             disposition.clone(),
                             Some(score_value),
                         ));
