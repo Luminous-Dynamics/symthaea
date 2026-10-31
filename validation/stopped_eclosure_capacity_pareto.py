@@ -333,6 +333,13 @@ def _prefix_digest(
     return _digest(payload)
 
 
+def _serialise_cardinality_summary(summary: dict) -> dict:
+    return {
+        key: fraction_pair(value) if isinstance(value, Fraction) else value
+        for key, value in summary.items()
+    }
+
+
 def _solve_one_time(
     current_e: tuple[Fraction, ...],
     weights: tuple[Fraction, ...],
@@ -361,7 +368,7 @@ def _solve_one_time(
             charges, baseline, values, costs, active_mask, previous_mask,
             capacity, alpha, k, prune=prune, frontier_limit=frontier_limit,
         )
-        summaries[str(k)] = summary
+        summaries[str(k)] = _serialise_cardinality_summary(summary)
         max_frontier = max(max_frontier, summary.get("max_frontier", 0))
         if candidate is None:
             continue
@@ -579,6 +586,10 @@ def verify_capacity_aware_pareto(
         expected = {
             "time": t,
             "active_mask": active[t],
+            "closure_load": (
+                fraction_pair(alpha - cert["minimum_slack"])
+                if mask else None
+            ),
             "rejections": [i + 1 for i in range(len(paths)) if (mask >> i) & 1],
             "utility": fraction_pair(utility),
             "cost": fraction_pair(cost),
