@@ -46,6 +46,7 @@
           "item_id",
           "parameters",
           "solution",
+          "normalized_determinant_margin_permille",
           "parameter_sha256",
           "answer_sha256"
         ],
@@ -109,6 +110,11 @@
           "answer_sha256": {
             "type": "string",
             "pattern": "^[0-9a-f]{64}$"
+          },
+          "normalized_determinant_margin_permille": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
           }
         }
       }
