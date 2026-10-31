@@ -250,6 +250,24 @@ pub struct Iit4SystemPhiSearchConfig {
     pub include_total_cut: bool,
 }
 
+/// Certified IIT 4.0 (2023) system-phi upper bound from Zaeemzadeh &
+/// Tononi (2024), Table 2.
+///
+/// The theorem assumes binary units, a conditionally independent TPM, and
+/// system partitions that do not sever self-connections. Those assumptions
+/// hold for this crate's binary factored model and ordinary directed
+/// set-partition family, but not when the special TotalCut is enabled.
+/// None therefore means that the theorem must not be used for pruning or
+/// validation under the requested policy.
+pub fn certified_iit4_2023_system_phi_upper_bound(
+    candidate_units: usize,
+    include_total_cut: bool,
+) -> Option<usize> {
+    if candidate_units == 0 || include_total_cut {
+        return None;
+    }
+    candidate_units.checked_mul(candidate_units - 1)
+}
 impl Default for Iit4SystemPhiSearchConfig {
     fn default() -> Self {
         Self {
@@ -553,6 +571,8 @@ pub enum SystemPhiError {
         candidate_evaluations: usize,
         max_evaluations: usize,
     },
+    #[error("computed IIT 4.0 (2023) phi_s {value} exceeds certified upper bound {upper_bound} (Zaeemzadeh & Tononi 2024, Table 2)")]
+    CertifiedUpperBoundViolation { value: f64, upper_bound: usize },
     #[error("specified-state pair count overflow")]
     StatePairCounterOverflow,
 }
@@ -2656,6 +2676,21 @@ impl BinaryCausalModel {
                 )
             };
 
+        if let (Some(value), Some(upper_bound)) = (
+            phi_s,
+            certified_iit4_2023_system_phi_upper_bound(
+                candidate_system.len(),
+                config.include_total_cut,
+            ),
+        ) {
+            let tolerance = 10.0_f64.powi(-(config.decimal_precision as i32));
+            if value > upper_bound as f64 + tolerance {
+                return Err(SystemPhiError::CertifiedUpperBoundViolation {
+                    value,
+                    upper_bound,
+                });
+            }
+        }
         Ok(Iit4SystemPhiAnalysis {
             formalism: FormalismProfile::Iit4_0_2023,
             candidate_system: candidate_system.to_vec(),
@@ -3621,6 +3656,14 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn certified_system_phi_bound_is_enabled_only_inside_theorem_domain() {
+        assert_eq!(certified_iit4_2023_system_phi_upper_bound(1, false), Some(0));
+        assert_eq!(certified_iit4_2023_system_phi_upper_bound(3, false), Some(6));
+        assert_eq!(certified_iit4_2023_system_phi_upper_bound(16, false), Some(240));
+        assert_eq!(certified_iit4_2023_system_phi_upper_bound(3, true), None);
+        assert_eq!(certified_iit4_2023_system_phi_upper_bound(0, false), None);
+    }
     #[test]
     fn fixed_state_system_partition_matches_iit4_2023_directional_gid() {
         // Two mutually coupled binary units. At current state 00, the cause
