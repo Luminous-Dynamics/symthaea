@@ -732,6 +732,44 @@ mod tests {
     }
 
     #[test]
+    fn edge_budget_counts_the_referenced_edge_endpoints() {
+        let (mut e,g,o,_,gb,ob) = fixture_values();
+        e["review_budget"]["unit"] = json!("edges");
+        e["review_budget"]["limit"] = json!(1);
+        let eb = serde_json::to_vec(&e).unwrap();
+        let receipt = audit_values(&e,&g,&o,&eb,&gb,&ob).unwrap();
+        let result = &receipt["review_budget_result"];
+        assert_eq!(result["selected_edge_count"], 1);
+        assert_eq!(result["selected_node_count"], 2);
+        assert_eq!(result["true_positive_nodes"], 2);
+    }
+
+    #[test]
+    fn unknown_path_can_preserve_missing_edge_uncertainty() {
+        let (mut e,g,o,_,gb,ob) = fixture_values();
+        e["paths"][0]["status"] = json!("unknown");
+        e["paths"][0]["edge_ids"] = json!(["edge-not-observed"]);
+        e["paths"][0]["reason"] = json!("Source mapping is incomplete");
+        let eb = serde_json::to_vec(&e).unwrap();
+        let receipt = audit_values(&e,&g,&o,&eb,&gb,&ob).unwrap();
+        assert_eq!(receipt["path_audit"]["retained_matched_path_count"], 0);
+        assert_eq!(receipt["path_audit"]["paths"][0]["all_source_edges_present"], false);
+    }
+
+    #[test]
+    fn complete_claim_passes_only_for_exact_complete_reference_set() {
+        let (mut e,g,mut o,_,gb,_) = fixture_values();
+        o["reference_paths_complete"] = json!(true);
+        e["path_coverage"]["status"] = json!("complete");
+        e["path_coverage"]["oracle_id"] = json!("independent-oracle-v1");
+        e["path_coverage"]["certificate_sha256"] = json!("9".repeat(64));
+        let eb = serde_json::to_vec(&e).unwrap();
+        let ob = serde_json::to_vec(&o).unwrap();
+        let receipt = audit_values(&e,&g,&o,&eb,&gb,&ob).unwrap();
+        assert_eq!(receipt["path_audit"]["reference_path_coverage"], 1.0);
+    }
+
+    #[test]
     fn empty_reference_path_set_does_not_divide_by_zero() {
         let (mut e,g,mut o,_,gb,_) = fixture_values();
         o["reference_paths"] = json!([]);
