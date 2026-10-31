@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/hardsec-episode-restarted-plan-v1.schema.json",
+  "title": "HARDSEC episode restarted conformal plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "monitor_id",
+    "evidence_domain",
+    "stream_id",
+    "evaluation_group_id",
+    "score_artifact_sha256",
+    "context_assignment_policy_id",
+    "context_assignment_artifact_sha256",
+    "randomizer_source_sha256",
+    "fixed_before_evaluation",
+    "score_artifact_frozen",
+    "aggregation_policy",
+    "windows_per_episode",
+    "require_contiguous_window_indices",
+    "require_single_context_per_episode",
+    "invalid_window_policy",
+    "randomizer_independence_status",
+    "randomizers_strictly_between_zero_and_one",
+    "pvalue_rule",
+    "alpha_budget_total",
+    "contexts",
+    "betting_family",
+    "restart_weight_policy",
+    "restart_weight_formula",
+    "restart_weight_sum_upper_bound",
+    "pfa_statistic",
+    "score_model_training_execution_group_ids",
+    "score_model_selection_execution_group_ids",
+    "evaluation_execution_group_ids"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-episode-restarted-plan-v1"
+    },
+    "monitor_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_domain": {
+      "enum": [
+        "synthetic_fixture",
+        "simulator",
+        "physical_hardware"
+      ]
+    },
+    "stream_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_group_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "score_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "context_assignment_policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "context_assignment_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "randomizer_source_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "fixed_before_evaluation": {
+      "const": true
+    },
+    "score_artifact_frozen": {
+      "const": true
+    },
+    "aggregation_policy": {
+      "const": "max_anomaly_score"
+    },
+    "windows_per_episode": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "require_contiguous_window_indices": {
+      "const": true
+    },
+    "require_single_context_per_episode": {
+      "const": true
+    },
+    "invalid_window_policy": {
+      "const": "abstain_entire_episode"
+    },
+    "randomizer_independence_status": {
+      "const": "assumption_not_verified"
+    },
+    "randomizers_strictly_between_zero_and_one": {
+      "const": true
+    },
+    "pvalue_rule": {
+      "type": "string",
+      "minLength": 20
+    },
+    "alpha_budget_total": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "contexts": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "betting_family": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "theta",
+          "prior_weight"
+        ],
+        "properties": {
+          "theta": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "prior_weight": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "restart_weight_policy": {
+      "const": "near_harmonic_summable"
+    },
+    "restart_weight_formula": {
+      "const": "w_k=1/(2*k*(1+ln(k))^2)"
+    },
+    "restart_weight_sum_upper_bound": {
+      "const": 1
+    },
+    "pfa_statistic": {
+      "const": "weighted_restarted_sum"
+    },
+    "score_model_training_execution_group_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "score_model_selection_execution_group_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "evaluation_execution_group_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
