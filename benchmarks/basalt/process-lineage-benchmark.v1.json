@@ -1,0 +1,273 @@
+{
+  "suite_id": "basalt-process-lineage-benchmark-v1",
+  "version": 1,
+  "status": "protocol",
+  "purpose": "Measure whether observer process records preserve exact process incarnations, parent-child lineage, lifecycle ordering, and event-loss integrity against an independent supervisor oracle.",
+  "unit_of_analysis": "independent_task_attempt_lineage",
+  "non_goals": [
+    "general runtime threat detection",
+    "kernel observer implementation or attachment",
+    "filesystem dependency completeness",
+    "process argument or environment secret capture",
+    "authentication of oracle or observer authors",
+    "cross-host process identity"
+  ],
+  "identity_contract": {
+    "scope": [
+      "host_boot_id_digest",
+      "pid_namespace_inode",
+      "run_id",
+      "task_id",
+      "attempt_id"
+    ],
+    "process_instance_key": [
+      "pid",
+      "start_time_ticks"
+    ],
+    "pid_reuse_policy": "same PID with different start_time_ticks is a new process instance; same PID and same start_time_ticks is ambiguous/duplicate within a single lineage and must be rejected",
+    "namespace_policy": "PIDs from different PID namespaces are never joined, even when numeric PID and start_time_ticks match",
+    "time_policy": "monotonic nanoseconds for event ordering; raw /proc start_time_ticks are identity material, not wall-clock timestamps",
+    "pidfd_policy": "independent supervisor should use pidfd/CLONE_PIDFD where practical to retain a kernel reference to each child lifecycle; fallback /proc start_time_ticks must be separately stratified and disclosed"
+  },
+  "comparison_arms": [
+    {
+      "arm_id": "pid_only",
+      "role": "negative_control",
+      "description": "Join processes by numeric PID alone; expected to mismerge PID reuse and namespace collisions.",
+      "promotable": false
+    },
+    {
+      "arm_id": "procfs_starttime",
+      "role": "identity_baseline",
+      "description": "Use PID plus /proc/PID/stat start-time ticks, host boot identity and PID namespace identity.",
+      "promotable": true
+    },
+    {
+      "arm_id": "pidfd_supervised_oracle",
+      "role": "ground_truth_reference",
+      "description": "Independent supervisor retains pidfd references (or CLONE_PIDFD where available) and records wait/exit outcomes, alongside namespace-scoped process identities.",
+      "promotable": true
+    },
+    {
+      "arm_id": "falco_kernel_event_stream",
+      "role": "industry_baseline",
+      "description": "Use Falco kernel syscall events and its supported process-related event stream; retain native drop counters and exact configuration.",
+      "promotable": true
+    },
+    {
+      "arm_id": "tetragon_process_lifecycle",
+      "role": "industry_baseline",
+      "description": "Use Tetragon process_exec/process_exit records, parent metadata and exec_id; record version, policy and event export path.",
+      "promotable": true
+    },
+    {
+      "arm_id": "unreconciled_observer_receipt",
+      "role": "candidate_baseline",
+      "description": "Consume observer process/event receipt without an independent process graph or event-set reconciliation.",
+      "promotable": false
+    },
+    {
+      "arm_id": "basalt_lineage_oracle_audit",
+      "role": "candidate",
+      "description": "Reconcile observer process graph and lifecycle event stream against a separate supervisor oracle, sequence counters and scoped identity.",
+      "promotable": true
+    }
+  ],
+  "metrics": [
+    {
+      "metric_id": "process_instance_recall",
+      "phase": "safety",
+      "definition": "Fraction of supervisor-observed process instances present with exact PID and start_time_ticks under the matching boot/PID-namespace/run/task/attempt scope.",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "parent_edge_precision",
+      "phase": "safety",
+      "definition": "Fraction of reported parent edges that exactly match the independent supervisor graph, with no orphan or cross-lineage parent.",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "pid_reuse_separation",
+      "phase": "safety",
+      "definition": "Fraction of controlled PID-reuse cases represented as distinct process instances rather than merged by numeric PID.",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "lifecycle_event_recall",
+      "phase": "safety",
+      "definition": "Fraction of expected root_start/fork/clone/vfork/exec/exit events represented exactly once with the correct process instance.",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "sequence_gap_detection",
+      "phase": "safety",
+      "definition": "Fraction of injected per-source sequence gaps and duplicates detected and made non-promotable.",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "event_loss_false_acceptances",
+      "phase": "safety",
+      "definition": "Count of runs accepted as complete despite nonzero dropped events, ring-buffer overflows, restarts, unmonitored processes or sequence gaps.",
+      "target": {
+        "operator": "=",
+        "value": 0
+      },
+      "unit": "scenario_count"
+    },
+    {
+      "metric_id": "closed_tree_false_acceptances",
+      "phase": "safety",
+      "definition": "Count of runs accepted as closed when any expected process lacks an exit, an expected child is missing, or child/parent exit ordering is invalid.",
+      "target": {
+        "operator": "=",
+        "value": 0
+      },
+      "unit": "scenario_count"
+    },
+    {
+      "metric_id": "namespace_cross_join_false_acceptances",
+      "phase": "safety",
+      "definition": "Count of runs accepted after joining process identities across different host boot or PID namespace contexts.",
+      "target": {
+        "operator": "=",
+        "value": 0
+      },
+      "unit": "scenario_count"
+    },
+    {
+      "metric_id": "ambiguous_process_identity_acceptances",
+      "phase": "safety",
+      "definition": "Count of runs accepted with duplicate identity tuples, orphan parents, cycles or invalid process incarnation fields.",
+      "target": {
+        "operator": "=",
+        "value": 0
+      },
+      "unit": "scenario_count"
+    },
+    {
+      "metric_id": "p95_audit_latency_ms",
+      "phase": "efficiency",
+      "definition": "95th percentile audit latency for a 10,000-process and 100,000-event synthetic upper-bound receipt pair on a declared reference host.",
+      "target": {
+        "operator": "<=",
+        "value": 200
+      },
+      "unit": "milliseconds"
+    },
+    {
+      "metric_id": "p95_report_bytes",
+      "phase": "efficiency",
+      "definition": "95th percentile audit report size for the same upper-bound lineage workload.",
+      "target": {
+        "operator": "<=",
+        "value": 1048576
+      },
+      "unit": "bytes"
+    }
+  ],
+  "gates": {
+    "safety": [
+      "process_instance_recall",
+      "parent_edge_precision",
+      "pid_reuse_separation",
+      "lifecycle_event_recall",
+      "sequence_gap_detection",
+      "event_loss_false_acceptances",
+      "closed_tree_false_acceptances",
+      "namespace_cross_join_false_acceptances",
+      "ambiguous_process_identity_acceptances"
+    ],
+    "efficiency": [
+      "p95_audit_latency_ms",
+      "p95_report_bytes"
+    ],
+    "promotion_rule": "All safety gates are mandatory and non-compensatory. Efficiency is evaluated only after every safety gate passes. No composite score is permitted to compensate for lineage loss or false closure."
+  },
+  "statistical_protocol": {
+    "confidence_level": 0.95,
+    "independence_unit": "independent_task_attempt_lineage",
+    "clustering": "Events, syscalls, retries and repeated process starts within one task attempt are not independent samples. Cluster by repository task lineage and host boot/PID namespace.",
+    "stratification": [
+      "kernel_release",
+      "kernel_machine_architecture",
+      "pid_namespace_type",
+      "container_or_host",
+      "pidfd_available",
+      "supervisor_method",
+      "observer_version",
+      "observer_configuration",
+      "event_rate_stratum",
+      "process_tree_shape",
+      "pid_reuse_injected",
+      "namespace_boundary_injected",
+      "forced_event_loss"
+    ],
+    "controls": [
+      "pid_reuse_same_numeric_pid_new_starttime",
+      "duplicate_pid_and_starttime",
+      "same_pid_in_different_pid_namespace",
+      "missing_child_fork_event",
+      "missing_child_exit_event",
+      "child_exit_after_parent_exit",
+      "orphan_parent",
+      "parent_cycle",
+      "event_sequence_gap",
+      "duplicate_event_sequence",
+      "event_loss_counter_nonzero",
+      "observer_restart",
+      "unmonitored_child",
+      "capture_interval_does_not_cover_task"
+    ],
+    "splits": "Separate development, qualification and untouched confirmatory task lineages. Hold out workload templates and PID/namespace mutation strategies, not merely random event rows.",
+    "stopping": "Preregister independent task attempt count, host/kernel strata, mutation generators, event-rate controls, retries, exclusions and confidence intervals before qualification."
+  },
+  "required_disclosures": [
+    "oracle_binary_digest",
+    "supervisor_binary_digest",
+    "observer_binary_digest",
+    "observer_configuration_digest",
+    "host_boot_id_digest",
+    "pid_namespace_inode",
+    "task_id",
+    "attempt_id",
+    "pid_starttime_identity_method",
+    "pidfd_availability_and_use",
+    "capture_start_and_end_monotonic_ns",
+    "per_source_sequence_counters",
+    "reported_dropped_event_count",
+    "ring_buffer_overflow_count",
+    "observer_restart_count",
+    "unmonitored_process_count",
+    "namespace_crossing_policy"
+  ],
+  "forbidden_claims": [
+    "PID_alone_is_a_process_instance_identity",
+    "start_time_ticks_alone_is_globally_unique",
+    "matching_process_counts_proves_matching_lineage",
+    "zero_reported_loss_proves_no_unobserved_kernel_loss_without_independent_controls",
+    "process_tree_closed_boolean_proves_all_children_were_observed",
+    "this_audit_authenticates_oracle_or_observer",
+    "lineage_pass_qualifies_filesystem_dependency_completeness"
+  ],
+  "targets_are_proposed_not_measured": true
+}
