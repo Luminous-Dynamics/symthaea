@@ -417,12 +417,12 @@ jobs:
               if receipt.get("local_instance_count") != 1 or len(receipt.get("local_instances", [])) != 1:
                   raise SystemExit(f"{project}: local instance count mismatch")
               instance = receipt["local_instances"][0]
-              if instance.get("class_name") != "Decidable":
-                  raise SystemExit(f"{project}: expected Decidable local instance")
+              if instance.get("class_name") != "PITBLocalInstanceProbe":
+                  raise SystemExit(f"{project}: expected the unique PITBLocalInstanceProbe local instance")
               if instance.get("binder_is_instance_implicit") is not True:
                   raise SystemExit(f"{project}: binder instance metadata was not preserved")
-              if "Decidable" not in instance.get("type", ""):
-                  raise SystemExit(f"{project}: local instance type does not mention Decidable")
+              if "PITBLocalInstanceProbe" not in instance.get("type", ""):
+                  raise SystemExit(f"{project}: local instance type does not mention PITBLocalInstanceProbe")
               receipts.append({"project": project, "lean_toolchain": actual_toolchain, **receipt})
           out = runner / "pitb-lean-local-instance-compatibility.receipts.json"
           out.write_text(json.dumps({"schema_version":"pitb.local-instance-api-compat-report.v0","receipts":receipts}, indent=2) + "\n")
