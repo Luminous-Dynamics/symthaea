@@ -129,3 +129,8 @@ It provides canonical run/candidate/source-commit-bound artifact manifests; exac
 This primitive receives bytes from its caller. It does not retrieve from CAS/Holochain/object storage, authenticate a remote store, authenticate digital signatures, or establish semantic correctness. Integration with the anytime verifier promotion and bounded CAS retrieval is tracked separately in [Issue #9608](https://github.com/Luminous-Dynamics/symthaea/issues/9608). The implementation and limits are documented in \`AR5B5_EVIDENCE_ARTIFACT_BYTES_V0_1.md\`.
 
 All tests remain authored and unexecuted; no byte-verification or science-validity pass is claimed.
+
+
+### Terminal verifier rejection
+
+A candidate-verification rejection is now terminal for that candidate identity within the run. A later attempt to promote the same candidate is rejected by history validation. A contradictory verifier outcome after a prior promotion invalidates the history rather than allowing an already-qualified candidate to be silently reclassified. Use a new candidate/run/replication identity for changed bytes or an independent re-evaluation. A regression test covers rejection followed by attempted held-out promotion.
