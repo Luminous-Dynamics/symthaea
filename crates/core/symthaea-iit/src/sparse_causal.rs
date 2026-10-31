@@ -2152,6 +2152,21 @@ mod tests {
             .analyze_iit4_2023_system_phi_s(&candidate, &current_state, config, 1 << 16)
             .unwrap();
         assert_eq!(sparse_result.formalism, dense_result.formalism);
+        assert_eq!(
+            dense_result.algorithm_id,
+            crate::IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID
+        );
+        assert_eq!(
+            sparse_result.algorithm_id,
+            SPARSE_IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID
+        );
+        assert_ne!(dense_result.algorithm_id, sparse_result.algorithm_id);
+        let mut relabeled_receipt = sparse_result.clone();
+        relabeled_receipt.algorithm_id = crate::IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID;
+        assert_ne!(
+            sparse_result.receipt_sha256().unwrap(),
+            relabeled_receipt.receipt_sha256().unwrap()
+        );
         assert_eq!(sparse_result.certified_upper_bound, dense_result.certified_upper_bound);
         assert_eq!(sparse_result.certified_upper_bound, Some(candidate.len() * (candidate.len() - 1)));
         assert_eq!(sparse_result.receipt_sha256().unwrap(), sparse
