@@ -1,0 +1,96 @@
+name: HARDSEC-019 context-conditioned sequential monitor
+
+on:
+  pull_request:
+    paths:
+      - "examples/hardsec_context_sequential_monitor.rs"
+      - "docs/research/HARDSEC_019_CONTEXT_SEQUENTIAL_MONITOR.md"
+      - "schemas/hardsec-context-sequential-*.schema.json"
+      - "tests/fixtures/hardsec/context-sequential-v1/**"
+      - "tools/hardsec-adaptive-evasion-audit-harness/**"
+      - ".github/workflows/hardsec-context-sequential-monitor.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-context-sequential-monitor-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  context-sequential-monitor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact pull request revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_context_sequential_monitor.rs
+      - name: Run focused fixed-context sequential monitor unit suite
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-sequential-monitor --example hardsec_context_sequential_monitor
+      - name: Run synthetic sequential monitor known-answer fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          out_dir="$(mktemp -d)"
+          cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-sequential-monitor --example hardsec_context_sequential_monitor -- \
+            --plan tests/fixtures/hardsec/context-sequential-v1/plan.json \
+            --stream tests/fixtures/hardsec/context-sequential-v1/stream.json \
+            --receipt "$out_dir/sequential-receipt.json"
+          python3 - "$out_dir/sequential-receipt.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          assert receipt["result"] == "alarm_threshold_crossed", receipt
+          monitor = receipt["sequential_monitor"]
+          assert monitor["first_alarm_sequence_index"] == 4
+          assert monitor["valid_observation_count"] == 4
+          assert monitor["abstention_count"] == 3
+          assert monitor["post_alarm_reset_count"] == 0
+          assert monitor["alarm_is_latched"] is True
+          assert receipt["reference_policy"]["test_time_reference_updates"] == 0
+          assert receipt["betting_function"]["type"] == "fixed_mixture_of_power_p_value_bets"
+          assert receipt["statistical_guarantees"]["conditional_superuniformity_status"] == "assumption_not_verified"
+          assert receipt["statistical_guarantees"]["sequential_false_alarm_guarantee_status"] == "not_established_from_inputs"
+          assert receipt["statistical_guarantees"]["effective_sample_size_estimate"] is None
+          assert all(row["action"] != "benign" for row in monitor["window_decisions"])
+          assert any(row["abstention_reason"] == "unseen_workload_context" for row in monitor["window_decisions"])
+          PY
+
+      - name: Check preregistered sequential benchmark contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          path = "tests/fixtures/hardsec/context-sequential-v1/benchmark-plan.json"
+          with open(path, "r", encoding="utf-8") as handle:
+              plan = json.load(handle)
+          assert plan["status"] == "planned"
+          assert len(plan["baselines"]) == 9
+          assert len(plan["candidates"]) == 4
+          assert "perfectly_dependent_shared_latent_null" in plan["scenarios"]
+          assert "authors_python_official_cctm_current_main" in plan["baselines"]
+          reference = plan["reference_calibration_design"]
+          assert abs(reference["total_alpha_budget"] + reference["total_dkw_delta_budget"] - 0.05) < 1e-12
+          assert reference["context_count_for_fixture"] == 2
+          assert reference["alpha_per_context_for_fixture"] == 0.02
+          assert reference["delta_per_context_for_fixture"] == 0.005
+          required = reference["required_independent_reference_units_per_context"]
+          assert required == {
+              "epsilon_le_0_05": 1199,
+              "epsilon_le_0_025": 4794,
+              "epsilon_le_0_01": 29958,
+              "epsilon_le_0_005": 119830,
+          }
+          assert reference["iid_reference_assumption_required"] is True
+          assert reference["windows_do_not_establish_reference_independence"] is True
+          assert "windows" in reference["unit_definition"]
+          PY

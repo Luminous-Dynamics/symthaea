@@ -1,0 +1,161 @@
+{
+  "schema_version": "hardsec-context-cctm-stream-v1",
+  "evidence_domain": "synthetic_fixture",
+  "stream_id": "stream-cctm-demo-01",
+  "evaluation_group_id": "heldout-execution-cctm-01",
+  "scoring_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "records": [
+    {
+      "sequence_index": 1,
+      "window_id": "cctm-window-001",
+      "context_id": "compute",
+      "anomaly_score": 3,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 2,
+      "window_id": "cctm-window-002",
+      "context_id": "memory",
+      "anomaly_score": 3,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 3,
+      "window_id": "cctm-window-003",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 4,
+      "window_id": "cctm-window-004",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 5,
+      "window_id": "cctm-window-005",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 6,
+      "window_id": "cctm-window-006",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 7,
+      "window_id": "cctm-window-007",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 8,
+      "window_id": "cctm-window-008",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 9,
+      "window_id": "cctm-window-009",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 10,
+      "window_id": "cctm-window-010",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 11,
+      "window_id": "cctm-window-011",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 12,
+      "window_id": "cctm-window-012",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 13,
+      "window_id": "cctm-window-013",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 14,
+      "window_id": "cctm-window-014",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 15,
+      "window_id": "cctm-window-015",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 16,
+      "window_id": "cctm-window-016",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 17,
+      "window_id": "cctm-window-017",
+      "context_id": "compute",
+      "anomaly_score": 8.5,
+      "sensor_state": "stale",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 18,
+      "window_id": "cctm-window-018",
+      "context_id": "new-regime",
+      "anomaly_score": 8.5,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    },
+    {
+      "sequence_index": 19,
+      "window_id": "cctm-window-019",
+      "context_id": "memory",
+      "anomaly_score": 8.5,
+      "sensor_state": "untrusted",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions"
+    }
+  ]
+}

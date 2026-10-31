@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/hardsec-context-sequential-plan-v1.schema.json",
+  "title": "HARDSEC fixed-context sequential monitor plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "monitor_id",
+    "evidence_domain",
+    "stream_id",
+    "evaluation_group_id",
+    "alpha_budget",
+    "reference_update_policy",
+    "pmu_qualification_required",
+    "minimum_reference_scores",
+    "conditional_superuniformity_status",
+    "betting_mixture",
+    "contexts",
+    "scoring_artifact_sha256",
+    "anomaly_score_direction"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-context-sequential-plan-v1"
+    },
+    "monitor_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_domain": {
+      "enum": [
+        "synthetic_fixture",
+        "simulator",
+        "physical_hardware"
+      ]
+    },
+    "stream_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_group_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "alpha_budget": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "reference_update_policy": {
+      "const": "immutable_no_test_time_updates"
+    },
+    "pmu_qualification_required": {
+      "const": "qualified_for_named_acquisition_conditions"
+    },
+    "minimum_reference_scores": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "conditional_superuniformity_status": {
+      "const": "assumption_not_verified"
+    },
+    "betting_mixture": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lambda",
+          "weight"
+        ],
+        "properties": {
+          "lambda": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "exclusiveMaximum": 1
+          },
+          "weight": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "contexts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "context_id",
+          "reference_id",
+          "reference_group_ids",
+          "reference_scores"
+        ],
+        "properties": {
+          "context_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reference_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reference_group_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "reference_scores": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "scoring_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "anomaly_score_direction": {
+      "const": "higher_is_more_anomalous"
+    }
+  }
+}

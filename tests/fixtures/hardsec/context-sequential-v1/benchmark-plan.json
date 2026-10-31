@@ -1,0 +1,112 @@
+{
+  "schema_version": "hardsec-context-sequential-benchmark-v1",
+  "benchmark_id": "hs019-context-conditioned-sequential-monitor",
+  "status": "planned",
+  "baselines": [
+    "static_threshold",
+    "ewma",
+    "page_hinkley_cusum",
+    "fixed_window_conformal",
+    "growing_reference_conformal_test_martingale",
+    "fixed_reference_conditional_conformal_test_martingale",
+    "context_agnostic_fixed_reference_eprocess",
+    "dkw_corrected_fixed_reference_cctm_rust",
+    "authors_python_official_cctm_current_main"
+  ],
+  "candidates": [
+    "context_conditioned_fixed_reference_mixture_eprocess",
+    "symthaea_hdc_score_plus_sequential_layer",
+    "symthaea_liquid_score_plus_sequential_layer",
+    "context_conditioned_dkw_cctm_ons"
+  ],
+  "scenarios": [
+    "stationary_null",
+    "workload_phase_shift",
+    "persistent_context_transition",
+    "autocorrelated_null",
+    "heavy_tailed_null",
+    "benign_contention",
+    "context_mimicry",
+    "adaptive_timing",
+    "adaptive_interleaving",
+    "unseen_context",
+    "invalid_sensor",
+    "persistent_attack_effect",
+    "perfectly_dependent_shared_latent_null"
+  ],
+  "holdout_axes": [
+    "execution",
+    "program_binary",
+    "attack_family",
+    "adaptation_family",
+    "device_configuration",
+    "cross_platform"
+  ],
+  "metrics": [
+    "false_alarms_per_device_hour",
+    "any_false_alarm_probability_by_horizon",
+    "median_detection_delay",
+    "p95_detection_delay",
+    "attack_effect_conditioned_recall",
+    "worst_context_recall",
+    "worst_attack_family_recall",
+    "abstention_rate",
+    "reference_contamination",
+    "score_calibration",
+    "cpu_time",
+    "resident_memory",
+    "end_to_end_overhead"
+  ],
+  "aspirational_targets": {
+    "p95_delay_reduction_vs_best_reproduced_baseline": 0.2,
+    "worst_group_gap_max": 0.03,
+    "benign_false_alerts_per_device_hour_max": 0.1,
+    "pooled_attack_effect_recall_min": 0.9,
+    "invalid_sensor_or_unseen_context_silent_clears_max": 0,
+    "incremental_decision_layer_p95_overhead_max": 0.02
+  },
+  "claim_rules": {
+    "conditional_superuniformity_must_be_justified": true,
+    "alpha_budget_allocated_across_streams": true,
+    "domain_pooling_forbidden": true,
+    "random_window_confirmatory_claim_forbidden": true,
+    "targets_not_achievements": true
+  },
+  "reference_implementations": [
+    {
+      "id": "published_paper_equations_v2",
+      "url": "https://arxiv.org/html/2602.13848",
+      "version": "arXiv 2602.13848v2 (2026-06-12)",
+      "implementation_status": "rust_equations_implemented_parity_not_yet_independently_reproduced"
+    },
+    {
+      "id": "authors_official_python_main",
+      "url": "https://github.com/shaersh/cctm",
+      "reference_branch": "main",
+      "source_blob_sha256": {
+        "cond_ctm_py": "f8aff50078ac868167ac7442fc978e0402cf0faa",
+        "optimization_py": "39d972a29507db3a8e2d7a20ce3b5a2162764974",
+        "utils_py": "a094f6a8bd1ab7e0cf9623e30d43b4b9bdbcc8ea"
+      },
+      "implementation_status": "source_pinned_metrics_and_execution_not_reproduced"
+    }
+  ],
+  "reference_calibration_design": {
+    "total_alpha_budget": 0.04,
+    "total_dkw_delta_budget": 0.01,
+    "context_count_for_fixture": 2,
+    "alpha_per_context_for_fixture": 0.02,
+    "delta_per_context_for_fixture": 0.005,
+    "dkw_epsilon_formula": "sqrt(ln(2/delta_context)/(2*n_context))",
+    "dkw_epsilon_at_n_600": 0.07066036458008114,
+    "required_independent_reference_units_per_context": {
+      "epsilon_le_0_05": 1199,
+      "epsilon_le_0_025": 4794,
+      "epsilon_le_0_01": 29958,
+      "epsilon_le_0_005": 119830
+    },
+    "unit_definition": "one independently justified calibration score per context; repeated windows from one execution do not automatically qualify as separate units",
+    "iid_reference_assumption_required": true,
+    "windows_do_not_establish_reference_independence": true
+  }
+}

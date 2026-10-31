@@ -1,0 +1,73 @@
+name: HARDSEC-019 DKW corrected context CCTM
+
+on:
+  pull_request:
+    paths:
+      - "examples/hardsec_context_cctm_monitor.rs"
+      - "docs/research/HARDSEC_019_CONTEXT_SEQUENTIAL_MONITOR.md"
+      - "schemas/hardsec-context-cctm-*.schema.json"
+      - "tests/fixtures/hardsec/context-cctm-v1/**"
+      - "tools/hardsec-adaptive-evasion-audit-harness/**"
+      - ".github/workflows/hardsec-context-cctm-monitor.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-context-cctm-monitor-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  context-cctm-monitor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact pull request revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_context_cctm_monitor.rs
+      - name: Run focused CCTM unit suite
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-cctm-monitor --example hardsec_context_cctm_monitor
+      - name: Audit synthetic DKW-corrected CCTM fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          out_dir="$(mktemp -d)"
+          cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-cctm-monitor --example hardsec_context_cctm_monitor -- \
+            --plan tests/fixtures/hardsec/context-cctm-v1/plan.json \
+            --stream tests/fixtures/hardsec/context-cctm-v1/stream.json \
+            --receipt "$out_dir/cctm-receipt.json"
+          python3 - "$out_dir/cctm-receipt.json" <<'PY'
+          import json, sys, math
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          assert receipt["result"] == "alarm_threshold_crossed", receipt
+          monitor = receipt["sequential_monitor"]
+          assert monitor["overall_first_alarm_sequence_index"] == 16
+          assert monitor["overall_first_alarm_context_id"] == "compute"
+          assert monitor["valid_observation_count"] == 16
+          assert len(monitor["window_decisions"]) == 19
+          assert monitor["abstention_count"] == 3
+          assert monitor["post_alarm_reset_count"] == 0
+          assert len(receipt["reference_policy"]["contexts"]) == 2
+          for ctx in receipt["reference_policy"]["contexts"]:
+              assert ctx["reference_score_count"] == 600
+              assert abs(ctx["alpha_allocation"] - 0.02) < 1e-12
+              assert abs(ctx["delta_allocation"] - 0.005) < 1e-12
+          guarantee = receipt["statistical_guarantees"]
+          assert guarantee["null_stream_iid_assumption_status"] == "assumption_not_verified"
+          assert guarantee["reference_sample_iid_assumption_status"] == "assumption_not_verified"
+          assert guarantee["context_assignment_exogeneity_status"] == "assumption_not_verified"
+          assert guarantee["theorem_guarantee_status"] == "not_established_from_input_receipts"
+          assert abs(guarantee["unconditional_type_i_upper_bound_if_all_paper_assumptions_hold"] - 0.05) < 1e-12
+          assert guarantee["effective_sample_size_estimate"] is None
+          assert receipt["theoretical_contract"]["null_hypothesis"].find("i.i.d.") >= 0
+          assert any(row["abstention_reason"] == "unseen_workload_context" for row in monitor["window_decisions"])
+          PY
