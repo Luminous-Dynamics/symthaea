@@ -45,7 +45,7 @@ impl Scenario {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Policy {
     DirectPolicy,
-    ComputeMatchedDirectSearch,
+    DirectSearchControl,
     RandomPointSearch,
     AdaptivePointCem,
     PessimisticEnsembleCem,
@@ -57,7 +57,7 @@ enum Policy {
 impl Policy {
     const ALL: [Self; 8] = [
         Self::DirectPolicy,
-        Self::ComputeMatchedDirectSearch,
+        Self::DirectSearchControl,
         Self::RandomPointSearch,
         Self::AdaptivePointCem,
         Self::PessimisticEnsembleCem,
@@ -69,7 +69,7 @@ impl Policy {
     fn name(self) -> &'static str {
         match self {
             Self::DirectPolicy => "direct_policy",
-            Self::ComputeMatchedDirectSearch => "compute_matched_direct_search",
+            Self::DirectSearchControl => "direct_search_control",
             Self::RandomPointSearch => "random_point_search",
             Self::AdaptivePointCem => "adaptive_point_cem",
             Self::PessimisticEnsembleCem => "pessimistic_ensemble_cem",
@@ -100,7 +100,7 @@ impl Policy {
             Self::RandomPointSearch
             | Self::AdaptivePointCem
             | Self::ShuffledFutureNegativeControl => 1,
-            Self::DirectPolicy | Self::ComputeMatchedDirectSearch | Self::OracleCem => 0,
+            Self::DirectPolicy | Self::DirectSearchControl | Self::OracleCem => 0,
         }
     }
 }
@@ -397,8 +397,9 @@ fn evaluate_candidate(
     start_step: usize,
     block_len: usize,
 ) -> CandidateScore {
-    if policy == Policy::ComputeMatchedDirectSearch {
+    if policy == Policy::DirectSearchControl {
         return CandidateScore {
+            // Candidate-count matched control only: not hardware/FLOP/latency matched to model rollout.
             ranking_score: direct_sequence_score(state, actions),
             predicted_prefix_return: None,
             model_transition_evaluations: 0,
@@ -707,7 +708,7 @@ fn append_row(
     policy: Policy,
     episode_results: &[EpisodeMetrics],
     direct_returns: &[f64],
-    matched_returns: &[f64],
+    direct_search_control_returns: &[f64],
     shuffled_returns: &[f64],
     oracle_returns: &[f64],
 ) {
@@ -717,9 +718,9 @@ fn append_row(
         .zip(direct_returns)
         .map(|(value, direct)| value - direct)
         .collect();
-    let paired_matched: Vec<f64> = returns
+    let paired_search_control: Vec<f64> = returns
         .iter()
-        .zip(matched_returns)
+        .zip(direct_search_control_returns)
         .map(|(value, matched)| value - matched)
         .collect();
     let paired_shuffled: Vec<f64> = returns
@@ -741,7 +742,7 @@ fn append_row(
         sorted_returns[..lower_tail_count].iter().sum::<f64>() / lower_tail_count as f64;
     let worst_episode_return = sorted_returns[0];
     let (direct_delta, direct_low, direct_high) = mean_and_ci(&paired_direct);
-    let (matched_delta, matched_low, matched_high) = mean_and_ci(&paired_matched);
+    let (search_control_delta, search_control_low, search_control_high) = mean_and_ci(&paired_search_control);
     let (shuffled_delta, shuffled_low, shuffled_high) = mean_and_ci(&paired_shuffled);
     let (oracle_gap, oracle_low, oracle_high) = mean_and_ci(&paired_oracle_gap);
 
@@ -817,7 +818,7 @@ fn append_row(
     .expect("writing to String cannot fail");
     write!(
         output,
-        "\"paired_return_delta_vs_compute_matched_direct\":{matched_delta:.9},\"paired_delta_vs_compute_matched_ci95_lower\":{matched_low:.9},\"paired_delta_vs_compute_matched_ci95_upper\":{matched_high:.9},"
+        "\"paired_return_delta_vs_direct_search_control\":{search_control_delta:.9},\"paired_delta_vs_direct_search_control_ci95_lower\":{search_control_low:.9},\"paired_delta_vs_direct_search_control_ci95_upper\":{search_control_high:.9},"
     )
     .expect("writing to String cannot fail");
     write!(
@@ -852,7 +853,7 @@ fn render_report() -> String {
     )
     .expect("writing to String cannot fail");
     output.push_str(
-        "\"evaluator_uniform_grid_probe_count\":201,\"scenarios\":[\"benign\",\"state_action_pocket\",\"compounding_drift\",\"termination_seam\",\"regime_migration\"],\"policies\":[\"direct_policy\",\"compute_matched_direct_search\",\"random_point_search\",\"adaptive_point_cem\",\"pessimistic_ensemble_cem\",\"uncertainty_lcb_cem\",\"shuffled_future_negative_control\",\"oracle_cem\"],\"horizons\":[1,4,8],\"candidate_budgets\":[8,32,64],\"execution_blocks\":[1,4],",
+        "\"evaluator_uniform_grid_probe_count\":201,\"scenarios\":[\"benign\",\"state_action_pocket\",\"compounding_drift\",\"termination_seam\",\"regime_migration\"],\"policies\":[\"direct_policy\",\"direct_search_control\",\"random_point_search\",\"adaptive_point_cem\",\"pessimistic_ensemble_cem\",\"uncertainty_lcb_cem\",\"shuffled_future_negative_control\",\"oracle_cem\"],\"horizons\":[1,4,8],\"candidate_budgets\":[8,32,64],\"execution_blocks\":[1,4],",
     );
     write!(
         &mut output,
@@ -891,7 +892,7 @@ fn render_report() -> String {
                         .iter()
                         .map(|row| row.total_return)
                         .collect();
-                    let matched_returns: Vec<f64> = all_results[1]
+                    let direct_search_control_returns: Vec<f64> = all_results[1]
                         .iter()
                         .map(|row| row.total_return)
                         .collect();
@@ -918,7 +919,7 @@ fn render_report() -> String {
                             *policy,
                             &all_results[index],
                             &direct_returns,
-                            &matched_returns,
+                            &direct_search_control_returns,
                             &shuffled_returns,
                             &oracle_returns,
                         );
@@ -1069,10 +1070,10 @@ mod tests {
     }
 
     #[test]
-    fn matched_direct_search_uses_candidate_budget_without_world_model_calls() {
+    fn direct_search_control_uses_candidate_budget_without_world_model_calls() {
         let plan = plan_actions(
             Scenario::Benign,
-            Policy::ComputeMatchedDirectSearch,
+            Policy::DirectSearchControl,
             State { x: -0.2, v: 0.0 },
             0,
             4,
