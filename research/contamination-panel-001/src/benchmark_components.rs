@@ -616,6 +616,13 @@ pub fn audit_benchmark_components(
         if !finding_ids.insert(finding.finding_id.as_str()) {
             return Err("review finding IDs must be unique".to_owned());
         }
+        let affected_requirement_ids: BTreeSet<&str> =
+            finding.affected_requirement_ids.iter().map(String::as_str).collect();
+        if affected_requirement_ids.len() != finding.affected_requirement_ids.len()
+            || affected_requirement_ids.iter().any(|id| id.trim().is_empty())
+        {
+            return Err(format!("review finding {} has duplicate or empty requirement references", finding.finding_id));
+        }
         if finding.affected_requirement_ids.iter().any(|id| !requirement_by_id.contains_key(id.as_str())) {
             no_unknown_requirement_refs = false;
             unknown_requirement_reference_count += 1;
@@ -1200,6 +1207,16 @@ mod tests {
         assert!(!report.no_unknown_requirement_references);
         assert_eq!(report.orphan_evaluator_check_count, 1);
         assert_eq!(report.unknown_requirement_reference_count, 1);
+    }
+
+    #[test]
+    fn duplicate_declared_check_ids_fail_component_binding() {
+        let mut manifest = manifest();
+        manifest.evaluation.check_ids = vec!["CHECK-001".to_owned(), "CHECK-001".to_owned()];
+        manifest.manifest_sha256 = benchmark_component_manifest_digest(&manifest).unwrap();
+        let report = audit_benchmark_components(&manifest).unwrap();
+        assert!(!report.evaluation_check_bindings_valid);
+        assert!(!report.valid);
     }
 
     #[test]
