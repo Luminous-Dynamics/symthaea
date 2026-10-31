@@ -38,6 +38,9 @@ pub enum RightsDisposition {
     ReportedPermissiveNeedsPinnedRelease,
     /// License/reuse information is not sufficiently verified.
     LicenseUnverified,
+    /// Item-level rights and permitted use have been independently approved
+    /// for the exact declared scope and jurisdiction.
+    ApprovedForDeclaredUse,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -63,7 +66,7 @@ pub enum CorpusEvidenceStage {
     IngestApproved,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct CorpusScopeCounts {
     pub items: Option<u64>,
     pub performances: Option<u64>,
@@ -72,7 +75,7 @@ pub struct CorpusScopeCounts {
     pub audio_hours: Option<f64>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct MusicCorpusRecord {
     pub id: &'static str,
     pub title: &'static str,
@@ -318,7 +321,7 @@ pub const MUSIC_CORPORA: &[MusicCorpusRecord] = &[
     },
 ];
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicCorpusRegistry {
     pub schema: String,
     pub candidate_count: usize,
@@ -334,7 +337,10 @@ pub fn build_music_corpus_registry() -> MusicCorpusRegistry {
         candidate_count: records.len(),
         current_ingest_approved_count: records
             .iter()
-            .filter(|record| record.evidence_stage == CorpusEvidenceStage::IngestApproved)
+            .filter(|record| {
+                record.evidence_stage == CorpusEvidenceStage::IngestApproved
+                    && record.rights_disposition == RightsDisposition::ApprovedForDeclaredUse
+            })
             .count(),
         records,
         registry_sha256: String::new(),
@@ -363,9 +369,10 @@ impl MusicCorpusRegistry {
     /// stage; candidate records remain blocked regardless of their published
     /// licence summary.
     pub fn approved_for_ingest(&self) -> impl Iterator<Item = &MusicCorpusRecord> {
-        self.records
-            .iter()
-            .filter(|record| record.evidence_stage == CorpusEvidenceStage::IngestApproved)
+        self.records.iter().filter(|record| {
+            record.evidence_stage == CorpusEvidenceStage::IngestApproved
+                && record.rights_disposition == RightsDisposition::ApprovedForDeclaredUse
+        })
     }
 }
 
@@ -391,8 +398,9 @@ mod tests {
         assert_eq!(registry.approved_for_ingest().count(), 0);
         assert!(registry.records.iter().all(|record| {
             record.evidence_stage == CorpusEvidenceStage::CandidateDiscovered
-                && record.training_disposition != TrainingDisposition::AssetUseAfterPinnedSourceVerification
-                    || record.id == "vcsl"
+        }));
+        assert!(registry.records.iter().all(|record| {
+            record.rights_disposition != RightsDisposition::ApprovedForDeclaredUse
         }));
     }
 
