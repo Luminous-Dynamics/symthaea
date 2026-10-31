@@ -228,8 +228,8 @@ pub fn compare_pareto_baselines(
                     let analysis = analyze_smsemoa_report(report, config)
                         .map_err(map_smsemoa_error)?;
                     // The config is the frozen source of objective anchors and reference point.
-                    if config.objective_specs != objective_specs
-                        || config.reference_point_utility != reference_point_utility
+                    if config.objective_specs.as_slice() != objective_specs
+                        || config.reference_point_utility.as_slice() != reference_point_utility
                     {
                         return Err(BaselineComparisonError::new(
                             format!("runs[{index}].config"),
