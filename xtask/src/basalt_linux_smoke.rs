@@ -15,7 +15,7 @@ use serde::Serialize;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 #[cfg(target_os = "linux")]
-use std::os::unix::fs::MetadataExt;
+use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -500,9 +500,11 @@ fn write_new(path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
         fs::create_dir_all(parent)
             .with_context(|| format!("creating smoke report directory {}", parent.display()))?;
     }
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(target_os = "linux")]
+    options.mode(0o600);
+    let mut file = options
         .open(path)
         .with_context(|| format!("creating new smoke report {}", path.display()))?;
     file.write_all(bytes)?;
@@ -722,6 +724,20 @@ mod tests {
         assert!(!report.side_effects.landlock_rulesets_created_or_enforced);
     }
 
+    #[test]
+    fn report_file_is_private_and_never_overwritten() {
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let path = std::env::temp_dir().join(format!("basalt-smoke-test-{}-{nonce}.json", std::process::id()));
+        write_new(&path, br#"{"first":true}"#).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), br#"{"first":true}"#);
+        assert!(write_new(&path, br#"{"second":true}"#).is_err());
+        #[cfg(target_os = "linux")]
+        {
+            let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o600);
+        }
+        std::fs::remove_file(path).unwrap();
+    }
     #[test]
     fn kernel_machine_architecture_is_reported_separately_from_build_architecture() {
         let machine = kernel_machine_architecture().expect("uname must report kernel machine architecture on Linux");
