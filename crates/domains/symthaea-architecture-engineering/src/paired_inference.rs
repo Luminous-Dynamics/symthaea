@@ -14,6 +14,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use super::event_tape::EventTape;
+use super::matched_campaign::{
+    qualify_mechanism_matched_campaign, MatchedCampaignError, MatchedCampaignQualification,
+};
+use super::offer_set::OfferSetManifest;
 
 const SCHEMA: &str = "symthaea.architecture-engineering.paired-inference";
 const VERSION: &str = "0.1.0";
@@ -49,6 +53,16 @@ pub enum MetricDirection {
     LowerIsBetter,
 }
 
+
+/// Statistical use of a paired result. Pilot analysis is exploratory; confirmatory analysis
+/// enforces a larger independent-landscape floor and remains subject to external replication.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AnalysisTier {
+    Pilot,
+    Confirmatory,
+}
+
 /// Frozen primary endpoint and inferential design.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PairedInferencePlan {
@@ -57,6 +71,7 @@ pub struct PairedInferencePlan {
     pub campaign_id: String,
     /// Digest of the sorted, frozen EventTape set used to derive the observations.
     pub campaign_event_tape_set_sha256: String,
+    pub analysis_tier: AnalysisTier,
     pub baseline_policy_id: String,
     pub challenger_policy_id: String,
     pub metric_id: String,
@@ -496,6 +511,49 @@ pub fn analyze_paired_metric(
     })
 }
 
+
+/// Output of a paired analysis that first passed the common-contract/offer-set/resource gate.
+#[derive(Debug, Clone, PartialEq)]
+pub struct QualifiedPairedInference {
+    pub execution_qualification: MatchedCampaignQualification,
+    pub inference: PairedInferenceSummary,
+}
+
+/// End-to-end entry point for a paired policy result:
+/// 1. reconcile common event-tape contracts;
+/// 2. verify identical offered choices and action eligibility;
+/// 3. require complete schedules, known meters and equal realized normalized spend;
+/// 4. bind the analysis plan to the exact sorted policy tape set;
+/// 5. run preregistered landscape-clustered paired inference.
+///
+/// This is stronger than calling the analysis on metrics alone, but it still does not establish
+/// evaluator independence, scientific novelty or held-out transfer.
+pub fn analyze_qualified_paired_metric(
+    plan: &PairedInferencePlan,
+    observations: &[PairedMetricObservation],
+    tapes: &[EventTape],
+    manifests: &[OfferSetManifest],
+) -> Result<QualifiedPairedInference, PairedInferenceError> {
+    let execution_qualification =
+        qualify_mechanism_matched_campaign(tapes, manifests).map_err(|error: MatchedCampaignError| {
+            PairedInferenceError::new("execution_qualification", error.to_string())
+        })?;
+    if !execution_qualification.matched_execution_qualified {
+        return Err(PairedInferenceError::new(
+            "execution_qualification",
+            format!(
+                "matched execution is not qualified: {}",
+                execution_qualification.qualification_blockers.join("; ")
+            ),
+        ));
+    }
+    let inference = analyze_paired_metric_bound_to_tapes(plan, observations, tapes)?;
+    Ok(QualifiedPairedInference {
+        execution_qualification,
+        inference,
+    })
+}
+
 fn validate_plan(plan: &PairedInferencePlan) -> Result<(), PairedInferenceError> {
     if plan.schema != SCHEMA || plan.version != VERSION {
         return Err(PairedInferenceError::new(
@@ -558,10 +616,19 @@ fn validate_plan(plan: &PairedInferencePlan) -> Result<(), PairedInferenceError>
             "must be between 1 and 20 to bound exact sign-flip enumeration",
         ));
     }
-    if plan.minimum_landscape_clusters < 2 || plan.minimum_paired_seeds_per_landscape == 0 {
+    let minimum_clusters = match plan.analysis_tier {
+        AnalysisTier::Pilot => 6,
+        AnalysisTier::Confirmatory => 100,
+    };
+    if plan.minimum_landscape_clusters < minimum_clusters
+        || plan.minimum_paired_seeds_per_landscape < 4
+    {
         return Err(PairedInferenceError::new(
             "plan.minimum_sample",
-            "require at least two landscapes and one paired seed per landscape",
+            format!(
+                "{:?} analysis requires at least {minimum_clusters} independent landscape clusters and at least four paired seeds per landscape",
+                plan.analysis_tier
+            ),
         ));
     }
     Ok(())
@@ -757,6 +824,7 @@ mod tests {
             version: VERSION.to_owned(),
             campaign_id: "ar5b4-paired-test".to_owned(),
             campaign_event_tape_set_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned(),
+            analysis_tier: AnalysisTier::Pilot,
             baseline_policy_id: "baseline".to_owned(),
             challenger_policy_id: "challenger".to_owned(),
             metric_id: "verified_improvement_rate".to_owned(),
@@ -1036,6 +1104,27 @@ mod tests {
         let rows = observations(MetricDirection::HigherIsBetter, 12, 8, 0.05);
         let summary = analyze_paired_metric_bound_to_tapes(&plan, &rows, &[right, left]).unwrap();
         assert_eq!(summary.decision, InferenceDecision::EvidenceOfSuperiority);
+    }
+
+
+    #[test]
+    fn confirmatory_tier_cannot_lower_the_independent_landscape_floor() {
+        let mut plan = plan(MetricDirection::HigherIsBetter);
+        plan.analysis_tier = AnalysisTier::Confirmatory;
+        plan.minimum_landscape_clusters = 99;
+        assert!(validate_plan(&plan).is_err());
+        plan.minimum_landscape_clusters = 100;
+        assert!(validate_plan(&plan).is_ok());
+    }
+
+    #[test]
+    fn pilot_tier_has_explicit_minimum_landscape_and_seed_floors() {
+        let mut plan = plan(MetricDirection::HigherIsBetter);
+        plan.minimum_landscape_clusters = 5;
+        assert!(validate_plan(&plan).is_err());
+        plan.minimum_landscape_clusters = 6;
+        plan.minimum_paired_seeds_per_landscape = 3;
+        assert!(validate_plan(&plan).is_err());
     }
 
 
