@@ -127,3 +127,58 @@ This tool validates deterministic generation, packet/key separation, artifact co
 - that any detector is complete across all contamination mechanisms.
 
 A clean detector report remains evidence about the detector and evidence supplied—not evidence of universal absence.
+
+
+## Built-in detector baselines
+
+The first built-in baselines are deliberately simple and independently reproducible:
+
+- exact_text_equality: byte-for-byte equality of the two task strings;
+- normalized_text_equality: ASCII case-folding plus punctuation/whitespace normalization. It is explicitly **not** full Unicode normalization;
+- token_ngram_jaccard: Jaccard similarity over normalized token n-grams (n from 2 through 8).
+
+These establish lower bounds and fixture sanity checks. They are not the final competitive panel. MinHash/SimHash, language-appropriate structural/AST matching, embeddings, cross-encoders, LLM-assisted detectors, and FTD (ACL 2026) remain separate comparators to implement and reproduce. FTD requires a compatible model-access regime (likelihood/log-probability scores); its paper's FDR results must not be assumed to transfer.
+
+Create a detector specification such as:
+
+~~~json
+{
+  "schema": "symthaea.contamination_panel_detector_spec.v1",
+  "detector_id": "exact-text-v1",
+  "detector_version": "1.0.0",
+  "kind": "exact_text_equality",
+  "threshold_permille": 1000,
+  "token_ngram_size": 0
+}
+~~~
+
+For an n-gram detector, use kind "token_ngram_jaccard" and token_ngram_size between 2 and 8. The risk_permille output is a ranking/similarity score from 0 to 1000. It is **not** a probability and must not be used for Brier score, calibration or PPV without a separate calibration procedure.
+
+Run the detector against the public packet only:
+
+~~~sh
+cargo run --locked -- score \
+  /reviewer-release/public-packet.json \
+  /detector-workspace/exact-text-spec.json \
+  /detector-workspace/exact-text-run.json
+~~~
+
+Only after the score file is frozen should the evaluator join it to the sealed key and manifest:
+
+~~~sh
+cargo run --locked -- evaluate \
+  /reviewer-release/public-packet.json \
+  /secure/evaluator/sealed-key.json \
+  /secure/evaluator/manifest.json \
+  /detector-workspace/exact-text-run.json \
+  /secure/evaluator/exact-text-report.json
+~~~
+
+The evaluator verifies the public packet digest, sealed-key digest, seed commitment, generator/version and expected pair count against the challenge manifest. Publish a redacted report and retain the sealed key in evaluator-only storage.
+
+The report distinguishes precision, recall, specificity, false-positive rate and false-discovery rate for each tier. Empty class denominators produce null/not-estimable metrics, not zero. Current reports are descriptive counts for synthetic planted controls; cluster-aware confidence intervals, prevalence-adjusted PPV, threshold curves and temporal transfer are not yet implemented by this crate.
+
+## Detector development boundary
+
+Detector execution must never receive the sealed key. A detector adapter should consume the public packet and emit one score per opaque pair ID, bound to the exact packet digest. Evaluator-only code checks coverage and joins scores to the sealed key. For a model/API detector, additionally bind its exact model/provider version, prompt, runtime, model-access mode, token/call budget and any retrieval/network exposure through the separate score-validity disclosure workstream (#9493).
+
