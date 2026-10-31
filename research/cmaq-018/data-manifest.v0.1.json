@@ -1,0 +1,14 @@
+{
+  "schema_version": "cmaq-018-data-manifest-v0.1",
+  "dataset_id": "cmaq018-synthetic-v01",
+  "split": "development",
+  "episodes_per_scenario": 64,
+  "scenario_count": 7,
+  "total_scenario_episode_cases": 448,
+  "action_count": 7,
+  "pair_count_per_episode": 21,
+  "candidate_truth_access": false,
+  "visibility": "mixed_with_explicit_partition",
+  "license": "internal synthetic",
+  "seed_schedule_commitment_sha256": "5bc559963289ce80429bea306a0187ba271c40a38b1e15bb18f15f585e8a587d"
+}
