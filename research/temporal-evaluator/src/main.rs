@@ -1,3 +1,5 @@
+pub mod sensing;
+
 //! Evaluator-side counterfactual retention primitives.
 //!
 //! This is intentionally a separate package from the candidate benchmark
