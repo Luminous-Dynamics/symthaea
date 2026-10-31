@@ -14,6 +14,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use super::campaign_tape::{
+    ArmClaim, CampaignEvent, CampaignEventPayload, CampaignTape, CampaignTapeConfig,
+    CandidateDisposition, DirectionProposalDisposition, ResourceBudget, ResourceUsage,
+};
 use super::direction_board::{
     AllocationArm, AttemptDisposition, DirectionAttempt, DirectionBoard, DirectionBoardConfig,
     DirectionDescriptor, NewDirectionDisposition, NewDirectionProposal,
@@ -117,6 +121,247 @@ pub struct DirectionCampaignRun {
     pub inconclusive_new_proposals: usize,
     pub final_board_sha256: String,
     pub actions: Vec<DirectionCampaignAction>,
+    /// Content digest of the deterministically reconstructed action tape.
+    pub action_tape_sha256: String,
+}
+
+impl DirectionCampaignRun {
+    /// Reconstruct the exact policy-visible event tape from this synthetic run receipt.
+    ///
+    /// The first three common bootstrap evaluations are one logical batch; subsequent
+    /// policy decisions are sequential rounds. Runtime resources remain unknown because
+    /// this synthetic fixture does not measure wall/CPU/GPU/energy/token usage.
+    pub fn to_campaign_tape(&self) -> Result<CampaignTape, String> {
+        if self.actions.len() != self.action_count
+            || self.action_count != self.action_budget
+            || self.target_score != self.policy_config.target_score
+            || self.policy_config.action_cost_units == 0
+            || self.policy_config.oracle_uses_hidden_payoff_schedule
+                != (self.policy == DirectionCampaignPolicy::OracleUpperBound)
+        {
+            return Err("campaign run summary does not reconcile with action/config fields".to_owned());
+        }
+        if self.actions.len() < 4 {
+            return Err("campaign run is shorter than the shared bootstrap plus one action".to_owned());
+        }
+        for (index, expected_direction) in ["A", "B", "C"].iter().enumerate() {
+            let action = &self.actions[index];
+            if action.slot != index + 1
+                || action.is_new_proposal
+                || action.arm_id != *expected_direction
+                || action.observed_score.is_none()
+                || action.proposal_disposition.is_some()
+            {
+                return Err("first three campaign actions must be the common A/B/C bootstrap".to_owned());
+            }
+        }
+        let summed_cost = self.actions.iter().try_fold(0_u64, |sum, action| {
+            if action.cost_units != self.policy_config.action_cost_units {
+                return Err("action cost differs from frozen policy configuration".to_owned());
+            }
+            sum.checked_add(action.cost_units)
+                .ok_or_else(|| "campaign action cost sum overflow".to_owned())
+        })?;
+        if summed_cost != self.total_cost_units
+            || summed_cost != u64::try_from(self.action_budget)
+                .map_err(|_| "action budget does not fit u64".to_owned())?
+        {
+            return Err("campaign action costs do not reconcile with the declared budget".to_owned());
+        }
+
+        let policy_id = direction_policy_id(self.policy);
+        let task_recipe_sha256 = digest(&format!(
+            "synthetic-direction-task:v0.1:{:?}",
+            self.landscape
+        ));
+        let evaluator_sha256 = digest("synthetic-direction-evaluator:v0.1");
+        let candidate_stream_sha256 = digest(&format!(
+            "synthetic-payoff-stream:v0.1:{:?}:{}",
+            self.landscape, self.seed
+        ));
+        let budget = u64::try_from(self.action_budget)
+            .map_err(|_| "action budget does not fit u64".to_owned())?;
+        let config = CampaignTapeConfig {
+            task_recipe_sha256,
+            evaluator_sha256,
+            comparison_profile_sha256: PROFILE_SHA256.to_owned(),
+            candidate_stream_sha256,
+            // Three logical bootstrap slots are committed as one batch. Policy-selected
+            // actions then use one slot per sequential round; this is not a throughput claim.
+            worker_count: 3,
+            first_round_direction_claim_cap: 1,
+            steady_state_direction_claim_cap: 2,
+            new_direction_claim_cap: 1,
+            initial_direction_ids: vec!["A".to_owned(), "B".to_owned(), "C".to_owned()],
+            resource_budget: ResourceBudget {
+                max_action_units: budget,
+                max_wall_millis: None,
+                max_cpu_millis: None,
+                max_gpu_millis: None,
+                max_host_memory_peak_mib: None,
+                max_gpu_memory_peak_mib: None,
+                max_energy_mwh: None,
+                max_input_tokens: None,
+                max_output_tokens: None,
+                max_tool_calls: None,
+                max_evaluator_calls: None,
+                max_verifier_calls: None,
+            },
+        };
+        let tape_id = format!(
+            "direction-campaign-{}-{:?}-{}",
+            policy_id,
+            self.landscape,
+            self.seed
+        ).to_lowercase();
+        let mut tape = CampaignTape::new(
+            tape_id,
+            policy_id,
+            self.policy_config_sha256.clone(),
+            config,
+        ).map_err(|error| error.to_string())?;
+
+        let mut direction_eval_counts: BTreeMap<String, usize> = BTreeMap::new();
+        let mut proposal_count = 0usize;
+        for (index, action) in self.actions.iter().enumerate() {
+            let expected_slot = index + 1;
+            if action.slot != expected_slot || action.cost_units == 0 {
+                return Err("action slots must be contiguous and action costs positive".to_owned());
+            }
+            let (round_id, worker_id, visible_through) = if action.slot <= 3 {
+                (1_u64, format!("bootstrap-{}", action.slot), 0_u64)
+            } else {
+                (
+                    (action.slot - 2) as u64,
+                    "policy-worker-1".to_owned(),
+                    (action.slot - 1) as u64,
+                )
+            };
+            let (claimed_arm, payload) = if action.is_new_proposal {
+                if action.arm_id != "NEW" || action.observed_score.is_some() {
+                    return Err("NEW proposal action must claim NEW and cannot carry a score".to_owned());
+                }
+                let disposition = action.proposal_disposition.ok_or_else(|| {
+                    "NEW proposal action is missing its verifier disposition".to_owned()
+                })?;
+                let mapped = match disposition {
+                    NewDirectionDisposition::Admitted => DirectionProposalDisposition::Admitted {
+                        canonical_direction_id: "D".to_owned(),
+                    },
+                    NewDirectionDisposition::Duplicate => DirectionProposalDisposition::Duplicate {
+                        existing_direction_id: "D".to_owned(),
+                    },
+                    NewDirectionDisposition::Rejected => DirectionProposalDisposition::Rejected {
+                        reason_code: "synthetic_verifier_rejected".to_owned(),
+                    },
+                    NewDirectionDisposition::Inconclusive => DirectionProposalDisposition::Inconclusive {
+                        reason_code: "synthetic_verifier_inconclusive".to_owned(),
+                    },
+                };
+                let proposal_index = proposal_count;
+                proposal_count += 1;
+                let alias = proposal_index > 0;
+                let descriptor_kind = if alias { "canonicalized-alias" } else { "first-candidate" };
+                (
+                    ArmClaim::NewDirection,
+                    CampaignEventPayload::DirectionProposal {
+                        proposal_sha256: digest(&format!(
+                            "proposal:{:?}:{}:{}",
+                            self.landscape, self.seed, proposal_index
+                        )),
+                        descriptor_sha256: digest(&format!(
+                            "new-direction-descriptor:{descriptor_kind}"
+                        )),
+                        parent_candidate_sha256: Some(digest(&format!(
+                            "proposal-parent:{:?}:{}:{}",
+                            self.landscape, self.seed, proposal_index
+                        ))),
+                        disposition: mapped,
+                    },
+                )
+            } else {
+                if action.arm_id == "NEW"
+                    || action.proposal_disposition.is_some()
+                    || action.observed_score.is_none_or(|score| !score.is_finite())
+                {
+                    return Err("candidate evaluation must name a direction and finite verified score".to_owned());
+                }
+                let eval_index = {
+                    let count = direction_eval_counts.entry(action.arm_id.clone()).or_default();
+                    let current = *count;
+                    *count += 1;
+                    current
+                };
+                let candidate_sha256 = digest(&format!(
+                    "candidate:{:?}:{}:{}:{}",
+                    self.landscape, self.seed, action.arm_id, eval_index
+                ));
+                let parent_candidate_sha256 = digest(&format!(
+                    "candidate-parent:{:?}:{}:{}:{}",
+                    self.landscape, self.seed, action.arm_id, eval_index.saturating_sub(1)
+                ));
+                (
+                    ArmClaim::Direction {
+                        direction_id: action.arm_id.clone(),
+                    },
+                    CampaignEventPayload::CandidateEvaluation {
+                        candidate_sha256,
+                        parent_candidate_sha256,
+                        semantic_delta_sha256: digest(&format!(
+                            "semantic-delta:{:?}:{}:{}:{}",
+                            self.landscape, self.seed, action.arm_id, eval_index
+                        )),
+                        direction_id: action.arm_id.clone(),
+                        disposition: CandidateDisposition::Verified,
+                        score: action.observed_score,
+                    },
+                )
+            };
+            tape.append(CampaignEvent {
+                event_id: format!("direction-event-{}-{:04}", self.seed, action.slot),
+                sequence_number: 0,
+                round_id,
+                worker_id,
+                policy_visible_through_sequence: visible_through,
+                claimed_arm,
+                task_recipe_sha256: tape.config.task_recipe_sha256.clone(),
+                evaluator_sha256: tape.config.evaluator_sha256.clone(),
+                comparison_profile_sha256: tape.config.comparison_profile_sha256.clone(),
+                payload,
+                resource_usage: ResourceUsage {
+                    action_units: action.cost_units,
+                    wall_millis: None,
+                    cpu_millis: None,
+                    gpu_millis: None,
+                    host_memory_peak_mib: None,
+                    gpu_memory_peak_mib: None,
+                    energy_mwh: None,
+                    input_tokens: None,
+                    output_tokens: None,
+                    tool_calls: None,
+                    evaluator_calls: None,
+                    verifier_calls: None,
+                },
+                previous_event_sha256: String::new(),
+                event_sha256: String::new(),
+            }).map_err(|error| error.to_string())?;
+        }
+        tape.seal().map_err(|error| error.to_string())?;
+        Ok(tape)
+    }
+}
+
+fn direction_policy_id(policy: DirectionCampaignPolicy) -> String {
+    match policy {
+        DirectionCampaignPolicy::ScoreOnlyWinnerTakesAll => "score_only",
+        DirectionCampaignPolicy::FixedRoundRobin => "round_robin",
+        DirectionCampaignPolicy::Random => "random",
+        DirectionCampaignPolicy::GlobalUcb => "global_ucb",
+        DirectionCampaignPolicy::VerifierGroundedDirectionBoard => "direction_board",
+        DirectionCampaignPolicy::DiscountedUcb => "discounted_ucb",
+        DirectionCampaignPolicy::ThompsonSampling => "thompson_sampling",
+        DirectionCampaignPolicy::OracleUpperBound => "oracle_upper_bound",
+    }.to_owned()
 }
 
 /// Aggregate across independent seeds for one fixed policy, landscape and budget.
