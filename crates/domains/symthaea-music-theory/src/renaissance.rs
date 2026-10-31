@@ -189,10 +189,13 @@ fn verify_renaissance_plan(score: &Score, plan: &RenaissancePlan) -> Renaissance
         })
         .collect();
     alto.sort_by(|left, right| left.onset.beats().total_cmp(&right.onset.beats()));
-    let alto_suspension_resolves_down_step = alto.len() >= 2
-        && alto[alto.len() - 2].pitch.midi()
+    let alto_suspension_resolves_down_step = alto.len() == 2
+        && (alto[0].onset.beats() - cadence_start).abs() <= 1e-7
+        && (alto[0].duration.beats() - 1.5 * meter).abs() <= 1e-7
+        && (alto[1].onset.beats() - (cadence_start + 1.5 * meter)).abs() <= 1e-7
+        && alto[0].pitch.midi()
             == scale.degree_pitch(plan.alto_suspension_degree as i32, 4).midi()
-        && alto[alto.len() - 1].pitch.midi()
+        && alto[1].pitch.midi()
             == scale.degree_pitch(plan.alto_resolution_degree as i32, 4).midi();
 
     let mut soprano: Vec<_> = score
@@ -211,7 +214,17 @@ fn verify_renaissance_plan(score: &Score, plan: &RenaissancePlan) -> Renaissance
         .map(|degree| scale.degree_pitch(*degree as i32, 5).midi())
         .collect();
     let actual_soprano: Vec<_> = soprano.iter().map(|note| note.pitch.midi()).collect();
-    let soprano_landini_underthird_verified = actual_soprano == expected_soprano;
+    let expected_soprano_onsets = [
+        cadence_start,
+        cadence_start + 0.5 * meter,
+        cadence_start + meter,
+    ];
+    let soprano_landini_underthird_verified = actual_soprano == expected_soprano
+        && soprano.len() == expected_soprano_onsets.len()
+        && soprano
+            .iter()
+            .zip(expected_soprano_onsets)
+            .all(|(note, expected)| (note.onset.beats() - expected).abs() <= 1e-7);
 
     let mut bass: Vec<_> = score
         .notes
@@ -224,7 +237,8 @@ fn verify_renaissance_plan(score: &Score, plan: &RenaissancePlan) -> Renaissance
         .collect();
     bass.sort_by(|left, right| left.onset.beats().total_cmp(&right.onset.beats()));
     let bass_closes_on_tonic = bass.last().is_some_and(|note| {
-        note.pitch.midi() == scale.degree_pitch(plan.bass_final_degree as i32, 3).midi()
+        (note.onset.beats() - (cadence_start + meter)).abs() <= 1e-7
+            && note.pitch.midi() == scale.degree_pitch(plan.bass_final_degree as i32, 3).midi()
     });
 
     let melody_parts: std::collections::BTreeSet<_> = score
