@@ -1,0 +1,29 @@
+name: Anytime Imperfect-Judge Certification Kernel
+
+on:
+  push:
+    paths:
+      - "research/anytime-imperfect-judge-cert/**"
+      - ".github/workflows/anytime-imperfect-judge-cert.yml"
+  pull_request:
+    paths:
+      - "research/anytime-imperfect-judge-cert/**"
+      - ".github/workflows/anytime-imperfect-judge-cert.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  std-only-statistical-kernel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Format exact crate
+        run: cargo fmt --manifest-path research/anytime-imperfect-judge-cert/Cargo.toml -- --check
+      - name: Independent Python reference checks
+        run: python3 research/anytime-imperfect-judge-cert/tools/reference_check.py
+      - name: Run deterministic known-answer and sequential-null tests
+        run: cargo test --locked --manifest-path research/anytime-imperfect-judge-cert/Cargo.toml
