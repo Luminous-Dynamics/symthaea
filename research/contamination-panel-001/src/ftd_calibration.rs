@@ -199,8 +199,7 @@ fn build_item_scores(
     for cluster_start in (0..n).step_by(cluster_size) {
         let cluster_end = (cluster_start + cluster_size).min(n);
         let share_cluster = rng.choose_permille(config.item_cluster_correlation_permille);
-        let shared_cluster_feature_values: Vec<f64> =
-            (0..k).map(|_| rng.uniform_open()).collect();
+        let shared_cluster_value = rng.uniform_open();
 
         for item_index in cluster_start..cluster_end {
             let share_features = rng.choose_permille(config.feature_correlation_permille);
@@ -208,7 +207,7 @@ fn build_item_scores(
 
             for feature_index in 0..k {
                 let raw_score = if share_cluster {
-                    shared_cluster_feature_values[feature_index]
+                    shared_cluster_value
                 } else if share_features {
                     shared_item_feature_value
                 } else {
