@@ -25,7 +25,7 @@ The existing eight prediction fields remain unchanged. The optional complete dom
 - `shift_axis`
 - `is_ood_domain`
 
-If novelty detection is included, provide `ood_score` for every row. Domain metadata and novelty scores must each be complete across the input; partial annotation fails closed.
+If novelty detection is included, provide `ood_score` for every row. Domain metadata and novelty scores must each be complete across the input; partial annotation fails closed. Every domain-tagged run must also provide `--domain-split-manifest-sha256`, recorded in the report, which identifies the frozen manifest that assigned held-out status.
 
 A cluster_id must not span two domain_id values in one run; use globally unique/domain-qualified dependency identifiers. This prevents the OOD bootstrap from treating distinct domain blocks as one cluster.
 
@@ -61,7 +61,7 @@ Each domain receives its own classification metrics, reliability bins, high-conf
 
 When every row carries `ood_score`, the run must supply `--ood-detector-id` and `--ood-detector-profile-sha256`. These identify the frozen novelty method and hash its representation, model and preprocessing. The report records both values and evaluates the score against the predeclared `is_ood_domain` flag using AUROC and tie-aware average precision. An optional `--ood-score-threshold` reports false-OOD rate on in-domain rows and held-out-domain recall at that frozen operating point.
 
-Do not choose the threshold using confirmatory/lockbox labels. Select it on a separate development/calibration partition, then freeze and digest that choice. AUROC does not establish an operating point; AUPRC depends on the declared OOD prevalence.
+Do not choose the threshold using confirmatory/lockbox labels. Select it on a separate development partition, then freeze and digest that choice. The CLI requires `--ood-threshold-selection-partition development` and rejects thresholded evaluation when `--evaluation-partition development` to prevent using the same partition for selection and claimed evaluation. Development-only runs can report AUROC/AUPRC without a threshold. AUROC does not establish an operating point; AUPRC depends on the declared OOD prevalence.
 
 ## Invocation
 
@@ -83,6 +83,8 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
 ```
 
 The placeholders above must be replaced with the exact pinned dataset and profile identities before a real run. The checked-in fixture uses synthetic IDs and is only a regression input.
+
+For a later confirmatory/lockbox report, use the same frozen split-manifest digest and detector ID/profile digest, supply `--ood-score-threshold <development-selected-value>` plus `--ood-threshold-selection-partition development`, and change `--evaluation-partition` to `confirmatory` or `lockbox`. The scorer rejects threshold application to the development partition itself. Never pass confirmatory or lockbox labels back into threshold selection.
 
 ## Split and statistical requirements
 
