@@ -91,9 +91,9 @@ struct Args {
     #[arg(long, default_value_t = false)]
     require_domain_shift_audit: bool,
 
-    /// SHA-256 of the predeclared domain/split manifest that assigns is_ood_domain.
+    /// JSON manifest that binds exact sample IDs, dependency clusters, domains and split roles.
     #[arg(long)]
-    domain_split_manifest_sha256: Option<String>,
+    domain_split_manifest: Option<PathBuf>,
 
     /// Stable identifier for the frozen novelty/OOD detector that produced ood_score.
     #[arg(long)]
@@ -148,6 +148,52 @@ struct Prediction {
     /// Frozen model novelty score, separate from p_error and review_priority_score.
     #[serde(default)]
     ood_score: Option<f64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum ManifestPartition {
+    Train,
+    Calibration,
+    Development,
+    Confirmatory,
+    Lockbox,
+}
+
+impl ManifestPartition {
+    fn matches_evaluation(self, partition: EvaluationPartition) -> bool {
+        matches!(
+            (self, partition),
+            (Self::Development, EvaluationPartition::Development)
+                | (Self::Confirmatory, EvaluationPartition::Confirmatory)
+                | (Self::Lockbox, EvaluationPartition::Lockbox)
+        )
+    }
+
+    fn is_training_or_calibration(self) -> bool {
+        matches!(self, Self::Train | Self::Calibration)
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct DomainSplitManifest {
+    schema_version: u32,
+    manifest_id: String,
+    dataset_revision_commit_sha: String,
+    shift_axis: String,
+    seen_domain_ids: Vec<String>,
+    held_out_domain_ids: Vec<String>,
+    entries: Vec<DomainSplitEntry>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct DomainSplitEntry {
+    sample_id: String,
+    cluster_id: String,
+    domain_id: String,
+    partition: ManifestPartition,
 }
 
 #[derive(Debug, Serialize)]
@@ -1733,20 +1779,141 @@ fn domain_shift_evaluation(
 
 fn validate_domain_split_provenance(
     records: &[Prediction],
-    split_manifest_sha256: Option<&str>,
-) -> Result<(), String> {
+    manifest_bytes: Option<&[u8]>,
+    dataset_revision_commit_sha: &str,
+    evaluation_partition: EvaluationPartition,
+) -> Result<Option<String>, String> {
     let tagged = records.iter().any(|row| row.domain_id.is_some());
-    match (tagged, split_manifest_sha256) {
-        (true, Some(digest)) => {
-            if !is_lower_hex(digest, 64) {
-                return Err("--domain-split-manifest-sha256 must be a lowercase 64-character SHA-256 digest".into());
+    let manifest_bytes = match (tagged, manifest_bytes) {
+        (true, Some(bytes)) => bytes,
+        (true, None) => return Err("domain metadata requires --domain-split-manifest".into()),
+        (false, Some(_)) => return Err("--domain-split-manifest cannot be supplied without domain metadata".into()),
+        (false, None) => return Ok(None),
+    };
+
+    let manifest: DomainSplitManifest = serde_json::from_slice(manifest_bytes)
+        .map_err(|error| format!("domain split manifest is invalid JSON or has unknown fields: {error}"))?;
+    if manifest.schema_version != 1 {
+        return Err(format!("unsupported domain split manifest schema_version {}", manifest.schema_version));
+    }
+    if manifest.manifest_id.trim().is_empty() {
+        return Err("domain split manifest_id must be non-empty".into());
+    }
+    if manifest.dataset_revision_commit_sha != dataset_revision_commit_sha {
+        return Err("domain split manifest dataset_revision_commit_sha does not match --dataset-revision-commit-sha".into());
+    }
+    let allowed_axes = [
+        "species", "region", "source_volume", "source_archive",
+        "acquisition_protocol", "segmentation_lineage",
+        "modality_availability", "morphology_regime",
+    ];
+    if !allowed_axes.contains(&manifest.shift_axis.as_str()) {
+        return Err(format!("domain split manifest has unsupported shift_axis {:?}", manifest.shift_axis));
+    }
+
+    let seen = manifest.seen_domain_ids.iter().cloned().collect::<BTreeSet<_>>();
+    let held_out = manifest.held_out_domain_ids.iter().cloned().collect::<BTreeSet<_>>();
+    if seen.len() != manifest.seen_domain_ids.len()
+        || held_out.len() != manifest.held_out_domain_ids.len()
+        || seen.iter().any(|id| id.trim().is_empty())
+        || held_out.iter().any(|id| id.trim().is_empty())
+    {
+        return Err("seen_domain_ids and held_out_domain_ids must contain unique non-empty values".into());
+    }
+    if seen.is_empty() || held_out.is_empty() {
+        return Err("domain split manifest requires at least one seen and one held-out domain".into());
+    }
+    if seen.iter().any(|id| held_out.contains(id)) {
+        return Err("seen_domain_ids and held_out_domain_ids must be disjoint".into());
+    }
+
+    let mut entries = BTreeMap::<String, &DomainSplitEntry>::new();
+    let mut cluster_contracts = BTreeMap::<String, (String, ManifestPartition)>::new();
+    let mut seen_training_domains = BTreeSet::<String>::new();
+    let mut held_out_evaluation_domains = BTreeSet::<String>::new();
+    for entry in &manifest.entries {
+        if entry.sample_id.trim().is_empty()
+            || entry.cluster_id.trim().is_empty()
+            || entry.domain_id.trim().is_empty()
+        {
+            return Err("domain split manifest entries require non-empty sample_id, cluster_id and domain_id".into());
+        }
+        if entries.insert(entry.sample_id.clone(), entry).is_some() {
+            return Err(format!("domain split manifest contains duplicate sample_id {:?}", entry.sample_id));
+        }
+        let is_seen = seen.contains(&entry.domain_id);
+        let is_held_out = held_out.contains(&entry.domain_id);
+        if !is_seen && !is_held_out {
+            return Err(format!("domain {:?} is not declared in seen_domain_ids or held_out_domain_ids", entry.domain_id));
+        }
+        if let Some((previous_domain, previous_partition)) =
+            cluster_contracts.insert(entry.cluster_id.clone(), (entry.domain_id.clone(), entry.partition))
+        {
+            if previous_domain != entry.domain_id || previous_partition != entry.partition {
+                return Err(format!(
+                    "cluster_id {:?} crosses domain or split partition boundaries",
+                    entry.cluster_id
+                ));
             }
         }
-        (true, None) => return Err("domain metadata requires --domain-split-manifest-sha256".into()),
-        (false, Some(_)) => return Err("--domain-split-manifest-sha256 cannot be supplied without domain metadata".into()),
-        (false, None) => {}
+        if is_seen && entry.partition.is_training_or_calibration() {
+            seen_training_domains.insert(entry.domain_id.clone());
+        }
+        if is_held_out {
+            if entry.partition.is_training_or_calibration() {
+                return Err(format!(
+                    "held-out domain {:?} appears in train/calibration partition",
+                    entry.domain_id
+                ));
+            }
+            held_out_evaluation_domains.insert(entry.domain_id.clone());
+        }
     }
-    Ok(())
+    if manifest.entries.is_empty() {
+        return Err("domain split manifest entries must not be empty".into());
+    }
+    if seen.iter().any(|domain| !seen_training_domains.contains(domain)) {
+        return Err("every seen domain must have at least one train or calibration membership entry".into());
+    }
+    if held_out.iter().any(|domain| !held_out_evaluation_domains.contains(domain)) {
+        return Err("every held-out domain must have at least one development, confirmatory or lockbox membership entry".into());
+    }
+
+    let expected_ids = manifest.entries.iter()
+        .filter(|entry| entry.partition.matches_evaluation(evaluation_partition))
+        .map(|entry| entry.sample_id.clone())
+        .collect::<BTreeSet<_>>();
+    let observed_ids = records.iter().map(|row| row.sample_id.clone()).collect::<BTreeSet<_>>();
+    if expected_ids.is_empty() {
+        return Err("domain split manifest has no entries for the requested evaluation partition".into());
+    }
+    if expected_ids != observed_ids {
+        let missing = expected_ids.difference(&observed_ids).next().cloned();
+        let unexpected = observed_ids.difference(&expected_ids).next().cloned();
+        return Err(format!(
+            "prediction rows must exactly match the split manifest evaluation partition; missing={missing:?}, unexpected={unexpected:?}"
+        ));
+    }
+
+    for row in records {
+        let entry = entries.get(&row.sample_id)
+            .ok_or_else(|| format!("sample_id {:?} is absent from domain split manifest", row.sample_id))?;
+        let expected_ood = held_out.contains(&entry.domain_id);
+        if row.cluster_id != entry.cluster_id {
+            return Err(format!("sample_id {:?} cluster_id does not match split manifest", row.sample_id));
+        }
+        if row.domain_id.as_deref() != Some(entry.domain_id.as_str()) {
+            return Err(format!("sample_id {:?} domain_id does not match split manifest", row.sample_id));
+        }
+        if row.shift_axis.as_deref() != Some(manifest.shift_axis.as_str()) {
+            return Err(format!("sample_id {:?} shift_axis does not match split manifest", row.sample_id));
+        }
+        if row.is_ood_domain != Some(expected_ood) {
+            return Err(format!("sample_id {:?} is_ood_domain does not match seen/held-out domain declarations", row.sample_id));
+        }
+    }
+
+    Ok(Some(sha256(manifest_bytes)))
 }
 
 fn validate_ood_threshold_provenance(
@@ -1832,9 +1999,16 @@ fn run() -> Result<i32, String> {
         .map_err(|e| format!("failed to read input {}: {e}", args.input.display()))?;
     let input_hash = sha256(&input_bytes);
     let records = parse_jsonl(&input_bytes)?;
-    validate_domain_split_provenance(
+    let domain_split_manifest_bytes = args.domain_split_manifest.as_ref()
+        .map(|path| fs::read(path).map_err(|error| {
+            format!("failed to read domain split manifest {}: {error}", path.display())
+        }))
+        .transpose()?;
+    let domain_split_manifest_sha256 = validate_domain_split_provenance(
         &records,
-        args.domain_split_manifest_sha256.as_deref(),
+        domain_split_manifest_bytes.as_deref(),
+        &args.dataset_revision_commit_sha,
+        args.evaluation_partition,
     )?;
     validate_ood_detector_provenance(
         &records,
@@ -1932,7 +2106,7 @@ fn run() -> Result<i32, String> {
         ),
         domain_shift_audit_status,
         domain_shift_axis,
-        domain_split_manifest_sha256: args.domain_split_manifest_sha256.clone(),
+        domain_split_manifest_sha256,
         overall_calibration,
         overall_calibration_cluster_bootstrap_95,
         overall_calibration_iid_null_floor,
