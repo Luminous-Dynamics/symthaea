@@ -202,6 +202,11 @@ fn parse_regions(
         if rank == 0 || !ranks.insert(rank) {
             return Err(format!("{ctx}.rank must be positive and unique"));
         }
+        let score = value.get("score").and_then(Value::as_f64)
+            .ok_or_else(|| format!("{ctx}.score must be a finite number in [0, 1]"))?;
+        if !score.is_finite() || !(0.0..=1.0).contains(&score) {
+            return Err(format!("{ctx}.score must be a finite number in [0, 1]"));
+        }
         let region_nodes = string_array(value, "node_ids", &ctx)?;
         if region_nodes.is_empty() {
             return Err(format!("{ctx}.node_ids must not be empty"));
@@ -211,12 +216,16 @@ fn parse_regions(
                 return Err(format!("{ctx} references unknown node {node}"));
             }
         }
+        let region_node_set: BTreeSet<&str> = region_nodes.iter().map(String::as_str).collect();
         let region_edges = string_array(value, "edge_ids", &ctx)?;
-        for edge in &region_edges {
-            if !edges.contains_key(edge) {
-                return Err(format!("{ctx} references unknown edge {edge}"));
+        for edge_id in &region_edges {
+            let edge = edges.get(edge_id)
+                .ok_or_else(|| format!("{ctx} references unknown edge {edge_id}"))?;
+            if !region_node_set.contains(edge.source.as_str()) || !region_node_set.contains(edge.target.as_str()) {
+                return Err(format!("{ctx} edge {edge_id} has an endpoint outside the declared candidate region"));
             }
         }
+        let _support_claim_ids = string_array(value, "support_claim_ids", &ctx)?;
         regions.push(Region { id, rank, nodes: region_nodes, edges: region_edges });
     }
     regions.sort_by_key(|r| r.rank);
@@ -333,10 +342,41 @@ fn audit_values(
     if design_id != string(oracle, "design_id", "oracle")? {
         return Err("explanation and oracle design_id do not match".to_owned());
     }
+    let grouping = explanation.get("grouping").ok_or("explanation.grouping is required")?;
+    for key in ["dataset_id", "split_protocol", "split", "host_family_id", "design_id", "insertion_source_id", "trojan_family_id", "synthesis_toolchain_id", "cell_library_id"] {
+        let _ = string(grouping, key, "explanation.grouping")?;
+    }
     let source = explanation.get("source").ok_or("explanation.source is required")?;
+    let _ = string(source, "artifact_id", "explanation.source")?;
+    let _ = string(source, "source_path", "explanation.source")?;
     require_digest(source, "source_sha256", &graph_sha, "explanation.source")?;
     require_digest(source, "node_edge_map_sha256", &node_edge_sha, "explanation.source")?;
     require_digest(oracle, "source_sha256", &graph_sha, "oracle")?;
+    let model = explanation.get("model").ok_or("explanation.model is required")?;
+    for key in ["model_sha256", "config_sha256", "training_lineage_sha256"] {
+        let value = string(model, key, "explanation.model")?;
+        valid_sha(value, &format!("explanation.model.{key}"))?;
+    }
+    let explainer = explanation.get("explainer").ok_or("explanation.explainer is required")?;
+    let _ = string(explainer, "explainer_id", "explanation.explainer")?;
+    let _ = string(explainer, "method", "explanation.explainer")?;
+    let _ = string(explainer, "version", "explanation.explainer")?;
+    let explainer_config = string(explainer, "config_sha256", "explanation.explainer")?;
+    valid_sha(explainer_config, "explanation.explainer.config_sha256")?;
+    let decision = explanation.get("decision").ok_or("explanation.decision is required")?;
+    let decision_value = string(decision, "disposition", "explanation.decision")?;
+    if !matches!(decision_value, "clear" | "suspect" | "abstain") {
+        return Err("unsupported explanation.decision.disposition".to_owned());
+    }
+    let decision_score = decision.get("score").ok_or("explanation.decision.score is required")?;
+    if !decision_score.is_null() {
+        let score = decision_score.as_f64().ok_or("explanation.decision.score must be number or null")?;
+        if !score.is_finite() || !(0.0..=1.0).contains(&score) {
+            return Err("explanation.decision.score must be finite and in [0, 1]".to_owned());
+        }
+    }
+    let threshold_digest = string(decision, "threshold_profile_sha256", "explanation.decision")?;
+    valid_sha(threshold_digest, "explanation.decision.threshold_profile_sha256")?;
 
     let label_semantics = string(oracle, "label_semantics", "oracle")?;
     if label_semantics != "insertion_footprint" {
@@ -447,7 +487,14 @@ fn audit_values(
 
     let coverage = explanation.get("path_coverage").ok_or("explanation.path_coverage is required")?;
     let coverage_status = string(coverage, "status", "explanation.path_coverage")?;
+    if !matches!(coverage_status, "not_claimed" | "partial" | "complete") {
+        return Err("unsupported explanation.path_coverage.status".to_owned());
+    }
     if coverage_status == "complete" {
+        let oracle_id = string(coverage, "oracle_id", "explanation.path_coverage")?;
+        nonempty_id(oracle_id, "explanation.path_coverage.oracle_id")?;
+        let certificate = string(coverage, "certificate_sha256", "explanation.path_coverage")?;
+        valid_sha(certificate, "explanation.path_coverage.certificate_sha256")?;
         if !reference_paths_complete {
             return Err("complete path coverage cannot be claimed against an oracle path set not declared complete".to_owned());
         }
