@@ -597,11 +597,52 @@ impl CorpusRegistrySnapshot {
     }
 }
 
+/// Verify the exact source bytes against the declared SHA-256 before a
+/// workflow advances the record to `ArtifactDigestVerified`. Registry
+/// snapshot hashing is a separate manifest-integrity commitment.
+pub fn verify_artifact_bytes(
+    record: &CorpusArtifactRecord,
+    bytes: &[u8],
+) -> Result<String, EligibilityIssue> {
+    let Some(expected) = record.artifact_sha256.as_deref() else {
+        return Err(issue(
+            "artifact_digest_missing",
+            None,
+            "artifact bytes cannot be verified without a declared SHA-256".into(),
+        ));
+    };
+    if !is_sha256_hex(expected) {
+        return Err(issue(
+            "invalid_artifact_digest",
+            None,
+            "artifact_sha256 must be exactly 64 lowercase hexadecimal characters".into(),
+        ));
+    }
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    let actual = format!("{:x}", hasher.finalize());
+    if actual != expected {
+        return Err(issue(
+            "artifact_digest_mismatch",
+            None,
+            format!("source bytes hashed to {actual}, expected {expected}"),
+        ));
+    }
+    Ok(actual)
+}
+
 pub fn evaluate_eligibility(
     record: &CorpusArtifactRecord,
     request: &EligibilityRequest,
 ) -> CorpusEligibility {
     let mut issues = validate_artifact_record(record);
+    if record.ingest_stage != IngestStage::ArtifactDigestVerified {
+        issues.push(issue(
+            "artifact_not_digest_verified",
+            None,
+            "eligibility requires an ArtifactDigestVerified record; registry registration alone is not ingest approval".into(),
+        ));
+    }
     if request.jurisdiction.trim().is_empty() {
         issues.push(issue(
             "requested_jurisdiction_missing",
@@ -1037,6 +1078,31 @@ mod tests {
 
         let duplicate = build_registry_snapshot(vec![first.clone(), first]).unwrap_err();
         assert!(duplicate.iter().any(|issue| issue.code == "duplicate_artifact_id"));
+    }
+
+    #[test]
+    fn exact_artifact_bytes_must_match_the_declared_digest() {
+        let bytes = b"musical artifact bytes";
+        let mut record = audio_record();
+        let mut hasher = Sha256::new();
+        hasher.update(bytes);
+        record.artifact_sha256 = Some(format!("{:x}", hasher.finalize()));
+        assert!(verify_artifact_bytes(&record, bytes).is_ok());
+        assert_eq!(
+            verify_artifact_bytes(&record, b"modified bytes").unwrap_err().code,
+            "artifact_digest_mismatch"
+        );
+    }
+
+    #[test]
+    fn rights_clearance_without_verified_artifact_bytes_is_not_eligibility() {
+        let mut record = audio_record();
+        record.ingest_stage = IngestStage::RightsEvidenceChecked;
+        let result = evaluate_eligibility(&record, &research_request());
+        assert!(!result.eligible);
+        assert!(result.issues.iter().any(|issue| {
+            issue.code == "artifact_not_digest_verified"
+        }));
     }
 
     #[test]
