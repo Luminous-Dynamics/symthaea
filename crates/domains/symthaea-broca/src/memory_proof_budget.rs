@@ -1558,6 +1558,53 @@ mod tests {
     }
 
     #[test]
+    fn legacy_single_session_serialization_omits_new_zero_and_absent_fields() {
+        let mut legacy_candidate = candidate("A", "family-A", 2);
+        legacy_candidate.source_session_id = None;
+        let candidate_json = serde_json::to_value(&legacy_candidate).unwrap();
+        assert!(candidate_json.get("source_session_id").is_none());
+
+        let req = request(
+            vec![legacy_candidate],
+            vec![obligation(
+                "claim-1",
+                vec![justification("legacy-proof", &["A"])],
+            )],
+            32,
+        );
+        let request_json = serde_json::to_value(&req).unwrap();
+        assert!(
+            request_json["obligations"][0]
+                .get("minimum_distinct_sessions")
+                .is_none()
+        );
+        assert_eq!(
+            request_json["obligations"][0]["minimum_independent_families"],
+            serde_json::json!(1)
+        );
+    }
+
+    #[test]
+    fn proof_packet_rejects_mutated_source_session_identity() {
+        let mut a = candidate("A", "family-A", 2);
+        let mut b = candidate("B", "family-B", 4);
+        a.source_session_id = Some("session-1".into());
+        b.source_session_id = Some("session-2".into());
+        let mut obligation = obligation(
+            "claim-1",
+            vec![justification("two-session-proof", &["A", "B"])],
+        );
+        obligation.minimum_independent_families = 2;
+        obligation.minimum_distinct_sessions = 2;
+        let req = request(vec![a, b], vec![obligation], 32);
+        let mut result = solve_proof_budget(req.clone()).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+
+        result.evidence[0].source_session_id = Some("forged-session".into());
+        assert!(verify_proof_budget_result(&req, &result).is_err());
+    }
+
+    #[test]
     fn versioned_cross_session_proof_fixtures_match_optimizer_and_verifier() {
         let raw = include_str!(
             "../../../../research/broca-bitemporal-evaluation-v1/cross-session-proof-fixtures-v1.json"
