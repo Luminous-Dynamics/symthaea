@@ -74,9 +74,9 @@
   "local_validation": {
     "exact_two_type_reference": "executed in a separate local reference prototype; matches all listed exact actions and augmented-sample totals",
     "finite_grid_prototype_tests": {
-      "passed": 5,
-      "total": 5,
-      "scope": "local executable copy of committed finite-grid engine; not remote CI"
+      "passed": 6,
+      "total": 6,
+      "scope": "local executable copy of committed finite-grid engine; includes exact Appendix B.5 grid witness"
     },
     "committed_linear_engine_unit_tests": {
       "authored": 10,
@@ -88,7 +88,26 @@
       "grid_source": "727fe3fa1328d098d800b0aec3ef67be80d5a57c",
       "grid_tests": "7186ce4936413bb2b74043ff1a2473100fe856c0"
     },
-    "ci": "not yet run; no pass claimed"
+    "ci": "not yet run; no pass claimed",
+    "paper_grid_witness": {
+      "envelope_controller": {
+        "HH": 0.5,
+        "HL": 0.4,
+        "LL": 0.25
+      },
+      "equal_share_update": {
+        "HH": 0.5,
+        "HL": 0.4,
+        "LL": 0.25
+      },
+      "coordinate_sweep": {
+        "HH": 0.5,
+        "HL": 0.4,
+        "LL": 0.1
+      },
+      "coordinate_sweep_valid": true,
+      "equal_share_stalls_on_grid": true
+    }
   },
   "extensions": {
     "finite_action_grid": {
