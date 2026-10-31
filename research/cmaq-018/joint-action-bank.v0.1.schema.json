@@ -61,7 +61,8 @@
     },
     "joint_draw_bank_sha256": {
       "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 over the canonical byte encoding: domain tag, length-prefixed history digest, horizon, length-prefixed action-manifest digest and outcome-channel, action IDs, joint draw IDs, coupling byte, then each action's ordered f64 sample bits (all integers/f64 values little-endian). The digest excludes this field."
     },
     "coupling": {
       "enum": [
@@ -88,6 +89,7 @@
     "all action_ids are unique and each maps to exactly one row",
     "all joint_draw_ids are unique and the jth sample in every row shares the same declared joint draw",
     "history_sha256 and action_manifest_sha256 are frozen across every action in this bank",
-    "paired effects are computed from same-column sample differences, never marginal interval endpoint subtraction"
+    "paired effects are computed from same-column sample differences, never marginal interval endpoint subtraction",
+    "joint_draw_bank_sha256 equals SHA-256 of the canonical v0.1 byte encoding; it binds the action manifest, draw IDs, coupling and exact f64 sample bits"
   ]
 }
