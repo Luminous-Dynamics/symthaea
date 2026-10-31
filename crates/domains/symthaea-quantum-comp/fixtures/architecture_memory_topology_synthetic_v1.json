@@ -97,7 +97,7 @@
           "destination_region_id": "cpu_ddr",
           "direction": "write",
           "fabric": "ddr_memory_channel",
-          "communication_boundary_id": "synthetic-boundary-l3-to-ddr"
+          "communication_boundary_id": "synthetic-boundary-ddr-to-l3"
         }
       ],
       "state_placements": [
@@ -258,7 +258,7 @@
           "destination_region_id": "gpu_hbm",
           "direction": "write",
           "fabric": "hbm_memory_channel",
-          "communication_boundary_id": "synthetic-boundary-sram-to-hbm"
+          "communication_boundary_id": "synthetic-boundary-hbm-to-sram"
         }
       ],
       "state_placements": [
@@ -391,9 +391,7 @@
     "comparison_contract_fingerprint": "synthetic-comparison-contract-v1",
     "communication_boundary_ids": [
       "synthetic-boundary-ddr-to-l3",
-      "synthetic-boundary-l3-to-ddr",
-      "synthetic-boundary-hbm-to-sram",
-      "synthetic-boundary-sram-to-hbm"
+      "synthetic-boundary-hbm-to-sram"
     ],
     "state_class_ids": [
       "hdc_codebook",
