@@ -641,9 +641,11 @@ mod tests {
             &bundle,
             &serde_json::to_vec(&submission).unwrap(),
         ).unwrap();
+        let submission_value = serde_json::to_value(&submission).unwrap();
+        let report_value = serde_json::to_value(&report).unwrap();
         for (schema, value, version) in [
-            (&submission_schema, serde_json::to_value(&submission).unwrap(), FRESH_SUBMISSION_SCHEMA),
-            (&report_schema, serde_json::to_value(&report).unwrap(), FRESH_SCORE_REPORT_SCHEMA),
+            (&submission_schema, submission_value, FRESH_SUBMISSION_SCHEMA),
+            (&report_schema, report_value, FRESH_SCORE_REPORT_SCHEMA),
         ] {
             assert_eq!(schema["properties"]["schema"]["const"].as_str(), Some(version));
             let required: BTreeSet<String> = schema["required"].as_array().unwrap()
@@ -654,6 +656,16 @@ mod tests {
             assert_eq!(required, properties);
             assert_eq!(actual, properties);
         }
+        let response_properties: BTreeSet<String> = submission_schema["properties"]["responses"]["items"]["properties"]
+            .as_object().unwrap().keys().cloned().collect();
+        let actual_response: BTreeSet<String> = serde_json::to_value(&submission.responses[0])
+            .unwrap().as_object().unwrap().keys().cloned().collect();
+        assert_eq!(response_properties, actual_response);
+        let report_item_properties: BTreeSet<String> = report_schema["properties"]["items"]["items"]["properties"]
+            .as_object().unwrap().keys().cloned().collect();
+        let actual_report_item: BTreeSet<String> = serde_json::to_value(&report.items[0])
+            .unwrap().as_object().unwrap().keys().cloned().collect();
+        assert_eq!(report_item_properties, actual_report_item);
         let public_report = serde_json::to_string(&report).unwrap();
         assert!(!public_report.contains("\"solution\""));
         assert!(!public_report.contains("\"parameters\""));
@@ -788,6 +800,20 @@ mod tests {
             &bundle,
             &serde_json::to_vec(&build_submission(&bundle, exact_responses(&bundle))).unwrap()
         ).is_err());
+    }
+
+    #[test]
+    fn unknown_submission_and_response_fields_are_rejected() {
+        let bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
+        let submission = build_submission(&bundle, exact_responses(&bundle));
+        let mut json: Value = serde_json::to_value(&submission).unwrap();
+        json["unexpected"] = serde_json::json!("not-allowed");
+        assert!(serde_json::from_value::<FreshAnswerSubmissionV1>(json).is_err());
+
+        let mut response_json: Value =
+            serde_json::to_value(&submission.responses[0]).unwrap();
+        response_json["expected_answer"] = serde_json::json!({"x": 1, "y": 2});
+        assert!(serde_json::from_value::<FreshResponseRecordV1>(response_json).is_err());
     }
 
     #[test]
