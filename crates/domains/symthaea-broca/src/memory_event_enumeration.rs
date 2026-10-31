@@ -161,6 +161,23 @@ impl EventExtractionBatch {
                     admission.evidence_id
                 ));
             }
+            require_non_empty(&admission.source_revision_id, "source_revision_id")?;
+            if admission.token_cost == 0 {
+                return Err(format!(
+                    "source admission {:?} has no rendered evidence cost",
+                    admission.evidence_id
+                ));
+            }
+            if admission.recorded_at_unix_ms > inventory.receipt.known_at_unix_ms
+                || admission.retracted_at_unix_ms.is_some_and(|time| {
+                    time <= inventory.receipt.known_at_unix_ms
+                })
+            {
+                return Err(format!(
+                    "source admission {:?} is not current at the inventory known_at",
+                    admission.evidence_id
+                ));
+            }
             validate_sha256(
                 &admission.authorization_receipt_sha256,
                 "authorization_receipt_sha256",
@@ -215,6 +232,8 @@ impl EventExtractionBatch {
                 || admission.source_pointer != record.source.source_pointer
                 || admission.source_step_id != record.source.step_id
                 || admission.source_step_index != record.source.step_index
+                || admission.valid_from_unix_ms != record.valid_from_unix_ms
+                || admission.valid_until_unix_ms != record.valid_until_unix_ms
             {
                 return Err(format!(
                     "trusted admission source identity mismatch for {:?}",
@@ -798,6 +817,21 @@ mod tests {
         assert_eq!(result.receipt.unattributed_relevant_event_count, 1);
         assert!(!result.receipt.speaker_attribution_complete);
         assert!(!result.receipt.answer_is_permitted);
+    }
+
+    #[test]
+    fn invalid_bitemporal_admission_cannot_certify_closed_world_event_coverage() {
+        let (inventory, mut admissions) = inventory_and_admissions();
+        admissions[0].recorded_at_unix_ms = inventory.receipt.known_at_unix_ms + 1;
+        assert!(enumerate_events_closed_world(
+            &inventory, &batch(&inventory), &admissions, &query()
+        ).unwrap_err().contains("not current at the inventory known_at"));
+
+        let (inventory, mut admissions) = inventory_and_admissions();
+        admissions[0].valid_until_unix_ms = Some(50);
+        assert!(enumerate_events_closed_world(
+            &inventory, &batch(&inventory), &admissions, &query()
+        ).unwrap_err().contains("source identity mismatch"));
     }
 
     #[test]
