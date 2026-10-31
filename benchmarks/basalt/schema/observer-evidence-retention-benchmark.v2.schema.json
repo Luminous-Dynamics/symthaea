@@ -1,0 +1,1182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT evidence-retention frontier benchmark protocol v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "suite_id",
+    "catalog_path",
+    "unit_of_analysis",
+    "scoring_policy",
+    "comparison_arms",
+    "metrics",
+    "gates",
+    "statistical_protocol",
+    "reporting"
+  ],
+  "properties": {
+    "format_version": {
+      "const": 2
+    },
+    "suite_id": {
+      "const": "basalt-evidence-retention-frontier-v2"
+    },
+    "catalog_path": {
+      "type": "string",
+      "const": "benchmarks/basalt/coverage/observer-challenges.v1.json"
+    },
+    "unit_of_analysis": {
+      "const": "independent_task_scenario"
+    },
+    "scoring_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "composite_score",
+        "safety_before_efficiency",
+        "promote_only_when_all_safety_gates_pass",
+        "syscalls_or_events_are_independent_samples",
+        "cluster_key",
+        "paired_comparison_required",
+        "held_out_lineage_split_required"
+      ],
+      "properties": {
+        "composite_score": {
+          "const": "prohibited"
+        },
+        "safety_before_efficiency": {
+          "const": true
+        },
+        "promote_only_when_all_safety_gates_pass": {
+          "const": true
+        },
+        "syscalls_or_events_are_independent_samples": {
+          "const": false
+        },
+        "cluster_key": {
+          "const": "repository_task_lineage"
+        },
+        "paired_comparison_required": {
+          "const": true
+        },
+        "held_out_lineage_split_required": {
+          "const": true
+        }
+      }
+    },
+    "comparison_arms": {
+      "type": "array",
+      "minItems": 11,
+      "maxItems": 11,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "arm_id",
+          "role",
+          "description",
+          "promotable"
+        ],
+        "properties": {
+          "arm_id": {
+            "enum": [
+              "unsafe_no_invalidation",
+              "global_rerun",
+              "declared_build_metadata",
+              "trace_without_hermeticity",
+              "hermetic_candidate_observer",
+              "hermetic_observer_plus_replay",
+              "independent_reproducible_rebuild",
+              "bazel_strict_action_sandbox",
+              "nix_sandboxed_derivation",
+              "slsa_build_l4_platform",
+              "sccache_rust_compiler_cache"
+            ]
+          },
+          "role": {
+            "enum": [
+              "negative_control",
+              "safety_cost_reference",
+              "industry_baseline",
+              "candidate",
+              "cross_check"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "promotable": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 13,
+      "maxItems": 13,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "phase",
+          "definition",
+          "numerator",
+          "denominator",
+          "target",
+          "unit"
+        ],
+        "properties": {
+          "metric_id": {
+            "enum": [
+              "hidden_dependency_recall",
+              "stale_evidence_false_acceptances",
+              "unsupported_channel_disclosure",
+              "integrity_loss_fail_closed",
+              "false_invalidation_rate",
+              "unrelated_evidence_retention",
+              "normalized_reverification_work",
+              "paired_shifted_task_success_delta",
+              "semantic_access_retention",
+              "undeclared_build_script_stale_replay_detection",
+              "mtime_preserving_build_script_mutation_detection",
+              "build_script_environment_mutation_detection",
+              "dependency_false_attribution_rate"
+            ]
+          },
+          "phase": {
+            "enum": [
+              "safety",
+              "selectivity",
+              "efficiency",
+              "outcome"
+            ]
+          },
+          "definition": {
+            "type": "string",
+            "minLength": 1
+          },
+          "numerator": {
+            "type": "string",
+            "minLength": 1
+          },
+          "denominator": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operator",
+              "value"
+            ],
+            "properties": {
+              "operator": {
+                "enum": [
+                  "=",
+                  "<=",
+                  ">="
+                ]
+              },
+              "value": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          },
+          "unit": {
+            "enum": [
+              "proportion",
+              "scenario_count",
+              "normalized_work_ratio",
+              "absolute_proportion_delta"
+            ]
+          },
+          "alternative_gate": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "safety",
+        "selectivity",
+        "efficiency",
+        "outcome",
+        "promotion_rule"
+      ],
+      "properties": {
+        "safety": {
+          "type": "array",
+          "minItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "hidden_dependency_recall",
+              "stale_evidence_false_acceptances",
+              "unsupported_channel_disclosure",
+              "integrity_loss_fail_closed",
+              "semantic_access_retention",
+              "undeclared_build_script_stale_replay_detection",
+              "mtime_preserving_build_script_mutation_detection",
+              "build_script_environment_mutation_detection"
+            ]
+          }
+        },
+        "selectivity": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "false_invalidation_rate",
+              "unrelated_evidence_retention",
+              "dependency_false_attribution_rate"
+            ]
+          }
+        },
+        "efficiency": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "const": "normalized_reverification_work"
+          }
+        },
+        "outcome": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "const": "paired_shifted_task_success_delta"
+          }
+        },
+        "promotion_rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "statistical_protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "confidence_level",
+        "interval",
+        "maximum_miss_probability_claim",
+        "minimum_independent_scenarios_for_zero_miss_claim",
+        "zero_miss_rule",
+        "independence_unit",
+        "clustering",
+        "split",
+        "stopping"
+      ],
+      "properties": {
+        "confidence_level": {
+          "const": 0.95
+        },
+        "interval": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maximum_miss_probability_claim": {
+          "const": 0.001
+        },
+        "minimum_independent_scenarios_for_zero_miss_claim": {
+          "const": 2995
+        },
+        "zero_miss_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independence_unit": {
+          "const": "repository_task_lineage"
+        },
+        "clustering": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stopping": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "reporting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_strata",
+        "required_costs",
+        "required_disclosures",
+        "forbidden_claims"
+      ],
+      "properties": {
+        "required_strata": {
+          "type": "array",
+          "minItems": 13,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "required_costs": {
+          "type": "array",
+          "minItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "required_disclosures": {
+          "type": "array",
+          "minItems": 7,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "forbidden_claims": {
+          "type": "array",
+          "minItems": 7,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "properties": {
+        "comparison_arms": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "const": "unsafe_no_invalidation"
+              }
+            },
+            "required": [
+              "arm_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "comparison_arms": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "const": "global_rerun"
+              }
+            },
+            "required": [
+              "arm_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "comparison_arms": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "const": "declared_build_metadata"
+              }
+            },
+            "required": [
+              "arm_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "comparison_arms": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "const": "trace_without_hermeticity"
+              }
+            },
+            "required": [
+              "arm_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "comparison_arms": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "const": "hermetic_candidate_observer"
+              }
+            },
+            "required": [
+              "arm_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "comparison_arms": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "const": "hermetic_observer_plus_replay"
+              }
+            },
+            "required": [
+              "arm_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "comparison_arms": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "const": "independent_reproducible_rebuild"
+              }
+            },
+            "required": [
+              "arm_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "hidden_dependency_recall"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "stale_evidence_false_acceptances"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "unsupported_channel_disclosure"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "integrity_loss_fail_closed"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "false_invalidation_rate"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "unrelated_evidence_retention"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "normalized_reverification_work"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "paired_shifted_task_success_delta"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "semantic_access_retention"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "undeclared_build_script_stale_replay_detection"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "mtime_preserving_build_script_mutation_detection"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "build_script_environment_mutation_detection"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "comparison_arms": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "const": "unsafe_no_invalidation"
+              }
+            },
+            "required": [
+              "arm_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "comparison_arms": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "const": "global_rerun"
+              }
+            },
+            "required": [
+              "arm_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "comparison_arms": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "const": "declared_build_metadata"
+              }
+            },
+            "required": [
+              "arm_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "comparison_arms": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "const": "trace_without_hermeticity"
+              }
+            },
+            "required": [
+              "arm_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "comparison_arms": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "const": "hermetic_candidate_observer"
+              }
+            },
+            "required": [
+              "arm_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "comparison_arms": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "const": "hermetic_observer_plus_replay"
+              }
+            },
+            "required": [
+              "arm_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "comparison_arms": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "const": "independent_reproducible_rebuild"
+              }
+            },
+            "required": [
+              "arm_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "comparison_arms": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "const": "bazel_strict_action_sandbox"
+              }
+            },
+            "required": [
+              "arm_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "comparison_arms": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "const": "nix_sandboxed_derivation"
+              }
+            },
+            "required": [
+              "arm_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "comparison_arms": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "const": "slsa_build_l4_platform"
+              }
+            },
+            "required": [
+              "arm_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "comparison_arms": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "const": "sccache_rust_compiler_cache"
+              }
+            },
+            "required": [
+              "arm_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "hidden_dependency_recall"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "stale_evidence_false_acceptances"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "unsupported_channel_disclosure"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "integrity_loss_fail_closed"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "false_invalidation_rate"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "unrelated_evidence_retention"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "normalized_reverification_work"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "paired_shifted_task_success_delta"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "semantic_access_retention"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "undeclared_build_script_stale_replay_detection"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "mtime_preserving_build_script_mutation_detection"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "build_script_environment_mutation_detection"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "metrics": {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "metric_id": {
+                "const": "dependency_false_attribution_rate"
+              }
+            },
+            "required": [
+              "metric_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    }
+  ],
+  "format_version": 2
+}
