@@ -29,7 +29,7 @@ const GAUSSIAN_LOG_2PI: f64 = 1.837_877_066_409_345_3;
 #[serde(deny_unknown_fields)]
 pub struct DvdGenerationV1 {
     pub generation_id: String,
-    pub generation_seed_commitment_sha256: String,
+    pub rng_seed_commitment_sha256: String,
     pub generated_token_count: u64,
     /// Per-token conditional log probabilities for the generated response.
     pub response_token_log_probabilities: Vec<f64>,
@@ -53,7 +53,7 @@ pub struct DvdGenerationInputV1 {
     pub temperature_milli: u16,
     pub requested_generation_count: u32,
     pub tail_token_count: u32,
-    pub generation_seed_commitment_sha256: String,
+    pub generation_seed_schedule_sha256: String,
     pub generations: Vec<DvdGenerationV1>,
 }
 
@@ -97,7 +97,8 @@ pub struct DvdItemReportV1 {
     pub generation_count: u64,
     pub tail_token_count: u64,
     pub sampled_output_token_count: u64,
-    pub generation_seed_commitment_sha256: String,
+    pub generation_seed_schedule_sha256: String,
+    pub generation_seed_commitment_count: u64,
     pub input_sha256: String,
     pub mean_synthetic_difficulty: f64,
     /// Exact paper DVD statistic: population variance, denominator N.
@@ -491,7 +492,12 @@ pub fn score_dvd_item(input: &DvdGenerationInputV1) -> Result<DvdItemReportV1, S
         return Err("generation records must exactly match requested_generation_count".to_owned());
     }
 
+    validate_digest(
+        &input.generation_seed_schedule_sha256,
+        "generation_seed_schedule_sha256",
+    )?;
     let mut generation_ids = BTreeSet::new();
+    let mut generation_seed_commitments = BTreeSet::new();
     let mut synthetic_difficulties = Vec::with_capacity(input.generations.len());
     let mut total_generated_tokens = 0_u64;
     for generation in &input.generations {
@@ -502,20 +508,23 @@ pub fn score_dvd_item(input: &DvdGenerationInputV1) -> Result<DvdItemReportV1, S
             return Err("generation IDs must be unique, nonempty and <=256 bytes".to_owned());
         }
         validate_digest(
-            &generation.generation_seed_commitment_sha256,
-            "generation.generation_seed_commitment_sha256",
+            &generation.rng_seed_commitment_sha256,
+            "generation.rng_seed_commitment_sha256",
         )?;
-        if generation.generation_seed_commitment_sha256
-            != input.generation_seed_commitment_sha256
-        {
-            return Err(format!(
-                "generation {} seed commitment does not match input manifest",
-                generation.generation_id
-            ));
+        if !generation_seed_commitments.insert(generation.rng_seed_commitment_sha256.as_str()) {
+            return Err("each generation must have a distinct RNG seed commitment".to_owned());
         }
         if generation.generated_token_count < u64::from(input.tail_token_count) {
             return Err(format!(
                 "generation {} token count is below tail_token_count",
+                generation.generation_id
+            ));
+        }
+        if u64::try_from(generation.response_token_log_probabilities.len()).ok()
+            != Some(generation.generated_token_count)
+        {
+            return Err(format!(
+                "generation {} token log-probability count must exactly match generated_token_count",
                 generation.generation_id
             ));
         }
@@ -569,7 +578,9 @@ pub fn score_dvd_item(input: &DvdGenerationInputV1) -> Result<DvdItemReportV1, S
             .map_err(|_| "generation count overflows u64")?,
         tail_token_count: u64::from(input.tail_token_count),
         sampled_output_token_count: total_generated_tokens,
-        generation_seed_commitment_sha256: input.generation_seed_commitment_sha256.clone(),
+        generation_seed_schedule_sha256: input.generation_seed_schedule_sha256.clone(),
+        generation_seed_commitment_count: u64::try_from(generation_seed_commitments.len())
+            .map_err(|_| "generation seed commitment count overflows u64")?,
         input_sha256: hash_domain(b"dvd-input.v1", &input_bytes),
         mean_synthetic_difficulty: mean_difficulty,
         dvd_population_variance: dvd_variance,
@@ -611,8 +622,8 @@ mod tests {
             .enumerate()
             .map(|(index, difficulty)| DvdGenerationV1 {
                 generation_id: format!("generation-{index:03}"),
-                generation_seed_commitment_sha256: digest("seed"),
-                generated_token_count: 12,
+                rng_seed_commitment_sha256: digest(&format!("seed-{index}")),
+                generated_token_count: 6,
                 response_token_log_probabilities: vec![
                     *difficulty - 0.3,
                     *difficulty - 0.2,
@@ -639,7 +650,7 @@ mod tests {
             temperature_milli: 800,
             requested_generation_count: u32::try_from(values.len()).unwrap(),
             tail_token_count,
-            generation_seed_commitment_sha256: digest("seed"),
+            generation_seed_schedule_sha256: digest("seed-schedule"),
             generations,
         }
     }
@@ -658,6 +669,7 @@ mod tests {
         assert!((report.dvd_population_variance - expected).abs() < 1.0e-10);
         assert_eq!(report.generation_count, 50);
         assert_eq!(report.tail_token_count, 4);
+        assert_eq!(report.generation_seed_commitment_count, 50);
     }
 
     #[test]
@@ -719,6 +731,13 @@ mod tests {
     }
 
     #[test]
+    fn generated_token_count_must_match_likelihood_vector_length() {
+        let mut input = input_from_difficulties(&[-2.0; 10]);
+        input.generations[0].generated_token_count = 7;
+        assert!(score_dvd_item(&input).unwrap_err().contains("exactly match generated_token_count"));
+    }
+
+    #[test]
     fn positive_or_nonfinite_log_probabilities_fail_closed() {
         let mut input = input_from_difficulties(&[-2.0; 10]);
         input.generations[0].response_token_log_probabilities[0] = 0.1;
@@ -733,8 +752,9 @@ mod tests {
         input.generations[1].generation_id = input.generations[0].generation_id.clone();
         assert!(score_dvd_item(&input).unwrap_err().contains("generation IDs"));
         let mut input = input_from_difficulties(&[-2.0; 10]);
-        input.generations[0].generation_seed_commitment_sha256 = digest("other-seed");
-        assert!(score_dvd_item(&input).unwrap_err().contains("does not match"));
+        input.generations[0].rng_seed_commitment_sha256 =
+            input.generations[1].rng_seed_commitment_sha256.clone();
+        assert!(score_dvd_item(&input).unwrap_err().contains("distinct RNG seed commitment"));
     }
 
     #[test]
