@@ -428,7 +428,7 @@ fn ev(
     valid: (u64, Option<u64>), known: (u64, Option<u64>), scope: &str, authority: &str,
 ) -> EvidenceRevision {
     EvidenceRevision {
-        id: id.into(), source_id: format!("src-{family}-{id}"),
+        id: id.into(), source_id: format!("src-{}-{family}-{id}", split.label()),
         source_family_id: format!("{}-family-{family}", split.label()),
         independence_group_id: group.into(), subject_claim_id: claim.into(),
         asserted_polarity: polarity, valid_from: valid.0, valid_until: valid.1,
@@ -638,8 +638,12 @@ mod tests {
         ];
         let families = |s: &GraphSuite| s.planner_cases().iter()
             .flat_map(|c| c.evidence.iter().map(|e| e.source_family_id.clone())).collect::<BTreeSet<_>>();
+        let sources = |s: &GraphSuite| s.planner_cases().iter()
+            .flat_map(|c| c.evidence.iter().map(|e| e.source_id.clone())).collect::<BTreeSet<_>>();
         let a=families(&suites[0]); let b=families(&suites[1]); let c=families(&suites[2]);
+        let sa=sources(&suites[0]); let sb=sources(&suites[1]); let sc=sources(&suites[2]);
         assert!(a.is_disjoint(&b) && a.is_disjoint(&c) && b.is_disjoint(&c));
+        assert!(sa.is_disjoint(&sb) && sa.is_disjoint(&sc) && sb.is_disjoint(&sc));
     }
 
     #[test]
