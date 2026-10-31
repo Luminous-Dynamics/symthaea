@@ -648,8 +648,6 @@ pub struct CounterfactualInfluenceReport {
     /// Complete ordered per-window/per-channel trace, including raw and release
     /// thresholds and the final hysteresis/bridge classification.
     pub window_measurements: Vec<InfluenceWindowMeasurement>,
-    /// Merged intervals from raw enter-threshold crossings, before smoothing.
-    pub raw_threshold_intervals: Vec<FrameInterval>,
     /// Historical field retained with its raw measured meaning for audit.
     pub measured_influence_intervals: Vec<FrameInterval>,
     /// Hysteresis/gap/minimum-duration qualified support plus bounded tail hold.
@@ -1585,10 +1583,27 @@ pub fn measure_counterfactual_influence(
     input: &CounterfactualInfluenceInput<'_, '_>,
     verified_calibration: &VerifiedRepeatabilityCalibration,
 ) -> Result<CounterfactualInfluenceReport, CounterfactualInfluenceError> {
+    measure_counterfactual_influence_with_policy(
+        input,
+        verified_calibration,
+        &InfluenceSupportPolicy::default(),
+    )
+}
+
+/// Measure paired output deltas and qualify their temporal support using an
+/// explicit, replay-bound policy. The raw threshold intervals remain available
+/// in measured_influence_intervals; the EVAL-025 planner adapter must consume
+/// qualified_support_intervals.
+pub fn measure_counterfactual_influence_with_policy(
+    input: &CounterfactualInfluenceInput<'_, '_>,
+    verified_calibration: &VerifiedRepeatabilityCalibration,
+    support_policy: &InfluenceSupportPolicy,
+) -> Result<CounterfactualInfluenceReport, CounterfactualInfluenceError> {
     let calibration = &verified_calibration.calibration;
     validate_config(&calibration.analysis)?;
     validate_input(input, calibration)?;
     let windows = frame_windows(calibration.total_frames, &calibration.analysis)?;
+    validate_support_policy(support_policy, calibration.total_frames, windows.len())?;
     if calibration.cells.len() != windows.len() * calibration.channels {
         return Err(CounterfactualInfluenceError::WindowIndexMismatch);
     }
@@ -1604,7 +1619,9 @@ pub fn measure_counterfactual_influence(
 
     let metrics = analyze_pair(input.baseline_audio, input.counterfactual_audio, &windows);
     let mut measurements = Vec::with_capacity(metrics.len());
-    let mut affected = Vec::new();
+    let mut raw_affected = Vec::new();
+    let release_ratio =
+        support_policy.release_threshold_ratio_microunits as f32 / MICROS_PER_RATIO_UNIT as f32;
     for (index, metric) in metrics.into_iter().enumerate() {
         let cell = &calibration.cells[index];
         let rms_threshold = calibration
@@ -1618,10 +1635,14 @@ pub fn measure_counterfactual_influence(
                 cell.maximum_noop_spectral_distance
                     * calibration.analysis.noise_floor_multiplier,
             );
+        let release_rms_threshold = rms_threshold * release_ratio;
+        let release_spectral_threshold = spectral_threshold * release_ratio;
         let effect_detected = metric.rms_delta > rms_threshold
             || metric.spectral_magnitude_distance > spectral_threshold;
+        let release_detected = metric.rms_delta > release_rms_threshold
+            || metric.spectral_magnitude_distance > release_spectral_threshold;
         if effect_detected {
-            affected.push(FrameInterval {
+            raw_affected.push(FrameInterval {
                 start_frame: cell.start_frame,
                 end_frame: cell.end_frame,
             });
@@ -1635,7 +1656,12 @@ pub fn measure_counterfactual_influence(
             spectral_magnitude_distance: metric.spectral_magnitude_distance,
             calibrated_rms_threshold: rms_threshold,
             calibrated_spectral_threshold: spectral_threshold,
+            release_rms_threshold,
+            release_spectral_threshold,
             effect_detected,
+            release_detected,
+            in_qualified_support: false,
+            bridged_gap: false,
         });
     }
 
@@ -1643,11 +1669,19 @@ pub fn measure_counterfactual_influence(
         .iter()
         .filter(|measurement| measurement.effect_detected)
         .count();
-    let disposition = if affected_channel_windows > 0 {
-        InfluenceDisposition::EffectDetected
-    } else {
+    let (qualified_support_intervals, qualification_counts) = qualify_support_windows(
+        &mut measurements,
+        calibration.channels,
+        calibration.total_frames,
+        support_policy,
+    )?;
+    let disposition = if qualified_support_intervals.is_empty() {
         InfluenceDisposition::NoEffectAboveNoiseFloor
+    } else {
+        InfluenceDisposition::EffectDetected
     };
+    let measured_influence_intervals = merge_intervals(raw_affected);
+
     seal_report(CounterfactualInfluenceReport {
         version: COUNTERFACTUAL_INFLUENCE_VERSION.to_owned(),
         source_event_id: input.source_event_id.to_owned(),
@@ -1682,14 +1716,20 @@ pub fn measure_counterfactual_influence(
         analysis: calibration.analysis.clone(),
         total_channel_windows: measurements.len(),
         affected_channel_windows,
-        measured_influence_intervals: merge_intervals(affected),
+        support_policy: support_policy.clone(),
+        window_measurements: measurements,
+        measured_influence_intervals,
+        qualified_support_intervals,
+        qualified_channel_windows: qualification_counts.qualified_channel_windows,
+        bridged_channel_windows: qualification_counts.bridged_channel_windows,
+        tail_extension_frames_applied: qualification_counts.tail_extension_frames_applied,
         disposition,
         receipt_sha256: String::new(),
     })
 }
 
-/// Replay the influence measurements and receipt from the exact score,
-/// event-map, schedule, renderer, configuration, calibration and PCM inputs.
+/// Replay the influence measurements and report receipt, including the frozen
+/// temporal support policy and every per-window classification.
 pub fn verify_counterfactual_influence(
     report: &CounterfactualInfluenceReport,
     input: &CounterfactualInfluenceInput<'_, '_>,
@@ -1698,7 +1738,11 @@ pub fn verify_counterfactual_influence(
     if !influence_digest_valid(report)? {
         return Err(CounterfactualInfluenceError::InvalidInfluenceReceipt);
     }
-    let expected = measure_counterfactual_influence(input, verified_calibration)?;
+    let expected = measure_counterfactual_influence_with_policy(
+        input,
+        verified_calibration,
+        &report.support_policy,
+    )?;
     if &expected != report {
         return Err(CounterfactualInfluenceError::InfluenceReplayMismatch);
     }
