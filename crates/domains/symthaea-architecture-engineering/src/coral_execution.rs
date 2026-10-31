@@ -65,6 +65,8 @@ pub struct CoralSeatRound {
     pub schema: String,
     pub version: String,
     pub round_id: u64,
+    pub batch_label: String,
+    /// Content-derived batch ID; event-tape events must use this exact value.
     pub batch_id: String,
     pub source_board_sha256: String,
     /// Formula-level advisory allocation captured before workers made their choices.
@@ -79,7 +81,7 @@ struct UnsignedRound<'a> {
     schema: &'a str,
     version: &'a str,
     round_id: u64,
-    batch_id: &'a str,
+    batch_label: &'a str,
     source_board_sha256: &'a str,
     advisory_allocations: &'a [CoralAllocation],
     claims: &'a [CoralSeatClaim],
@@ -126,13 +128,15 @@ impl CoralSeatRound {
             schema: SCHEMA.to_owned(),
             version: VERSION.to_owned(),
             round_id,
-            batch_id: batch_id.to_owned(),
+            batch_label: batch_id.to_owned(),
+            batch_id: String::new(),
             source_board_sha256,
             advisory_allocations,
             claims,
             round_sha256: String::new(),
         };
         round.round_sha256 = round.compute_digest()?;
+        round.batch_id = round.derived_batch_id();
         round.validate_against_board(source_board)?;
         Ok(round)
     }
@@ -149,10 +153,10 @@ impl CoralSeatRound {
                 "unsupported Coral seat-round schema/version",
             ));
         }
-        if self.round_id == 0 || self.batch_id.trim().is_empty() {
+        if self.round_id == 0 || self.batch_label.trim().is_empty() {
             return Err(CoralExecutionError::new(
                 "round",
-                "round ID and batch ID are required",
+                "round ID and batch label are required",
             ));
         }
         validate_sha256(&self.source_board_sha256, "source_board_sha256")?;
@@ -179,6 +183,12 @@ impl CoralSeatRound {
                 "round digest does not match its frozen claims and advisory allocation",
             ));
         }
+        if self.batch_id != self.derived_batch_id() {
+            return Err(CoralExecutionError::new(
+                "batch_id",
+                "batch ID does not bind the frozen round digest",
+            ));
+        }
         Ok(())
     }
 
@@ -196,6 +206,26 @@ impl CoralSeatRound {
             .map_err(|error| CoralExecutionError::new("event_tape.integrity", error.to_string()))?;
 
         let header = tape.header();
+        if header.policy.has_hidden_oracle_access {
+            return Err(CoralExecutionError::new(
+                "event_tape.header.policy",
+                "the Coral reference policy adapter cannot claim hidden oracle access",
+            ));
+        }
+        let expected_config = serde_json::to_value(&source_board.config).map_err(|error| {
+            CoralExecutionError::new(
+                "event_tape.header.policy.config",
+                format!("Coral policy config serialization failed: {error}"),
+            )
+        })?;
+        if header.policy.algorithm_id != "coral-direction-board-v0.1"
+            || header.policy.config != expected_config
+        {
+            return Err(CoralExecutionError::new(
+                "event_tape.header.policy",
+                "policy algorithm/config does not identify the frozen Coral reference scheduler",
+            ));
+        }
         if header.comparison_mode != ComparisonMode::MechanismMatched {
             return Err(CoralExecutionError::new(
                 "event_tape.header.comparison_mode",
@@ -293,11 +323,15 @@ impl CoralSeatRound {
             schema: &self.schema,
             version: &self.version,
             round_id: self.round_id,
-            batch_id: &self.batch_id,
+            batch_label: &self.batch_label,
             source_board_sha256: &self.source_board_sha256,
             advisory_allocations: &self.advisory_allocations,
             claims: &self.claims,
         })
+    }
+
+    fn derived_batch_id(&self) -> String {
+        format!("coral-seat-round-{}-{}", self.round_id, &self.round_sha256[..16])
     }
 }
 
