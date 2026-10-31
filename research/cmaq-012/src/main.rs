@@ -1081,6 +1081,310 @@ fn sha256_hex(input: &[u8]) -> String {
     output
 }
 
+
+const PROFILE_SCHEMA_VERSION: &str = "cmaq-012-resource-profile-v0.1";
+const RECEIPT_SCHEMA_VERSION: &str = "cmaq-012-profiling-receipt-v0.1";
+const PROFILE_CLAIM_CEILING: &str = "measurement_profile_contract_only_receipt_bytes_must_be_independently_verified";
+const RECEIPT_CLAIM_CEILING: &str = "artifact_content_integrity_verified_profiler_and_hardware_origin_unattested";
+const ARTIFACT_MAX_BYTES: u64 = 1_048_576;
+
+#[derive(Clone, Debug)]
+struct ArtifactVerification {
+    status: &'static str,
+    profiles_verified: usize,
+    receipts_verified: usize,
+    fixture_only: bool,
+    claim_ceiling: &'static str,
+}
+
+fn optional_fixture_only(value: &JsonValue) -> Result<bool, String> {
+    match value {
+        JsonValue::Object(fields) => match fields.get("fixture_only") {
+            None => Ok(false),
+            Some(value) => value.as_bool("fixture_only"),
+        },
+        _ => Err("artifact root must be a JSON object".into()),
+    }
+}
+
+fn require_nonempty_string(value: &JsonValue, field: &str) -> Result<(), String> {
+    let text = value.get(field)?.as_str(field)?;
+    if text.trim().is_empty() {
+        return Err(format!("JSON field {field:?} must not be empty"));
+    }
+    Ok(())
+}
+
+fn require_digest_field(value: &JsonValue, field: &str) -> Result<(), String> {
+    let text = value.get(field)?.as_str(field)?;
+    digest(text).map(|_| ()).map_err(|error| format!("JSON field {field:?}: {error}"))
+}
+
+fn approximately_equal(left: f64, right: f64) -> bool {
+    (left - right).abs() <= 1e-9 * (1.0 + left.abs().max(right.abs()))
+}
+
+fn artifact_path(root: &Path, subdirectory: &str, digest_value: &str) -> PathBuf {
+    root.join(subdirectory).join(format!("{digest_value}.json"))
+}
+
+fn read_verified_artifact(
+    root: &Path,
+    subdirectory: &str,
+    expected_digest: &str,
+    kind: &str,
+) -> Result<Vec<u8>, String> {
+    let path = artifact_path(root, subdirectory, expected_digest);
+    let metadata = fs::symlink_metadata(&path)
+        .map_err(|error| format!("missing {kind} artifact {}: {error}", path.display()))?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(format!("{kind} artifact {} must be a regular non-symlink file", path.display()));
+    }
+    if metadata.len() == 0 || metadata.len() > ARTIFACT_MAX_BYTES {
+        return Err(format!("{kind} artifact {} must be 1..={ARTIFACT_MAX_BYTES} bytes", path.display()));
+    }
+    let bytes = fs::read(&path)
+        .map_err(|error| format!("failed to read {kind} artifact {}: {error}", path.display()))?;
+    let actual = sha256_hex(&bytes);
+    if actual != expected_digest {
+        return Err(format!(
+            "{kind} artifact digest mismatch at {}: expected {expected_digest}, computed {actual}",
+            path.display()
+        ));
+    }
+    Ok(bytes)
+}
+
+fn validate_profile_artifact(
+    bytes: &[u8],
+    expected_digest: &str,
+    expected_method: ResourceMeasurementMethod,
+    allow_fixtures: bool,
+) -> Result<bool, String> {
+    let text = std::str::from_utf8(bytes).map_err(|_| "resource profile is not UTF-8".to_string())?;
+    let profile = parse_json(text).map_err(|error| format!("invalid resource profile JSON: {error}"))?;
+    if profile.get("schema_version")?.as_str("schema_version")? != PROFILE_SCHEMA_VERSION {
+        return Err("resource profile schema_version mismatch".into());
+    }
+    if profile.get("resource_measurement_method")?.as_str("resource_measurement_method")?
+        != expected_method.name()
+    {
+        return Err("resource profile measurement method does not match TSV rows".into());
+    }
+    if profile.get("claim_ceiling")?.as_str("claim_ceiling")? != PROFILE_CLAIM_CEILING {
+        return Err("resource profile claim_ceiling mismatch".into());
+    }
+    if digest(expected_digest)? != expected_digest {
+        return Err("resource profile digest is not canonical lowercase hexadecimal".into());
+    }
+
+    let fixture_only = optional_fixture_only(&profile)?;
+    if fixture_only && !allow_fixtures {
+        return Err("synthetic fixture resource profile rejected without explicit --allow-fixtures".into());
+    }
+
+    let hardware = profile.get("hardware")?;
+    for field in ["os_arch", "cpu_model", "device_clock_policy"] {
+        require_nonempty_string(hardware, field)?;
+    }
+    if hardware.get("logical_cpu_count")?.as_u64("logical_cpu_count")? == 0
+        || hardware.get("memory_bytes")?.as_u64("memory_bytes")? == 0
+    {
+        return Err("resource profile hardware counts and memory must be positive".into());
+    }
+    for field in ["accelerator_model", "accelerator_driver"] {
+        let value = hardware.get(field)?;
+        if !value.is_null() { value.as_str(field)?; }
+    }
+
+    let software = profile.get("software")?;
+    require_nonempty_string(software, "source_commit")?;
+    require_nonempty_string(software, "compiler")?;
+    require_nonempty_string(software, "runtime")?;
+    require_digest_field(software, "binary_sha256")?;
+    require_digest_field(software, "dependency_lock_sha256")?;
+
+    let instrumentation = profile.get("instrumentation")?;
+    for field in ["profiler_name", "profiler_version", "measurement_scope",
+                  "synchronization_policy", "instrumentation_overhead_policy"] {
+        require_nonempty_string(instrumentation, field)?;
+    }
+    require_digest_field(instrumentation, "profiler_binary_sha256")?;
+    if instrumentation.get("measured_repetitions")?.as_u64("measured_repetitions")? == 0 {
+        return Err("resource profile measured_repetitions must be positive".into());
+    }
+
+    let compute_definition = profile.get("compute_work_unit_definition")?;
+    if compute_definition.get("unit_name")?.as_str("unit_name")? != "normalized_compute_work_unit" {
+        return Err("resource profile compute work unit name mismatch".into());
+    }
+    require_nonempty_string(compute_definition, "counting_semantics")?;
+    let accepted = match compute_definition.get("accepted_methods")? {
+        JsonValue::Array(values) => values,
+        _ => return Err("resource profile accepted_methods must be an array".into()),
+    };
+    if !accepted.iter().any(|value| value.as_str("accepted_methods[]").ok() == Some(expected_method.name())) {
+        return Err("resource profile does not declare the TSV measurement method as accepted".into());
+    }
+
+    if profile.get("latency_measurement")?.get("unit")?.as_str("latency_measurement.unit")? != "milliseconds"
+        || profile.get("memory_measurement")?.get("unit")?.as_str("memory_measurement.unit")? != "bytes"
+        || profile.get("energy_measurement")?.get("unit")?.as_str("energy_measurement.unit")? != "millijoules"
+    {
+        return Err("resource profile units must be milliseconds, bytes and millijoules".into());
+    }
+    for (section, field, expected) in [
+        ("tolerances", "compute_work_relative", COMPUTE_WORK_TOLERANCE),
+        ("tolerances", "latency_relative", LATENCY_TOLERANCE),
+        ("tolerances", "peak_memory_relative", MEMORY_TOLERANCE),
+    ] {
+        let value = profile.get(section)?.get(field)?.as_f64(field)?;
+        if !approximately_equal(value, expected) {
+            return Err(format!("resource profile tolerance {field} does not match auditor contract"));
+        }
+    }
+    Ok(fixture_only)
+}
+
+fn validate_receipt_row(
+    receipt: &JsonValue,
+    row: &Row,
+    profile_digest: &str,
+    profile_fixture_only: bool,
+    allow_fixtures: bool,
+) -> Result<(), String> {
+    if receipt.get("schema_version")?.as_str("schema_version")? != RECEIPT_SCHEMA_VERSION {
+        return Err("profiling receipt schema_version mismatch".into());
+    }
+    if receipt.get("claim_ceiling")?.as_str("claim_ceiling")? != RECEIPT_CLAIM_CEILING {
+        return Err("profiling receipt claim_ceiling mismatch".into());
+    }
+    if receipt.get("resource_profile_sha256")?.as_str("resource_profile_sha256")? != profile_digest {
+        return Err("profiling receipt resource profile digest does not match TSV row".into());
+    }
+    if receipt.get("task")?.as_str("task")? != row.task
+        || receipt.get("capability")?.as_str("capability")? != row.capability
+        || receipt.get("split")?.as_str("split")? != row.split
+        || receipt.get("seed")?.as_u64("seed")? != row.seed
+        || receipt.get("arm")?.as_str("arm")? != row.arm.name()
+    {
+        return Err("profiling receipt episode identity does not match TSV row".into());
+    }
+    if receipt.get("measurement_method")?.as_str("measurement_method")? != row.resource_measurement_method.name() {
+        return Err("profiling receipt measurement method does not match TSV row".into());
+    }
+    let latency = receipt.get("latency_ms")?.as_f64("latency_ms")?;
+    if !approximately_equal(latency, row.latency_ms) {
+        return Err("profiling receipt latency_ms does not match TSV row".into());
+    }
+    if receipt.get("compute_work_units")?.optional_u64("compute_work_units")? != row.compute_work_units
+        || receipt.get("peak_memory_bytes")?.optional_u64("peak_memory_bytes")? != row.peak_memory_bytes
+    {
+        return Err("profiling receipt compute or memory does not match TSV row".into());
+    }
+    let energy = receipt.get("energy_millijoules")?.optional_f64("energy_millijoules")?;
+    match (energy, row.energy_millijoules) {
+        (Some(a), Some(b)) if approximately_equal(a, b) => {}
+        (None, None) => {}
+        _ => return Err("profiling receipt energy does not match TSV row".into()),
+    }
+    for (field, expected) in [
+        ("direct_value_calls", row.direct_value_calls),
+        ("world_model_forward_calls", row.world_model_forward_calls),
+        ("world_model_transition_calls", row.world_model_transition_calls),
+        ("oracle_transition_calls", row.oracle_transition_calls),
+        ("environment_transition_calls", row.environment_transition_calls),
+        ("optimizer_iterations", row.optimizer_iterations),
+    ] {
+        if receipt.get(field)?.as_u64(field)? != expected {
+            return Err(format!("profiling receipt {field} does not match TSV row"));
+        }
+    }
+    require_nonempty_string(receipt, "recorder_id")?;
+    if receipt.get("profiling_receipt_sha256").is_ok() {
+        return Err("profiling receipt must not contain a self-referential digest field".into());
+    }
+    let fixture_only = optional_fixture_only(receipt)?;
+    if fixture_only != profile_fixture_only {
+        return Err("profiling receipt fixture_only flag differs from resource profile".into());
+    }
+    if fixture_only && !allow_fixtures {
+        return Err("synthetic profiling receipt rejected without explicit --allow-fixtures".into());
+    }
+    Ok(())
+}
+
+fn verify_artifacts(
+    groups: &[(ResultKey, Vec<BTreeMap<Arm, Row>>)],
+    artifacts_dir: &Path,
+    allow_fixtures: bool,
+) -> Result<ArtifactVerification, String> {
+    let mut verified_profiles = BTreeSet::new();
+    let mut verified_receipts = BTreeSet::new();
+    let mut fixture_mode: Option<bool> = None;
+
+    for ((task, capability, split), episodes) in groups {
+        let reference = &episodes[0][&Arm::D0];
+        let profile_digest = &reference.resource_profile_sha256;
+        let profile_bytes = read_verified_artifact(
+            artifacts_dir, "profiles", profile_digest, "resource profile"
+        )?;
+        let profile_fixture = validate_profile_artifact(
+            &profile_bytes, profile_digest, reference.resource_measurement_method, allow_fixtures
+        )?;
+        if fixture_mode.replace(profile_fixture).is_some_and(|previous| previous != profile_fixture) {
+            return Err("artifact set mixes fixture-only and non-fixture profiles".into());
+        }
+        verified_profiles.insert(profile_digest.clone());
+
+        for episode in episodes {
+            for arm in ARMS {
+                let row = &episode[&arm];
+                if row.resource_profile_sha256 != *profile_digest {
+                    return Err(format!("resource profile drift while verifying {task}/{capability}/{split}"));
+                }
+                let receipt_digest = &row.profiling_receipt_sha256;
+                let receipt_bytes = read_verified_artifact(
+                    artifacts_dir, "receipts", receipt_digest, "profiling receipt"
+                )?;
+                let receipt_text = std::str::from_utf8(&receipt_bytes)
+                    .map_err(|_| format!("profiling receipt {receipt_digest} is not UTF-8"))?;
+                let receipt = parse_json(receipt_text)
+                    .map_err(|error| format!("invalid profiling receipt {receipt_digest}: {error}"))?;
+                validate_receipt_row(&receipt, row, profile_digest, profile_fixture, allow_fixtures)
+                    .map_err(|error| format!("profiling receipt {receipt_digest}: {error}"))?;
+                verified_receipts.insert(receipt_digest.clone());
+            }
+        }
+    }
+
+    let fixture_only = fixture_mode.unwrap_or(false);
+    let (status, claim_ceiling) = if fixture_only {
+        ("synthetic_fixture_content_verified_origin_unattested",
+         "synthetic_fixture_content_integrity_verified_no_hardware_claim")
+    } else {
+        ("content_verified_origin_unattested",
+         "artifact_content_integrity_verified_profiler_and_hardware_origin_unattested")
+    };
+    Ok(ArtifactVerification {
+        status,
+        profiles_verified: verified_profiles.len(),
+        receipts_verified: verified_receipts.len(),
+        fixture_only,
+        claim_ceiling,
+    })
+}
+
+fn unverified_artifacts() -> ArtifactVerification {
+    ArtifactVerification {
+        status: "digest_only_not_independently_verified",
+        profiles_verified: 0,
+        receipts_verified: 0,
+        fixture_only: false,
+        claim_ceiling: "tsv_digest_syntax_only_no_artifact_bytes_or_hardware_origin_verified",
+    }
+}
+
 fn parse_args() -> Result<(PathBuf, usize, u64), String> {
     let mut input = None;
     let mut replicates = 2000usize;
