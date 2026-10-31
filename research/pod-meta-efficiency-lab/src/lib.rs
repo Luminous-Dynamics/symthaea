@@ -575,6 +575,7 @@ mod tests {
             .find(|c| c.id == "attractive_but_stale_evidence").unwrap();
         let result = run_trial(&case, Policy::UnverifiedConfidence, 10, 1729);
         assert!(result.false_support_count > 0 || result.false_completion);
+        assert!(!result.correct_abstention);
     }
 
     #[test]
