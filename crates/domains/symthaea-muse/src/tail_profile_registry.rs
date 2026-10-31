@@ -204,6 +204,9 @@ pub struct TailProfile {
     pub dataset_revision: String,
     pub benchmark_manifest_sha256: String,
     pub benchmark_audit_sha256: String,
+    /// Original signed topology declaration, retained so each registry can
+    /// independently re-verify the renderer-authority signature.
+    pub topology_attestation: RendererTopologyAttestation,
     pub context: TailProfileContext,
     pub builder_spec: TailProfileBuildSpec,
     pub event_observations: Vec<TailProfileEventObservation>,
@@ -715,6 +718,7 @@ fn zero_miss_upper_rate_95_micros(n: usize) -> Option<u32> {
 
 fn create_profile_unsigned(
     spec: &TailProfileBuildSpec,
+    topology_attestation: &RendererTopologyAttestation,
     context: TailProfileContext,
     observations: &[TailProfileEventObservation],
     benchmark_manifest_sha256: &str,
@@ -831,6 +835,7 @@ fn create_profile_unsigned(
         dataset_revision: spec.dataset_revision.clone(),
         benchmark_manifest_sha256: benchmark_manifest_sha256.to_owned(),
         benchmark_audit_sha256: benchmark_audit_sha256.to_owned(),
+        topology_attestation: topology_attestation.clone(),
         context,
         builder_spec: spec.clone(),
         event_observations: observations.to_vec(),
