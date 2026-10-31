@@ -326,6 +326,7 @@ pub struct ValidatedRoundSummary {
     pub charged_budget_units: u64,
     pub verified_evaluations: usize,
     pub admitted_directions: usize,
+    pub duplicate_proposals: usize,
     pub rejected_actions: usize,
     pub inconclusive_actions: usize,
     pub failed_actions: usize,
@@ -363,6 +364,7 @@ impl RoundCloseReceipt {
             charged_budget_units: 0,
             verified_evaluations: 0,
             admitted_directions: 0,
+            duplicate_proposals: 0,
             rejected_actions: 0,
             inconclusive_actions: 0,
             failed_actions: 0,
@@ -483,6 +485,7 @@ impl RoundCloseReceipt {
                         summary.admitted_directions += 1;
                     }
                     ProposalDisposition::Duplicate => {
+                        summary.duplicate_proposals += 1;
                         let id = resolved_direction_id.as_deref().ok_or_else(|| {
                             RoundContractError::new(
                                 format!("{path}.resolved_direction_id"),
@@ -594,7 +597,12 @@ impl RoundCloseReceipt {
     }
 
     pub fn digest(&self) -> Result<String, RoundContractError> {
-        let bytes = serde_json::to_vec(self)
+        // Seats may finish asynchronously. Canonicalize by action ID so equivalent sets
+        // of receipts produce the same close digest independent of arrival order.
+        let mut canonical = self.clone();
+        canonical.results.sort_by(|left, right| left.action_id.cmp(&right.action_id));
+        canonical.costs.sort_by(|left, right| left.action_id.cmp(&right.action_id));
+        let bytes = serde_json::to_vec(&canonical)
             .map_err(|error| RoundContractError::new("round_close", error.to_string()))?;
         Ok(domain_digest(ROUND_CLOSE_DOMAIN, &bytes))
     }
