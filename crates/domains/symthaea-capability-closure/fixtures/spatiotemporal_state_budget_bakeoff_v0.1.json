@@ -88,7 +88,21 @@
       "HDC_fast_slow_novelty_refresh",
       "HDC_plus_STDL_local_auxiliary",
       "HDC_plus_BrainTrace_online_trace"
-    ]
+    ],
+    "implementation": {
+      "path": "research/temporal-bench/src/gradient_oracle.rs",
+      "model": "scalar two-module recurrent recurrence h_t=alpha*h_(t-1)+w*x_t; g_t=beta*g_(t-1)+v*h_t; y=c*g_T",
+      "methods": [
+        "exact_reverse_mode_BPTT",
+        "centered_finite_difference",
+        "hidden_temporal_detachment",
+        "downstream_temporal_detachment",
+        "local_auxiliary_head_gradient"
+      ],
+      "tests_authored": 8,
+      "tests_executed": false,
+      "scope_limit": "Small scalar gradient-path control only; not STDL, BrainTrace, HDC-LTC, or a multi-module/event-vision benchmark."
+    }
   },
   "stage1": {
     "name": "event and static vision parity",
@@ -134,13 +148,20 @@
   "execution_state": {
     "protocol_authored": true,
     "fixture_authored": true,
-    "code_implemented": false,
+    "code_implemented": true,
     "tests_executed": false,
     "benchmark_executed": false,
     "hardware_energy_measured": false,
     "results_present": false,
     "STDL_reproduced": false,
-    "BrainTrace_reproduced": false
+    "BrainTrace_reproduced": false,
+    "gradient_oracle_implemented": true,
+    "gradient_oracle_path": "research/temporal-bench/src/gradient_oracle.rs",
+    "gradient_oracle_tests_authored": 8,
+    "gradient_oracle_tests_executed": false,
+    "full_multimodule_oracle_implemented": false,
+    "stdl_implemented": false,
+    "braintrace_implemented": false
   },
   "caveats": [
     "STDL's public code snapshot predates journal publication; exact paper runner mapping unverified.",
@@ -148,5 +169,10 @@
     "BrainTrace pp-prop is a factorized approximation, not an exact D-RTRL/BPTT gradient.",
     "No energy inference from GPU memory or simulator operation counts.",
     "Oracle isolation and signed evaluator receipts are separate prerequisite work in #9437."
+  ],
+  "next_implementation_steps": [
+    "Extend scalar oracle to two-/four-module nonlinear and delayed-dependency cases.",
+    "Add gradient coverage and memory accounting for explicit local-boundary and HDC summary arms.",
+    "Only after independent correctness checks, connect STDL/BrainTrace adapters and matched dataset loaders."
   ]
 }
