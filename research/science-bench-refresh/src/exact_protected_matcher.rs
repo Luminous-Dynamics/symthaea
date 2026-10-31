@@ -26,11 +26,7 @@ pub const PROTECTED_INDEX_SCHEMA: &str =
 const HASH_PREFIX: &[u8] = b"symthaea.science_bench_refresh.protected_search_index.v1\0";
 const MAX_ARTIFACTS: usize = 250_000;
 const MAX_DIGEST: u32 = 1_000_000;
-const CLASSIFICATIONS: &[&str] = &[
-    "benchmark_metadata",
-    "question_context",
-    "explicit_answer",
-];
+const CLASSIFICATIONS: &[&str] = &["benchmark_metadata", "question_context", "explicit_answer"];
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -110,7 +106,9 @@ fn validate_protected_index_bytes(
     let index: ProtectedSearchArtifactIndexV1 = serde_json::from_slice(bytes)
         .map_err(|error| format!("protected index does not match strict v1 shape: {error}"))?;
     if index.schema != PROTECTED_INDEX_SCHEMA {
-        return Err(format!("protected index schema must be {PROTECTED_INDEX_SCHEMA}"));
+        return Err(format!(
+            "protected index schema must be {PROTECTED_INDEX_SCHEMA}"
+        ));
     }
     if index.generation_id.trim().is_empty() || index.generation_id.len() > 128 {
         return Err("protected index generation_id must be 1..=128 characters".to_owned());
@@ -119,16 +117,27 @@ fn validate_protected_index_bytes(
         return Err("protected index generation_id does not match receipt".to_owned());
     }
     for (field, value) in [
-        ("matcher_revision_sha256", index.matcher_revision_sha256.as_str()),
-        ("decision_rules_sha256", index.decision_rules_sha256.as_str()),
-        ("index_commitment_sha256", index.index_commitment_sha256.as_str()),
+        (
+            "matcher_revision_sha256",
+            index.matcher_revision_sha256.as_str(),
+        ),
+        (
+            "decision_rules_sha256",
+            index.decision_rules_sha256.as_str(),
+        ),
+        (
+            "index_commitment_sha256",
+            index.index_commitment_sha256.as_str(),
+        ),
     ] {
         if !valid_digest(value) {
             return Err(format!("{field} must be 64 lowercase hex characters"));
         }
     }
     if index.artifacts.len() > MAX_ARTIFACTS {
-        return Err(format!("protected index exceeds {MAX_ARTIFACTS} artifact records"));
+        return Err(format!(
+            "protected index exceeds {MAX_ARTIFACTS} artifact records"
+        ));
     }
 
     let mut reference_ids = BTreeSet::new();
@@ -160,10 +169,7 @@ fn validate_protected_index_bytes(
             artifact.reference_id_sha256.as_str(),
         );
         if previous_key.is_some_and(|previous| previous >= key) {
-            return Err(
-                "protected artifacts are not in canonical order"
-                    .to_owned(),
-            );
+            return Err("protected artifacts are not in canonical order".to_owned());
         }
         previous_key = Some(key);
     }
@@ -235,8 +241,7 @@ pub fn match_search_exposure_exact(
                 let new_rank = classification_rank(&artifact.classification);
                 let current_rank = classification_rank(&current.0);
                 if new_rank > current_rank
-                    || (new_rank == current_rank
-                        && artifact.reference_id_sha256 < current.1)
+                    || (new_rank == current_rank && artifact.reference_id_sha256 < current.1)
                 {
                     *current = (
                         artifact.classification.clone(),
@@ -244,10 +249,12 @@ pub fn match_search_exposure_exact(
                     );
                 }
             })
-            .or_insert_with(|| (
-                artifact.classification.clone(),
-                artifact.reference_id_sha256.clone(),
-            ));
+            .or_insert_with(|| {
+                (
+                    artifact.classification.clone(),
+                    artifact.reference_id_sha256.clone(),
+                )
+            });
     }
 
     let mut records = Vec::with_capacity(receipt.events.len());
@@ -343,14 +350,18 @@ mod tests {
         SEARCH_RECEIPT_SCHEMA, SearchExposureEventV1, event_hash, receipt_hash,
     };
 
-    const ZERO: &str =
-        "0000000000000000000000000000000000000000000000000000000000000000";
+    const ZERO: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
     fn receipt_with_response(content: Option<&[u8]>) -> SearchExposureReceiptV1 {
         let response_sha = content.map(sha256_hex);
         let mut event = SearchExposureEventV1 {
             sequence: 0,
-            event_kind: if content.is_some() { "fetch" } else { "network_request" }.to_owned(),
+            event_kind: if content.is_some() {
+                "fetch"
+            } else {
+                "network_request"
+            }
+            .to_owned(),
             decision: if content.is_some() { "allow" } else { "block" }.to_owned(),
             request_sha256: sha256_hex(b"opaque-request"),
             host: "search.example.org".to_owned(),
@@ -365,7 +376,12 @@ mod tests {
             generation_id: "exact-matcher-test-generation".to_owned(),
             policy_revision_sha256: sha256_hex(b"policy-revision"),
             task_ref_sha256: sha256_hex(b"opaque-task-ref"),
-            network_policy: if content.is_some() { "audited_open_web" } else { "isolated" }.to_owned(),
+            network_policy: if content.is_some() {
+                "audited_open_web"
+            } else {
+                "isolated"
+            }
+            .to_owned(),
             allowed_hosts: vec![],
             expected_event_count: 1,
             final_event_sha256: event.event_sha256.clone(),
@@ -389,14 +405,26 @@ mod tests {
             index_commitment_sha256: ZERO.to_owned(),
         };
         index.artifacts.sort_by(|left, right| {
-            (&left.content_sha256, &left.classification, &left.reference_id_sha256)
-                .cmp(&(&right.content_sha256, &right.classification, &right.reference_id_sha256))
+            (
+                &left.content_sha256,
+                &left.classification,
+                &left.reference_id_sha256,
+            )
+                .cmp(&(
+                    &right.content_sha256,
+                    &right.classification,
+                    &right.reference_id_sha256,
+                ))
         });
         index.index_commitment_sha256 = index_commitment(&index).unwrap();
         index
     }
 
-    fn artifact(reference: &str, classification: &str, content: &[u8]) -> ProtectedSearchArtifactV1 {
+    fn artifact(
+        reference: &str,
+        classification: &str,
+        content: &[u8],
+    ) -> ProtectedSearchArtifactV1 {
         ProtectedSearchArtifactV1 {
             reference_id_sha256: sha256_hex(reference.as_bytes()),
             classification: classification.to_owned(),
@@ -447,7 +475,8 @@ mod tests {
         let meta_report = match_search_exposure_exact(
             &serde_json::to_vec(&meta_receipt).unwrap(),
             &serde_json::to_vec(&meta_index).unwrap(),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(meta_report.records[0].classification, "benchmark_metadata");
 
         let context_body = b"context exact bytes";
@@ -459,7 +488,8 @@ mod tests {
         let context_report = match_search_exposure_exact(
             &serde_json::to_vec(&context_receipt).unwrap(),
             &serde_json::to_vec(&context_index).unwrap(),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(context_report.records[0].classification, "question_context");
     }
 
@@ -473,7 +503,8 @@ mod tests {
         let report = match_search_exposure_exact(
             &serde_json::to_vec(&receipt).unwrap(),
             &serde_json::to_vec(&index).unwrap(),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(report.records[0].classification, "no_match");
 
         let blocked = receipt_with_response(None);
@@ -481,7 +512,8 @@ mod tests {
         let report = match_search_exposure_exact(
             &serde_json::to_vec(&blocked).unwrap(),
             &serde_json::to_vec(&blocked_index).unwrap(),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(report.records[0].classification, "not_evaluable");
     }
 
@@ -495,20 +527,23 @@ mod tests {
         );
         index.artifacts.clear();
         let receipt_bytes = serde_json::to_vec(&receipt).unwrap();
-        assert!(match_search_exposure_exact(
-            &receipt_bytes,
-            &serde_json::to_vec(&index).unwrap(),
-        ).is_err());
+        assert!(
+            match_search_exposure_exact(&receipt_bytes, &serde_json::to_vec(&index).unwrap(),)
+                .is_err()
+        );
 
         let mut wrong_generation = protected_index(
             "other-generation",
             vec![artifact("answer", "explicit_answer", body)],
         );
         wrong_generation.index_commitment_sha256 = index_commitment(&wrong_generation).unwrap();
-        assert!(match_search_exposure_exact(
-            &receipt_bytes,
-            &serde_json::to_vec(&wrong_generation).unwrap(),
-        ).is_err());
+        assert!(
+            match_search_exposure_exact(
+                &receipt_bytes,
+                &serde_json::to_vec(&wrong_generation).unwrap(),
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -523,15 +558,20 @@ mod tests {
         let index_bytes = serde_json::to_vec(&index).unwrap();
         let report = match_search_exposure_exact(&receipt_bytes, &index_bytes).unwrap();
         let report_bytes = serde_json::to_vec(&report).unwrap();
-        let verified = verify_search_exposure_exact_match_report(
-            &receipt_bytes, &index_bytes, &report_bytes
-        ).unwrap();
+        let verified =
+            verify_search_exposure_exact_match_report(&receipt_bytes, &index_bytes, &report_bytes)
+                .unwrap();
         assert_eq!(verified.contaminated_event_count, 1);
 
         let mut altered = report;
         altered.records[0].classification = "no_match".to_owned();
-        assert!(verify_search_exposure_exact_match_report(
-            &receipt_bytes, &index_bytes, &serde_json::to_vec(&altered).unwrap()
-        ).is_err());
+        assert!(
+            verify_search_exposure_exact_match_report(
+                &receipt_bytes,
+                &index_bytes,
+                &serde_json::to_vec(&altered).unwrap()
+            )
+            .is_err()
+        );
     }
 }
