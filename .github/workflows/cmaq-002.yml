@@ -75,6 +75,15 @@ jobs:
               raise AssertionError("ActiveArena custody admitted side-camera candidate observation")
 
           hostile = json.loads(json.dumps(custody))
+          hostile["forecasts"][0]["memory_promoted"] = True
+          try:
+              validate(instance=hostile, schema=custody_schema)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError("ActiveArena custody admitted forecast promotion into observation memory")
+
+          hostile = json.loads(json.dumps(custody))
           hostile["evaluator_only"]["candidate_visible"] = True
           try:
               validate(instance=hostile, schema=custody_schema)
