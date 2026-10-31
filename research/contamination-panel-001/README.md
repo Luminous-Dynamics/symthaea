@@ -208,3 +208,43 @@ The Rust kernel provides:
 
 The statistical report does **not** claim that these calculations automatically guarantee FDR control. The reference sample must be representative of the contaminated null, the resulting p-values must be super-uniform under that null, and cross-hypothesis dependence must meet the relevant multiple-testing assumptions. This crate does not establish those conditions. It also does not yet implement PPL, Min-K, Min-K++ or model-serving adapters, so it is an aggregation/reproduction kernel rather than a full FTD reproduction.
 
+
+
+Run the empirical reference step for each detector feature. Reference scores are the chosen contaminated-null sample; test scores are per opaque pair ID:
+
+~~~sh
+cargo run --locked -- ftd-pvalues \
+  ppl \
+  greater \
+  /secure/evaluator/reference-ppl-scores.json \
+  /detector-workspace/test-ppl-scores.json \
+  "$seed_hex" \
+  /detector-workspace/ppl-feature-pvalues.json
+~~~
+
+Use greater when high scores are evidence that an item is unlike the contaminated reference (the official FTD code direction for its reported experiments). Use less only when the detector's score semantics are reversed. Do not infer direction from a feature name; predeclare and validate it.
+
+Fuse feature p-values and apply final BH:
+
+~~~sh
+cargo run --locked -- ftd-fuse \
+  /detector-workspace/feature-pvalues.json \
+  0.05 \
+  paper \
+  none \
+  /secure/evaluator/ftd-paper-weights-report.json
+
+cargo run --locked -- ftd-fuse \
+  /detector-workspace/feature-pvalues.json \
+  0.05 \
+  official \
+  500 \
+  /secure/evaluator/ftd-official-weights-report.json
+~~~
+
+The first command uses paper Eq. (7) normalized BH rejection-count weights. The second adds the official implementation's softmax sharpening at temperature 0.5. Compare both; do not silently label the extra sharpening as part of the printed equation.
+
+The reported p-value direction in the ACL paper's Eq. (4) appears to be a lower-tail sign typo given the stated score direction and clean-selection rule. The official implementation uses the greater-tail direction in its listed experiments. This crate records both directions so the choice is explicit and testable.
+
+This is not a full FTD reproduction: model scoring for PPL, Min-K and Min-K++ is not implemented here. Nor does running BH or a Cauchy combination alone establish an FDR guarantee. The null reference must be representative, p-values must be super-uniform under contamination, and the multiple-hypothesis dependence assumptions must be justified on the actual evaluation population.
+
