@@ -553,11 +553,11 @@ fn score_case(
 
 #[allow(clippy::too_many_arguments)] // Synthetic fixture fields are deliberately explicit at call sites.
 fn ev(
-    split: DatasetSplit, family: &str, id: &str, claim: &str, polarity: Polarity, group: &str,
+    seed: u64, split: DatasetSplit, family: &str, id: &str, claim: &str, polarity: Polarity, group: &str,
     valid: (u64, Option<u64>), known: (u64, Option<u64>), scope: &str, authority: &str,
 ) -> EvidenceRevision {
     EvidenceRevision {
-        id: id.into(), source_id: format!("src-{}-{}-{family}-{id}", split.label(), valid.0),
+        id: id.into(), source_id: format!("src-{}-{seed}-{family}-{id}", split.label()),
         source_family_id: format!("{}-family-{family}", split.label()),
         independence_group_id: group.into(), subject_claim_id: claim.into(),
         asserted_polarity: polarity, valid_from: valid.0, valid_until: valid.1,
@@ -633,8 +633,8 @@ pub fn generate_poar_graph_suite_with_config(
             ProofRequirement::Evidence("e-root".into()),
         ], 1)]),
     ], vec![
-        ev(split,"and","e-leaf","leaf",Polarity::Supports,"g-leaf",(t,None),(t,None),"scope-a","authority-a"),
-        ev(split,"and","e-root","root",Polarity::Supports,"g-root",(t,None),(t,None),"scope-a","authority-a"),
+        ev(seed,split,"and","e-leaf","leaf",Polarity::Supports,"g-leaf",(t,None),(t,None),"scope-a","authority-a"),
+        ev(seed,split,"and","e-root","root",Polarity::Supports,"g-root",(t,None),(t,None),"scope-a","authority-a"),
     ], &[("e-leaf",HiddenTruth::SupportsAssertion),("e-root",HiddenTruth::SupportsAssertion)]);
 
     // OR: old revision is no longer known; current path remains admissible.
@@ -644,8 +644,8 @@ pub fn generate_poar_graph_suite_with_config(
             alt("current-path",Polarity::Supports,vec![ProofRequirement::Evidence("e-current".into())],1),
         ]),
     ], vec![
-        ev(split,"or","e-old","claim",Polarity::Supports,"g-old",(t,None),(t,Some(t+10)),"scope-a","authority-a"),
-        ev(split,"or","e-current","claim",Polarity::Supports,"g-current",(t,None),(t+10,None),"scope-a","authority-a"),
+        ev(seed,split,"or","e-old","claim",Polarity::Supports,"g-old",(t,None),(t,Some(t+10)),"scope-a","authority-a"),
+        ev(seed,split,"or","e-current","claim",Polarity::Supports,"g-current",(t,None),(t+10,None),"scope-a","authority-a"),
     ], &[("e-old",HiddenTruth::SupportsAssertion),("e-current",HiddenTruth::SupportsAssertion)]);
 
     // Correlated echo: two record IDs but one independence group.
@@ -654,8 +654,8 @@ pub fn generate_poar_graph_suite_with_config(
             ProofRequirement::Evidence("e-echo-a".into()),ProofRequirement::Evidence("e-echo-b".into()),
         ],2)]),
     ], vec![
-        ev(split,"echo","e-echo-a","claim",Polarity::Supports,"same-origin",(t,None),(t,None),"scope-a","authority-a"),
-        ev(split,"echo","e-echo-b","claim",Polarity::Supports,"same-origin",(t,None),(t,None),"scope-a","authority-a"),
+        ev(seed,split,"echo","e-echo-a","claim",Polarity::Supports,"same-origin",(t,None),(t,None),"scope-a","authority-a"),
+        ev(seed,split,"echo","e-echo-b","claim",Polarity::Supports,"same-origin",(t,None),(t,None),"scope-a","authority-a"),
     ], &[("e-echo-a",HiddenTruth::SupportsAssertion),("e-echo-b",HiddenTruth::SupportsAssertion)]);
 
     // Bitemporal correction: both records are valid at the query time, but only
@@ -667,8 +667,8 @@ pub fn generate_poar_graph_suite_with_config(
                 alt("revision-two",Polarity::Refutes,vec![ProofRequirement::Evidence("e-rev-two".into())],1),
             ]),
         ],vec![
-            ev(split,"temporal","e-rev-one","claim",Polarity::Supports,"g-rev-one",(t,Some(t+100)),(t,Some(t+10)),"scope-a","authority-a"),
-            ev(split,"temporal","e-rev-two","claim",Polarity::Refutes,"g-rev-two",(t,Some(t+100)),(t+10,None),"scope-a","authority-a"),
+            ev(seed,split,"temporal","e-rev-one","claim",Polarity::Supports,"g-rev-one",(t,Some(t+100)),(t,Some(t+10)),"scope-a","authority-a"),
+            ev(seed,split,"temporal","e-rev-two","claim",Polarity::Refutes,"g-rev-two",(t,Some(t+100)),(t+10,None),"scope-a","authority-a"),
         ],&[("e-rev-one",HiddenTruth::SupportsAssertion),("e-rev-two",HiddenTruth::RefutesAssertion)]);
     }
 
@@ -682,19 +682,19 @@ pub fn generate_poar_graph_suite_with_config(
             ProofRequirement::Evidence("e-unaffected".into()),
         ],1)]),
     ],vec![
-        ev(split,"retraction","e-base","base",Polarity::Supports,"g-base",(t,None),(t,None),"scope-a","authority-a"),
-        ev(split,"retraction-independent","e-unaffected","unaffected",Polarity::Supports,"g-unaffected",(t,None),(t,None),"scope-a","authority-a"),
+        ev(seed,split,"retraction","e-base","base",Polarity::Supports,"g-base",(t,None),(t,None),"scope-a","authority-a"),
+        ev(seed,split,"retraction-independent","e-unaffected","unaffected",Polarity::Supports,"g-unaffected",(t,None),(t,None),"scope-a","authority-a"),
     ],&[("e-base",HiddenTruth::SupportsAssertion),("e-unaffected",HiddenTruth::SupportsAssertion)]);
 
     // Scope mismatch and authority mismatch are distinct fixtures.
     add(&mut suite,seed,split,"scope-mismatch",q(t+5,t+5),&["claim"],vec![
         claim("claim",vec![alt("scope-path",Polarity::Supports,vec![ProofRequirement::Evidence("e-scope".into())],1)]),
-    ],vec![ev(split,"scope","e-scope","claim",Polarity::Supports,"g-scope",(t,None),(t,None),"scope-b","authority-a")],
+    ],vec![ev(seed,split,"scope","e-scope","claim",Polarity::Supports,"g-scope",(t,None),(t,None),"scope-b","authority-a")],
     &[("e-scope",HiddenTruth::SupportsAssertion)]);
 
     add(&mut suite,seed,split,"authority-mismatch",q(t+5,t+5),&["claim"],vec![
         claim("claim",vec![alt("authority-path",Polarity::Supports,vec![ProofRequirement::Evidence("e-authority".into())],1)]),
-    ],vec![ev(split,"authority","e-authority","claim",Polarity::Supports,"g-authority",(t,None),(t,None),"scope-a","authority-b")],
+    ],vec![ev(seed,split,"authority","e-authority","claim",Polarity::Supports,"g-authority",(t,None),(t,None),"scope-a","authority-b")],
     &[("e-authority",HiddenTruth::SupportsAssertion)]);
 
     // Simultaneous positive and negative support must remain contested.
@@ -704,8 +704,8 @@ pub fn generate_poar_graph_suite_with_config(
             alt("negative-path",Polarity::Refutes,vec![ProofRequirement::Evidence("e-negative".into())],1),
         ]),
     ],vec![
-        ev(split,"conflict","e-positive","claim",Polarity::Supports,"g-plus",(t,None),(t,None),"scope-a","authority-a"),
-        ev(split,"conflict","e-negative","claim",Polarity::Refutes,"g-minus",(t,None),(t,None),"scope-a","authority-a"),
+        ev(seed,split,"conflict","e-positive","claim",Polarity::Supports,"g-plus",(t,None),(t,None),"scope-a","authority-a"),
+        ev(seed,split,"conflict","e-negative","claim",Polarity::Refutes,"g-minus",(t,None),(t,None),"scope-a","authority-a"),
     ],&[("e-positive",HiddenTruth::SupportsAssertion),("e-negative",HiddenTruth::RefutesAssertion)]);
 
     // Cycles cannot self-certify.
@@ -717,7 +717,7 @@ pub fn generate_poar_graph_suite_with_config(
     // Future-known evidence cannot leak into the earlier as-known view.
     add(&mut suite,seed,split,"future-known-leak",q(t+5,t+5),&["claim"],vec![
         claim("claim",vec![alt("future-path",Polarity::Supports,vec![ProofRequirement::Evidence("e-future".into())],1)]),
-    ],vec![ev(split,"future","e-future","claim",Polarity::Supports,"g-future",(t,None),(t+20,None),"scope-a","authority-a")],
+    ],vec![ev(seed,split,"future","e-future","claim",Polarity::Supports,"g-future",(t,None),(t+20,None),"scope-a","authority-a")],
     &[("e-future",HiddenTruth::SupportsAssertion)]);
 
     // Difficulty is structurally stratified: dev=8, calibration=32, held-out test=64.
@@ -741,7 +741,7 @@ pub fn generate_poar_graph_suite_with_config(
         let leaf = format!("chain-{:03}", depth - 1);
         let suffix = format!("long-chain-{depth}");
         add(&mut suite, seed, split, &suffix, q(t+5,t+5), &["chain-000"], claims,
-            vec![ev(split,"long-chain","e-chain-leaf",&leaf,Polarity::Supports,"g-chain-leaf",
+            vec![ev(seed,split,"long-chain","e-chain-leaf",&leaf,Polarity::Supports,"g-chain-leaf",
                 (t,None),(t,None),"scope-a","authority-a")],
             &[("e-chain-leaf",HiddenTruth::SupportsAssertion)]);
     }
@@ -750,12 +750,12 @@ pub fn generate_poar_graph_suite_with_config(
     add(&mut suite,seed,split,"assertion-content-mismatch",q(t+5,t+5),&["claim"],vec![
         claim("claim",vec![alt("assertion-path",Polarity::Supports,
             vec![ProofRequirement::Evidence("e-assertion".into())],1)]),
-    ],vec![ev(split,"assertion","e-assertion","claim",Polarity::Supports,"g-assertion",
+    ],vec![ev(seed,split,"assertion","e-assertion","claim",Polarity::Supports,"g-assertion",
         (t,None),(t,None),"scope-a","authority-a")],
     &[("e-assertion",HiddenTruth::Irrelevant)]);
 
     // Truthful content is still inadmissible when the source-integrity floor fails.
-    let mut unverified = ev(split,"integrity","e-unverified","claim",Polarity::Supports,"g-unverified",
+    let mut unverified = ev(seed,split,"integrity","e-unverified","claim",Polarity::Supports,"g-unverified",
         (t,None),(t,None),"scope-a","authority-a");
     unverified.integrity = SourceIntegrity::Unverified;
     add(&mut suite,seed,split,"unverified-source",q(t+5,t+5),&["claim"],vec![
@@ -770,8 +770,8 @@ pub fn generate_poar_graph_suite_with_config(
             ProofRequirement::Evidence("e-independent-b".into()),
         ],2)]),
     ],vec![
-        ev(split,"independent","e-independent-a","claim",Polarity::Supports,"g-independent-a",(t,None),(t,None),"scope-a","authority-a"),
-        ev(split,"independent","e-independent-b","claim",Polarity::Supports,"g-independent-b",(t,None),(t,None),"scope-a","authority-a"),
+        ev(seed,split,"independent","e-independent-a","claim",Polarity::Supports,"g-independent-a",(t,None),(t,None),"scope-a","authority-a"),
+        ev(seed,split,"independent","e-independent-b","claim",Polarity::Supports,"g-independent-b",(t,None),(t,None),"scope-a","authority-a"),
     ],&[("e-independent-a",HiddenTruth::SupportsAssertion),("e-independent-b",HiddenTruth::SupportsAssertion)]);
 
     Ok(suite)
