@@ -46,9 +46,9 @@ This PR adds:
 - strict source-epoch ledger and audit-report JSON schemas;
 - a machine-readable seven-arm, nine-metric benchmark;
 - `basalt-event-delivery-audit --ledger PATH` CLI;
-- thirteen unit tests authored for clean closure, tail loss, interior gaps, overlap, counter mismatch, required/excluded discards, unclosed consumers, restart, unknown epochs and source duplication.
+- sixteen unit tests authored for clean closure, tail loss, interior gaps, overlap, counter mismatch, required/excluded discards, unclosed consumers, restart, unknown epochs, source duplication, per-source range-count overflow and cross-epoch aggregate overflow.
 
-The auditor compares each source epoch's attempted range against event singletons and classified loss/discard intervals. It checks that intervals are non-overlapping and cover the entire attempted range, including the tail. It recomputes published/lost/discarded counts and compares them against the supplied counters. It refuses loss-free status for any unreviewed policy exclusion, even when the sequence arithmetic is complete.
+The auditor compares each source epoch's attempted range against event singletons and classified loss/discard intervals. It checks that intervals are non-overlapping and cover the entire attempted range, including the tail. It recomputes published/lost/discarded counts and compares them against the supplied counters. It refuses loss-free status for any unreviewed policy exclusion, even when the sequence arithmetic is complete. Per-source and aggregate counters use checked addition: overflow becomes an explicit malformed-ledger error and blocks promotion rather than silently saturating at `u64::MAX`. The adversarial tests exercise both per-source range-count overflow and cross-epoch aggregate overflow.
 
 ## Industry comparison
 
