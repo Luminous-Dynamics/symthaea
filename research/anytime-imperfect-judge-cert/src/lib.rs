@@ -343,10 +343,10 @@ mod tests {
     #[test]
     fn incompatible_test_prevalence_and_fpr_are_inconclusive_not_zero_risk() {
         let counts = ChannelCounts {
-            true_positive: 9_500,
-            false_negative: 500,
-            true_negative: 9_800,
-            false_positive: 200,
+            true_positive: 9_900,
+            false_negative: 100,
+            true_negative: 8_500,
+            false_positive: 1_500,
             test_positive: 0,
             test_total: 10_000,
         };
