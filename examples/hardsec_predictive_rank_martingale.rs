@@ -64,6 +64,21 @@ struct FeatureState {
 }
 
 #[derive(Debug, Clone)]
+struct FeatureStep {
+    observed_value: f64,
+    predictive_mean: f64,
+    centered_payoff: f64,
+    max_abs_payoff: f64,
+    b_t: f64,
+    factor: f64,
+    gradient: f64,
+    accumulator_after: f64,
+    lambda_unprojected: f64,
+    log_wealth: f64,
+    crossing_index: Option<usize>,
+}
+
+#[derive(Debug, Clone)]
 struct Plan {
     monitor_id: String,
     evidence_domain: String,
@@ -475,7 +490,7 @@ fn audit_values(
             return Err("PRM predictive rank probability must be positive".to_owned());
         }
         let counts_before=counts.clone();
-        let mut feature_rows=Vec::with_capacity(features.len());
+        let mut pending=Vec::with_capacity(features.len());
         for state in features.iter_mut() {
             let h_observed=state.feature_values[rank_index];
             let conditional_mean=state.feature_values.iter().zip(pi.iter()).map(|(h,p)|h*p).sum::<f64>();
@@ -490,40 +505,49 @@ fn audit_values(
                 return Err(format!("feature {} betting factor violates minimum",state.feature_id));
             }
             min_component_factor=min_component_factor.min(factor);
-            let log_factor=factor.ln();
-            state.log_wealth+=log_factor;
-            let g=z/factor;
-            let accumulator_next=state.accumulator+g*g;
-            let lambda_unprojected=state.lambda+ONS_STEP*g/accumulator_next;
-            counts[rank_index]+=1;
-            let pi_next=predictive_law(&counts,n,t+1);
-            let max_abs_next=max_abs_centered(&state.feature_values,&pi_next);
-            let b_next=projection_radius(max_abs_next);
-            let lambda_next=lambda_unprojected.clamp(-b_next,b_next);
+            state.log_wealth+=factor.ln();
+            let gradient=z/factor;
+            let accumulator_after=state.accumulator+gradient*gradient;
+            let lambda_unprojected=state.lambda+ONS_STEP*gradient/accumulator_after;
             let crossing_now=state.first_crossing_index.is_none() && state.log_wealth>=threshold;
             if crossing_now {state.first_crossing_index=Some(t);}
+            pending.push(FeatureStep{
+                observed_value:h_observed,predictive_mean:conditional_mean,centered_payoff:z,
+                max_abs_payoff:max_abs_z,b_t,factor,gradient,accumulator_after,
+                lambda_unprojected,log_wealth:state.log_wealth,crossing_index:state.first_crossing_index
+            });
+        }
+        // There is one new rank observation, regardless of portfolio width.
+        // Advance the shared Pólya-urn history exactly once.
+        counts[rank_index]+=1;
+        let pi_next=predictive_law(&counts,n,t+1);
+        let mut feature_rows=Vec::with_capacity(features.len());
+        for (state,step) in features.iter_mut().zip(pending.iter()) {
+            let max_abs_next=max_abs_centered(&state.feature_values,&pi_next);
+            let b_next=projection_radius(max_abs_next);
+            let lambda_next=step.lambda_unprojected.clamp(-b_next,b_next);
             feature_rows.push(json!({
                 "feature_id":state.feature_id,
                 "feature_type":state.feature_type,
                 "portfolio_weight":state.portfolio_weight,
-                "observed_feature_value":h_observed,
-                "predictive_feature_mean":conditional_mean,
-                "centered_payoff_z":z,
-                "predictive_max_abs_payoff_B":max_abs_z,
-                "ons_projection_radius_b_t":b_t,
+                "observed_feature_value":step.observed_value,
+                "predictive_feature_mean":step.predictive_mean,
+                "centered_payoff_z":step.centered_payoff,
+                "predictive_max_abs_payoff_B":step.max_abs_payoff,
+                "ons_projection_radius_b_t":step.b_t,
                 "lambda_t_predictable":state.lambda,
-                "betting_factor":factor,
+                "betting_factor":step.factor,
                 "minimum_factor_required":MIN_FACTOR,
-                "log_wealth":state.log_wealth,
+                "log_wealth":step.log_wealth,
                 "accumulator_before":state.accumulator,
-                "ons_gradient":g,
-                "accumulator_after":accumulator_next,
-                "lambda_unprojected_next":lambda_unprojected,
+                "ons_gradient":step.gradient,
+                "accumulator_after":step.accumulator_after,
+                "lambda_unprojected_next":step.lambda_unprojected,
                 "ons_projection_radius_b_next":b_next,
                 "lambda_next":lambda_next,
-                "first_crossing_sequence_index":state.first_crossing_index
+                "first_crossing_sequence_index":step.crossing_index
             }));
-            state.accumulator=accumulator_next;
+            state.accumulator=step.accumulator_after;
             state.lambda=lambda_next;
         }
         let log_terms:Vec<f64>=features.iter().map(|f|f.portfolio_weight.ln()+f.log_wealth).collect();
@@ -837,6 +861,33 @@ mod tests {
         let features=r["sequential_monitor"]["component_reports"].as_array().unwrap();
         let expected=features.iter().map(|f|f["portfolio_weight"].as_f64().unwrap()*f["final_e_value"].as_f64().unwrap()).sum::<f64>();
         assert!((expected-r["sequential_monitor"]["final_portfolio_log_e_value"].as_f64().unwrap().exp()).abs()<1e-8);
+    }
+
+
+    #[test]
+    fn shared_rank_history_advances_once_per_observation_not_per_feature(){
+        let (p,d,c)=fixture();
+        let r=audit(&p,&d,&c).unwrap();
+        for (i,row) in r["sequential_monitor"]["window_decisions"].as_array().unwrap().iter().enumerate(){
+            let law=&row["predictive_rank_law"];
+            let before=law["rank_history_counts_before"].as_array().unwrap().iter().map(|x|x.as_u64().unwrap()).sum::<u64>();
+            let after=law["rank_history_counts_after"].as_array().unwrap().iter().map(|x|x.as_u64().unwrap()).sum::<u64>();
+            assert_eq!(before,i as u64);
+            assert_eq!(after,(i+1) as u64);
+            assert_eq!(after-before,1);
+        }
+    }
+
+    #[test]
+    fn randomized_tie_rank_is_lexicographic_and_deterministic(){
+        let calibration=vec![
+            Sample{unit_id:"a".into(),score:1.0,tie_uniform:0.1},
+            Sample{unit_id:"b".into(),score:1.0,tie_uniform:0.4},
+            Sample{unit_id:"c".into(),score:1.0,tie_uniform:0.9},
+        ];
+        assert_eq!(rank_against_reference(&calibration,1.0,0.05),1);
+        assert_eq!(rank_against_reference(&calibration,1.0,0.5),3);
+        assert_eq!(rank_against_reference(&calibration,1.0,0.95),4);
     }
 
     #[test]
