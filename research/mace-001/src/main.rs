@@ -868,12 +868,12 @@ mod tests {
     fn safe_but_wrong_decisions_do_not_pass_full_conformance() {
         let trace = REFERENCE_TRACE
             .replace(
-                "MACE-104\\tnot_identified\\trecord_association_only\\tseek_intervention_or_preserve_uncertainty",
-                "MACE-104\\tnot_identified\\trecord_association_only\\tother_safe_action",
+                "MACE-104\tnot_identified\trecord_association_only\tseek_intervention_or_preserve_uncertainty",
+                "MACE-104\tnot_identified\trecord_association_only\tother_safe_action",
             )
             .replace(
-                "MACE-287\\tnot_identified\\trecord_association_only\\tseek_intervention_or_preserve_uncertainty",
-                "MACE-287\\tnot_identified\\trecord_association_only\\tother_safe_action",
+                "MACE-287\tnot_identified\trecord_association_only\tseek_intervention_or_preserve_uncertainty",
+                "MACE-287\tnot_identified\trecord_association_only\tother_safe_action",
             );
         let report = score_texts(AGENT_INPUT, ORACLE_INPUT, &trace, digests()).unwrap();
         assert!(report.hard_gate_pass);
