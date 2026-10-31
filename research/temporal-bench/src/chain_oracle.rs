@@ -86,6 +86,7 @@ pub struct SpatialCutResult {
 pub enum ChainOracleError {
     InvalidModuleCount { requested: usize, minimum: usize, maximum: usize },
     ParameterLengthMismatch,
+    TemporalMaskLengthMismatch,
     EmptyInput,
     TooManySteps { requested: usize, maximum: usize },
     NonFiniteParameter { name: &'static str, index: Option<usize> },
@@ -103,6 +104,9 @@ impl fmt::Display for ChainOracleError {
             ),
             Self::ParameterLengthMismatch => {
                 write!(f, "recurrent and feedforward weight arrays must have equal length")
+            }
+            Self::TemporalMaskLengthMismatch => {
+                write!(f, "temporal detachment mask length must equal module count")
             }
             Self::EmptyInput => write!(f, "chain input stream must not be empty"),
             Self::TooManySteps { requested, maximum } => {
@@ -283,7 +287,7 @@ pub fn gradient_with_temporal_detachment(
     validate(config)?;
     let modules = config.module_count();
     if detach_temporal.len() != modules {
-        return Err(ChainOracleError::ParameterLengthMismatch);
+        return Err(ChainOracleError::TemporalMaskLengthMismatch);
     }
     let trace = forward(config)?;
     let time_steps = config.inputs.len();
@@ -397,14 +401,10 @@ pub fn spatial_cut_with_auxiliary(
             gradient.feedforward_weights[module] += total_adjoint * previous_spatial;
 
             if time > 0 {
-                if global_adjoint != 0.0 {
-                    global_adjoints[time - 1][module] +=
-                        global_adjoint * config.recurrent_weights[module];
-                }
-                if local_adjoint != 0.0 {
-                    local_adjoints[time - 1][module] +=
-                        local_adjoint * config.recurrent_weights[module];
-                }
+                global_adjoints[time - 1][module] +=
+                    global_adjoint * config.recurrent_weights[module];
+                local_adjoints[time - 1][module] +=
+                    local_adjoint * config.recurrent_weights[module];
             }
             if module > 0 {
                 if module != boundary_module + 1 {
@@ -560,7 +560,7 @@ mod tests {
         let config = ScalarChainConfig::four_module_reference();
         assert!(matches!(
             gradient_with_temporal_detachment(&config, &[true, false]),
-            Err(ChainOracleError::ParameterLengthMismatch)
+            Err(ChainOracleError::TemporalMaskLengthMismatch)
         ));
     }
 }
