@@ -24,6 +24,8 @@ Supported objective mappings:
 |---|---|---|
 | MeanVerifiedScore | Mean of verified evaluation scores | Maximize |
 | MinimumVerifiedScore | Worst observed verified score | Maximize |
+| MeanReportedUncertainty | Mean evaluator-reported uncertainty over verified repeats | Minimize |
+| MaximumReportedUncertainty | Worst evaluator-reported uncertainty | Minimize |
 | LowerConfidenceBoundVerifiedScore | Mean minus z × sample standard-error proxy; requires at least two verified repeats | Maximize |
 | VerifiedAttemptRate | Verified evaluation count / all candidate attempts, including retries | Maximize |
 | MeanReportedUncertainty | Mean evaluator-reported uncertainty across all verified repeats | Minimize |
@@ -81,7 +83,8 @@ The adapter does not retrieve artifact bytes from the evidence digests. It prove
 - strict validation rejects unknown resource meters;
 - metric/objective direction mismatch is rejected;
 - lower-confidence-bound metric rejects a single verified sample;
-- uncertainty objective rejects missing uncertainty on a verified repeat.
+- uncertainty objective rejects missing uncertainty on a verified repeat;
+- deterministic report reconstruction rejects tampered candidate/resource summaries.
 
 These tests are authored but not run. Acceptance commands:
 
@@ -102,3 +105,7 @@ cargo clippy -p symthaea-architecture-engineering --all-targets -- -D warnings
 5. Next: semantic alias and verifier corruption challenge fixtures, multi-run uncertainty-aware Pareto fronts, ZDT/DTLZ/WFG and constrained benchmark expansion, plus pinned algorithm adapters.
 
 No SOTA result is claimed by this adapter.
+
+The adapter now exposes evaluator-reported uncertainty as a selectable objective. When mean or maximum reported uncertainty is selected, every verified evaluation must carry that field; missing uncertainty fails closed. The lower-confidence-bound score remains a descriptive optimization statistic (mean minus z times a sample-standard-error proxy), not a calibrated confidence interval.
+
+A deterministic report verifier, `verify_event_tape_pareto_report`, reruns the adapter on the exact tape/config and rejects any mismatch in source tape digest, candidate manifests, Pareto analysis or resource accounting. This verifies deterministic reconstruction; artifact-byte retrieval remains separate.
