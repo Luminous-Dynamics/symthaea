@@ -128,7 +128,7 @@ fn nonempty(value: &str) -> bool {
 fn validate_request(request: &CapabilityRequest) -> Result<(), String> {
     if !instrument_descriptors()
         .iter()
-        .any(|descriptor| descriptor.id == request.instrument_id)
+        .any(|descriptor| descriptor.id == request.instrument_id.as_str())
     {
         return Err(format!("unknown instrument stable ID: {}", request.instrument_id));
     }
@@ -286,7 +286,7 @@ mod tests {
     use super::*;
 
     fn digest(byte: char) -> String {
-        std::iter::repeat_n(byte, 64).collect()
+        std::iter::repeat(byte).take(64).collect()
     }
 
     fn request() -> CapabilityRequest {
