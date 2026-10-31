@@ -100,7 +100,7 @@
         "downstream_temporal_detachment",
         "local_auxiliary_head_gradient"
       ],
-      "tests_authored": 9,
+      "tests_authored": 18,
       "tests_executed": false,
       "scope_limit": "Small scalar gradient-path control only; not STDL, BrainTrace, HDC-LTC, or a multi-module/event-vision benchmark.",
       "verification_controls": [
@@ -110,7 +110,25 @@
         "hidden_detachment_changes_long_horizon_credit",
         "double_detachment_keeps_only_final_step_input_credit",
         "local_auxiliary_objective_is_distinct_from_global_BPTT"
-      ]
+      ],
+      "chain_oracle": {
+        "path": "research/temporal-bench/src/chain_oracle.rs",
+        "modules_supported": [
+          2,
+          4
+        ],
+        "model": "Scalar recurrent chain with per-module temporal recurrence and feedforward coupling.",
+        "methods": [
+          "full_reverse_mode_BPTT",
+          "centered_finite_difference",
+          "per_module_temporal_stop_gradient",
+          "STDL_style_spatial_cut",
+          "separate_local_auxiliary_objective"
+        ],
+        "tests_authored": 9,
+        "tests_executed": false,
+        "claim_ceiling": "Analytic scalar chain only; it is not a reproduction or implementation of STDL, BrainTrace, HDC-LTC, or an event-vision model."
+      }
     },
     "sensitivity_factors": {
       "braintrace_pp_prop": {
@@ -209,7 +227,14 @@
     "full_multimodule_oracle_implemented": false,
     "stdl_implemented": false,
     "braintrace_implemented": false,
-    "braintrace_sensitivity_sweep_implemented": false
+    "braintrace_sensitivity_sweep_implemented": false,
+    "chain_oracle_implemented": true,
+    "chain_oracle_tests_authored": 9,
+    "chain_oracle_tests_executed": false,
+    "nonlinear_multimodule_oracle_implemented": false,
+    "stdl_training_implemented": false,
+    "braintrace_training_implemented": false,
+    "braintrace_pp_prop_sensitivity_implemented": false
   },
   "caveats": [
     "STDL's public code snapshot predates journal publication; exact paper runner mapping unverified.",
