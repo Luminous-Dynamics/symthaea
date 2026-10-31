@@ -66,6 +66,9 @@ pub struct CounterfactualEventSupportEvidence {
     pub channels: usize,
     pub output_frame_count: u64,
     pub disposition: InfluenceDisposition,
+    /// Raw threshold-positive windows retained for audit, not planner use.
+    pub raw_measured_support: Vec<AcousticSupportInterval>,
+    /// Hysteresis-qualified intervals are carried by support.acoustic_support.
     pub support: EventInteractionSupport,
     /// Domain-separated hash over this evidence with both digest fields blank.
     pub evidence_sha256: String,
@@ -306,31 +309,38 @@ fn build_event_support(
         domains.insert(format!("fluidsynth:effects-group:{group}"));
     }
 
-    if report.measured_influence_intervals.len() > MAX_SUPPORT_INTERVALS_PER_EVENT {
+    if report.measured_influence_intervals.len() > MAX_SUPPORT_INTERVALS_PER_EVENT
+        || report.qualified_support_intervals.len() > MAX_SUPPORT_INTERVALS_PER_EVENT
+    {
         return Err(CounterfactualSupportAdapterError::InvalidSupportIntervals);
     }
-    let mut acoustic_support = Vec::with_capacity(report.measured_influence_intervals.len());
-    for interval in &report.measured_influence_intervals {
-        let start_frame = u64::try_from(interval.start_frame)
-            .map_err(|_| CounterfactualSupportAdapterError::InvalidSupportIntervals)?;
-        let end_frame = u64::try_from(interval.end_frame)
-            .map_err(|_| CounterfactualSupportAdapterError::InvalidSupportIntervals)?;
-        if start_frame >= end_frame || end_frame > report.total_frames as u64 {
-            return Err(CounterfactualSupportAdapterError::InvalidSupportIntervals);
-        }
-        acoustic_support.push(AcousticSupportInterval { start_frame, end_frame });
-    }
-    acoustic_support.sort_unstable();
-    let mut merged: Vec<AcousticSupportInterval> = Vec::with_capacity(acoustic_support.len());
-    for interval in acoustic_support {
-        if let Some(previous) = merged.last_mut() {
-            if interval.start_frame <= previous.end_frame {
-                previous.end_frame = previous.end_frame.max(interval.end_frame);
-                continue;
+    let convert_intervals = |source: &[crate::audio_preservation::FrameInterval]| {
+        let mut converted = Vec::with_capacity(source.len());
+        for interval in source {
+            let start_frame = u64::try_from(interval.start_frame)
+                .map_err(|_| CounterfactualSupportAdapterError::InvalidSupportIntervals)?;
+            let end_frame = u64::try_from(interval.end_frame)
+                .map_err(|_| CounterfactualSupportAdapterError::InvalidSupportIntervals)?;
+            if start_frame >= end_frame || end_frame > report.total_frames as u64 {
+                return Err(CounterfactualSupportAdapterError::InvalidSupportIntervals);
             }
+            converted.push(AcousticSupportInterval { start_frame, end_frame });
         }
-        merged.push(interval);
-    }
+        converted.sort_unstable();
+        let mut merged: Vec<AcousticSupportInterval> = Vec::with_capacity(converted.len());
+        for interval in converted {
+            if let Some(previous) = merged.last_mut() {
+                if interval.start_frame <= previous.end_frame {
+                    previous.end_frame = previous.end_frame.max(interval.end_frame);
+                    continue;
+                }
+            }
+            merged.push(interval);
+        }
+        Ok::<Vec<AcousticSupportInterval>, CounterfactualSupportAdapterError>(merged)
+    };
+    let raw_measured_support = convert_intervals(&report.measured_influence_intervals)?;
+    let qualified_support = convert_intervals(&report.qualified_support_intervals)?;
 
     let mut evidence = CounterfactualEventSupportEvidence {
         version: COUNTERFACTUAL_SUPPORT_ADAPTER_VERSION.to_owned(),
@@ -355,9 +365,10 @@ fn build_event_support(
         channels: report.channels,
         output_frame_count: report.total_frames as u64,
         disposition: report.disposition,
+        raw_measured_support,
         support: EventInteractionSupport {
             source_event_index,
-            acoustic_support: merged,
+            acoustic_support: qualified_support,
             routing_domains: domains.into_iter().collect(),
             // Partial effects-group topology is not a complete render graph.
             // EVAL-019 will conservatively expand pair scope until this changes.
