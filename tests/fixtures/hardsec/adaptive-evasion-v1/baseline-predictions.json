@@ -1,13 +1,13 @@
 {
   "schema_version": "hardsec-adaptive-predictions-v1",
   "campaign_id": "hs012-synthetic-campaign-01",
-  "model_id": "fixture-improved-detector",
+  "model_id": "fixture-baseline-detector",
   "model_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
   "threshold_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
   "cases": [
     {
       "case_id": "c1",
-      "response": "alert",
+      "response": "clear",
       "score": 0.91,
       "cost": {
         "acquisition_ns": 100,
@@ -29,7 +29,7 @@
     },
     {
       "case_id": "c3",
-      "response": "alert",
+      "response": "clear",
       "score": null,
       "cost": {
         "acquisition_ns": 100,
@@ -62,7 +62,7 @@
     },
     {
       "case_id": "c6",
-      "response": "clear",
+      "response": "alert",
       "score": 0.08,
       "cost": {
         "acquisition_ns": 100,
@@ -95,7 +95,7 @@
     },
     {
       "case_id": "c9",
-      "response": "sensor_invalid",
+      "response": "clear",
       "score": null,
       "cost": {
         "acquisition_ns": 100,
