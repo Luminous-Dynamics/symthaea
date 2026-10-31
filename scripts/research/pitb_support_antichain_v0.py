@@ -76,7 +76,7 @@ def powerset(values):
     }
 
 
-def validate_outcome(row, n):
+def validate_outcome(row, n, max_variables=12):
     if not isinstance(row, dict) or set(row) != OUTCOME_KEYS:
         raise ContractError(f"outcome row {n} has missing or unsupported keys")
     if row["schema_version"] != OUTCOME_SCHEMA:
@@ -277,7 +277,7 @@ def score_predictions(predictions, groups):
 def analyze(rows, predictions=None, max_variables=12):
     grouped = defaultdict(list)
     for i, raw in enumerate(rows, 1):
-        row = validate_outcome(raw, i)
+        row = validate_outcome(raw, i, max_variables)
         grouped[group_key(row)].append(row)
     reports = [analyze_group(k, v, max_variables) for k, v in sorted(grouped.items())]
     return {
