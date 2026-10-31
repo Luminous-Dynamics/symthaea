@@ -5,7 +5,6 @@
 //! Tchebycheff scalarization and bounded neighbourhood replacement. Objectives are minimized.
 //! This is a reference baseline, not a claim of state-of-the-art performance.
 
-use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::error::Error;
