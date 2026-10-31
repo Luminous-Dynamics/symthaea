@@ -618,6 +618,60 @@ mod tests {
     }
 
     #[test]
+    fn emitted_opera_plan_verifies_all_nine_bar_dialogue_obligations() {
+        let home = Key::major(PitchClass::C);
+        for seed in 0..64u64 {
+            let realized = realize_opera_with_plan(home, 100.0, 4.0, seed, &intent());
+            assert_eq!(realized.plan.engine_version, "two-theme-dialogue-v1");
+            assert_eq!(realized.plan.total_bars, 9);
+            assert_eq!(realized.plan.sections.len(), 4);
+            assert!(
+                realized.verification.all_verified(),
+                "seed {seed}: {:?}",
+                realized.verification
+            );
+            assert!((realized.score.total_beats.beats() - 36.0).abs() <= 1e-7);
+        }
+    }
+
+    #[test]
+    fn opera_plan_verifier_rejects_a_missing_dialogue_turn() {
+        let home = Key::major(PitchClass::C);
+        let realized = realize_opera_with_plan(home, 100.0, 4.0, 3, &intent());
+        let mut corrupted = realized.score.clone();
+        let dialogue_bar = 5.0 * 4.0;
+        corrupted.notes.retain(|note| {
+            !(note.role == VoiceRole::CounterMelody
+                && note.onset.beats() >= dialogue_bar
+                && note.onset.beats() < dialogue_bar + 4.0)
+        });
+        let verification = verify_opera_plan(&corrupted, home, &realized.plan);
+        assert!(!verification.dialogue_alternates_one_bar_at_a_time);
+        assert!(!verification.all_verified());
+    }
+
+    #[test]
+    fn opera_plan_verifier_rejects_interruption_that_crosses_the_cutoff() {
+        let home = Key::major(PitchClass::C);
+        let realized = realize_opera_with_plan(home, 100.0, 4.0, 3, &intent());
+        let mut corrupted = realized.score.clone();
+        let last_counter = corrupted
+            .notes
+            .iter_mut()
+            .filter(|note| {
+                note.role == VoiceRole::CounterMelody
+                    && note.onset.beats() >= 32.0
+                    && note.onset.beats() < 36.0
+            })
+            .max_by(|left, right| left.onset.beats().total_cmp(&right.onset.beats()))
+            .expect("interruption must have a final Theme B note");
+        last_counter.duration = Duration::new(3, 2);
+        let verification = verify_opera_plan(&corrupted, home, &realized.plan);
+        assert!(!verification.interruption_cuts_theme_b_at_exact_boundary);
+        assert!(!verification.all_verified());
+    }
+
+    #[test]
     fn theme_a_and_theme_b_are_genuinely_different_material() {
         let a_degrees: Vec<i32> = theme_a().notes.iter().filter_map(|n| n.degree).collect();
         let b_degrees: Vec<i32> = theme_b().notes.iter().filter_map(|n| n.degree).collect();
