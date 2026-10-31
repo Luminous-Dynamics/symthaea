@@ -151,5 +151,7 @@
     ],
     "contains_truth_labels": false,
     "mapping_digest_bound_to_assignment_input": true
-  }
+  },
+  "anomaly_score_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "assignment_mode": "frozen_classifier"
 }
