@@ -102,6 +102,9 @@ pub struct TargetDeltaCandidateV1 {
     pub candidate_id: String,
     /// Identity of the target claim/entity/scope being evaluated.
     pub target_identity_sha256: String,
+    /// Exact parent baseline/variant artifact digests shown to reviewers.
+    pub baseline_artifact_sha256: String,
+    pub variant_artifact_sha256: String,
     pub baseline_target_state_sha256: String,
     pub variant_target_state_sha256: String,
     pub expected_target_change: TargetChangeKindV1,
@@ -160,6 +163,10 @@ impl TargetDeltaPlanV1 {
 #[serde(deny_unknown_fields)]
 pub struct TargetDeltaReviewerObservationV1 {
     pub reviewer_id_sha256: String,
+    /// Echoes bind this adjudication to the exact planned target and parent artifacts.
+    pub reviewed_target_identity_sha256: String,
+    pub baseline_artifact_sha256: String,
+    pub variant_artifact_sha256: String,
     /// Reviewers describe what they observed; they do not see the expected transition.
     pub observed_target_change: TargetChangeKindV1,
     /// Canonically sorted unique identity commitments observed to have changed.
@@ -441,7 +448,13 @@ pub fn validate_target_delta_plan_fields(
     for candidate in parent_candidates {
         let id = candidate.get("candidate_id").and_then(Value::as_str).unwrap_or("");
         let intended = candidate.get("intended_relation").and_then(Value::as_str).unwrap_or("");
-        if id.is_empty() || parent_by_id.insert(id.to_owned(), intended.to_owned()).is_some() {
+        let baseline = candidate.get("baseline_input_sha256").and_then(Value::as_str).unwrap_or("");
+        let variant = candidate.get("variant_input_sha256").and_then(Value::as_str).unwrap_or("");
+        if id.is_empty()
+            || parent_by_id
+                .insert(id.to_owned(), (intended.to_owned(), baseline.to_owned(), variant.to_owned()))
+                .is_some()
+        {
             issues.push("parent quality plan contains duplicate or empty candidate IDs".to_owned());
         }
     }
@@ -450,15 +463,24 @@ pub fn validate_target_delta_plan_fields(
         if !nonempty(&candidate.candidate_id, MAX_LABEL) || !seen.insert(candidate.candidate_id.as_str()) {
             issues.push("target-delta candidate IDs must be non-empty, bounded and unique".to_owned());
         }
-        let intended = parent_by_id.get(&candidate.candidate_id).map(String::as_str).unwrap_or("");
-        if intended != "semantic_invariant" && intended != "semantic_change" {
+        let parent_binding = parent_by_id.get(&candidate.candidate_id);
+        let intended = parent_binding.map(|binding| binding.0.as_str()).unwrap_or("");
+        if parent_binding.is_none() || (intended != "semantic_invariant" && intended != "semantic_change") {
             issues.push(format!("candidate {} does not exist in the parent quality plan", candidate.candidate_id));
         }
         if !valid_digest(&candidate.target_identity_sha256, allow_zero)
+            || !valid_digest(&candidate.baseline_artifact_sha256, false)
+            || !valid_digest(&candidate.variant_artifact_sha256, false)
             || !valid_digest(&candidate.baseline_target_state_sha256, allow_zero)
             || !valid_digest(&candidate.variant_target_state_sha256, allow_zero)
         {
-            issues.push(format!("candidate {} has invalid target-state commitments", candidate.candidate_id));
+            issues.push(format!("candidate {} has invalid target/artifact state commitments", candidate.candidate_id));
+        }
+        if let Some((_, parent_baseline, parent_variant)) = parent_binding
+            && (candidate.baseline_artifact_sha256 != *parent_baseline
+                || candidate.variant_artifact_sha256 != *parent_variant)
+        {
+            issues.push(format!("candidate {} target-delta artifacts differ from parent quality-plan inputs", candidate.candidate_id));
         }
         let expected_changed = sorted_unique_digests(
             &candidate.expected_changed_claim_ids_sha256,
@@ -811,6 +833,15 @@ pub fn analyze_intervention_target_delta(
             }
             if !valid_digest(&reviewer.adjudication_artifact_sha256, false) {
                 return Err(format!("candidate {id} has invalid target-delta adjudication artifact digest"));
+            }
+            if !valid_digest(&reviewer.reviewed_target_identity_sha256, false)
+                || reviewer.reviewed_target_identity_sha256 != target_spec.target_identity_sha256
+                || !valid_digest(&reviewer.baseline_artifact_sha256, false)
+                || reviewer.baseline_artifact_sha256 != target_spec.baseline_artifact_sha256
+                || !valid_digest(&reviewer.variant_artifact_sha256, false)
+                || reviewer.variant_artifact_sha256 != target_spec.variant_artifact_sha256
+            {
+                return Err(format!("candidate {id} reviewer target/artifact binding differs from the committed plan"));
             }
             if !reviewer.blind_to_generator_identity
                 || !reviewer.blind_to_intended_relation
