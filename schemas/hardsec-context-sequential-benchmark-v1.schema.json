@@ -14,7 +14,8 @@
     "holdout_axes",
     "metrics",
     "aspirational_targets",
-    "claim_rules"
+    "claim_rules",
+    "reference_implementations"
   ],
   "properties": {
     "schema_version": {
@@ -34,7 +35,7 @@
     },
     "baselines": {
       "type": "array",
-      "minItems": 8,
+      "minItems": 9,
       "uniqueItems": true,
       "items": {
         "type": "string"
@@ -138,6 +139,48 @@
         },
         "targets_not_achievements": {
           "const": true
+        }
+      }
+    },
+    "reference_implementations": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "url",
+          "implementation_status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "version": {
+            "type": "string"
+          },
+          "reference_branch": {
+            "type": "string"
+          },
+          "source_blob_sha256": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            }
+          },
+          "implementation_status": {
+            "enum": [
+              "rust_equations_implemented_parity_not_yet_independently_reproduced",
+              "source_pinned_metrics_and_execution_not_reproduced"
+            ]
+          }
         }
       }
     }
