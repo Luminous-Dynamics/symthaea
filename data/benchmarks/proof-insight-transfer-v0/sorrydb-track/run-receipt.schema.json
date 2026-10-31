@@ -326,7 +326,11 @@
         "required": [
           "attempt_index",
           "seed_sha256",
-          "status"
+          "status",
+          "tokens",
+          "tool_calls",
+          "wall_time_ms",
+          "cost_microusd"
         ],
         "properties": {
           "attempt_index": {
@@ -443,6 +447,26 @@
                 "new_axiom_names",
                 "trust_tier",
                 "axiom_names"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "verified_failure"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "proof_sha256",
+                "source_patch_sha256",
+                "verifier_id",
+                "verifier_receipt_sha256"
               ]
             }
           }
