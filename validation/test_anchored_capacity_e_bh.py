@@ -172,6 +172,27 @@ class AnchoredCapacityEbhTests(unittest.TestCase):
                 capacity=0,
             )
 
+    def test_verifier_rejects_tampered_capacity_and_baseline_cost_receipts(self):
+        import copy
+
+        e = [30, 14, 6]
+        alpha = Fraction(1, 10)
+        values = [1, 100, 1]
+        costs = [1, 1, 1]
+        result = select_anchored_capacity_e_bh(e, alpha, values, costs, capacity=2)
+
+        bad_cost = copy.deepcopy(result)
+        bad_cost["baseline_cost"] = [99, 1]
+        check = verify_anchored_capacity_e_bh(bad_cost, e, alpha, values, costs)
+        self.assertFalse(check["valid"])
+        self.assertIn("baseline_cost_receipt_mismatch", check["failures"])
+
+        bad_weights = copy.deepcopy(result)
+        bad_weights["selected"]["weights"][0] = [1, 1]
+        check = verify_anchored_capacity_e_bh(bad_weights, e, alpha, values, costs)
+        self.assertFalse(check["valid"])
+        self.assertIn("optimizer_weight_receipt_mismatch", check["failures"])
+
     def test_local_e_collection_identity_and_nonnegativity(self):
         e = [Fraction(29), Fraction(1), Fraction(0)]
         m = len(e)
