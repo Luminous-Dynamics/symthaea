@@ -39,7 +39,9 @@
     "pmu_workload_id",
     "pmu_workload_binary_sha256",
     "pmu_acquisition_condition_id",
-    "pmu_event_ids"
+    "pmu_event_ids",
+    "trace_lineage_dataset_id",
+    "trace_lineage_source_corpus_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -213,6 +215,14 @@
         "type": "string",
         "minLength": 1
       }
+    },
+    "trace_lineage_dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trace_lineage_source_corpus_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
     }
   }
 }
