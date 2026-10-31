@@ -320,6 +320,12 @@ fn build_cohort_manifest(
         ("paired_em_legal_views", "exact same sample IDs as fused_geometry_legal_em; score legal EM views on this cohort"),
         ("geometry_without_legal_em", "geometry is present AND none of em_xy/em_xz/em_yz is present"),
         ("em_best_only_excluded", "em_best is present AND none of em_xy/em_xz/em_yz is present"),
+        ("paired_false_split_correction_geometry_only", "task_routing contains false_split_correction AND dual geometry is present AND at least one legal EM view is present; score dual geometry-only"),
+        ("paired_false_split_correction_em_legal_views", "exact same sample IDs as paired_false_split_correction_geometry_only; score legal EM views with task-correct mask fusion"),
+        ("paired_false_merge_identification_geometry_only", "task_routing contains false_merge_identification AND single geometry is present AND at least one legal EM view is present; score single geometry-only"),
+        ("paired_false_merge_identification_em_legal_views", "exact same sample IDs as paired_false_merge_identification_geometry_only; score legal EM views with A/B masks fused for the single-segment task"),
+        ("paired_split_mask_generation_geometry_only", "task_routing contains split_mask_generation AND single geometry is present AND at least one legal EM view is present; score single geometry-only"),
+        ("paired_split_mask_generation_em_legal_views", "exact same sample IDs as paired_split_mask_generation_geometry_only; score legal EM views with A/B masks fused for the single-segment task"),
     ];
     for (name, rule) in rules {
         members.insert(name.to_string(), (rule.to_string(), BTreeSet::new()));
@@ -355,6 +361,31 @@ fn build_cohort_manifest(
         }
         if has_em_best && !has_legal_em {
             add_cohort_member(&mut members, "em_best_only_excluded", rules[7].1, sample_id);
+        }
+
+        // Paired modality cohorts are task-specific: false-split correction
+        // consumes dual geometry, while false-merge and split-mask tasks use
+        // single geometry. The geometry and EM cohorts receive the same ID.
+        for (route, geometry_present) in [
+            ("false_split_correction", row.has_dual_mask),
+            ("false_merge_identification", row.has_single_mask),
+            ("split_mask_generation", row.has_single_mask),
+        ] {
+            if row.task_routing.iter().any(|actual| actual == route)
+                && geometry_present
+                && has_legal_em
+            {
+                let geometry_name = format!("paired_{route}_geometry_only");
+                let em_name = format!("paired_{route}_em_legal_views");
+                let geometry_rule = format!(
+                    "task_routing contains {route} AND task-appropriate geometry is present AND at least one legal EM view is present; score geometry-only"
+                );
+                let em_rule = format!(
+                    "exact same sample IDs as {geometry_name}; score legal EM views after the task-required A/B mask transformation"
+                );
+                add_cohort_member(&mut members, &geometry_name, &geometry_rule, sample_id);
+                add_cohort_member(&mut members, &em_name, &em_rule, sample_id);
+            }
         }
     }
 
@@ -392,7 +423,7 @@ fn build_cohort_manifest(
         eligibility_policy_version: "connectomebench2-v2-modality-cohorts-v1",
         cohort_set_sha256: cohort_set_digest,
         cohorts,
-        scope_note: "Membership is derived from metadata-sidecar declared slots and masks only. It does not verify Parquet payload bytes, image readability, biological correctness, or population inclusion probabilities. paired_geometry_only and paired_em_legal_views contain exactly the same sample IDs. EM-best-only rows are diagnostic exclusions, not usable EM examples.",
+        scope_note: "Membership is derived from metadata-sidecar declared slots, task routes and masks only. It does not verify Parquet payload bytes, image readability, biological correctness, or population inclusion probabilities. The overall paired_geometry_only/paired_em_legal_views IDs match exactly; each task-specific paired geometry/EM pair also has identical IDs and requires dual geometry for false_split_correction or single geometry for false_merge_identification/split_mask_generation. A/B EM mask fusion remains a model preprocessing contract, not a property proven by this membership manifest. EM-best-only rows are diagnostic exclusions, not usable EM examples.",
     }
 }
 
