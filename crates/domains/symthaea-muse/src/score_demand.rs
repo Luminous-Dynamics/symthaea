@@ -24,7 +24,10 @@ pub enum DemandIdentityBasis {
 pub struct VoiceDemand {
     /// Absent when the input score does not assign a real PartId to every note.
     pub part_id: Option<u16>,
-    pub role: VoiceRole,
+    /// A stable part can perform more than one function over the score. Keep
+    /// those roles attached to the part instead of splitting one instrument
+    /// line into multiple independently assigned groups.
+    pub roles: Vec<VoiceRole>,
     pub identity_basis: DemandIdentityBasis,
     pub note_count: usize,
     pub min_midi: u8,
@@ -122,8 +125,15 @@ pub fn analyze_score_demand(
         } else {
             u16::MAX
         };
+        // Stable parts are grouped once even if their functional role changes.
+        // Without complete part identity, use one aggregate per role.
+        let group_role_key = if has_complete_part_identity {
+            0
+        } else {
+            role_rank(note.role)
+        };
         groups
-            .entry((group_id, role_rank(note.role)))
+            .entry((group_id, group_role_key))
             .or_default()
             .push(note);
     }
@@ -169,7 +179,13 @@ fn build_voice_demand(
     score_span: f64,
     meter: u8,
 ) -> VoiceDemand {
-    let role = notes[0].role;
+    let mut roles = Vec::new();
+    for note in &notes {
+        if !roles.contains(&note.role) {
+            roles.push(note.role);
+        }
+    }
+    roles.sort_by_key(|role| role_rank(*role));
     let mut min_midi = u8::MAX;
     let mut max_midi = 0u8;
     let mut midi_sum = 0u64;
@@ -235,7 +251,7 @@ fn build_voice_demand(
 
     VoiceDemand {
         part_id: has_complete_part_identity.then_some(group_id),
-        role,
+        roles,
         identity_basis: if has_complete_part_identity {
             DemandIdentityBasis::StablePartId
         } else {
@@ -299,7 +315,7 @@ mod tests {
         let melody = profile
             .voice_demands
             .iter()
-            .find(|voice| voice.role == VoiceRole::Melody)
+            .find(|voice| voice.roles.contains(&VoiceRole::Melody))
             .unwrap();
         assert_eq!(melody.part_id, Some(1));
         assert_eq!(melody.note_count, 3);
@@ -308,15 +324,42 @@ mod tests {
         assert_eq!(melody.distinct_onset_count, 3);
         assert_eq!(melody.peak_simultaneous_notes, 2);
         assert!((melody.mean_note_duration_beats - 4.0 / 3.0).abs() < 1.0e-12);
-        assert!((melody.notes_per_score_beat - 0.5).abs() < 1.0e-12);
+        assert!((melody.notes_per_score_beat - 1.0).abs() < 1.0e-12);
 
         let bass = profile
             .voice_demands
             .iter()
-            .find(|voice| voice.role == VoiceRole::Bass)
+            .find(|voice| voice.roles.contains(&VoiceRole::Bass))
             .unwrap();
         assert_eq!(bass.part_id, Some(2));
         assert_eq!(bass.peak_simultaneous_notes, 1);
+    }
+
+    #[test]
+    fn stable_part_remains_one_demand_when_its_role_changes() {
+        let mut score = Score::new(Key::major(PitchClass::C), 100.0, 4);
+        for (role, midi, onset) in [
+            (VoiceRole::Melody, 67, 0),
+            (VoiceRole::Harmony, 64, 1),
+        ] {
+            score.push(ScoreNote {
+                part: PartId(9),
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new(onset, 1),
+                duration: Duration::new(1, 1),
+                velocity: 0.6,
+                role,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        let profile = analyze_score_demand(&score).unwrap();
+        assert_eq!(profile.voice_demands.len(), 1);
+        assert_eq!(profile.voice_demands[0].part_id, Some(9));
+        assert_eq!(
+            profile.voice_demands[0].roles,
+            vec![VoiceRole::Melody, VoiceRole::Harmony]
+        );
     }
 
     #[test]
@@ -366,6 +409,7 @@ mod tests {
             DemandIdentityBasis::RoleAggregateBecausePartIdentityIsIncomplete
         );
         assert_eq!(profile.voice_demands[0].note_count, 2);
+        assert_eq!(profile.voice_demands[0].roles, vec![VoiceRole::Melody]);
     }
 
     #[test]
