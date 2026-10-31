@@ -48,7 +48,7 @@ A Duplicate must refer to a canonical ID admitted earlier in the trial. This val
 - false novelty rejection: the first proposal for a new semantic identity is rejected;
 - inconclusive: a proposal does not receive a determinate verifier result.
 
-The corruption plan is explicit and applied to selected proposal IDs. A confirmatory campaign should additionally freeze a randomized, seeded corruption schedule, rates and selection policy before exposing outcomes.
+The corruption plan is explicit and applied to selected proposal IDs. The resulting report is bound to the challenge, verifier trial, and evaluator-only adjudication-key digest. A deterministic report verifier can recompute all confusion counts and regret from those exact inputs. A confirmatory campaign should additionally freeze a randomized, seeded corruption schedule, rates and selection policy before exposing outcomes.
 
 ## Metrics
 
@@ -77,7 +77,8 @@ The current regret is a deterministic synthetic utility calculation, not a stati
 - false-new admission creates a false split and wastes a canonical allocation slot;
 - false novelty rejection is detected and reduces reachable utility;
 - duplicate decisions pointing to unregistered canonical IDs are rejected;
-- a substituted policy-visible challenge cannot reuse another challenge's adjudication key.
+- a substituted policy-visible challenge cannot reuse another challenge's adjudication key;
+- deterministic report verification rejects a tampered regret or confusion summary.
 
 No tests have been executed in this environment.
 
