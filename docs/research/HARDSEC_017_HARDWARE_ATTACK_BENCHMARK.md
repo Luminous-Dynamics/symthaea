@@ -89,6 +89,11 @@ Report each split independently; do not collapse them into one “generalization
 
 Nested splits must prevent trace/window parentage, replays, repeated iterations or duplicated content from crossing a claimed independent holdout. For class-homogeneous LOPO folds, report per-program accuracy and class-conditional recall/specificity; mark mixed-class precision, F1 and MCC unavailable for that fold.
 
+
+### PMU metrology prerequisite
+
+Before any physical or simulator HPC event set is treated as confirmatory, qualify that exact platform/event configuration using [HARDSEC-018](https://github.com/Luminous-Dynamics/symthaea/pull/9470). Require paired no-PMU, singleton-per-event and co-scheduled measurements with fixed work units; retain an overcommitted condition to characterize multiplexing. A failed co-scheduling or observer-effect gate means the affected event/configuration is not a confirmatory input. Multiplex-scaled counts remain estimates and must not be represented as directly observed counters, even when they agree numerically with singleton runs. Repeat the metrology qualification when PMU, firmware/SBI, kernel/perf, event mapping, CPU/HART or workload configuration changes.
+
 ## 6. Primary metrics and operating point
 
 **Primary security endpoint:** attack-effect-conditioned recall. Only malicious cases with independently observed attack effect enter the successful-effect denominator. Attempted attacks with no observed effect and unknown-effect cases remain separate.
@@ -133,7 +138,7 @@ These are conditional design calculations: the groups must actually be independe
 - Probabilistic interleaving at predeclared rates, including 10^-2 through 10^-6 where safely measurable.
 - Benign CPU, memory, cache, branch and I/O contention; multi-process workloads; workload phase changes.
 - Attacker-aware counter selection, sparse sampling, counter multiplexing and threshold adaptation.
-- Counter acquisition interference: isolated vs simultaneous event collection, order randomization, perf overhead, counter scaling/time-enabled/time-running, event aliasing and event semantics.
+- Counter acquisition interference: isolated vs simultaneous event collection, order randomization, perf overhead, counter scaling/time-enabled/time-running, event aliasing and event semantics; require a passing HARDSEC-018 acquisition qualification for confirmatory physical/simulator HPC evidence.
 - Repeated/replayed traces, duplicate windows, overlapping windows, label permutation within correct groups and split leakage.
 - Sensor faults: missing, stale, misaligned, multiplexed, reset, overflow, untrusted or implausible readings.
 - Ablations: raw HPC, instruction-only, normalized HPC, multiple denominator choices, temporal features, HDC, CfC/LTC, calibration, abstention and cascaded stages.
