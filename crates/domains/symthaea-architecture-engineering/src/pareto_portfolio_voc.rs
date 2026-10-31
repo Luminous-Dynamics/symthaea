@@ -46,8 +46,12 @@ pub struct ParetoPortfolioParticle {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ParetoPortfolioPosterior {
-    /// Strictly sorted, unique candidate IDs bind every objective-vector column.
+    /// Strictly sorted, unique candidate IDs bind every candidate-vector column.
     pub candidate_ids: Vec<String>,
+    /// Strictly sorted objective IDs; this is the exact coordinate order for every objective vector.
+    pub objective_ids: Vec<String>,
+    /// Digest of the complete objective registry defining units, directions, protocols and costs.
+    pub objective_registry_sha256: String,
     /// Exact architecture configuration SHA-256 for each candidate, in candidate_ids order.
     pub candidate_config_sha256: Vec<String>,
     /// Device/profile feasibility is a hard state and is not encoded as a numeric objective.
@@ -363,6 +367,30 @@ pub fn evaluate_portfolio_measurement_voc(
 ) -> Result<PortfolioParetoVoC, PortfolioVoCError> {
     validate_posterior(posterior, config, design)?;
     validate_objective_registry(registry)?;
+    if posterior.objective_registry_sha256 != registry.registry_sha256 {
+        return Err(PortfolioVoCError::new(
+            "objective_registry_sha256",
+            "posterior objective vectors were normalized under a different objective registry",
+        ));
+    }
+    let mut registry_objective_ids: Vec<String> = registry
+        .objectives
+        .iter()
+        .map(|objective| objective.objective_id.clone())
+        .collect();
+    registry_objective_ids.sort();
+    if posterior.objective_ids != registry_objective_ids {
+        return Err(PortfolioVoCError::new(
+            "objective_ids",
+            "posterior objective coordinate order does not match the objective registry",
+        ));
+    }
+    if posterior.objective_ids.len() != design.reference().len() {
+        return Err(PortfolioVoCError::new(
+            "objective_ids",
+            "posterior objective count does not match the QMC design",
+        ));
+    }
     validate_action(registry, posterior, action)?;
 
     let current_decision =
@@ -605,6 +633,21 @@ fn validate_posterior(
         return Err(PortfolioVoCError::new(
             "candidate_ids",
             "candidate IDs, configuration digests and feasibility flags must have the same non-zero length",
+        ));
+    }
+    if posterior.objective_ids.len() != design.reference().len()
+        || posterior.objective_ids.iter().any(|id| id.trim().is_empty())
+        || posterior.objective_ids.windows(2).any(|pair| pair[0] >= pair[1])
+    {
+        return Err(PortfolioVoCError::new(
+            "objective_ids",
+            "objective IDs must be non-empty, strictly sorted and match the QMC design dimension",
+        ));
+    }
+    if !is_sha256(&posterior.objective_registry_sha256) {
+        return Err(PortfolioVoCError::new(
+            "objective_registry_sha256",
+            "must be a lowercase hexadecimal SHA-256 digest",
         ));
     }
     for (index, digest) in posterior.candidate_config_sha256.iter().enumerate() {
@@ -922,6 +965,8 @@ mod tests {
     fn posterior() -> ParetoPortfolioPosterior {
         ParetoPortfolioPosterior {
             candidate_ids: vec!["A".into(), "B".into(), "C".into()],
+            objective_ids: vec!["accuracy".into(), "latency".into()],
+            objective_registry_sha256: registry().registry_sha256,
             candidate_config_sha256: vec![sha('a'), sha('b'), sha('c')],
             candidate_feasible: vec![true, true, true],
             particles: vec![ParetoPortfolioParticle {
@@ -954,20 +999,36 @@ mod tests {
             schema: "symthaea.nas.objective-registry".into(),
             version: "0.1.0".into(),
             benchmark_id: "portfolio-voc-test".into(),
-            objectives: vec![ObjectiveDefinition {
-                objective_id: "accuracy".into(),
-                value_unit: "fraction".into(),
-                direction: ObjectiveDirection::Maximize,
-                source: ObjectiveSource::TrainedEvaluation,
-                normalization: ObjectiveNormalization {
-                    raw_min: 0.0,
-                    raw_max: 1.0,
+            objectives: vec![
+                ObjectiveDefinition {
+                    objective_id: "accuracy".into(),
+                    value_unit: "fraction".into(),
+                    direction: ObjectiveDirection::Maximize,
+                    source: ObjectiveSource::TrainedEvaluation,
+                    normalization: ObjectiveNormalization {
+                        raw_min: 0.0,
+                        raw_max: 1.0,
+                    },
+                    measurement_protocol_sha256: sha('a'),
+                    hardware_profile_sha256: None,
+                    measurement_cost_unit: "objective-query".into(),
+                    measurement_cost_model_sha256: sha('b'),
                 },
-                measurement_protocol_sha256: sha('a'),
-                hardware_profile_sha256: None,
-                measurement_cost_unit: "objective-query".into(),
-                measurement_cost_model_sha256: sha('b'),
-            }],
+                ObjectiveDefinition {
+                    objective_id: "latency".into(),
+                    value_unit: "milliseconds".into(),
+                    direction: ObjectiveDirection::Minimize,
+                    source: ObjectiveSource::TrainedEvaluation,
+                    normalization: ObjectiveNormalization {
+                        raw_min: 0.0,
+                        raw_max: 100.0,
+                    },
+                    measurement_protocol_sha256: sha('c'),
+                    hardware_profile_sha256: None,
+                    measurement_cost_unit: "objective-query".into(),
+                    measurement_cost_model_sha256: sha('d'),
+                },
+            ],
             hardware_profiles: vec![],
             registry_sha256: String::new(),
         };
@@ -1006,6 +1067,8 @@ mod tests {
     fn two_particle_posterior() -> ParetoPortfolioPosterior {
         ParetoPortfolioPosterior {
             candidate_ids: vec!["A".into(), "B".into(), "C".into()],
+            objective_ids: vec!["accuracy".into(), "latency".into()],
+            objective_registry_sha256: registry().registry_sha256,
             candidate_config_sha256: vec![sha('a'), sha('b'), sha('c')],
             candidate_feasible: vec![true, true, true],
             particles: vec![
@@ -1275,6 +1338,50 @@ mod tests {
         action.objective_registry_sha256 = sha('f');
         action.observation_likelihood_model_sha256 =
             compute_portfolio_action_likelihood_sha256(&action).unwrap();
+        assert!(evaluate_portfolio_measurement_voc(
+            &registry(),
+            &posterior,
+            &two_portfolios(),
+            &ParetoPortfolioConfig {
+                target_k: 1,
+                minimum_feasible_utility: vec![0.0, 0.0],
+            },
+            &design(),
+            &action,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn rejects_posterior_with_a_different_objective_registry_digest() {
+        let posterior = two_particle_posterior();
+        let mut changed_registry = registry();
+        changed_registry.benchmark_id = "another-benchmark".into();
+        changed_registry.registry_sha256 =
+            compute_objective_registry_sha256(&changed_registry).unwrap();
+        let mut action = action(&posterior);
+        action.objective_registry_sha256 = changed_registry.registry_sha256.clone();
+        action.observation_likelihood_model_sha256 =
+            compute_portfolio_action_likelihood_sha256(&action).unwrap();
+        assert!(evaluate_portfolio_measurement_voc(
+            &changed_registry,
+            &posterior,
+            &two_portfolios(),
+            &ParetoPortfolioConfig {
+                target_k: 1,
+                minimum_feasible_utility: vec![0.0, 0.0],
+            },
+            &design(),
+            &action,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn rejects_posterior_objective_column_order_mismatch() {
+        let mut posterior = two_particle_posterior();
+        posterior.objective_ids.reverse();
+        let action = action(&posterior);
         assert!(evaluate_portfolio_measurement_voc(
             &registry(),
             &posterior,
