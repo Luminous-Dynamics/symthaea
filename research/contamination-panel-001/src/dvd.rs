@@ -619,6 +619,7 @@ pub fn score_dvd_item(input: &DvdGenerationInputV1) -> Result<DvdItemReportV1, S
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
 
     fn digest(label: &str) -> String {
         hash_domain(b"dvd-test", label.as_bytes())
@@ -663,6 +664,27 @@ mod tests {
             generation_seed_schedule_sha256: digest("seed-schedule"),
             generations,
         }
+    }
+
+    #[test]
+    fn versioned_schema_and_50_by_20_fixture_validate() {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../schema/dvd-generation-input.schema.json"
+        )).unwrap();
+        let fixture: DvdGenerationInputV1 = serde_json::from_str(include_str!(
+            "../fixtures/dvd-two-state-input.json"
+        )).unwrap();
+        assert_eq!(
+            schema["properties"]["schema"]["const"].as_str(),
+            Some(DVD_INPUT_SCHEMA)
+        );
+        assert_eq!(
+            schema["properties"]["log_probability_semantics"]["const"].as_str(),
+            Some("base_model_conditional_log_probability")
+        );
+        assert_eq!(fixture.requested_generation_count, DVD_PAPER_GENERATIONS);
+        assert_eq!(fixture.tail_token_count, DVD_PAPER_TAIL_TOKENS);
+        assert!(score_dvd_item(&fixture).is_ok());
     }
 
     #[test]
