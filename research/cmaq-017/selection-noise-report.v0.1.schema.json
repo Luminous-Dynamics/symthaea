@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-017-selection-noise-v0.1.json",
+  "title": "CMAQ-017 Repeated Continuation Selection-Noise Report",
+  "description": "Design contract for a future simulator-integrated repeated-continuation report. It does not describe a result from the current CMAQ-017 v0.1 runner.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "candidate_count",
+    "continuation_count",
+    "history_id_digest",
+    "continuation_schedule_digest",
+    "selection_partition",
+    "scoring_partition",
+    "metrics",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-017-selection-noise-v0.1"
+    },
+    "candidate_count": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "continuation_count": {
+      "type": "integer",
+      "minimum": 3
+    },
+    "history_id_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "continuation_schedule_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "selection_partition": {
+      "enum": [
+        "leave_one_continuation_out",
+        "predeclared_train_partition"
+      ]
+    },
+    "scoring_partition": {
+      "const": "held_out_continuation"
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "naive_best_of_n_mean",
+        "cross_fitted_selected_mean",
+        "naive_selection_gain",
+        "held_out_selection_gain",
+        "selection_optimism_gap",
+        "candidate_variance_share",
+        "continuation_variance_share",
+        "candidate_continuation_interaction_share"
+      ],
+      "properties": {
+        "naive_best_of_n_mean": { "type": "number" },
+        "cross_fitted_selected_mean": { "type": "number" },
+        "naive_selection_gain": { "type": "number" },
+        "held_out_selection_gain": { "type": "number" },
+        "selection_optimism_gap": { "type": "number" },
+        "candidate_variance_share": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "continuation_variance_share": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "candidate_continuation_interaction_share": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "metric_contract_only_no_simulator_result"
+    }
+  }
+}

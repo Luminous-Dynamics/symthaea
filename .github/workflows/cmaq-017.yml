@@ -44,11 +44,50 @@ jobs:
           python3 - <<'PY'
           import json
           from pathlib import Path
-          from jsonschema import validate
+          from jsonschema import Draft202012Validator, ValidationError, validate
 
           report = json.loads(Path("/tmp/cmaq-017-report.json").read_text())
           schema = json.loads(Path("report.schema.json").read_text())
           validate(instance=report, schema=schema)
+
+          selection_noise_schema = json.loads(
+              Path("selection-noise-report.v0.1.schema.json").read_text()
+          )
+          Draft202012Validator.check_schema(selection_noise_schema)
+          selection_noise_sample = {
+              "schema_version": "cmaq-017-selection-noise-v0.1",
+              "candidate_count": 4,
+              "continuation_count": 17,
+              "history_id_digest": "a" * 64,
+              "continuation_schedule_digest": "b" * 64,
+              "selection_partition": "leave_one_continuation_out",
+              "scoring_partition": "held_out_continuation",
+              "metrics": {
+                  "naive_best_of_n_mean": 1.2,
+                  "cross_fitted_selected_mean": 0.8,
+                  "naive_selection_gain": 0.2,
+                  "held_out_selection_gain": -0.2,
+                  "selection_optimism_gap": 0.4,
+                  "candidate_variance_share": 0.4,
+                  "continuation_variance_share": 0.3,
+                  "candidate_continuation_interaction_share": 0.3
+              },
+              "claim_ceiling": "metric_contract_only_no_simulator_result"
+          }
+          validate(instance=selection_noise_sample, schema=selection_noise_schema)
+          shares = selection_noise_sample["metrics"]["candidate_variance_share"] + (
+              selection_noise_sample["metrics"]["continuation_variance_share"]
+          ) + selection_noise_sample["metrics"]["candidate_continuation_interaction_share"]
+          assert abs(shares - 1.0) < 1e-12
+          invalid_selection_noise = json.loads(json.dumps(selection_noise_sample))
+          invalid_selection_noise["continuation_count"] = 1
+          try:
+              validate(instance=invalid_selection_noise, schema=selection_noise_schema)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError("selection-noise schema admitted fewer than three continuations")
+
           assert report["schema_version"] == "cmaq-017-multistep-exploitability-v0.1"
           assert report["episode_count"] == 16
           assert report["environment_steps"] == 12
