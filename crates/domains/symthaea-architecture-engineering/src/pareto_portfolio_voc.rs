@@ -1385,7 +1385,7 @@ mod tests {
     #[test]
     fn rejects_posterior_objective_column_order_mismatch() {
         let mut posterior = two_particle_posterior();
-        posterior.objective_ids.reverse();
+        posterior.objective_ids = vec!["energy".into(), "latency".into()];
         let action = action(&posterior);
         assert!(evaluate_portfolio_measurement_voc(
             &registry(),
