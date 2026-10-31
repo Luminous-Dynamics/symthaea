@@ -1,0 +1,14 @@
+{
+  "schema_version": "cmaq-018-selected-action-evaluation-v0.1",
+  "claim_ceiling": "synthetic_evaluator_fixture_only_no_predictor_calibration_or_physical_safety_claim",
+  "episode_count": 4,
+  "actions_per_episode": 2,
+  "mean_realized_regret": 1.25,
+  "mean_regret_upper_bound": 1.25,
+  "regret_bound_coverage": 0.75,
+  "simultaneous_interval_coverage": 0.75,
+  "dominant_certificate_count": 2,
+  "false_dominant_certificate_count": 1,
+  "false_dominant_certificate_rate": 0.5,
+  "mean_selected_interval_width": 1.5
+}
