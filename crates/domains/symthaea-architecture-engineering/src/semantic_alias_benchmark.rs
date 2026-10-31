@@ -258,6 +258,28 @@ impl AliasCorruptionRates {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AliasCorruptionSchedule {
+    pub schema: String,
+    pub version: String,
+    pub challenge_sha256: String,
+    pub seed: u64,
+    pub rates: AliasCorruptionRates,
+    pub corruptions: Vec<AliasCorruption>,
+    pub schedule_sha256: String,
+}
+
+#[derive(Serialize)]
+struct AliasCorruptionSchedulePayload<'a> {
+    schema: &'a str,
+    version: &'a str,
+    challenge_sha256: &'a str,
+    seed: u64,
+    rates: &'a AliasCorruptionRates,
+    corruptions: &'a [AliasCorruption],
+}
+
 struct AliasScheduleRng {
     state: u64,
 }
@@ -291,7 +313,7 @@ pub fn seeded_alias_corruption_schedule(
     clean_trial: &AliasVerifierTrial,
     rates: &AliasCorruptionRates,
     seed: u64,
-) -> Result<Vec<AliasCorruption>, SemanticAliasError> {
+) -> Result<AliasCorruptionSchedule, SemanticAliasError> {
     challenge.validate()?;
     adjudication.validate_for(challenge)?;
     validate_trial_shape(challenge, clean_trial)?;
@@ -398,7 +420,24 @@ pub fn seeded_alias_corruption_schedule(
             }
         }
     }
-    Ok(corruptions)
+    let challenge_sha256 = challenge.challenge_sha256()?;
+    let schedule_sha256 = digest_serializable(&AliasCorruptionSchedulePayload {
+        schema: SCHEMA,
+        version: VERSION,
+        challenge_sha256: &challenge_sha256,
+        seed,
+        rates,
+        corruptions: &corruptions,
+    })?;
+    Ok(AliasCorruptionSchedule {
+        schema: SCHEMA.to_owned(),
+        version: VERSION.to_owned(),
+        challenge_sha256,
+        seed,
+        rates: rates.clone(),
+        corruptions,
+        schedule_sha256,
+    })
 }
 
 /// Apply explicitly seeded/adjudicated corruptions to a clean verifier trial.
@@ -477,6 +516,7 @@ pub struct SemanticAliasBenchmarkReport {
     pub trial_sha256: String,
     /// Digest of evaluator-only truth labels and utility values; never exposes them.
     pub adjudication_sha256: String,
+    pub corruption_schedule_sha256: Option<String>,
     pub proposal_count: usize,
     pub admitted_decision_count: usize,
     pub duplicate_decision_count: usize,
@@ -503,6 +543,7 @@ struct SemanticAliasReceiptPayload<'a> {
     challenge_sha256: &'a str,
     trial_sha256: &'a str,
     adjudication_sha256: &'a str,
+    corruption_schedule_sha256: Option<&'a str>,
     proposal_count: usize,
     admitted_decision_count: usize,
     duplicate_decision_count: usize,
@@ -525,6 +566,16 @@ pub fn evaluate_alias_trial(
     adjudication: &AliasAdjudicationKey,
     trial: &AliasVerifierTrial,
     allocation_budget: usize,
+) -> Result<SemanticAliasBenchmarkReport, SemanticAliasError> {
+    evaluate_alias_trial_inner(challenge, adjudication, trial, allocation_budget, None)
+}
+
+fn evaluate_alias_trial_inner(
+    challenge: &PolicyVisibleAliasChallenge,
+    adjudication: &AliasAdjudicationKey,
+    trial: &AliasVerifierTrial,
+    allocation_budget: usize,
+    corruption_schedule_sha256: Option<String>,
 ) -> Result<SemanticAliasBenchmarkReport, SemanticAliasError> {
     challenge.validate()?;
     adjudication.validate_for(challenge)?;
@@ -684,6 +735,7 @@ pub fn evaluate_alias_trial(
         challenge_sha256: &challenge_sha256,
         trial_sha256: &trial_sha256,
         adjudication_sha256: &adjudication_sha256,
+        corruption_schedule_sha256: corruption_schedule_sha256.as_deref(),
         proposal_count: challenge.proposals.len(),
         admitted_decision_count,
         duplicate_decision_count,
@@ -708,6 +760,7 @@ pub fn evaluate_alias_trial(
         challenge_sha256,
         trial_sha256,
         adjudication_sha256,
+        corruption_schedule_sha256,
         proposal_count: challenge.proposals.len(),
         admitted_decision_count,
         duplicate_decision_count,
@@ -729,6 +782,79 @@ pub fn evaluate_alias_trial(
 
 /// Recompute every alias metric and digest from the policy-visible challenge, evaluator-only
 /// adjudication key and verifier decisions. This rejects altered confusion matrices or regret.
+/// Evaluate a verifier trial together with the exact seeded corruption schedule.
+pub fn evaluate_seeded_alias_schedule(
+    challenge: &PolicyVisibleAliasChallenge,
+    adjudication: &AliasAdjudicationKey,
+    clean_trial: &AliasVerifierTrial,
+    schedule: &AliasCorruptionSchedule,
+    allocation_budget: usize,
+) -> Result<SemanticAliasBenchmarkReport, SemanticAliasError> {
+    verify_alias_corruption_schedule(challenge, adjudication, clean_trial, schedule)?;
+    let corrupted = inject_alias_corruptions(challenge, clean_trial, &schedule.corruptions)?;
+    evaluate_alias_trial_inner(
+        challenge,
+        adjudication,
+        &corrupted,
+        allocation_budget,
+        Some(schedule.schedule_sha256.clone()),
+    )
+}
+
+/// Verify the schedule itself by deterministic reconstruction from seed and frozen rates.
+pub fn verify_alias_corruption_schedule(
+    challenge: &PolicyVisibleAliasChallenge,
+    adjudication: &AliasAdjudicationKey,
+    clean_trial: &AliasVerifierTrial,
+    schedule: &AliasCorruptionSchedule,
+) -> Result<(), SemanticAliasError> {
+    if schedule.schema != SCHEMA || schedule.version != VERSION {
+        return Err(SemanticAliasError::new(
+            "schedule.schema",
+            "unsupported alias corruption schedule schema/version",
+        ));
+    }
+    let recomputed = seeded_alias_corruption_schedule(
+        challenge,
+        adjudication,
+        clean_trial,
+        &schedule.rates,
+        schedule.seed,
+    )?;
+    if &recomputed != schedule {
+        return Err(SemanticAliasError::new(
+            "schedule",
+            "stored corruption schedule differs from deterministic reconstruction",
+        ));
+    }
+    Ok(())
+}
+
+/// Verify the report, evaluator-only adjudication key and corruption schedule together.
+pub fn verify_seeded_alias_schedule_report(
+    challenge: &PolicyVisibleAliasChallenge,
+    adjudication: &AliasAdjudicationKey,
+    clean_trial: &AliasVerifierTrial,
+    schedule: &AliasCorruptionSchedule,
+    allocation_budget: usize,
+    report: &SemanticAliasBenchmarkReport,
+) -> Result<(), SemanticAliasError> {
+    let recomputed = evaluate_seeded_alias_schedule(
+        challenge,
+        adjudication,
+        clean_trial,
+        schedule,
+        allocation_budget,
+    )?;
+    if &recomputed != report {
+        return Err(SemanticAliasError::new(
+            "report",
+            "stored seeded alias report differs from deterministic schedule reconstruction",
+        ));
+    }
+    Ok(())
+}
+
 pub fn verify_alias_benchmark_report(
     challenge: &PolicyVisibleAliasChallenge,
     adjudication: &AliasAdjudicationKey,
@@ -976,10 +1102,16 @@ mod tests {
             &challenge, &adjudication, &clean, &rates, 17,
         ).unwrap();
         assert_eq!(first, second);
+        assert_eq!(first.schedule_sha256.len(), 64);
 
-        let corrupted = inject_alias_corruptions(&challenge, &clean, &first).unwrap();
-        let report = evaluate_alias_trial(&challenge, &adjudication, &corrupted, 2).unwrap();
+        let report = evaluate_seeded_alias_schedule(
+            &challenge, &adjudication, &clean, &first, 2,
+        ).unwrap();
         assert_eq!(report.challenge_sha256, challenge.challenge_sha256().unwrap());
+        assert_eq!(report.corruption_schedule_sha256, Some(first.schedule_sha256.clone()));
+        verify_seeded_alias_schedule_report(
+            &challenge, &adjudication, &clean, &first, 2, &report,
+        ).unwrap();
     }
 
     #[test]
