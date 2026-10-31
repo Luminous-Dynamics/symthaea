@@ -932,6 +932,38 @@ mod tests {
     }
 
     #[test]
+    fn reports_stratified_em_eligibility_and_excludes_em_best_from_usable_cohort() {
+        let mut rows = valid_dataset();
+        rows[0].row.present_slots.push("em_xy".to_string());
+        rows[0].row.has_em = true;
+        rows[1].row.present_slots.push("em_best".to_string());
+        rows[1].row.has_em = true;
+        rows[4].row.present_slots.push("em_xz".to_string());
+        rows[4].row.has_em = true;
+
+        let report = report(&rows);
+        assert_eq!(report.status, "PASS", "{:?}", report.errors);
+        let overall = report.modality_coverage.get("overall").unwrap();
+        assert_eq!(overall.total_rows, 5);
+        assert_eq!(overall.geometry_rows, 5);
+        assert_eq!(overall.em_any_rows, 3);
+        assert_eq!(overall.em_missing_rows, 2);
+        assert_eq!(overall.em_usable_rows, 2);
+        assert_eq!(overall.em_best_present_rows, 1);
+        assert_eq!(overall.fused_geometry_em_rows, 2);
+        assert!((overall.em_any_fraction.unwrap() - 0.6).abs() < 1.0e-12);
+        assert!((overall.em_usable_fraction.unwrap() - 0.4).abs() < 1.0e-12);
+
+        assert!(report.modality_coverage.contains_key("task_route|false_split_correction"));
+        assert!(report.modality_coverage.contains_key("sample_type|merge_edit"));
+        assert!(report.modality_coverage.contains_key("species|mouse"));
+        assert!(report.modality_coverage.contains_key("split|train"));
+        assert!(report.modality_coverage.contains_key("source_archive|edits_and_adj_controls_mouse"));
+        assert!(report.modality_coverage.contains_key("sample_type_species_split|merge_edit|mouse|train"));
+        assert!(report.modality_coverage.contains_key("task_route_species_split|false_split_correction|mouse|train"));
+    }
+
+    #[test]
     fn requires_upstream_lineage_key_for_each_archive_bank() {
         let mut rows = valid_dataset();
         rows[3].metadata.as_object_mut().unwrap().remove("source_operation_id");
