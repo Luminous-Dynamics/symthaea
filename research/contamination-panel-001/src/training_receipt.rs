@@ -697,6 +697,61 @@ mod tests {
     }
 
     #[test]
+    fn receipt_and_audit_schemas_match_serialized_struct_fields() {
+        let receipt_schema: Value = serde_json::from_str(include_str!(
+            "../schema/paired-training-execution-receipt.schema.json"
+        )).unwrap();
+        let audit_schema: Value = serde_json::from_str(include_str!(
+            "../schema/paired-training-execution-audit.schema.json"
+        )).unwrap();
+        let design = design();
+        let manifest = randomize_intervention(&design, &seed()).unwrap();
+        let receipt = paired_receipt(&design, &manifest);
+        let receipt_value = serde_json::to_value(&receipt).unwrap();
+        let report = validate_fixture().unwrap();
+        let report_value = serde_json::to_value(&report).unwrap();
+
+        assert_eq!(
+            receipt_schema["properties"]["schema"]["const"].as_str(),
+            Some(TRAINING_RECEIPT_SCHEMA)
+        );
+        assert_eq!(
+            audit_schema["properties"]["schema"]["const"].as_str(),
+            Some(TRAINING_RECEIPT_REPORT_SCHEMA)
+        );
+        let receipt_required: BTreeSet<String> = receipt_schema["required"].as_array().unwrap()
+            .iter().map(|value| value.as_str().unwrap().to_owned()).collect();
+        let receipt_properties: BTreeSet<String> = receipt_schema["properties"].as_object().unwrap()
+            .keys().cloned().collect();
+        let receipt_keys: BTreeSet<String> = receipt_value.as_object().unwrap()
+            .keys().cloned().collect();
+        assert_eq!(receipt_required, receipt_properties);
+        assert_eq!(receipt_keys, receipt_properties);
+
+        let arm_schema = &receipt_schema["$defs"]["arm"];
+        let arm_required: BTreeSet<String> = arm_schema["required"].as_array().unwrap()
+            .iter().map(|value| value.as_str().unwrap().to_owned()).collect();
+        let arm_properties: BTreeSet<String> = arm_schema["properties"].as_object().unwrap()
+            .keys().cloned().collect();
+        let treatment_keys: BTreeSet<String> = receipt_value["treatment"].as_object().unwrap()
+            .keys().cloned().collect();
+        let placebo_keys: BTreeSet<String> = receipt_value["placebo"].as_object().unwrap()
+            .keys().cloned().collect();
+        assert_eq!(arm_required, arm_properties);
+        assert_eq!(treatment_keys, arm_properties);
+        assert_eq!(placebo_keys, arm_properties);
+
+        let audit_required: BTreeSet<String> = audit_schema["required"].as_array().unwrap()
+            .iter().map(|value| value.as_str().unwrap().to_owned()).collect();
+        let audit_properties: BTreeSet<String> = audit_schema["properties"].as_object().unwrap()
+            .keys().cloned().collect();
+        let audit_keys: BTreeSet<String> = report_value.as_object().unwrap()
+            .keys().cloned().collect();
+        assert_eq!(audit_required, audit_properties);
+        assert_eq!(audit_keys, audit_properties);
+    }
+
+    #[test]
     fn paired_complete_receipt_is_consistent_but_not_cryptographically_verified() {
         let report = validate_fixture().unwrap();
         assert!(report.valid);
