@@ -41,7 +41,7 @@ The oracle artifact contains hidden labels and gold proof paths; do not give it 
 - `poar-graph-export` writes canonical planner-only and oracle TSV artifacts; the oracle header binds the planner's raw SHA-256 digest.
 - `encode_prediction_artifact_v1`, `poar-prediction-demo`, and `poar-graph-eval` support frozen prediction records, strict canonical parsing, exact-byte SHA-256 binding, target/disposition completeness, contiguous retrieval ranks, duplicate/dangling reference rejection, and oracle self-consistency checks. The evaluator runs after inference and emits a machine-readable per-run receipt with individual metrics.
 - The focused workflow smoke-tests export, an explicit all-abstain prediction artifact, evaluator parsing/scoring, and receipt identity in runner temporary storage; it deletes the oracle rather than uploading it. The abstain artifact verifies format/scoring execution only and is not a model or quality baseline.
-- 53 authored unit tests: 24 scheduler/receipt tests, one POAR routing-suite test, 22 graph/oracle tests, and 6 frozen-artifact evaluator tests.
+- 56 authored unit tests: 24 scheduler/receipt tests, one POAR routing-suite test, 22 graph/oracle tests, seven frozen-artifact parser/evaluator tests, and two SHA-256 known-answer tests.
 - Graph benchmarks report disposition correctness, false support/refutation, unsupported proof paths, citation completeness, temporal/scope/authority/integrity violations, retracted citations, correlated-source violations, plus ranked temporal evidence coverage@3 and precision@3; retrieval ranking is separate from final proof citations, and there is no composite score.
 
 ## Research contracts
