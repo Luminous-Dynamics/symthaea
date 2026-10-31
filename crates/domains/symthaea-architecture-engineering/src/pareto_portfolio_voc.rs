@@ -310,9 +310,14 @@ pub fn evaluate_portfolio_class_regret(
     let portfolio_class_regret = mean(&regret_replicates);
     let portfolio_class_regret_standard_error = standard_error(&regret_replicates);
     let margin = 1.96 * portfolio_class_regret_standard_error;
+    let maximum_possible_regret = design
+        .reference()
+        .iter()
+        .map(|lower| 1.0 - lower)
+        .product::<f64>();
     let regret_interval = (
         (portfolio_class_regret - margin).max(0.0),
-        portfolio_class_regret + margin,
+        (portfolio_class_regret + margin).min(maximum_possible_regret),
     );
 
     let posterior_sha256 = digest_serializable(
