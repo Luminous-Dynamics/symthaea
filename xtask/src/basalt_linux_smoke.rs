@@ -31,7 +31,7 @@ const MAX_BOOT_ID_BYTES: usize = 128;
 pub enum ProbeStatus {
     Passed,
     NotSupported,
-    Disabled,
+    OperationNotSupported,
     PermissionDenied,
     InvalidRequest,
     NotAttempted,
@@ -373,7 +373,7 @@ fn classify_errno(errno: i32) -> ProbeStatus {
     } else if errno == libc::EINVAL {
         ProbeStatus::InvalidRequest
     } else if errno == libc::EOPNOTSUPP {
-        ProbeStatus::Disabled
+        ProbeStatus::OperationNotSupported
     } else if errno == libc::EPERM || errno == libc::EACCES {
         ProbeStatus::PermissionDenied
     } else {
@@ -472,7 +472,7 @@ mod tests {
     #[test]
     fn errno_mapping_distinguishes_unsupported_disabled_denied_and_invalid_request() {
         assert_eq!(classify_errno(libc::ENOSYS), ProbeStatus::NotSupported);
-        assert_eq!(classify_errno(libc::EOPNOTSUPP), ProbeStatus::Disabled);
+        assert_eq!(classify_errno(libc::EOPNOTSUPP), ProbeStatus::OperationNotSupported);
         assert_eq!(classify_errno(libc::EPERM), ProbeStatus::PermissionDenied);
         assert_eq!(classify_errno(libc::EACCES), ProbeStatus::PermissionDenied);
         assert_eq!(classify_errno(libc::EINVAL), ProbeStatus::InvalidRequest);
@@ -513,7 +513,7 @@ mod tests {
     fn landlock_errno_is_preserved_and_classified() {
         let fake = FakeSyscalls::new(Err(libc::EOPNOTSUPP), Ok(31), Ok(()));
         let item = probe_landlock_abi_with(&fake);
-        assert_eq!(item.status, ProbeStatus::Disabled);
+        assert_eq!(item.status, ProbeStatus::OperationNotSupported);
         assert_eq!(item.errno, Some(libc::EOPNOTSUPP));
         assert!(!item.resource_created);
     }
