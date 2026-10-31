@@ -117,18 +117,19 @@ def validate_budget(row, index):
 def validate_graph(universe, fixed, order, graph, label):
     if set(universe) & set(fixed):
         raise ContractError(f"{label}: mutable and fixed declaration IDs overlap")
-    if len(order) != len(universe) or set(order) != set(universe):
-        raise ContractError(f"{label}: declaration_order must contain every mutable declaration once")
-    if not isinstance(graph, dict) or set(graph) != set(universe):
-        raise ContractError(f"{label}: dependency graph must have one entry per mutable declaration")
+    all_declarations = set(universe) | set(fixed)
+    if len(order) != len(all_declarations) or set(order) != all_declarations:
+        raise ContractError(f"{label}: declaration_order must contain every fixed and mutable declaration exactly once")
+    if not isinstance(graph, dict) or set(graph) != all_declarations:
+        raise ContractError(f"{label}: dependency graph must have one entry per fixed and mutable declaration")
     positions = {name: i for i, name in enumerate(order)}
     result = {}
-    for name in universe:
+    for name in sorted(all_declarations):
         deps = require_ids(graph[name], f"{label}.declaration_dependencies[{name}]")
         for dep in deps:
-            if dep not in positions and dep not in fixed:
+            if dep not in positions:
                 raise ContractError(f"{label}: {name} depends on unknown prerequisite {dep}")
-            if dep in positions and positions[dep] >= positions[name]:
+            if positions[dep] >= positions[name]:
                 raise ContractError(f"{label}: {dep} must precede dependent declaration {name}")
         result[name] = deps
     return result
@@ -136,7 +137,9 @@ def validate_graph(universe, fixed, order, graph, label):
 
 def context_valid(subset, fixed, graph):
     present = set(subset) | set(fixed)
-    missing = sorted((name, dep) for name in subset for dep in graph[name] if dep not in present)
+    # Fixed declarations remain in the reconstructed context too. They can
+    # themselves depend on a mutable declaration, so their closure matters.
+    missing = sorted((name, dep) for name in present for dep in graph[name] if dep not in present)
     return not missing, missing
 
 
@@ -371,16 +374,16 @@ def analyze(rows, reliability_floor=0.80, min_replicates=20, max_variables=8, si
             analyze_group(key, value, reliability_floor, min_replicates, max_variables, simultaneous_alpha)
             for key, value in sorted(groups.items())
         ],
-        "context_validity_definition": "A context is valid only when each selected declaration's mutable prerequisites are also selected and every fixed prerequisite is in the pinned fixed context.",
+        "context_validity_definition": "A context is valid only when every remaining declaration, including fixed declarations, has all direct prerequisites present in the selected mutable set or pinned fixed context.",
         "reliability_definition": "A context qualifies only when the one-sided Wilson lower bound with Bonferroni familywise adjustment across every well-formed context is at least reliability_floor and replicate count is at least min_replicates.",
         "evidence_boundary": "Digests, budgets and row/schedule bindings are checked; referenced receipt bytes still require independent authentication.",
     }
 
 
 def synthetic_rows(study, target, component, universe, dependencies, predicate,
-                   budget, replicate_count=50, success_counts=None):
-    fixed = ["fixed-base"]
-    order = sorted(universe)
+                   budget, replicate_count=50, success_counts=None, fixed_declarations=None):
+    fixed = sorted(fixed_declarations) if fixed_declarations is not None else ["fixed-base"]
+    order = sorted(set(universe) | set(fixed))
     graph = {name: sorted(dependencies.get(name, [])) for name in order}
     budget = dict(budget)
     hashes = {
@@ -444,12 +447,17 @@ def self_test():
                           lambda s: {"h1", "h2"} <= s, budget)
     dep = synthetic_rows("self", "dependency", "c3", ["base", "dependent"],
                          {"dependent": ["base"]}, lambda s: "base" in s, budget)
-    reports = [analyze(rows)["groups"][0] for rows in (alt, conj, dep)]
+    fixed_dep = synthetic_rows("self", "fixed-dependency", "c6", ["base"],
+                               {"fixed-child": ["base"]}, lambda s: "base" in s,
+                               budget, fixed_declarations=["fixed-child"])
+    reports = [analyze(rows)["groups"][0] for rows in (alt, conj, dep, fixed_dep)]
     by_target = {g["target_id"]: g for g in reports}
     assert by_target["alternative"]["reliable_minimal_support_antichain"] == [["h"], ["hEq"]]
     assert by_target["conjunctive"]["reliable_minimal_support_antichain"] == [["h1", "h2"]]
     assert by_target["dependency"]["invalid_context_count"] == 1
     assert by_target["dependency"]["reliable_minimal_support_antichain"] == [["base"]]
+    assert by_target["fixed-dependency"]["invalid_context_count"] == 1
+    assert by_target["fixed-dependency"]["reliable_minimal_support_antichain"] == [["base"]]
 
     stochastic = synthetic_rows("self", "stochastic", "c4", ["h", "hEq"], {},
                                 lambda s: bool(s), budget,
