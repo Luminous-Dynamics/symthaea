@@ -82,7 +82,7 @@ impl WorkflowTerminal {
         match self {
             Self::CompletedVerified => "completed_verified",
             Self::CompletedUnverified => "completed_unverified",
-            Self::CompensatedVerified => "aborted_verified",
+            Self::CompensatedVerified => "compensated_verified",
             Self::PartialState => "partial_state",
             Self::UnknownOutcome => "unknown_outcome",
         }
