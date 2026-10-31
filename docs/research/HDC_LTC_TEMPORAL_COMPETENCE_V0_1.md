@@ -92,10 +92,15 @@ Required baseline families, where semantics are appropriate:
 - GRU-D or another missingness-aware recurrent variant;
 - ODE-RNN/latent-ODE or another reproducible continuous-time recurrent reference;
 - adaptive LIF/ALIF or a representative SNN on event-native tasks;
+- BrainTrace online-learning methods on compatible SNN tasks: D-RTRL (parameter-dimensional traces), pp-prop / ES-D-RTRL (input/output-factorized traces), and e-prop where supported by the matched model;
 - a small temporal convolution network;
 - matched parameter/state-budget and compute-budget controls.
 
-For each baseline pin repository, commit/release, framework, configuration, training budget, precision, data pipeline, random seed, hardware, and all deviations. A paper's reported score is a literature reference, not a reproduced score. Compare only within the same task definition and test split.
+**BrainTrace is a required named competitor, not a generic SNN checkbox.** The paper *Model-agnostic linear-memory online learning in spiking neural networks* (Nature Communications, 19 January 2026; DOI 10.1038/s41467-026-68453-w) introduces model-agnostic online learning/eligibility-trace compilation. Its published abstract and full text report D-RTRL and pp-prop/ES-D-RTRL methods, and online training across several SNN dynamics. The current public package inspected for this protocol is BrainTrace v0.2.8 at commit `4fd426e1ec58a61a11d47a8d95c32346778e8b11`; the public DMS experiment repository is pinned at `81332436b3a0167bc83059878e43a0f0e2eb62c7`. See `BRAINTRACE_REFERENCE_AUDIT_V0_1.md` for the code-level task and split audit.
+
+BrainTrace's algorithms are online **learning** baselines, not drop-in inference-only architectures. Compare them on online adaptation and long-horizon credit assignment, count trace memory and compute, and include BPTT as a small-scale gradient reference. Do not interpret pp-prop's factorized trace as an exact full-parameter gradient; keep its approximation/rank/decay explicit. Paper-reported metrics remain literature results, not Symthaea reproductions.
+
+For every baseline pin repository, exact commit/release, framework, configuration, training budget, precision, data pipeline, random seed, hardware, and all deviations. A paper's reported score is a literature reference, not a reproduced score. Compare only within the same task definition and test split.
 
 ## 7. Metrics
 
@@ -172,6 +177,9 @@ These are targets, not measured results:
 
 ## 11. Evidence and claim boundary
 
-The repository also contains an isolated, dependency-free Rust delayed-cue generator prototype under research/temporal-bench. It creates a deterministic event stream and a separate oracle record, with unit tests for reproducibility, temporal ordering, Hamming-similarity controls, uniqueness, and invalid configuration. The oracle is returned from the same process and is **not** a sealed evaluator boundary.
+The repository contains an isolated, dependency-free Rust prototype under research/temporal-bench:
+- a delayed-cue generator with controlled key similarity and distractor interference;
+- a multi-timescale forecasting generator with hidden periods/phases, a hidden middle-third regime boundary, and delayed online feedback;
+- an evaluator-side trace verifier with negative-control tests for altered labels, early feedback, missing feedback, and oracle identity mismatch.
 
-The full multi-task generator, streaming runner, dataset adapters, separate evaluator process, benchmark execution, model comparison, hardware measurement, and energy result are not yet included. The Rust tests are authored but unrun in this environment. A passing benchmark would establish a result only for the declared tasks, splits, model versions, and hardware. It would not establish consciousness, general intelligence, universal superiority, or neuromorphic hardware efficiency if measured only on conventional CPU/GPU execution.
+The generated public event stream and oracle remain returned in one process. The verifier has been implemented, but the confirmatory oracle is **not yet sealed by process or permission isolation**. Rust unit tests are authored but unrun in this environment. The full seven-family generator, streaming runner, dataset adapters, separate evaluator service, benchmark execution, model comparison, hardware measurement, and energy result are not yet included. A passing benchmark would establish a result only for the declared tasks, splits, model versions, and hardware. It would not establish consciousness, general intelligence, universal superiority, or neuromorphic hardware efficiency if measured only on conventional CPU/GPU execution.
