@@ -1291,6 +1291,15 @@ mod tests {
         assert!(audit(&p, &s).unwrap_err().contains("must remain assumption_not_verified"));
     }
 
+
+    #[test]
+    fn refuses_to_claim_accepted_observation_selection_is_verified() {
+        let (mut plan, stream, _, _) = fixture();
+        plan["accepted_observation_selection_assumption_status"] = json!("verified");
+        let error = audit(&plan, &stream).unwrap_err();
+        assert!(error.contains("accepted_observation_selection_assumption_status"));
+    }
+
     #[test]
     fn perfectly_dependent_marginally_null_streams_expose_iid_assumption_failure() {
         // Deterministic 10,000-point quadrature over one latent X ~ Uniform[0,6].
