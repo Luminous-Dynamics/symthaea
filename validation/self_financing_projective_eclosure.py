@@ -123,10 +123,49 @@ def predictable_shares(
     )
 
 
+def _policy_scores(
+    policy: str,
+    fixed_scores: Sequence[Fraction],
+    past_wealth: Sequence[Fraction],
+    active_mask: int,
+) -> tuple[Fraction, ...]:
+    if policy == "static_priority":
+        return tuple(fixed_scores)
+    if policy == "equal_active":
+        return tuple(
+            Fraction(1) if (active_mask >> i) & 1 else Fraction(0)
+            for i in range(len(fixed_scores))
+        )
+    if policy == "past_wealth":
+        return tuple(past_wealth)
+    if policy == "past_wealth_squared":
+        return tuple(value * value for value in past_wealth)
+    if policy == "largest_past_wealth":
+        active_values = [
+            past_wealth[i] for i in range(len(past_wealth))
+            if (active_mask >> i) & 1
+        ]
+        if not active_values:
+            return tuple(Fraction(0) for _ in past_wealth)
+        maximum = max(active_values)
+        return tuple(
+            Fraction(1)
+            if (active_mask >> i) & 1 and past_wealth[i] == maximum
+            else Fraction(0)
+            for i in range(len(past_wealth))
+        )
+    raise ValueError(
+        "share_policy must be static_priority, equal_active, past_wealth, "
+        "past_wealth_squared, or largest_past_wealth"
+    )
+
+
 def build_self_financing_intersection_paths(
     increment_paths: Sequence[Sequence[int | float | str | Fraction]],
     active_masks: Sequence[int],
     priority_scores: Sequence[int | float | str | Fraction],
+    *,
+    share_policy: str = "static_priority",
 ) -> tuple[dict[int, tuple[Fraction, ...]], tuple[tuple[Fraction, ...], ...]]:
     """Build every intersection product process and the predictable shares.
 
@@ -150,7 +189,23 @@ def build_self_financing_intersection_paths(
     if any(v < 0 for row in x for v in row) or any(v < 0 for v in scores):
         raise ValueError("increments and scores must be nonnegative")
 
-    shares = tuple(predictable_shares(mask, scores) for mask in active_masks)
+    if share_policy not in (
+        "static_priority", "equal_active", "past_wealth",
+        "past_wealth_squared", "largest_past_wealth",
+    ):
+        raise ValueError("unsupported predictable share policy")
+    past_wealth = [Fraction(1) for _ in range(n)]
+    shares_list = []
+    for t, active in enumerate(active_masks):
+        current_scores = _policy_scores(
+            share_policy, scores, past_wealth, active
+        )
+        shares_list.append(predictable_shares(active, current_scores))
+        # Update the base coordinate wealth only after shares for this time
+        # have been chosen: the portfolio policy is predictable.
+        for i in range(n):
+            past_wealth[i] *= x[i][t]
+    shares = tuple(shares_list)
     result: dict[int, tuple[Fraction, ...]] = {}
     for subset in range(1, 1 << n):
         wealth = Fraction(1)
