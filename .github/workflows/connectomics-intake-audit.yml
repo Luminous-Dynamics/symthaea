@@ -85,6 +85,7 @@ on:
       - "docs/neuroscience/examples/CONNECTOME_QUERY_IMPACT_SYNTHETIC.example.json"
       - "docs/neuroscience/CONNECTOME_CORRECTION_PORTFOLIO.schema.json"
       - "docs/neuroscience/CONNECTOME_QUERY_ENSEMBLE_AUDIT.schema.json"
+      - "docs/neuroscience/CONNECTOME_MODALITY_COHORT_MANIFEST.schema.json"
       - "docs/neuroscience/CONNECTOME_QUERY_ENSEMBLE_AUDIT_PROTOCOL_V1.md"
       - "docs/neuroscience/examples/CONNECTOME_QUERY_ENSEMBLE_AUDIT.example.json"
       - "docs/neuroscience/CONNECTOME_CORRECTION_PORTFOLIO_AUDIT_PROTOCOL_V1.md"
