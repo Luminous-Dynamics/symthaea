@@ -24,12 +24,14 @@
   },
   "execution_state": {
     "protocol_authored": true,
-    "generator_implemented": false,
+    "generator_implemented": true,
     "runner_implemented": false,
     "rust_tests_executed": false,
     "benchmark_executed": false,
     "hardware_energy_measured": false,
-    "result_values_present": false
+    "result_values_present": false,
+    "generator_scope": "Delayed-cue synthetic prototype only; the seven-family suite generator is not implemented.",
+    "rust_tests_authored": true
   },
   "workload_contract": {
     "sample_semantics": "Causal observations; no future samples; elapsed simulated time is explicit.",
