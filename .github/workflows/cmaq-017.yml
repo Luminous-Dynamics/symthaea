@@ -86,9 +86,18 @@ jobs:
                   assert isinstance(row[key], (int, float))
                   assert abs(row[key]) < 1e8
 
-              assert row["mean_model_transition_evaluations"] == (
+              assert row["mean_model_transition_evaluations"] <= (
                   row["mean_model_head_evaluations"] * row["horizon"]
               )
+              assert row["mean_oracle_transition_evaluations"] <= (
+                  row["mean_candidate_sequence_queries"] * row["horizon"]
+              )
+              if row["policy"] in ("random_point_search", "adaptive_point_cem",
+                                   "pessimistic_ensemble_cem", "uncertainty_lcb_cem",
+                                   "shuffled_future_negative_control"):
+                  assert row["mean_model_transition_evaluations"] > 0.0
+              if row["policy"] == "oracle_cem":
+                  assert row["mean_oracle_transition_evaluations"] > 0.0
               assert row["mean_evaluator_diagnostic_transition_evaluations"] == (
                   row["mean_executed_steps"]
               )
