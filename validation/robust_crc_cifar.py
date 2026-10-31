@@ -519,13 +519,26 @@ def run_grid_robustness_stress(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--mode", choices=("five", "grid"), default="five")
+    parser.add_argument("--n", type=int, default=50)
+    parser.add_argument("--alpha", type=float, default=0.10)
+    parser.add_argument("--grid-min-count", type=int, default=500)
+    parser.add_argument("--grid-step", type=int, default=500)
     args = parser.parse_args()
-    result = run_comparison()
-    Path(args.output).write_text(json.dumps(result, indent=2, allow_nan=False)+"\n", encoding="utf-8")
+    if args.mode == "five":
+        result = run_comparison(n=args.n, alpha=args.alpha)
+    else:
+        result = run_grid_robustness_stress(
+            n=args.n, alpha=args.alpha,
+            min_count_per_type=args.grid_min_count,
+            step=args.grid_step,
+        )
+    Path(args.output).write_text(
+        json.dumps(result, indent=2, allow_nan=False)+"\n", encoding="utf-8"
+    )
     print(json.dumps({
         "output": args.output,
-        "worst_case_specificity": result["worst_case_specificity"],
-        "scenario_results": result["scenario_comparison"],
-        "max_augmented_violation": result["verification"]["max_budget_excess"],
+        "mode": args.mode,
+        "worst_case": result.get("worst_case", result.get("worst_case_specificity")),
         "solver": result["solver"],
     }, indent=2))
