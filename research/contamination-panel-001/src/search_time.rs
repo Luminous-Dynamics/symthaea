@@ -717,6 +717,58 @@ mod tests {
     }
 
     #[test]
+    fn strict_trace_and_finding_schemas_match_rust_serialization() {
+        let trace_schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schema/search-time-exposure-trace.schema.json"
+        )).unwrap();
+        let audit_schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schema/search-time-exposure-audit.schema.json"
+        )).unwrap();
+        let findings_schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schema/search-time-exposure-findings.schema.json"
+        )).unwrap();
+        let findings_audit_schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schema/search-time-exposure-findings-audit.schema.json"
+        )).unwrap();
+
+        let trace = trace();
+        let trace_audit = audit_search_time_trace(&trace).unwrap();
+        let findings = findings(&trace);
+        let findings_audit = audit_search_time_findings(&trace, &findings).unwrap();
+        for (schema, value, version) in [
+            (&trace_schema, serde_json::to_value(&trace).unwrap(), SEARCH_TRACE_SCHEMA),
+            (&audit_schema, serde_json::to_value(&trace_audit).unwrap(), SEARCH_AUDIT_SCHEMA),
+            (&findings_schema, serde_json::to_value(&findings).unwrap(), SEARCH_FINDINGS_SCHEMA),
+            (&findings_audit_schema, serde_json::to_value(&findings_audit).unwrap(), SEARCH_FINDINGS_AUDIT_SCHEMA),
+        ] {
+            assert_eq!(schema["properties"]["schema"]["const"].as_str(), Some(version));
+            let required: BTreeSet<String> = schema["required"].as_array().unwrap()
+                .iter().map(|value| value.as_str().unwrap().to_owned()).collect();
+            let properties: BTreeSet<String> = schema["properties"].as_object().unwrap()
+                .keys().cloned().collect();
+            let actual: BTreeSet<String> = value.as_object().unwrap()
+                .keys().cloned().collect();
+            assert_eq!(required, properties);
+            assert_eq!(actual, properties);
+        }
+        let expected_event_fields: BTreeSet<String> =
+            trace_schema["properties"]["events"]["items"]["properties"]
+                .as_object().unwrap().keys().cloned().collect();
+        let actual_event_fields: BTreeSet<String> =
+            serde_json::to_value(&trace.events[0]).unwrap().as_object().unwrap()
+                .keys().cloned().collect();
+        assert_eq!(expected_event_fields, actual_event_fields);
+
+        let expected_finding_fields: BTreeSet<String> =
+            findings_schema["properties"]["findings"]["items"]["properties"]
+                .as_object().unwrap().keys().cloned().collect();
+        let actual_finding_fields: BTreeSet<String> =
+            serde_json::to_value(&findings.findings[0]).unwrap().as_object().unwrap()
+                .keys().cloned().collect();
+        assert_eq!(expected_finding_fields, actual_finding_fields);
+    }
+
+    #[test]
     fn exact_hash_chain_replays_for_valid_trace() {
         let trace = trace();
         let audit = audit_search_time_trace(&trace).unwrap();
