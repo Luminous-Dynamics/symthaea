@@ -148,14 +148,24 @@ struct Summary {
     model: &'static str,
     mean_pair_coverage: f64,
     mean_effect_sign_accuracy: Option<f64>,
+    effect_sign_accuracy_ci95_lower: Option<f64>,
+    effect_sign_accuracy_ci95_upper: Option<f64>,
     mean_effect_magnitude_mae: Option<f64>,
+    effect_magnitude_mae_ci95_lower: Option<f64>,
+    effect_magnitude_mae_ci95_upper: Option<f64>,
     mean_rank_tau_b: Option<f64>,
+    rank_tau_b_ci95_lower: Option<f64>,
+    rank_tau_b_ci95_upper: Option<f64>,
     mean_top1_regret: Option<f64>,
+    top1_regret_ci95_lower: Option<f64>,
+    top1_regret_ci95_upper: Option<f64>,
     mean_null_false_effect_rate: Option<f64>,
     mean_branch_coverage: f64,
     mean_branch_outcome_mae: Option<f64>,
     mean_branch_state_mae: Option<f64>,
     mean_terminal_false_safe_rate: Option<f64>,
+    terminal_false_safe_rate_ci95_lower: Option<f64>,
+    terminal_false_safe_rate_ci95_upper: Option<f64>,
     mean_branch_prediction_evaluations: f64,
     mean_pair_effect_evaluations: f64,
     mean_oracle_branch_evaluations: f64,
@@ -537,6 +547,42 @@ fn mean_optional(values: &[Option<f64>]) -> Option<f64> {
     (!present.is_empty()).then(|| present.iter().sum::<f64>() / present.len() as f64)
 }
 
+
+fn bootstrap_mean_ci(values: &[Option<f64>], seed: u64) -> Option<(f64, f64)> {
+    const RESAMPLES: usize = 2000;
+    let observed: Vec<f64> = values.iter().filter_map(|value| *value).collect();
+    if observed.len() < 2 {
+        return None;
+    }
+
+    let mut rng = SplitMix64::new(seed);
+    let mut means = Vec::with_capacity(RESAMPLES);
+    for _ in 0..RESAMPLES {
+        let mut total = 0.0;
+        for _ in 0..observed.len() {
+            let index = (rng.unit() * observed.len() as f64) as usize;
+            total += observed[index.min(observed.len() - 1)];
+        }
+        means.push(total / observed.len() as f64);
+    }
+    means.sort_by(f64::total_cmp);
+    let lower_index = ((RESAMPLES - 1) as f64 * 0.025).floor() as usize;
+    let upper_index = ((RESAMPLES - 1) as f64 * 0.975).ceil() as usize;
+    Some((means[lower_index], means[upper_index]))
+}
+
+fn metric_bootstrap_seed(scenario: Scenario, model: Model, salt: u64) -> u64 {
+    let scenario_hash = scenario
+        .name()
+        .bytes()
+        .fold(0u64, |hash, byte| hash.wrapping_mul(131).wrapping_add(byte as u64));
+    let model_hash = model
+        .name()
+        .bytes()
+        .fold(0u64, |hash, byte| hash.wrapping_mul(137).wrapping_add(byte as u64));
+    BASE_SEED ^ scenario_hash.rotate_left(13) ^ model_hash.rotate_left(29) ^ salt
+}
+
 fn summarize(scenario: Scenario, model: Model) -> Summary {
     let mut rows = Vec::with_capacity(EPISODES);
     for episode in 0..EPISODES {
@@ -546,6 +592,29 @@ fn summarize(scenario: Scenario, model: Model) -> Summary {
     }
 
     let denominator = EPISODES as f64;
+    let sign_ci = bootstrap_mean_ci(
+        &rows.iter().map(|row| row.sign_accuracy).collect::<Vec<_>>(),
+        metric_bootstrap_seed(scenario, model, 1),
+    );
+    let magnitude_ci = bootstrap_mean_ci(
+        &rows.iter().map(|row| row.effect_magnitude_mae).collect::<Vec<_>>(),
+        metric_bootstrap_seed(scenario, model, 2),
+    );
+    let tau_ci = bootstrap_mean_ci(
+        &rows.iter().map(|row| row.rank_tau_b).collect::<Vec<_>>(),
+        metric_bootstrap_seed(scenario, model, 3),
+    );
+    let regret_ci = bootstrap_mean_ci(
+        &rows.iter().map(|row| row.top1_regret).collect::<Vec<_>>(),
+        metric_bootstrap_seed(scenario, model, 4),
+    );
+    let false_safe_ci = bootstrap_mean_ci(
+        &rows
+            .iter()
+            .map(|row| row.terminal_false_safe_rate)
+            .collect::<Vec<_>>(),
+        metric_bootstrap_seed(scenario, model, 5),
+    );
     Summary {
         scenario: scenario.name(),
         model: model.name(),
@@ -553,15 +622,23 @@ fn summarize(scenario: Scenario, model: Model) -> Summary {
         mean_effect_sign_accuracy: mean_optional(
             &rows.iter().map(|row| row.sign_accuracy).collect::<Vec<_>>(),
         ),
+        effect_sign_accuracy_ci95_lower: sign_ci.map(|interval| interval.0),
+        effect_sign_accuracy_ci95_upper: sign_ci.map(|interval| interval.1),
         mean_effect_magnitude_mae: mean_optional(
             &rows.iter().map(|row| row.effect_magnitude_mae).collect::<Vec<_>>(),
         ),
+        effect_magnitude_mae_ci95_lower: magnitude_ci.map(|interval| interval.0),
+        effect_magnitude_mae_ci95_upper: magnitude_ci.map(|interval| interval.1),
         mean_rank_tau_b: mean_optional(
             &rows.iter().map(|row| row.rank_tau_b).collect::<Vec<_>>(),
         ),
+        rank_tau_b_ci95_lower: tau_ci.map(|interval| interval.0),
+        rank_tau_b_ci95_upper: tau_ci.map(|interval| interval.1),
         mean_top1_regret: mean_optional(
             &rows.iter().map(|row| row.top1_regret).collect::<Vec<_>>(),
         ),
+        top1_regret_ci95_lower: regret_ci.map(|interval| interval.0),
+        top1_regret_ci95_upper: regret_ci.map(|interval| interval.1),
         mean_null_false_effect_rate: mean_optional(
             &rows.iter().map(|row| row.null_false_effect_rate).collect::<Vec<_>>(),
         ),
@@ -575,6 +652,8 @@ fn summarize(scenario: Scenario, model: Model) -> Summary {
         mean_terminal_false_safe_rate: mean_optional(
             &rows.iter().map(|row| row.terminal_false_safe_rate).collect::<Vec<_>>(),
         ),
+        terminal_false_safe_rate_ci95_lower: false_safe_ci.map(|interval| interval.0),
+        terminal_false_safe_rate_ci95_upper: false_safe_ci.map(|interval| interval.1),
         mean_branch_prediction_evaluations: rows
             .iter()
             .map(|row| row.branch_prediction_evaluations as f64)
@@ -651,12 +730,28 @@ fn render_report() -> String {
 
             output.push_str("\"mean_effect_sign_accuracy\":");
             write_optional(&mut output, row.mean_effect_sign_accuracy);
+            output.push_str(",\"effect_sign_accuracy_ci95_lower\":");
+            write_optional(&mut output, row.effect_sign_accuracy_ci95_lower);
+            output.push_str(",\"effect_sign_accuracy_ci95_upper\":");
+            write_optional(&mut output, row.effect_sign_accuracy_ci95_upper);
             output.push_str(",\"mean_effect_magnitude_mae\":");
             write_optional(&mut output, row.mean_effect_magnitude_mae);
+            output.push_str(",\"effect_magnitude_mae_ci95_lower\":");
+            write_optional(&mut output, row.effect_magnitude_mae_ci95_lower);
+            output.push_str(",\"effect_magnitude_mae_ci95_upper\":");
+            write_optional(&mut output, row.effect_magnitude_mae_ci95_upper);
             output.push_str(",\"mean_rank_tau_b\":");
             write_optional(&mut output, row.mean_rank_tau_b);
+            output.push_str(",\"rank_tau_b_ci95_lower\":");
+            write_optional(&mut output, row.rank_tau_b_ci95_lower);
+            output.push_str(",\"rank_tau_b_ci95_upper\":");
+            write_optional(&mut output, row.rank_tau_b_ci95_upper);
             output.push_str(",\"mean_top1_regret\":");
             write_optional(&mut output, row.mean_top1_regret);
+            output.push_str(",\"top1_regret_ci95_lower\":");
+            write_optional(&mut output, row.top1_regret_ci95_lower);
+            output.push_str(",\"top1_regret_ci95_upper\":");
+            write_optional(&mut output, row.top1_regret_ci95_upper);
             output.push_str(",\"mean_null_false_effect_rate\":");
             write_optional(&mut output, row.mean_null_false_effect_rate);
             write!(
@@ -670,6 +765,10 @@ fn render_report() -> String {
             write_optional(&mut output, row.mean_branch_state_mae);
             output.push_str(",\"mean_terminal_false_safe_rate\":");
             write_optional(&mut output, row.mean_terminal_false_safe_rate);
+            output.push_str(",\"terminal_false_safe_rate_ci95_lower\":");
+            write_optional(&mut output, row.terminal_false_safe_rate_ci95_lower);
+            output.push_str(",\"terminal_false_safe_rate_ci95_upper\":");
+            write_optional(&mut output, row.terminal_false_safe_rate_ci95_upper);
             write!(
                 &mut output,
                 ",\"mean_branch_prediction_evaluations\":{:.3},\"mean_pair_effect_evaluations\":{:.3},\"mean_oracle_branch_evaluations\":{:.3}}}",
@@ -692,6 +791,18 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+
+    #[test]
+    fn episode_bootstrap_interval_is_deterministic_and_respects_constant_metrics() {
+        let values = vec![Some(0.25); EPISODES];
+        let first = bootstrap_mean_ci(&values, BASE_SEED).unwrap();
+        let second = bootstrap_mean_ci(&values, BASE_SEED).unwrap();
+        assert_eq!(first.0.to_bits(), second.0.to_bits());
+        assert_eq!(first.1.to_bits(), second.1.to_bits());
+        assert!((first.0 - 0.25).abs() < 1e-12);
+        assert!((first.1 - 0.25).abs() < 1e-12);
+    }
 
     #[test]
     fn null_effect_branches_share_exactly_zero_causal_difference() {
