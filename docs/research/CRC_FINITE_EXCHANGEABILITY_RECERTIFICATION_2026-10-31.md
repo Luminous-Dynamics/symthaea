@@ -157,11 +157,30 @@ Results from the exact-rational development run:
 
 The single unchanged calibration state is the all-type-0 sample, whose all-type-0 augmentation has no unused risk budget. The verifier retains it rather than spending nonexistent slack.
 
+### Nonconvex finite-grid completion: coordinate-sweep admissibility
+
+The paper's Proposition 3.7 gives a different completion for nonconvex monotone losses when the observation space is finite. Instead of relying on convexity and repeated global recertification, lower one controller coordinate at a time. If calibration multiset \(D\) contains \(\nu_D(z)\) copies of type \(z\), lowering \(A(D)\) to \(a\) changes the held-out loss on \(D\cup\{z\}\) exactly \(\nu_D(z)+1\) times. The coordinate can be lowered precisely when
+
+\[
+(\nu_D(z)+1)\{\ell(z,a)-\ell(z,A(D))\}
+\leq \Delta_A(D\cup\{z\})
+\quad\forall z.
+\]
+
+The module validation/crc_discrete_admissibility.py implements this result for exact finite action grids and one or more monotone loss/risk tables. It uses a deterministic reverse-lexicographic count-vector sweep, independently checks every augmented multiset, and verifies that no single coordinate can be lowered while holding the others fixed. Under the paper's finite-support monotonicity argument, a coordinate that cannot be lowered at its turn cannot become reducible after later updates consume more shared slack.
+
+For the paper's two-type example, using a 1/40 action grid and the envelope-CRC baseline (HH=1/2, HL=2/5, LL=1/4), the one-pass sweep returns the exact admissible controller (HH=1/2, HL=3/8, LL=1/8). All four augmented multisets are checked; the three mixed/high-loss constraints bind with exact slack zero, while LLL retains positive slack. The baseline is valid but the admissibility verifier returns a concrete lowerable-coordinate witness.
+
+This finite-grid route is important for step-function losses such as miscoverage indicators, where the convex interval theorem is unavailable. It is still finite-support only; continuous outcomes require a certified continuum optimizer or a uniform approximation bound.
+
+The module also accepts multiple loss tables sharing the same ordered action grid. Its current multi-risk regression test uses a proportional second risk as a consistency check; genuinely heterogeneous multi-risk benchmarks remain future work.
+
 ## Tests
 
 From the repository root:
 
     PYTHONPATH=validation python -m unittest -v test_crc_finite_recertification.py
+    PYTHONPATH=validation python -m unittest -v test_crc_discrete_admissibility.py
 
 Tests cover:
 
@@ -183,8 +202,9 @@ Tests cover:
 ## Next research gates
 
 1. Reproduce the paper's exact two-type example and equations from the primary manuscript, documenting notation and action orientation.
-2. Generalize from affine to arbitrary convex losses where the per-type inverse can be computed exactly.
-3. Add a certified continuous-space mode using interval branch-and-bound or a globally valid lower bound on slack. A finite grid alone is never a validity proof.
+2. Generalize the finite-grid coordinate sweep to multiple independent loss families and benchmark order sensitivity / admissible controllers.
+3. Generalize affine recertification to arbitrary convex losses where per-type inverses can be computed exactly.
+4. Add a certified continuous-space mode using interval branch-and-bound or a globally valid lower bound on slack. A finite grid alone is never a validity proof.
 4. Verify the general contraction theorem using exact rational fixtures and adversarial loss curves.
 5. Add a reproducible hierarchical CIFAR-100 experiment with frozen model predictions, calibration split, action grid, preprocessing and seeds.
 6. Integrate the resulting typed finite-exchangeability receipt into the active symthaea-statistics architecture from issue #9357; do not create another statistics crate.
