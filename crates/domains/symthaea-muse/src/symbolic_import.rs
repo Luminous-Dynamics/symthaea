@@ -41,6 +41,9 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
             return Err("SMPTE-time MIDI is not supported in the first symbolic importer".into());
         }
     };
+    if ticks_per_beat == 0 {
+        return Err("MIDI metrical timing declares zero ticks per beat".into());
+    }
     let mut tempo_bpm = 120.0_f32;
     let mut meter = 4_u8;
     let mut fifths = 0_i8;
@@ -437,6 +440,14 @@ mod tests {
         assert!((score.notes[0].duration.beats() - 1.0).abs() < 1e-12);
         assert!((score.notes[1].duration.beats() - 1.0).abs() < 1e-12);
         assert!(score.has_part_identity());
+
+        let mut invalid_timing = midi;
+        invalid_timing[12] = 0;
+        invalid_timing[13] = 0;
+        assert!(
+            parse_midi(&invalid_timing).is_err(),
+            "zero ticks per beat must be rejected rather than panicking in Duration::new"
+        );
     }
 
     #[test]
