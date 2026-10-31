@@ -92,8 +92,9 @@ pub struct RenaissancePlan {
 /// Score-side checks for the structural obligations of the Renaissance form.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RenaissanceVerification {
-    pub equal_voices_present: bool,
+    pub three_independent_voices_present: bool,
     pub no_chordal_harmony_voice: bool,
+    pub meter_and_duration_match: bool,
     pub point_one_entry_order_verified: bool,
     pub point_two_entry_order_verified: bool,
     pub alto_suspension_resolves_down_step: bool,
@@ -103,8 +104,9 @@ pub struct RenaissanceVerification {
 
 impl RenaissanceVerification {
     pub fn all_verified(&self) -> bool {
-        self.equal_voices_present
+        self.three_independent_voices_present
             && self.no_chordal_harmony_voice
+            && self.meter_and_duration_match
             && self.point_one_entry_order_verified
             && self.point_two_entry_order_verified
             && self.alto_suspension_resolves_down_step
@@ -162,12 +164,14 @@ fn verify_renaissance_plan(score: &Score, plan: &RenaissancePlan) -> Renaissance
             .is_some_and(|note| (note.onset.beats() - bar as f64 * meter).abs() <= 1e-7)
     };
     let point_one_entry_order_verified =
-        plan.point_one_entry_order == ["bassus", "altus", "superius"]
+        plan.point_one_entry_order
+            == vec!["bassus".to_string(), "altus".to_string(), "superius".to_string()]
             && role_at(VoiceRole::Bass, plan.point_one_start_bar)
             && role_at(VoiceRole::CounterMelody, plan.point_one_start_bar + 1)
             && role_at(VoiceRole::Melody, plan.point_one_start_bar + 2);
     let point_two_entry_order_verified =
-        plan.point_two_entry_order == ["superius", "bassus", "altus"]
+        plan.point_two_entry_order
+            == vec!["superius".to_string(), "bassus".to_string(), "altus".to_string()]
             && role_at(VoiceRole::Melody, plan.point_two_start_bar)
             && role_at(VoiceRole::Bass, plan.point_two_start_bar + 1)
             && role_at(VoiceRole::CounterMelody, plan.point_two_start_bar + 2);
@@ -224,10 +228,12 @@ fn verify_renaissance_plan(score: &Score, plan: &RenaissancePlan) -> Renaissance
     });
 
     RenaissanceVerification {
-        equal_voices_present: has_role(VoiceRole::Melody)
+        three_independent_voices_present: has_role(VoiceRole::Melody)
             && has_role(VoiceRole::CounterMelody)
             && has_role(VoiceRole::Bass),
         no_chordal_harmony_voice: !has_role(VoiceRole::Harmony),
+        meter_and_duration_match: score.meter == plan.meter
+            && (score.total_beats.beats() - plan.total_bars as f64 * meter).abs() <= 1e-7,
         point_one_entry_order_verified,
         point_two_entry_order_verified,
         alto_suspension_resolves_down_step,
