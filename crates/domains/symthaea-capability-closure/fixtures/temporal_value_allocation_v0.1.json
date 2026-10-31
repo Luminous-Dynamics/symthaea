@@ -65,7 +65,7 @@
       "no_retention_lower_reference"
     ],
     "implementation": {
-      "tests_authored": 10,
+      "tests_authored": 11,
       "tests_executed": false,
       "production_hdc_ltc_integration": false,
       "online_value_predictor": false,
@@ -81,7 +81,7 @@
       "opposite_sign": "dt * (e0^2 + e1^2) / (2 * (abs(e0) + abs(e1)))"
     },
     "support": "first_observation_through_last_observation_only_no_extrapolation",
-    "claim_ceiling": "exact for declared piecewise-linear residual interpolant only; not ground truth over unobserved intervals",
+    "claim_ceiling": "exact for declared piecewise-linear residual interpolant only; not ground truth over unobserved intervals; CAE is a locally added absolute-error companion and is not claimed as a method established by the cited CSE paper",
     "outputs": [
       "duration_us",
       "integrated_squared_error",
@@ -163,7 +163,7 @@
   "stretch_targets_not_results": {
     "wrong_belief_exposure_relative_reduction": 0.2,
     "alternative_equal_TED_byte_seconds_reduction": 0.3,
-    "historical_as_known_preservation_rate": 1.0,
+    "historical_as_known_preservation_rate": 1,
     "future_information_leakage_count": 0,
     "stale_memory_false_recall_in_exhaustive_controls": 0
   },
@@ -212,8 +212,8 @@
   },
   "validation": {
     "parent_branch_authored_tests_reported": 208,
-    "new_tests_authored": 18,
-    "combined_source_level_test_count_expected": 226,
+    "new_tests_authored": 19,
+    "combined_source_level_test_count_expected": 227,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
