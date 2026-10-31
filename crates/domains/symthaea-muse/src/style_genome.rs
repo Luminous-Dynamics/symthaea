@@ -19,13 +19,12 @@ use std::collections::BTreeSet;
 
 use symthaea_muse_protocol::catalog::HybridStyleSpec;
 use symthaea_music_theory::{
-    CompositionSpec, Form, GrammarPlanEvidence, GrammarStructuralTrace, MusicalIntent,
-    Score, ScoreValidationConfig, Style, THEORY_VALIDATION_VERSION,
-    compose_with_grammar_plan, fingerprint,
-    score_validation::{ScoreValidationRule, ValidationSeverity, is_universal_invariant, validate_score},
+    GrammarPlanEvidence, GrammarStructuralTrace, MusicalIntent,
+    Score, ScoreValidationConfig, fingerprint, compose_with_grammar_plan,
+    score_validation::{ValidationSeverity, is_universal_invariant, validate_score},
 };
 
-use crate::style_mixer::{CompiledHybridStyle, StyleMixLayer, compile_hybrid_style};
+use crate::style_mixer::{StyleMixLayer, compile_hybrid_style};
 
 pub const STYLE_GENOME_SCHEMA: &str = "muse-style-genome-v1";
 pub const STYLE_GENOME_EVALUATION_SCHEMA: &str = "muse-style-genome-evaluation-v1";
@@ -101,8 +100,9 @@ pub struct GenomeMutation {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StyleGenome {
     pub schema: String,
-    /// Content-derived identifier; changing recipe, parentage or mutation
-    /// history changes the ID. No wall clock or random UUID is involved.
+    pub compiler_schema: String,
+    /// Content-derived identifier; changing recipe, compiler schema,
+    /// parentage or mutation history changes the ID. No wall clock or UUID.
     pub genome_id: String,
     pub recipe: HybridStyleSpec,
     pub parent_genome_ids: Vec<String>,
@@ -112,6 +112,7 @@ pub struct StyleGenome {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct GenomeIdentity<'a> {
     schema: &'a str,
+    compiler_schema: &'a str,
     recipe: &'a HybridStyleSpec,
     parent_genome_ids: &'a [String],
     mutation_history: &'a [GenomeMutation],
@@ -129,6 +130,7 @@ impl StyleGenome {
     ) -> Result<Self, GenomeIssue> {
         let mut genome = Self {
             schema: STYLE_GENOME_SCHEMA.into(),
+            compiler_schema: crate::style_mixer::HYBRID_STYLE_COMPILER_SCHEMA.into(),
             genome_id: String::new(),
             recipe,
             parent_genome_ids,
@@ -138,9 +140,16 @@ impl StyleGenome {
         Ok(genome)
     }
 
+    pub fn verify_id(&self) -> bool {
+        self.schema == STYLE_GENOME_SCHEMA
+            && self.compiler_schema == crate::style_mixer::HYBRID_STYLE_COMPILER_SCHEMA
+            && self.compute_id().is_ok_and(|expected| expected == self.genome_id)
+    }
+
     fn compute_id(&self) -> Result<String, GenomeIssue> {
         let identity = GenomeIdentity {
             schema: &self.schema,
+            compiler_schema: &self.compiler_schema,
             recipe: &self.recipe,
             parent_genome_ids: &self.parent_genome_ids,
             mutation_history: &self.mutation_history,
@@ -305,6 +314,8 @@ pub struct GenomeEvaluation {
     pub genome: StyleGenome,
     pub compiler_schema: String,
     pub compiled_spec_sha256: String,
+    pub evaluation_config_sha256: String,
+    pub reference_population_sha256: Option<String>,
     pub seed_count: usize,
     pub eligible_for_archive: bool,
     pub abstention_reasons: Vec<GenomeIssue>,
@@ -329,14 +340,14 @@ pub struct GenomeArchiveConfig {
     /// Normalized Euclidean distance. Near-clone rejection is a duplicate
     /// control only; its threshold must be calibrated on null pairs before
     /// confirmatory discovery claims.
-    pub near_clone_threshold: f64,
+    pub near_clone_threshold: Option<f64>,
 }
 
 impl Default for GenomeArchiveConfig {
     fn default() -> Self {
         Self {
             max_entries: 256,
-            near_clone_threshold: 0.01,
+            near_clone_threshold: None,
         }
     }
 }
@@ -354,6 +365,10 @@ pub struct GenomeArchiveEntry {
 pub struct GenomeArchive {
     pub schema: String,
     pub config: GenomeArchiveConfig,
+    /// The reference population is frozen for the lifetime of an archive.
+    /// Pareto comparisons are invalid when novelty scores use different baselines.
+    pub reference_population_sha256: Option<String>,
+    pub reference_population_bound: bool,
     pub entries: Vec<GenomeArchiveEntry>,
 }
 
@@ -382,17 +397,19 @@ impl GenomeArchive {
         if config.max_entries == 0 {
             return Err(GenomeIssue::new("invalid_archive_capacity", "max_entries must be positive"));
         }
-        if !config.near_clone_threshold.is_finite()
-            || !(0.0..=1.0).contains(&config.near_clone_threshold)
-        {
+        if config.near_clone_threshold.is_some_and(|threshold| {
+            !threshold.is_finite() || !(0.0..=1.0).contains(&threshold)
+        }) {
             return Err(GenomeIssue::new(
                 "invalid_near_clone_threshold",
-                "near_clone_threshold must be finite and in [0,1]",
+                "near_clone_threshold must be None or finite and in [0,1]",
             ));
         }
         Ok(Self {
             schema: STYLE_GENOME_ARCHIVE_SCHEMA.into(),
             config,
+            reference_population_sha256: None,
+            reference_population_bound: false,
             entries: Vec::new(),
         })
     }
