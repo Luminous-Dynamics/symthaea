@@ -787,5 +787,23 @@ mod integration_smoke_tests {
             ),
             Ok(())
         );
+        let knowledge_predictions: Vec<_> = knowledge_oracle
+            .answers
+            .iter()
+            .map(|answer| knowledge_stream::KnowledgePrediction {
+                query_id: answer.query_id,
+                answer: match answer.expected_value {
+                    Some(value) => knowledge_stream::KnowledgeCandidateAnswer::Value(value),
+                    None => knowledge_stream::KnowledgeCandidateAnswer::NoFact,
+                },
+            })
+            .collect();
+        let knowledge_score = knowledge_stream::score_knowledge_predictions(
+            &knowledge_oracle,
+            &knowledge_predictions
+        ).unwrap();
+        assert_eq!(knowledge_score.exact_matches, 5);
+        assert_eq!(knowledge_score.future_knowledge_leaks, 0);
+        assert_eq!(knowledge_score.stale_answers_after_retraction, 0);
     }
 }
