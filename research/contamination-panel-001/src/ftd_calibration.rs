@@ -60,6 +60,8 @@ pub struct PValueCalibrationDiagnosticV1 {
     pub mean_null_count_per_supported_repetition: f64,
     pub mean_maximum_ecdf_excess_on_10_point_grid: f64,
     pub mean_absolute_ecdf_deviation_on_10_point_grid: f64,
+    pub mean_ks_statistic: f64,
+    pub mean_cvm_statistic: f64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -317,7 +319,7 @@ fn make_feature_p_values(
     })
 }
 
-fn fixed_grid_calibration(values: &[f64]) -> Option<(u64, f64, f64)> {
+fn fixed_grid_calibration(values: &[f64]) -> Option<(u64, f64, f64, f64, f64)> {
     if values.is_empty() {
         return None;
     }
@@ -333,16 +335,30 @@ fn fixed_grid_calibration(values: &[f64]) -> Option<(u64, f64, f64)> {
         maximum_excess = maximum_excess.max((empirical - threshold).max(0.0));
         absolute_deviation_sum += (empirical - threshold).abs();
     }
+
+    let mut ks_statistic = 0.0_f64;
+    let mut cvm_statistic = 1.0 / (12.0 * n);
+    for (index, value) in sorted.iter().copied().enumerate() {
+        let rank = index as f64 + 1.0;
+        let d_plus = rank / n - value;
+        let d_minus = value - index as f64 / n;
+        ks_statistic = ks_statistic.max(d_plus.max(d_minus));
+        let midpoint = (2.0 * rank - 1.0) / (2.0 * n);
+        cvm_statistic += (value - midpoint).powi(2);
+    }
+
     Some((
         u64::try_from(sorted.len()).ok()?,
         maximum_excess,
         absolute_deviation_sum / 10.0,
+        ks_statistic,
+        cvm_statistic,
     ))
 }
 
 fn summarize_calibration_diagnostic(
     feature_id: String,
-    observations: &[(u64, f64, f64)],
+    observations: &[(u64, f64, f64, f64, f64)],
 ) -> Option<PValueCalibrationDiagnosticV1> {
     if observations.is_empty() {
         return None;
@@ -363,6 +379,8 @@ fn summarize_calibration_diagnostic(
             .iter()
             .map(|row| row.2)
             .sum::<f64>() / count,
+        mean_ks_statistic: observations.iter().map(|row| row.3).sum::<f64>() / count,
+        mean_cvm_statistic: observations.iter().map(|row| row.4).sum::<f64>() / count,
     })
 }
 
@@ -400,8 +418,8 @@ pub fn run_ftd_calibration(
     let mut power_values = Vec::with_capacity(config.repetitions as usize);
     let mut selected_fraction_values = Vec::with_capacity(config.repetitions as usize);
     let mut run_exceedances = Vec::with_capacity(config.repetitions as usize);
-    let mut feature_calibration = vec![Vec::<(u64, f64, f64)>::new(); config.feature_count as usize];
-    let mut combined_calibration = Vec::<(u64, f64, f64)>::new();
+    let mut feature_calibration = vec![Vec::<(u64, f64, f64, f64, f64)>::new(); config.feature_count as usize];
+    let mut combined_calibration = Vec::<(u64, f64, f64, f64, f64)>::new();
     let mut selected_clean_total = 0_u64;
     let mut selected_contaminated_total = 0_u64;
     let mut total_nulls = 0_u64;
@@ -435,7 +453,7 @@ pub fn run_ftd_calibration(
                 .map(|(_, row)| row.p_value)
                 .collect();
             if let Some(stats) = fixed_grid_calibration(&null_p_values) {
-                feature_calibration[feature_index].push((stats.0, stats.1, stats.2));
+                feature_calibration[feature_index].push((stats.0, stats.1, stats.2, stats.3, stats.4));
             }
         }
         let fused = ftd_weighted_cauchy_bh(
@@ -454,7 +472,7 @@ pub fn run_ftd_calibration(
             })
             .collect();
         if let Some(stats) = fixed_grid_calibration(&null_combined_p_values) {
-            combined_calibration.push((stats.0, stats.1, stats.2));
+            combined_calibration.push((stats.0, stats.1, stats.2, stats.3, stats.4));
         }
 
         let mut selected = 0_u64;
