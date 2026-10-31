@@ -205,14 +205,20 @@ pub fn run_four_seat_campaign(
             ));
         }
 
+        let mut planned_offsets: BTreeMap<String, usize> = BTreeMap::new();
         let seats: Vec<RoundSeat> = assignments
             .iter()
             .enumerate()
             .map(|(seat_index, direction_id)| {
                 let action_id = format!("r{round_index:04}-s{seat_index:02}");
+                let offset = planned_offsets.entry(direction_id.clone()).or_default();
+                let evaluation_index = history[direction_id].len() + *offset;
+                *offset += 1;
                 RoundSeat {
+                    // The same direction/seed/evaluation-index work item hashes identically
+                    // across policies, enabling honest paired comparisons.
                     work_item_sha256: digest(&format!(
-                        "candidate:{campaign_id}:{round_index}:{seat_index}:{direction_id}"
+                        "candidate:{seed}:{direction_id}:{evaluation_index}"
                     )),
                     action_id,
                     action: RoundAction::EvaluateDirection(direction_id.clone()),
@@ -246,6 +252,10 @@ pub fn run_four_seat_campaign(
                     values.iter().copied().max_by(f64::total_cmp),
                 )
             })
+            .collect();
+        let pre_round_history_counts: BTreeMap<String, usize> = history
+            .iter()
+            .map(|(direction, values)| (direction.clone(), values.len()))
             .collect();
         let mut within_round_offsets: BTreeMap<String, usize> = BTreeMap::new();
         let mut results = Vec::with_capacity(SEATS_PER_ROUND);
@@ -341,12 +351,13 @@ pub fn run_four_seat_campaign(
                 direction_sha256: direction_digest.clone(),
                 method_id: format!("round-{round_index}-{}", result.action_id),
                 parent_candidate_sha256: digest(&format!(
-                    "parent:{campaign_id}:{round_index}:{resolved_direction_id}"
+                    "parent:{seed}:{resolved_direction_id}:{}",
+                    pre_round_history_counts[resolved_direction_id]
                 )),
                 candidate_sha256: seat.work_item_sha256.clone(),
                 semantic_delta_sha256: digest(&format!(
-                    "semantic-delta:{campaign_id}:{round_index}:{}",
-                    result.action_id
+                    "semantic-delta:{}",
+                    seat.work_item_sha256
                 )),
                 comparison_profile_sha256: PROFILE_SHA256.to_owned(),
                 metric_id: METRIC_ID.to_owned(),
