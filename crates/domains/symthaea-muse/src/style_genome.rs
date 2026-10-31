@@ -281,6 +281,9 @@ pub struct GenomeTrial {
     pub semantic_trace_verifier_version: String,
     pub semantic_trace_checked_records: usize,
     pub semantic_trace_issues: Vec<GenomeTraceIssue>,
+    /// Full typed plan receipt; signatures and operation labels are recomputed
+    /// from this value during evaluation verification.
+    pub grammar_plan: GrammarPlanEvidence,
     pub grammar_plan_kind: String,
     pub grammar_plan_well_formed: bool,
     /// Domain-separated, seed-normalized fingerprint of the family-native plan.
@@ -830,6 +833,7 @@ pub fn evaluate_genome(
             semantic_trace_verifier_version: semantic_verification.verifier_version.clone(),
             semantic_trace_checked_records: semantic_verification.checked_records,
             semantic_trace_issues,
+            grammar_plan: realization.plan.clone(),
             grammar_plan_kind: grammar_plan_name(&realization.plan),
             grammar_plan_well_formed,
             grammar_plan_signature,
@@ -1624,6 +1628,10 @@ impl GenomeEvaluation {
             && self.seed_count == self.trials.len()
             && self.trials.iter().all(|trial| {
                 is_sha256_hex(&trial.score_sha256)
+                    && grammar_plan_name(&trial.grammar_plan) == trial.grammar_plan_kind
+                    && grammar_plan_well_formed(&trial.grammar_plan) == trial.grammar_plan_well_formed
+                    && grammar_plan_signature(&trial.grammar_plan) == trial.grammar_plan_signature
+                    && grammar_transformations(&trial.grammar_plan) == trial.grammar_transformations
                     && (!self.eligible_for_archive
                         || trial.grammar_plan_signature.as_ref().is_some_and(|value| is_sha256_hex(value)))
                     && (!self.eligible_for_archive
@@ -1860,6 +1868,26 @@ mod tests {
             jaccard_distance(&["inversion".into()], &["inversion".into()]),
             0.0
         );
+    }
+
+    #[test]
+    fn evaluation_digest_recomputes_native_plan_fingerprint_from_stored_plan() {
+        let genome = classical_genome();
+        let config = GenomeEvaluationConfig {
+            seeds: vec![1, 2],
+            ..GenomeEvaluationConfig::default()
+        };
+        let mut evaluation =
+            evaluate_genome(&genome, &MusicalIntent::default(), &config, &[]).unwrap();
+        assert!(evaluation.verify_digest());
+
+        match &mut evaluation.trials[0].grammar_plan {
+            GrammarPlanEvidence::PeriodSentence(plan) => plan.section_count += 1,
+            other => panic!("expected PeriodSentence plan in Classical genome, got {other:?}"),
+        }
+        // The hash-shaped plan signature and original evaluation digest are
+        // unchanged; verification must still reject the mutated typed plan.
+        assert!(!evaluation.verify_digest());
     }
 
     #[test]
