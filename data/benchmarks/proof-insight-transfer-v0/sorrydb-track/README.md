@@ -160,3 +160,11 @@ cargo run -p symthaea-proof-insights --bin import_sorrydb_snapshot -- \\
 The importer rejects altered source bytes, duplicate task IDs, non-canonical repository remotes, malformed commit/toolchain identifiers, unsafe paths, malformed spans, and unexpected task/project counts. It emits a deterministic manifest with source pins, task ordinals, project/repository identity, source coordinates, and hashed debugging-goal strings. The debugging goal is not treated as authoritative proof-state evidence.
 
 The source byte hash and manifest are provenance artifacts only. They do not establish that a source repository can be rebuilt or that any proof obligation has been solved. Lean reconstruction and independent checking remain a separate milestone.
+
+## Toolchain stratification and smoke candidates
+
+The frozen 1,000-task cohort spans 14 Lean toolchain tags, ranging from v4.18.0-rc1 through v4.27.0-rc1. Its largest groups are v4.27.0-rc1 (318), v4.26.0 (218), v4.24.0 (145), and v4.26.0-rc2 (97). Report environment readiness by toolchain and repository separately from theorem-proving success. A source checkout, toolchain, dependency, or untouched-project build failure is not a model proof failure; preserve it in operational accounting and do not silently remove it from the cohort.
+
+The first three source-inspected smoke candidates are recorded in smoke-cohort-candidates.v0.json: LeanCourse25/v4.24.0, PrimeNumberTheoremAnd/v4.26.0, and clap-lean/v4.26.0-rc2. The third task was selected because the SorryDB debug-context preview contains inst✝ : Fact (Nat.Prime p), providing a direct challenge for the new local-instance evidence path. This textual hint is only for selection. The actual LocalInstances registry must be read from the real Lean metavariable state.
+
+All three exact sorry source spans and project manifest blob pins have been inspected. None has been rebuilt, reconstructed as real Lean evidence, or solved. This is a small integration smoke cohort, not a statistical accuracy sample.

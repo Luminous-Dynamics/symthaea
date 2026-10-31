@@ -1,0 +1,188 @@
+{
+  "schema_version": "pitb.sorrydb.smoke-candidates.v0",
+  "dataset": {
+    "snapshot_id": "SorryDB_2601",
+    "source_repository": "SorryDB/SorryDB",
+    "source_repository_commit": "74b3b63f8ba890d675f362924b21ac55db410383",
+    "source_split_path": "data/SorryDB_2601/SorryDB_2601_1000_evaluation_split.json",
+    "source_git_blob_sha1": "af3b663429dc4689ee728d2fb5c7d8d5034476f7",
+    "source_sha256": "26bfd11099f6b8db7f80d49bdea5d9f8ea0d23ba65d44d93f67ed42ba1530062",
+    "source_bytes": 1599271,
+    "task_count": 1000,
+    "project_count": 78
+  },
+  "cohort_status": "selected_candidate_not_reconstructed",
+  "policy": {
+    "candidate_selection": "one direct LocalInstances challenge plus two proof-hole tasks from distinct stable Lean toolchain strata",
+    "proof_state_source": "must be reconstructed from the pinned Lean project; SorryDB debug_info.goal is only a task-selection hint",
+    "proof_result_claimed": false,
+    "build_or_import_run_claimed": false,
+    "attempt_budget": "not_registered",
+    "next_action": "reconstruct the exact project, rebuild with pinned toolchain and lake-manifest, export real Lean proof state, then register S0-S4 budgets before any prover attempt"
+  },
+  "toolchain_stratification": {
+    "distinct_toolchain_tags": 14,
+    "task_counts": [
+      {
+        "lean_version": "v4.27.0-rc1",
+        "tasks": 318
+      },
+      {
+        "lean_version": "v4.26.0",
+        "tasks": 218
+      },
+      {
+        "lean_version": "v4.24.0",
+        "tasks": 145
+      },
+      {
+        "lean_version": "v4.26.0-rc2",
+        "tasks": 97
+      },
+      {
+        "lean_version": "v4.22.0",
+        "tasks": 72
+      },
+      {
+        "lean_version": "v4.23.0-rc2",
+        "tasks": 37
+      },
+      {
+        "lean_version": "v4.24.0-rc1",
+        "tasks": 36
+      },
+      {
+        "lean_version": "v4.25.0-rc2",
+        "tasks": 22
+      },
+      {
+        "lean_version": "v4.18.0-rc1",
+        "tasks": 14
+      },
+      {
+        "lean_version": "v4.25.0",
+        "tasks": 12
+      },
+      {
+        "lean_version": "v4.18.0",
+        "tasks": 11
+      },
+      {
+        "lean_version": "v4.26.0-rc1",
+        "tasks": 10
+      },
+      {
+        "lean_version": "v4.21.0",
+        "tasks": 7
+      },
+      {
+        "lean_version": "v4.22.0-rc4",
+        "tasks": 1
+      }
+    ]
+  },
+  "tasks": [
+    {
+      "ordinal": 0,
+      "task_id": "0ffe8d507806bde948dfed1d59a579a2650452acaa68992cca839c14cf2f365f",
+      "selection_role": "stable_toolchain_baseline",
+      "repository": {
+        "remote": "https://github.com/fpvandoorn/LeanCourse25",
+        "branch": "master",
+        "commit": "cd0f32f5b07311e08a9e89733a1375f54eb790c0",
+        "lean_version": "v4.24.0"
+      },
+      "location": {
+        "path": "LeanCourse25/Assignments/Assignment11.lean",
+        "start_line": 39,
+        "start_column": 78,
+        "end_line": 39,
+        "end_column": 83,
+        "column_indexing": "zero_based",
+        "verified_source_slice": "sorry",
+        "source_file_git_blob_sha1": "d553bc3bda3d14af1bc90373b7d0c5fc81bfba0a"
+      },
+      "project_pins": {
+        "lean_toolchain_file_git_blob_sha1": "c00a53503cc3cc776c290056ed21ce7e5d80b083",
+        "lakefile_toml_git_blob_sha1": "fcaf0ab48e8cd8ed6a1af0acf355e0430ed11bfd",
+        "lake_manifest_json_git_blob_sha1": "6dce7dda77492aaef6d63db207f10f364e1bae4b",
+        "mathlib_revision": "f897ebcf72cd16f89ab4577d0c826cd14afaafc7"
+      },
+      "target_hint": "nullmeasurable_measurable_null",
+      "debug_context_signal": "ordinary proposition/measure-theory context; not an authoritative reconstructed proof state",
+      "source_inspected": true,
+      "environment_reconstructed": false,
+      "project_build_status": "not_run",
+      "lean_evidence_status": "not_run",
+      "proof_attempt_status": "not_run"
+    },
+    {
+      "ordinal": 1,
+      "task_id": "7956fe8e4946a9ddf7098ee84c69669db5bc902715dad6e7cdf0db121aa5bfce",
+      "selection_role": "stable_toolchain_and_dependency_context",
+      "repository": {
+        "remote": "https://github.com/AlexKontorovich/PrimeNumberTheoremAnd",
+        "branch": "More-FKS",
+        "commit": "ddcb6542f2b62883c8642d3db4ecc115afcce33e",
+        "lean_version": "v4.26.0"
+      },
+      "location": {
+        "path": "PrimeNumberTheoremAnd/FioriKadiriSwidinsky.lean",
+        "start_line": 44,
+        "start_column": 137,
+        "end_line": 44,
+        "end_column": 142,
+        "column_indexing": "zero_based",
+        "verified_source_slice": "sorry",
+        "source_file_git_blob_sha1": "6214f90ce5f8c61aca4a4d696ff5687d872dfc0e"
+      },
+      "project_pins": {
+        "lean_toolchain_file_git_blob_sha1": "2654c20bb16bfd3a12f77a6cdeb73d48bf3b8359",
+        "lakefile_toml_git_blob_sha1": "17c674bdc92fe6e333c839adc27ff7b8948be42c",
+        "lake_manifest_json_git_blob_sha1": "c0405e3c9643b00b1ce6a8120516ca482e6fe4ec",
+        "mathlib_revision": "2df2f0150c275ad53cb3c90f7c98ec15a56a1a67"
+      },
+      "target_hint": "table_1_prop",
+      "debug_context_signal": "numerical prime-number-theorem estimate; no instance-registry signal inferred from debug goal",
+      "source_inspected": true,
+      "environment_reconstructed": false,
+      "project_build_status": "not_run",
+      "lean_evidence_status": "not_run",
+      "proof_attempt_status": "not_run"
+    },
+    {
+      "ordinal": 2,
+      "task_id": "19f8c8d2aa81dccb1ea0da25a7f9271c9330e18eb3ec4aa453917a3c5d29cbed",
+      "selection_role": "explicit_local_instance_registry_challenge",
+      "repository": {
+        "remote": "https://github.com/Clap-lang/clap-lean",
+        "branch": "assert_range2",
+        "commit": "326f55435f91295d95a6166b060cace7ef92e6e4",
+        "lean_version": "v4.26.0-rc2"
+      },
+      "location": {
+        "path": "Clap/Compilation.lean",
+        "start_line": 278,
+        "start_column": 2,
+        "end_line": 278,
+        "end_column": 7,
+        "column_indexing": "zero_based",
+        "verified_source_slice": "sorry",
+        "source_file_git_blob_sha1": "ec8e38968c481b479cd6588756feaeebd2164286"
+      },
+      "project_pins": {
+        "lean_toolchain_file_git_blob_sha1": "7035713c5522d1113de6e26251f8791eba689308",
+        "lakefile_toml_git_blob_sha1": "0ca8d438bf079e52a9fff208ba57dfb4bd7e266e",
+        "lake_manifest_json_git_blob_sha1": "001d03474b6ea317800a505fe646c39da0acddaf",
+        "mathlib_revision": "d5c9558e75342a10d6321e6a8c798a14f68ae23c"
+      },
+      "target_hint": "fail₁",
+      "debug_context_signal": "inst✝ : Fact (Nat.Prime p); selection hint only, actual LocalInstances registry must be captured from Lean",
+      "source_inspected": true,
+      "environment_reconstructed": false,
+      "project_build_status": "not_run",
+      "lean_evidence_status": "not_run",
+      "proof_attempt_status": "not_run"
+    }
+  ]
+}

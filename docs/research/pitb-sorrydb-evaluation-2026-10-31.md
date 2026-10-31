@@ -88,3 +88,10 @@ The January evaluation file is identified at SorryDB source commit \`74b3b63f8ba
 Two rows use a zero-based start column; therefore the importer allows column zero while retaining one-based line numbers and strictly ordered source spans. This is a source-format detail that the generic documentation example does not make obvious.
 
 A Rust importer has been added to the PITB crate. It verifies byte count and SHA-256 before parsing, checks the fixed task/project counts, validates every repository pin and source coordinate, rejects duplicate IDs/path traversal, and emits a deterministic task manifest with provenance hashes. Its self-tests and real-snapshot run are wired into the focused SorryDB workflow; no compile or workflow pass is claimed until observed.
+
+
+## Environment readiness and local-instance coverage
+
+SorryDB_2601 contains 14 Lean toolchain tags, not one homogeneous compiler environment. Separate source/toolchain/dependency/project reconstruction from proof completion. A task enters the model-evaluation denominator only after the original pinned project passes the preflight build. Also publish operational yield over the entire assigned cohort, retaining preflight failures as non-solves rather than silently dropping them. See pitb-sorrydb-toolchain-and-smoke-cohort-2026-10-31.md for the exact version distribution and the three pinned smoke-task candidates.
+
+A textual scan of the dataset's debugging goal previews finds 426 instance-like binder strings. This is only a selection heuristic. The first candidate exercising this path uses clap-lean, with a preview binder inst✝ : Fact (Nat.Prime p); actual local instance resources must be captured from Lean's metavariable declaration, not inferred from the rendered preview.
