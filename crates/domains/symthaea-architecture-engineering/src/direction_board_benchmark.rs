@@ -336,8 +336,10 @@ pub fn run_direction_campaign(
         action_cost_units: 1,
         oracle_uses_hidden_payoff_schedule: policy == DirectionCampaignPolicy::OracleUpperBound,
     };
-    let policy_config_bytes = serde_json::to_vec(&policy_config)
+    let policy_config_value = serde_json::to_value(&policy_config)
         .map_err(|error| format!("policy config serialization failed: {error}"))?;
+    let policy_config_bytes = serde_json::to_vec(&policy_config_value)
+        .map_err(|error| format!("policy config encoding failed: {error}"))?;
     let policy_config_sha256 = digest_bytes(&policy_config_bytes);
     Ok(DirectionCampaignRun {
         schema: "symthaea.direction-campaign.run".to_owned(),
@@ -1347,7 +1349,8 @@ mod tests {
             0xabc,
         )
         .expect("campaign should run");
-        let bytes = serde_json::to_vec(&run.policy_config).expect("config serializes");
+        let value = serde_json::to_value(&run.policy_config).expect("config serializes");
+        let bytes = serde_json::to_vec(&value).expect("config value encodes");
         assert_eq!(run.policy_config_sha256, digest_bytes(&bytes));
         assert_eq!(run.policy_config.target_score, TARGET_SCORE);
         assert_eq!(run.policy_config.common_bootstrap_evaluations, 3);
@@ -1499,4 +1502,31 @@ mod tests {
         assert_eq!(aggregate[0].mean_total_cost_units, 32.0);
         assert!(aggregate_direction_campaign_runs(&[run.clone(), run]).is_err());
     }
+    #[test]
+    fn synthetic_campaign_emits_integrity_checkable_but_unmetered_event_tape() {
+        let run = run_direction_campaign(
+            DirectionLandscapeFamily::NewOperatorBreakthrough,
+            DirectionCampaignPolicy::ThompsonSampling,
+            48,
+            0x5eed,
+        )
+        .expect("synthetic campaign should run");
+        let tape = run
+            .to_event_tape()
+            .expect("campaign should convert to the common event tape");
+        let summary = tape
+            .validate_integrity()
+            .expect("synthetic tape structure and action charges should validate");
+        assert_eq!(summary.event_count, run.action_count);
+        assert_eq!(
+            summary.total_charged_budget_microunits,
+            Some(run.total_cost_units * 1_000_000)
+        );
+        assert!(!summary.fully_metered);
+        assert!(
+            tape.validate().is_err(),
+            "synthetic action-count receipts must not masquerade as complete host/energy metering"
+        );
+    }
+
 }
