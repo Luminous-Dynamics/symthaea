@@ -225,8 +225,14 @@ fn proc_status_hex(status: &str, key: &str) -> Option<String> {
         .then(|| value.to_ascii_lowercase())
 }
 
-fn proc_status_u8(status: &str, key: &str) -> Option<u8> {
-    proc_status_value(status, key)?.parse().ok()
+fn proc_status_no_new_privs(status: &str) -> Option<u8> {
+    let value = proc_status_value(status, "NoNewPrivs")?.parse::<u8>().ok()?;
+    (value <= 1).then_some(value)
+}
+
+fn proc_status_seccomp_mode(status: &str) -> Option<u8> {
+    let value = proc_status_value(status, "Seccomp")?.parse::<u8>().ok()?;
+    (value <= 2).then_some(value)
 }
 
 fn proc_status_effective_id(status: &str, key: &str) -> Option<u32> {
@@ -257,8 +263,8 @@ fn process_security_context() -> ProcessSecurityContext {
         effective_gid,
         cap_eff_hex: status.as_deref().and_then(|text| proc_status_hex(text, "CapEff")),
         cap_bnd_hex: status.as_deref().and_then(|text| proc_status_hex(text, "CapBnd")),
-        no_new_privs: status.as_deref().and_then(|text| proc_status_u8(text, "NoNewPrivs")),
-        seccomp_mode: status.as_deref().and_then(|text| proc_status_u8(text, "Seccomp")),
+        no_new_privs: status.as_deref().and_then(proc_status_no_new_privs),
+        seccomp_mode: status.as_deref().and_then(proc_status_seccomp_mode),
         mount_namespace_inode,
         user_namespace_inode,
         pid_namespace_inode,
@@ -751,9 +757,9 @@ mod tests {
         let status = "Name:\tbasalt\nCapEff:\t00000000000000a5\nCapBnd:\t00000000000000ff\nNoNewPrivs:\t1\nSeccomp:\t2\n";
         assert_eq!(proc_status_hex(status, "CapEff").as_deref(), Some("00000000000000a5"));
         assert_eq!(proc_status_hex(status, "CapBnd").as_deref(), Some("00000000000000ff"));
-        assert_eq!(proc_status_u8(status, "NoNewPrivs"), Some(1));
-        assert_eq!(proc_status_u8(status, "Seccomp"), Some(2));
-        assert_eq!(proc_status_u8(status, "NoSuchField"), None);
+        assert_eq!(proc_status_no_new_privs(status), Some(1));
+        assert_eq!(proc_status_seccomp_mode(status), Some(2));
+        assert_eq!(proc_status_no_new_privs(status), None);
     }
 
     #[test]
@@ -764,11 +770,18 @@ mod tests {
         assert_eq!(proc_status_effective_id(status, "NoSuchField"), None);
     }
     #[test]
+    fn proc_status_boolean_and_seccomp_fields_reject_out_of_schema_values() {
+        let status = "NoNewPrivs:\t2\nSeccomp:\t3\n";
+        assert_eq!(proc_status_no_new_privs(status), None);
+        assert_eq!(proc_status_seccomp_mode(status), None);
+    }
+
+    #[test]
     fn malformed_proc_status_capability_values_remain_unknown() {
         let status = "CapEff:\t0xnot-hex\nNoNewPrivs:\tunknown\nSeccomp:\t3\n";
         assert_eq!(proc_status_hex(status, "CapEff"), None);
-        assert_eq!(proc_status_u8(status, "NoNewPrivs"), None);
-        assert_eq!(proc_status_u8(status, "Seccomp"), Some(3));
+        assert_eq!(proc_status_no_new_privs(status), None);
+        assert_eq!(proc_status_seccomp_mode(status), None);
     }
 
     #[test]
