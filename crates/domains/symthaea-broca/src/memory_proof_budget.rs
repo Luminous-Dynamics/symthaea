@@ -2092,6 +2092,30 @@ mod tests {
         assert!(obligation.bind_verified_complete_enumeration(
             &index, &empty, "empty-enumeration"
         ).unwrap_err().contains("proof-of-absence"));
+
+        let user_only = index.enumerate_exact_lexical_all_terms_at_snapshot(
+            "invoice paid",
+            "scope-1",
+            200,
+            300,
+            Some(EvidenceSpeakerRole::User),
+        ).unwrap();
+        let mut user_obligation = ProofObligation {
+            conclusion_id: "claim-user-only".into(),
+            alternatives: Vec::new(),
+            minimum_independent_families: 1,
+            minimum_distinct_sessions: 0,
+            minimum_user_authored_evidence: 0,
+            required_complete_evidence_ids: BTreeSet::new(),
+            enumeration_receipt_sha256: None,
+            selection_overhead_tokens: 0,
+        };
+        user_obligation.bind_verified_complete_enumeration(
+            &index,
+            &user_only,
+            "all-user-matches",
+        ).unwrap();
+        assert_eq!(user_obligation.minimum_user_authored_evidence, 1);
     }
 
     #[test]
