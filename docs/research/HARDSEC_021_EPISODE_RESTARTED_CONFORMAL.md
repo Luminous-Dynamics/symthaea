@@ -94,7 +94,7 @@ A_{j,t}=f_{\theta_j}(p_t)\left(A_{j,t-1}+w_t\right),
 \qquad
 S_t=\sum_j\pi_jA_{j,t}.
 ]
-This restart recurrence updates the betting state in O(J) work and O(J) state per context, where J is the number of betting parameters. That is not the entire monitor's memory use: exact online conformal ranks require access to the prior episode-score multiset. The executable stores that multiset in an order-statistics AVL tree with subtree counts and duplicate multiplicities. It computes the exact number of prior scores below/equal to the new score in O(log T) expected/worst-case tree height and inserts the new score in O(log T); AVL balancing gives deterministic logarithmic height. Total state is O(T+J) per context and each episode update is O(log T+J), rather than scanning all previous scores (O(T) per episode) or retaining every restarted product (O(T^2) restart state). The tree preserves exact ranks and ties—no approximate quantile sketch is used. The betting recurrence itself is implemented in log space with log-add-exp to avoid numerical overflow/underflow.
+This restart recurrence updates the betting state in O(J) work and O(J) state per context, where J is the number of betting parameters. That is not the entire monitor's memory use: exact online conformal ranks require access to the prior episode-score multiset. The executable stores that multiset in an order-statistics AVL tree with subtree counts and duplicate multiplicities. It computes the exact number of prior scores below/equal to the new score in O(log T) expected/worst-case tree height and inserts the new score in O(log T); AVL balancing gives deterministic worst-case logarithmic height. Total state is O(T+J) per context and each episode update is O(log T+J), rather than scanning all previous scores (O(T) per episode) or retaining every restarted product (O(T^2) restart state). The tree preserves exact ranks and ties—no approximate quantile sketch is used. The betting recurrence itself is implemented in log space with log-add-exp to avoid numerical overflow/underflow.
 
 The ordinary fixed-start conformal mixture (M_{1,t}) is also emitted as a diagnostic comparator. Only the weighted-restarted sum is the primary alarm statistic in v1.
 
@@ -104,10 +104,11 @@ Inputs:
 - Plan: `schemas/hardsec-episode-restarted-plan-v1.schema.json`
 - Episode/window stream: `schemas/hardsec-episode-window-stream-v1.schema.json`
 - Benchmark plan: `schemas/hardsec-episode-restarted-benchmark-v1.schema.json`
-- Rust executable: `examples/hardsec_episode_restarted_monitor.rs`
+- Rust executable: `examples/hardsec_episode_restarted_monitor.rs` (28 authored Rust tests)
+- PMU acquisition prerequisite: `examples/hardsec_pmu_metrology_audit.rs` and the HARDSEC-018 metrology plan/observations
 - Fixtures: `tests/fixtures/hardsec/episode-restarted-v1/`
 
-The plan pins score, context-assignment and randomizer-source digests separately. It fixes:
+The plan pins score, context-assignment and randomizer-source digests separately, and also fixes the HARDSEC-018 PMU protocol ID, platform, workload binary, co-scheduled acquisition condition and event set. It fixes:
 - exactly four windows per episode;
 - contiguous window indices and source offsets;
 - equal window widths inside an episode;
@@ -118,6 +119,8 @@ The plan pins score, context-assignment and randomizer-source digests separately
 - fixed context vocabulary and betting family.
 
 The executable consumes the truth-free HARDSEC-020 runtime mapping and joins it by exact source-window sequence and ID. All windows in an accepted episode must map to the same declared context. An unknown, unaccepted or mixed assignment abstains for the complete episode. The truth oracle is not passed to the restarted monitor.
+
+It also requires the actual HARDSEC-018 PMU qualification receipt, the exact PMU metrology plan and the exact observations file. It recomputes and checks the plan/observation SHA-256 values in the PMU receipt; checks the result, protocol ID, platform ID, workload ID and workload-binary digest; requires each selected event to be confirmatory-eligible in the declared co-scheduled group; verifies that multiplex-scaled values are not confirmatory and that the observer-effect gate is within thresholds; and requires every episode to match the qualified platform, workload binary and acquisition condition. The focused CI workflow runs the PMU auditor first, then supplies its generated receipt to HARDSEC-021. The PMU receipt still says execution independence is not established: measurement qualification is not an independence proof or hardware attestation.
 
 ## 6. Synthetic known-answer results
 
@@ -195,7 +198,7 @@ If episode dependence remains material, use this detector only as an empirical/e
 
 ## 9. Exact rank data structure and dependent-null diagnostic
 
-The implementation originally scanned all earlier episode scores for each conformal rank, which would make the monitor quadratic in the number of episodes. It now uses an order-statistics AVL tree. Each distinct transformed score is stored once with a multiplicity count; every node stores subtree population and height. Rank and tie counts are exact, including equality of signed zero, and the AVL structure remains balanced on sorted/adversarial insertion orders. Two new unit tests compare the AVL result to a linear reference implementation with ties and verify logarithmic height after 10,000 monotone inserts.
+The implementation originally scanned all earlier episode scores for each conformal rank, which would make the monitor quadratic in the number of episodes. It now uses an order-statistics AVL tree. Each distinct transformed score is stored once with a multiplicity count; every node stores subtree population and height. Rank and tie counts are exact, including equality of signed zero, and the AVL structure remains balanced on sorted/adversarial insertion orders. Two unit tests compare the AVL result to a linear reference implementation with ties and verify logarithmic height after 10,000 monotone inserts. The full executable now has 28 authored Rust tests spanning episode lineage, context receipt mapping, PMU qualification, p-value ranks/ties, restart recurrence, late changes, invalid inputs and dependent-null controls.
 
 A second negative control directly demonstrates the danger of cross-execution dependence. The Rust test constructs 500 deterministic pseudo-random AR(1) null streams, each 200 episodes long, with correlation coefficient \(\rho=0.8\), approximately Gaussian innovations (12-uniform Irwin–Hall approximation), a separate seeded randomizer stream, and a per-context nominal \(\alpha=0.025\) boundary. A matching independent reference calculation produced 298/500 alarms (59.6%) under this deliberately dependent stationary episode generator. The Rust test asserts a broad 45–75% range to avoid brittle exact-count sensitivity.
 
@@ -210,3 +213,14 @@ The distinction is important:
 - **HARDSEC-021 present status:** PFA theorem not established from the supplied receipts; delay optimality not claimed; the finite betting family is a benchmark candidate and must be stress-tested against a broader continuous betting prior or a learned-but-frozen score/betting family.
 
 References: [Bhattacharyya & Ramdas (2026), §§1–3 and Assumption 1/2](https://arxiv.org/abs/2609.27179); [Barber & Pananjady (2026)](https://proceedings.mlr.press/v313/barber26a.html). The latter's switch-coefficient analysis applies to split-conformal prediction under stationary beta-mixing time series; it is not a sequential PFA theorem and cannot be substituted for one.
+
+
+## 11. Three-source evidence gate
+
+A confirmatory episode update now depends on three independently versioned evidence inputs:
+
+1. **HARDSEC-018 PMU metrology:** the exact plan and trial-observation bytes plus a qualified receipt. It establishes that the named event configuration passes the declared co-scheduling and observer-effect thresholds; it does not establish independence.
+2. **HARDSEC-020 context assignment:** the truth-free, digest-bound, per-window assignment map. It establishes that the current context mapping is consistent with the separately evaluated assignment output; it does not authenticate the classifier or prove context exogeneity.
+3. **HARDSEC-021 episode manifest:** one fixed four-window episode per execution group, with unique source trace/window identities, contiguous source offsets, fixed score/model/randomizer digests and a single selected context. It establishes the declared grouping and mapping consistency; it does not authenticate the raw trace or prove successive executions independent.
+
+The sequential update is blocked unless all three inputs agree on the exact platform/workload/score/context/episode identities. This is an evidence-lineage gate, not a signed hardware attestation. The monitor's statistical claim remains conditional on independent/exchangeable episode scores, independent randomizers, fixed scoring, exogenous context assignment and non-informative episode abstention.
