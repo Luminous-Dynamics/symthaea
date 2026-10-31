@@ -18,6 +18,7 @@ pub const BUILT_GENERATOR_WORKTREE_CLEAN: &str = env!("SBR_GENERATOR_WORKTREE_CL
 pub mod counterfactual_evidence;
 pub mod evidence_behavior_contracts;
 pub mod evidence_outcomes;
+pub mod execution_custody;
 pub mod exact_protected_matcher;
 pub mod generator;
 pub mod judge_factorial;
