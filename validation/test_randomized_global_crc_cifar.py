@@ -123,6 +123,22 @@ class RandomizedGlobalCommonDepthTests(unittest.TestCase):
         tampered[0]=np.roll(tampered[0],1)
         verified=engine.verify_certificate(result["certificate"],tampered)
         self.assertFalse(verified["valid"])
+        self.assertTrue(
+            verified["reason"] in {
+                "exact augmented-state verification failed",
+                "evidence digest mismatch: decision_output_sha256",
+            } or "digest mismatch" in verified["reason"]
+        )
+
+    def test_certificate_fails_closed_on_digest_tampering(self):
+        import copy
+        engine=RandomizedCommonDepthCRC(5,.2,(70,20,10))
+        result=engine.solve()
+        probabilities=np.asarray(result["probabilities"])
+        altered=copy.deepcopy(result["certificate"])
+        altered["evidence_digests"]["decision_output_sha256"]="0"*64
+        verified=engine.verify_certificate(altered,probabilities)
+        self.assertFalse(verified["valid"])
         self.assertIn("digest mismatch",verified["reason"])
 
     def test_certificate_fails_closed_on_risk_target_or_state_domain_change(self):
