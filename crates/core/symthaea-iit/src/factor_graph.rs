@@ -253,12 +253,86 @@ impl BinaryLogFactor {
     }
 }
 
+/// Deterministic min-fill elimination plan computed before factor contraction.
+///
+/// `predicted_peak_factor_entries` is the maximum of the largest input factor
+/// table and the largest planned bucket product table implied by induced width.
+/// It is an exact allocation bound for the planned order, not a probabilistic
+/// estimate; if it exceeds the caller's budget, planning fails before contraction.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FactorEliminationPlan {
+    pub elimination_order: Vec<usize>,
+    pub induced_width: usize,
+    pub predicted_peak_factor_entries: usize,
+    pub max_factor_entries: usize,
+}
+
+/// Plan exact binary-factor elimination without multiplying any factor tables.
+///
+/// The planner validates scopes and the elimination set, computes a deterministic
+/// min-fill order, and calculates the maximum input/bucket table size. Because
+/// an eliminated variable's incident-factor union contains exactly its active
+/// primal-graph neighbours plus itself, the largest bucket has `2^(width + 1)`
+/// entries. The plan is rejected before contraction if that table exceeds budget.
+pub fn plan_min_fill_elimination(
+    factor_scopes: &[Vec<usize>],
+    eliminate: &[usize],
+    max_factor_entries: usize,
+) -> Result<FactorEliminationPlan, FactorGraphError> {
+    if factor_scopes.is_empty() {
+        return Err(FactorGraphError::EmptyFactorGraph);
+    }
+    let mut seen = BTreeSet::new();
+    for variable in eliminate.iter().copied() {
+        if !seen.insert(variable) {
+            return Err(FactorGraphError::DuplicateEliminationVariable { variable });
+        }
+    }
+
+    let mut largest_input_factor = 1usize;
+    for scope in factor_scopes {
+        for pair in scope.windows(2) {
+            if pair[0] >= pair[1] {
+                return Err(FactorGraphError::ScopeNotStrictlyAscending {
+                    left: pair[0],
+                    right: pair[1],
+                });
+            }
+        }
+        let entries = assignment_count(scope.len())?;
+        check_budget(entries, max_factor_entries)?;
+        largest_input_factor = largest_input_factor.max(entries);
+    }
+
+    let (elimination_order, induced_width) = min_fill_order_scopes(factor_scopes, eliminate)?;
+    let largest_bucket = if induced_width == 0 {
+        // Unary input factors already account for any represented zero-width
+        // elimination. Completely absent variables produce scalar factors.
+        1usize
+    } else {
+        let bucket_scope = induced_width
+            .checked_add(1)
+            .ok_or(FactorGraphError::IndexOverflow)?;
+        assignment_count(bucket_scope)?
+    };
+    let predicted_peak_factor_entries = largest_input_factor.max(largest_bucket);
+    check_budget(predicted_peak_factor_entries, max_factor_entries)?;
+
+    Ok(FactorEliminationPlan {
+        elimination_order,
+        induced_width,
+        predicted_peak_factor_entries,
+        max_factor_entries,
+    })
+}
+
 /// Telemetry for one completed log-domain min-fill contraction.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LogFactorEliminationReport {
     pub factor: BinaryLogFactor,
     pub elimination_order: Vec<usize>,
     pub induced_width: usize,
+    pub predicted_peak_factor_entries: usize,
     pub peak_factor_entries: usize,
     pub factor_multiplications: usize,
     pub variables_summed_out: usize,
@@ -285,6 +359,8 @@ pub struct FactorEliminationReport {
     pub elimination_order: Vec<usize>,
     /// Maximum number of active neighbours at the point of elimination.
     pub induced_width: usize,
+    /// Peak table size predicted by the preflight elimination plan.
+    pub predicted_peak_factor_entries: usize,
     /// Largest input or intermediate factor table observed.
     pub peak_factor_entries: usize,
     /// Number of binary factor multiplications performed.
@@ -304,15 +380,11 @@ pub fn min_fill_sum_product(
     eliminate: &[usize],
     max_factor_entries: usize,
 ) -> Result<FactorEliminationReport, FactorGraphError> {
-    if factors.is_empty() {
-        return Err(FactorGraphError::EmptyFactorGraph);
-    }
-    let mut seen = BTreeSet::new();
-    for variable in eliminate.iter().copied() {
-        if !seen.insert(variable) {
-            return Err(FactorGraphError::DuplicateEliminationVariable { variable });
-        }
-    }
+    let scopes = factors
+        .iter()
+        .map(|factor| factor.variables.clone())
+        .collect::<Vec<_>>();
+    let plan = plan_min_fill_elimination(&scopes, eliminate, max_factor_entries)?;
 
     // Variable-to-factor incidence buckets avoid rescanning every factor for
     // every elimination step. A consumed factor is removed from each of its
@@ -332,7 +404,8 @@ pub fn min_fill_sum_product(
         work.push(Some(factor.clone()));
     }
 
-    let (elimination_order, induced_width) = min_fill_order(factors, eliminate)?;
+    let elimination_order = plan.elimination_order.clone();
+    let induced_width = plan.induced_width;
     let mut factor_multiplications = 0usize;
     let mut variables_summed_out = 0usize;
 
@@ -393,6 +466,7 @@ pub fn min_fill_sum_product(
         factor: result,
         elimination_order,
         induced_width,
+        predicted_peak_factor_entries: plan.predicted_peak_factor_entries,
         peak_factor_entries,
         factor_multiplications,
         variables_summed_out,
@@ -410,15 +484,11 @@ pub fn min_fill_log_sum_product(
     eliminate: &[usize],
     max_factor_entries: usize,
 ) -> Result<LogFactorEliminationReport, FactorGraphError> {
-    if factors.is_empty() {
-        return Err(FactorGraphError::EmptyFactorGraph);
-    }
-    let mut seen = BTreeSet::new();
-    for variable in eliminate.iter().copied() {
-        if !seen.insert(variable) {
-            return Err(FactorGraphError::DuplicateEliminationVariable { variable });
-        }
-    }
+    let scopes = factors
+        .iter()
+        .map(|factor| factor.variables.clone())
+        .collect::<Vec<_>>();
+    let plan = plan_min_fill_elimination(&scopes, eliminate, max_factor_entries)?;
 
     let mut work = Vec::<Option<BinaryLogFactor>>::with_capacity(
         factors.len().saturating_add(eliminate.len()),
@@ -435,11 +505,8 @@ pub fn min_fill_log_sum_product(
         work.push(Some(factor.clone()));
     }
 
-    let scopes = factors
-        .iter()
-        .map(|factor| factor.variables.clone())
-        .collect::<Vec<_>>();
-    let (elimination_order, induced_width) = min_fill_order_scopes(&scopes, eliminate)?;
+    let elimination_order = plan.elimination_order.clone();
+    let induced_width = plan.induced_width;
     let mut factor_multiplications = 0usize;
     let mut variables_summed_out = 0usize;
 
@@ -499,6 +566,7 @@ pub fn min_fill_log_sum_product(
         factor: result,
         elimination_order,
         induced_width,
+        predicted_peak_factor_entries: plan.predicted_peak_factor_entries,
         peak_factor_entries,
         factor_multiplications,
         variables_summed_out,
@@ -511,6 +579,7 @@ pub fn min_fill_log_sum_product(
 /// variable on every elimination step. Eliminating v only changes adjacency
 /// among v's current neighbours, so only those neighbours need fresh scores.
 /// Stale heap entries are discarded by per-variable generation counters.
+#[cfg(test)]
 fn min_fill_order(
     factors: &[BinaryFactor],
     eliminate: &[usize],
