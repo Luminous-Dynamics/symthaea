@@ -75,6 +75,11 @@
       "id": "SEAL-014",
       "mutation": "Create a self-consistent event chain with an event observation timestamp later than the declared consumer-drain acknowledgement",
       "expected": "reject_event_after_drain"
+    },
+    {
+      "id": "SEAL-015",
+      "mutation": "Provide a fully reconciled ledger with a classified lost tail and a matching valid integrity seal",
+      "expected": "integrity_passed_with_ledger_loss_free_false"
     }
   ],
   "metrics": [
