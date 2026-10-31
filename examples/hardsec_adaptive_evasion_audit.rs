@@ -801,7 +801,7 @@ mod tests {
             "campaign_id":"hs012-synthetic-campaign-01",
             "evidence_domain":"synthetic_fixture",
             "platform_id":"synthetic-cpu-model-v1",
-            "holdout_axes":["program","execution","adaptation_family"],
+            "holdout_axes":["program","execution","attack_family","adaptation_family"],
             "cases":[
                 {"case_id":"tr1","split":"train","program_group_id":"train-p","execution_group_id":"train-e","device_config_id":"cpu-a","attack_family_id":"spectre-base","adaptation_family_id":"none","adaptation_level":0,"sensor_state":"valid"},
                 {"case_id":"va1","split":"validation","program_group_id":"val-p","execution_group_id":"val-e","device_config_id":"cpu-a","attack_family_id":"spectre-base","adaptation_family_id":"none","adaptation_level":0,"sensor_state":"valid"},
@@ -855,7 +855,7 @@ mod tests {
     fn invalid_sensor_clear_is_reported_as_integrity_violation() {
         let (p,m,t,pb,mb,tb) = fixture_values();
         let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
-        assert_eq!(receipt["sensor_integrity"]["invalid_sensor_cases"], 2);
+        assert_eq!(receipt["sensor_integrity"]["invalid_sensor_cases"], 3);
         assert_eq!(receipt["sensor_integrity"]["invalid_sensor_clear_verdicts"], 1);
         assert_eq!(receipt["sensor_integrity"]["integrity_outcome"], "integrity_violation_observed");
     }
@@ -935,6 +935,27 @@ mod tests {
         let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
         assert_eq!(receipt["generalization"]["adaptation_group_count"], 3);
         assert_eq!(receipt["generalization"]["adaptation_family_level"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn calibration_is_reported_only_when_every_detector_score_exists() {
+        let (mut p,m,t,_,mb,tb) = fixture_values();
+        p["cases"][2]["score"] = json!(0.53);
+        p["cases"][8]["score"] = json!(0.04);
+        let pb = serde_json::to_vec(&p).unwrap();
+        let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
+        assert_eq!(receipt["calibration"]["scored_cases"], 9);
+        assert!(receipt["calibration"]["brier_score"].as_f64().is_some());
+        assert_eq!(receipt["calibration"]["target_semantics"], "malicious_attempt_vs_benign_not_successful_effect");
+    }
+
+    #[test]
+    fn valid_sensor_benign_tnr_excludes_invalid_sensor_clear_verdicts() {
+        let (p,m,t,pb,mb,tb) = fixture_values();
+        let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
+        assert_eq!(receipt["primary_metrics"]["benign_valid_sensor_cases"], 2);
+        assert_eq!(receipt["primary_metrics"]["benign_invalid_sensor_cases"], 2);
+        assert_eq!(receipt["primary_metrics"]["benign_true_negative_rate_on_valid_sensor_cases"], 0.5);
     }
 
     #[test]
