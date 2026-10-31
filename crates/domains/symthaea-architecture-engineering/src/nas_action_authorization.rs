@@ -85,6 +85,8 @@ pub struct NasMeasurementActionScope {
     pub observation_likelihood_model_sha256: String,
     /// Exact frozen family manifest; excluded only from derived stream ID to avoid a hash cycle.
     pub confidence_family_manifest_sha256: String,
+    /// Compare-and-swap reservation ledger head observed before this preflight.
+    pub reservation_ledger_head_sha256: String,
     pub resource_registry_sha256: String,
     pub resource_budget_sha256: String,
     pub resource_cost_sha256: String,
@@ -151,6 +153,20 @@ impl fmt::Display for NasAuthorizationError {
 }
 
 impl Error for NasAuthorizationError {}
+
+/// In-process capability proving that the complete measurement preflight succeeded.
+///
+/// Fields are private and the type is not serializable. It can only be obtained by
+/// running `prepare_measurement_reservation`; deserializing or reconstructing a
+/// preflight receipt is not sufficient to create this token.
+pub struct VerifiedMeasurementReservation {
+    pub(crate) preflight_receipt: NasActionPreflightReceipt,
+    pub(crate) scope_sha256: String,
+    pub(crate) reservation_ledger_head_sha256: String,
+    pub(crate) resource_registry_sha256: String,
+    pub(crate) resource_budget_sha256: String,
+    pub(crate) resource_cost: crate::multi_resource_budget::ResourceCostVector,
+}
 
 pub struct MeasurementPreflightRequest<'a> {
     pub scope: &'a NasMeasurementActionScope,
@@ -708,6 +724,7 @@ fn validate_measurement_scope(scope: &NasMeasurementActionScope) -> Result<(), N
         ("instrument_identity_sha256", &scope.instrument_identity_sha256),
         ("observation_likelihood_model_sha256", &scope.observation_likelihood_model_sha256),
         ("confidence_family_manifest_sha256", &scope.confidence_family_manifest_sha256),
+        ("reservation_ledger_head_sha256", &scope.reservation_ledger_head_sha256),
         ("resource_registry_sha256", &scope.resource_registry_sha256),
         ("resource_budget_sha256", &scope.resource_budget_sha256),
         ("resource_cost_sha256", &scope.resource_cost_sha256),
@@ -880,6 +897,25 @@ fn compute_objective_order_sha256(ids: &[String]) -> Result<String, NasAuthoriza
     digest_serde(OBJECTIVE_ORDER_DOMAIN, ids)
 }
 
+/// Run the complete preflight and return an in-process reservation capability.
+///
+/// The expected reservation-ledger head is part of the scope digest. The reservation
+/// ledger must compare it atomically with its current head before accepting the cost.
+pub fn prepare_measurement_reservation(
+    request: &MeasurementPreflightRequest<'_>,
+) -> Result<VerifiedMeasurementReservation, NasAuthorizationError> {
+    let receipt = verify_measurement_preflight(request)?;
+    let cost = action_cost_vector(request)?.clone();
+    Ok(VerifiedMeasurementReservation {
+        preflight_receipt: receipt.clone(),
+        scope_sha256: receipt.scope_sha256,
+        reservation_ledger_head_sha256: request.scope.reservation_ledger_head_sha256.clone(),
+        resource_registry_sha256: request.scope.resource_registry_sha256.clone(),
+        resource_budget_sha256: request.scope.resource_budget_sha256.clone(),
+        resource_cost: cost,
+    })
+}
+
 /// Check the integrity digest of a preflight receipt. This does not re-verify its source evidence
 /// or turn a preflight receipt into an execution capability.
 pub fn verify_action_preflight_receipt_digest(
@@ -896,7 +932,7 @@ pub fn verify_action_preflight_receipt_digest(
     Ok(())
 }
 
-fn compute_preflight_receipt_sha256(
+pub(crate) fn compute_preflight_receipt_sha256(
     receipt: &NasActionPreflightReceipt,
 ) -> Result<String, NasAuthorizationError> {
     let mut canonical = receipt.clone();
@@ -1203,6 +1239,7 @@ mod tests {
             instrument_identity_sha256: sha('5'),
             observation_likelihood_model_sha256: sha('6'),
             confidence_family_manifest_sha256: sha('a'),
+            reservation_ledger_head_sha256: sha('b'),
             resource_registry_sha256: sha('7'),
             resource_budget_sha256: sha('8'),
             resource_cost_sha256: sha('9'),
@@ -1460,6 +1497,13 @@ mod tests {
         };
         let resource_actions = vec![resource_action];
 
+        let mut reservation_ledger = crate::resource_reservation::ResourceReservationLedger::new(
+            "run-authz-measurement-001",
+            resource_registry.clone(),
+            resource_budget.clone(),
+            100,
+        )
+        .unwrap();
         let mut scope = NasMeasurementActionScope {
             run_id: "run-authz-measurement-001".into(),
             target_commit_id: "a".repeat(40),
@@ -1486,6 +1530,7 @@ mod tests {
                 .observation_likelihood_model_sha256
                 .clone(),
             confidence_family_manifest_sha256: String::new(),
+            reservation_ledger_head_sha256: reservation_ledger.head_sha256().to_owned(),
             resource_registry_sha256: resource_registry.registry_sha256.clone(),
             resource_budget_sha256: digest_serde(
                 b"symthaea.nas.resource-budget.v0.1",
@@ -1520,7 +1565,7 @@ mod tests {
         )
         .unwrap();
 
-        let receipt = verify_measurement_preflight(&MeasurementPreflightRequest {
+        let preflight_request = MeasurementPreflightRequest {
             scope: &scope,
             confidence_ledger: &confidence_ledger,
             objective_registry: &objective_registry,
@@ -1532,14 +1577,37 @@ mod tests {
             resource_registry: &resource_registry,
             resource_budget: &resource_budget,
             resource_actions: &resource_actions,
-        })
-        .unwrap();
-        assert_eq!(receipt.action_kind, NasActionKind::AcquireMeasurement);
-        assert_eq!(
-            receipt.disposition,
-            "PREFLIGHT_ELIGIBLE_NO_RESERVATION_NO_EXECUTION"
-        );
-        verify_action_preflight_receipt_digest(&receipt).unwrap();
+        };
+        let verified_reservation =
+            prepare_measurement_reservation(&preflight_request).unwrap();
+        let reservation = reservation_ledger
+            .reserve_measurement(
+                reservation_ledger.head_sha256(),
+                verified_reservation,
+                20,
+            )
+            .unwrap();
+        assert_eq!(reservation.state, crate::resource_reservation::ReservationState::Reserved);
+        let reservation = reservation_ledger
+            .commit_measurement(reservation_ledger.head_sha256(), &reservation.reservation_id)
+            .unwrap();
+        assert_eq!(reservation.state, crate::resource_reservation::ReservationState::Committed);
+        reservation_ledger.verify_integrity().unwrap();
+        // Retrying the exact same action scope after losing the first response is
+        // idempotent: it returns the existing COMMITTED state and appends no event.
+        let retry_capability =
+            prepare_measurement_reservation(&preflight_request).unwrap();
+        let event_count_before_retry = reservation_ledger.events().len();
+        let retry = reservation_ledger
+            .reserve_measurement(
+                &scope.reservation_ledger_head_sha256,
+                retry_capability,
+                30,
+            )
+            .unwrap();
+        assert_eq!(retry.state, crate::resource_reservation::ReservationState::Committed);
+        assert_eq!(reservation_ledger.events().len(), event_count_before_retry);
+        assert_eq!(reservation.state, crate::resource_reservation::ReservationState::Committed);
 
         let mut changed_manifest_scope = scope.clone();
         changed_manifest_scope.confidence_family_manifest_sha256 = sha('0');
@@ -1591,6 +1659,7 @@ mod tests {
             instrument_identity_sha256: sha('4'),
             observation_likelihood_model_sha256: sha('5'),
             confidence_family_manifest_sha256: sha('a'),
+            reservation_ledger_head_sha256: sha('b'),
             resource_registry_sha256: sha('6'),
             resource_budget_sha256: sha('7'),
             resource_cost_sha256: sha('8'),
