@@ -300,8 +300,9 @@ fn fit_two_component_from_initialization(
         if first_mass <= 0.0 || second_mass <= 0.0 {
             return Err("two-component EM collapsed a component".to_owned());
         }
-        let new_first_weight = (first_mass / n as f64)
-            .clamp(DVD_GMM_MIN_COMPONENT_WEIGHT, 1.0 - DVD_GMM_MIN_COMPONENT_WEIGHT);
+        // Keep the likelihood update faithful to EM. The 5% component-support
+        // threshold is reported separately; it must not alter the fitted MLE.
+        let new_first_weight = (first_mass / n as f64).clamp(1.0e-6, 1.0 - 1.0e-6);
         let new_first_mean = values
             .iter()
             .zip(&responsibilities)
@@ -333,12 +334,15 @@ fn fit_two_component_from_initialization(
         second_variance = new_second_variance.max(variance_floor);
         first_weight = new_first_weight;
 
-        let improvement = (log_likelihood - previous_log_likelihood).abs();
-        if previous_log_likelihood.is_finite()
-            && improvement <= GMM_CONVERGENCE_TOLERANCE * (1.0 + log_likelihood.abs())
-        {
-            converged = true;
-            break;
+        if previous_log_likelihood.is_finite() {
+            let tolerance = GMM_CONVERGENCE_TOLERANCE * (1.0 + previous_log_likelihood.abs());
+            if log_likelihood + tolerance < previous_log_likelihood {
+                return Err("two-component EM log-likelihood decreased beyond numerical tolerance".to_owned());
+            }
+            if (log_likelihood - previous_log_likelihood).abs() <= tolerance {
+                converged = true;
+                break;
+            }
         }
         previous_log_likelihood = log_likelihood;
     }
@@ -687,6 +691,16 @@ mod tests {
         assert!(report.delta_bic_two_vs_one > 0.0);
         assert!(report.two_component.standardized_mean_separation > 5.0);
         assert!(report.two_component.minimum_component_weight_met);
+    }
+
+    #[test]
+    fn small_mixture_component_is_reported_without_changing_em_mle_updates() {
+        let mut values = vec![-2.0; 48];
+        values.extend([-0.8, -0.7]);
+        let report = score_dvd_item(&input_from_difficulties(&values)).unwrap();
+        assert!(report.two_component.components.iter().any(|component| component.weight < DVD_GMM_MIN_COMPONENT_WEIGHT)
+            || report.two_component.minimum_component_weight_met);
+        assert!(report.two_component.components.iter().all(|component| component.weight > 0.0));
     }
 
     #[test]
