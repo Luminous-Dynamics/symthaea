@@ -68,6 +68,17 @@ pub struct ExposureDelta {
     pub missing_output_us: i128,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MeasuredRunCost {
+    pub compute_used: u64,
+    pub refreshes_used: u64,
+    pub observations_used: u64,
+    pub read_bytes: u64,
+    pub write_bytes: u64,
+    /// Calibrated evaluator measurement, absent when unavailable.
+    pub measured_energy_nj: Option<u64>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CounterfactualRun {
     pub context: EpisodeContext,
@@ -75,6 +86,7 @@ pub struct CounterfactualRun {
     /// Sorted, unique IDs of items retained during this run.
     pub selected_item_ids: Vec<u64>,
     pub bytes_used: u64,
+    pub measured_cost: MeasuredRunCost,
     pub outcome: ExposureOutcome,
 }
 
@@ -84,6 +96,8 @@ pub struct CounterfactualEffect {
     pub intervention_item_ids: Vec<u64>,
     pub retained_run_id: u64,
     pub evicted_run_id: u64,
+    pub retained_cost: MeasuredRunCost,
+    pub evicted_cost: MeasuredRunCost,
     pub delta_evict_minus_retain: ExposureDelta,
 }
 
@@ -92,6 +106,7 @@ pub struct SubsetSummary {
     pub subset_mask: u64,
     pub selected_item_ids: Vec<u64>,
     pub bytes_used: u64,
+    pub measured_cost: MeasuredRunCost,
     pub outcome: ExposureOutcome,
 }
 
@@ -129,6 +144,9 @@ pub enum CounterfactualError {
     TreatmentDiffersByUnexpectedItems,
     ByteCountMismatch { reported: u64, computed: u64 },
     OutOfBudget { used: u64, budget: u64 },
+    ComputeOutOfBudget { used: u64, budget: u64 },
+    RefreshOutOfBudget { used: u64, budget: u64 },
+    ObservationOutOfBudget { used: u64, budget: u64 },
     ExposureExceedsEpisode { exposure_us: u64, episode_us: u64 },
     IncompleteSubsetEnumeration { expected: usize, actual: usize },
     DuplicateSubset { mask: u64 },
@@ -173,6 +191,15 @@ impl fmt::Display for CounterfactualError {
             ),
             Self::OutOfBudget { used, budget } => {
                 write!(f, "selected bytes {used} exceed byte budget {budget}")
+            }
+            Self::ComputeOutOfBudget { used, budget } => {
+                write!(f, "compute use {used} exceeds compute budget {budget}")
+            }
+            Self::RefreshOutOfBudget { used, budget } => {
+                write!(f, "refresh count {used} exceeds refresh budget {budget}")
+            }
+            Self::ObservationOutOfBudget { used, budget } => {
+                write!(f, "observation count {used} exceeds observation budget {budget}")
             }
             Self::ExposureExceedsEpisode { exposure_us, episode_us } => write!(
                 f,
@@ -232,6 +259,8 @@ pub fn evaluate_paired_intervention(
         intervention_item_ids: intervention.into_iter().collect(),
         retained_run_id: retained.run_id,
         evicted_run_id: evicted.run_id,
+        retained_cost: retained.measured_cost,
+        evicted_cost: evicted.measured_cost,
         delta_evict_minus_retain: ExposureDelta {
             wrong_belief_us: i128::from(evicted.outcome.wrong_belief_us)
                 - i128::from(retained.outcome.wrong_belief_us),
@@ -305,6 +334,7 @@ pub fn qualify_exact_subsets(
             subset_mask: mask,
             selected_item_ids: run.selected_item_ids.clone(),
             bytes_used: run.bytes_used,
+            measured_cost: run.measured_cost,
             outcome: run.outcome,
         };
         if by_mask.insert(mask, summary).is_some() {
@@ -385,6 +415,24 @@ fn validate_run(
         return Err(CounterfactualError::OutOfBudget {
             used: run.bytes_used,
             budget: run.context.byte_budget,
+        });
+    }
+    if run.measured_cost.compute_used > run.context.compute_budget {
+        return Err(CounterfactualError::ComputeOutOfBudget {
+            used: run.measured_cost.compute_used,
+            budget: run.context.compute_budget,
+        });
+    }
+    if run.measured_cost.refreshes_used > run.context.refresh_budget {
+        return Err(CounterfactualError::RefreshOutOfBudget {
+            used: run.measured_cost.refreshes_used,
+            budget: run.context.refresh_budget,
+        });
+    }
+    if run.measured_cost.observations_used > run.context.observation_budget {
+        return Err(CounterfactualError::ObservationOutOfBudget {
+            used: run.measured_cost.observations_used,
+            budget: run.context.observation_budget,
         });
     }
     run.outcome.validate(run.context.total_exposure_us)?;
@@ -511,6 +559,14 @@ mod tests {
             run_id,
             selected_item_ids,
             bytes_used,
+            measured_cost: MeasuredRunCost {
+                compute_used: 500,
+                refreshes_used: 3,
+                observations_used: 10,
+                read_bytes: 512,
+                write_bytes: 128,
+                measured_energy_nj: Some(2_000),
+            },
             outcome,
         }
     }
