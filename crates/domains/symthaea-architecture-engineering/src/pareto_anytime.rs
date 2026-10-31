@@ -1127,7 +1127,8 @@ pub fn analyze_anytime_history(history: &AnytimeHistory) -> Result<AnytimeRunRec
             },
             archive_sha256: empty_archive_sha.clone(),
         },
-        final_resources: ResourceCost::zero(),
+        // No event means no measured resource baseline; do not report an unexecuted run as free.
+        final_resources: ResourceCost::unknown(),
         final_elapsed_wall_millis: 0,
         final_resource_qualified: false,
     }).collect::<Vec<_>>();
@@ -1219,6 +1220,9 @@ pub fn analyze_anytime_history(history: &AnytimeHistory) -> Result<AnytimeRunRec
     let last_elapsed = history.events.last().map_or(0, |event| event.completed_elapsed_millis);
     let final_resource_qualified = !history.events.is_empty()
         && header.required_resource_meters.iter().all(|meter| totals.meter_is_known(*meter));
+    if history.events.is_empty() {
+        totals = ResourceCost::unknown();
+    }
     let successful_candidate_count = candidates.len();
     let mut target_results = Vec::with_capacity(progress.len());
     for item in progress {
@@ -1491,6 +1495,18 @@ mod tests {
                 failure_reason: None,
             },
         }).unwrap();
+    }
+
+    #[test]
+    fn empty_history_does_not_claim_zero_resource_cost() {
+        let history = AnytimeHistory::new(header()).unwrap();
+        let receipt = analyze_anytime_history(&history).unwrap();
+        assert_eq!(receipt.event_count, 0);
+        assert_eq!(receipt.total_resources.host_cpu_millis, None);
+        assert_eq!(receipt.total_resources.energy_millijoules, None);
+        assert!(!receipt.required_resource_meters_satisfied);
+        assert_eq!(receipt.target_results[0].final_resources.host_cpu_millis, None);
+        assert_eq!(receipt.target_results[0].status, TargetAttainmentStatus::NotReachedByBudget);
     }
 
     #[test]
