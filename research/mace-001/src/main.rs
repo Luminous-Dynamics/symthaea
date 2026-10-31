@@ -524,6 +524,7 @@ impl ScoreReport {
                 "  \"mean_tokens\": {:.3},\n",
                 "  \"mean_model_calls\": {:.3},\n",
                 "  \"hard_gate_pass\": {},\n",
+                "  \"full_conformance_pass\": {},\n",
                 "  \"agent_input_sha256\": \"{}\",\n",
                 "  \"oracle_sha256\": \"{}\",\n",
                 "  \"candidate_sha256\": \"{}\",\n",
@@ -548,6 +549,7 @@ impl ScoreReport {
             self.token_sum as f64 / denominator,
             self.model_call_sum as f64 / denominator,
             self.hard_gate_pass,
+            self.hard_gate_pass && self.exact_case_matches == self.cases,
             self.agent_input_sha256,
             self.oracle_sha256,
             self.candidate_sha256
@@ -873,7 +875,7 @@ mod tests {
     fn evaluator_labels_must_agree_with_independent_scm_reference() {
         let mutated = ORACLE_INPUT.replace(
             "MACE-104\tnot_identified",
-            "MACE-104\\tidentified",
+            "MACE-104\tidentified",
         );
         assert!(audit_texts(AGENT_INPUT, &mutated, ("agent-sha", "oracle-sha")).is_err());
     }
@@ -978,6 +980,24 @@ mod tests {
             .collect::<Vec<_>>()
             .join("\n")
             + "\n";
+        assert!(audit_texts(&changed, ORACLE_INPUT, ("a", "o")).is_err());
+    }
+
+    #[test]
+    fn irrelevant_control_context_cannot_add_an_unregistered_field() {
+        let changed = AGENT_INPUT.replace(
+            "\"display_theme\":\"blue\"",
+            "\"display_theme\":\"blue\",\"secret_tag\":\"extra\"",
+        );
+        assert!(audit_texts(&changed, ORACLE_INPUT, ("a", "o")).is_err());
+    }
+
+    #[test]
+    fn irrelevant_control_event_payload_must_remain_exact() {
+        let changed = AGENT_INPUT.replace(
+            "\"display_theme\":\"blue\"",
+            "\"display_theme\":\"red\"",
+        );
         assert!(audit_texts(&changed, ORACLE_INPUT, ("a", "o")).is_err());
     }
 
