@@ -33,7 +33,7 @@ struct Args {
     output: Option<PathBuf>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Input {
     schema_version: u32,
@@ -47,9 +47,16 @@ struct Input {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct DetectorConfig {
+    /// V1 sample-index half-window. Preserved as the baseline mode.
     half_window_samples: usize,
     score_threshold: f64,
     min_separation_nm: f64,
+    /// Optional physical-arclength mode: deterministic linear resampling interval.
+    #[serde(default)]
+    resample_interval_nm: Option<f64>,
+    /// Optional physical-arclength half-window. Must be an integer multiple of resample_interval_nm.
+    #[serde(default)]
+    half_window_nm: Option<f64>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -109,6 +116,23 @@ struct MethodReport {
 }
 
 #[derive(Debug, Serialize)]
+struct PhysicalResamplingReport {
+    interval_nm: f64,
+    half_window_nm: f64,
+    effective_half_window_samples: usize,
+    interpolation: &'static str,
+    total_resampled_sample_count: usize,
+    per_track_sample_counts: Vec<TrackResamplingCount>,
+}
+
+#[derive(Debug, Serialize)]
+struct TrackResamplingCount {
+    track_id: String,
+    original_sample_count: usize,
+    resampled_sample_count: usize,
+}
+
+#[derive(Debug, Serialize)]
 struct Evaluation {
     tolerance_nm: f64,
     truth_boundary_count: usize,
@@ -134,6 +158,7 @@ struct Report {
     total_track_count: usize,
     total_sample_count: usize,
     total_cable_length_nm: f64,
+    physical_resampling: Option<PhysicalResamplingReport>,
     method_reports: Vec<MethodReport>,
     status: &'static str,
     information_flow: &'static str,
@@ -192,6 +217,25 @@ fn validate_input(input: &Input) -> Result<(), String> {
     {
         return Err("detector score threshold and minimum separation must be finite and positive".into());
     }
+    match (input.detector.resample_interval_nm, input.detector.half_window_nm) {
+        (None, None) => {}
+        (Some(interval_nm), Some(half_window_nm)) => {
+            if !interval_nm.is_finite() || interval_nm <= 0.0
+                || !half_window_nm.is_finite() || half_window_nm <= 0.0
+            {
+                return Err("physical resampling interval and half-window must be finite and positive".into());
+            }
+            let ratio = half_window_nm / interval_nm;
+            let rounded = ratio.round();
+            if !ratio.is_finite() || rounded < 3.0
+                || (ratio - rounded).abs() > 1.0e-9 * ratio.abs().max(1.0)
+                || rounded > usize::MAX as f64
+            {
+                return Err("half_window_nm must be an integer multiple of resample_interval_nm with at least three samples per half-window".into());
+            }
+        }
+        _ => return Err("resample_interval_nm and half_window_nm must either both be present or both be absent".into()),
+    }
     for (name, value) in [
         ("radius_nm", input.noise.radius_nm),
         ("tangent_degrees", input.noise.tangent_degrees),
@@ -213,6 +257,17 @@ fn validate_input(input: &Input) -> Result<(), String> {
         let window = input.detector.half_window_samples;
         if track.samples.len() < (2 * window + 1) {
             return Err(format!("track {} needs at least {} samples", track.track_id, 2 * window + 1));
+        }
+        if let Some(half_window_nm) = input.detector.half_window_nm {
+            let span_nm = track.samples.last().unwrap().distance_nm
+                - track.samples.first().unwrap().distance_nm;
+            if span_nm < 2.0 * half_window_nm {
+                return Err(format!(
+                    "track {} physical extent ({span_nm} nm) is shorter than two physical half-windows ({} nm)",
+                    track.track_id,
+                    2.0 * half_window_nm
+                ));
+            }
         }
         let mut previous_distance = None;
         for sample in &track.samples {
@@ -238,6 +293,117 @@ fn validate_input(input: &Input) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+fn interpolate_sample(left: &Sample, right: &Sample, distance_nm: f64) -> Sample {
+    if distance_nm == left.distance_nm {
+        return left.clone();
+    }
+    if distance_nm == right.distance_nm {
+        return right.clone();
+    }
+    let fraction = (distance_nm - left.distance_nm)
+        / (right.distance_nm - left.distance_nm);
+    let interpolate = |a: f64, b: f64| a + (b - a) * fraction;
+    Sample {
+        distance_nm,
+        radius_nm: interpolate(left.radius_nm, right.radius_nm),
+        tangent_degrees: interpolate(left.tangent_degrees, right.tangent_degrees),
+        membrane_integrity: interpolate(left.membrane_integrity, right.membrane_integrity),
+        synapse_density: interpolate(left.synapse_density, right.synapse_density),
+    }
+}
+
+/// Deterministically resample an ordered profile onto a fixed physical arclength grid.
+/// Source samples may be irregularly spaced, but must be strictly increasing.
+fn resample_track(track: &Track, interval_nm: f64) -> Result<Track, String> {
+    if !interval_nm.is_finite() || interval_nm <= 0.0 {
+        return Err("resampling interval must be finite and positive".into());
+    }
+    if track.samples.len() < 2 {
+        return Err(format!("track {} needs at least two source samples", track.track_id));
+    }
+    let start_nm = track.samples.first().unwrap().distance_nm;
+    let end_nm = track.samples.last().unwrap().distance_nm;
+    let span_nm = end_nm - start_nm;
+    let step_count_float = (span_nm / interval_nm).floor();
+    if !step_count_float.is_finite() || step_count_float < 1.0
+        || step_count_float > 1_000_000.0
+    {
+        return Err(format!(
+            "track {} resampling would produce an unsupported grid size",
+            track.track_id
+        ));
+    }
+    let step_count = step_count_float as usize;
+    let mut samples = Vec::with_capacity(step_count + 1);
+    let mut right_index = 1_usize;
+    for index in 0..=step_count {
+        let distance_nm = start_nm + index as f64 * interval_nm;
+        while right_index + 1 < track.samples.len()
+            && track.samples[right_index].distance_nm < distance_nm
+        {
+            right_index += 1;
+        }
+        let left = &track.samples[right_index - 1];
+        let right = &track.samples[right_index];
+        if distance_nm < left.distance_nm || distance_nm > right.distance_nm {
+            return Err(format!(
+                "track {} resampling target fell outside source interpolation support",
+                track.track_id
+            ));
+        }
+        samples.push(interpolate_sample(left, right, distance_nm));
+    }
+    Ok(Track {
+        track_id: track.track_id.clone(),
+        samples,
+    })
+}
+
+fn build_physical_resampled_input(input: &Input) -> Result<(Option<Input>, Option<PhysicalResamplingReport>), String> {
+    let (interval_nm, half_window_nm) = match (
+        input.detector.resample_interval_nm,
+        input.detector.half_window_nm,
+    ) {
+        (None, None) => return Ok((None, None)),
+        (Some(interval), Some(half_window)) => (interval, half_window),
+        _ => return Err("physical resampling configuration is incomplete".into()),
+    };
+    let half_window_samples = (half_window_nm / interval_nm).round() as usize;
+    let mut physical_input = input.clone();
+    physical_input.detector.half_window_samples = half_window_samples;
+    let mut per_track_sample_counts = Vec::with_capacity(input.tracks.len());
+    let mut total_resampled_sample_count = 0_usize;
+    let mut resampled_tracks = Vec::with_capacity(input.tracks.len());
+    for track in &input.tracks {
+        let resampled = resample_track(track, interval_nm)?;
+        let resampled_count = resampled.samples.len();
+        total_resampled_sample_count = total_resampled_sample_count
+            .checked_add(resampled_count)
+            .ok_or_else(|| "total resampled sample count overflowed".to_string())?;
+        per_track_sample_counts.push(TrackResamplingCount {
+            track_id: track.track_id.clone(),
+            original_sample_count: track.samples.len(),
+            resampled_sample_count: resampled_count,
+        });
+        resampled_tracks.push(resampled);
+    }
+    physical_input.tracks = resampled_tracks;
+    if physical_input.tracks.iter().any(|track| {
+        track.samples.len() < (2 * half_window_samples + 1)
+    }) {
+        return Err("one or more resampled tracks are too short for the configured physical window".into());
+    }
+    let report = PhysicalResamplingReport {
+        interval_nm,
+        half_window_nm,
+        effective_half_window_samples: half_window_samples,
+        interpolation: "piecewise_linear_on_uniform_arclength_grid_v1",
+        total_resampled_sample_count,
+        per_track_sample_counts,
+    };
+    Ok((Some(physical_input), Some(report)))
 }
 
 fn fit_sse(samples: &[Sample], feature: Feature) -> f64 {
@@ -470,6 +636,9 @@ fn run(input: &Input, input_bytes: &[u8], truth_bytes: Option<&[u8]>, tolerance_
     // Detection is fully completed before evaluator-only truth is parsed.
     let radius_candidates = detect(input, false);
     let multi_candidates = detect(input, true);
+    let (physical_input, physical_resampling) = build_physical_resampled_input(input)?;
+    let physical_radius_candidates = physical_input.as_ref().map(|value| detect(value, false));
+    let physical_multi_candidates = physical_input.as_ref().map(|value| detect(value, true));
     let truth = truth_bytes.map(|bytes| -> Result<Truth, String> {
         let value: Truth = serde_json::from_slice(bytes)
             .map_err(|error| format!("invalid evaluator-only truth JSON: {error}"))?;
@@ -479,6 +648,10 @@ fn run(input: &Input, input_bytes: &[u8], truth_bytes: Option<&[u8]>, tolerance_
     let truth_sha = truth_bytes.map(sha256);
     let radius_evaluation = truth.as_ref().map(|value| evaluate(&radius_candidates, value, input, tolerance_nm));
     let multi_evaluation = truth.as_ref().map(|value| evaluate(&multi_candidates, value, input, tolerance_nm));
+    let physical_radius_evaluation = truth.as_ref().zip(physical_radius_candidates.as_ref())
+        .map(|(truth, candidates)| evaluate(candidates, truth, input, tolerance_nm));
+    let physical_multi_evaluation = truth.as_ref().zip(physical_multi_candidates.as_ref())
+        .map(|(truth, candidates)| evaluate(candidates, truth, input, tolerance_nm));
     let total_samples = input.tracks.iter().map(|track| track.samples.len()).sum();
     let total_length = input.tracks.iter()
         .map(|track| track.samples.last().unwrap().distance_nm - track.samples.first().unwrap().distance_nm)
@@ -494,7 +667,9 @@ fn run(input: &Input, input_bytes: &[u8], truth_bytes: Option<&[u8]>, tolerance_
         total_track_count: input.tracks.len(),
         total_sample_count: total_samples,
         total_cable_length_nm: total_length,
-        method_reports: vec![
+        physical_resampling,
+        method_reports: {
+            let mut methods = vec![
             MethodReport {
                 method: "no_proposal",
                 candidate_count: 0,
@@ -513,10 +688,28 @@ fn run(input: &Input, input_bytes: &[u8], truth_bytes: Option<&[u8]>, tolerance_
                 candidates: multi_candidates,
                 evaluation: multi_evaluation,
             },
-        ],
+            ];
+            if let Some(candidates) = physical_radius_candidates.as_ref() {
+                methods.push(MethodReport {
+                    method: "physical_arclength_radius_only_piecewise_linear",
+                    candidate_count: candidates.len(),
+                    candidates: candidates.clone(),
+                    evaluation: physical_radius_evaluation,
+                });
+            }
+            if let Some(candidates) = physical_multi_candidates.as_ref() {
+                methods.push(MethodReport {
+                    method: "physical_arclength_multifeature_piecewise_linear",
+                    candidate_count: candidates.len(),
+                    candidates: candidates.clone(),
+                    evaluation: physical_multi_evaluation,
+                });
+            }
+            methods
+        },
         status: if truth.is_some() { "SYNTHETIC_OR_HELD_OUT_EVALUATED_NOT_PROMOTED" } else { "PROPOSALS_ONLY_NOT_EVALUATED" },
         information_flow: "Detector consumes only the exact profile input. Ground-truth boundary labels are parsed only after both candidate lists have been generated, are byte-bound to the exact input SHA-256, and are used only for evaluation.",
-        scope_note: "Synthetic ordered 1D morphology profiles only. This does not inspect EM images, meshes, or skeleton geometry; does not identify a biological false merge; and does not justify automatic edits. A positive score is a human-review proposal only.",
+        scope_note: "Synthetic ordered 1D morphology profiles only. The optional physical-arclength mode applies deterministic piecewise-linear resampling to a fixed nm grid and derives its half-window from physical length; its fixed score threshold remains heuristic and not statistically calibrated. This does not inspect EM images, meshes, or skeleton geometry; does not identify a biological false merge; and does not justify automatic edits. A positive score is a human-review proposal only.",
     })
 }
 
