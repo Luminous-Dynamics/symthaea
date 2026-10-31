@@ -20,6 +20,25 @@ const MAX_MOUNT_ENTRIES: usize = 16_384;
 const RELEVANT_MOUNTS: &[&str] = &[
     "bpf", "tracefs", "cgroup2",
 ];
+const CAPABILITY_IDS: [&str; 6] = [
+    "bpf_lsm",
+    "tracefs_process_events",
+    "fanotify_notifications",
+    "fanotify_access_permissions",
+    "landlock",
+    "cgroup_v2_process_scope",
+];
+const FANOTIFY_LIMITATIONS: &[&str] = &[
+    "Kernel configuration is not a runtime API or privilege probe.",
+    "fanotify does not report mmap-based file access.",
+    "fanotify does not report remote events on network filesystems.",
+    "Recursive directory marking can race; event queues can overflow.",
+];
+const LANDLOCK_LIMITATIONS: &[&str] = &[
+    "Kernel configuration is not a Landlock ABI/version probe.",
+    "Landlock is an access-control mechanism, not an activity recorder.",
+    "Some special filesystem objects remain outside explicit path restrictions.",
+];
 
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -210,7 +229,7 @@ pub fn probe_linux() -> anyhow::Result<LinuxProbeReport> {
 
     let mut capabilities = vec![
         CapabilityAssessment {
-            capability_id: "bpf_lsm",
+            capability_id: CAPABILITY_IDS[0],
             status: bpf_status,
             evidence: vec![
                 active_lsm.clone(),
@@ -227,7 +246,7 @@ pub fn probe_linux() -> anyhow::Result<LinuxProbeReport> {
             ],
         },
         CapabilityAssessment {
-            capability_id: "tracefs_process_events",
+            capability_id: CAPABILITY_IDS[1],
             status: trace_status,
             evidence: {
                 let mut evidence = vec![mount_text.clone()];
@@ -240,21 +259,16 @@ pub fn probe_linux() -> anyhow::Result<LinuxProbeReport> {
             ],
         },
         CapabilityAssessment {
-            capability_id: "fanotify_notifications",
+            capability_id: CAPABILITY_IDS[2],
             status: fanotify_status,
             evidence: vec![
                 config.evidence.clone(),
                 not_probed_evidence("fanotify_runtime_api", "no fanotify_init/fanotify_mark syscall was executed"),
             ],
-            limitations: vec![
-                "Kernel configuration is not a runtime API or privilege probe.",
-                "fanotify does not report mmap-based file access.",
-                "fanotify does not report remote events on network filesystems.",
-                "Recursive directory marking can race; event queues can overflow.",
-            ],
+            limitations: FANOTIFY_LIMITATIONS.to_vec(),
         },
         CapabilityAssessment {
-            capability_id: "fanotify_access_permissions",
+            capability_id: CAPABILITY_IDS[3],
             status: fanotify_permission_status,
             evidence: vec![config.evidence.clone()],
             limitations: vec![
@@ -263,20 +277,16 @@ pub fn probe_linux() -> anyhow::Result<LinuxProbeReport> {
             ],
         },
         CapabilityAssessment {
-            capability_id: "landlock",
+            capability_id: CAPABILITY_IDS[4],
             status: landlock_status,
             evidence: vec![
                 config.evidence.clone(),
                 not_probed_evidence("landlock_abi", "no landlock_create_ruleset syscall was executed"),
             ],
-            limitations: vec![
-                "Kernel configuration is not a Landlock ABI/version probe.",
-                "Landlock is an access-control mechanism, not an activity recorder.",
-                "Some special filesystem objects remain outside explicit path restrictions.",
-            ],
+            limitations: LANDLOCK_LIMITATIONS.to_vec(),
         },
         CapabilityAssessment {
-            capability_id: "cgroup_v2_process_scope",
+            capability_id: CAPABILITY_IDS[5],
             status: cgroup_status,
             evidence: vec![mount_text.clone(), cgroup_membership],
             limitations: vec![
@@ -735,13 +745,24 @@ mod tests {
 
     #[test]
     fn fanotify_limitations_are_explicit_not_hidden_by_config_detection() {
-        let limitations = [
-            "mmap-based access is not reported",
-            "remote network filesystem events are not reported",
-            "recursive directory marking can race",
-            "event queues can overflow",
-        ];
-        assert_eq!(limitations.len(), 4);
+        assert_eq!(FANOTIFY_LIMITATIONS.len(), 4);
+        assert!(FANOTIFY_LIMITATIONS.iter().any(|text| text.contains("mmap")));
+        assert!(FANOTIFY_LIMITATIONS.iter().any(|text| text.contains("network filesystems")));
+        assert!(FANOTIFY_LIMITATIONS.iter().any(|text| text.contains("overflow")));
+    }
+
+    #[test]
+    fn capability_ids_match_the_checked_in_report_schema() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../benchmarks/basalt/schema/linux-capability-inventory.v1.schema.json"
+        )).unwrap();
+        let mut schema_ids: Vec<String> = schema["properties"]["capabilities"]["items"]
+            ["properties"]["capability_id"]["enum"]
+            .as_array().unwrap().iter().map(|value| value.as_str().unwrap().to_string()).collect();
+        let mut source_ids: Vec<String> = CAPABILITY_IDS.iter().map(|value| value.to_string()).collect();
+        schema_ids.sort();
+        source_ids.sort();
+        assert_eq!(schema_ids, source_ids);
     }
 
     #[test]
