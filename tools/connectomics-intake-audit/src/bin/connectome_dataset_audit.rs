@@ -320,12 +320,12 @@ fn build_cohort_manifest(
         ("paired_em_legal_views", "exact same sample IDs as fused_geometry_legal_em; score legal EM views on this cohort"),
         ("geometry_without_legal_em", "geometry is present AND none of em_xy/em_xz/em_yz is present"),
         ("em_best_only_excluded", "em_best is present AND none of em_xy/em_xz/em_yz is present"),
-        ("paired_false_split_correction_geometry_only", "task_routing contains false_split_correction AND dual geometry is present AND at least one legal EM view is present; score dual geometry-only"),
-        ("paired_false_split_correction_em_legal_views", "exact same sample IDs as paired_false_split_correction_geometry_only; score legal EM views with task-correct mask fusion"),
-        ("paired_false_merge_identification_geometry_only", "task_routing contains false_merge_identification AND single geometry is present AND at least one legal EM view is present; score single geometry-only"),
-        ("paired_false_merge_identification_em_legal_views", "exact same sample IDs as paired_false_merge_identification_geometry_only; score legal EM views with A/B masks fused for the single-segment task"),
-        ("paired_split_mask_generation_geometry_only", "task_routing contains split_mask_generation AND single geometry is present AND at least one legal EM view is present; score single geometry-only"),
-        ("paired_split_mask_generation_em_legal_views", "exact same sample IDs as paired_split_mask_generation_geometry_only; score legal EM views with A/B masks fused for the single-segment task"),
+        ("paired_false_split_correction_geometry_only", "task_routing contains false_split_correction AND task-appropriate geometry is present AND at least one legal EM view is present; score geometry-only"),
+        ("paired_false_split_correction_em_legal_views", "exact same sample IDs as paired_false_split_correction_geometry_only; score legal EM views after the task-required A/B mask transformation"),
+        ("paired_false_merge_identification_geometry_only", "task_routing contains false_merge_identification AND task-appropriate geometry is present AND at least one legal EM view is present; score geometry-only"),
+        ("paired_false_merge_identification_em_legal_views", "exact same sample IDs as paired_false_merge_identification_geometry_only; score legal EM views after the task-required A/B mask transformation"),
+        ("paired_split_mask_generation_geometry_only", "task_routing contains split_mask_generation AND task-appropriate geometry is present AND at least one legal EM view is present; score geometry-only"),
+        ("paired_split_mask_generation_em_legal_views", "exact same sample IDs as paired_split_mask_generation_geometry_only; score legal EM views after the task-required A/B mask transformation"),
     ];
     for (name, rule) in rules {
         members.insert(name.to_string(), (rule.to_string(), BTreeSet::new()));
