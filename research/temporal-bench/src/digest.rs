@@ -78,7 +78,7 @@ mod tests {
         let digest = hasher.finish();
         assert_eq!(
             digest_hex(&digest),
-            "TODO_CANONICAL_HASH_VECTOR"
+            "3fdf318f8c9c52d7f866f2d59f3030a52f435558886801f75dab2b93edf74049"
         );
     }
 
