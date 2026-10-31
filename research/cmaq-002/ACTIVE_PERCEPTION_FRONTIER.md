@@ -89,6 +89,8 @@ Report:
 
 The paper's published ActiveArena-OFT and ActiveArena-Plan scores are reference points only. A Symthaea result must use the same task protocol, observation/action interface, split and scoring rules before any direct score comparison.
 
+The source and protocol reference is pinned in [activearena-baseline.lock.json](activearena-baseline.lock.json): simulator source `leeibo/ActiveArena@1bf2c77b8d3ab978fc5b4599a69d017f593edbe8` (MIT) and policy source `leeibo/ActiveArena-VLA@abaea42b223d40f7b763cd879ce926c8c0c906a1` (MIT with upstream StarVLA attribution). The Hugging Face dataset card reports Apache-2.0 and approximately 581k LeRobot rows, but this lock intentionally leaves its immutable dataset revision/checksum manifest unpinned. The base RoboTwin and supplementary ActiveArena asset datasets have separately pinned source revisions, but their data/asset licenses remain unverified here. The ActiveArena-VLA checkpoint bundle is also not yet pinned by an immutable revision and manifest. No dataset, asset archive, base VLM or checkpoint weights have been downloaded. Treat the lock as source/protocol metadata only until those gates are resolved.
+
 ## How CMAQ-002 v0.3 fits
 
 The current branch provides reusable measurement concepts, not an ActiveArena implementation:
