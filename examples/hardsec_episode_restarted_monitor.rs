@@ -384,6 +384,9 @@ fn parse_episodes(value: &Value, plan: &Plan) -> Result<Vec<Episode>, String> {
             let pmu_qualification_result = string_field(window_value, "pmu_qualification_result", &wc)?.to_owned();
             let source_offset_start = count_field(window_value, "source_offset_start", &wc)?;
             let source_offset_end = count_field(window_value, "source_offset_end", &wc)?;
+            if window_index == 0 && source_offset_start != 0 {
+                return Err(format!("{wc} first source window must begin at offset zero"));
+            }
             if source_offset_end <= source_offset_start {
                 return Err(format!("{wc} source offsets must have positive width"));
             }
@@ -485,6 +488,9 @@ fn parse_context_receipt(
     for (index, item) in assignment_values.iter().enumerate() {
         let context = format!("runtime_mapping.assignments[{index}]");
         let source_sequence_index = count_field(item, "sequence_index", &context)?;
+        if !mapped_source_sequences.insert(source_sequence_index) {
+            return Err(format!("duplicate context assignment source sequence index {source_sequence_index}"));
+        }
         let window_id = string_field(item, "window_id", &context)?.to_owned();
         let decision_status = string_field(item, "decision_status", &context)?.to_owned();
         let decision_reason = string_field(item, "decision_reason", &context)?.to_owned();
@@ -820,6 +826,7 @@ fn audit_values(
             "one_episode_per_unique_execution_group":true,
             "source_window_ids_unique":true,
             "source_offsets_contiguous_within_episode":true,
+            "source_offsets_start_at_zero":true,
             "evaluation_execution_groups_disjoint_from_model_training_and_selection":true,
             "declared_execution_group_independence":"not_established_from_input_receipts"
         },
@@ -1019,7 +1026,7 @@ mod tests {
 
     #[test]
     fn online_randomized_conformal_p_value_matches_known_rank_and_ties() {
-        let previous=vec![-1.0,-2.0,-2.0,-4.0];
+        let previous=vec![-4.0,-3.0,-2.0,-2.0];
         // Current transformed score -2.0: two prior values are strictly less,
         // three values are tied including the current item; t=5.
         let p=online_randomized_conformal_p(&previous,2.0,0.25).unwrap();
