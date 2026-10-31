@@ -1887,6 +1887,22 @@ mod tests {
     }
 
     #[test]
+    fn compatibility_objectives_keep_native_plan_axes_inapplicable() {
+        let compatibility = GenomeObjectives {
+            novelty_distance: None,
+            within_genome_diversity: 0.0,
+            motif_transformation_richness: None,
+            form_coverage: None,
+            grammar_topology_variation: None,
+            grammar_operation_diversity: None,
+        };
+        assert_eq!(
+            compatibility.axes(),
+            [None, Some(0.0), None, None, None, None]
+        );
+    }
+
+    #[test]
     fn grammar_plan_operation_sets_are_versioned_in_trial_receipts() {
         let genome = classical_genome();
         let config = GenomeEvaluationConfig {
