@@ -1,11 +1,11 @@
-# POAR-RX Parallel Workflow Benchmark v1
+# POAR-RX Multi-Target Partial-Workflow Benchmark v1
 
 **Date:** 2026-10-31  
 **Status:** deterministic research microbenchmark and protocol; not a production transaction engine or external leaderboard result.
 
 ## Research question
 
-Can a controller recover a multi-action workflow while preserving independent branches, current authority, concurrent external writes, and truthful terminal-state reporting?
+Can a controller recover a multi-action workflow while preserving target-state invariants, current authority, concurrent external writes, and truthful terminal-state reporting?
 
 The single-action acknowledgement-loss experiment is necessary but insufficient. A workflow may have already committed one branch while another branch is blocked, stale, or ambiguous. Replaying the whole plan can duplicate earlier effects or overwrite valid concurrent changes. Compensation can itself be unauthorized or fail.
 
@@ -33,7 +33,7 @@ The module research/poar-rx-lab/src/workflow.rs models a two-target workflow:
 3. The second action either commits, is rejected, loses its acknowledgement, or encounters a changed precondition.
 4. The controller reports verified completion, unverified completion, verified abort, partial state, or unknown outcome.
 
-This is a deliberately small deterministic simulator; its local world model is both executor and oracle.
+This first executable slice deliberately serializes the two agent actions (first target, then second target). Concurrent external mutations are injected between them; this is not yet an agent-side parallel DAG executor. Its local world model is both executor and oracle. The benchmark title/path preserves the intended extension toward parallel workflows, but no parallel-execution result is claimed.
 
 ### Policies
 
@@ -104,13 +104,13 @@ For a causal comparison, match model/checkpoint, prompts, context, tools, permis
 This first two-target simulator:
 - does not implement durable crash-consistent storage;
 - does not model real distributed transactions, real IAM, network partitions, or external APIs;
-- does not yet have multi-agent races or arbitrary DAG/loop/async scheduling;
+- does not yet execute agent branches in parallel and does not model multi-agent races, arbitrary DAG/loop/async scheduling;
 - uses a public deterministic fault schedule and a visible local oracle;
 - does not establish SOTA, production reliability, or general exactly-once semantics.
 
 Next gates:
 1. Add crash-point replay and a durable journal with fsync/atomic-write contracts.
-2. Add multi-target/parallel dependency graphs, conditional branches and asynchronous completion.
+2. Add actual multi-target parallel dependency graphs, conditional branches and asynchronous completion.
 3. Add hidden, family-held-out fault schedules and protected evaluator separation.
 4. Validate the controller against an independently implemented strong saga baseline.
 5. Run judge-free state predicate scoring plus optional blinded human/LLM diagnostic annotations; never let LLM-as-judge decide safety-critical ground truth.
