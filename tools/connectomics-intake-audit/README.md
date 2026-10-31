@@ -322,3 +322,22 @@ The `connectome-query-cert-audit` verifier now requires `query.dependency_roots`
 ## Acquisition–proofreading co-design
 
 Research track [#9282](https://github.com/Luminous-Dynamics/symthaea/issues/9282) investigates choosing between targeted re-imaging, specialist re-tracing, and human review by expected query-error reduction per total cost. It includes independent probability sampling of untouched regions to protect against active-selection bias. No microscope-control implementation is included.
+
+
+## Finite reconstruction query robustness audit
+
+The `connectome-query-ensemble-audit` binary evaluates the same scientific graph query across a finite, explicit set of provenance-bound reconstruction scenarios. V1 reports per-query min/max values, decision stability, per-scenario outcomes, canonical graph/scenario-set digests, and shared evidence-lineage groups.
+
+It is intentionally an **unweighted finite scenario evaluator**. It does not produce posterior probabilities, confidence intervals, or evidence that the submitted scenarios exhaust all biologically plausible reconstructions.
+
+```sh
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
+  --bin connectome-query-ensemble-audit -- \
+  --input docs/neuroscience/examples/CONNECTOME_QUERY_ENSEMBLE_AUDIT.example.json \
+  --output query-ensemble-report.json
+
+cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml \
+  --bin connectome-query-ensemble-audit
+```
+
+See `docs/neuroscience/CONNECTOME_QUERY_ENSEMBLE_AUDIT.schema.json` and `CONNECTOME_QUERY_ENSEMBLE_AUDIT_PROTOCOL_V1.md` for the exact input and scope contract. The checked-in fixture contains a query that changes across plausible graphs and two decision-stable controls. All results are synthetic.
