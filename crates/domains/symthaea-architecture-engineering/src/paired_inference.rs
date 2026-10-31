@@ -1069,6 +1069,63 @@ mod tests {
         tape
     }
 
+    fn offer_manifest(tape: &EventTape) -> OfferSetManifest {
+        let snapshot = OfferSetSnapshot::new(
+            1,
+            None,
+            0,
+            vec!["A".to_owned()],
+            true,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        )
+        .unwrap();
+        OfferSetManifest::new(tape, vec![snapshot]).unwrap()
+    }
+
+    #[test]
+    fn composed_execution_gate_and_paired_analysis_succeed_only_on_exact_inputs() {
+        let baseline = evidence_tape("baseline", serde_json::json!({"alpha": 0.5}));
+        let challenger = evidence_tape("challenger", serde_json::json!({"beta": 0.7}));
+        let manifests = [offer_manifest(&baseline), offer_manifest(&challenger)];
+        let tapes = [baseline, challenger];
+        let mut plan = plan(MetricDirection::HigherIsBetter);
+        plan.campaign_event_tape_set_sha256 = event_tape_set_sha256(&tapes).unwrap();
+        let rows = observations(MetricDirection::HigherIsBetter, 12, 8, 0.05);
+
+        let result =
+            analyze_qualified_paired_metric(&plan, &rows, &tapes, &manifests).unwrap();
+        assert!(result.execution_qualification.matched_execution_qualified);
+        assert_eq!(
+            result.inference.decision,
+            InferenceDecision::EvidenceOfSuperiority
+        );
+    }
+
+    #[test]
+    fn composed_analysis_rejects_cross_policy_offer_set_mismatch() {
+        let baseline = evidence_tape("baseline", serde_json::json!({"alpha": 0.5}));
+        let challenger = evidence_tape("challenger", serde_json::json!({"beta": 0.7}));
+        let baseline_manifest = offer_manifest(&baseline);
+        let challenger_snapshot = OfferSetSnapshot::new(
+            1,
+            None,
+            0,
+            vec!["A".to_owned(), "B".to_owned()],
+            true,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        )
+        .unwrap();
+        let challenger_manifest =
+            OfferSetManifest::new(&challenger, vec![challenger_snapshot]).unwrap();
+        let tapes = [baseline, challenger];
+        let manifests = [baseline_manifest, challenger_manifest];
+        let mut plan = plan(MetricDirection::HigherIsBetter);
+        plan.campaign_event_tape_set_sha256 = event_tape_set_sha256(&tapes).unwrap();
+        let rows = observations(MetricDirection::HigherIsBetter, 12, 8, 0.05);
+
+        assert!(analyze_qualified_paired_metric(&plan, &rows, &tapes, &manifests).is_err());
+    }
+
     #[test]
     fn tape_set_digest_is_order_invariant_and_binds_complete_policy_evidence() {
         let left = evidence_tape("baseline", serde_json::json!({"alpha": 0.5}));
