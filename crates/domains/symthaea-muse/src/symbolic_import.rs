@@ -900,7 +900,7 @@ mod tests {
     fn musicxml_pitch_outside_midi_range_is_rejected_instead_of_clamped() {
         let xml = br#"<score-partwise><part id="P1"><measure number="1">
             <attributes><divisions>1</divisions></attributes>
-            <note><pitch><step>C</step><octave>9</octave></pitch><duration>1</duration></note>
+            <note><pitch><step>C</step><octave>10</octave></pitch><duration>1</duration></note>
         </measure></part></score-partwise>"#;
         assert!(parse_musicxml(xml).is_err());
     }
