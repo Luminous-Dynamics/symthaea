@@ -835,6 +835,19 @@ mod tests {
         assert!(MAX_HASHED_FILE_BYTES >= MAX_TEXT_BYTES);
     }
 
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn live_inventory_is_read_only_and_never_qualifies_the_host() {
+        let report = probe_linux().unwrap();
+        assert_eq!(report.capabilities.len(), 6);
+        assert!(report.capabilities.windows(2).all(|pair| {
+            pair[0].capability_id < pair[1].capability_id
+        }));
+        assert!(!report.observer_attached);
+        assert!(!report.workload_executed);
+        assert!(!report.qualification_eligible);
+    }
+
     #[test]
     fn digest_encoding_is_lowercase_and_domain_tagged() {
         let digest = sha256_tagged(b"basalt");
