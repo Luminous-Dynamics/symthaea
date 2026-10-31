@@ -1,6 +1,7 @@
 use contamination_panel_bench::{
     ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, DetectorRunV1,
     DetectorSpecV1, PublicChallengePacketV1, SealedChallengeKeyV1,
+    dvd::{DvdGenerationInputV1, score_dvd_item},
     audit_blinded_adjudications, detectors::{evaluate_detector_run, score_public_packet},
     ftd::{
         empirical_reference_p_values, ftd_weighted_cauchy_bh, FeaturePValuesV1,
@@ -197,6 +198,30 @@ fn ftd_fuse(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn score_dvd(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench score-dvd <dvd-generation-input.json> <dvd-report.json>"
+                .into(),
+        );
+    }
+    let input: DvdGenerationInputV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
+    let report = score_dvd_item(&input).map_err(io::Error::other)?;
+    let bytes = serde_json::to_vec_pretty(&report)?;
+    write_bytes(&args[2], &bytes)?;
+    println!(
+        "item={} generations={} K={} dvd_variance={:.8} delta_bic={:.4} mixture_converged={}",
+        report.item_id,
+        report.generation_count,
+        report.tail_token_count,
+        report.dvd_population_variance,
+        report.delta_bic_two_vs_one,
+        report.two_component.converged
+    );
+    println!("calibration status: {}", report.calibration_status);
+    Ok(())
+}
+
 fn audit_adjudications(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 4 {
         return Err(
@@ -246,9 +271,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("evaluate") => evaluate_run(&args),
         Some("ftd-pvalues") => ftd_pvalues(&args),
         Some("ftd-fuse") => ftd_fuse(&args),
+        Some("score-dvd") => score_dvd(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | score-dvd | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
