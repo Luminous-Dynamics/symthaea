@@ -600,7 +600,20 @@ impl RoundCloseReceipt {
     }
 }
 
-/// Append-only campaign chain. A new round extends the preceding close digest.
+/// Immutable per-round ledger entry used to reconstruct campaign totals.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RoundLedgerEntry {
+    pub round_id: String,
+    pub round_index: u64,
+    pub parent_close_sha256: Option<String>,
+    pub plan_sha256: String,
+    pub close_sha256: String,
+    pub action_count: u64,
+    pub charged_budget_units: u64,
+}
+
+/// Append-only campaign chain. Aggregate totals are reconstructed from its entries.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RoundLedger {
@@ -610,6 +623,7 @@ pub struct RoundLedger {
     pub total_action_count: u64,
     pub total_charged_budget_units: u64,
     pub closed_round_ids: BTreeSet<String>,
+    pub entries: Vec<RoundLedgerEntry>,
 }
 
 impl RoundLedger {
@@ -623,7 +637,83 @@ impl RoundLedger {
             total_action_count: 0,
             total_charged_budget_units: 0,
             closed_round_ids: BTreeSet::new(),
+            entries: Vec::new(),
         })
+    }
+
+    /// Rebuild indexes and totals from the complete ordered entry list.
+    pub fn validate_integrity(&self) -> Result<(), RoundContractError> {
+        validate_identifier("campaign_id", &self.campaign_id)?;
+        if self.next_round_index != self.entries.len() as u64 {
+            return Err(RoundContractError::new(
+                "next_round_index",
+                "does not equal the number of closed round entries",
+            ));
+        }
+        let mut ids = BTreeSet::new();
+        let mut expected_parent: Option<String> = None;
+        let mut actions = 0u64;
+        let mut charged = 0u64;
+        for (index, entry) in self.entries.iter().enumerate() {
+            validate_identifier(&format!("entries[{index}].round_id"), &entry.round_id)?;
+            if entry.round_index != index as u64 {
+                return Err(RoundContractError::new(
+                    format!("entries[{index}].round_index"),
+                    "round indexes must be contiguous and ordered",
+                ));
+            }
+            if !ids.insert(entry.round_id.clone()) {
+                return Err(RoundContractError::new(
+                    format!("entries[{index}].round_id"),
+                    "duplicate round ID in ledger",
+                ));
+            }
+            match (expected_parent.as_deref(), entry.parent_close_sha256.as_deref()) {
+                (None, None) => {}
+                (Some(expected), Some(actual)) if expected == actual => {}
+                _ => {
+                    return Err(RoundContractError::new(
+                        format!("entries[{index}].parent_close_sha256"),
+                        "entry does not extend the preceding close digest",
+                    ));
+                }
+            }
+            validate_sha256(&format!("entries[{index}].plan_sha256"), &entry.plan_sha256)?;
+            validate_sha256(&format!("entries[{index}].close_sha256"), &entry.close_sha256)?;
+            if entry.action_count == 0 || entry.charged_budget_units < entry.action_count {
+                return Err(RoundContractError::new(
+                    format!("entries[{index}]"),
+                    "action count must be positive and charged budget cannot be lower",
+                ));
+            }
+            actions = actions
+                .checked_add(entry.action_count)
+                .ok_or_else(|| RoundContractError::new("total_action_count", "overflow"))?;
+            charged = charged
+                .checked_add(entry.charged_budget_units)
+                .ok_or_else(|| RoundContractError::new("total_charged_budget_units", "overflow"))?;
+            expected_parent = Some(entry.close_sha256.clone());
+        }
+
+        if ids != self.closed_round_ids {
+            return Err(RoundContractError::new(
+                "closed_round_ids",
+                "round ID index does not reconcile with ledger entries",
+            ));
+        }
+        if actions != self.total_action_count || charged != self.total_charged_budget_units {
+            return Err(RoundContractError::new(
+                "totals",
+                "stored action or budget totals do not reconcile with round entries",
+            ));
+        }
+        if expected_parent != self.last_close_sha256 {
+            return Err(RoundContractError::new(
+                "last_close_sha256",
+                "ledger tip does not match the final round entry",
+            ));
+        }
+        Ok(())
     }
 
     pub fn append(
@@ -631,6 +721,7 @@ impl RoundLedger {
         plan: &RoundPlan,
         close: &RoundCloseReceipt,
     ) -> Result<ValidatedRoundSummary, RoundContractError> {
+        self.validate_integrity()?;
         plan.validate_integrity()?;
         if plan.round_index != self.next_round_index {
             return Err(RoundContractError::new(
@@ -653,17 +744,28 @@ impl RoundLedger {
         }
         let summary = close.validate_against(plan)?;
         let close_digest = close.digest()?;
+        let entry = RoundLedgerEntry {
+            round_id: plan.round_id.clone(),
+            round_index: plan.round_index,
+            parent_close_sha256: plan.parent_close_sha256.clone(),
+            plan_sha256: plan.plan_sha256.clone(),
+            close_sha256: close_digest.clone(),
+            action_count: summary.action_count as u64,
+            charged_budget_units: summary.charged_budget_units,
+        };
         self.total_action_count = self
             .total_action_count
-            .checked_add(summary.action_count as u64)
+            .checked_add(entry.action_count)
             .ok_or_else(|| RoundContractError::new("total_action_count", "overflow"))?;
         self.total_charged_budget_units = self
             .total_charged_budget_units
-            .checked_add(summary.charged_budget_units)
+            .checked_add(entry.charged_budget_units)
             .ok_or_else(|| RoundContractError::new("total_charged_budget_units", "overflow"))?;
         self.closed_round_ids.insert(plan.round_id.clone());
+        self.entries.push(entry);
         self.last_close_sha256 = Some(close_digest);
         self.next_round_index += 1;
+        self.validate_integrity()?;
         Ok(summary)
     }
 }
