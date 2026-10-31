@@ -219,11 +219,11 @@ These are targets, not measured results:
 5. Scalar analytical controls converge to tolerance under integration step refinement.
 6. Delay-conditioned recall and interference curves are published for every preregistered delay.
 7. Online adaptation reports detection, recovery, regret, false alarms, and old-regime retention.
-6. Any memory reduction includes persistent and peak bytes, all intermediate buffers, and read/write traffic.
-7. Energy claims use calibrated hardware measurement and disclose the full boundary; simulator estimates are not hardware measurements.
-8. Improvement claims are supported on held-out source families and state all Pareto gains and regressions.
-9. Null tasks visibly expose cases where simpler baselines are superior.
-10. No production behavior changes until exact-head build/tests, independent numerical controls, and matched baselines pass.
+8. Any memory reduction includes persistent and peak bytes, all intermediate buffers, and read/write traffic.
+9. Energy claims use calibrated hardware measurement and disclose the full boundary; simulator estimates are not hardware measurements.
+10. Improvement claims are supported on held-out source families and state all Pareto gains and regressions.
+11. Null tasks visibly expose cases where simpler baselines are superior.
+12. No production behavior changes until exact-head build/tests, independent numerical controls, and matched baselines pass.
 
 ## 10. Execution ladder
 
@@ -249,7 +249,7 @@ These commands are a runbook, not evidence that checks have passed.
 
 ## 11. Evidence and claim boundary
 
-The repository contains a standalone Rust research crate under research/temporal-bench (using the standard sha2 crate, not a dependency-free implementation). Prototype generators and task/oracle verifiers are authored for all nine task families:
+The repository contains a standalone Rust research crate under research/temporal-bench (using the standard sha2 crate, not a dependency-free implementation). Prototype generators and task/oracle verifiers are authored for all ten task families:
 - a delayed-cue generator with controlled key similarity and distractor interference;
 - a multi-timescale forecasting/change-point generator with hidden periods/phases, a hidden middle-third regime boundary, delayed online feedback, and labels recomputed by the verifier from the hidden process;
 - a DMS generator/verifier matching the pinned eight-direction task timing and population-tuned spike input;
@@ -264,6 +264,6 @@ The repository contains a standalone Rust research crate under research/temporal
 
 Seed-bound replay checks regenerate expected tasks and oracles from evaluator-held seed/configuration and reject recommitted but seed-inconsistent event streams. The seed/configuration remains evaluator-owned and is not given to the candidate. These checks improve reproducibility; they are not a cryptographic security boundary.
 
-The public task and oracle are still returned together in one process. The confirmatory oracle is **not yet sealed by process or permission isolation**; there is no candidate sandbox, evaluator-owned signature, replay-resistant receipt, or secure taskgen/evaluator runner. **144 Rust unit tests are authored but unrun** in this environment; cargo, rustc, and rustfmt are unavailable here.
+The public task and oracle are still returned together in one process. The confirmatory oracle is **not yet sealed by process or permission isolation**; there is no candidate sandbox, evaluator-owned signature, replay-resistant receipt, or secure taskgen/evaluator runner. **163 Rust unit tests are authored but unrun** in this environment; cargo, rustc, and rustfmt are unavailable here.
 
-No dataset adapter, baseline training run, model comparison, hardware measurement, or energy result has been executed. The nine synthetic/reference-task generators are authored, but burst-cluster T1 and sinusoidal/frequency-sweep T7 extensions remain open. The evaluator runner, real-dataset adapters, independent process isolation, signed receipts, benchmark execution, system measurements, and energy result are not yet included. A passing benchmark would establish a result only for the declared tasks, splits, model versions, and hardware. It would not establish consciousness, general intelligence, universal superiority, or neuromorphic hardware efficiency if measured only on conventional CPU/GPU execution.
+No dataset adapter, baseline training run, model comparison, hardware measurement, or energy result has been executed. The ten synthetic/reference-task generators are authored, but burst-cluster T1 and sinusoidal/frequency-sweep T7 extensions remain open. The optional OAKS external dataset adapter is specified but not implemented. The evaluator runner, real-dataset adapters, independent process isolation, signed receipts, benchmark execution, system measurements, and energy result are not yet included. A passing benchmark would establish a result only for the declared tasks, splits, model versions, and hardware. It would not establish consciousness, general intelligence, universal superiority, or neuromorphic hardware efficiency if measured only on conventional CPU/GPU execution.
