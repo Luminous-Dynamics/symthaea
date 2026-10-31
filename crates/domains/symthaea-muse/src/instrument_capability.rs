@@ -14,7 +14,9 @@
 //! it does not itself hash external asset bytes or replace the source inventory,
 //! rights registry, render probe or independent qualification runner.
 
+use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 use crate::instrument_ontology::instrument_descriptors;
 
@@ -85,13 +87,66 @@ pub struct CapabilityProof {
     pub receipt_sha256: String,
     /// Source/model/rights manifest digest for the evidence inputs.
     pub source_manifest_sha256: String,
-    /// Independent verifier implementation/build digest.
+    /// Independent verifier implementation/build digest. Must match the
+    /// build pinned for `verifier_key_id` in the application trust policy.
     pub independent_verifier_sha256: String,
     /// Must equal the renderer build requested by the capability cell.
     pub renderer_build_sha256: String,
     /// Required for sample-backed or hybrid realization; optional for a
     /// purely procedural synthesis model.
     pub asset_sha256: Option<String>,
+    /// Identifier of the trusted verifier key that signed this exact claim.
+    pub verifier_key_id: String,
+    /// Ed25519 signature over `capability_attestation_message`, hex-encoded.
+    pub attestation_signature_hex: String,
+}
+
+/// One verifier public key pinned by application configuration. The key is
+/// bound to one verifier build digest so a signature cannot claim evidence
+/// produced by a different, unqualified executable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TrustedCapabilityVerifier {
+    pub key_id: String,
+    pub public_key: [u8; 32],
+    pub verifier_build_sha256: String,
+}
+
+/// Trust roots for capability qualification. Construct this from keys pinned
+/// by the application/release policy, never from the capability evidence
+/// bundle being checked. An empty store cannot promote any evidence to
+/// Supported or Unsupported.
+#[derive(Debug, Clone, Default)]
+pub struct CapabilityTrustStore {
+    verifiers: BTreeMap<String, TrustedCapabilityVerifier>,
+}
+
+impl CapabilityTrustStore {
+    pub fn new(
+        verifiers: impl IntoIterator<Item = TrustedCapabilityVerifier>,
+    ) -> Result<Self, String> {
+        let mut store = Self::default();
+        for verifier in verifiers {
+            if !nonempty(&verifier.key_id) {
+                return Err("trusted verifier key_id must be non-empty".into());
+            }
+            if !valid_sha256(&verifier.verifier_build_sha256) {
+                return Err(format!(
+                    "trusted verifier {} has an invalid build SHA-256",
+                    verifier.key_id
+                ));
+            }
+            VerifyingKey::from_bytes(&verifier.public_key)
+                .map_err(|_| format!("trusted verifier {} has an invalid Ed25519 public key", verifier.key_id))?;
+            if store.verifiers.insert(verifier.key_id.clone(), verifier).is_some() {
+                return Err("duplicate trusted verifier key_id".into());
+            }
+        }
+        Ok(store)
+    }
+
+    fn verifier(&self, key_id: &str) -> Option<&TrustedCapabilityVerifier> {
+        self.verifiers.get(key_id)
+    }
 }
 
 /// One immutable cell in the instrument × setup × technique × articulation ×
@@ -104,6 +159,51 @@ pub struct CapabilityEvidenceCell {
     pub reason: Option<String>,
     /// Qualified and Unsupported outcomes both require auditable proof.
     pub proof: Option<CapabilityProof>,
+}
+
+#[derive(Serialize)]
+struct CapabilityAttestationPayload<'a> {
+    domain: &'static str,
+    schema_version: u16,
+    request: &'a CapabilityRequest,
+    outcome: CapabilityEvidenceOutcome,
+    reason: Option<&'a str>,
+    receipt_sha256: &'a str,
+    source_manifest_sha256: &'a str,
+    independent_verifier_sha256: &'a str,
+    renderer_build_sha256: &'a str,
+    asset_sha256: Option<&'a str>,
+    verifier_key_id: &'a str,
+}
+
+/// Canonical message signed by the independent capability verifier. It binds
+/// every decision-relevant field, including the exact request and whether the
+/// verifier concluded Qualified or Unsupported. Keep struct field order and
+/// schema version stable; any change requires a schema-version increment.
+pub fn capability_attestation_message(
+    cell: &CapabilityEvidenceCell,
+) -> Result<Vec<u8>, String> {
+    let Some(proof) = &cell.proof else {
+        return Err("capability cell has no proof to attest".into());
+    };
+    if cell.outcome == CapabilityEvidenceOutcome::NotEvaluated {
+        return Err("NotEvaluated cells cannot carry a capability attestation".into());
+    }
+    let payload = CapabilityAttestationPayload {
+        domain: "luminous-dynamics/muse-instrument-capability",
+        schema_version: 1,
+        request: &cell.request,
+        outcome: cell.outcome,
+        reason: cell.reason.as_deref(),
+        receipt_sha256: &proof.receipt_sha256,
+        source_manifest_sha256: &proof.source_manifest_sha256,
+        independent_verifier_sha256: &proof.independent_verifier_sha256,
+        renderer_build_sha256: &proof.renderer_build_sha256,
+        asset_sha256: proof.asset_sha256.as_deref(),
+        verifier_key_id: &proof.verifier_key_id,
+    };
+    serde_json::to_vec(&payload)
+        .map_err(|error| format!("failed to serialize capability attestation: {error}"))
 }
 
 /// Decision returned to the composer/arranger. Unknown is not Supported;
@@ -159,10 +259,25 @@ fn validate_request(request: &CapabilityRequest) -> Result<(), String> {
     Ok(())
 }
 
+fn decode_signature_hex(value: &str) -> Result<[u8; 64], String> {
+    if value.len() != 128 {
+        return Err("attestation_signature_hex must encode exactly 64 bytes".into());
+    }
+    let mut signature = [0u8; 64];
+    for (index, byte) in signature.iter_mut().enumerate() {
+        let start = index * 2;
+        *byte = u8::from_str_radix(&value[start..start + 2], 16)
+            .map_err(|_| "attestation_signature_hex contains non-hexadecimal data".to_string())?;
+    }
+    Ok(signature)
+}
+
 fn validate_proof(
-    request: &CapabilityRequest,
-    proof: &CapabilityProof,
+    cell: &CapabilityEvidenceCell,
+    trust_store: &CapabilityTrustStore,
 ) -> Result<(), String> {
+    let request = &cell.request;
+    let proof = cell.proof.as_ref().ok_or_else(|| "capability cell is missing its proof".to_string())?;
     for (field, value) in [
         ("receipt_sha256", proof.receipt_sha256.as_str()),
         ("source_manifest_sha256", proof.source_manifest_sha256.as_str()),
@@ -179,6 +294,9 @@ fn validate_proof(
     if proof.renderer_build_sha256 != request.renderer_build_sha256 {
         return Err("proof renderer build does not match the exact requested renderer build".into());
     }
+    if !nonempty(&proof.verifier_key_id) {
+        return Err("verifier_key_id must be non-empty".into());
+    }
     if let Some(asset_sha256) = &proof.asset_sha256 {
         if !valid_sha256(asset_sha256) {
             return Err("asset_sha256 must be a 64-character hexadecimal SHA-256 digest".into());
@@ -191,14 +309,29 @@ fn validate_proof(
     {
         return Err("sample-backed and hybrid capability cells require an immutable asset SHA-256".into());
     }
+
+    let trusted = trust_store.verifier(&proof.verifier_key_id).ok_or_else(|| {
+        format!("verifier key {} is not pinned by the application trust policy", proof.verifier_key_id)
+    })?;
+    if proof.independent_verifier_sha256 != trusted.verifier_build_sha256 {
+        return Err("independent verifier build does not match the build pinned for this trusted key".into());
+    }
+    let public_key = VerifyingKey::from_bytes(&trusted.public_key)
+        .map_err(|_| "pinned verifier public key is invalid".to_string())?;
+    let signature_bytes = decode_signature_hex(&proof.attestation_signature_hex)?;
+    let signature = Signature::from_bytes(&signature_bytes);
+    let message = capability_attestation_message(cell)?;
+    public_key
+        .verify_strict(&message, &signature)
+        .map_err(|_| "capability attestation signature is invalid for this exact cell".to_string())?;
     Ok(())
 }
 
 /// Resolve a request against immutable evidence cells.
 ///
 /// - No exact cell: `Unknown`.
-/// - One well-formed qualified cell: `Supported`.
-/// - One well-formed negative cell: `Unsupported`.
+/// - One exact cell with a valid attestation from a verifier key pinned in
+///   the supplied application trust store: `Supported` or `Unsupported`.
 /// - Duplicate exact cells or malformed/conflicting receipts:
 ///   `InvalidEvidence`.
 ///
@@ -207,6 +340,7 @@ fn validate_proof(
 pub fn resolve_capability(
     request: &CapabilityRequest,
     cells: &[CapabilityEvidenceCell],
+    trust_store: &CapabilityTrustStore,
 ) -> CapabilityDecision {
     if let Err(reason) = validate_request(request) {
         return CapabilityDecision::InvalidEvidence { reason };
@@ -252,7 +386,7 @@ pub fn resolve_capability(
                     reason: "Qualified capability cell is missing its proof receipt".into(),
                 };
             };
-            match validate_proof(request, proof) {
+            match validate_proof(cell, trust_store) {
                 Ok(()) => CapabilityDecision::Supported {
                     receipt_sha256: proof.receipt_sha256.clone(),
                 },
@@ -270,7 +404,7 @@ pub fn resolve_capability(
                     reason: "Unsupported capability cell requires a verifier-backed receipt".into(),
                 };
             };
-            match validate_proof(request, proof) {
+            match validate_proof(cell, trust_store) {
                 Ok(()) => CapabilityDecision::Unsupported {
                     reason,
                     receipt_sha256: proof.receipt_sha256.clone(),
