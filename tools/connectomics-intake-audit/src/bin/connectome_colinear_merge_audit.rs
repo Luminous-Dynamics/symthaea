@@ -909,6 +909,8 @@ mod tests {
         let input: Input = serde_json::from_slice(input_bytes).expect("profile fixture should parse");
         let report = run(&input, input_bytes, Some(truth_bytes), 500.0).expect("boundaries should evaluate");
         assert_eq!(report.input_sha256, "e1cef74eb7d37866320e6d8ad93d1d030c4c6d99fd411e3dc8cc277ad83b82fb");
+        assert!(report.physical_resampling.is_empty(), "legacy fixture without physical settings must remain V1-only");
+        assert_eq!(report.method_reports.len(), 3, "V1 baseline method set must remain unchanged");
         let no_proposal = report.method_reports[0].evaluation.as_ref().unwrap();
         let radius = report.method_reports[1].evaluation.as_ref().unwrap();
         let multi = report.method_reports[2].evaluation.as_ref().unwrap();
