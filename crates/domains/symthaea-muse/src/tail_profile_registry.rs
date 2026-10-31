@@ -1307,6 +1307,50 @@ mod tests {
     }
 
     #[test]
+    fn recomputed_statistics_reject_a_resigned_but_forged_guard() {
+        let key = signing_key();
+        let attestation = topology_attestation("profile-publisher-v1", &key);
+        let mut profile = signed_test_profile(context(&attestation), "profile-publisher-v1", &key);
+        profile.statistics.guard_frames += 1;
+        let changed_digest = profile_digest(&profile).unwrap();
+        profile.profile_sha256 = changed_digest.clone();
+        profile.signature_ed25519_hex =
+            hex_encode(key.sign(changed_digest.as_bytes()).to_bytes().as_ref());
+        let mut authorities = BTreeMap::new();
+        authorities.insert(
+            "profile-publisher-v1".to_owned(),
+            authority("profile-publisher-v1", &key),
+        );
+        assert_eq!(
+            verify_tail_profile(&profile, &authorities).unwrap_err(),
+            TailProfileError::ProfileReceiptInvalid
+        );
+    }
+
+    #[test]
+    fn event_observation_tampering_is_detected_even_after_resigning_profile() {
+        let key = signing_key();
+        let attestation = topology_attestation("profile-publisher-v1", &key);
+        let mut profile = signed_test_profile(context(&attestation), "profile-publisher-v1", &key);
+        profile.event_observations[0].raw_measured_end_frame = Some(221);
+        profile.event_evidence_set_sha256 = event_set_digest(&profile.event_observations);
+        profile.lineage_summaries = lineage_summaries(&profile.event_observations).unwrap();
+        let changed_digest = profile_digest(&profile).unwrap();
+        profile.profile_sha256 = changed_digest.clone();
+        profile.signature_ed25519_hex =
+            hex_encode(key.sign(changed_digest.as_bytes()).to_bytes().as_ref());
+        let mut authorities = BTreeMap::new();
+        authorities.insert(
+            "profile-publisher-v1".to_owned(),
+            authority("profile-publisher-v1", &key),
+        );
+        assert_eq!(
+            verify_tail_profile(&profile, &authorities).unwrap_err(),
+            TailProfileError::ProfileReceiptInvalid
+        );
+    }
+
+    #[test]
     fn modified_profile_signature_or_context_cannot_resolve() {
         let key = signing_key();
         let authority = authority("profile-publisher-v1", &key);
