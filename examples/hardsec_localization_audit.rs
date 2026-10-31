@@ -402,23 +402,44 @@ fn audit_values(
         if status != "retained" && reason.trim().is_empty() {
             return Err(format!("{ctx}.reason is required for non-retained path status"));
         }
-        check_path_edges(&path_id, &edge_ids, &edges, status == "retained")?;
-        let matched = if status == "retained" {
-            match oracle_paths.get(&path_id) {
-                Some(expected) if expected == &edge_ids => {
-                    path_matches.insert(path_id.clone());
-                    true
+        let all_edges_present = edge_ids.iter().all(|edge_id| edges.contains_key(edge_id));
+        let structurally_continuous = all_edges_present
+            && check_path_edges(&path_id, &edge_ids, &edges, false).is_ok();
+        let matched = match status {
+            "retained" => {
+                check_path_edges(&path_id, &edge_ids, &edges, true)?;
+                match oracle_paths.get(&path_id) {
+                    Some(expected) if expected == &edge_ids => {
+                        path_matches.insert(path_id.clone());
+                        true
+                    }
+                    Some(_) => return Err(format!("retained path {path_id} differs from the oracle edge sequence")),
+                    None => return Err(format!("retained path {path_id} is absent from the evaluator oracle")),
                 }
-                Some(_) => return Err(format!("retained path {path_id} differs from the oracle edge sequence")),
-                None => return Err(format!("retained path {path_id} is absent from the evaluator oracle")),
             }
-        } else {
-            false
+            "cut_and_reported" => {
+                if !structurally_continuous || edge_ids.is_empty() {
+                    return Err(format!("cut_and_reported path {path_id} must list a non-empty continuous source-edge segment"));
+                }
+                false
+            }
+            "unknown" => false,
+            "contradicted" => {
+                if let Some(expected) = oracle_paths.get(&path_id) {
+                    if expected == &edge_ids {
+                        return Err(format!("path {path_id} is marked contradicted but exactly matches the evaluator oracle"));
+                    }
+                }
+                false
+            }
+            _ => return Err(format!("unsupported path status {status}")),
         };
         path_reports.push(json!({
             "path_id": path_id,
             "status": status,
             "oracle_match": matched,
+            "all_source_edges_present": all_edges_present,
+            "structurally_continuous": structurally_continuous,
             "edge_count": edge_ids.len(),
             "reason": reason
         }));
