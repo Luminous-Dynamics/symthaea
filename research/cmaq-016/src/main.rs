@@ -6,6 +6,8 @@ const BASE_SEED: u64 = 0xC0A9_0016_2026_1031;
 const POCKET_CENTER: f64 = 0.72;
 const POCKET_WIDTH: f64 = 0.018;
 const POCKET_AMPLITUDE: f64 = 0.65;
+// The five synthetic heads have separate error pockets. This is an explicit
+// mechanism ablation, not a claim that learned ensemble heads are independent.
 const ENSEMBLE_CENTERS: [f64; 5] = [0.56, 0.64, 0.72, 0.80, 0.88];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -52,6 +54,21 @@ impl Policy {
             Self::Oracle => "oracle",
         }
     }
+
+    fn uses_model(self) -> bool {
+        matches!(
+            self,
+            Self::RandomSearch | Self::AdaptiveCem | Self::PessimisticEnsembleCem
+        )
+    }
+
+    fn model_heads_per_candidate(self) -> usize {
+        match self {
+            Self::PessimisticEnsembleCem => ENSEMBLE_CENTERS.len(),
+            Self::RandomSearch | Self::AdaptiveCem => 1,
+            Self::DirectPolicy | Self::Oracle => 0,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -87,10 +104,10 @@ impl SplitMix64 {
 struct EpisodeResult {
     action: f64,
     true_return: f64,
-    predicted_return: f64,
-    optimizer_optimism_gap: f64,
-    selected_action_error: f64,
+    selected_model_score: Option<f64>,
+    optimizer_optimism_gap: Option<f64>,
     candidate_queries: usize,
+    model_head_evaluations: usize,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -99,13 +116,13 @@ struct Summary {
     candidate_budget: usize,
     policy: &'static str,
     mean_true_return: f64,
-    mean_reference_model_return: f64,
+    mean_selected_model_score: Option<f64>,
     mean_candidate_queries_per_episode: f64,
-    mean_optimizer_optimism_gap: f64,
+    mean_model_head_evaluations_per_episode: f64,
+    mean_optimizer_optimism_gap: Option<f64>,
     mean_selected_action_regret: f64,
     selected_pocket_rate: f64,
-    mean_selected_action_error: f64,
-    uniform_grid_prediction_mse: f64,
+    uniform_grid_point_model_mse: f64,
 }
 
 fn true_return(action: f64) -> f64 {
@@ -150,8 +167,8 @@ fn model_head_prediction(
 }
 
 fn reference_model_prediction(scenario: Scenario, action: f64, seed: u64) -> f64 {
-    // The point-predictor baseline uses the central head. Other heads are
-    // reserved for the explicitly pessimistic ensemble arm.
+    // The point-predictor baseline uses the central synthetic head. Other
+    // heads exist solely for the pessimistic-ensemble comparator.
     model_head_prediction(scenario, action, seed, 2)
 }
 
@@ -161,20 +178,13 @@ fn pessimistic_model_prediction(scenario: Scenario, action: f64, seed: u64) -> f
         .fold(f64::INFINITY, f64::min)
 }
 
-fn policy_score(
-    scenario: Scenario,
-    policy: Policy,
-    action: f64,
-    episode_seed: u64,
-) -> f64 {
+fn policy_score(scenario: Scenario, policy: Policy, action: f64, seed: u64) -> f64 {
     match policy {
-        Policy::PessimisticEnsembleCem => {
-            pessimistic_model_prediction(scenario, action, episode_seed)
+        Policy::PessimisticEnsembleCem => pessimistic_model_prediction(scenario, action, seed),
+        Policy::RandomSearch | Policy::AdaptiveCem => {
+            reference_model_prediction(scenario, action, seed)
         }
-        Policy::Oracle => true_return(action),
-        Policy::DirectPolicy | Policy::RandomSearch | Policy::AdaptiveCem => {
-            reference_model_prediction(scenario, action, episode_seed)
-        }
+        Policy::DirectPolicy | Policy::Oracle => true_return(action),
     }
 }
 
@@ -194,9 +204,9 @@ fn optimize(
             ^ (policy as u64).wrapping_mul(0xA076_1D64_78BD_642F),
     );
 
-    let action = match policy {
-        Policy::DirectPolicy => -0.20,
-        Policy::Oracle => 0.20,
+    let (action, selected_model_score) = match policy {
+        Policy::DirectPolicy => (-0.20, None),
+        Policy::Oracle => (0.20, None),
         Policy::RandomSearch => {
             let mut best_action = 0.0;
             let mut best_score = f64::NEG_INFINITY;
@@ -208,7 +218,7 @@ fn optimize(
                     best_action = candidate;
                 }
             }
-            best_action
+            (best_action, Some(best_score))
         }
         Policy::AdaptiveCem | Policy::PessimisticEnsembleCem => {
             cem_search(scenario, policy, candidate_budget, episode_seed, &mut rng)
@@ -216,22 +226,13 @@ fn optimize(
     };
 
     let actual = true_return(action);
-    let predicted = match policy {
-        Policy::DirectPolicy => actual,
-        Policy::Oracle => actual,
-        _ => reference_model_prediction(scenario, action, episode_seed),
-    };
-
     EpisodeResult {
         action,
         true_return: actual,
-        predicted_return: predicted,
-        optimizer_optimism_gap: predicted - actual,
-        selected_action_error: predicted - actual,
-        candidate_queries: match policy {
-            Policy::DirectPolicy | Policy::Oracle => 0,
-            _ => candidate_budget,
-        },
+        selected_model_score,
+        optimizer_optimism_gap: selected_model_score.map(|score| score - actual),
+        candidate_queries: if policy.uses_model() { candidate_budget } else { 0 },
+        model_head_evaluations: candidate_budget * policy.model_heads_per_candidate(),
     }
 }
 
@@ -241,14 +242,16 @@ fn cem_search(
     candidate_budget: usize,
     episode_seed: u64,
     rng: &mut SplitMix64,
-) -> f64 {
+) -> (f64, Option<f64>) {
     let rounds = 3usize;
     let base_per_round = candidate_budget / rounds;
     let remainder = candidate_budget % rounds;
     let mut mean = -0.15;
     let mut std_dev = 0.72;
+    // No uncounted model query is made at initialization: every score below
+    // corresponds to one declared candidate sequence evaluation.
     let mut best_action = mean;
-    let mut best_score = policy_score(scenario, policy, best_action, episode_seed);
+    let mut best_score = f64::NEG_INFINITY;
 
     for round in 0..rounds {
         let count = base_per_round + (round < remainder) as usize;
@@ -270,8 +273,8 @@ fn cem_search(
         candidates.sort_by(|left, right| right.1.total_cmp(&left.1));
         let elite_count = (count / 5).max(1).min(candidates.len());
         let elite = &candidates[..elite_count];
-        let elite_mean = elite.iter().map(|(action, _)| *action).sum::<f64>()
-            / elite_count as f64;
+        let elite_mean =
+            elite.iter().map(|(action, _)| *action).sum::<f64>() / elite_count as f64;
         let variance = elite
             .iter()
             .map(|(action, _)| (*action - elite_mean).powi(2))
@@ -281,10 +284,10 @@ fn cem_search(
         std_dev = (variance.sqrt() * 1.25).clamp(0.02, 0.72);
     }
 
-    best_action
+    (best_action, Some(best_score))
 }
 
-fn uniform_grid_prediction_mse(scenario: Scenario, seed: u64) -> f64 {
+fn uniform_grid_point_model_mse(scenario: Scenario, seed: u64) -> f64 {
     let points = 201usize;
     (0..points)
         .map(|index| {
@@ -296,37 +299,50 @@ fn uniform_grid_prediction_mse(scenario: Scenario, seed: u64) -> f64 {
         / points as f64
 }
 
-fn summarize(
-    scenario: Scenario,
-    candidate_budget: usize,
-    policy: Policy,
-) -> Summary {
+fn summarize(scenario: Scenario, candidate_budget: usize, policy: Policy) -> Summary {
     let mut actual_sum = 0.0;
-    let mut predicted_sum = 0.0;
-    let mut query_sum = 0usize;
-    let mut optimism_sum = 0.0;
+    let mut model_score_sum = 0.0;
+    let mut candidate_query_sum = 0usize;
+    let mut head_evaluation_sum = 0usize;
+    let mut optimism_gap_sum = 0.0;
+    let mut model_score_count = 0usize;
     let mut regret_sum = 0.0;
     let mut pocket_count = 0usize;
-    let mut error_sum = 0.0;
     let mut mse_sum = 0.0;
 
     for episode in 0..EPISODES {
         let episode_seed = BASE_SEED ^ (episode as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
         let result = optimize(scenario, policy, candidate_budget, episode_seed);
         actual_sum += result.true_return;
-        predicted_sum += result.predicted_return;
-        query_sum += result.candidate_queries;
-        optimism_sum += result.optimizer_optimism_gap;
+        candidate_query_sum += result.candidate_queries;
+        head_evaluation_sum += result.model_head_evaluations;
         regret_sum += 1.0 - result.true_return;
-        error_sum += result.selected_action_error;
-        mse_sum += uniform_grid_prediction_mse(scenario, episode_seed);
+        mse_sum += uniform_grid_point_model_mse(scenario, episode_seed);
 
-        if scenario == Scenario::NarrowOptimismPocket
-            && (result.action - POCKET_CENTER).abs() <= 0.045
-        {
+        if let Some(score) = result.selected_model_score {
+            model_score_sum += score;
+            model_score_count += 1;
+        }
+        if let Some(gap) = result.optimizer_optimism_gap {
+            optimism_gap_sum += gap;
+        }
+
+        let pocket_hit = if policy == Policy::PessimisticEnsembleCem {
+            ENSEMBLE_CENTERS
+                .iter()
+                .any(|center| (result.action - center).abs() <= 0.045)
+        } else {
+            (result.action - POCKET_CENTER).abs() <= 0.045
+        };
+        if scenario == Scenario::NarrowOptimismPocket && pocket_hit {
             pocket_count += 1;
         }
+
         debug_assert!(result.candidate_queries <= candidate_budget);
+        debug_assert_eq!(
+            result.model_head_evaluations,
+            candidate_budget * policy.model_heads_per_candidate()
+        );
     }
 
     let denominator = EPISODES as f64;
@@ -335,13 +351,22 @@ fn summarize(
         candidate_budget,
         policy: policy.name(),
         mean_true_return: actual_sum / denominator,
-        mean_reference_model_return: predicted_sum / denominator,
-        mean_candidate_queries_per_episode: query_sum as f64 / denominator,
-        mean_optimizer_optimism_gap: optimism_sum / denominator,
+        mean_selected_model_score: (model_score_count > 0)
+            .then(|| model_score_sum / model_score_count as f64),
+        mean_candidate_queries_per_episode: candidate_query_sum as f64 / denominator,
+        mean_model_head_evaluations_per_episode: head_evaluation_sum as f64 / denominator,
+        mean_optimizer_optimism_gap: (model_score_count > 0)
+            .then(|| optimism_gap_sum / model_score_count as f64),
         mean_selected_action_regret: regret_sum / denominator,
         selected_pocket_rate: pocket_count as f64 / denominator,
-        mean_selected_action_error: error_sum / denominator,
-        uniform_grid_prediction_mse: mse_sum / denominator,
+        uniform_grid_point_model_mse: mse_sum / denominator,
+    }
+}
+
+fn write_optional_number(output: &mut String, value: Option<f64>) {
+    match value {
+        Some(number) => write!(output, "{number:.9}").expect("writing to String cannot fail"),
+        None => output.push_str("null"),
     }
 }
 
@@ -365,7 +390,7 @@ fn render_report() -> String {
     )
     .expect("writing to String cannot fail");
     output.push_str(
-        "\"candidate_budgets\":[8,32,128,512],         \"scenarios\":[\"benign_iid_noise\",\"narrow_optimism_pocket\"],         \"policies\":[\"direct_policy\",\"random_search\",\"adaptive_cem\",\"pessimistic_ensemble_cem\",\"oracle\"],         \"summary\":[",
+        "\"candidate_budgets\":[8,32,128,512],\"scenarios\":[\"benign_iid_noise\",\"narrow_optimism_pocket\"],\"policies\":[\"direct_policy\",\"random_search\",\"adaptive_cem\",\"pessimistic_ensemble_cem\",\"oracle\"],\"summary\":[",
     );
 
     for (index, row) in summaries.iter().enumerate() {
@@ -374,18 +399,25 @@ fn render_report() -> String {
         }
         write!(
             &mut output,
-            "{{\"scenario\":\"{}\",\"candidate_budget\":{},\"policy\":\"{}\",             \"mean_true_return\":{:.9},\"mean_reference_model_return\":{:.9},\"mean_candidate_queries_per_episode\":{:.3},             \"mean_optimizer_optimism_gap\":{:.9},\"mean_selected_action_regret\":{:.9},             \"selected_pocket_rate\":{:.9},\"mean_selected_action_error\":{:.9},             \"uniform_grid_prediction_mse\":{:.9}}}",
-            row.scenario,
-            row.candidate_budget,
-            row.policy,
-            row.mean_true_return,
-            row.mean_reference_model_return,
-            row.mean_candidate_queries_per_episode,
-            row.mean_optimizer_optimism_gap,
+            "{{\"scenario\":\"{}\",\"candidate_budget\":{},\"policy\":\"{}\",\"mean_true_return\":{:.9},\"mean_selected_model_score\":",
+            row.scenario, row.candidate_budget, row.policy, row.mean_true_return
+        )
+        .expect("writing to String cannot fail");
+        write_optional_number(&mut output, row.mean_selected_model_score);
+        output.push_str(",\"mean_candidate_queries_per_episode\":");
+        write!(
+            &mut output,
+            "{:.3},\"mean_model_head_evaluations_per_episode\":{:.3},\"mean_optimizer_optimism_gap\":",
+            row.mean_candidate_queries_per_episode, row.mean_model_head_evaluations_per_episode
+        )
+        .expect("writing to String cannot fail");
+        write_optional_number(&mut output, row.mean_optimizer_optimism_gap);
+        write!(
+            &mut output,
+            ",\"mean_selected_action_regret\":{:.9},\"selected_pocket_rate\":{:.9},\"uniform_grid_point_model_mse\":{:.9}}}",
             row.mean_selected_action_regret,
             row.selected_pocket_rate,
-            row.mean_selected_action_error,
-            row.uniform_grid_prediction_mse
+            row.uniform_grid_point_model_mse
         )
         .expect("writing to String cannot fail");
     }
@@ -427,56 +459,37 @@ mod tests {
 
     #[test]
     fn pessimistic_minimum_suppresses_a_single_head_pocket() {
-        let optimistic = reference_model_prediction(
-            Scenario::NarrowOptimismPocket,
-            POCKET_CENTER,
-            BASE_SEED,
-        );
-        let pessimistic = pessimistic_model_prediction(
-            Scenario::NarrowOptimismPocket,
-            POCKET_CENTER,
-            BASE_SEED,
-        );
+        let optimistic =
+            reference_model_prediction(Scenario::NarrowOptimismPocket, POCKET_CENTER, BASE_SEED);
+        let pessimistic =
+            pessimistic_model_prediction(Scenario::NarrowOptimismPocket, POCKET_CENTER, BASE_SEED);
         assert!(pessimistic < optimistic);
         assert!(pessimistic - true_return(POCKET_CENTER) < 0.02);
     }
 
     #[test]
-    fn query_budget_is_not_exceeded() {
+    fn query_and_head_evaluation_budgets_are_explicit() {
         for policy in Policy::ALL {
-            let result = optimize(
-                Scenario::NarrowOptimismPocket,
-                policy,
-                32,
-                BASE_SEED,
+            let result = optimize(Scenario::NarrowOptimismPocket, policy, 32, BASE_SEED);
+            assert_eq!(result.candidate_queries, if policy.uses_model() { 32 } else { 0 });
+            assert_eq!(
+                result.model_head_evaluations,
+                32 * policy.model_heads_per_candidate()
             );
-            assert!(result.candidate_queries <= 32);
         }
     }
 
     #[test]
     fn adaptive_search_exposes_the_narrow_optimism_pocket_as_budget_grows() {
-        let low = summarize(
-            Scenario::NarrowOptimismPocket,
-            8,
-            Policy::AdaptiveCem,
-        );
-        let high = summarize(
-            Scenario::NarrowOptimismPocket,
-            512,
-            Policy::AdaptiveCem,
-        );
+        let low = summarize(Scenario::NarrowOptimismPocket, 8, Policy::AdaptiveCem);
+        let high = summarize(Scenario::NarrowOptimismPocket, 512, Policy::AdaptiveCem);
         assert!(high.selected_pocket_rate > low.selected_pocket_rate);
         assert!(high.mean_true_return < low.mean_true_return);
     }
 
     #[test]
     fn pessimistic_ensemble_reduces_the_synthetic_exploit_gap() {
-        let greedy = summarize(
-            Scenario::NarrowOptimismPocket,
-            512,
-            Policy::AdaptiveCem,
-        );
+        let greedy = summarize(Scenario::NarrowOptimismPocket, 512, Policy::AdaptiveCem);
         let robust = summarize(
             Scenario::NarrowOptimismPocket,
             512,
@@ -503,18 +516,9 @@ mod tests {
 
     #[test]
     fn direct_policy_is_independent_of_model_error_lane() {
-        let benign = optimize(
-            Scenario::BenignIidNoise,
-            Policy::DirectPolicy,
-            128,
-            BASE_SEED,
-        );
-        let exploit = optimize(
-            Scenario::NarrowOptimismPocket,
-            Policy::DirectPolicy,
-            128,
-            BASE_SEED,
-        );
+        let benign = optimize(Scenario::BenignIidNoise, Policy::DirectPolicy, 128, BASE_SEED);
+        let exploit =
+            optimize(Scenario::NarrowOptimismPocket, Policy::DirectPolicy, 128, BASE_SEED);
         assert_eq!(benign.action, exploit.action);
         assert_eq!(benign.true_return, exploit.true_return);
     }
