@@ -771,3 +771,75 @@ Schemas:
 - schema/search-time-exposure-findings.schema.json
 - schema/search-time-exposure-findings-audit.schema.json
 
+
+
+## Four-component benchmark audit
+
+The module src/benchmark_components.rs adds an evidence-first contract for four benchmark components: User/Task, Environment, Ground Truth and Evaluation.
+
+This complements the existing contamination and causal-exposure lanes. A benchmark can be perfectly unexposed and still be invalid if its user request cannot be executed in the declared environment, its oracle does not match the task contract, or its grader does not check an explicit requirement.
+
+The design is informed by AgentSuite/COBA (ICML 2026), which audits User, Environment, Ground Truth and Evaluation interactions and reports F1 from 0.791 to 0.874 across six evaluated agent benchmarks. This module does not reproduce COBA's semantic detector or claim comparable accuracy.
+
+### Manifest contract
+
+BenchmarkComponentManifestV1 binds:
+- **User/Task:** exact instruction, goal, role, requirement ledger, capability requirements and prohibited capabilities.
+- **Environment:** immutable runtime image, initial-state fixture, tool manifest, setup/teardown receipts, provided capabilities, preconditions and nondeterminism policy.
+- **Ground Truth:** oracle, reference implementation, expected outcomes, provenance evidence and known limitations.
+- **Evaluation:** grader source/binary, rubric, metric definition, report schema, evaluator check IDs and aggregation policy.
+- Four typed interfaces: user-to-environment, environment-to-ground-truth, ground-truth-to-evaluation and evaluation-to-user.
+- Evaluator checks mapping requirement IDs and environment precondition IDs.
+- Reviewer findings with component, defect class, severity, evidence digest, reviewer identity commitment, attestation digest, review method and disposition.
+
+All artifacts and the exact manifest have domain-separated SHA-256 bindings. Raw prompts, expected answers, tool output and reviewer identities need not be serialized into the public report.
+
+### Requirement-to-check coverage
+
+Every explicit user requirement must be mapped to at least one evaluator check. Each requirement's environment preconditions must be declared in the environment and covered by a check that also covers that exact requirement/precondition pair.
+
+A check with no requirement mapping is an orphan check. A check or review finding that references an unknown requirement is rejected from qualification. A requirement that has no evaluator coverage remains in the report as uncovered; it is never silently dropped.
+
+The capability contract is also checked:
+- every user-required capability must be provided by the environment;
+- no user-prohibited capability may be exposed by the environment;
+- required and prohibited capability lists must contain unique nonempty IDs.
+
+### Audit command
+
+~~~sh
+cargo run --locked -- audit-benchmark-components \
+  /secure/evaluator/benchmark-component-manifest.json \
+  /secure/evaluator/benchmark-component-audit.json
+~~~
+
+Verify the emitted report independently:
+
+~~~sh
+cargo run --locked -- verify-benchmark-component-audit \
+  /secure/evaluator/benchmark-component-audit.json
+~~~
+
+Schemas:
+- schema/benchmark-component-manifest.schema.json
+- schema/benchmark-component-audit.schema.json
+
+### Reviewer evidence and claim ceiling
+
+Review findings can be proposed by deterministic rules, human review, model triage or external audit. Model-triage findings cannot self-assert human confirmation. A reviewer identity commitment and attestation digest are recorded, but this module does not authenticate signatures or reviewer authority.
+
+An unresolved blocker makes the structural audit invalid. Ambiguous/inferred requirements remain counted separately rather than being converted into explicit requirements by the auditor.
+
+The audit always emits:
+- reviewer_attestations_authenticated=false;
+- semantic_component_validity_verified=false;
+- qualified_for_confirmatory_use=false.
+
+A structurally valid report means only that the declared four-component artifacts and requirement/check mappings are internally consistent. It does not prove the user task is clear, environment realistic, ground truth correct, or grader fair.
+
+### Qualification targets and SOTA comparison
+
+The initial deterministic suite targets 100% rejection of injected missing/duplicate/stale/mismatched artifacts, 100% detection of uncovered explicit requirements and orphan checks, zero false blocker flags on clean synthetic controls, and byte-identical replay on identical inputs.
+
+External validity requires a blinded, human-adjudicated comparison on at least six diverse benchmarks. Report per-component/per-defect precision, recall, F1, macro-F1, reviewer agreement and confidence intervals. The proposed held-out macro-F1 target of 0.90 is a goal, not a result; the COBA range is a published comparator, not a directly comparable score until the same dataset and annotation protocol are used.
+
