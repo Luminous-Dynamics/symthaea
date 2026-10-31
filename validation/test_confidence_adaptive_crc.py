@@ -75,6 +75,51 @@ class ConfidenceAdaptiveCRCTests(unittest.TestCase):
                      for j in range(e.num_groups))
         self.assertEqual(e.state_count,int(expected))
 
+
+    def test_randomized_grouping_and_capping_parity(self):
+        rng=np.random.default_rng(20261031)
+        pairs=[(.02,.18),(.08,.40),(.14,.62),(.22,.85)]
+        for case in range(12):
+            n=int(rng.integers(4,8))
+            calibration=[]
+            for _ in range(n):
+                u,v=pairs[int(rng.integers(0,len(pairs)))]
+                error_type=int(rng.choice([1,2]))
+                calibration.append((u,v,error_type))
+            query=pairs[int(rng.integers(0,len(pairs)))]
+            alpha=float(rng.choice([.2,.25,.3,.4]))
+            grouped=ConfidenceAdaptiveCRC(calibration,query,alpha,
+                cap_breakpoints=True,group_duplicates=True)
+            ungrouped=ConfidenceAdaptiveCRC(calibration,query,alpha,
+                cap_breakpoints=True,group_duplicates=False)
+            grouped_table=dict(grouped.baseline_table)
+            ungrouped_table=dict(ungrouped.baseline_table)
+            for round_index in range(3):
+                for j,counts in grouped.states:
+                    check=grouped.expand_group_state_against_ungrouped(
+                        ungrouped,j,counts,grouped_table=grouped_table,
+                        ungrouped_table=ungrouped_table)
+                    self.assertTrue(check["match"],(case,round_index,j,counts,check))
+                self.assertTrue(grouped.validity_report(grouped_table)["valid"])
+                self.assertTrue(ungrouped.validity_report(ungrouped_table)["valid"])
+                if round_index<2:
+                    grouped_table=grouped.recertify_round(grouped_table)
+                    ungrouped_table=ungrouped.recertify_round(ungrouped_table)
+
+            capped=ConfidenceAdaptiveCRC(calibration,query,alpha,
+                cap_breakpoints=True,group_duplicates=False)
+            uncapped=ConfidenceAdaptiveCRC(calibration,query,alpha,
+                cap_breakpoints=False,group_duplicates=False)
+            capped_table=dict(capped.baseline_table)
+            uncapped_table=dict(uncapped.baseline_table)
+            for round_index in range(3):
+                for state in capped.states:
+                    self.assertAlmostEqual(capped_table[state],uncapped_table[state],
+                        places=10,msg=f"case={case}, round={round_index}, state={state}")
+                if round_index<2:
+                    capped_table=capped.recertify_round(capped_table)
+                    uncapped_table=uncapped.recertify_round(uncapped_table)
+
     def test_invalid_breakpoint_order_and_type_rejected(self):
         with self.assertRaises(ValueError):
             ConfidenceAdaptiveCRC([(.5,.2,1)],(.1,.3),.2)
