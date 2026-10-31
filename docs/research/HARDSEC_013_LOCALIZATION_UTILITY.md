@@ -42,6 +42,14 @@ Additional context must stay separate:
 
 These studies use different datasets, labels, units and protocols. Their numbers are not pooled, averaged, or presented as a common leaderboard.
 
+### 2.1 Additional GNN and industry assurance comparators
+
+A September 2026 *Microelectronics Journal* paper, “A unified graph neural network pipeline for hardware Trojan detection,” reports a two-layer GCN on 55 synthesized designs spanning the AES-T100–T2800 family and PIC16F84-T200. It reports 87.27% accuracy and ROC-AUC 0.9563 on its combined dataset, with saliency-guided subgraph localization assessed by node-level IoU. This is a relevant structural/localization baseline, not a transferable SOTA score: its 55-design/two-family setup must be re-evaluated under lineage-aware and source-held-out splits, matched review budgets, and the same independent path/equivalence oracles before any comparative claim. DOI: [10.1016/j.vlsi.2026.102775](https://doi.org/10.1016/j.vlsi.2026.102775).
+
+Industry assurance is broader than a detector leaderboard. NIST IR 8615 (published 1 September 2026) records priorities for interoperable evidence-based trust models, lifecycle provenance/traceability, supply-chain assurance and scalable continuous verification/validation: https://doi.org/10.6028/NIST.IR.8615. OpenTitan is a concrete open silicon Root-of-Trust comparator: its documented security model covers provisioning, secure boot, attestation, lifecycle, firmware update, chip identity and ownership transfer, while its penetration-testing framework targets FPGA and silicon implementations with side-channel and fault-injection testing: https://opentitan.org/book/doc/security/.
+
+The engineering opportunity is to make localization evidence consumable by this wider assurance chain—source-identified, path-bound, reproducible and explicit about unknowns—rather than claiming that an ML detector replaces formal verification, test, attestation, silicon validation or supply-chain controls.
+
 ## 3. Paradigm shift: an explanation is a falsifiable engineering claim
 
 Do not optimize for agreement between attribution methods or attractive saliency maps. Represent an explanation as a set of explicit claims:
