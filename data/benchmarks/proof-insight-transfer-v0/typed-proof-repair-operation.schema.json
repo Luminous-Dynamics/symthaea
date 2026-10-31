@@ -116,7 +116,6 @@
         "type": "string",
         "minLength": 1
       },
-      "minItems": 1,
       "uniqueItems": true
     },
     "declared_support": {
@@ -195,6 +194,9 @@
         "properties": {
           "lean_check": {
             "const": "passed"
+          },
+          "affected_node_ids": {
+            "minItems": 1
           }
         }
       }
@@ -213,7 +215,12 @@
       "then": {
         "required": [
           "rejection_code"
-        ]
+        ],
+        "properties": {
+          "affected_node_ids": {
+            "maxItems": 0
+          }
+        }
       }
     },
     {
@@ -231,6 +238,9 @@
         "properties": {
           "lean_check": {
             "const": "not_run"
+          },
+          "affected_node_ids": {
+            "maxItems": 0
           }
         }
       }
