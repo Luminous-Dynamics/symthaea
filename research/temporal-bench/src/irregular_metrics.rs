@@ -10,6 +10,9 @@
 //! 2026). Bandwidth is evaluator-supplied and must be preregistered. These are
 //! estimates, not exact integrals; publish MSE/MAE, CSE/CAE, bandwidth and ESS.
 
+use super::continuous_risk::{
+    integrate_piecewise_linear_risk, ContinuousRiskError, PiecewiseLinearRisk,
+};
 use super::irregular::{
     verify_irregular_trace, IrregularOracle, IrregularTask, IrregularVerificationError,
 };
@@ -44,6 +47,9 @@ pub struct IrregularForecastMetrics {
     pub sample_count: usize,
     pub bandwidth_us: u64,
     pub effective_sample_size: f64,
+    /// Exact reference for the piecewise-linear residual path between observed endpoints.
+    /// This does not establish correctness outside the observed support.
+    pub piecewise_linear_reference: PiecewiseLinearRisk,
     pub fast: IrregularMetricChannel,
     pub medium: IrregularMetricChannel,
     pub slow: IrregularMetricChannel,
@@ -76,6 +82,7 @@ pub enum IrregularMetricError {
     TimestampMismatch { index: usize },
     NonFinitePrediction { index: usize },
     InvalidDensityEstimate { index: usize },
+    ContinuousRisk(ContinuousRiskError),
     NonFiniteMetric,
 }
 
@@ -100,6 +107,7 @@ impl fmt::Display for IrregularMetricError {
             Self::InvalidDensityEstimate { index } => {
                 write!(f, "leave-one-out KDE density is invalid at sample {index}")
             }
+            Self::ContinuousRisk(error) => write!(f, "continuous-time reference failed: {error}"),
             Self::NonFiniteMetric => write!(f, "irregular forecast metric is non-finite"),
         }
     }
@@ -138,6 +146,8 @@ pub fn score_irregular_forecasts(
     }
 
     let mut timestamps = Vec::with_capacity(count);
+    let mut timestamps_us = Vec::with_capacity(count);
+    let mut residuals = Vec::with_capacity(count);
     let mut ordinary_squared_sums = [0.0_f64; 3];
     let mut ordinary_absolute_sums = [0.0_f64; 3];
 
@@ -158,20 +168,29 @@ pub fn score_irregular_forecasts(
             return Err(IrregularMetricError::NonFinitePrediction { index });
         }
         timestamps.push(observation.time_us as f64);
+        timestamps_us.push(observation.time_us);
         let predicted = [prediction.fast, prediction.medium, prediction.slow];
         let truth = [
             f64::from(point.latent[0]),
             f64::from(point.latent[1]),
             f64::from(point.latent[2]),
         ];
+        let mut sample_residuals = [0.0_f64; 3];
         for channel in 0..3 {
             let error = predicted[channel] - truth[channel];
+            sample_residuals[channel] = error;
             let absolute = error.abs();
             let squared = error * error;
             ordinary_absolute_sums[channel] += absolute;
             ordinary_squared_sums[channel] += squared;
         }
+        residuals.push(sample_residuals);
     }
+
+    let piecewise_linear_reference = integrate_piecewise_linear_risk(
+        &timestamps_us,
+        &residuals,
+    ).map_err(IrregularMetricError::ContinuousRisk)?;
 
     let inverse_density_logs = leave_one_out_inverse_density_logs(
         &timestamps,
@@ -201,18 +220,8 @@ pub fn score_irregular_forecasts(
     for channel in 0..3 {
         let mut weighted_squared = 0.0_f64;
         let mut weighted_absolute = 0.0_f64;
-        // Reconstruct errors here so the score stores no per-sample temporary
-        // arrays and the timestamp-to-oracle pairing remains explicit.
-        for (index, (point, prediction)) in
-            oracle.points.iter().zip(predictions).enumerate()
-        {
-            let truth = f64::from(point.latent[channel]);
-            let predicted = match channel {
-                0 => prediction.fast,
-                1 => prediction.medium,
-                _ => prediction.slow,
-            };
-            let error = predicted - truth;
+        for (index, sample_residuals) in residuals.iter().enumerate() {
+            let error = sample_residuals[channel];
             weighted_squared += weights[index] * error * error;
             weighted_absolute += weights[index] * error.abs();
         }
@@ -236,6 +245,7 @@ pub fn score_irregular_forecasts(
         sample_count: count,
         bandwidth_us: config.bandwidth_us,
         effective_sample_size,
+        piecewise_linear_reference,
         fast: channels[0].clone(),
         medium: channels[1].clone(),
         slow: channels[2].clone(),
@@ -319,6 +329,8 @@ mod tests {
         assert_eq!(scores.fast.mae, 0.0);
         assert_eq!(scores.fast.cse, 0.0);
         assert_eq!(scores.fast.cae, 0.0);
+        assert_eq!(scores.piecewise_linear_reference.mean_squared_error, [0.0; 3]);
+        assert_eq!(scores.piecewise_linear_reference.mean_absolute_error, [0.0; 3]);
         assert!(scores.effective_sample_size > 0.0);
         assert!(scores.effective_sample_size <= scores.sample_count as f64);
     }
@@ -367,6 +379,43 @@ mod tests {
         assert!(scores.fast.mse > 0.0);
         assert!(scores.fast.cse < scores.fast.mse);
         assert!(scores.effective_sample_size > 0.0);
+    }
+
+    #[test]
+    fn constant_residuals_match_cse_and_exact_piecewise_linear_reference() {
+        let (task, oracle) = fixture();
+        let mut predictions = oracle_predictions(&task, &oracle);
+        for prediction in &mut predictions {
+            prediction.fast += 1.0;
+            prediction.medium -= 2.0;
+            prediction.slow += 0.5;
+        }
+        let scores = score_irregular_forecasts(
+            &task,
+            &oracle,
+            &predictions,
+            CseKernelConfig { bandwidth_us: 20_000 },
+        )
+        .unwrap();
+
+        for (channel, expected_mse, expected_mae) in [
+            (&scores.fast, 1.0, 1.0),
+            (&scores.medium, 4.0, 2.0),
+            (&scores.slow, 0.25, 0.5),
+        ] {
+            assert!((channel.mse - expected_mse).abs() < 1.0e-10);
+            assert!((channel.mae - expected_mae).abs() < 1.0e-10);
+            assert!((channel.cse - expected_mse).abs() < 1.0e-10);
+            assert!((channel.cae - expected_mae).abs() < 1.0e-10);
+        }
+        assert_eq!(
+            scores.piecewise_linear_reference.mean_squared_error,
+            [1.0, 4.0, 0.25]
+        );
+        assert_eq!(
+            scores.piecewise_linear_reference.mean_absolute_error,
+            [1.0, 2.0, 0.5]
+        );
     }
 
     #[test]

@@ -22,6 +22,8 @@ pub mod phase;
 pub mod retention;
 pub mod temporal;
 pub mod temporal_error_debt;
+pub mod temporal_value;
+pub mod continuous_risk;
 
 const MAX_DISTRACTORS: usize = 10_000;
 
