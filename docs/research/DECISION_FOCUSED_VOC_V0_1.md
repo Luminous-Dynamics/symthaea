@@ -85,11 +85,11 @@ The caller supplies:
 - spend already attributed to each action class;
 - minimum reserves for fidelity queries, dormant reactivation and sentinel audit.
 
-An action may spend its own reserve but cannot consume resources protected for other action classes. The returned plan records each action's total cost, expected regret reduction, regret reduction per unit, cost penalty, net value and feasibility disposition.
+An action may spend its own reserve but cannot consume resources protected for other action classes. The returned plan records each action's total cost, expected regret reduction, regret reduction per unit, cost penalty, net value and feasibility disposition. A deterministic replay verifier recomputes the full plan from the frozen manifest, posterior, actions and budget configuration, and rejects any modified field or digest.
 
 ## 6. Authored test coverage
 
-Nineteen Rust test declarations cover:
+Twenty Rust test declarations cover:
 - the discrete-posterior value-of-information example (current regret 0.5, expected post-action regret 0.1, VOI 0.4);
 - no-information actions and explicit stopping;
 - top-K objective and lower-is-better metric semantics;
@@ -100,6 +100,7 @@ Nineteen Rust test declarations cover:
 - fidelity-name/index mismatch and fidelity-cost-model reconciliation for resumable prefixes versus independent restarts;
 - aggregate-only sentinel outcomes;
 - deterministic action tie-breaking;
+- deterministic plan replay and tamper detection;
 - canonical posterior/action-model digests;
 - order-independent plan digest;
 - malformed likelihood dimensions fail without panic.
