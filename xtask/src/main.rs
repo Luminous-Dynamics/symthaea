@@ -131,6 +131,15 @@ enum Commands {
         #[arg(long)]
         ledger: PathBuf,
     },
+    /// Verify the exact ledger bytes and source-epoch record chains bound by an integrity-only epoch seal.
+    BasaltEpochSealVerify {
+        /// Path to the exact event-delivery ledger bytes.
+        #[arg(long)]
+        ledger: PathBuf,
+        /// Path to the source-epoch seal JSON.
+        #[arg(long)]
+        seal: PathBuf,
+    },
     /// Validate a BASALT versioned run record and its cross-record evidence invariants.
     BasaltValidate {
         /// Path to the run-record JSON file.
@@ -276,6 +285,13 @@ fn main() -> anyhow::Result<()> {
             println!("{}", serde_json::to_string_pretty(&report)?);
             if !report.audit_passed {
                 anyhow::bail!("BASALT event-delivery accounting failed");
+            }
+        }
+        Commands::BasaltEpochSealVerify { ledger, seal } => {
+            let report = basalt_event_delivery::audit_seal_files(&ledger, &seal)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if !report.integrity_passed {
+                anyhow::bail!("BASALT source-epoch seal integrity verification failed");
             }
         }
         Commands::BasaltValidate { input, manifest, spec_root } => {
