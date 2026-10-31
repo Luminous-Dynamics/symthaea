@@ -936,6 +936,7 @@ mod tests {
                     source_span_end: excerpt_a.len() as u64,
                     source_family_id: "family-1".into(),
                     source_session_id: Some("session-1".into()),
+                    source_speaker: Some(crate::memory_evidence::EvidenceSpeakerRole::User),
                     scope_id: "scope-1".into(),
                     payload_sha256: digest("payload-1"),
                     source_span_sha256: digest(excerpt_a),
@@ -960,6 +961,7 @@ mod tests {
                     source_span_end: excerpt_b.len() as u64,
                     source_family_id: "family-2".into(),
                     source_session_id: Some("session-2".into()),
+                    source_speaker: Some(crate::memory_evidence::EvidenceSpeakerRole::Assistant),
                     scope_id: "scope-1".into(),
                     payload_sha256: digest("payload-2"),
                     source_span_sha256: digest(excerpt_b),
@@ -984,6 +986,7 @@ mod tests {
                 }],
                 minimum_independent_families: 2,
                 minimum_distinct_sessions: 2,
+                minimum_user_authored_evidence: 1,
                 selection_overhead_tokens: 1,
             }],
         }
