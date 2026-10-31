@@ -23,7 +23,7 @@ The confirmatory design therefore uses three files and two execution domains:
 **Domain A (planner):** receives only `planner.poar`; no read permission, mount, environment variable, network endpoint, or log containing the oracle.  
 **Domain B (evaluator):** receives the immutable planner artifact, sealed oracle, and a frozen prediction artifact after inference has ended. The evaluator must not run during inference and must not provide per-item oracle feedback to the planner.
 
-The current single-process harness does not satisfy this separation. A later protected evaluation service or separately permissioned job must.
+The current generator still creates both files in one process, so this is **not** secure evaluator isolation. A later protected evaluation service or separately permissioned job must prevent the planner from receiving the oracle bytes, key, path, or endpoint.
 
 ## 2. Canonical record encoding
 
@@ -123,6 +123,17 @@ Never collapse hard integrity failures into average accuracy. Preserve separate 
 
 ## 6. Current implementation gap
 
-The checked-in Rust code currently implements the planner/oracle logic and a private in-process label map; it does **not** yet implement these serialization formats, sealed artifact storage, independent evaluator process, SHA-256 receipt, or signed results. This design document is the target contract, not evidence that those features exist.
+Implemented:
+- Deterministic planner-only and oracle-only TSV encoders in `graph.rs`.
+- `poar-graph-export` binary that writes the two files and binds the oracle header to the planner file's SHA-256 digest using the system `sha256sum` executable.
+- Unit tests that assert hidden truth and gold claim/path records are absent from planner output and present in oracle output; non-canonical planner digests are rejected.
+- Focused qualification workflow smoke step that verifies the digest binding and checks record separation in temporary runner storage, then deletes the oracle without uploading it.
+
+Still not implemented:
+- An independent artifact parser / evaluator process that consumes frozen predictions and the sealed oracle.
+- Protected storage or permission boundaries that prevent the planner from reading oracle bytes.
+- Signed benchmark run receipts and an externally auditable model evaluation pipeline.
+
+The exporter currently emits both files within one process; it makes the data boundary explicit and testable but is **not itself a secure boundary**. This design document remains the target for the remaining work.
 
 Issue [#9360](https://github.com/Luminous-Dynamics/symthaea/issues/9360) tracks implementation, tests, protected-job design, and acceptance evidence.
