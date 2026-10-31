@@ -2498,8 +2498,8 @@ mod tests {
             within_genome_diversity: 0.1,
             motif_transformation_richness: Some(0.0),
             form_coverage: Some(0.0),
-            grammar_topology_variation: 0.0,
-            grammar_operation_diversity: 0.0,
+            grammar_topology_variation: Some(0.0),
+            grammar_operation_diversity: Some(0.0),
         };
         assert!(!objective_dominates(&dedicated, &generic));
         assert!(!objective_dominates(&generic, &dedicated));
