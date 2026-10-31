@@ -777,6 +777,8 @@ mod tests {
                 half_window_samples: 4,
                 score_threshold: 2.5,
                 min_separation_nm: 400.0,
+                resample_interval_nm: None,
+                half_window_nm: None,
             },
             noise: FeatureNoise {
                 radius_nm: 5.0,
@@ -795,6 +797,25 @@ mod tests {
             Sample { distance_nm, radius_nm, tangent_degrees, membrane_integrity, synapse_density }
         }).collect();
         Track { track_id: track_id.into(), samples }
+    }
+
+    fn make_sampled_track(
+        track_id: &str,
+        spacing_nm: usize,
+        feature_fn: impl Fn(f64) -> (f64, f64, f64, f64),
+    ) -> Track {
+        let steps = 10_000 / spacing_nm;
+        let samples = (0..=steps).map(|index| {
+            let distance_nm = (index * spacing_nm) as f64;
+            let (radius_nm, tangent_degrees, membrane_integrity, synapse_density) = feature_fn(distance_nm);
+            Sample { distance_nm, radius_nm, tangent_degrees, membrane_integrity, synapse_density }
+        }).collect();
+        Track { track_id: track_id.into(), samples }
+    }
+
+    fn enable_physical_mode(input: &mut Input, interval_nm: f64, half_window_nm: f64) {
+        input.detector.resample_interval_nm = Some(interval_nm);
+        input.detector.half_window_nm = Some(half_window_nm);
     }
 
     #[test]
@@ -905,6 +926,90 @@ mod tests {
         assert!(validate_input(&input).unwrap_err().contains("strictly increasing"));
         let mut input = base_input(vec![make_track("one", |_| (60.0, 0.0, 1.2, 0.2))]);
         assert!(validate_input(&input).unwrap_err().contains("out-of-domain"));
+    }
+
+    #[test]
+    fn physical_resampling_maps_irregular_samples_to_declared_nm_grid() {
+        let track = Track {
+            track_id: "irregular-linear-profile".into(),
+            samples: vec![0.0, 60.0, 130.0, 200.0, 250.0]
+                .into_iter()
+                .map(|distance_nm| Sample {
+                    distance_nm,
+                    radius_nm: 100.0 - distance_nm * 0.1,
+                    tangent_degrees: 2.0 + distance_nm * 0.02,
+                    membrane_integrity: 0.9 - distance_nm * 0.0004,
+                    synapse_density: 0.1 + distance_nm * 0.001,
+                })
+                .collect(),
+        };
+        let resampled = resample_track(&track, 50.0).unwrap();
+        let distances = resampled.samples.iter()
+            .map(|sample| sample.distance_nm)
+            .collect::<Vec<_>>();
+        assert_eq!(distances, vec![0.0, 50.0, 100.0, 150.0, 200.0, 250.0]);
+        for sample in &resampled.samples {
+            assert!((sample.radius_nm - (100.0 - sample.distance_nm * 0.1)).abs() < 1.0e-9);
+            assert!((sample.tangent_degrees - (2.0 + sample.distance_nm * 0.02)).abs() < 1.0e-9);
+            assert!((sample.membrane_integrity - (0.9 - sample.distance_nm * 0.0004)).abs() < 1.0e-9);
+            assert!((sample.synapse_density - (0.1 + sample.distance_nm * 0.001)).abs() < 1.0e-9);
+        }
+    }
+
+    #[test]
+    fn physical_mode_detects_same_physical_boundary_across_source_sampling_densities() {
+        let mut detected_positions = Vec::<Vec<f64>>::new();
+        for spacing_nm in [25_usize, 50, 100, 200] {
+            let track = make_sampled_track("same-physical-step", spacing_nm, |x| {
+                if x < 5_000.0 { (80.0, 4.0, 0.95, 0.2) } else { (48.0, 5.0, 0.80, 0.7) }
+            });
+            let mut input = base_input(vec![track]);
+            enable_physical_mode(&mut input, 25.0, 400.0);
+            validate_input(&input).unwrap();
+            let (physical_input, report) = build_physical_resampled_input(&input).unwrap();
+            let physical_input = physical_input.expect("physical mode should be enabled");
+            let report = report.expect("resampling report should be present");
+            assert_eq!(report.interval_nm, 25.0);
+            assert_eq!(report.half_window_nm, 400.0);
+            assert_eq!(report.effective_half_window_samples, 16);
+            assert_eq!(physical_input.tracks[0].samples.len(), 401);
+            let candidates = detect(&physical_input, false);
+            let positions = candidates.iter().map(|candidate| candidate.boundary_nm).collect::<Vec<_>>();
+            assert!(!positions.is_empty(), "spacing={spacing_nm} produced no physical candidate");
+            assert!(positions.iter().any(|position| (*position - 5_000.0).abs() <= 25.0),
+                "spacing={spacing_nm} positions={positions:?}");
+            detected_positions.push(positions);
+        }
+        assert!(detected_positions.windows(2).all(|pair| pair[0] == pair[1]),
+            "physical proposals changed across source sampling densities: {detected_positions:?}");
+    }
+
+    #[test]
+    fn physical_mode_requires_interval_and_window_as_a_pair() {
+        let track = make_sampled_track("physical-step", 100, |x| {
+            if x < 5_000.0 { (80.0, 4.0, 0.95, 0.2) } else { (48.0, 5.0, 0.80, 0.7) }
+        });
+        let mut input = base_input(vec![track]);
+        input.detector.resample_interval_nm = Some(25.0);
+        assert!(validate_input(&input).unwrap_err().contains("must either both be present"));
+    }
+
+    #[test]
+    fn physical_half_window_must_be_an_integer_grid_multiple() {
+        let track = make_sampled_track("physical-step", 100, |x| {
+            if x < 5_000.0 { (80.0, 4.0, 0.95, 0.2) } else { (48.0, 5.0, 0.80, 0.7) }
+        });
+        let mut input = base_input(vec![track]);
+        enable_physical_mode(&mut input, 25.0, 410.0);
+        assert!(validate_input(&input).unwrap_err().contains("integer multiple"));
+    }
+
+    #[test]
+    fn physical_window_rejects_track_without_enough_spatial_support() {
+        let track = make_track("short-track", |_| (60.0, 4.0, 0.95, 0.2));
+        let mut input = base_input(vec![track]);
+        enable_physical_mode(&mut input, 25.0, 2_100.0);
+        assert!(validate_input(&input).unwrap_err().contains("shorter than two physical half-windows"));
     }
 
     #[test]
