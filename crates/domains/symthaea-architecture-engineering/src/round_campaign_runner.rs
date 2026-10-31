@@ -658,11 +658,14 @@ mod tests {
         assert_eq!(comparisons.len(), POLICIES.len() - 1);
         assert!(comparisons.iter().all(|item| item.pair_count == seeds.len()));
 
+        let mut incomplete = runs.clone();
+        incomplete.runs.pop();
         assert!(compare_four_seat_campaign_runs(
-            &runs[..runs.len() - 1],
+            &incomplete,
             RoundSchedulerPolicy::DirectionBoardFixedSet,
         )
         .is_err());
+        assert!(incomplete.validate_integrity().is_err());
     }
 
     #[test]
