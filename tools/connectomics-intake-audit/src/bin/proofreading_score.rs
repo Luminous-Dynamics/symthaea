@@ -1998,6 +1998,7 @@ fn select_ood_threshold_from_development(
     }
 
     let mut candidates = rows.iter().filter_map(|row| row.ood_score).collect::<Vec<_>>();
+    candidates.push(1.0);
     candidates.sort_by(f64::total_cmp);
     candidates.dedup_by(|a, b| a.total_cmp(b).is_eq());
 
@@ -2777,6 +2778,21 @@ mod tests {
         let result = select_ood_threshold_from_development(&rows, "b".repeat(64), 0.05).unwrap();
         assert_eq!(result.status, "NO_FEASIBLE_THRESHOLD");
         assert_eq!(result.selected_threshold, None);
+    }
+
+    #[test]
+    fn development_threshold_selection_considers_closed_unit_interval_upper_bound() {
+        let rows = vec![
+            tagged_row("dev-edge-in-1", false, 0.1, "mouse", false, 0.999),
+            tagged_row("dev-edge-in-2", false, 0.1, "mouse", false, 0.998),
+            tagged_row("dev-edge-ood-1", true, 0.9, "zebrafish", true, 0.5),
+            tagged_row("dev-edge-ood-2", true, 0.9, "zebrafish", true, 0.4),
+        ];
+        let result = select_ood_threshold_from_development(&rows, "d".repeat(64), 0.05).unwrap();
+        assert_eq!(result.status, "SELECTED");
+        assert_eq!(result.selected_threshold, Some(1.0));
+        assert_eq!(result.false_ood_rate_on_in_domain, Some(0.0));
+        assert_eq!(result.held_out_domain_recall, Some(0.0));
     }
 
     #[test]
