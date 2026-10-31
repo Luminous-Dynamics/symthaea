@@ -304,8 +304,10 @@ pub struct GenomeEvaluation {
     pub genome: StyleGenome,
     pub compiler_schema: String,
     pub compiled_spec_sha256: String,
+    pub evaluation_config: GenomeEvaluationConfig,
     pub evaluation_config_sha256: String,
     pub reference_population_sha256: Option<String>,
+    pub reference_population_member_count: usize,
     pub seed_count: usize,
     pub eligible_for_archive: bool,
     pub abstention_reasons: Vec<GenomeIssue>,
@@ -561,12 +563,7 @@ pub fn evaluate_genome(
             "reference fingerprints must contain only finite values",
         )]);
     }
-    let evaluation_config_sha256 = {
-        let bytes = serde_json::to_vec(config).map_err(|error| {
-            vec![GenomeIssue::new("evaluation_config_serialization_failed", error.to_string())]
-        })?;
-        domain_sha256(b"symthaea:muse-style-genome-config:v1\n", &bytes)
-    };
+    let evaluation_config_sha256 = config_digest(config)?;
     let reference_population_sha256 = reference_population_digest(reference_population)?;
     let compiled = compile_hybrid_style(&genome.recipe).map_err(|mix_issues| {
         mix_issues.into_iter().map(|problem| {
@@ -619,10 +616,16 @@ pub fn evaluate_genome(
             b"symthaea:muse-style-genome-score:v1\n",
             &score_bytes,
         );
-        let form_signature = realization.form.as_ref().and_then(|form| {
-            serde_json::to_vec(form).ok().map(|bytes| {
-                domain_sha256(b"symthaea:muse-style-genome-form:v1\n", &bytes)
-            })
+        // Form variation is topology variation, not arbitrary differences
+        // in notes, key spelling or progression values. Hash only section
+        // role order and meter so equivalent forms remain in the same cell.
+        let form_signature = realization.form.as_ref().map(|form| {
+            let role_sequence = form.sections.iter()
+                .map(|section| format!("{:?}", section.role))
+                .collect::<Vec<_>>();
+            let topology = serde_json::to_vec(&(realization.score.meter, role_sequence))
+                .unwrap_or_default();
+            domain_sha256(b"symthaea:muse-style-genome-form-topology:v1\n", &topology)
         });
         let motif_transformations = realization.trace.motif_occurrences.iter()
             .map(|occurrence| occurrence.transformation.clone())
@@ -685,11 +688,12 @@ pub fn evaluate_genome(
         .flat_map(|trial| trial.motif_transformations.iter().cloned())
         .collect::<BTreeSet<_>>();
     let motif_transformation_richness = (motif_transformations.len() as f64 / 4.0).min(1.0);
-    let form_variation = trials.iter()
+    let distinct_form_topologies = trials.iter()
         .filter_map(|trial| trial.form_signature.as_ref())
         .collect::<BTreeSet<_>>()
-        .len() as f64
-        / trials.len().max(1) as f64;
+        .len();
+    let form_variation_denominator = compiled.spec.form_pool.len().min(trials.len()).max(1);
+    let form_variation = distinct_form_topologies as f64 / form_variation_denominator as f64;
 
     let mut mean_fingerprint = vec![0.0; fingerprint::STRUCT_DIMS];
     if !trial_fingerprints.is_empty() {
@@ -705,8 +709,10 @@ pub fn evaluate_genome(
         genome: genome.clone(),
         compiler_schema: crate::style_mixer::HYBRID_STYLE_COMPILER_SCHEMA.into(),
         compiled_spec_sha256: compiled.provenance.compiled_spec_sha256.clone(),
+        evaluation_config: config.clone(),
         evaluation_config_sha256,
         reference_population_sha256,
+        reference_population_member_count: reference_population.len(),
         seed_count: config.seeds.len(),
         eligible_for_archive,
         abstention_reasons: issues,
@@ -909,6 +915,13 @@ fn objective_dominates(left: &GenomeObjectives, right: &GenomeObjectives) -> boo
     strictly_better
 }
 
+fn config_digest(config: &GenomeEvaluationConfig) -> Result<String, Vec<GenomeIssue>> {
+    let bytes = serde_json::to_vec(config).map_err(|error| {
+        vec![GenomeIssue::new("evaluation_config_serialization_failed", error.to_string())]
+    })?;
+    Ok(domain_sha256(b"symthaea:muse-style-genome-config:v1\n", &bytes))
+}
+
 fn evaluation_digest(evaluation: &GenomeEvaluation) -> Result<String, Vec<GenomeIssue>> {
     let mut copy = evaluation.clone();
     copy.evaluation_sha256.clear();
@@ -955,9 +968,13 @@ impl GenomeEvaluation {
             && self.genome.verify_id()
             && self.evaluation_config_sha256.len() == 64
             && self.evaluation_config_sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+            && config_digest(&self.evaluation_config).is_ok_and(|expected| {
+                expected == self.evaluation_config_sha256
+            })
             && self.reference_population_sha256.as_ref().is_none_or(|digest| {
                 digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit())
             })
+            && self.seed_count == self.evaluation_config.seeds.len()
             && evaluation_digest(self).is_ok_and(|expected| expected == self.evaluation_sha256)
     }
 }
