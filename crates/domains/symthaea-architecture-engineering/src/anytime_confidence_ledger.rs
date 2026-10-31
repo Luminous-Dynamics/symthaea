@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::anytime_qmc_confidence::{
-    AnytimeBoundedMeanConfig, AnytimeBoundedMeanReceipt, AnytimeDecision,
+    AnytimeBoundedMeanConfig, AnytimeBoundedMeanReceipt,
     evaluate_anytime_bounded_mean,
 };
 
