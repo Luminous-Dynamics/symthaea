@@ -20,7 +20,8 @@
     "aspirational_targets",
     "statistical_support",
     "negative_controls",
-    "report_rules"
+    "report_rules",
+    "dataset_sources"
   ],
   "properties": {
     "schema_version": {
@@ -330,6 +331,43 @@
         },
         "simulator_physical_synthetic_separate": {
           "const": true
+        }
+      }
+    },
+    "dataset_sources": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "doi",
+          "evidence_domain",
+          "availability_status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "doi": {
+            "type": "string",
+            "pattern": "^10\\\\.34810/DATA[0-9]+$"
+          },
+          "evidence_domain": {
+            "enum": [
+              "physical_hardware",
+              "simulator"
+            ]
+          },
+          "availability_status": {
+            "enum": [
+              "metadata_discovered_archive_unverified",
+              "archive_bytes_verified",
+              "provenance_verified"
+            ]
+          }
         }
       }
     }
