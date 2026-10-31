@@ -301,6 +301,14 @@ fn keyed_id(seed: &[u8], domain: &[u8], ordinal: u64, slot: u64) -> String {
     hex_digest(&keyed_digest(seed, domain, ordinal, slot))
 }
 
+fn generation_subkey(seed: &[u8], generation_id: &str) -> [u8; 32] {
+    let mut message = Vec::with_capacity(generation_id.len() + 24);
+    message.extend_from_slice(b"generation-scope.v1\\0");
+    message.extend_from_slice(&(generation_id.len() as u64).to_be_bytes());
+    message.extend_from_slice(generation_id.as_bytes());
+    hmac_sha256(seed, &message)
+}
+
 fn valid_digest(value: &str) -> bool {
     value.len() == 64
         && value
@@ -522,6 +530,7 @@ pub fn generate_challenge_bundle(
 ) -> Result<ChallengeBundleV1, String> {
     validate_config(config, seed)?;
 
+    let generation_key = generation_subkey(seed, &config.generation_id);
     let seed_commitment_sha256 = hash_domain(b"seed-commitment.v1", seed);
     let mut pairs = Vec::new();
     let mut pair_truth = Vec::new();
@@ -530,28 +539,28 @@ pub fn generate_challenge_bundle(
     for tier in TierV1::ALL {
         for target_positive in [true, false] {
             for _ in 0..config.pairs_per_tier {
-                let (a, b, slope) = task_values(seed, ordinal);
+                let (a, b, slope) = task_values(&generation_key, ordinal);
                 let construction = construct_pair(tier, target_positive, a, b, slope);
-                let pair_id = keyed_id(seed, b"pair-id", ordinal, 0);
-                let mut left_item_id = keyed_id(seed, b"item-id", ordinal, 0);
-                let mut right_item_id = keyed_id(seed, b"item-id", ordinal, 1);
+                let pair_id = keyed_id(&generation_key, b"pair-id", ordinal, 0);
+                let mut left_item_id = keyed_id(&generation_key, b"item-id", ordinal, 0);
+                let mut right_item_id = keyed_id(&generation_key, b"item-id", ordinal, 1);
                 let mut left_text = construction.left_text;
                 let mut right_text = construction.right_text;
                 let mut mechanisms = construction.mechanisms;
                 let relationship = construction.relationship;
                 let transformation_family = construction.transformation_family;
                 let mut left_source_lineage_sha256 =
-                    source_digest(seed, ordinal, 0, construction.same_source_lineage);
+                    source_digest(&generation_key, ordinal, 0, construction.same_source_lineage);
                 let mut right_source_lineage_sha256 =
-                    source_digest(seed, ordinal, 1, construction.same_source_lineage);
+                    source_digest(&generation_key, ordinal, 1, construction.same_source_lineage);
                 let mut left_recipe_family_sha256 =
-                    recipe_digest(seed, ordinal, 0, construction.same_recipe_family);
+                    recipe_digest(&generation_key, ordinal, 0, construction.same_recipe_family);
                 let mut right_recipe_family_sha256 =
-                    recipe_digest(seed, ordinal, 1, construction.same_recipe_family);
+                    recipe_digest(&generation_key, ordinal, 1, construction.same_recipe_family);
 
                 // Deterministically randomize pair orientation independently of
                 // tier and control label; the public packet exposes no side marker.
-                let reverse = keyed_digest(seed, b"pair-orientation", ordinal, 0)[0] & 1 == 1;
+                let reverse = keyed_digest(&generation_key, b"pair-orientation", ordinal, 0)[0] & 1 == 1;
                 if reverse {
                     std::mem::swap(&mut left_item_id, &mut right_item_id);
                     std::mem::swap(&mut left_text, &mut right_text);
@@ -610,8 +619,15 @@ pub fn generate_challenge_bundle(
     pair_truth.sort_by(|left, right| left.pair_id.cmp(&right.pair_id));
 
     let pair_ids: BTreeSet<&str> = pairs.iter().map(|pair| pair.pair_id.as_str()).collect();
+    let item_ids: BTreeSet<&str> = pairs
+        .iter()
+        .flat_map(|pair| [pair.left_item_id.as_str(), pair.right_item_id.as_str()])
+        .collect();
     if pair_ids.len() != pairs.len() {
         return Err("derived pair ID collision detected; regenerate with a new seed".to_owned());
+    }
+    if item_ids.len() != pairs.len() * 2 {
+        return Err("derived item ID collision detected; regenerate with a new seed".to_owned());
     }
 
     let public_packet = PublicChallengePacketV1 {
@@ -670,6 +686,7 @@ fn validate_pair_packet(packet: &PublicChallengePacketV1) -> Result<(), String> 
         return Err("public packet must have a generation_id and at least one pair".to_owned());
     }
     let mut pair_ids = BTreeSet::new();
+    let mut item_ids = BTreeSet::new();
     for pair in &packet.pairs {
         if !valid_digest(&pair.pair_id)
             || !valid_digest(&pair.left_item_id)
@@ -683,6 +700,12 @@ fn validate_pair_packet(packet: &PublicChallengePacketV1) -> Result<(), String> 
         }
         if !pair_ids.insert(pair.pair_id.as_str()) {
             return Err(format!("public packet repeats pair ID {}", pair.pair_id));
+        }
+        if pair.left_item_id == pair.right_item_id
+            || !item_ids.insert(pair.left_item_id.as_str())
+            || !item_ids.insert(pair.right_item_id.as_str())
+        {
+            return Err(format!("public packet repeats or aliases item IDs for pair {}", pair.pair_id));
         }
         if pair_digest(pair)? != pair.pair_digest_sha256 {
             return Err(format!("pair {} digest does not match public content", pair.pair_id));
@@ -1070,6 +1093,17 @@ mod tests {
         assert_eq!(manifest.sealed_key_sha256, bundle.sealed_key_sha256);
         assert_eq!(manifest.seed_commitment_sha256, bundle.seed_commitment_sha256);
         assert!(manifest.claim_boundary.contains("not_evidence_of_real_model_training_exposure"));
+    }
+
+    #[test]
+    fn generation_id_scopes_outputs_even_when_seed_is_reused() {
+        let seed = seed(19);
+        let first = generate_challenge_bundle(&config(), &seed).unwrap();
+        let mut other_config = config();
+        other_config.generation_id = "fixture-generation-002".to_owned();
+        let second = generate_challenge_bundle(&other_config, &seed).unwrap();
+        assert_ne!(first.public_packet_sha256, second.public_packet_sha256);
+        assert_ne!(first.sealed_key_sha256, second.sealed_key_sha256);
     }
 
     #[test]
