@@ -371,6 +371,22 @@
               "published_result_not_independently_reproduced",
               "qualitative_field_critique_not_a_numeric_baseline"
             ]
+          },
+          "reported_accuracy": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "reported_overhead": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
           }
         }
       }
