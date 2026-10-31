@@ -459,7 +459,7 @@ fn plan_actions(
     let remainder = candidate_budget % rounds;
 
     for round in 0..rounds {
-        let count = base_per_round + usize::from(round < remainder);
+        let count = base_per_round + if round < remainder { 1 } else { 0 };
         if count == 0 {
             continue;
         }
