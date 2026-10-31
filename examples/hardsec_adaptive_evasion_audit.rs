@@ -352,7 +352,7 @@ fn audit_values(
         let mut split_by_value: BTreeMap<String, String> = BTreeMap::new();
         for case in metadata.values() {
             let group_value = axis_value(case, axis);
-            if axis == "adaptation_family" && group_value == "none" {
+            if matches!(axis.as_str(), "adaptation_family" | "attack_family") && group_value == "none" {
                 continue;
             }
             if let Some(previous) = split_by_value.insert(group_value.to_owned(), case.split.clone()) {
@@ -381,6 +381,7 @@ fn audit_values(
     let mut benign_clears = 0usize;
     let mut benign_abstentions = 0usize;
     let mut valid_benign_cases = 0usize;
+    let mut valid_benign_alerts = 0usize;
     let mut valid_benign_clears = 0usize;
     let mut invalid_benign_cases = 0usize;
     let mut all_alerts = 0usize;
@@ -389,6 +390,7 @@ fn audit_values(
     let mut invalid_sensor_clear_verdicts = 0usize;
 
     let mut adaptation_groups: BTreeMap<String, RecallCounts> = BTreeMap::new();
+    let mut adaptation_family_groups: BTreeMap<String, RecallCounts> = BTreeMap::new();
     let mut program_groups: BTreeMap<String, RecallCounts> = BTreeMap::new();
     let mut execution_groups: BTreeMap<String, RecallCounts> = BTreeMap::new();
     let mut benign_by_program: BTreeMap<String, (usize, usize, usize)> = BTreeMap::new();
@@ -430,6 +432,7 @@ fn audit_values(
                     success_attack_cases += 1;
                     let key = format!("{}|{}", meta.adaptation_family_id, meta.adaptation_level);
                     add_recall(adaptation_groups.entry(key).or_default(), &prediction.response);
+                    add_recall(adaptation_family_groups.entry(meta.adaptation_family_id.clone()).or_default(), &prediction.response);
                     add_recall(program_groups.entry(meta.program_group_id.clone()).or_default(), &prediction.response);
                     add_recall(execution_groups.entry(meta.execution_group_id.clone()).or_default(), &prediction.response);
                     match prediction.response.as_str() {
@@ -466,6 +469,9 @@ fn audit_values(
                     "alert" => {
                         benign_alerts += 1;
                         counts.1 += 1;
+                        if !invalid_sensor {
+                            valid_benign_alerts += 1;
+                        }
                     }
                     "clear" => {
                         benign_clears += 1;
@@ -503,6 +509,7 @@ fn audit_values(
     }
 
     let (adaptation_macro, adaptation_worst, adaptation_group_count) = macro_recall(&adaptation_groups);
+    let (adaptation_family_macro, adaptation_family_worst, adaptation_family_count) = macro_recall(&adaptation_family_groups);
 
     // Calibration is for malicious-attempt versus benign labels, not for
     // successful attack effects. It is unavailable unless every test case
@@ -555,6 +562,9 @@ fn audit_values(
     let benign_false_alert_rate = if benign_cases == 0 { None } else {
         Some(benign_alerts as f64 / benign_cases as f64)
     };
+    let benign_false_alert_rate_valid_sensor = if valid_benign_cases == 0 { None } else {
+        Some(valid_benign_alerts as f64 / valid_benign_cases as f64)
+    };
     let benign_true_negative_rate = if valid_benign_cases == 0 { None } else {
         Some(valid_benign_clears as f64 / valid_benign_cases as f64)
     };
@@ -582,6 +592,14 @@ fn audit_values(
         "energy": "not_measured_by_this_evaluator"
     });
 
+    let by_adaptation_family: Vec<Value> = adaptation_family_groups.iter().map(|(group, stats)| json!({
+        "adaptation_family_id": group,
+        "successful_attack_cases": stats.cases,
+        "detected": stats.detected,
+        "cleared": stats.cleared,
+        "abstained": stats.abstained,
+        "attack_effect_recall": recall(stats)
+    })).collect();
     let by_adaptation: Vec<Value> = adaptation_groups.iter().map(|(group, stats)| json!({
         "adaptation_family_and_level": group,
         "successful_attack_cases": stats.cases,
@@ -648,6 +666,7 @@ fn audit_values(
             "benign_clear_verdicts": benign_clears,
             "benign_abstentions": benign_abstentions,
             "benign_false_alert_rate": benign_false_alert_rate,
+            "benign_false_alert_rate_on_valid_sensor_cases": benign_false_alert_rate_valid_sensor,
             "benign_true_negative_rate_on_valid_sensor_cases": benign_true_negative_rate,
             "benign_valid_sensor_cases": valid_benign_cases,
             "benign_invalid_sensor_cases": invalid_benign_cases,
@@ -657,9 +676,13 @@ fn audit_values(
         },
         "generalization": {
             "adaptation_family_level": by_adaptation,
-            "adaptation_family_macro_recall": adaptation_macro,
-            "worst_adaptation_family_recall": adaptation_worst,
-            "adaptation_group_count": adaptation_group_count,
+            "adaptation_family_level_macro_recall": adaptation_macro,
+            "worst_adaptation_family_level_recall": adaptation_worst,
+            "adaptation_family_level_group_count": adaptation_group_count,
+            "adaptation_family": by_adaptation_family,
+            "adaptation_family_macro_recall": adaptation_family_macro,
+            "worst_adaptation_family_recall": adaptation_family_worst,
+            "adaptation_family_count": adaptation_family_count,
             "program_group_level": by_program,
             "program_macro_recall": program_macro,
             "worst_program_recall": program_worst,
@@ -844,7 +867,8 @@ mod tests {
         let metrics = &receipt["primary_metrics"];
         assert_eq!(metrics["successful_attack_effect_cases"], 3);
         assert_eq!(metrics["successful_attack_alerts"], 1);
-        assert_eq!(metrics["attack_effect_conditioned_recall"], 1.0/3.0);
+        let attack_recall = metrics["attack_effect_conditioned_recall"].as_f64().unwrap();
+        assert!((attack_recall - 1.0/3.0).abs() < 1e-12);
         assert_eq!(metrics["failed_attack_attempts_excluded_from_success_recall"], 1);
         assert_eq!(metrics["unknown_attack_effect_attempts_excluded"], 1);
         assert_eq!(metrics["benign_cases"], 4);
@@ -933,8 +957,10 @@ mod tests {
     fn reports_adaptation_strata_separately() {
         let (p,m,t,pb,mb,tb) = fixture_values();
         let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
-        assert_eq!(receipt["generalization"]["adaptation_group_count"], 3);
+        assert_eq!(receipt["generalization"]["adaptation_family_level_group_count"], 3);
         assert_eq!(receipt["generalization"]["adaptation_family_level"].as_array().unwrap().len(), 3);
+        assert_eq!(receipt["generalization"]["adaptation_family_count"], 2);
+        assert_eq!(receipt["generalization"]["adaptation_family"].as_array().unwrap().len(), 2);
     }
 
     #[test]
@@ -955,6 +981,7 @@ mod tests {
         let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
         assert_eq!(receipt["primary_metrics"]["benign_valid_sensor_cases"], 2);
         assert_eq!(receipt["primary_metrics"]["benign_invalid_sensor_cases"], 2);
+        assert_eq!(receipt["primary_metrics"]["benign_false_alert_rate_on_valid_sensor_cases"], 0.5);
         assert_eq!(receipt["primary_metrics"]["benign_true_negative_rate_on_valid_sensor_cases"], 0.5);
     }
 
