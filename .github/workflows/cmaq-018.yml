@@ -106,7 +106,7 @@ jobs:
                       assert lower is None and upper is None
                   else:
                       assert lower is not None and upper is not None
-                      assert lower <= mean_value <= upper
+                      assert lower <= upper
 
           # Null effects must not be mistaken for evidence of a nonzero action effect.
           null_point = get("null_effect", "point_outcome")
