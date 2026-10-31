@@ -18,6 +18,8 @@ File: crates/domains/symthaea-architecture-engineering/src/pareto_objectives.rs
 - ParetoAnalysisPlan: freezes objective order, campaign identity, reference point and candidate set. Candidate IDs are canonicalized.
 - analyze_pareto: transforms objectives into maximization utilities, excludes infeasible candidates, computes strict Pareto dominance, retains the nondominated front, and returns exact hypervolume and a digest-bound receipt.
 - analyze_reference_sensitivity: computes hypervolume under the primary reference point and each explicitly supplied alternative; reports min/max/range and a digest-bound sensitivity receipt.
+- inverted_generational_distance_plus and additive_epsilon_indicator: companion set-quality metrics in the same maximization-utility coordinates.
+- analyze_reference_front_indicators: computes IGD+ and additive epsilon against a unique, mutually nondominated reference front and returns a receipt binding the plan, approximation front and canonical reference front.
 
 ### Objective transformation
 
@@ -53,7 +55,7 @@ Reference sensitivity is a separate output. A single HV value is never presented
 1. This is a batch analysis primitive. It does not yet stream candidate events directly from EventTape.
 2. The evidence SHA-256 is a content reference. This module does not fetch or independently verify artifact bytes; that remains the responsibility of the retained evidence/verifier path.
 3. The current exact-HV plan supports at most four objectives. Higher-dimensional search needs separately validated approximation or non-HV indicators; it must not silently use an approximation under the same label.
-4. The module does not yet calculate IGD+, additive epsilon, R2, attainment surfaces, uncertainty-aware dominance, or confidence intervals across independent campaign instances.
+4. The module now calculates IGD+ and additive epsilon. It does not yet calculate R2, attainment surfaces, uncertainty-aware dominance, or confidence intervals across independent campaign instances.
 5. Reference-point sensitivity is computed, but the benchmark protocol still needs to freeze its primary point and sensitivity set before confirmatory results are examined.
 6. The objective set is supplied by the evaluator. Policies must not choose objective transformations, constraints or reference points after observing their outcomes.
 
@@ -65,6 +67,8 @@ Reference sensitivity is a separate output. A single HV value is never presented
 - reference-clipped volume;
 - infeasible-candidate exclusion from the front and hypervolume;
 - reference-point sensitivity and receipt;
+- IGD+ and additive-epsilon known cases, including strictly dominating approximations;
+- reference-front receipt order invariance and rejection of duplicate/dominated reference points;
 - candidate-order invariance of plan and receipt digests;
 - malformed dimensions, feasibility metadata and evidence digests;
 - duplicate reference-point rejection.
@@ -139,7 +143,7 @@ The goal is not simply a bigger hypervolume. The target is a better verified Par
 
 1. Add an EventTape adapter that derives each candidate's objective vector and resource dimensions from independently verified candidate outcomes and complete resource receipts.
 2. Retain candidate evidence bytes or content-addressed artifact locators, not only digest strings.
-3. Add IGD+, additive epsilon and attainment-based analysis with frozen reference sets.
+3. Add R2, attainment-based analysis and uncertainty intervals with frozen reference sets.
 4. Add deterministic DTLZ/ZDT/WFG fixtures and baseline adapters in a separate benchmark module.
 5. Add multi-run cluster inference and correction across the preregistered indicator family.
 6. Extend beyond four objectives only with an explicitly versioned algorithm and approximation-error tests.
