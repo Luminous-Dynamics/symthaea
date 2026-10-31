@@ -178,20 +178,23 @@ a_t=a_{t-1}+z_t^2,
 \eta_{t+1}=\operatorname{clip}\left(\eta_t+\frac{4z_t}{a_t},-0.5,0.5\right).
 ]
 
-Each context has a separate wealth process with (alpha_c=alpha/K); the DKW failure budget is also divided by context. Under the paper's within-context i.i.d. null/reference assumptions and externally assigned contexts, a union bound composes the finite context family. The output reports the theorem's conditional structure and the corresponding (alpha+delta) unconditional upper-bound implication, but keeps every assumption unverified.
+Each context has a separate wealth process with (alpha_c=alpha/K); the DKW failure budget is also divided by context. Under the paper's within-context i.i.d. null/reference assumptions and externally assigned contexts, a union bound composes the finite context family. The theorem controls type-I error by alpha conditional on the DKW confidence event; because that event itself has failure budget delta, the conservative unconditional upper bound is alpha+delta. The fixture therefore uses total alpha=0.04 and total delta=0.01, yielding a 5% upper bound if all assumptions hold. Every assumption remains unverified.
 
 **Scope warning:** the paper's null is an i.i.d. score stream (X_t\sim P_c) within each context, with i.i.d. calibration scores from the same (P_c). It is not a theorem for arbitrary autocorrelated telemetry. PMU windows from a single execution may violate these assumptions badly. The 600 synthetic reference rows are assigned unique synthetic group IDs to test the contract; this does not establish independence in a physical dataset.
 
+**DKW calibration-size cost:** with two contexts and total delta=0.01, each context receives delta_c=0.005. The corresponding DKW half-width is epsilon=sqrt(ln(400)/(2n)). At n=600, epsilon≈0.07066; to reach epsilon≤0.05 requires 1,199 independent reference units per context, epsilon≤0.025 requires 4,794, epsilon≤0.01 requires 29,958, and epsilon≤0.005 requires 119,830. These must be independent calibration units under the theorem, not merely windows. This is a key deployment feasibility constraint and an explicit benchmark axis.
+
 ### Paper/official-code parity
 
-The paper's HTML v2 Algorithm 2 specifies the ONS step (4z_t/a_t) and equation (8) uses (C=1/(0.5+\sqrt{1+k^2}\epsilon)). The authors' public Python `optimization.py` currently uses a different step coefficient (2/(2-\log 3)), and `utils.py` uses (1/(0.5+(1+k)\epsilon)). This Rust executable follows the published equation/algorithm, not byte-for-byte parity with that Python implementation. A parity/reproduction comparison is required before describing it as a faithful port of the authors' software package. See the [paper](https://arxiv.org/html/2602.13848) and [official implementation](https://github.com/shaersh/cctm).
+The paper's HTML v2 Algorithm 2 specifies the ONS step (4z_t/a_t) and equation (8) uses (C=1/(0.5+\sqrt{1+k^2}\epsilon)). The authors' public Python `optimization.py` currently uses a different step coefficient (2/(2-\log 3)), and `utils.py` uses (1/(0.5+(1+k)\epsilon)). The current Git blobs were pinned on 2026-10-31: `cond_ctm.py` = `f8aff50078ac868167ac7442fc978e0402cf0faa`, `optimization.py` = `39d972a29507db3a8e2d7a20ce3b5a2162764974`, `utils.py` = `a094f6a8bd1ab7e0cf9623e30d43b4b9bdbcc8ea`. This Rust executable follows the published equation/algorithm, not byte-for-byte parity with that Python implementation. The benchmark plan now includes the pinned Python source as a separate comparator; neither variant has been empirically reproduced yet. See the [paper](https://arxiv.org/html/2602.13848), [official implementation](https://github.com/shaersh/cctm), [ONS source](https://github.com/shaersh/cctm/blob/main/optimization.py), and [betting utility](https://github.com/shaersh/cctm/blob/main/utils.py).
 
 CCTM fixture:
 - Plan: `schemas/hardsec-context-cctm-plan-v1.schema.json`
 - Stream: `schemas/hardsec-context-cctm-stream-v1.schema.json`
 - Fixtures: `tests/fixtures/hardsec/context-cctm-v1/plan.json` and `stream.json`
-- 600 declared reference rows per context; two contexts; 18 total stream records.
-- Synthetic sequence crosses the compute-context alpha boundary at stream index 15; stale telemetry, unseen context and untrusted sensor records abstain.
+- 600 declared reference rows per context; two contexts; 19 total stream records.
+- Total alpha=0.04 and delta=0.01 are allocated as alpha_c=0.02 and delta_c=0.005 per context.
+- Synthetic sequence crosses the compute-context alpha boundary at stream index 16; stale telemetry, unseen context and untrusted sensor records abstain.
 - Sixteen authored Rust tests cover DKW width, (alpha/delta) allocation, ONS bounds, reference-group separation, invalid inputs and the known answer.
 
 Run:
@@ -215,4 +218,4 @@ cargo run --locked \
 
 A dedicated Rust test constructs 10,000 equally weighted latent scores (U\in(0,1)), maps each to a null score (X=6U) under the fixture's uniform-score reference grid, and repeats each latent score for 100 consecutive observations. Each time position has the correct marginal null score distribution, but all observations within a stream are perfectly dependent. The fixed reference grid's ECDF is within the declared DKW band for the uniform CDF, isolating the failure of the test-stream i.i.d. assumption in this constructed diagnostic.
 
-A private numerical cross-check of this exact deterministic grid gives 7,983 threshold crossings out of 10,000 latent paths (79.83%) at nominal (alpha=5%). The Rust test asserts a broad 75–85% range to avoid a fragile exact floating-point count. This is a deterministic grid stress test, not a Monte Carlo confidence interval, measured PMU false-alarm probability, or claim about real hardware. Its purpose is to prevent this implementation from being represented as valid for arbitrary dependent telemetry.
+A private numerical cross-check of this exact deterministic grid gives 7,917 threshold crossings out of 10,000 latent paths (79.17%) with the combined alpha+delta budget set to 5%. The Rust test asserts a broad 75–85% range to avoid a fragile exact floating-point count. This is a deterministic grid stress test, not a Monte Carlo confidence interval, measured PMU false-alarm probability, or claim about real hardware. Its purpose is to prevent this implementation from being represented as valid for arbitrary dependent telemetry.
