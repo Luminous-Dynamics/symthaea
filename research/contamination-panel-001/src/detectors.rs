@@ -5,8 +5,8 @@
 //! planted controls; uncertainty and generalization require separate analysis.
 
 use crate::{
-    PUBLIC_PACKET_SCHEMA, PublicChallengePacketV1, SealedChallengeKeyV1, SEALED_KEY_SCHEMA,
-    TierV1, hash_domain, validate_pair_packet,
+    ExposureMechanismV1, PUBLIC_PACKET_SCHEMA, PublicChallengePacketV1, SealedChallengeKeyV1,
+    SEALED_KEY_SCHEMA, TierV1, hash_domain, validate_pair_packet,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -698,6 +698,8 @@ mod tests {
             if truth.target_tier == TierV1::T1Exact {
                 truth.target_control_label = crate::TargetControlLabelV1::PositiveForTargetTier;
                 truth.planted_mechanisms_present.push(ExposureMechanismV1::ExactInstance);
+                truth.planted_mechanisms_present.sort();
+                truth.planted_mechanisms_present.dedup();
                 truth.right_source_lineage_sha256 = truth.left_source_lineage_sha256.clone();
             }
         }
