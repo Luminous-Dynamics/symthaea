@@ -125,8 +125,17 @@ pub fn probe_linux() -> anyhow::Result<LinuxProbeReport> {
     let active_lsm = read_text_evidence("active_lsm", Path::new("/sys/kernel/security/lsm"));
     let btf_vmlinux = digest_file_evidence("btf_vmlinux", Path::new("/sys/kernel/btf/vmlinux"));
     let config = read_kernel_config(release.value.as_deref().unwrap_or("unknown"));
-    let mount_text = read_text_evidence("mountinfo", Path::new("/proc/self/mountinfo"));
-    let mounts = mount_text.value.as_deref().map(parse_relevant_mounts).unwrap_or_default();
+    let mountinfo_raw = read_text_evidence("mountinfo_raw", Path::new("/proc/self/mountinfo"));
+    let mounts = mountinfo_raw.value.as_deref().map(parse_relevant_mounts).unwrap_or_default();
+    // Keep only a digest and bounded summary in the report; raw mountinfo can
+    // contain unrelated host paths and is not needed for profile selection.
+    let mount_text = ProbeEvidence {
+        key: "mount_inventory".to_string(),
+        status: mountinfo_raw.status,
+        value: Some(format!("relevant_mounts={}", mounts.len())),
+        content_digest: mountinfo_raw.content_digest.clone(),
+        path: mountinfo_raw.path.clone(),
+    };
 
     let (bpftool_evidence, bpftool_version) = match find_executable("bpftool") {
         Some(path) => (
@@ -315,6 +324,7 @@ fn read_kernel_config(release: &str) -> ConfigEvidence {
         PathBuf::from(format!("/usr/lib/modules/{release}/build/.config")),
     ];
 
+    let mut inaccessible = false;
     for path in candidates {
         match read_bounded_text(&path) {
             Ok(text) => {
@@ -341,14 +351,19 @@ fn read_kernel_config(release: &str) -> ConfigEvidence {
                     flags,
                 };
             }
-            Err(_) => continue,
+            Err(error) => {
+                if error.kind() == std::io::ErrorKind::PermissionDenied {
+                    inaccessible = true;
+                }
+                continue;
+            }
         }
     }
 
     ConfigEvidence {
         evidence: ProbeEvidence {
             key: "kernel_config".to_string(),
-            status: EvidenceStatus::NotProbed,
+            status: if inaccessible { EvidenceStatus::Inaccessible } else { EvidenceStatus::NotProbed },
             value: None,
             content_digest: None,
             path: Some("checked /boot/config-<release>, /lib/modules/<release>/build/.config, /usr/lib/modules/<release>/build/.config".to_string()),
@@ -744,6 +759,21 @@ mod tests {
         assert!(!report.qualification_eligible);
         assert!(!report.observer_attached);
         assert!(!report.workload_executed);
+    }
+
+    #[test]
+    fn mount_inventory_persists_digest_and_count_not_unrelated_host_paths() {
+        let raw = "1 0 0:1 / /workspace rw - ext4 /dev/root rw\n";
+        let relevant = parse_relevant_mounts(raw);
+        let evidence = ProbeEvidence {
+            key: "mount_inventory".to_string(),
+            status: EvidenceStatus::Collected,
+            value: Some(format!("relevant_mounts={}", relevant.len())),
+            content_digest: Some(sha256_tagged(raw.as_bytes())),
+            path: Some("/proc/self/mountinfo".to_string()),
+        };
+        assert_eq!(evidence.value.as_deref(), Some("relevant_mounts=0"));
+        assert_ne!(evidence.content_digest.as_deref(), Some(raw));
     }
 
     #[test]
