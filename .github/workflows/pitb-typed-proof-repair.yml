@@ -1,0 +1,100 @@
+name: PITB Typed Proof Repair Contract
+
+on:
+  pull_request:
+    paths:
+      - "scripts/research/pitb_typed_repair_trajectory_v0.py"
+      - "data/benchmarks/proof-insight-transfer-v0/typed-proof-repair-operation.schema.json"
+      - "docs/research/pitb-typed-proof-repair-2026-10-31.md"
+      - ".github/workflows/pitb-typed-proof-repair.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  typed-proof-repair-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact proposed commit
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pinned JSON Schema validator
+        run: python -m pip install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
+      - name: Check validator syntax and trajectory invariants
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/research/pitb_typed_repair_trajectory_v0.py
+          python scripts/research/pitb_typed_repair_trajectory_v0.py --self-test
+      - name: Validate Draft 2020-12 operation schema and accepted/rejected controls
+        run: |
+          python - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("data/benchmarks/proof-insight-transfer-v0/typed-proof-repair-operation.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema)
+          good = {
+              "schema_version": "pitb.typed-proof-repair-operation.v0",
+              "episode_id": "schema-control",
+              "operation_id": "op-0",
+              "sequence_index": 0,
+              "target_theorem_id": "target",
+              "target_statement_sha256_before": "a" * 64,
+              "target_statement_sha256_after": "a" * 64,
+              "blueprint_sha256_before": "b" * 64,
+              "blueprint_sha256_after": "c" * 64,
+              "operation": {"kind": "add_dependency", "node_id": "lemma"},
+              "pre_state_node_ids": ["lemma", "target"],
+              "post_state_node_ids": ["lemma", "target"],
+              "affected_node_ids": ["lemma"],
+              "declared_support": ["lemma"],
+              "decision": "applied",
+              "lean_check": "passed",
+              "operation_receipt_sha256": "d" * 64,
+              "run_receipt_sha256": "e" * 64
+          }
+          def require_valid(value, label):
+              errors = list(validator.iter_errors(value))
+              if errors:
+                  raise SystemExit(f"{label}: {errors[0].message}")
+          def require_invalid(value, label):
+              if not list(validator.iter_errors(value)):
+                  raise SystemExit(f"{label}: invalid operation was accepted")
+          require_valid(good, "valid applied operation")
+          rejected = copy.deepcopy(good)
+          rejected.update({
+              "decision": "rejected",
+              "lean_check": "failed",
+              "blueprint_sha256_after": "b" * 64,
+              "affected_node_ids": [],
+              "rejection_code": "precondition_failed"
+          })
+          require_valid(rejected, "valid rejected operation with empty affected set")
+          missing_state = copy.deepcopy(good)
+          del missing_state["pre_state_node_ids"]
+          require_invalid(missing_state, "missing pre-state node inventory")
+          bad_applied = copy.deepcopy(good)
+          bad_applied["lean_check"] = "failed"
+          require_invalid(bad_applied, "applied operation without Lean success")
+          bad_rejected = copy.deepcopy(rejected)
+          bad_rejected["affected_node_ids"] = ["lemma"]
+          require_invalid(bad_rejected, "rejected operation with affected nodes")
+          bad_abstention = copy.deepcopy(rejected)
+          bad_abstention.update({
+              "decision": "abstained",
+              "lean_check": "passed",
+              "rejection_code": None,
+              "affected_node_ids": []
+          })
+          require_invalid(bad_abstention, "abstention that invokes Lean")
+          print("PITB_TYPED_REPAIR_SCHEMA_PASS: applied/rejected examples, missing-state, invalid-Lean and mutation controls")
+          PY
