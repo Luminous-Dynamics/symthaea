@@ -1,0 +1,325 @@
+{
+  "format_version": 2,
+  "suite_id": "basalt-evidence-retention-frontier-v2",
+  "catalog_path": "benchmarks/basalt/coverage/observer-challenges.v1.json",
+  "unit_of_analysis": "independent_task_scenario",
+  "scoring_policy": {
+    "composite_score": "prohibited",
+    "safety_before_efficiency": true,
+    "promote_only_when_all_safety_gates_pass": true,
+    "syscalls_or_events_are_independent_samples": false,
+    "cluster_key": "repository_task_lineage",
+    "paired_comparison_required": true,
+    "held_out_lineage_split_required": true
+  },
+  "comparison_arms": [
+    {
+      "arm_id": "unsafe_no_invalidation",
+      "role": "negative_control",
+      "description": "Reuse all cached evidence without checking invalidation; demonstrates the unsafe lower-cost extreme.",
+      "promotable": false
+    },
+    {
+      "arm_id": "global_rerun",
+      "role": "safety_cost_reference",
+      "description": "Rerun every affected task after every mutation; defines normalized verification work of 1.0.",
+      "promotable": true
+    },
+    {
+      "arm_id": "declared_build_metadata",
+      "role": "industry_baseline",
+      "description": "Use build-system declared input manifests and native dependency metadata without an independent observation challenge.",
+      "promotable": true
+    },
+    {
+      "arm_id": "trace_without_hermeticity",
+      "role": "industry_baseline",
+      "description": "Use filesystem/process/environment tracing without constraining all external state.",
+      "promotable": true
+    },
+    {
+      "arm_id": "hermetic_candidate_observer",
+      "role": "candidate",
+      "description": "Use immutable snapshots, constrained execution and the candidate observer receipt.",
+      "promotable": true
+    },
+    {
+      "arm_id": "hermetic_observer_plus_replay",
+      "role": "candidate",
+      "description": "Compose the hermetic observer with independent fixture replay and oracle adjudication.",
+      "promotable": true
+    },
+    {
+      "arm_id": "independent_reproducible_rebuild",
+      "role": "cross_check",
+      "description": "Rebuild from the declared source, environment and instructions on an independent builder and compare specified output bytes; this cross-check does not replace dependency-observation qualification.",
+      "promotable": false
+    },
+    {
+      "arm_id": "bazel_strict_action_sandbox",
+      "role": "industry_baseline",
+      "description": "Run the same action fixtures under Bazel's strongest supported Linux action sandbox; pin Bazel version, sandbox strategy, user-namespace availability, execroot and remote-cache configuration. Record denied and successful undeclared-input attempts.",
+      "promotable": true
+    },
+    {
+      "arm_id": "nix_sandboxed_derivation",
+      "role": "industry_baseline",
+      "description": "Run equivalent fixtures as Nix sandboxed derivations with pinned derivation/store inputs; record store closure, network policy, sandbox configuration and all undeclared external-input outcomes.",
+      "promotable": true
+    },
+    {
+      "arm_id": "slsa_build_l4_platform",
+      "role": "industry_baseline",
+      "description": "Use an actual trusted build platform that documents and satisfies SLSA Build L4 technical controls for complete resolvedDependencies. Verify builder identity, platform trust boundary and every oracle-consumed dependency digest; do not infer L4 from a provenance file alone.",
+      "promotable": true
+    },
+    {
+      "arm_id": "sccache_rust_compiler_cache",
+      "role": "industry_baseline",
+      "description": "Run the same Rust compiler workloads through a pinned sccache version and configuration. Score compiler-artifact cache correctness under Cargo build-script, environment and mtime mutations; treat it as a compiler-cache baseline, not a hermetic action sandbox.",
+      "promotable": false
+    }
+  ],
+  "metrics": [
+    {
+      "metric_id": "hidden_dependency_recall",
+      "phase": "safety",
+      "definition": "Fraction of consumed-resource scenarios in which the changed ground-truth resource is attributed exactly once with the expected post-mutation digest and all required facts.",
+      "numerator": "capture_dependency cases passing resource identity, digest and required-fact checks",
+      "denominator": "all independently adjudicated capture_dependency cases",
+      "target": {
+        "operator": ">=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "stale_evidence_false_acceptances",
+      "phase": "safety",
+      "definition": "Count of scenarios where evidence is reused after a consumed input changes or where evidence relying on an unsupported channel is reused.",
+      "numerator": "stale_evidence_false_acceptances",
+      "denominator": "not_applicable_count_metric",
+      "target": {
+        "operator": "=",
+        "value": 0
+      },
+      "unit": "scenario_count"
+    },
+    {
+      "metric_id": "unsupported_channel_disclosure",
+      "phase": "safety",
+      "definition": "Fraction of unsupported-channel scenarios that name the unresolved channel and mark both disposition and reuse decision unresolved or invalidated.",
+      "numerator": "report_unresolved cases passing all channel, disposition and reuse checks",
+      "denominator": "all independently adjudicated report_unresolved cases",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "integrity_loss_fail_closed",
+      "phase": "safety",
+      "definition": "Fraction of injected observer-loss or integrity-fault scenarios whose receipt and reuse decision are both invalidated.",
+      "numerator": "invalidate_receipt cases with integrity fault visible, disposition invalidated and reuse_decision invalidated",
+      "denominator": "all independently adjudicated invalidate_receipt cases",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "false_invalidation_rate",
+      "phase": "selectivity",
+      "definition": "Fraction of independently proven unrelated-change scenarios where evidence is unnecessarily invalidated or reverified.",
+      "numerator": "preserve_unrelated cases with reuse_decision invalidated or reverified",
+      "denominator": "all independently adjudicated preserve_unrelated cases",
+      "target": {
+        "operator": "<=",
+        "value": 0.05
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "unrelated_evidence_retention",
+      "phase": "selectivity",
+      "definition": "Fraction of independently proven unrelated-change scenarios in which prior evidence is retained and reused.",
+      "numerator": "preserve_unrelated cases with disposition preserved and reuse_decision reused",
+      "denominator": "all independently adjudicated preserve_unrelated cases",
+      "target": {
+        "operator": ">=",
+        "value": 0.95
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "normalized_reverification_work",
+      "phase": "efficiency",
+      "definition": "Candidate's measured verification work divided by matched global-rerun work, measured with the same task set and resource accounting.",
+      "numerator": "candidate verification work units",
+      "denominator": "global_rerun verification work units",
+      "target": {
+        "operator": "<=",
+        "value": 0.7
+      },
+      "unit": "normalized_work_ratio"
+    },
+    {
+      "metric_id": "paired_shifted_task_success_delta",
+      "phase": "outcome",
+      "definition": "Candidate task-success proportion minus matched baseline task-success proportion under preregistered workspace and dependency shifts.",
+      "numerator": "paired candidate successes minus paired baseline successes",
+      "denominator": "matched shifted task scenarios",
+      "target": {
+        "operator": ">=",
+        "value": 0.03
+      },
+      "unit": "absolute_proportion_delta",
+      "alternative_gate": "non_inferior_success_with_materially_lower_cost"
+    },
+    {
+      "metric_id": "semantic_access_retention",
+      "phase": "safety",
+      "definition": "Fraction of read-but-discard scenarios where the accessed resource is attributed exactly once and changed-input evidence is invalidated or reverified, despite an unchanged declared task-output digest.",
+      "numerator": "read-but-discard cases with exactly one matching observed resource and reuse_decision invalidated or reverified",
+      "denominator": "all independently adjudicated read-but-discard cases",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "undeclared_build_script_stale_replay_detection",
+      "phase": "safety",
+      "definition": "Fraction of preregistered Cargo build-script hidden-input scenarios where the warm incremental result remains stale after mutation and a fresh replay reflects the changed input.",
+      "numerator": "Cargo build-script hidden-input cases with stale warm output and changed fresh-replay output both confirmed",
+      "denominator": "all independently adjudicated Cargo build-script hidden-input scenarios in the supported profile",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "mtime_preserving_build_script_mutation_detection",
+      "phase": "safety",
+      "definition": "Fraction of correctly declared build-script inputs whose bytes change while mtime is held constant that the independent observer still records as changed dependencies.",
+      "numerator": "mtime-preserving input mutations with a matching changed-content digest in the observer receipt and stale evidence rejected",
+      "denominator": "all independently adjudicated mtime-preserving build-script mutation scenarios in the supported profile",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "build_script_environment_mutation_detection",
+      "phase": "safety",
+      "definition": "Fraction of controlled build-script invocation-environment mutations that an independent observer records and prevents from reusing stale evidence, including the positive control with rerun-if-env-changed.",
+      "numerator": "environment mutation cases with matching changed-value commitment, observer attribution and stale evidence rejection",
+      "denominator": "all independently adjudicated build-script environment mutation scenarios in the supported profile",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "dependency_false_attribution_rate",
+      "phase": "selectivity",
+      "definition": "Fraction of independently oracle-confirmed non-consumed resources that the candidate incorrectly attributes as dependencies for the action. Report by resource class and observation source.",
+      "numerator": "non-consumed resources attributed as dependencies",
+      "denominator": "all independently adjudicated non-consumed resource controls",
+      "target": {
+        "operator": "<=",
+        "value": 0.01
+      },
+      "unit": "proportion"
+    }
+  ],
+  "gates": {
+    "safety": [
+      "hidden_dependency_recall",
+      "stale_evidence_false_acceptances",
+      "unsupported_channel_disclosure",
+      "integrity_loss_fail_closed",
+      "semantic_access_retention",
+      "undeclared_build_script_stale_replay_detection",
+      "mtime_preserving_build_script_mutation_detection",
+      "build_script_environment_mutation_detection"
+    ],
+    "selectivity": [
+      "false_invalidation_rate",
+      "unrelated_evidence_retention",
+      "dependency_false_attribution_rate"
+    ],
+    "efficiency": [
+      "normalized_reverification_work"
+    ],
+    "outcome": [
+      "paired_shifted_task_success_delta"
+    ],
+    "promotion_rule": "All safety gates are mandatory and non-compensatory. Selectivity, efficiency and outcome results are evaluated only after all safety gates pass. The stated non-inferiority alternative must be preregistered before unblinding."
+  },
+  "statistical_protocol": {
+    "confidence_level": 0.95,
+    "interval": "one_sided_exact_binomial_for_zero_miss_claims; report two_sided_exact_intervals_for_all_proportions",
+    "maximum_miss_probability_claim": 0.001,
+    "minimum_independent_scenarios_for_zero_miss_claim": 2995,
+    "zero_miss_rule": "A zero-miss result is a finite-sample upper bound, not proof of zero risk.",
+    "independence_unit": "repository_task_lineage",
+    "clustering": "Related mutations, retries, syscalls and events within one task lineage do not increase the independent sample count.",
+    "split": "Separate development, qualification and untouched confirmatory holdout lineages.",
+    "stopping": "Preregister sample size, exclusions, retry policy, evaluator, mutations and stopping rules before qualification runs."
+  },
+  "reporting": {
+    "required_strata": [
+      "observation_channel",
+      "scenario_family",
+      "mutation_kind",
+      "kernel_profile",
+      "observer_profile",
+      "semantic_effect_class",
+      "build_system",
+      "mutation_timestamp_mode",
+      "environment_input_kind",
+      "baseline_implementation_version",
+      "sandbox_strategy",
+      "remote_cache_mode",
+      "slsa_build_level_claim"
+    ],
+    "required_costs": [
+      "wall_time",
+      "cpu_time",
+      "io_bytes",
+      "trace_bytes",
+      "snapshot_bytes",
+      "reverification_work_units",
+      "p50_recovery_latency",
+      "p95_recovery_latency",
+      "cache_hit_rate",
+      "denied_undeclared_access_count"
+    ],
+    "required_disclosures": [
+      "unresolved_scenarios",
+      "oracle_trust_boundary",
+      "observer_loss_events",
+      "excluded_scenarios_with_reasons",
+      "exact_input_digests",
+      "semantic_effect_scope",
+      "baseline_version_and_configuration_digest",
+      "unsupported_baseline_capabilities"
+    ],
+    "forbidden_claims": [
+      "profile_qualified_from_catalog_parse",
+      "observer_complete_from_signature_alone",
+      "zero_risk_from_zero_observed_misses",
+      "industry_sota_from_unmatched_scores",
+      "SLSA_Build_L4_from_provenance_presence_alone",
+      "Bazel_or_Nix_superiority_from_unmatched_configuration",
+      "compiler_cache_equivalence_to_hermetic_action_isolation"
+    ]
+  }
+}
