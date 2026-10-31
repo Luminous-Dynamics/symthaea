@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_DOMAIN_SPLIT_MANIFEST.schema.json",
+  "title": "Connectome proofreading domain split manifest",
+  "description": "Frozen membership manifest. Rust validation verifies exact prediction-row coverage, dataset revision, seen/held-out domain declarations, cluster/domain isolation and train/calibration/evaluation partition isolation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "manifest_id",
+    "dataset_revision_commit_sha",
+    "shift_axis",
+    "seen_domain_ids",
+    "held_out_domain_ids",
+    "entries"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "manifest_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_revision_commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "shift_axis": {
+      "enum": [
+        "species",
+        "region",
+        "source_volume",
+        "source_archive",
+        "acquisition_protocol",
+        "segmentation_lineage",
+        "modality_availability",
+        "morphology_regime"
+      ]
+    },
+    "seen_domain_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "held_out_domain_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sample_id",
+          "cluster_id",
+          "domain_id",
+          "partition"
+        ],
+        "properties": {
+          "sample_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cluster_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "domain_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "partition": {
+            "enum": [
+              "train",
+              "calibration",
+              "development",
+              "confirmatory",
+              "lockbox"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
