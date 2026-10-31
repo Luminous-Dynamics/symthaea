@@ -70,7 +70,7 @@ jobs:
                      for row in joint_bank["outcome_samples"])
 
           def canonical_joint_draw_bank_digest(bank):
-              payload = bytearray(b"cmaq-018-joint-action-bank-v0.1\\0")
+              payload = bytearray(b"cmaq-018-joint-action-bank-v0.1\0")
 
               def append_text(value):
                   encoded = value.encode("utf-8")
