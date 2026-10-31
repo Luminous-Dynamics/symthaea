@@ -30,11 +30,15 @@
     "benchmark_executed": false,
     "hardware_energy_measured": false,
     "result_values_present": false,
-    "generator_scope": "Delayed-cue and multi-timescale forecasting/change-point synthetic generators; the full seven-family generator suite is not implemented.",
+    "generator_scope": "Delayed-cue and multi-timescale forecasting/change-point synthetic generators; T8/T9 external reference-task adapters are specified but not implemented.",
     "rust_tests_authored": true,
     "oracle_trace_verifier_implemented": true,
     "oracle_process_isolation_implemented": false,
-    "rust_tests_authored_count": 23
+    "rust_tests_authored_count": 23,
+    "rust_tests_by_file": {
+      "research/temporal-bench/src/lib.rs": 9,
+      "research/temporal-bench/src/temporal.rs": 14
+    }
   },
   "workload_contract": {
     "sample_semantics": "Causal observations; no future samples; elapsed simulated time is explicit.",
@@ -261,6 +265,81 @@
         "forecast_error_by_horizon"
       ],
       "oracle": "Exact oscillator phase and event times"
+    },
+    {
+      "id": "T8_BRAINTRACE_DMS",
+      "name": "BrainTrace reference delayed match-to-sample",
+      "source": {
+        "repository": "https://github.com/chaobrain/braintrace-snn-experiments",
+        "commit": "81332436b3a0167bc83059878e43a0f0e2eb62c7",
+        "path": "task-rsnn-long-term-dependency.py",
+        "blob": "f219f53953cdca8465b00e962c7380ff025e0a0b"
+      },
+      "anchor": {
+        "directions": 8,
+        "dt_ms": 1,
+        "fixation_ms": 10,
+        "sample_ms": 500,
+        "delay_ms": 1000,
+        "test_ms": 500,
+        "input_channels": 100,
+        "recurrent_neurons": 200
+      },
+      "primary_metrics": [
+        "accuracy_by_delay",
+        "false_match_rate",
+        "time_to_decision",
+        "state_bytes",
+        "training_memory_bytes"
+      ],
+      "replication_controls": [
+        "pin_script_and_library",
+        "explicit_independent_seed_resets",
+        "new_source_family_holdout",
+        "one_shot_confirmatory_evaluation"
+      ],
+      "audit_status": "public_reference_script_inspected; no score imported; paper-to-script exact revision match unverified"
+    },
+    {
+      "id": "T9_BRAINTRACE_EVIDENCE_ACCUMULATION",
+      "name": "BrainTrace reference sequential evidence accumulation",
+      "source": {
+        "repository": "https://github.com/chaobrain/braintrace-snn-experiments",
+        "commit": "81332436b3a0167bc83059878e43a0f0e2eb62c7",
+        "data_path": "ei_coba_net_decision_making/data.py",
+        "data_blob": "2de7e924b458f51c2939653cf5e88fdff5fae349",
+        "training_path": "ei_coba_net_decision_making/training.py",
+        "training_blob": "a89a32bf18b520dba595d232dbbb153a4de64527",
+        "model_path": "ei_coba_net_decision_making/model.py",
+        "model_blob": "5f12e956afa64d3169430291e7e233c0cbf34a57"
+      },
+      "anchor": {
+        "cues": 7,
+        "cue_duration_ms": 100,
+        "inter_cue_interval_ms": 50,
+        "delay_ms": 1000,
+        "recall_ms": 150,
+        "neuron_groups": {
+          "left": 25,
+          "right": 25,
+          "recall": 25,
+          "noise": 25
+        }
+      },
+      "primary_metrics": [
+        "accuracy_by_evidence_strength",
+        "accuracy_by_delay",
+        "time_to_recovery",
+        "forgetting",
+        "state_and_trace_bytes"
+      ],
+      "replication_controls": [
+        "pass_explicit_seed",
+        "pin_key_schedule",
+        "source_family_holdout",
+        "separate_confirmatory_stream"
+      ],
+      "audit_status": "public_generator_and_trainer_inspected; training-only loop has no separate held-out test path; no score imported"
     }
   ],
   "architecture_arms": [
@@ -374,7 +453,11 @@
         "Reproduction must use independent seed resets, grouped/locked development and confirmatory trials, and one-shot confirmatory evaluation."
       ],
       "scores_imported": false,
-      "matched_reproduction_status": "not_executed"
+      "matched_reproduction_status": "not_executed",
+      "evidence_accumulation_data_blob": "2de7e924b458f51c2939653cf5e88fdff5fae349",
+      "evidence_accumulation_training_blob": "a89a32bf18b520dba595d232dbbb153a4de64527",
+      "paper_to_script_revision_verified": false,
+      "public_training_script_test_split_found": false
     }
   }
 }
