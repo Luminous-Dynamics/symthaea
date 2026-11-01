@@ -13,7 +13,8 @@ The lab separates forecast estimation from resource enforcement. Its initial exe
 - a shift-aware feasibility gate includes the mandatory verification reserve;
 - a non-parametric time-to-sufficient-proof baseline separates right-censoring from competing terminal events;
 - an append-only forecast journal stores pre-execution predictions separately from evaluator, meter, and verifier outcomes;
-- a proof-frontier structural baseline feeds one-sided split-conformal simultaneous resource-vector envelopes.
+- a proof-frontier structural baseline feeds one-sided split-conformal simultaneous resource-vector envelopes;
+- a landmark IPCW calibration baseline adapts time-varying history-conditioned censoring weights to proof-completion resource scores.
 
 ## Run
 
