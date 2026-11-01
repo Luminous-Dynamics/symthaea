@@ -7,8 +7,7 @@ use pod_meta_cost_to_go_lab::{
     OnlineCostDimension, OnlineFeedbackDisposition, OnlineFeedbackReceipt,
     OnlinePredictionStatement, OnlineSelectionLedger, PrefixBudgetReceipt, PrefixReplayEvaluator,
     ProofFrontierFeatures, ReconciliationOutcome, RemainingCostForecast, ReservationId,
-    ResourceVector,
-    SelectedProofCalibrationExample, SelectedProofEnvelope,
+    ResourceVector, SelectedProofCalibrationExample, SelectedProofEnvelope,
     SelectionConditionedConformalCalibrator, SelectionReceipt, ShiftStatus,
     SplitVectorConformalCalibrator, StateEvidence, TerminalOutcome, assess_completion_feasibility,
     assess_joint_resource_fit, calibrate_landmark_ipcw,
@@ -1198,8 +1197,12 @@ fn main() {
         historical_report.report.completed_verified,
         historical_report.report.right_censored,
         historical_report.report.global_fallback_prefixes,
-        historical_report.report.dimensions[0].q50_mean_absolute_error.unwrap(),
-        historical_report.report.dimensions[0].q90_marginal_coverage.unwrap()
+        historical_report.report.dimensions[0]
+            .q50_mean_absolute_error
+            .unwrap(),
+        historical_report.report.dimensions[0]
+            .q90_marginal_coverage
+            .unwrap()
     );
     println!(
         "HISTORICAL_BASELINE_ROW\tcensored-exceedance\t{}\t{}",
@@ -1211,5 +1214,4 @@ fn main() {
         historical_report.report.global_fallback_prefixes,
         historical_report.report.by_task_family.len()
     );
-
 }
