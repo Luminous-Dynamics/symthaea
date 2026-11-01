@@ -100,7 +100,7 @@ For every algorithm and problem instance:
 
 ## Limitations
 
-- This implementation has not been cross-checked against a pinned external SMS-EMOA implementation or PlatEMO 4.16.
+- This implementation has not been cross-checked against a pinned external SMS-EMOA implementation or PlatEMO v4.17.
 - It supports only the current ZDT1 and three-objective DTLZ2 fixtures.
 - The compact algorithm uses a particular rank/crowding tournament and one-offspring loop. External parity must compare every operator and parameter explicitly.
 - Exact hypervolume and repeated leave-one-out contribution calculations are costly; the population cap is 512.
