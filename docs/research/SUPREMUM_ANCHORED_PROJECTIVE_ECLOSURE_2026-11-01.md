@@ -159,12 +159,25 @@ Selecting the largest r satisfying the sorted e-value threshold is the e-BH rule
 
 This is an exact computational special case, not a universal replacement for intersection-specific evidence. It can be conservative because all auxiliary mass is coordinate-separable and because the safe baseline uses ever-rejected indicators. The richer #9695/#9684 intersection processes may certify sets that this additive e-BH restriction cannot.
 
+### Scaling benchmark
+
+Run the exact-rational selector benchmark:
+
+```bash
+python validation/benchmark_supremum_anchored_ebh.py \
+  --sizes 8 12 16 100 1000 10000 100000 \
+  --repeats 7 --output anchored-ebh-results.json
+```
+
+For each n it reports e-BH selector latency, an independent O(n) feasibility-verifier latency, traced peak allocation, baseline anchor size, additional discoveries and whether the anchor was retained. At n<=16 it also compares the selected set with the exhaustive all-intersections selector. Larger instances are verified using the independent additive-closure singleton criterion. This is a computational benchmark only; it does not test stochastic q_i/v_i assumptions or establish FDR/SupFDR calibration.
+
 ### Files and finite verification
 
 The reference checker now includes:
 - `build_additive_anchored_auxiliary`, which constructs each normalized intersection auxiliary process F_S,t;
 - `build_additive_anchored_coordinate_e_paths`, which produces the per-coordinate e_i,t paths;
 - `select_additive_anchored_e_bh`, a deterministic O(n log n) selector with stable ID tie-breaking and an explicit anchor-retention check.
+- `validation/benchmark_supremum_anchored_ebh.py` and `validation/test_benchmark_supremum_anchored_ebh.py`, an O(n log n) scaling scorecard and exhaustive small-family parity controls.
 
 Tests compare the constructed intersection paths with the sums of coordinate paths, compare e-BH against the exhaustive finite closure selector, verify every resulting closure inequality, and exercise residual-zero/invalid-budget/empty-horizon cases. These tests are authored but have not been executed from a repository checkout; no CI pass is claimed.
 
