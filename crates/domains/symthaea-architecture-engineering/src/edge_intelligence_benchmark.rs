@@ -1326,6 +1326,23 @@ mod tests {
         }
     }
 
+    fn recurring_stream_config() -> TemporalStreamConfig {
+        TemporalStreamConfig {
+            event_count: 2_000,
+            seed: 0xC1_7A,
+            base_interval_us: 10_000,
+            timestamp_jitter_ppm: 100_000,
+            feature_dropout_ppm: 10_000,
+            out_of_distribution_rate_ppm: 50_000,
+            label_delay_us: 5_000,
+            drift: TemporalDriftSchedule::Recurring {
+                drift_at_event: 500,
+                return_at_event: 1_300,
+                to_regime: 1,
+            },
+        }
+    }
+
     fn prequential_trace(
         dataset: &TemporalStreamDataset,
         include_updates: bool,
@@ -1518,6 +1535,21 @@ mod tests {
         *score = 32_769;
         trace.execution_trace_sha256 = compute_prequential_execution_trace_sha256(&trace).unwrap();
         assert!(audit_prequential_execution(&dataset, &trace).unwrap_err().to_string().contains("novelty score"));
+    }
+
+    #[test]
+    fn recurring_drift_reports_recovery_retention_and_open_set_quality() {
+        let dataset = generate_temporal_drift_stream(&recurring_stream_config()).unwrap();
+        let trace = prequential_trace(&dataset, true);
+        let receipt = audit_prequential_execution(&dataset, &trace).unwrap();
+        assert_eq!(receipt.metrics.drift_transition_count, 2);
+        assert_eq!(receipt.metrics.recovered_drift_transition_count, 2);
+        assert_eq!(receipt.metrics.unrecovered_drift_transitions, 0);
+        assert!(receipt.metrics.mean_drift_recovery_samples.unwrap() <= 100.0);
+        assert_eq!(receipt.metrics.retention_compared_regime_count, 1);
+        assert_eq!(receipt.metrics.maximum_regime_retention_loss_pp, Some(0.0));
+        assert_eq!(receipt.metrics.open_set_auprc, Some(1.0));
+        assert!(receipt.metrics.worst_regime_accuracy.unwrap() >= 0.99);
     }
 
     #[test]
