@@ -99,6 +99,35 @@ def equicorrelation_envelope(
     return result
 
 
+def projective_equicorrelation_envelope(
+    dimension: int, rho_min: float = 0.2, rho_max: float = 0.8
+) -> list[list[float]]:
+    """A single kernel whose finite principal submatrices dominate all rho.
+
+    V_d = (1-rho_min) I_d + rho_max 11^T. For every rho in
+    [rho_min,rho_max],
+
+      V_d - Sigma_d(rho)
+        = (rho-rho_min) I_d + (rho_max-rho) 11^T,
+
+    which is PSD because both coefficients are nonnegative. Unlike the
+    tighter dimension-specific envelope above, this family is projectively
+    consistent: every principal submatrix is the same formula at the smaller
+    dimension. This form requires 0 <= rho_min <= rho_max <= 1.
+    """
+    if dimension < 1:
+        raise ValueError("dimension must be positive")
+    if not (0.0 <= rho_min <= rho_max <= 1.0):
+        raise ValueError("projective envelope requires 0 <= rho_min <= rho_max <= 1")
+    diagonal = 1.0 - rho_min + rho_max
+    result = [
+        [diagonal if i == j else rho_max for j in range(dimension)]
+        for i in range(dimension)
+    ]
+    assert_symmetric_psd(result)
+    return result
+
+
 def matrix_dominates(upper: Sequence[Sequence[float]], lower: Sequence[Sequence[float]]) -> bool:
     if len(upper) != len(lower):
         return False
