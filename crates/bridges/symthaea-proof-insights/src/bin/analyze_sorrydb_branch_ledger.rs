@@ -483,6 +483,12 @@ fn validate_snapshot_receipt_link(
             if receipt.run_status != "not_attempted" {
                 bail!("synthetic R5 ledger must link to a no-run snapshot receipt");
             }
+            if receipt.task_id != ledger.task.task_id
+                || receipt.repository_commit != ledger.task.repository_commit
+                || receipt.proof_state_sha256 != ledger.task.proof_state_sha256
+            {
+                bail!("synthetic R5 snapshot receipt task/commit/proof-state identity differs from the branch ledger");
+            }
         }
         (_, _, Some(_)) => {
             bail!("--snapshot-receipt is allowed only with arm R5");
