@@ -16,7 +16,7 @@ const MAX_OBSERVED_UTILIZATION_PPM: u64 = 1_000_000_000;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ResourcePriceConfig {
     /// Desired utilization of each resource, in parts per million of its cap.
-    pub target_utilization_ppm: u64,
+    pub target_utilization_ppm: [u64; 12],
     /// EWMA weight assigned to the newest completed episode.
     pub smoothing_alpha_ppm: u64,
     /// Price learning rate per unit of normalized utilization error.
@@ -30,12 +30,14 @@ pub struct ResourcePriceConfig {
 
 impl ResourcePriceConfig {
     pub fn validate(self) -> Result<(), PriceError> {
-        if self.target_utilization_ppm > 1_000_000
+        if self.target_utilization_ppm.iter().any(|target| *target > 1_000_000)
             || self.smoothing_alpha_ppm == 0
             || self.smoothing_alpha_ppm > 1_000_000
             || self.step_size_ppm == 0
             || self.maximum_price_ppm == 0
-            || self.maximum_observed_utilization_ppm <= self.target_utilization_ppm
+            || self.target_utilization_ppm.iter().any(|target| {
+                self.maximum_observed_utilization_ppm <= *target
+            })
             || self.maximum_observed_utilization_ppm > MAX_OBSERVED_UTILIZATION_PPM
         {
             return Err(PriceError::InvalidConfig);
@@ -189,7 +191,7 @@ pub fn update_resource_prices(
         let updated_price = update_one_price(
             previous_price,
             smoothed,
-            config.target_utilization_ppm,
+            config.target_utilization_ppm[index],
             config.step_size_ppm,
             config.maximum_price_ppm,
         )?;
@@ -281,7 +283,7 @@ mod tests {
 
     fn config() -> ResourcePriceConfig {
         ResourcePriceConfig {
-            target_utilization_ppm: 700_000,
+            target_utilization_ppm: [700_000; 12],
             smoothing_alpha_ppm: 1_000_000,
             step_size_ppm: 100_000,
             maximum_price_ppm: 1_000_000,
@@ -340,6 +342,27 @@ mod tests {
             state.smoothed_utilization_ppm(ResourceDimension::Observations),
             500_000
         );
+    }
+
+    #[test]
+    fn each_resource_can_have_its_own_utilization_target() {
+        let mut state = ResourcePriceState::default();
+        let mut cfg = config();
+        cfg.target_utilization_ppm[0] = 900_000;
+        cfg.target_utilization_ppm[6] = 500_000;
+        let measured = ResourceVector {
+            persistent_bytes: 800,
+            observations: 800,
+            ..ResourceVector::default()
+        };
+        let budget = ResourceVector {
+            persistent_bytes: 1_000,
+            observations: 1_000,
+            ..ResourceVector::default()
+        };
+        update_resource_prices(&mut state, measured, budget, cfg).unwrap();
+        assert_eq!(state.price_ppm(ResourceDimension::PersistentBytes), 0);
+        assert!(state.price_ppm(ResourceDimension::Observations) > 0);
     }
 
     #[test]
@@ -434,7 +457,7 @@ mod tests {
     fn invalid_config_and_episode_counter_overflow_fail_closed() {
         let mut state = ResourcePriceState::default();
         let mut invalid = config();
-        invalid.target_utilization_ppm = 1_000_001;
+        invalid.target_utilization_ppm[0] = 1_000_001;
         assert_eq!(
             update_resource_prices(&mut state, ResourceVector::default(), ResourceVector::default(), invalid),
             Err(PriceError::InvalidConfig)
