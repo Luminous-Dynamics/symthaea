@@ -23,7 +23,7 @@
     "target_expr_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
     "local_context_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "metavar_context_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    "proof_state_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    "proof_state_sha256": "ce1cb4c9325bc61e9618ad387c1c4abbcc681ff68901b955464b92aa79831ec6"
   },
   "server": {
     "lean_server_binary_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
