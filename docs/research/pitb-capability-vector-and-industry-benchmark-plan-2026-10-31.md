@@ -164,3 +164,8 @@ PITB now has an executable deterministic controller and calibration receipt veri
 The calibration receipt is still an aggregate summary: source checker/replay receipt bytes must be individually authenticated before its values can be described as empirical calibration.
 
 Initial targets are ≥30% lower cost per verified proof and ≥10% cost-quality AUC improvement against a matched fixed-step baseline, with non-inferior success at equal total budget. Those targets intentionally clear the published 25.8% cost and 7.9% AUC results by a small margin; they are not achieved results. The design, schema, synthetic fixture and executable are in `docs/research/pitb-adaptive-proof-search-allocation-2026-11-01.md` and `data/benchmarks/proof-insight-transfer-v0/adaptive-allocation/`.
+
+
+## Benchmark target integrity
+
+The ICML 2026 benchmark audit reported 4,833 findings across five widely used Lean benchmarks/forks, including 398 mechanically certified defects such as counterexamples, vacuous theorems and unsound axioms. PITB now has a separate target-integrity receipt contract and exact-byte Rust verifier. It pins source/statement/environment, checks elaboration and axiom closure, records counterexample/vacuity probe evidence, and requires independent semantic approval before eligibility. Compilation or kernel proof success alone does not establish benchmark semantic validity. This is a separate task-eligibility gate, not a composite performance score; no real cohort audit has yet been run. See `docs/research/pitb-benchmark-integrity-gate-2026-11-01.md`.
