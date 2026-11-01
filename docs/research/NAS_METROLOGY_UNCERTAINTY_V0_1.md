@@ -90,15 +90,15 @@ The module includes a bounded next-replicate planner that evaluates three strate
 - repeat only the reference artifact;
 - acquire blocked paired replicates for both.
 
-It calculates the projected Type A term as sample standard deviation divided by the square root of the projected replicate count; declared Type B uncertainty is held fixed. It finds the lowest-cost strategy that could make the expanded intervals disjoint within the frozen per-replicate resource costs, total budget and maximum additional-replicate horizon.
+It calculates the projected Type A term as sample standard deviation divided by the square root of the projected replicate count; declared Type B uncertainty is held fixed. Each strategy is costed using explicit `ResourceCostVector` templates (for example, instrument seconds, target-device seconds, energy, storage and money) and checked component-wise against the existing `ResourceRegistry` and `ResourceBudget`. It returns the non-dominated plan frontier in projected interval separation × full resource-vector space; no scalar exchange rate is invented between unlike resource classes.
 
 The planner explicitly returns:
 - `ALREADY_RESOLVED`: no additional measurement is needed to establish strict ordering under the current rule;
 - `METROLOGY_LIMITED`: the mean difference is no larger than the sum of the irreducible expanded Type B terms; more repeats cannot resolve the comparison;
-- `ADDITIONAL_REPLICATES_REQUIRED`: a qualifying action fits the declared budget/horizon;
+- `ADDITIONAL_REPLICATES_REQUIRED`: at least one non-dominated strategy fits every resource component and the maximum additional-replicate horizon;
 - `NO_PLAN_WITHIN_BUDGET_OR_HORIZON`: no qualifying action was found inside the supplied limits.
 
-This is a deterministic planning heuristic with fixed observed means and sample standard deviations, not a posterior probability of future results. It does not replace a preregistered sequential stopping rule. Its output can be passed to the existing multi-resource budget and compare-and-swap reservation machinery; the final acquisition and analysis still require a run receipt.
+The planning receipt binds a canonical digest of the full configuration, including resource registry, budget, and per-replicate cost vectors. This is a deterministic planning heuristic with fixed observed means and sample standard deviations, not a posterior probability of future results. It does not replace a preregistered sequential stopping rule. The resulting frontier can feed the existing multi-resource action planner and compare-and-swap reservation machinery; final acquisition and analysis still require a run receipt.
 
 ## Search integration
 
