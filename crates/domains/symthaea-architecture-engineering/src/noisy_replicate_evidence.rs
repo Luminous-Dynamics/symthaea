@@ -174,6 +174,12 @@ impl NoisyReplicateEvidenceManifest {
             &self.objective_vector_sha256,
             "manifest.objective_vector_sha256",
         )?;
+        if self.artifact.artifact_id.trim().is_empty() {
+            return Err(NoisyReplicateEvidenceError::new(
+                "manifest.artifact.artifact_id",
+                "artifact ID must be non-empty",
+            ));
+        }
         if self.artifact.role != EvidenceArtifactRole::EvaluationOutput {
             return Err(NoisyReplicateEvidenceError::new(
                 "manifest.artifact.role",
