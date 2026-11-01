@@ -1508,6 +1508,10 @@ mod tests {
         assert_eq!(metrics.mean_action_response_cosine, 0.0);
         assert_eq!(metrics.cosine_scored_action_count, 0);
         assert_eq!(metrics.missed_action_effect_count, 2);
+        let fixture: ActionResponseMetrics = serde_json::from_str(include_str!(
+            "../docs/action-response-metrics.missed-effects.example.json"
+        )).unwrap();
+        assert_eq!(metrics, fixture);
     }
 
 
@@ -1560,6 +1564,10 @@ mod tests {
         assert!(metrics.mean_action_effect_mse < 1e-12);
         assert_eq!(metrics.missed_action_effect_count, 0);
         assert_eq!(metrics.false_positive_action_effect_count, 0);
+        let fixture: ActionResponseMetrics = serde_json::from_str(include_str!(
+            "../docs/action-response-metrics.aligned.example.json"
+        )).unwrap();
+        assert_eq!(metrics, fixture);
     }
 
     #[test]
