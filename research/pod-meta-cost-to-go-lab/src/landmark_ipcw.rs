@@ -54,6 +54,7 @@ pub struct LandmarkEpisode {
 pub enum LandmarkIpcwError {
     EmptyCalibrationSet,
     InvalidMiscoverage,
+    LandmarkMismatch,
     InvalidPositivityFloor,
     MissingModelDigest,
     MissingCensorModelDigest,
@@ -199,8 +200,14 @@ pub fn calibrate_landmark_ipcw(
         if episode.episode_id == 0 {
             return Err(LandmarkIpcwError::InvalidEpisodeId);
         }
+        if episode.landmark_work_units != landmark_work_units {
+            return Err(LandmarkIpcwError::LandmarkMismatch);
+        }
         if !episode_ids.insert(episode.episode_id) {
             return Err(LandmarkIpcwError::DuplicateEpisode);
+        }
+        if matches!(episode.terminal, LandmarkTerminal::CompetingTerminal(_)) {
+            return Err(LandmarkIpcwError::CompetingRiskRequiresSeparateEstimator);
         }
         if episode.observed_endpoint_work_units <= episode.landmark_work_units {
             exited_before_landmark += 1;
@@ -222,9 +229,7 @@ pub fn calibrate_landmark_ipcw(
                 }
                 right_censored_after_landmark += 1;
             }
-            LandmarkTerminal::CompetingTerminal(_) => {
-                return Err(LandmarkIpcwError::CompetingRiskRequiresSeparateEstimator);
-            }
+            LandmarkTerminal::CompetingTerminal(_) => unreachable!("competing terminals rejected above"),
             LandmarkTerminal::ProofCompleted {
                 remaining_resource_cost,
                 verifier_digest,
@@ -287,28 +292,24 @@ pub fn calibrate_landmark_ipcw(
 
     scores_and_weights.sort_by(|left, right| left.0.total_cmp(&right.0));
     let target_coverage = 1.0 - miscoverage;
+    let required_covered_weight = target_coverage * sum_weights;
+    let mut cumulative_covered_weight = 0.0_f64;
     let mut candidate_threshold = None;
-    let mut start = 0;
-    while start < scores_and_weights.len() {
-        let threshold = scores_and_weights[start].0;
-        let mut covered_weight = 0.0_f64;
-        for (score, weight) in &scores_and_weights {
-            if *score <= threshold {
-                covered_weight += weight;
-            }
+    let mut index = 0;
+    while index < scores_and_weights.len() {
+        let threshold = scores_and_weights[index].0;
+        while index < scores_and_weights.len()
+            && scores_and_weights[index].0.total_cmp(&threshold).is_eq()
+        {
+            cumulative_covered_weight += scores_and_weights[index].1;
+            index += 1;
         }
-        let balance = covered_weight - target_coverage * sum_weights;
-        if !balance.is_finite() {
+        if !cumulative_covered_weight.is_finite() {
             return Err(LandmarkIpcwError::NonFiniteWeight);
         }
-        if balance >= 0.0 {
+        if cumulative_covered_weight >= required_covered_weight {
             candidate_threshold = Some(threshold);
             break;
-        }
-        while start < scores_and_weights.len()
-            && scores_and_weights[start].0.total_cmp(&threshold).is_eq()
-        {
-            start += 1;
         }
     }
     let normalized_residual_threshold =
@@ -626,6 +627,28 @@ mod tests {
                 COHORT,
             ),
             Err(LandmarkIpcwError::CensoringReceiptPartitionMismatch)
+        );
+    }
+
+    #[test]
+    fn episode_rows_must_share_the_requested_landmark() {
+        let rows = [
+            completed(1, 5, 6, 1, 1.0),
+            completed(2, 6, 7, 2, 1.0),
+        ];
+        assert_eq!(calibrate(&rows), Err(LandmarkIpcwError::LandmarkMismatch));
+    }
+
+    #[test]
+    fn competing_terminals_are_rejected_even_before_the_landmark() {
+        let mut row = completed(1, 5, 6, 1, 1.0);
+        row.observed_endpoint_work_units = 4;
+        row.terminal =
+            LandmarkTerminal::CompetingTerminal(CompetingProofTerminal::ExplicitAbort);
+        row.censoring_receipt = None;
+        assert_eq!(
+            calibrate(&[row]),
+            Err(LandmarkIpcwError::CompetingRiskRequiresSeparateEstimator)
         );
     }
 
