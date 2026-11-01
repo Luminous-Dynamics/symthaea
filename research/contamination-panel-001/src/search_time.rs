@@ -1290,6 +1290,7 @@ mod tests {
         for (body, expected_class) in cases {
             let mut trace = trace_fixture();
             trace.challenge_packet_sha256 = bundle.public_packet.public_packet_sha256.clone();
+            trace.model_checkpoint_sha256 = bundle.public_packet.model_checkpoint_sha256.clone();
             trace.events[0].response_sha256 = Some(search_response_body_digest(&body));
             trace.events[0].response_bytes = body.len() as u64;
             seal_search_time_trace(&mut trace).unwrap();
@@ -1422,6 +1423,9 @@ mod tests {
             },
             &[0x92; 32],
         ).unwrap();
+        trace.challenge_packet_sha256 = bundle.public_packet.public_packet_sha256.clone();
+        trace.model_checkpoint_sha256 = bundle.public_packet.model_checkpoint_sha256.clone();
+        seal_search_time_trace(&mut trace).unwrap();
         assert!(analyze_search_time_response_bodies(&trace, &bundle, &[], &[])
             .unwrap_err().contains("every response-bearing allowed event"));
         let findings = analyze_search_time_response_bodies(&trace, &bundle, &[], &[1]).unwrap();
