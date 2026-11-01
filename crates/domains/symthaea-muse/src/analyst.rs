@@ -1675,6 +1675,8 @@ mod tests {
         let definition_basis = basis(EvidenceStatus::Observed, "test", &[]);
         let mut bass_entrance = note("n3", 3.0, "normal");
         bass_entrance.voice_role = "Bass".into();
+        let mut bass_entrance = note("n3", 3.0, "normal");
+        bass_entrance.voice_role = "Bass".into();
         let composition = ListenCompositionBundle {
             ticks_per_beat: 480,
             duration_ticks: 1920,
