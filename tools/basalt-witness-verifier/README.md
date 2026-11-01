@@ -18,7 +18,10 @@ It currently:
 - checks payload-type binding;
 - returns the exact authenticated payload bytes from the DSSE verification result;
 - requires those bytes to be byte-for-byte RFC 8785 canonical JSON;
-- reports exact envelope, payload and trust-store digests.
+- reports exact envelope, payload and trust-store digests;
+- authenticates nonce-bound head responses from individual members;
+- verifies each referenced checkpoint DSSE envelope against the write quorum and recomputes its domain-separated checkpoint digest;
+- accepts lagging replicas, rejects same-sequence certified forks, and selects the highest certified sequence among the distinct read-quorum members.
 
 The verifier uses the `dsse` crate for DSSE PAE, Ed25519 signing/verification and distinct-key threshold verification; `serde_json_canonicalizer` for RFC 8785 JCS; and `ed25519-dalek` for public-key identity fixtures. See [DSSE crate documentation](https://docs.rs/dsse/latest/dsse/), [serde_json_canonicalizer](https://docs.rs/serde_json_canonicalizer/latest/serde_json_canonicalizer/), and [ed25519-dalek](https://docs.rs/ed25519-dalek/latest/ed25519_dalek/).
 
