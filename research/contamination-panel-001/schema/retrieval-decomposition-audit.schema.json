@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/retrieval-decomposition-audit-v1.json",
+  "title": "Retrieval decomposition artifact audit v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "valid",
+    "corpus_digest_matches",
+    "oracle_digest_matches",
+    "document_hashes_and_lengths_match",
+    "evidence_spans_match",
+    "claim_graph_is_acyclic",
+    "distractor_arithmetic_matches",
+    "expected_answer_matches_calculation",
+    "experiment_bindings_match",
+    "all_six_arms_present",
+    "replicate_arm_orders_are_permutations",
+    "unique_task_and_replicate_bindings",
+    "candidate_oracle_separation_declared",
+    "document_count",
+    "claim_count",
+    "distractor_count",
+    "replicate_count",
+    "corpus_sha256",
+    "oracle_sha256",
+    "experiment_id",
+    "experiment_status",
+    "issues",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.retrieval_decomposition.audit.v1"
+    },
+    "valid": {
+      "type": "boolean"
+    },
+    "corpus_digest_matches": {
+      "type": "boolean"
+    },
+    "oracle_digest_matches": {
+      "type": "boolean"
+    },
+    "document_hashes_and_lengths_match": {
+      "type": "boolean"
+    },
+    "evidence_spans_match": {
+      "type": "boolean"
+    },
+    "claim_graph_is_acyclic": {
+      "type": "boolean"
+    },
+    "distractor_arithmetic_matches": {
+      "type": "boolean"
+    },
+    "expected_answer_matches_calculation": {
+      "type": "boolean"
+    },
+    "experiment_bindings_match": {
+      "type": "boolean"
+    },
+    "all_six_arms_present": {
+      "type": "boolean"
+    },
+    "replicate_arm_orders_are_permutations": {
+      "type": "boolean"
+    },
+    "unique_task_and_replicate_bindings": {
+      "type": "boolean"
+    },
+    "candidate_oracle_separation_declared": {
+      "type": "boolean"
+    },
+    "document_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "claim_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "distractor_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "replicate_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "corpus_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "oracle_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "experiment_status": {
+      "enum": [
+        "protocol_only",
+        "exploratory",
+        "confirmatory_preregistered"
+      ]
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
