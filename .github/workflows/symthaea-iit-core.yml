@@ -22,8 +22,8 @@ defaults:
 jobs:
   rust-core:
     name: Compile and test the IIT model/repertoire core
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -79,32 +79,35 @@ jobs:
           git diff --no-index -- /tmp/Cargo.lock.before Cargo.lock || true
           echo "----- End Cargo.lock delta -----"
 
+      - name: Build isolated benchmark examples in release mode
+        run: cargo build --release --locked -p symthaea-iit --examples 2>&1 | tee target/iit-benchmark-evidence/release-build.log
+
       - name: Exercise deterministic partition sweep
-        run: cargo run --locked -p symthaea-iit --example directed_partition_sweep -- --repeats 2 2>&1 | tee target/iit-benchmark-evidence/directed-partitions.csv
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/directed-partitions.time.txt target/release/examples/directed_partition_sweep --repeats 5 2>&1 | tee target/iit-benchmark-evidence/directed-partitions.csv
 
       - name: Exercise bounded factor-graph elimination sweep
-        run: cargo run --locked -p symthaea-iit --example factor_elimination_sweep 2>&1 | tee target/iit-benchmark-evidence/factor-elimination.csv
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/factor-elimination.time.txt target/release/examples/factor_elimination_sweep 2>&1 | tee target/iit-benchmark-evidence/factor-elimination.csv
 
       - name: Exercise exact cutset conditioning under a bounded factor budget
-        run: cargo run --release --locked -p symthaea-iit --example cutset_conditioning_sweep -- --repeats 2 2>&1 | tee target/iit-benchmark-evidence/cutset-conditioning.csv
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/cutset-conditioning.time.txt target/release/examples/cutset_conditioning_sweep --repeats 5 2>&1 | tee target/iit-benchmark-evidence/cutset-conditioning.csv
 
       - name: Rank exact cutset separator candidates before inference
-        run: cargo run --release --locked -p symthaea-iit --example cutset_frontier_sweep 2>&1 | tee target/iit-benchmark-evidence/cutset-frontier.csv
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/cutset-frontier.time.txt target/release/examples/cutset_frontier_sweep 2>&1 | tee target/iit-benchmark-evidence/cutset-frontier.csv
 
       - name: Benchmark proper-system Eq4 with sparse external backgrounds
-        run: cargo run --locked -p symthaea-iit --example eq4_sparse_background_sweep 2>&1 | tee target/iit-benchmark-evidence/eq4-background.csv
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/eq4-background.time.txt target/release/examples/eq4_sparse_background_sweep 2>&1 | tee target/iit-benchmark-evidence/eq4-background.csv
 
       - name: Benchmark sparse local-CPT Eq4 across growing substrates
-        run: cargo run --locked -p symthaea-iit --example sparse_eq4_scale_sweep -- --repeats 3 2>&1 | tee target/iit-benchmark-evidence/sparse-eq4-scale.csv
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/sparse-eq4-scale.time.txt target/release/examples/sparse_eq4_scale_sweep --repeats 5 2>&1 | tee target/iit-benchmark-evidence/sparse-eq4-scale.csv
 
       - name: Benchmark sparse Eq4 across ring, hub-spoke, and grid topologies
-        run: cargo run --release --locked -p symthaea-iit --example sparse_eq4_topology_sweep -- --repeats 3 2>&1 | tee target/iit-benchmark-evidence/sparse-eq4-topologies.csv
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/sparse-eq4-topologies.time.txt target/release/examples/sparse_eq4_topology_sweep --repeats 5 2>&1 | tee target/iit-benchmark-evidence/sparse-eq4-topologies.csv
 
       - name: Benchmark sparse fixed-state partition scoring
-        run: cargo run --locked -p symthaea-iit --example sparse_partition_score_sweep -- --repeats 1 2>&1 | tee target/iit-benchmark-evidence/sparse-partition-score.csv
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/sparse-partition-score.time.txt target/release/examples/sparse_partition_score_sweep --repeats 5 2>&1 | tee target/iit-benchmark-evidence/sparse-partition-score.csv
 
       - name: Benchmark exact sparse system-search reuse
-        run: cargo run --release --locked -p symthaea-iit --example sparse_system_search_reuse_sweep -- --repeats 2 --max-units 2048 2>&1 | tee target/iit-benchmark-evidence/sparse-full-system-search.csv
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/sparse-full-system-search.time.txt target/release/examples/sparse_system_search_reuse_sweep --repeats 5 --max-units 2048 2>&1 | tee target/iit-benchmark-evidence/sparse-full-system-search.csv
 
       - name: Clippy the isolated crate
         run: cargo clippy --locked -p symthaea-iit --all-targets -- -D warnings 2>&1 | tee target/iit-benchmark-evidence/clippy.log
