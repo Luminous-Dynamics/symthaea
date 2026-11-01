@@ -223,9 +223,9 @@ fn evaluate_control(
         )
     } else if desired_match {
         (
-            "claim_satisfied_for_declared_scope",
-            "continue",
-            "the claim matches the policy and has linked evidence from an accepted source",
+            "independent_verifier_required",
+            "abstain",
+            "a linked evidence source label is not an authenticated verification receipt; an independent verifier must qualify the exact claim, evidence, and profile digest",
         )
     } else {
         (
@@ -266,25 +266,14 @@ fn compile_policy(policy: &Value, profile: &Value, policy_bytes: &[u8], profile_
         .map(|control| evaluate_control(control, profile, &ledger))
         .collect::<Result<Vec<_>, _>>()?;
 
-    let all_satisfied = obligations
-        .iter()
-        .all(|obligation| obligation["status"] == "satisfied_for_declared_scope");
     let incomplete_count = obligations
         .iter()
         .filter(|obligation| obligation["status"] == "evidence_incomplete")
         .count();
-    let unsatisfied_count = obligations.len() - obligations
-        .iter()
-        .filter(|obligation| obligation["status"] == "satisfied_for_declared_scope")
-        .count();
 
     Ok(json!({
         "schema_version": "hardsec-mobile-policy-receipt-v1",
-        "result": if all_satisfied {
-            "all_claims_satisfied_for_declared_scope"
-        } else {
-            "policy_not_satisfied_or_evidence_incomplete"
-        },
+        "result": "obligations_compiled_verification_not_performed",
         "claim_scope": "deterministic policy obligation evaluation only; not proof of device security",
         "policy_id": policy["policy_id"],
         "policy_sha256": sha256_hex(policy_bytes),
@@ -296,8 +285,8 @@ fn compile_policy(policy: &Value, profile: &Value, policy_bytes: &[u8], profile_
             "soc_family": profile["device"]["soc_family"]
         },
         "obligation_count": obligations.len(),
-        "satisfied_count": obligations.len() - unsatisfied_count,
-        "unsatisfied_count": unsatisfied_count,
+        "satisfied_count": 0,
+        "outstanding_count": obligations.len(),
         "evidence_incomplete_count": incomplete_count,
         "obligations": obligations,
         "claim_ceiling": {
@@ -306,8 +295,9 @@ fn compile_policy(policy: &Value, profile: &Value, policy_bytes: &[u8], profile_
             "physical_attack_resistance_established": false,
             "limitations": [
                 "The compiler evaluates declared profile claims; it does not configure the operating system.",
-                "A satisfied obligation means only that the required claim has linked evidence of an accepted source type.",
-                "Evidence source authenticity, freshness, scope and quality must be checked by the corresponding independent verifier.",
+                "This compiler never marks a security control satisfied; it emits verification obligations only.",
+                "Evidence source-type labels are untrusted metadata, not authenticated proof of their own authenticity.",
+                "Independent verifiers must authenticate source, freshness, scope, quality and the exact profile/evidence digests.",
                 "The supplied Pixel 8 Pro input is a synthetic capability fixture, not a physical-device capture."
             ]
         }
@@ -384,10 +374,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(
-            receipt["result"],
-            "policy_not_satisfied_or_evidence_incomplete"
-        );
+        assert_eq!(receipt["result"], "obligations_compiled_verification_not_performed");
         assert_eq!(receipt["satisfied_count"], 0);
         assert_eq!(receipt["obligation_count"], 6);
         assert_eq!(receipt["evidence_incomplete_count"], 6);
@@ -415,7 +402,7 @@ mod tests {
     }
 
     #[test]
-    fn claim_scoped_accepted_evidence_can_satisfy_runtime_obligation() {
+    fn accepted_source_label_still_requires_an_independent_verifier() {
         let mut profile = fixture_profile();
         profile["evidence_domain"] = Value::String("physical_device_lab".to_owned());
         profile["hardware_protections"]["memory_tagging"]["runtime_state"] =
@@ -440,7 +427,8 @@ mod tests {
             .unwrap();
         let receipt = evaluate_control(mte, &profile, &ledger).unwrap();
 
-        assert_eq!(receipt["status"], "claim_satisfied_for_declared_scope");
+        assert_eq!(receipt["status"], "independent_verifier_required");
+        assert_eq!(receipt["action"], "abstain");
     }
 
     #[test]
