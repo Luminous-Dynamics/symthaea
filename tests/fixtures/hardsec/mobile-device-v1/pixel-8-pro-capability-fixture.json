@@ -18,7 +18,8 @@
     "attestation_security_level": "not_measured",
     "attestation_challenge_freshness": "not_measured",
     "certificate_chain_status": "not_measured",
-    "patch_level_binding_status": "not_measured"
+    "patch_level_binding_status": "not_measured",
+    "evidence_ids": []
   },
   "hardware_protections": {
     "memory_tagging": {
@@ -74,7 +75,8 @@
     "time_running_ns": null,
     "read_overhead_status": "not_measured",
     "sample_loss_status": "not_measured",
-    "observer_effect_status": "not_measured"
+    "observer_effect_status": "not_measured",
+    "evidence_ids": []
   },
   "environment": {
     "thermal_status": "not_measured",
