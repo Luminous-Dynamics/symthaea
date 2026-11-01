@@ -48,7 +48,7 @@ impl fmt::Display for SandboxPlanError {
             Self::ZeroDigest(field) => write!(f, "{field} digest must be nonzero"),
             Self::InvalidLimit(field) => write!(f, "invalid sandbox resource limit: {field}"),
             Self::InvalidSeccompDescriptor => {
-                write!(f, "seccomp descriptor must be a pre-opened fd >= 3")
+                write!(f, "seccomp descriptor must be pre-opened and normalized to fd 3")
             }
             Self::InvalidBubblewrapPath => {
                 write!(f, "Bubblewrap executable must be an absolute pinned Nix store path")
@@ -152,7 +152,7 @@ fn validate_spec(spec: &CandidateSandboxSpec) -> Result<Vec<RuntimeClosureEntry>
     if spec.seccomp_sha256 == [0; 32] {
         return Err(SandboxPlanError::ZeroDigest("seccomp"));
     }
-    if spec.seccomp_fd < 3 {
+    if spec.seccomp_fd != 3 {
         return Err(SandboxPlanError::InvalidSeccompDescriptor);
     }
     if candidate_store_root(&spec.candidate_executable).is_none() {
@@ -424,6 +424,37 @@ mod tests {
         assert!(!plan.bubblewrap_arguments.iter().any(|arg| arg == "/home"));
         assert!(plan.bubblewrap_arguments.iter().any(|arg| arg == "--clearenv"));
         assert!(plan.bubblewrap_arguments.iter().any(|arg| arg == "--seccomp"));
+    }
+
+    #[test]
+    fn scope_mode_uses_pipe_without_invalid_wait_or_service_only_properties() {
+        let plan = build_candidate_sandbox_plan(&spec()).unwrap();
+        assert!(plan.systemd_run_arguments.iter().any(|arg| arg == "--scope"));
+        assert!(plan.systemd_run_arguments.iter().any(|arg| arg == "--pipe"));
+        assert!(!plan.systemd_run_arguments.iter().any(|arg| arg == "--wait"));
+        for service_only in [
+            "--property=NoNewPrivileges=yes",
+            "--property=PrivateNetwork=yes",
+            "--property=ProtectHome=yes",
+            "--property=ProtectSystem=strict",
+        ] {
+            assert!(!plan.systemd_run_arguments.iter().any(|arg| arg == service_only));
+        }
+    }
+
+    #[test]
+    fn seccomp_descriptor_is_normalized_to_fd_three() {
+        let mut invalid = spec();
+        invalid.seccomp_fd = 4;
+        assert_eq!(
+            build_candidate_sandbox_plan(&invalid).unwrap_err(),
+            SandboxPlanError::InvalidSeccompDescriptor
+        );
+        let plan = build_candidate_sandbox_plan(&spec()).unwrap();
+        let index = plan.bubblewrap_arguments.iter()
+            .position(|arg| arg == "--seccomp")
+            .unwrap();
+        assert_eq!(plan.bubblewrap_arguments[index + 1], "3");
     }
 
     #[test]
