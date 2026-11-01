@@ -47,7 +47,7 @@ The deterministic CLI fixture emits four PREFIX_REPLAY_ROW records: terminal cou
 
 V1 does not yet include:
 
-- a remaining hard-budget receipt per prefix, so false-feasible/false-infeasible classification is not computed;
+- paired evaluation of the frontier model, historical baseline, last-observed-cost, conformal and CAP prediction outputs on a large real task suite;
 - a baseline comparison against static estimates, last-observed-cost, selection-blind conformal, CAP, or BAGEN;
 - forecast-query overhead in all-in resource usage;
 - model/selection-policy replay or the generation of fresh estimates from prefixes; it evaluates already recorded forecasts;
@@ -62,6 +62,17 @@ V1 does not yet include:
 4. Record forecast-query overhead and include it in all-in cost.
 5. Report confidence intervals and worst-family calibration; preserve censoring and competing risks.
 
+## Remaining-budget feasibility
+
+`evaluate_with_budgets` accepts a `PrefixBudgetReceipt` keyed by exact `(run_id, decision_sequence)` and bound to the forecast's `pre_state_digest`. It rejects duplicate, unknown, zero-identity, and state-mismatched receipts. A prediction is feasible only when the forecast is in-domain, has nonzero support, exceeds the caller's completion-probability threshold, and its q90 resource vector plus mandatory-verification reserve fits all six remaining budget dimensions. Shifted or unsupported forecasts abstain.
+
+Actual feasibility is known for a verified sufficient-proof outcome when measured remaining work fits the budget, or for a right-censored episode when its observed lower bound already exceeds at least one resource limit. Otherwise the actual outcome remains unknown. Competing terminals and pending feedback are excluded from confusion-matrix rates. False-feasible and false-infeasible rates use only resolved predictions of the corresponding class; abstentions are separately counted.
+
+## Frozen historical baseline
+
+`historical_baseline.rs` fits a task-family conditional empirical median and nearest-rank q90/q95 from exact independently verified training completions. Censored, competing, and pending training episodes do not contribute exact cost labels. Unseen task families fall back to a global empirical profile. Evaluation rejects any run ID that overlaps the training cohort and emits q50 absolute error/signed bias plus marginal q90/q95 empirical coverage on the same verified evaluation labels as the frontier-conditioned predictor.
+
+This baseline is a deliberately simple comparator, not a conformal method. Its q90/q95 are empirical order statistics and provide no distribution-free coverage guarantee. The deterministic fixture includes a censored training run (excluded), a family-specific prediction, an unseen-family global fallback, and a disjoint evaluation set.
 ## Claim limits
 
 This slice validates journal replay and deterministic feasibility accounting. It does not demonstrate better forecast accuracy, lower false-feasible rates, improved task success, or superiority over BAGEN/industry baselines. Those claims require the paired prefix benchmark, disjoint task-family and chronological holdouts, and externally reviewable raw receipts.
