@@ -14,16 +14,13 @@
 use crate::{
     hash_domain,
     intervention::{
-        RandomizedInterventionDesignV1, RandomizedInterventionManifestV1,
-        audit_intervention,
+        RandomizedInterventionDesignV1, RandomizedInterventionManifestV1, audit_intervention,
     },
 };
 use serde::{Deserialize, Serialize};
 
-pub const TRAINING_RECEIPT_SCHEMA: &str =
-    "symthaea.paired_training_execution_receipt.v1";
-pub const TRAINING_RECEIPT_REPORT_SCHEMA: &str =
-    "symthaea.paired_training_execution_audit.v1";
+pub const TRAINING_RECEIPT_SCHEMA: &str = "symthaea.paired_training_execution_receipt.v1";
+pub const TRAINING_RECEIPT_REPORT_SCHEMA: &str = "symthaea.paired_training_execution_audit.v1";
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -172,9 +169,8 @@ fn validate_utc_timestamp(value: &str, label: &str) -> Result<(), String> {
             return Err(format!("{label} must use YYYY-MM-DDTHH:MM:SSZ"));
         }
     }
-    let parse = |start: usize, end: usize| -> u32 {
-        value[start..end].parse::<u32>().unwrap_or(u32::MAX)
-    };
+    let parse =
+        |start: usize, end: usize| -> u32 { value[start..end].parse::<u32>().unwrap_or(u32::MAX) };
     let year = parse(0, 4);
     let month = parse(5, 7);
     let day = parse(8, 10);
@@ -189,21 +185,15 @@ fn validate_utc_timestamp(value: &str, label: &str) -> Result<(), String> {
         2 => 28,
         _ => 0,
     };
-    if year == 0
-        || day == 0
-        || day > days_in_month
-        || hour > 23
-        || minute > 59
-        || second > 59
-    {
-        return Err(format!("{label} contains an impossible date or clock value"));
+    if year == 0 || day == 0 || day > days_in_month || hour > 23 || minute > 59 || second > 59 {
+        return Err(format!(
+            "{label} contains an impossible date or clock value"
+        ));
     }
     Ok(())
 }
 
-fn expected_design_sha256(
-    design: &RandomizedInterventionDesignV1,
-) -> Result<String, String> {
+fn expected_design_sha256(design: &RandomizedInterventionDesignV1) -> Result<String, String> {
     // This must remain byte-for-byte consistent with randomize_intervention.
     let bytes = serde_json::to_vec(design)
         .map_err(|error| format!("cannot serialize intervention design: {error}"))?;
@@ -214,7 +204,8 @@ fn intervention_payload_digest(
     manifest: &RandomizedInterventionManifestV1,
     arm: TrainingArmV1,
 ) -> Result<String, String> {
-    let entries: Vec<InterventionPayloadEntryV1<'_>> = manifest.assignments
+    let entries: Vec<InterventionPayloadEntryV1<'_>> = manifest
+        .assignments
         .iter()
         .filter(|assignment| assignment.assigned_to_exposure)
         .map(|assignment| match arm {
@@ -252,7 +243,9 @@ fn validate_arm_common(
         return Err(format!("expected {:?} arm receipt", expected_arm));
     }
     if arm.run_id.trim().is_empty() || arm.run_id.len() > 256 {
-        return Err(format!("{expected_arm:?} run_id must be nonempty and <=256 bytes"));
+        return Err(format!(
+            "{expected_arm:?} run_id must be nonempty and <=256 bytes"
+        ));
     }
 
     for (value, label) in [
@@ -260,19 +253,49 @@ fn validate_arm_common(
         (&arm.parent_checkpoint_sha256, "parent_checkpoint_sha256"),
         (&arm.output_checkpoint_sha256, "output_checkpoint_sha256"),
         (&arm.training_corpus_sha256, "training_corpus_sha256"),
-        (&arm.shared_training_corpus_sha256, "shared_training_corpus_sha256"),
-        (&arm.intervention_manifest_sha256, "intervention_manifest_sha256"),
-        (&arm.intervention_assignment_sha256, "intervention_assignment_sha256"),
-        (&arm.intervention_payload_sha256, "intervention_payload_sha256"),
-        (&arm.training_rng_seed_commitment_sha256, "training_rng_seed_commitment_sha256"),
+        (
+            &arm.shared_training_corpus_sha256,
+            "shared_training_corpus_sha256",
+        ),
+        (
+            &arm.intervention_manifest_sha256,
+            "intervention_manifest_sha256",
+        ),
+        (
+            &arm.intervention_assignment_sha256,
+            "intervention_assignment_sha256",
+        ),
+        (
+            &arm.intervention_payload_sha256,
+            "intervention_payload_sha256",
+        ),
+        (
+            &arm.training_rng_seed_commitment_sha256,
+            "training_rng_seed_commitment_sha256",
+        ),
         (&arm.training_code_sha256, "training_code_sha256"),
         (&arm.runtime_image_sha256, "runtime_image_sha256"),
-        (&arm.tokenization_pipeline_sha256, "tokenization_pipeline_sha256"),
-        (&arm.training_hyperparameters_sha256, "training_hyperparameters_sha256"),
+        (
+            &arm.tokenization_pipeline_sha256,
+            "tokenization_pipeline_sha256",
+        ),
+        (
+            &arm.training_hyperparameters_sha256,
+            "training_hyperparameters_sha256",
+        ),
         (&arm.optimizer_schedule_sha256, "optimizer_schedule_sha256"),
-        (&arm.corpus_shard_manifest_sha256, "corpus_shard_manifest_sha256"),
-        (&arm.post_tokenization_manifest_sha256, "post_tokenization_manifest_sha256"),
-        (&arm.trainer_job_execution_receipt_sha256, "trainer_job_execution_receipt_sha256"),
+        (
+            &arm.corpus_shard_manifest_sha256,
+            "corpus_shard_manifest_sha256",
+        ),
+        (
+            &arm.post_tokenization_manifest_sha256,
+            "post_tokenization_manifest_sha256",
+        ),
+        (
+            &arm.trainer_job_execution_receipt_sha256,
+            "trainer_job_execution_receipt_sha256",
+        ),
     ] {
         validate_digest(value, label)?;
     }
@@ -285,44 +308,62 @@ fn validate_arm_common(
     validate_utc_timestamp(&arm.started_at_utc, "started_at_utc")?;
     validate_utc_timestamp(&arm.completed_at_utc, "completed_at_utc")?;
     if arm.completed_at_utc < arm.started_at_utc {
-        return Err(format!("{expected_arm:?} completed_at_utc precedes started_at_utc"));
+        return Err(format!(
+            "{expected_arm:?} completed_at_utc precedes started_at_utc"
+        ));
     }
     if arm.wall_clock_millis == 0 {
-        return Err(format!("{expected_arm:?} wall_clock_millis must be positive"));
+        return Err(format!(
+            "{expected_arm:?} wall_clock_millis must be positive"
+        ));
     }
 
     if arm.base_checkpoint_sha256 != design.model_base_checkpoint_sha256
         || arm.parent_checkpoint_sha256 != design.model_base_checkpoint_sha256
     {
-        return Err(format!("{expected_arm:?} base/parent checkpoint does not match preregistered base"));
+        return Err(format!(
+            "{expected_arm:?} base/parent checkpoint does not match preregistered base"
+        ));
     }
     let expected_corpus = match expected_arm {
         TrainingArmV1::Treatment => &design.treatment_training_corpus_sha256,
         TrainingArmV1::Placebo => &design.placebo_training_corpus_sha256,
     };
     if &arm.training_corpus_sha256 != expected_corpus {
-        return Err(format!("{expected_arm:?} training corpus digest does not match design"));
+        return Err(format!(
+            "{expected_arm:?} training corpus digest does not match design"
+        ));
     }
     if arm.shared_training_corpus_sha256 != design.shared_training_corpus_sha256
         || arm.shared_training_token_count != design.shared_training_token_count
     {
-        return Err(format!("{expected_arm:?} shared corpus identity/budget does not match design"));
+        return Err(format!(
+            "{expected_arm:?} shared corpus identity/budget does not match design"
+        ));
     }
     if arm.intervention_manifest_sha256 != manifest.manifest_sha256
         || arm.intervention_assignment_sha256 != manifest.assignment_sha256
     {
-        return Err(format!("{expected_arm:?} receipt does not bind the exact intervention assignment"));
+        return Err(format!(
+            "{expected_arm:?} receipt does not bind the exact intervention assignment"
+        ));
     }
     if arm.intervention_payload_sha256 != expected_payload_sha256 {
-        return Err(format!("{expected_arm:?} payload digest does not match assigned records"));
+        return Err(format!(
+            "{expected_arm:?} payload digest does not match assigned records"
+        ));
     }
     if arm.intervention_token_count != expected_intervention_tokens {
-        return Err(format!("{expected_arm:?} intervention token count does not match assignment"));
+        return Err(format!(
+            "{expected_arm:?} intervention token count does not match assignment"
+        ));
     }
     if arm.requested_total_training_token_budget != design.total_training_token_budget
         || arm.requested_training_steps != design.training_steps
     {
-        return Err(format!("{expected_arm:?} requested training budget/steps do not match design"));
+        return Err(format!(
+            "{expected_arm:?} requested training budget/steps do not match design"
+        ));
     }
     if arm.training_rng_seed_commitment_sha256 != design.training_rng_seed_commitment_sha256
         || arm.training_code_sha256 != design.training_code_sha256
@@ -331,20 +372,27 @@ fn validate_arm_common(
         || arm.training_hyperparameters_sha256 != design.training_hyperparameters_sha256
         || arm.optimizer_schedule_sha256 != design.optimizer_schedule_sha256
     {
-        return Err(format!("{expected_arm:?} trainer code/runtime/tokenizer/configuration does not match design"));
+        return Err(format!(
+            "{expected_arm:?} trainer code/runtime/tokenizer/configuration does not match design"
+        ));
     }
 
-    let observed_total = arm.observed_shared_training_token_count
+    let observed_total = arm
+        .observed_shared_training_token_count
         .checked_add(arm.observed_intervention_token_count)
         .ok_or_else(|| format!("{expected_arm:?} observed token total overflows u64"))?;
     if arm.observed_total_training_token_count != observed_total {
-        return Err(format!("{expected_arm:?} observed total token count does not equal component sum"));
+        return Err(format!(
+            "{expected_arm:?} observed total token count does not equal component sum"
+        ));
     }
     if arm.observed_shared_training_token_count > design.shared_training_token_count
         || arm.observed_intervention_token_count > expected_intervention_tokens
         || arm.observed_training_steps > design.training_steps
     {
-        return Err(format!("{expected_arm:?} observed tokens/steps exceed declared budgets"));
+        return Err(format!(
+            "{expected_arm:?} observed tokens/steps exceed declared budgets"
+        ));
     }
     match arm.status {
         TrainingRunStatusV1::Completed => {
@@ -353,7 +401,9 @@ fn validate_arm_common(
                 || arm.observed_total_training_token_count != design.total_training_token_budget
                 || arm.observed_training_steps != design.training_steps
             {
-                return Err(format!("{expected_arm:?} completed run did not consume the full declared token/step budget"));
+                return Err(format!(
+                    "{expected_arm:?} completed run did not consume the full declared token/step budget"
+                ));
             }
         }
         TrainingRunStatusV1::Partial | TrainingRunStatusV1::Failed => {
@@ -361,7 +411,9 @@ fn validate_arm_common(
         }
     }
     if arm.output_checkpoint_sha256 == arm.base_checkpoint_sha256 {
-        return Err(format!("{expected_arm:?} output checkpoint must differ from base checkpoint"));
+        return Err(format!(
+            "{expected_arm:?} output checkpoint must differ from base checkpoint"
+        ));
     }
     Ok(())
 }
@@ -379,8 +431,10 @@ pub fn validate_paired_training_execution_receipt(
     receipt_bytes: &[u8],
 ) -> Result<PairedTrainingExecutionAuditV1, String> {
     audit_intervention(design, manifest, seed)?;
-    let receipt: PairedTrainingExecutionReceiptV1 = serde_json::from_slice(receipt_bytes)
-        .map_err(|error| format!("paired training receipt does not match strict v1 JSON: {error}"))?;
+    let receipt: PairedTrainingExecutionReceiptV1 =
+        serde_json::from_slice(receipt_bytes).map_err(|error| {
+            format!("paired training receipt does not match strict v1 JSON: {error}")
+        })?;
     if receipt.schema != TRAINING_RECEIPT_SCHEMA {
         return Err(format!("receipt schema must be {TRAINING_RECEIPT_SCHEMA}"));
     }
@@ -389,7 +443,9 @@ pub fn validate_paired_training_execution_receipt(
         || receipt.experiment_id != manifest.experiment_id
         || receipt.replicate_id != manifest.replicate_id
     {
-        return Err("receipt experiment/replicate identity does not match design and manifest".to_owned());
+        return Err(
+            "receipt experiment/replicate identity does not match design and manifest".to_owned(),
+        );
     }
 
     let expected_design_sha256 = expected_design_sha256(design)?;
@@ -401,8 +457,7 @@ pub fn validate_paired_training_execution_receipt(
     }
     let expected_treatment_payload =
         intervention_payload_digest(manifest, TrainingArmV1::Treatment)?;
-    let expected_placebo_payload =
-        intervention_payload_digest(manifest, TrainingArmV1::Placebo)?;
+    let expected_placebo_payload = intervention_payload_digest(manifest, TrainingArmV1::Placebo)?;
 
     let mut issues = Vec::new();
     validate_arm_common(
@@ -437,47 +492,68 @@ pub fn validate_paired_training_execution_receipt(
         serde_json::to_vec(&clone)
             .map_err(|error| format!("cannot serialize receipt for digest: {error}"))?
     };
-    let expected_receipt_digest =
-        hash_domain(b"paired-training-execution-receipt.v1", &receipt_without_digest);
+    let expected_receipt_digest = hash_domain(
+        b"paired-training-execution-receipt.v1",
+        &receipt_without_digest,
+    );
     if receipt.pair_receipt_sha256 != expected_receipt_digest {
         return Err("paired training receipt digest does not match contents".to_owned());
     }
 
     let treatment_completed = receipt.treatment.status == TrainingRunStatusV1::Completed;
     let placebo_completed = receipt.placebo.status == TrainingRunStatusV1::Completed;
-    let training_configuration_matched =
-        receipt.treatment.training_code_sha256 == receipt.placebo.training_code_sha256
+    let training_configuration_matched = receipt.treatment.training_code_sha256
+        == receipt.placebo.training_code_sha256
         && receipt.treatment.runtime_image_sha256 == receipt.placebo.runtime_image_sha256
-        && receipt.treatment.tokenization_pipeline_sha256 == receipt.placebo.tokenization_pipeline_sha256
-        && receipt.treatment.training_hyperparameters_sha256 == receipt.placebo.training_hyperparameters_sha256
+        && receipt.treatment.tokenization_pipeline_sha256
+            == receipt.placebo.tokenization_pipeline_sha256
+        && receipt.treatment.training_hyperparameters_sha256
+            == receipt.placebo.training_hyperparameters_sha256
         && receipt.treatment.optimizer_schedule_sha256 == receipt.placebo.optimizer_schedule_sha256
-        && receipt.treatment.training_rng_seed_commitment_sha256 == receipt.placebo.training_rng_seed_commitment_sha256
+        && receipt.treatment.training_rng_seed_commitment_sha256
+            == receipt.placebo.training_rng_seed_commitment_sha256
         && receipt.treatment.requested_training_steps == receipt.placebo.requested_training_steps
-        && receipt.treatment.requested_total_training_token_budget == receipt.placebo.requested_total_training_token_budget;
-    let base_checkpoint_matched =
-        receipt.treatment.base_checkpoint_sha256 == receipt.placebo.base_checkpoint_sha256
+        && receipt.treatment.requested_total_training_token_budget
+            == receipt.placebo.requested_total_training_token_budget;
+    let base_checkpoint_matched = receipt.treatment.base_checkpoint_sha256
+        == receipt.placebo.base_checkpoint_sha256
         && receipt.treatment.parent_checkpoint_sha256 == receipt.placebo.parent_checkpoint_sha256;
-    let corpus_identities_matched_to_design =
-        receipt.treatment.training_corpus_sha256 == design.treatment_training_corpus_sha256
+    let corpus_identities_matched_to_design = receipt.treatment.training_corpus_sha256
+        == design.treatment_training_corpus_sha256
         && receipt.placebo.training_corpus_sha256 == design.placebo_training_corpus_sha256;
-    let treatment_token_budget_conserved =
-        receipt.treatment.status == TrainingRunStatusV1::Completed
-        && receipt.treatment.observed_total_training_token_count == design.total_training_token_budget;
-    let placebo_token_budget_conserved =
-        receipt.placebo.status == TrainingRunStatusV1::Completed
-        && receipt.placebo.observed_total_training_token_count == design.total_training_token_budget;
+    let treatment_token_budget_conserved = receipt.treatment.status
+        == TrainingRunStatusV1::Completed
+        && receipt.treatment.observed_total_training_token_count
+            == design.total_training_token_budget;
+    let placebo_token_budget_conserved = receipt.placebo.status == TrainingRunStatusV1::Completed
+        && receipt.placebo.observed_total_training_token_count
+            == design.total_training_token_budget;
     let observed_token_budgets_complete =
         treatment_token_budget_conserved && placebo_token_budget_conserved;
     let observed_step_budgets_complete = treatment_completed
         && placebo_completed
         && receipt.treatment.observed_training_steps == design.training_steps
         && receipt.placebo.observed_training_steps == design.training_steps;
-    let runner_attestation_digests_present =
-        receipt.treatment.runner_attestation_sha256.as_deref().is_some_and(valid_digest)
-        && receipt.placebo.runner_attestation_sha256.as_deref().is_some_and(valid_digest);
-    let checkpoint_custody_digests_present =
-        receipt.treatment.checkpoint_custody_receipt_sha256.as_deref().is_some_and(valid_digest)
-        && receipt.placebo.checkpoint_custody_receipt_sha256.as_deref().is_some_and(valid_digest);
+    let runner_attestation_digests_present = receipt
+        .treatment
+        .runner_attestation_sha256
+        .as_deref()
+        .is_some_and(valid_digest)
+        && receipt
+            .placebo
+            .runner_attestation_sha256
+            .as_deref()
+            .is_some_and(valid_digest);
+    let checkpoint_custody_digests_present = receipt
+        .treatment
+        .checkpoint_custody_receipt_sha256
+        .as_deref()
+        .is_some_and(valid_digest)
+        && receipt
+            .placebo
+            .checkpoint_custody_receipt_sha256
+            .as_deref()
+            .is_some_and(valid_digest);
     let paired_checkpoints_distinct =
         receipt.treatment.output_checkpoint_sha256 != receipt.placebo.output_checkpoint_sha256;
 
@@ -533,8 +609,8 @@ pub fn validate_paired_training_execution_receipt(
 mod tests {
     use super::*;
     use crate::intervention::{
-        randomize_intervention, ExposureMechanismV1, RandomizedInterventionDesignV1,
-        SourceClusterV1, TrainingStageV1,
+        ExposureMechanismV1, RandomizedInterventionDesignV1, SourceClusterV1, TrainingStageV1,
+        randomize_intervention,
     };
     use serde_json::Value;
     use std::collections::BTreeSet;
@@ -552,7 +628,10 @@ mod tests {
                     cluster_id: cluster_id.clone(),
                     task_family: family.to_owned(),
                     source_family_sha256: digest(&format!("source-{cluster_id}")),
-                    item_ids: vec![format!("{cluster_id}-item-1"), format!("{cluster_id}-item-2")],
+                    item_ids: vec![
+                        format!("{cluster_id}-item-1"),
+                        format!("{cluster_id}-item-2"),
+                    ],
                     exposure_variant_sha256: digest(&format!("variant-{cluster_id}")),
                     exposure_token_count: 500,
                     matched_placebo_record_sha256: digest(&format!("placebo-{cluster_id}")),
@@ -667,8 +746,7 @@ mod tests {
             let clone = receipt.clone();
             serde_json::to_vec(&clone).unwrap()
         };
-        receipt.pair_receipt_sha256 =
-            hash_domain(b"paired-training-execution-receipt.v1", &bytes);
+        receipt.pair_receipt_sha256 = hash_domain(b"paired-training-execution-receipt.v1", &bytes);
         receipt
     }
 
@@ -691,10 +769,12 @@ mod tests {
     fn strict_receipt_and_audit_schemas_match_serialized_struct_fields() {
         let receipt_schema: Value = serde_json::from_str(include_str!(
             "../schema/paired-training-execution-receipt.schema.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let audit_schema: Value = serde_json::from_str(include_str!(
             "../schema/paired-training-execution-audit.schema.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let design = design();
         let manifest = randomize_intervention(&design, &seed()).unwrap();
         let receipt = paired_receipt(&design, &manifest);
@@ -704,7 +784,8 @@ mod tests {
             &manifest,
             &seed(),
             &serde_json::to_vec(&receipt).unwrap(),
-        ).unwrap();
+        )
+        .unwrap();
         let audit_value = serde_json::to_value(&report).unwrap();
 
         assert_eq!(
@@ -716,31 +797,58 @@ mod tests {
             Some(TRAINING_RECEIPT_REPORT_SCHEMA)
         );
         let arm_properties: BTreeSet<String> = receipt_schema["$defs"]["arm"]["properties"]
-            .as_object().unwrap().keys().cloned().collect();
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         let arm_required: BTreeSet<String> = receipt_schema["$defs"]["arm"]["required"]
-            .as_array().unwrap().iter()
-            .map(|value| value.as_str().unwrap().to_owned()).collect();
-        let treatment_keys: BTreeSet<String> = receipt_value["treatment"].as_object().unwrap()
-            .keys().cloned().collect();
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().to_owned())
+            .collect();
+        let treatment_keys: BTreeSet<String> = receipt_value["treatment"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(arm_properties, arm_required);
         assert_eq!(arm_properties, treatment_keys);
 
-        let receipt_required: BTreeSet<String> = receipt_schema["required"].as_array().unwrap()
-            .iter().map(|value| value.as_str().unwrap().to_owned()).collect();
-        let receipt_properties: BTreeSet<String> = receipt_schema["properties"].as_object().unwrap()
-            .keys().cloned().collect();
+        let receipt_required: BTreeSet<String> = receipt_schema["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().to_owned())
+            .collect();
+        let receipt_properties: BTreeSet<String> = receipt_schema["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(receipt_required, receipt_properties);
-        let receipt_keys: BTreeSet<String> = receipt_value.as_object().unwrap()
-            .keys().cloned().collect();
+        let receipt_keys: BTreeSet<String> =
+            receipt_value.as_object().unwrap().keys().cloned().collect();
         assert_eq!(receipt_keys, receipt_properties);
 
-        let audit_required: BTreeSet<String> = audit_schema["required"].as_array().unwrap()
-            .iter().map(|value| value.as_str().unwrap().to_owned()).collect();
-        let audit_properties: BTreeSet<String> = audit_schema["properties"].as_object().unwrap()
-            .keys().cloned().collect();
+        let audit_required: BTreeSet<String> = audit_schema["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().to_owned())
+            .collect();
+        let audit_properties: BTreeSet<String> = audit_schema["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(audit_required, audit_properties);
-        let audit_keys: BTreeSet<String> = audit_value.as_object().unwrap()
-            .keys().cloned().collect();
+        let audit_keys: BTreeSet<String> =
+            audit_value.as_object().unwrap().keys().cloned().collect();
         assert_eq!(audit_keys, audit_properties);
     }
 
@@ -748,10 +856,12 @@ mod tests {
     fn receipt_and_audit_schemas_match_serialized_struct_fields() {
         let receipt_schema: Value = serde_json::from_str(include_str!(
             "../schema/paired-training-execution-receipt.schema.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let audit_schema: Value = serde_json::from_str(include_str!(
             "../schema/paired-training-execution-audit.schema.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let design = design();
         let manifest = randomize_intervention(&design, &seed()).unwrap();
         let receipt = paired_receipt(&design, &manifest);
@@ -767,34 +877,66 @@ mod tests {
             audit_schema["properties"]["schema"]["const"].as_str(),
             Some(TRAINING_RECEIPT_REPORT_SCHEMA)
         );
-        let receipt_required: BTreeSet<String> = receipt_schema["required"].as_array().unwrap()
-            .iter().map(|value| value.as_str().unwrap().to_owned()).collect();
-        let receipt_properties: BTreeSet<String> = receipt_schema["properties"].as_object().unwrap()
-            .keys().cloned().collect();
-        let receipt_keys: BTreeSet<String> = receipt_value.as_object().unwrap()
-            .keys().cloned().collect();
+        let receipt_required: BTreeSet<String> = receipt_schema["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().to_owned())
+            .collect();
+        let receipt_properties: BTreeSet<String> = receipt_schema["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+        let receipt_keys: BTreeSet<String> =
+            receipt_value.as_object().unwrap().keys().cloned().collect();
         assert_eq!(receipt_required, receipt_properties);
         assert_eq!(receipt_keys, receipt_properties);
 
         let arm_schema = &receipt_schema["$defs"]["arm"];
-        let arm_required: BTreeSet<String> = arm_schema["required"].as_array().unwrap()
-            .iter().map(|value| value.as_str().unwrap().to_owned()).collect();
-        let arm_properties: BTreeSet<String> = arm_schema["properties"].as_object().unwrap()
-            .keys().cloned().collect();
-        let treatment_keys: BTreeSet<String> = receipt_value["treatment"].as_object().unwrap()
-            .keys().cloned().collect();
-        let placebo_keys: BTreeSet<String> = receipt_value["placebo"].as_object().unwrap()
-            .keys().cloned().collect();
+        let arm_required: BTreeSet<String> = arm_schema["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().to_owned())
+            .collect();
+        let arm_properties: BTreeSet<String> = arm_schema["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+        let treatment_keys: BTreeSet<String> = receipt_value["treatment"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+        let placebo_keys: BTreeSet<String> = receipt_value["placebo"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(arm_required, arm_properties);
         assert_eq!(treatment_keys, arm_properties);
         assert_eq!(placebo_keys, arm_properties);
 
-        let audit_required: BTreeSet<String> = audit_schema["required"].as_array().unwrap()
-            .iter().map(|value| value.as_str().unwrap().to_owned()).collect();
-        let audit_properties: BTreeSet<String> = audit_schema["properties"].as_object().unwrap()
-            .keys().cloned().collect();
-        let audit_keys: BTreeSet<String> = report_value.as_object().unwrap()
-            .keys().cloned().collect();
+        let audit_required: BTreeSet<String> = audit_schema["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().to_owned())
+            .collect();
+        let audit_properties: BTreeSet<String> = audit_schema["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+        let audit_keys: BTreeSet<String> =
+            report_value.as_object().unwrap().keys().cloned().collect();
         assert_eq!(audit_required, audit_properties);
         assert_eq!(audit_keys, audit_properties);
     }
@@ -818,7 +960,11 @@ mod tests {
         assert!(report.observed_step_budgets_complete);
         assert!(report.ready_for_independent_attestation_verification);
         assert!(!report.independently_verified);
-        assert!(report.external_attestation_verification.contains("not_cryptographically_verified"));
+        assert!(
+            report
+                .external_attestation_verification
+                .contains("not_cryptographically_verified")
+        );
     }
 
     #[test]
@@ -829,11 +975,17 @@ mod tests {
         receipt.treatment.training_corpus_sha256 = design.placebo_training_corpus_sha256.clone();
         receipt.pair_receipt_sha256.clear();
         let bytes0 = serde_json::to_vec(&receipt).unwrap();
-        receipt.pair_receipt_sha256 =
-            hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
-        assert!(validate_paired_training_execution_receipt(
-            &design, &manifest, &seed(), &serde_json::to_vec(&receipt).unwrap()
-        ).unwrap_err().contains("treatment training corpus digest"));
+        receipt.pair_receipt_sha256 = hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
+        assert!(
+            validate_paired_training_execution_receipt(
+                &design,
+                &manifest,
+                &seed(),
+                &serde_json::to_vec(&receipt).unwrap()
+            )
+            .unwrap_err()
+            .contains("treatment training corpus digest")
+        );
     }
 
     #[test]
@@ -844,11 +996,17 @@ mod tests {
         receipt.placebo.observed_total_training_token_count += 1;
         receipt.pair_receipt_sha256.clear();
         let bytes0 = serde_json::to_vec(&receipt).unwrap();
-        receipt.pair_receipt_sha256 =
-            hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
-        assert!(validate_paired_training_execution_receipt(
-            &design, &manifest, &seed(), &serde_json::to_vec(&receipt).unwrap()
-        ).unwrap_err().contains("observed token count does not equal component sum"));
+        receipt.pair_receipt_sha256 = hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
+        assert!(
+            validate_paired_training_execution_receipt(
+                &design,
+                &manifest,
+                &seed(),
+                &serde_json::to_vec(&receipt).unwrap()
+            )
+            .unwrap_err()
+            .contains("observed token count does not equal component sum")
+        );
     }
 
     #[test]
@@ -863,11 +1021,14 @@ mod tests {
             design.shared_training_token_count + 4_000;
         receipt.pair_receipt_sha256.clear();
         let bytes0 = serde_json::to_vec(&receipt).unwrap();
-        receipt.pair_receipt_sha256 =
-            hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
+        receipt.pair_receipt_sha256 = hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
         let report = validate_paired_training_execution_receipt(
-            &design, &manifest, &seed(), &serde_json::to_vec(&receipt).unwrap()
-        ).unwrap();
+            &design,
+            &manifest,
+            &seed(),
+            &serde_json::to_vec(&receipt).unwrap(),
+        )
+        .unwrap();
         assert!(!report.execution_consistent);
         assert!(!report.ready_for_independent_attestation_verification);
         assert!(report.issues.iter().any(|issue| issue.contains("Partial")));
@@ -881,11 +1042,17 @@ mod tests {
         receipt.placebo.training_rng_seed_commitment_sha256 = digest("different-training-seed");
         receipt.pair_receipt_sha256.clear();
         let bytes0 = serde_json::to_vec(&receipt).unwrap();
-        receipt.pair_receipt_sha256 =
-            hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
-        assert!(validate_paired_training_execution_receipt(
-            &design, &manifest, &seed(), &serde_json::to_vec(&receipt).unwrap()
-        ).unwrap_err().contains("trainer code/runtime/tokenizer/configuration"));
+        receipt.pair_receipt_sha256 = hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
+        assert!(
+            validate_paired_training_execution_receipt(
+                &design,
+                &manifest,
+                &seed(),
+                &serde_json::to_vec(&receipt).unwrap()
+            )
+            .unwrap_err()
+            .contains("trainer code/runtime/tokenizer/configuration")
+        );
     }
 
     #[test]
@@ -896,11 +1063,17 @@ mod tests {
         receipt.placebo.runtime_image_sha256 = digest("different-runtime");
         receipt.pair_receipt_sha256.clear();
         let bytes0 = serde_json::to_vec(&receipt).unwrap();
-        receipt.pair_receipt_sha256 =
-            hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
-        assert!(validate_paired_training_execution_receipt(
-            &design, &manifest, &seed(), &serde_json::to_vec(&receipt).unwrap()
-        ).unwrap_err().contains("trainer code/runtime/tokenizer/configuration"));
+        receipt.pair_receipt_sha256 = hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
+        assert!(
+            validate_paired_training_execution_receipt(
+                &design,
+                &manifest,
+                &seed(),
+                &serde_json::to_vec(&receipt).unwrap()
+            )
+            .unwrap_err()
+            .contains("trainer code/runtime/tokenizer/configuration")
+        );
     }
 
     #[test]
@@ -908,14 +1081,21 @@ mod tests {
         let design = design();
         let manifest = randomize_intervention(&design, &seed()).unwrap();
         let mut receipt = paired_receipt(&design, &manifest);
-        receipt.placebo.output_checkpoint_sha256 = receipt.treatment.output_checkpoint_sha256.clone();
+        receipt.placebo.output_checkpoint_sha256 =
+            receipt.treatment.output_checkpoint_sha256.clone();
         receipt.pair_receipt_sha256.clear();
         let bytes0 = serde_json::to_vec(&receipt).unwrap();
-        receipt.pair_receipt_sha256 =
-            hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
-        assert!(validate_paired_training_execution_receipt(
-            &design, &manifest, &seed(), &serde_json::to_vec(&receipt).unwrap()
-        ).unwrap_err().contains("output checkpoint digests must differ"));
+        receipt.pair_receipt_sha256 = hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
+        assert!(
+            validate_paired_training_execution_receipt(
+                &design,
+                &manifest,
+                &seed(),
+                &serde_json::to_vec(&receipt).unwrap()
+            )
+            .unwrap_err()
+            .contains("output checkpoint digests must differ")
+        );
     }
 
     #[test]
@@ -926,11 +1106,17 @@ mod tests {
         receipt.treatment.intervention_payload_sha256 = digest("wrong-payload");
         receipt.pair_receipt_sha256.clear();
         let bytes0 = serde_json::to_vec(&receipt).unwrap();
-        receipt.pair_receipt_sha256 =
-            hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
-        assert!(validate_paired_training_execution_receipt(
-            &design, &manifest, &seed(), &serde_json::to_vec(&receipt).unwrap()
-        ).unwrap_err().contains("payload digest does not match"));
+        receipt.pair_receipt_sha256 = hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
+        assert!(
+            validate_paired_training_execution_receipt(
+                &design,
+                &manifest,
+                &seed(),
+                &serde_json::to_vec(&receipt).unwrap()
+            )
+            .unwrap_err()
+            .contains("payload digest does not match")
+        );
     }
 
     #[test]
@@ -942,7 +1128,10 @@ mod tests {
             "2026-10-31T23:60:00Z",
             "2026-10-31T23:59:60Z",
         ] {
-            assert!(validate_utc_timestamp(timestamp, "test").is_err(), "{timestamp}");
+            assert!(
+                validate_utc_timestamp(timestamp, "test").is_err(),
+                "{timestamp}"
+            );
         }
         assert!(validate_utc_timestamp("2024-02-29T23:59:59Z", "test").is_ok());
     }
@@ -955,21 +1144,30 @@ mod tests {
         receipt.treatment.started_at_utc = "not-a-time".to_owned();
         receipt.pair_receipt_sha256.clear();
         let bytes0 = serde_json::to_vec(&receipt).unwrap();
-        receipt.pair_receipt_sha256 =
-            hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
-        assert!(validate_paired_training_execution_receipt(
-            &design, &manifest, &seed(), &serde_json::to_vec(&receipt).unwrap()
-        ).unwrap_err().contains("YYYY-MM-DDTHH:MM:SSZ"));
+        receipt.pair_receipt_sha256 = hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
+        assert!(
+            validate_paired_training_execution_receipt(
+                &design,
+                &manifest,
+                &seed(),
+                &serde_json::to_vec(&receipt).unwrap()
+            )
+            .unwrap_err()
+            .contains("YYYY-MM-DDTHH:MM:SSZ")
+        );
 
         let mut receipt = paired_receipt(&design, &manifest);
         receipt.placebo.runner_attestation_sha256 = None;
         receipt.pair_receipt_sha256.clear();
         let bytes0 = serde_json::to_vec(&receipt).unwrap();
-        receipt.pair_receipt_sha256 =
-            hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
+        receipt.pair_receipt_sha256 = hash_domain(b"paired-training-execution-receipt.v1", &bytes0);
         let report = validate_paired_training_execution_receipt(
-            &design, &manifest, &seed(), &serde_json::to_vec(&receipt).unwrap()
-        ).unwrap();
+            &design,
+            &manifest,
+            &seed(),
+            &serde_json::to_vec(&receipt).unwrap(),
+        )
+        .unwrap();
         assert!(report.execution_consistent);
         assert!(!report.runner_attestation_digests_present);
         assert!(!report.ready_for_independent_attestation_verification);
@@ -994,8 +1192,15 @@ mod tests {
         let mut json: Value = serde_json::to_value(receipt).unwrap();
         json["treatment"]["cpu_time_millis"] = serde_json::json!(999);
         let changed: PairedTrainingExecutionReceiptV1 = serde_json::from_value(json).unwrap();
-        assert!(validate_paired_training_execution_receipt(
-            &design, &manifest, &seed(), &serde_json::to_vec(&changed).unwrap()
-        ).unwrap_err().contains("digest does not match contents"));
+        assert!(
+            validate_paired_training_execution_receipt(
+                &design,
+                &manifest,
+                &seed(),
+                &serde_json::to_vec(&changed).unwrap()
+            )
+            .unwrap_err()
+            .contains("digest does not match contents")
+        );
     }
 }
