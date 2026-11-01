@@ -394,7 +394,7 @@ pub fn accuracy_cost_pareto_front(
         let group_max_accuracy = points[start..end]
             .iter()
             .map(|point| point.1)
-            .max_by(f64::total_cmp)
+            .max_by(|left, right| left.total_cmp(right))
             .expect("a Pareto cost group is non-empty");
 
         if best_accuracy_at_lower_cost
@@ -481,7 +481,7 @@ pub fn audit_nats_bench_mcu_export(
         "current_uA", "power_mW", "energy_mJ", "board",
     ];
     let accuracy_required = ["arch_idx", "cifar10", "cifar100", "ImageNet16-120"];
-    let failure_required = ["arch_idx", "int8_kb"];
+    let failure_required = ["arch_idx", "int8_kb", "stage", "outcome"];
     let hardware_extensions = hardware.extension_columns(&hardware_required);
     let accuracy_extensions = accuracies.extension_columns(&accuracy_required);
     let failure_extensions = failures.extension_columns(&failure_required);
