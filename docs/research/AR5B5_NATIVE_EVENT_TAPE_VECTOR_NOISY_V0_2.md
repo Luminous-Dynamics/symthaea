@@ -83,7 +83,7 @@ For each successful event, replay verifies:
 
 Missing bundles, extra/unreferenced bundles, byte substitutions, vector substitutions, identity changes, and receipt mutations fail closed. Failed attempts remain counted and charged by EventTape but do not enter sample means or confidence intervals.
 
-**Receipt boundary:** this proves byte and identity correspondence. The current receipt records verifier ID/build and is reconstructable, but is not a signed attestation. A hash chain is not a signature, remote-store authentication, evaluator correctness proof, or statistical-independence certificate.
+**Receipt boundary:** this proves byte and identity correspondence. The current receipt records verifier ID/build and is reconstructable, but is not a signed attestation. The separate generic EventTape verifier_receipt_sha256 remains an opaque digest in this tranche; no corresponding verifier-attestation bytes or signature are resolved by this adapter. A hash chain is not a signature, remote-store authentication, evaluator correctness proof, or statistical-independence certificate.
 
 ## 5. Independent replay against AnytimeHistory
 
