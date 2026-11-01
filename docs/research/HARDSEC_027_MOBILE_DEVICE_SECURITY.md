@@ -118,6 +118,12 @@ Do not claim these targets are achieved. Do not combine prevention effectiveness
 
 **Cross-platform honesty.** Android and iOS do not expose identical telemetry or attestation. Compare common outcome measures and capability envelopes; do not normalize away differences in privilege, silicon or vendor instrumentation.
 
+## 7. Android acquisition follow-on
+
+[HARDSEC-028 / #9739](https://github.com/Luminous-Dynamics/symthaea/issues/9739) adds a privacy-safe ADB inventory path. It uses a fixed whitelist of `getprop` keys, hashes the build fingerprint, reduces CPU info to allowlisted features, and runs `simpleperf list` only as an event-name inventory. It does not enumerate device serials, collect stable identifiers, or run a PMU sampling session. Reported boot properties remain distinct from cryptographically verified KeyMint/RootOfTrust fields.
+
+The capture implementation is in [PR #9741](https://github.com/Luminous-Dynamics/symthaea/pull/9741), stacked on the profile contract. A physical device has not been queried by the authoring workflow; the test inputs remain synthetic.
+
 ## 7. Claim ceiling
 
 This phase establishes only profile shape, privacy contract and source/evidence distinctions. It does not establish the user's device configuration, runtime MTE enablement, attestation result, PMU access, observer effect, physical attack resistance, or detection performance. The synthetic fixture must remain visibly synthetic until replaced by a privacy-reviewed, locally captured device receipt.
