@@ -251,12 +251,11 @@ fn stratum_id(task_family: &str, bucket: ClusterSizeBucketV1) -> String {
     format!("{task_family}:{bucket:?}")
 }
 
-fn validate_design(
-    design: &RandomizedInterventionDesignV1,
-    seed: &[u8],
-) -> Result<(), String> {
+fn validate_design(design: &RandomizedInterventionDesignV1, seed: &[u8]) -> Result<(), String> {
     if design.schema != INTERVENTION_DESIGN_SCHEMA {
-        return Err(format!("design schema must be {INTERVENTION_DESIGN_SCHEMA}"));
+        return Err(format!(
+            "design schema must be {INTERVENTION_DESIGN_SCHEMA}"
+        ));
     }
     if seed.len() < INTERVENTION_MIN_SEED_BYTES {
         return Err(format!(
@@ -264,17 +263,44 @@ fn validate_design(
         ));
     }
     for (value, label) in [
-        (&design.benchmark_task_set_sha256, "benchmark_task_set_sha256"),
-        (&design.model_base_checkpoint_sha256, "model_base_checkpoint_sha256"),
-        (&design.training_rng_seed_commitment_sha256, "training_rng_seed_commitment_sha256"),
-        (&design.shared_training_corpus_sha256, "shared_training_corpus_sha256"),
+        (
+            &design.benchmark_task_set_sha256,
+            "benchmark_task_set_sha256",
+        ),
+        (
+            &design.model_base_checkpoint_sha256,
+            "model_base_checkpoint_sha256",
+        ),
+        (
+            &design.training_rng_seed_commitment_sha256,
+            "training_rng_seed_commitment_sha256",
+        ),
+        (
+            &design.shared_training_corpus_sha256,
+            "shared_training_corpus_sha256",
+        ),
         (&design.training_code_sha256, "training_code_sha256"),
         (&design.runtime_image_sha256, "runtime_image_sha256"),
-        (&design.tokenization_pipeline_sha256, "tokenization_pipeline_sha256"),
-        (&design.training_hyperparameters_sha256, "training_hyperparameters_sha256"),
-        (&design.optimizer_schedule_sha256, "optimizer_schedule_sha256"),
-        (&design.treatment_training_corpus_sha256, "treatment_training_corpus_sha256"),
-        (&design.placebo_training_corpus_sha256, "placebo_training_corpus_sha256"),
+        (
+            &design.tokenization_pipeline_sha256,
+            "tokenization_pipeline_sha256",
+        ),
+        (
+            &design.training_hyperparameters_sha256,
+            "training_hyperparameters_sha256",
+        ),
+        (
+            &design.optimizer_schedule_sha256,
+            "optimizer_schedule_sha256",
+        ),
+        (
+            &design.treatment_training_corpus_sha256,
+            "treatment_training_corpus_sha256",
+        ),
+        (
+            &design.placebo_training_corpus_sha256,
+            "placebo_training_corpus_sha256",
+        ),
     ] {
         validate_digest(value, label)?;
     }
@@ -285,7 +311,9 @@ fn validate_design(
         || design.benchmark_id.trim().is_empty()
         || design.benchmark_version.trim().is_empty()
     {
-        return Err("experiment, replicate and benchmark identity fields must be nonempty".to_owned());
+        return Err(
+            "experiment, replicate and benchmark identity fields must be nonempty".to_owned(),
+        );
     }
     if design.total_training_token_budget == 0 || design.training_steps == 0 {
         return Err("training token budget and training_steps must be positive".to_owned());
@@ -297,12 +325,18 @@ fn validate_design(
         || design.shared_training_corpus_sha256 == design.treatment_training_corpus_sha256
         || design.shared_training_corpus_sha256 == design.placebo_training_corpus_sha256
     {
-        return Err("shared, treatment and placebo training corpus digests must be pairwise distinct".to_owned());
+        return Err(
+            "shared, treatment and placebo training corpus digests must be pairwise distinct"
+                .to_owned(),
+        );
     }
     if design.shared_training_token_count == 0
         || design.shared_training_token_count > design.total_training_token_budget
     {
-        return Err("shared_training_token_count must be positive and no greater than total budget".to_owned());
+        return Err(
+            "shared_training_token_count must be positive and no greater than total budget"
+                .to_owned(),
+        );
     }
     if !(2..=MAX_INTERVENTION_CLUSTERS).contains(&design.clusters.len()) {
         return Err(format!(
@@ -324,7 +358,10 @@ fn validate_design(
             return Err("cluster IDs must be unique, nonempty and <=256 bytes".to_owned());
         }
         if cluster.task_family.trim().is_empty() || cluster.task_family.len() > 128 {
-            return Err(format!("cluster {} has invalid task_family", cluster.cluster_id));
+            return Err(format!(
+                "cluster {} has invalid task_family",
+                cluster.cluster_id
+            ));
         }
         validate_digest(
             &cluster.source_family_sha256,
@@ -339,10 +376,14 @@ fn validate_design(
             "cluster.matched_placebo_record_sha256",
         )?;
         if !exposure_variant_digests.insert(cluster.exposure_variant_sha256.as_str()) {
-            return Err("exposure variant record digest is reused across source clusters".to_owned());
+            return Err(
+                "exposure variant record digest is reused across source clusters".to_owned(),
+            );
         }
         if !placebo_record_digests.insert(cluster.matched_placebo_record_sha256.as_str()) {
-            return Err("matched placebo record digest is reused across source clusters".to_owned());
+            return Err(
+                "matched placebo record digest is reused across source clusters".to_owned(),
+            );
         }
         if cluster.exposure_variant_sha256 == cluster.matched_placebo_record_sha256 {
             return Err(format!(
@@ -351,7 +392,10 @@ fn validate_design(
             ));
         }
         if cluster.item_ids.is_empty() || cluster.item_ids.len() > 10_000 {
-            return Err(format!("cluster {} must contain 1..=10000 item IDs", cluster.cluster_id));
+            return Err(format!(
+                "cluster {} must contain 1..=10000 item IDs",
+                cluster.cluster_id
+            ));
         }
         if cluster.exposure_token_count == 0
             || cluster.matched_placebo_token_count != cluster.exposure_token_count
@@ -384,7 +428,10 @@ fn validate_design(
         let mut within_cluster = BTreeSet::new();
         for item_id in &cluster.item_ids {
             if item_id.trim().is_empty() || item_id.len() > 256 {
-                return Err(format!("cluster {} contains an empty/oversized item ID", cluster.cluster_id));
+                return Err(format!(
+                    "cluster {} contains an empty/oversized item ID",
+                    cluster.cluster_id
+                ));
             }
             if !within_cluster.insert(item_id.as_str()) || !item_ids.insert(item_id.as_str()) {
                 return Err(format!(
@@ -418,7 +465,8 @@ fn manifest_digest(manifest: &RandomizedInterventionManifestV1) -> Result<String
         total_item_count: manifest.total_item_count,
         exposed_training_token_count: manifest.exposed_training_token_count,
         matched_placebo_token_count: manifest.matched_placebo_token_count,
-        actual_exposure_cluster_fraction_permille: manifest.actual_exposure_cluster_fraction_permille,
+        actual_exposure_cluster_fraction_permille: manifest
+            .actual_exposure_cluster_fraction_permille,
         actual_exposure_token_fraction_permille: manifest.actual_exposure_token_fraction_permille,
         allocation_strata: &manifest.allocation_strata,
         assignments: &manifest.assignments,
@@ -457,8 +505,8 @@ pub fn randomize_intervention(
     let mut exposed_item_count = 0_u64;
     let mut exposed_training_token_count = 0_u64;
     let mut matched_placebo_token_count = 0_u64;
-    let total_cluster_count = u64::try_from(design.clusters.len())
-        .map_err(|_| "total cluster count exceeds u64")?;
+    let total_cluster_count =
+        u64::try_from(design.clusters.len()).map_err(|_| "total cluster count exceeds u64")?;
 
     for (stratum, mut clusters) in strata {
         if design.target_exposure_fraction_permille > 0
@@ -475,15 +523,21 @@ pub fn randomize_intervention(
             .drain(..)
             .map(|cluster| {
                 (
-                    priority_digest(seed, &design.experiment_id, &design.replicate_id, &stratum, &cluster.cluster_id),
+                    priority_digest(
+                        seed,
+                        &design.experiment_id,
+                        &design.replicate_id,
+                        &stratum,
+                        &cluster.cluster_id,
+                    ),
                     cluster,
                 )
             })
             .collect();
         ranked.sort_by(|left, right| {
-            left.0.cmp(&right.0).then_with(|| {
-                left.1.cluster_id.cmp(&right.1.cluster_id)
-            })
+            left.0
+                .cmp(&right.0)
+                .then_with(|| left.1.cluster_id.cmp(&right.1.cluster_id))
         });
         let stratum_count = ranked.len();
         let rounded_exposed_count = (stratum_count
@@ -549,12 +603,16 @@ pub fn randomize_intervention(
         return Err("exposed benchmark token count exceeds total training token budget".to_owned());
     }
     if matched_placebo_token_count != exposed_training_token_count {
-        return Err("matched placebo token budget does not equal exposed benchmark token budget".to_owned());
+        return Err(
+            "matched placebo token budget does not equal exposed benchmark token budget".to_owned(),
+        );
     }
-    let treatment_total = design.shared_training_token_count
+    let treatment_total = design
+        .shared_training_token_count
         .checked_add(exposed_training_token_count)
         .ok_or_else(|| "treatment total training token count overflows u64".to_owned())?;
-    let placebo_total = design.shared_training_token_count
+    let placebo_total = design
+        .shared_training_token_count
         .checked_add(matched_placebo_token_count)
         .ok_or_else(|| "placebo total training token count overflows u64".to_owned())?;
     if treatment_total != design.total_training_token_budget
@@ -584,7 +642,7 @@ pub fn randomize_intervention(
         u16::try_from(
             (u128::from(exposed_training_token_count) * 1_000
                 / u128::from(design.total_training_token_budget))
-                .min(1_000),
+            .min(1_000),
         )
         .map_err(|_| "actual token exposure fraction exceeds u16")?
     };
@@ -655,11 +713,15 @@ pub fn audit_intervention(
     }
     let cluster_integrity = manifest.assignments.iter().all(|assignment| {
         !assignment.item_ids.is_empty()
-            && assignment.item_ids.iter().all(|item| !item.trim().is_empty())
+            && assignment
+                .item_ids
+                .iter()
+                .all(|item| !item.trim().is_empty())
     });
-    let task_family_stratification_complete = manifest.allocation_strata.iter().all(|stratum| {
-        stratum.exposed_cluster_count <= stratum.cluster_count
-    });
+    let task_family_stratification_complete = manifest
+        .allocation_strata
+        .iter()
+        .all(|stratum| stratum.exposed_cluster_count <= stratum.cluster_count);
     Ok(InterventionAuditReportV1 {
         schema: INTERVENTION_AUDIT_SCHEMA.to_owned(),
         valid: true,
@@ -755,41 +817,69 @@ mod tests {
     fn versioned_schemas_and_design_fixture_are_consistent() {
         let design_schema: Value = serde_json::from_str(include_str!(
             "../schema/randomized-intervention-design.schema.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let manifest_schema: Value = serde_json::from_str(include_str!(
             "../schema/randomized-intervention-manifest.schema.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let audit_schema: Value = serde_json::from_str(include_str!(
             "../schema/randomized-intervention-audit.schema.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let fixture: RandomizedInterventionDesignV1 = serde_json::from_str(include_str!(
             "../fixtures/intervention-semantic-variant-design.json"
-        )).unwrap();
+        ))
+        .unwrap();
 
         assert_eq!(
             design_schema["properties"]["schema"]["const"].as_str(),
             Some(INTERVENTION_DESIGN_SCHEMA)
         );
-        let design_required: BTreeSet<String> = design_schema["required"].as_array().unwrap()
-            .iter().map(|value| value.as_str().unwrap().to_owned()).collect();
-        let design_properties: BTreeSet<String> = design_schema["properties"].as_object().unwrap()
-            .keys().cloned().collect();
+        let design_required: BTreeSet<String> = design_schema["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().to_owned())
+            .collect();
+        let design_properties: BTreeSet<String> = design_schema["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(design_required, design_properties);
 
         assert_eq!(
             manifest_schema["properties"]["schema"]["const"].as_str(),
             Some(INTERVENTION_MANIFEST_SCHEMA)
         );
-        let manifest_required: BTreeSet<String> = manifest_schema["required"].as_array().unwrap()
-            .iter().map(|value| value.as_str().unwrap().to_owned()).collect();
-        let manifest_properties: BTreeSet<String> = manifest_schema["properties"].as_object().unwrap()
-            .keys().cloned().collect();
+        let manifest_required: BTreeSet<String> = manifest_schema["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().to_owned())
+            .collect();
+        let manifest_properties: BTreeSet<String> = manifest_schema["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(manifest_required, manifest_properties);
 
-        let audit_required: BTreeSet<String> = audit_schema["required"].as_array().unwrap()
-            .iter().map(|value| value.as_str().unwrap().to_owned()).collect();
-        let audit_properties: BTreeSet<String> = audit_schema["properties"].as_object().unwrap()
-            .keys().cloned().collect();
+        let audit_required: BTreeSet<String> = audit_schema["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().to_owned())
+            .collect();
+        let audit_properties: BTreeSet<String> = audit_schema["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(audit_required, audit_properties);
         assert_eq!(
             audit_schema["properties"]["schema"]["const"].as_str(),
@@ -798,7 +888,10 @@ mod tests {
 
         let manifest = randomize_intervention(&fixture, &seed()).unwrap();
         let manifest_json: Value = serde_json::to_value(&manifest).unwrap();
-        assert_eq!(manifest_json["schema"].as_str(), Some(INTERVENTION_MANIFEST_SCHEMA));
+        assert_eq!(
+            manifest_json["schema"].as_str(),
+            Some(INTERVENTION_MANIFEST_SCHEMA)
+        );
         let audit = audit_intervention(&fixture, &manifest, &seed()).unwrap();
         assert_eq!(
             serde_json::to_value(&audit).unwrap()["schema"].as_str(),
@@ -826,9 +919,11 @@ mod tests {
     fn task_family_and_cluster_size_strata_receive_balanced_exposure_counts() {
         let manifest = randomize_intervention(&design(), &seed()).unwrap();
         assert_eq!(manifest.allocation_strata.len(), 4);
-        assert!(manifest.allocation_strata.iter().all(|stratum| {
-            stratum.cluster_count == 8 && stratum.exposed_cluster_count == 4
-        }));
+        assert!(
+            manifest.allocation_strata.iter().all(|stratum| {
+                stratum.cluster_count == 8 && stratum.exposed_cluster_count == 4
+            })
+        );
         assert_eq!(manifest.exposed_cluster_count, 16);
         assert_eq!(manifest.total_cluster_count, 32);
     }
@@ -838,7 +933,12 @@ mod tests {
         let manifest = randomize_intervention(&design(), &seed()).unwrap();
         let mut seen_items = BTreeSet::new();
         for assignment in &manifest.assignments {
-            assert!(assignment.item_ids.iter().all(|item| seen_items.insert(item)));
+            assert!(
+                assignment
+                    .item_ids
+                    .iter()
+                    .all(|item| seen_items.insert(item))
+            );
             assert_eq!(assignment.size_bucket, ClusterSizeBucketV1::Small);
         }
         assert_eq!(seen_items.len(), 64);
@@ -902,9 +1002,11 @@ mod tests {
     fn duplicate_source_family_digest_is_rejected_to_prevent_cluster_splitting() {
         let mut design = design();
         design.clusters[1].source_family_sha256 = design.clusters[0].source_family_sha256.clone();
-        assert!(randomize_intervention(&design, &seed())
-            .unwrap_err()
-            .contains("source family"));
+        assert!(
+            randomize_intervention(&design, &seed())
+                .unwrap_err()
+                .contains("source family")
+        );
     }
 
     #[test]
@@ -913,11 +1015,25 @@ mod tests {
         let first = randomize_intervention(&first_design, &seed()).unwrap();
         first_design.replicate_id = "replicate-002".to_owned();
         let second = randomize_intervention(&first_design, &seed()).unwrap();
-        let first_priorities: BTreeMap<&str, &str> = first.assignments.iter()
-            .map(|assignment| (assignment.cluster_id.as_str(), assignment.priority_sha256.as_str()))
+        let first_priorities: BTreeMap<&str, &str> = first
+            .assignments
+            .iter()
+            .map(|assignment| {
+                (
+                    assignment.cluster_id.as_str(),
+                    assignment.priority_sha256.as_str(),
+                )
+            })
             .collect();
-        let second_priorities: BTreeMap<&str, &str> = second.assignments.iter()
-            .map(|assignment| (assignment.cluster_id.as_str(), assignment.priority_sha256.as_str()))
+        let second_priorities: BTreeMap<&str, &str> = second
+            .assignments
+            .iter()
+            .map(|assignment| {
+                (
+                    assignment.cluster_id.as_str(),
+                    assignment.priority_sha256.as_str(),
+                )
+            })
             .collect();
         assert_ne!(first_priorities, second_priorities);
     }
@@ -927,9 +1043,11 @@ mod tests {
         let mut invalid_design = design();
         invalid_design.clusters[0].matched_placebo_record_sha256 =
             invalid_design.clusters[0].exposure_variant_sha256.clone();
-        assert!(randomize_intervention(&invalid_design, &seed())
-            .unwrap_err()
-            .contains("exposure variant and matched placebo record digests must differ"));
+        assert!(
+            randomize_intervention(&invalid_design, &seed())
+                .unwrap_err()
+                .contains("exposure variant and matched placebo record digests must differ")
+        );
     }
 
     #[test]
@@ -937,9 +1055,11 @@ mod tests {
         let mut invalid_design = design();
         invalid_design.shared_training_corpus_sha256 =
             invalid_design.treatment_training_corpus_sha256.clone();
-        assert!(randomize_intervention(&invalid_design, &seed())
-            .unwrap_err()
-            .contains("must be pairwise distinct"));
+        assert!(
+            randomize_intervention(&invalid_design, &seed())
+                .unwrap_err()
+                .contains("must be pairwise distinct")
+        );
     }
 
     #[test]
@@ -947,23 +1067,31 @@ mod tests {
         let mut invalid = design();
         invalid.clusters[1].exposure_variant_sha256 =
             invalid.clusters[0].exposure_variant_sha256.clone();
-        assert!(randomize_intervention(&invalid, &seed())
-            .unwrap_err().contains("exposure variant record digest is reused"));
+        assert!(
+            randomize_intervention(&invalid, &seed())
+                .unwrap_err()
+                .contains("exposure variant record digest is reused")
+        );
 
         let mut invalid = design();
         invalid.clusters[1].matched_placebo_record_sha256 =
             invalid.clusters[0].matched_placebo_record_sha256.clone();
-        assert!(randomize_intervention(&invalid, &seed())
-            .unwrap_err().contains("matched placebo record digest is reused"));
+        assert!(
+            randomize_intervention(&invalid, &seed())
+                .unwrap_err()
+                .contains("matched placebo record digest is reused")
+        );
     }
 
     #[test]
     fn duplicate_item_ids_across_clusters_fail_closed() {
         let mut design = design();
         design.clusters[1].item_ids[0] = design.clusters[0].item_ids[0].clone();
-        assert!(randomize_intervention(&design, &seed())
-            .unwrap_err()
-            .contains("duplicated within/across"));
+        assert!(
+            randomize_intervention(&design, &seed())
+                .unwrap_err()
+                .contains("duplicated within/across")
+        );
     }
 
     #[test]
@@ -971,18 +1099,22 @@ mod tests {
         let mut invalid_design = design();
         invalid_design.clusters[1].exposure_token_count += 1;
         invalid_design.clusters[1].matched_placebo_token_count += 1;
-        assert!(randomize_intervention(&invalid_design, &seed())
-            .unwrap_err()
-            .contains("equal exposure token count"));
+        assert!(
+            randomize_intervention(&invalid_design, &seed())
+                .unwrap_err()
+                .contains("equal exposure token count")
+        );
     }
 
     #[test]
     fn placebo_token_mismatch_fails_closed() {
         let mut design = design();
         design.clusters[0].matched_placebo_token_count += 1;
-        assert!(randomize_intervention(&design, &seed())
-            .unwrap_err()
-            .contains("token counts must be equal"));
+        assert!(
+            randomize_intervention(&design, &seed())
+                .unwrap_err()
+                .contains("token counts must be equal")
+        );
     }
 
     #[test]
@@ -1000,24 +1132,30 @@ mod tests {
     fn assignment_mutation_is_detected_by_manifest_digest_and_replay() {
         let design = design();
         let mut manifest = randomize_intervention(&design, &seed()).unwrap();
-        manifest.assignments[0].assigned_to_exposure = !manifest.assignments[0].assigned_to_exposure;
-        assert!(audit_intervention(&design, &manifest, &seed())
-            .unwrap_err()
-            .contains("manifest digest does not match its contents"));
+        manifest.assignments[0].assigned_to_exposure =
+            !manifest.assignments[0].assigned_to_exposure;
+        assert!(
+            audit_intervention(&design, &manifest, &seed())
+                .unwrap_err()
+                .contains("manifest digest does not match its contents")
+        );
     }
 
     #[test]
     fn assignment_payload_with_recomputed_manifest_hash_still_fails_replay() {
         let design = design();
         let mut manifest = randomize_intervention(&design, &seed()).unwrap();
-        manifest.assignments[0].assigned_to_exposure = !manifest.assignments[0].assigned_to_exposure;
+        manifest.assignments[0].assigned_to_exposure =
+            !manifest.assignments[0].assigned_to_exposure;
         let assignment_bytes = serde_json::to_vec(&manifest.assignments).unwrap();
         manifest.assignment_sha256 =
             hash_domain(b"randomized-intervention-assignments.v1", &assignment_bytes);
         manifest.manifest_sha256 = manifest_digest(&manifest).unwrap();
-        assert!(audit_intervention(&design, &manifest, &seed())
-            .unwrap_err()
-            .contains("does not match replayed allocation"));
+        assert!(
+            audit_intervention(&design, &manifest, &seed())
+                .unwrap_err()
+                .contains("does not match replayed allocation")
+        );
     }
 
     #[test]
