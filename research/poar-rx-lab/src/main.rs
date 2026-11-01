@@ -1,5 +1,5 @@
+use poar_rx_lab::{ControllerPolicy, FaultSchedule, run_trial};
 use pod_meta_lab::recovery::DispatchSemantics;
-use poar_rx_lab::{run_trial, ControllerPolicy, FaultSchedule};
 
 fn main() {
     println!(
