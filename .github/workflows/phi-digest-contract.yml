@@ -18,6 +18,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # PRs test the exact contributor head, not GitHub's synthetic merge commit.
+  TESTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
 jobs:
   digest-contract:
     name: Verify Rust/Python digest golden vectors
@@ -26,6 +31,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TESTED_SOURCE_SHA }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -43,6 +50,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TESTED_SOURCE_SHA }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -83,7 +92,9 @@ jobs:
         shell: bash
         run: |
           {
-            echo "git_commit=${GITHUB_SHA}"
+            echo "tested_source_sha=$(git rev-parse HEAD)"
+            echo "github_event_sha=${GITHUB_SHA}"
+            echo "pull_request_head_sha=${PULL_REQUEST_HEAD_SHA}"
             echo "workflow_run_id=${GITHUB_RUN_ID}"
             echo "runner_os=${RUNNER_OS}"
             echo "runner_arch=${RUNNER_ARCH}"
@@ -110,7 +121,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: pyphi-iit4-2023-reference-${{ github.sha }}
+          name: pyphi-iit4-2023-reference-${{ env.TESTED_SOURCE_SHA }}
           path: target/pyphi-reference/
           if-no-files-found: warn
           retention-days: 30
