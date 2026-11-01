@@ -128,6 +128,10 @@ jobs:
         shell: bash
         run: /usr/bin/time -v -o target/iit-benchmark-evidence/parameter-landscape.time.txt target/release/examples/sparse_phi_landscape_sweep 2>&1 | tee target/iit-benchmark-evidence/parameter-landscape.csv
 
+      - name: Record every exact IIT partition score along the landscape
+        shell: bash
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/parameter-landscape-partitions.time.txt target/release/examples/sparse_phi_partition_diagnostic_sweep 2>&1 | tee target/iit-benchmark-evidence/parameter-landscape-partitions.csv
+
       - name: Clippy the isolated crate
         run: cargo clippy --locked -p symthaea-iit --all-targets -- -D warnings 2>&1 | tee target/iit-benchmark-evidence/clippy.log
 
@@ -151,7 +155,8 @@ jobs:
             sparse-full-system-search \
             min-fill-planner-comparison \
             macro-mapping-families \
-            parameter-landscape
+            parameter-landscape \
+            parameter-landscape-partitions
           do
             csv="target/iit-benchmark-evidence/${stem}.csv"
             timing="target/iit-benchmark-evidence/${stem}.time.txt"
@@ -169,6 +174,11 @@ jobs:
           test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape.csv | cut -d, -f35 | sort -u | wc -l)" -ge 1
           awk -F, 'NR > 1 && ($28 < 1 || $27 == "" || $27 == "NA") { exit 1 }' target/iit-benchmark-evidence/parameter-landscape.csv
           printf 'PASS parameter-landscape: 13 exact samples; common input digests; signed values, full MIP tie families, regimes and unique receipts; no interval certification claimed\\n'
+          awk -F, 'NR > 1 && (NF != 28 || $28 != "EXACT_PARTITION_SAMPLE" || length($6) != 64 || length($7) != 64 || length($8) != 64 || length($15) != 64 || length($26) != 64 || length($27) != 64) { exit 1 }' target/iit-benchmark-evidence/parameter-landscape-partitions.csv
+          test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape-partitions.csv | cut -d, -f4 | sort -u | wc -l)" -eq 13
+          test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape-partitions.csv | cut -d, -f15 | sort -u | wc -l)" -ge 1
+          test "$(wc -l < target/iit-benchmark-evidence/parameter-landscape-partitions.csv)" -gt 14
+          printf 'PASS parameter-landscape-partitions: complete per-cut sample rows with model, request, cut, score-request and score-receipt identities\\n'
 
       - name: Upload immutable IIT benchmark evidence
         if: always()
