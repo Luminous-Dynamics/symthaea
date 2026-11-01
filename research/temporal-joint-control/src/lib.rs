@@ -164,6 +164,7 @@ pub enum PlanError {
     EmptyPlanSet,
     DuplicatePlanId { plan_id: u64 },
     DuplicateOrUnsortedActionIds { plan_id: u64 },
+    ActionKindChanged { action_id: u64 },
     InvalidExposurePriority,
     NoFeasiblePlan { rejected: Vec<RejectedPlan> },
 }
@@ -175,6 +176,9 @@ impl fmt::Display for PlanError {
             Self::DuplicatePlanId { plan_id } => write!(f, "duplicate joint plan ID {plan_id}"),
             Self::DuplicateOrUnsortedActionIds { plan_id } => {
                 write!(f, "plan {plan_id} action IDs must be unique and strictly increasing")
+            }
+            Self::ActionKindChanged { action_id } => {
+                write!(f, "action {action_id} changes kind across joint-plan alternatives")
             }
             Self::InvalidExposurePriority => {
                 write!(f, "exposure priority must contain each of the three axes exactly once")
@@ -205,12 +209,22 @@ pub fn select_joint_plan(
     }
 
     let mut seen_plans = BTreeSet::new();
+    let mut action_kinds = std::collections::BTreeMap::<u64, ActionKind>::new();
     for plan in plans {
         if !seen_plans.insert(plan.plan_id) {
             return Err(PlanError::DuplicatePlanId { plan_id: plan.plan_id });
         }
         if plan.actions.windows(2).any(|pair| pair[0].action_id >= pair[1].action_id) {
             return Err(PlanError::DuplicateOrUnsortedActionIds { plan_id: plan.plan_id });
+        }
+        for action in &plan.actions {
+            if let Some(previous_kind) = action_kinds.get(&action.action_id) {
+                if previous_kind != &action.kind {
+                    return Err(PlanError::ActionKindChanged { action_id: action.action_id });
+                }
+            } else {
+                action_kinds.insert(action.action_id, action.kind);
+            }
         }
     }
 
@@ -481,6 +495,17 @@ mod tests {
             select_joint_plan(&duplicate_plans, budget(), PRIORITY),
             Err(PlanError::DuplicatePlanId { plan_id: 2 })
         ));
+    }
+
+    #[test]
+    fn action_kind_is_stable_across_complete_plan_alternatives() {
+        let first = plan(1, &[10], [2, 0, 0], costs(1, 1, 1), 1);
+        let mut second = plan(2, &[10], [3, 0, 0], costs(1, 1, 1), 1);
+        second.actions[0].kind = ActionKind::Verify;
+        assert_eq!(
+            select_joint_plan(&[first, second], budget(), PRIORITY),
+            Err(PlanError::ActionKindChanged { action_id: 10 })
+        );
     }
 
     #[test]
