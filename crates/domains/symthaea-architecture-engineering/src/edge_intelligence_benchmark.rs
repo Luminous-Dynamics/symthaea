@@ -432,6 +432,8 @@ pub enum PrequentialAction {
         timestamp_us: u64,
         predicted_class: Option<u8>,
         positive_probability_q15: u16,
+        /// Higher means more likely to be an out-of-distribution event.
+        novelty_score_q15: u16,
         model_state_sha256: String,
     },
     LabelReleased {
@@ -466,6 +468,17 @@ pub struct PrequentialExecutionTrace {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct TemporalRegimeMetrics {
+    pub regime_id: u8,
+    pub event_count: usize,
+    pub correct_count: usize,
+    pub accuracy: f64,
+    pub false_positive_count: usize,
+    pub false_negative_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PrequentialMetrics {
     pub event_count: usize,
     pub correct_count: usize,
@@ -479,6 +492,13 @@ pub struct PrequentialMetrics {
     pub coverage: f64,
     pub selective_accuracy: Option<f64>,
     pub brier_score: f64,
+    pub open_set_auprc: Option<f64>,
+    pub per_regime_metrics: Vec<TemporalRegimeMetrics>,
+    pub worst_regime_accuracy: Option<f64>,
+    /// Mean number of events from a detected regime transition to recovered rolling accuracy.
+    pub mean_drift_recovery_samples: Option<f64>,
+    /// Maximum percentage-point accuracy drop when a previously seen regime recurs.
+    pub maximum_regime_retention_loss_pp: Option<f64>,
     pub false_alarms_per_hour: f64,
     pub missed_events_per_hour: f64,
     pub mean_prediction_latency_us: f64,
@@ -507,6 +527,7 @@ struct PredictionObservation {
     timestamp_us: u64,
     predicted_class: Option<u8>,
     positive_probability_q15: u16,
+    novelty_score_q15: u16,
 }
 
 pub fn compute_prequential_execution_trace_sha256(
@@ -617,8 +638,8 @@ pub fn audit_prequential_execution(
                 if predicted_class.is_some_and(|label| label > 1) {
                     return Err(EdgeBenchmarkError::new(format!("prequential_trace.actions[{action_index}].predicted_class"), "binary prediction must be 0, 1 or abstain"));
                 }
-                if *positive_probability_q15 > 32_768 {
-                    return Err(EdgeBenchmarkError::new(format!("prequential_trace.actions[{action_index}].positive_probability_q15"), "must be in Q0.15 range [0,32768]"));
+                if *positive_probability_q15 > 32_768 || *novelty_score_q15 > 32_768 {
+                    return Err(EdgeBenchmarkError::new(format!("prequential_trace.actions[{action_index}].probability"), "positive-class probability and novelty score must be in Q0.15 range [0,32768]"));
                 }
                 let observation = &dataset.observations[*event_index];
                 let delayed_label = &dataset.delayed_labels[*event_index];
