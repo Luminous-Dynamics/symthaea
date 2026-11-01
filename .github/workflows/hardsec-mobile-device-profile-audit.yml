@@ -52,10 +52,11 @@ jobs:
           import json
           with open("/tmp/hardsec-mobile-policy-receipt.json", "r", encoding="utf-8") as handle:
               receipt = json.load(handle)
-          assert receipt["result"] == "policy_not_satisfied_or_evidence_incomplete"
+          assert receipt["result"] == "obligations_compiled_verification_not_performed"
           assert receipt["obligation_count"] == 6
           assert receipt["satisfied_count"] == 0
           assert receipt["evidence_incomplete_count"] == 6
+          assert receipt["outstanding_count"] == 6
           assert receipt["claim_ceiling"]["device_security_proved"] is False
           assert receipt["claim_ceiling"]["runtime_integrity_verified"] is False
           print("HARDSEC mobile policy compiler abstention contract verified.")
