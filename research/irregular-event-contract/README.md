@@ -25,7 +25,7 @@ The crate contains no future target or evaluator label. It does not define
 benchmark-specific train/validation/test splits: those must remain pinned to
 each benchmark's official protocol.
 
-Twenty-seven Rust test functions are authored for delayed-observation non-leakage,
+Thirty-five Rust test functions are authored (16 event contract, 11 bitemporal revision, 8 purged-split tests) for delayed-observation non-leakage,
 out-of-order event times, missingness preservation, censored intervals,
 source-local sequence uniqueness, legitimate future-covariate availability,
 and input validation. No Cargo build, rustfmt, Clippy, tests or dataset adapter
@@ -58,3 +58,18 @@ retraction visibility, independent valid/knowledge clocks, source-identity
 preservation, transaction atomicity, revision sequencing, target rules,
 availability-before-commit rejection, source sequence collision rejection,
 and deterministic history digests.
+
+
+## Leakage-controlled chronological splits
+
+The `splits` module supplies `purged_chronological_split`. It partitions
+forecast windows per entity by distinct forecast origin (tied origins stay in
+one split), then purges any training target interval crossing into validation
+and any validation target interval crossing into test. An optional embargo is
+applied at both boundaries. Historical input windows may overlap; target labels
+may not cross the next partition boundary.
+
+This is intended to complement, not silently replace, the official benchmark
+split during reproduction. Report both official-path results and the
+leakage-controlled split when the official harness normalizes using full-record
+statistics or has overlapping forecast targets across split boundaries.
