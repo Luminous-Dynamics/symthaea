@@ -1056,9 +1056,10 @@ mod tests {
     #[test]
     fn duplicate_item_across_relation_strata_is_rejected() {
         let mut replicate = sample_transfer_replicate();
-        replicate.strata[1].item_ids = replicate.strata[0].item_ids.clone();
-        replicate.strata[1].item_set_sha256 =
-            canonical_item_set_digest(&replicate.strata[1].item_ids).unwrap();
+        let duplicate_items = replicate.strata[0].item_ids.clone();
+        let duplicate_digest = canonical_item_set_digest(&duplicate_items).unwrap();
+        replicate.strata[1].item_ids = duplicate_items;
+        replicate.strata[1].item_set_sha256 = duplicate_digest;
         let mut expected_cells = BTreeMap::new();
         let mut expected_matrix_keys = None;
         assert!(validate_replicate_matrix(
@@ -1140,8 +1141,8 @@ mod tests {
     #[test]
     fn duplicate_adjudicator_pseudonyms_are_rejected() {
         let mut replicate = sample_transfer_replicate();
-        replicate.strata[0].adjudication_reviewer_ids[2] =
-            replicate.strata[0].adjudication_reviewer_ids[1].clone();
+        let duplicate_reviewer = replicate.strata[0].adjudication_reviewer_ids[1].clone();
+        replicate.strata[0].adjudication_reviewer_ids[2] = duplicate_reviewer;
         let mut expected_cells = BTreeMap::new();
         let mut expected_matrix_keys = None;
         assert!(validate_replicate_matrix(
