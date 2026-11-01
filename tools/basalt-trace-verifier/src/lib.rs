@@ -91,7 +91,7 @@ pub struct Scope {
     pub log_origin_id: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Request {
     pub expected_source_generation: Option<u64>,
