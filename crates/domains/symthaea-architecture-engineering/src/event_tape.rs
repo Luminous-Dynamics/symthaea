@@ -2392,6 +2392,17 @@ mod tests {
         )
     }
 
+    fn noisy_artifact_reference(sha256: &str) -> EvidenceArtifactReference {
+        EvidenceArtifactReference {
+            artifact_id: "replicate-observation".to_owned(),
+            role: EvidenceArtifactRole::EvaluationOutput,
+            media_type: "application/json".to_owned(),
+            storage_locator: "cas://replicate-observation".to_owned(),
+            byte_length: 128,
+            sha256: sha256.to_owned(),
+        }
+    }
+
     fn objective_contract(mode: EventTapeObjectiveMode) -> EventTapeObjectiveContract {
         let objective_specs = match mode {
             EventTapeObjectiveMode::DeterministicVector => vec![
@@ -2540,6 +2551,7 @@ mod tests {
                     evidence_sha256: Some(H1.to_owned()),
                     evidence_manifest_sha256: Some(H2.to_owned()),
                     evidence_byte_receipt_sha256: Some(H3.to_owned()),
+                    evidence_artifact: Some(noisy_artifact_reference(H1)),
                     failure_reason: None,
                 },
                 3,
@@ -2574,6 +2586,7 @@ mod tests {
                 evidence_sha256: None,
                 evidence_manifest_sha256: None,
                 evidence_byte_receipt_sha256: None,
+                evidence_artifact: None,
                 failure_reason: Some("evaluation deadline exceeded".to_owned()),
             },
             4,
@@ -2621,6 +2634,7 @@ mod tests {
                     evidence_sha256: Some(H1.to_owned()),
                     evidence_manifest_sha256: Some(H2.to_owned()),
                     evidence_byte_receipt_sha256: Some(H3.to_owned()),
+                    evidence_artifact: Some(noisy_artifact_reference(H1)),
                     failure_reason: None,
                 },
                 2,
