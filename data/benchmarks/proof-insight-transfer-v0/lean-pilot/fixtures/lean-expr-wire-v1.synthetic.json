@@ -168,6 +168,91 @@
         },
         "transparent_value": null,
         "nondep_value_provenance": null
+      },
+      {
+        "local_index": 3,
+        "user_name": "transparentN",
+        "binder_info": "explicit",
+        "is_aux_declaration": false,
+        "is_implementation_detail": false,
+        "is_let_declaration": true,
+        "is_nondep": false,
+        "type": {
+          "tag": "const",
+          "name": {
+            "tag": "str",
+            "prefix": {
+              "tag": "anonymous"
+            },
+            "value": "Nat"
+          },
+          "levels": []
+        },
+        "transparent_value": {
+          "tag": "fvar",
+          "local_index": 0
+        },
+        "nondep_value_provenance": null
+      },
+      {
+        "local_index": 4,
+        "user_name": "haveProof",
+        "binder_info": "explicit",
+        "is_aux_declaration": false,
+        "is_implementation_detail": false,
+        "is_let_declaration": true,
+        "is_nondep": true,
+        "type": {
+          "tag": "app",
+          "function": {
+            "tag": "app",
+            "function": {
+              "tag": "app",
+              "function": {
+                "tag": "const",
+                "name": {
+                  "tag": "str",
+                  "prefix": {
+                    "tag": "anonymous"
+                  },
+                  "value": "Eq"
+                },
+                "levels": [
+                  {
+                    "tag": "succ",
+                    "of": {
+                      "tag": "zero"
+                    }
+                  }
+                ]
+              },
+              "argument": {
+                "tag": "const",
+                "name": {
+                  "tag": "str",
+                  "prefix": {
+                    "tag": "anonymous"
+                  },
+                  "value": "Nat"
+                },
+                "levels": []
+              }
+            },
+            "argument": {
+              "tag": "fvar",
+              "local_index": 0
+            }
+          },
+          "argument": {
+            "tag": "fvar",
+            "local_index": 0
+          }
+        },
+        "transparent_value": null,
+        "nondep_value_provenance": {
+          "tag": "fvar",
+          "local_index": 1
+        }
       }
     ],
     "local_instances": [
@@ -186,7 +271,7 @@
   "digests": {
     "environment_sha256": "1cecfc3beef332e2e04ca84419a0b85de2c0e02614e224929b4515495ee243d6",
     "target_expr_sha256": "a4a58a4b669fe897c5a11cf692ac592c666abdf1058985160d263f0931645cbb",
-    "context_sha256": "d7657303abf3885294a2fb691bda040cce76476548e4cc1c0f2114ed07007d0c",
-    "proof_state_sha256": "870f53707976a756cc17f7f390722de421e6b1f3b2ca946b714a6733dfa790ad"
+    "context_sha256": "e900ab2c1a4f7819ab626319bcb0288fc4f31a64f962e82006b68158eeca4730",
+    "proof_state_sha256": "9b48b38cc6c03a532f232f3be1774086dba083cf10d3239605d16e1c048d6e7d"
   }
 }
