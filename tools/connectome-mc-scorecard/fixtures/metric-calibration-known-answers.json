@@ -20,7 +20,8 @@
       "positive_control_win_rate": 0,
       "one_sided_wilson_lower_bound": 0,
       "one_sided_wilson_upper_bound": 0.11915783736096448,
-      "mean_oriented_improvement": 0
+      "mean_oriented_improvement": 0,
+      "mean_dynamic_range_fraction": 0
     },
     {
       "effect_magnitude": 1,
@@ -31,7 +32,8 @@
       "positive_control_win_rate": 1,
       "one_sided_wilson_lower_bound": 0.8808421626390356,
       "one_sided_wilson_upper_bound": 1,
-      "mean_oriented_improvement": 0.5
+      "mean_oriented_improvement": 0.5,
+      "mean_dynamic_range_fraction": 0.5
     },
     {
       "effect_magnitude": 2,
@@ -42,7 +44,8 @@
       "positive_control_win_rate": 1,
       "one_sided_wilson_lower_bound": 0.8808421626390356,
       "one_sided_wilson_upper_bound": 1,
-      "mean_oriented_improvement": 1
+      "mean_oriented_improvement": 1,
+      "mean_dynamic_range_fraction": 1
     }
   ],
   "zero_effect_false_positive_upper_bound": 0.11915783736096448,
