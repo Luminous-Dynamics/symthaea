@@ -84,3 +84,28 @@ With priors `[0.45, 0.45, 0.10]`, the brittle experiment has an optimistic 0.9-b
 ### What this still does not solve
 
 A declared ambiguity set can still omit the true mechanism. A separate held-out model-adequacy gate must test predictive performance on unseen mechanisms/animals/contexts, calibrate abstention, and decide when no named model is adequate. See [SCI-CONNECTOMICS-046 (#9796)](https://github.com/Luminous-Dynamics/symthaea/issues/9796).
+
+## Held-out open-world model-adequacy gate
+
+A finite likelihood ambiguity set is not enough: it may still omit a mechanism. The first adequacy reference therefore calibrates a **session-level nonconformity score** using two disjoint cohorts:
+
+- In-scope calibration units: one preregistered independent animal/session aggregate per unit, used to estimate whether useful in-scope models are retained.
+- Omitted-mechanism calibration units: one aggregate score per independent mechanism family, used to calibrate false-adequacy risk for future omitted families.
+
+Higher nonconformity must mean worse predictive fit. The score, trajectory aggregation, observation model, and normalization must be frozen before calibration. Neurons, frames, and repeated recordings within one animal/session or omitted family must not be counted as independent calibration units.
+
+For target false-adequacy level alpha, with n independent omitted mechanism families, the reference selects:
+
+\`k = floor(alpha * (n + 1))\`
+
+and uses the k-th smallest omitted-family score as the threshold. A held-out animal/session is called ADEQUATE_UNDER_CALIBRATION only when its score is strictly less than that threshold. Strict inequality handles ties conservatively. Under exchangeability with the omitted-family calibration population, the false-adequacy probability is bounded by k/(n+1). This guarantee is limited to that calibration population; it does not certify arbitrary unknown mechanisms or distribution shifts that are not represented there.
+
+The gate also computes a one-sided Wilson lower bound on in-scope acceptance. The calibrator is usable only if this lower bound meets the preregistered minimum-acceptance floor. If k=0 or the in-scope floor fails, every held-out decision is UNRESOLVED.
+
+**Sample-size floor:** at alpha=0.05, fewer than 19 independent omitted mechanism families yields k=0, so no nontrivial threshold exists. Nineteen is only a coarse minimum, not a general recommendation; useful calibration will generally require substantially more independent families and a defensible exchangeability argument.
+
+A high score means the declared candidate set plus its observation model is inadequate or shifted under this calibration. It does not identify which mechanism is missing. Registration errors, optical artefacts, latent common input, extrasynaptic signalling, and context/observation-model shift can all cause the same signal.
+
+Input: \`schemas/adequacy-calibration-input.schema.json\`. Output: \`schemas/adequacy-calibration-output.schema.json\`. Synthetic fixtures: \`fixtures/adequacy-calibration.example.json\` and \`fixtures/adequacy-calibration-known-answers.json\`.
+
+The gate is a first reference implementation, not a biological adequacy certificate. Its calibration cohorts, omitted-family definition, score construction, exchangeability scope, and split provenance must be reviewed and frozen before any biological test.
