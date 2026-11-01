@@ -72,7 +72,10 @@ fn parse_sequence(fixture: &Value, field: &str) -> Vec<usize> {
             usize::try_from(state).expect("state index fits usize")
         })
         .collect();
-    assert!(sequence.len() >= 3, "sequence must have at least three states");
+    assert!(
+        sequence.len() >= 3,
+        "sequence must have at least three states"
+    );
     assert!(
         sequence.iter().all(|state| *state < 2),
         "this known-answer fixture has binary states only"
@@ -254,7 +257,10 @@ mod tests {
     #[test]
     fn exact_report_rejects_only_the_declared_counterexample_not_markov_truth_in_general() {
         let value = report();
-        assert_eq!(value["result"], "exact_order2_alias_counterexample_verified");
+        assert_eq!(
+            value["result"],
+            "exact_order2_alias_counterexample_verified"
+        );
         assert_eq!(
             value["eligibility"]["first_order_abstraction_falsified_for_alias_fixture"],
             true
