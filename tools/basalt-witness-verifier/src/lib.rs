@@ -969,6 +969,253 @@ mod tests {
         envelope.to_json().unwrap()
     }
 
+    fn build_root_key(seed: &[u8; 32], index: usize) -> TrustRootKey {
+        let signing_key = SigningKey::from_bytes(seed);
+        let public_key = STANDARD.encode(signing_key.verifying_key().to_bytes());
+        TrustRootKey {
+            keyid: canonical_key_id(&public_key).unwrap(),
+            algorithm: "ed25519".to_string(),
+            public_key,
+            administrative_domain: format!("root-domain-{index}"),
+            status: "active".to_string(),
+        }
+    }
+
+    fn build_root(
+        seeds: &[[u8; 32]],
+        version: u64,
+        previous: Option<String>,
+        initial_set_digest: String,
+    ) -> WitnessTrustRoot {
+        WitnessTrustRoot {
+            record_type: "basalt.authority.witness-trust-root".to_string(),
+            schema_version: 1,
+            authority_id: "basalt-test-authority".to_string(),
+            trust_root_version: version.to_string(),
+            previous_trust_root_digest: previous,
+            root_threshold: 2,
+            root_keys: seeds
+                .iter()
+                .enumerate()
+                .map(|(index, seed)| build_root_key(seed, index))
+                .collect(),
+            initial_witness_set_id: "basalt-test-witness-set".to_string(),
+            initial_witness_set_version: "1".to_string(),
+            initial_witness_set_digest: initial_set_digest,
+        }
+    }
+
+    fn build_witness_set(
+        seeds: &[[u8; 32]],
+        version: u64,
+        previous: Option<String>,
+        root_version: u64,
+    ) -> WitnessSetMetadata {
+        WitnessSetMetadata {
+            record_type: "basalt.authority.witness-set-metadata".to_string(),
+            schema_version: 1,
+            authority_id: "basalt-test-authority".to_string(),
+            witness_set_id: "basalt-test-witness-set".to_string(),
+            witness_set_version: version.to_string(),
+            previous_witness_set_digest: previous,
+            trust_root_version: root_version.to_string(),
+            fault_tolerance: 1,
+            member_count: 4,
+            write_quorum: 3,
+            read_quorum: 3,
+            signature_algorithm_policy:
+                "from-pinned-trust-metadata; never selected from an untrusted envelope".to_string(),
+            members: seeds
+                .iter()
+                .enumerate()
+                .map(|(index, seed)| {
+                    let signing_key = SigningKey::from_bytes(seed);
+                    let public_key = STANDARD.encode(signing_key.verifying_key().to_bytes());
+                    WitnessSetMember {
+                        member_id: format!("witness-{index}"),
+                        keyid: canonical_key_id(&public_key).unwrap(),
+                        algorithm: "ed25519".to_string(),
+                        public_key,
+                        administrative_domain: format!("witness-domain-{index}"),
+                        status: "active".to_string(),
+                    }
+                })
+                .collect(),
+        }
+    }
+
+    fn canonical<T: Serialize>(value: &T) -> Vec<u8> {
+        serde_json_canonicalizer::to_vec(value).unwrap()
+    }
+
+    fn root_fixture() -> (
+        Vec<u8>,
+        String,
+        Vec<u8>,
+        Vec<[u8; 32]>,
+        Vec<[u8; 32]>,
+        WitnessSetMetadata,
+    ) {
+        let old_seeds = vec![test_seed(41), test_seed(42), test_seed(43)];
+        let new_seeds = vec![test_seed(51), test_seed(52), test_seed(53)];
+        let witness_seeds = vec![
+            test_seed(61),
+            test_seed(62),
+            test_seed(63),
+            test_seed(64),
+        ];
+        let initial_set = build_witness_set(&witness_seeds, 1, None, 1);
+        let initial_set_digest = witness_set_metadata_digest(&canonical(&initial_set));
+        let genesis = build_root(&old_seeds, 1, None, initial_set_digest);
+        let genesis_bytes = canonical(&genesis);
+        let genesis_pin = sha256_prefixed(&genesis_bytes);
+        let successor = build_root(
+            &new_seeds,
+            2,
+            Some(witness_trust_root_digest(&genesis_bytes)),
+            genesis.initial_witness_set_digest.clone(),
+        );
+        let successor_bytes = canonical(&successor);
+        let rotation_envelope = sign_payload(
+            TRUST_ROOT_PAYLOAD_TYPE,
+            &successor_bytes,
+            &[old_seeds[0], old_seeds[1], new_seeds[0], new_seeds[1]],
+        );
+        (
+            genesis_bytes,
+            genesis_pin,
+            rotation_envelope,
+            old_seeds,
+            new_seeds,
+            initial_set,
+        )
+    }
+
+    #[test]
+    fn root_rotation_requires_old_and_new_thresholds_and_exact_predecessor() {
+        let (genesis, pin, rotation, _, _, _) = root_fixture();
+        let chain = verify_trust_root_chain(&genesis, &pin, &[rotation]).unwrap();
+        assert_eq!(chain.report.status, "verified");
+        assert_eq!(chain.report.verified_root_versions, vec!["1", "2"]);
+        assert_eq!(chain.report.latest_root_version, "2");
+        assert_eq!(chain.report.latest_root_threshold, 2);
+        assert_eq!(chain.report.latest_active_root_keys, 3);
+    }
+
+    #[test]
+    fn root_rotation_rejects_missing_old_root_threshold() {
+        let (genesis, pin, _, old, new, initial_set) = root_fixture();
+        let successor = build_root(
+            &new,
+            2,
+            Some(witness_trust_root_digest(&genesis)),
+            witness_set_metadata_digest(&canonical(&initial_set)),
+        );
+        let envelope = sign_payload(
+            TRUST_ROOT_PAYLOAD_TYPE,
+            &canonical(&successor),
+            &[old[0], new[0], new[1]],
+        );
+        assert!(verify_trust_root_chain(&genesis, &pin, &[envelope]).is_err());
+    }
+
+    #[test]
+    fn root_rotation_rejects_missing_new_root_threshold() {
+        let (genesis, pin, _, old, new, initial_set) = root_fixture();
+        let successor = build_root(
+            &new,
+            2,
+            Some(witness_trust_root_digest(&genesis)),
+            witness_set_metadata_digest(&canonical(&initial_set)),
+        );
+        let envelope = sign_payload(
+            TRUST_ROOT_PAYLOAD_TYPE,
+            &canonical(&successor),
+            &[old[0], old[1], new[0]],
+        );
+        assert!(verify_trust_root_chain(&genesis, &pin, &[envelope]).is_err());
+    }
+
+    #[test]
+    fn root_rotation_rejects_skipped_version_and_wrong_predecessor() {
+        let (genesis, pin, _, old, new, initial_set) = root_fixture();
+        let digest = witness_set_metadata_digest(&canonical(&initial_set));
+        let skipped = build_root(
+            &new,
+            3,
+            Some(witness_trust_root_digest(&genesis)),
+            digest.clone(),
+        );
+        let skipped_envelope = sign_payload(
+            TRUST_ROOT_PAYLOAD_TYPE,
+            &canonical(&skipped),
+            &[old[0], old[1], new[0], new[1]],
+        );
+        assert!(verify_trust_root_chain(&genesis, &pin, &[skipped_envelope]).is_err());
+
+        let wrong_parent = build_root(
+            &new,
+            2,
+            Some(sha256_prefixed(b"not-the-current-root")),
+            digest,
+        );
+        let wrong_parent_envelope = sign_payload(
+            TRUST_ROOT_PAYLOAD_TYPE,
+            &canonical(&wrong_parent),
+            &[old[0], old[1], new[0], new[1]],
+        );
+        assert!(verify_trust_root_chain(&genesis, &pin, &[wrong_parent_envelope]).is_err());
+    }
+
+    #[test]
+    fn root_chain_rejects_unpinned_genesis_bytes() {
+        let (genesis, _, rotation, _, _, _) = root_fixture();
+        let wrong_pin = sha256_prefixed(b"unrelated genesis");
+        assert!(verify_trust_root_chain(&genesis, &wrong_pin, &[rotation]).is_err());
+    }
+
+    #[test]
+    fn witness_set_metadata_is_bound_to_root_initial_digest_and_rotation_chain() {
+        let (genesis, pin, rotation, old, new, initial_set) = root_fixture();
+        let root_chain = verify_trust_root_chain(&genesis, &pin, &[rotation]).unwrap();
+
+        let initial_envelope = sign_payload(
+            WITNESS_SET_PAYLOAD_TYPE,
+            &canonical(&initial_set),
+            &[old[0], old[1]],
+        );
+        let verified_initial =
+            verify_witness_set_metadata(&initial_envelope, &root_chain, None).unwrap();
+        assert_eq!(verified_initial.report.witness_set_version, "1");
+
+        let next_seeds = [
+            test_seed(71),
+            test_seed(72),
+            test_seed(73),
+            test_seed(74),
+        ];
+        let next_set = build_witness_set(
+            &next_seeds,
+            2,
+            Some(verified_initial.report.witness_set_digest.clone()),
+            2,
+        );
+        let next_envelope = sign_payload(
+            WITNESS_SET_PAYLOAD_TYPE,
+            &canonical(&next_set),
+            &[new[0], new[1]],
+        );
+        let verified_next = verify_witness_set_metadata(
+            &next_envelope,
+            &root_chain,
+            Some(&verified_initial),
+        )
+        .unwrap();
+        assert_eq!(verified_next.report.witness_set_version, "2");
+        assert_eq!(verified_next.report.trust_root_version, "2");
+        assert_eq!(verified_next.report.read_quorum, 3);
+    }
+
     #[test]
     fn pae_matches_independent_checked_in_vector() {
         let payload_type = TEST_PAYLOAD_TYPE;
