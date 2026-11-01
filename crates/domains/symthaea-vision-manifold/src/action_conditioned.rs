@@ -1203,6 +1203,91 @@ mod tests {
 
 
 
+
+    #[test]
+    fn zero_action_and_inverse_action_metamorphic_controls_hold_after_learning() {
+        let mut model = predictor();
+        let positive_action = [1.0, -1.0];
+        let training_forecast = model.issue_forecast(
+            &digest('a'), 10, &digest('b'), &digest('c'), &digest('e'),
+            7, 1.0, &[0.0, 0.0], &positive_action
+        ).unwrap();
+        model.score_and_learn(
+            training_forecast.forecast_id,
+            &[0.6, -0.4],
+            11,
+            1.0,
+        ).unwrap();
+
+        let base = [0.1, -0.2];
+        let candidates = vec![
+            ActionConditionedCandidateAction {
+                action_id: 10,
+                action_descriptor_sha256: digest('f'),
+                action_embedding: vec![0.0, 0.0],
+            },
+            ActionConditionedCandidateAction {
+                action_id: 11,
+                action_descriptor_sha256: digest('c'),
+                action_embedding: positive_action.to_vec(),
+            },
+            ActionConditionedCandidateAction {
+                action_id: 12,
+                action_descriptor_sha256: digest('d'),
+                action_embedding: vec![-positive_action[0], -positive_action[1]],
+            },
+        ];
+        let receipts = model.issue_action_set(
+            &digest('a'), 11, &digest('b'), &digest('e'), 1.0, &base, &candidates
+        ).unwrap();
+        let find = |action_id| receipts.iter()
+            .find(|receipt| receipt.action_id == action_id)
+            .unwrap();
+        let zero = &find(10).predicted_future_hv;
+        let reference = &find(11).predicted_future_hv;
+        let inverse = &find(12).predicted_future_hv;
+
+        assert_eq!(zero, &base);
+        for index in 0..base.len() {
+            assert!((reference[index] + inverse[index] - 2.0 * base[index]).abs() < 1e-7);
+        }
+        assert!(reference.iter().zip(base).any(|(predicted, base)| (predicted - base).abs() > 1e-6));
+    }
+
+    #[test]
+    fn canonical_action_set_digest_is_independent_of_candidate_input_order() {
+        let mut first_model = predictor();
+        let mut second_model = predictor();
+        let candidates = vec![
+            ActionConditionedCandidateAction {
+                action_id: 17,
+                action_descriptor_sha256: digest('c'),
+                action_embedding: vec![1.0, 0.0],
+            },
+            ActionConditionedCandidateAction {
+                action_id: 3,
+                action_descriptor_sha256: digest('d'),
+                action_embedding: vec![-1.0, 0.0],
+            },
+        ];
+        let reversed = vec![candidates[1].clone(), candidates[0].clone()];
+        let first = first_model.issue_action_set(
+            &digest('a'), 50, &digest('b'), &digest('e'), 0.25, &[0.2, -0.1], &candidates
+        ).unwrap();
+        let second = second_model.issue_action_set(
+            &digest('a'), 50, &digest('b'), &digest('e'), 0.25, &[0.2, -0.1], &reversed
+        ).unwrap();
+        assert_eq!(first[0].action_set_sha256, second[0].action_set_sha256);
+        assert_eq!(
+            first.iter().map(|r| r.action_id).collect::<Vec<_>>(),
+            second.iter().map(|r| r.action_id).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            first.iter().map(|r| r.forecast_sha256.clone()).collect::<Vec<_>>(),
+            second.iter().map(|r| r.forecast_sha256.clone()).collect::<Vec<_>>()
+        );
+    }
+
     #[test]
     fn heldout_action_set_scoring_consumes_receipts_without_updating_the_predictor() {
         let mut model = predictor();
