@@ -143,7 +143,14 @@ Temporal competence:
 - wrong-belief, abstention and missing-output exposure separately;
 - event detection delay and regime recovery time;
 - calibration and selective risk;
-- performance under delayed/missing/censored observation.
+- performance under delayed/missing/censored observation;
+- **false-complete rate** (primary completeness safety metric): an interval declared complete despite a later source event within it;
+- false-incomplete rate and completeness lag;
+- late-arrival breach detection recall and detection latency;
+- source-specific watermark skew and asynchronous modality delay;
+- fraction of absent/unknown facts retained as Unknown until all required sources close the interval.
+
+Completeness is evaluated against hidden source schedules. A source watermark is a policy-bound progress claim, not proof of physical truth; measure false-complete and false-incomplete behavior separately.
 
 Efficiency:
 - parameter/model footprint and peak memory;
