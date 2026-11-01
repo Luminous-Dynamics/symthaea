@@ -452,9 +452,13 @@ impl TimeImmCsvAdapter {
         super::validate_event_batch(&events)
             .map_err(|error| TimeImmAdapterError::InvalidEventBatch(error.to_string()))?;
         Ok(TimeImmParsedTable {
+            dataset_id: self.config.dataset_id.clone(),
+            record_id: self.config.expected_record_id.clone(),
             entity_id,
+            adapter_config_sha256: self.config_sha256(),
             source_file_sha256,
             availability_policy_sha256: self.config.availability_policy.sha256(),
+            timestamp_zone_sha256: timestamp_zone_sha256(self.config.naive_timestamp_zone.as_ref()),
             row_count,
             events,
             max_rounding_error_by_feature: BTreeMap::new(),
