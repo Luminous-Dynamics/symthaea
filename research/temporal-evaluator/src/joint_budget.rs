@@ -15,6 +15,7 @@ pub struct JointResourceUse {
     pub persistent_bytes: u64,
     pub retained_byte_us: u128,
     pub io_bytes: u64,
+    pub latency_us: u64,
     pub compute_units: u64,
     pub observations: u64,
     pub energy_nj: u64,
@@ -26,6 +27,7 @@ impl JointResourceUse {
         self.persistent_bytes <= budget.persistent_bytes
             && self.retained_byte_us <= budget.retained_byte_us
             && self.io_bytes <= budget.io_bytes
+            && self.latency_us <= budget.latency_us
             && self.compute_units <= budget.compute_units
             && self.observations <= budget.observations
             && self.energy_nj <= budget.energy_nj
@@ -343,6 +345,7 @@ fn dominates(left: &JointSubsetSummary, right: &JointSubsetSummary) -> bool {
         && x.persistent_bytes <= y.persistent_bytes
         && x.retained_byte_us <= y.retained_byte_us
         && x.io_bytes <= y.io_bytes
+        && x.latency_us <= y.latency_us
         && x.compute_units <= y.compute_units
         && x.observations <= y.observations
         && x.energy_nj <= y.energy_nj
@@ -353,6 +356,7 @@ fn dominates(left: &JointSubsetSummary, right: &JointSubsetSummary) -> bool {
         || x.persistent_bytes < y.persistent_bytes
         || x.retained_byte_us < y.retained_byte_us
         || x.io_bytes < y.io_bytes
+        || x.latency_us < y.latency_us
         || x.compute_units < y.compute_units
         || x.observations < y.observations
         || x.energy_nj < y.energy_nj
@@ -377,6 +381,7 @@ mod tests {
                 persistent_bytes: 100,
                 retained_byte_us: 10_000,
                 io_bytes: 100,
+                latency_us: 10_000,
                 compute_units: 100,
                 observations: 100,
                 energy_nj: 1_000,
