@@ -254,16 +254,22 @@ The first macro-grain research increment adds a bounded, canonical
 default mapping families: ON-count coarse-graining at update grain 1 and
 blackboxing designated output constituents at the final update of a temporal
 window. It binds an ordered micro-constituent set, temporal update grain,
-truth-table size, canonical mapping digest, and the original mapping's
-complement orientation. Complementary mappings share the same unoriented
-mapping digest while retaining distinct state-label orientations in the full
-spec digest. The sequence-state bit order is explicit: oldest micro time first,
-with the first listed constituent as the least-significant bit.
+truth-table size, background-apportionment set, canonical mapping digest, and
+the original mapping's complement orientation. Complementary mappings share
+the same unoriented mapping digest while retaining distinct state-label
+orientations in the full v0.2 spec digest. Background apportionment is sorted,
+unique, disjoint from the unit's micro footprint, and bound into the full
+spec identity. The sequence-state bit order is explicit: oldest micro time
+first, with the first listed constituent as the least-significant bit. The
+mapping can be applied to full-system micro-history vectors with checked
+history length, equal state widths, and constituent index bounds.
 
 Construction rejects unsorted/duplicate constituents, zero temporal grain,
 overflowing sequence-state domains, constant mappings, incorrect truth-table
-lengths, invalid local output selections, and mappings above a caller-supplied
-entry budget. The current code does **not** derive macro TPMs, decide whether
+lengths, invalid local output selections, duplicate or overlapping background
+apportionment, and mappings above a caller-supplied entry budget. The current
+descriptor accepts direct micro-unit constituents; nested macro constituents
+and hierarchical composition remain future work. The current code does **not** derive macro TPMs, decide whether
 units satisfy the intrinsic-unit criteria, or search across grains. Those
 stages need separate PyPhi 2.0 differential fixtures and resource-bound proofs
 before they can be described as implemented. The macro-unit issue is
