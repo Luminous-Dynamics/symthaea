@@ -107,7 +107,7 @@ registry-digest-bound subset table and reports:
 
 For action i, the main-effect sample compares E(S) with E(S+i). For pair i,j,
 the interaction is the change in i's exposure reduction when j is present:
-`E(S) - E(S+i) - E(S+j) + E(S+i+j)`. Only contexts where all required
+`E(S+i) + E(S+j) - E(S) - E(S+i+j)`. Only contexts where all required
 interventions are both compatible and within every resource budget contribute.
 This is a conditional, feasibility-filtered interaction measure, not Shapley
 value and not a universal causal claim outside the declared fixture/task
