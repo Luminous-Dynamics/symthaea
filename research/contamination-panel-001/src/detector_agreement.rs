@@ -289,7 +289,7 @@ impl StatusCounts {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct StratumKey {
     family_key: String,
     difficulty_band: String,
