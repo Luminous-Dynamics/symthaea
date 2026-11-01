@@ -575,7 +575,7 @@ fn hypergeometric_failure_probability(
             log_mass += ((successes - k) as f64).ln()
                 + ((sample_size - k) as f64).ln()
                 - ((k + 1) as f64).ln()
-                - ((failures - sample_size + k + 1) as f64).ln();
+                - ((failures - (sample_size - k) + 1) as f64).ln();
         }
     }
     log_sum.exp().clamp(0.0, 1.0)
