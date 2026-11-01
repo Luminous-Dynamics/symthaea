@@ -1033,6 +1033,10 @@ mod tests {
         assert_eq!(report.anytime_receipt.objective_evaluation_attempt_count, 5);
         assert_eq!(report.anytime_receipt.total_resources.evaluator_calls, Some(5));
         assert_eq!(report.anytime_receipt.total_resources.normalized_charge_microunits, Some(5));
+        assert!(report.anytime_receipt.target_results.iter().all(|target| {
+            target.status == TargetAttainmentStatus::NotApplicableInNoisyMode
+                && target.final_metric_value.is_none()
+        }));
         assert_eq!(report.noisy_pareto_report.candidate_summaries.len(), 2);
         assert!(report.noisy_pareto_report.candidate_summaries.iter().all(|item| item.sample_count == 2));
         verify_noisy_anytime_campaign_report(&plan, &history, &report).unwrap();
