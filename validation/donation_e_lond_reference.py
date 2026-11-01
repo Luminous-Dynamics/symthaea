@@ -254,6 +254,7 @@ class DonationELONDIndex:
         self.e_values: list[Fraction] = []
         self.rejected: list[bool] = []
         self.nonrejected_wealth = Fraction(0)
+        self.gamma_mass = Fraction(0)
         self.root: Optional[_Node] = None
 
     @property
@@ -311,12 +312,17 @@ class DonationELONDIndex:
         weight = as_fraction(gamma)
         if e < 0 or weight < 0:
             raise ValueError("e-values and gamma weights must be nonnegative")
+        if not isinstance(rejected, bool):
+            raise TypeError("rejected must be a bool")
+        if self.gamma_mass + weight > 1:
+            raise ValueError("cumulative gamma weights must sum to at most one")
         index = len(self.e_values) + 1
         if weight == 0 and rejected:
             raise ValueError("zero-weight hypothesis cannot be rejected")
         self.e_values.append(e)
         self.gamma.append(weight)
-        self.rejected.append(bool(rejected))
+        self.rejected.append(rejected)
+        self.gamma_mass += weight
         if rejected:
             key = weight * (e - 1)
             self.root = _insert(self.root, key, weight, weight * e)
@@ -344,18 +350,9 @@ class DonationELONDIndex:
 
     def verify(self) -> bool:
         """Independent O(t) recomputation of wealth and threshold."""
-        expected = donation_threshold_reference(
-            self.e_values[:-1] if self.e_values else [],
-            self.gamma[:-1] if self.gamma else [],
-            [i + 1 for i, flag in enumerate(self.rejected[:-1]) if flag],
-            self.delta,
-        ) if self.e_values else None
-        if expected is None:
-            if self.nonrejected_wealth != 0 or self.root is not None:
-                return False
-            return True
-        # Compare all accumulated state excluding the final hypothesis is not
-        # enough; rebuild exact expected wealth from the complete prefix.
+        if not self.e_values:
+            return self.nonrejected_wealth == 0 and self.root is None
+        # Rebuild exact expected wealth from the complete prefix.
         r = sum(self.rejected)
         q = Fraction(1, 1) / (self.delta * (r + 1))
         naive = donation_wealth_reference(
