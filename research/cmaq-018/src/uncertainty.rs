@@ -652,11 +652,9 @@ pub fn select_structured_task_action(
         .map(|(_, index)| central_interval(&channel.outcome_samples[*index], nominal_coverage))
         .collect::<Result<_, _>>()?;
     Ok(match select_interval_dominant_action(&intervals)? {
-        RobustActionDecision::Certified { action_index } => {
-            StructuredActionDecision::Certified {
-                action_id: actions[action_index].0,
-            }
-        }
+        RobustActionDecision::Certified { action_index } => StructuredActionDecision::Certified {
+            action_id: actions[action_index].0,
+        },
         RobustActionDecision::Abstain { reason } => StructuredActionDecision::Abstain { reason },
     })
 }
@@ -1457,7 +1455,6 @@ mod tests {
             Err(IntervalError::StructuredChannelSampleCardinalityMismatch)
         );
     }
-
 
     #[test]
     fn structured_action_selection_uses_only_named_task_utility_channel() {
