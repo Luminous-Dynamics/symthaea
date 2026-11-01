@@ -116,7 +116,8 @@
         "positive_control_win_rate",
         "one_sided_wilson_lower_bound",
         "one_sided_wilson_upper_bound",
-        "mean_oriented_improvement"
+        "mean_oriented_improvement",
+        "mean_dynamic_range_fraction"
       ],
       "properties": {
         "effect_magnitude": {
@@ -155,6 +156,9 @@
           "maximum": 1
         },
         "mean_oriented_improvement": {
+          "type": "number"
+        },
+        "mean_dynamic_range_fraction": {
           "type": "number"
         }
       }
