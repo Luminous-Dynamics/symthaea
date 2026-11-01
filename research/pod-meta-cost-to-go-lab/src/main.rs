@@ -673,7 +673,7 @@ fn main() {
             1,
             3,
             OnlineFeedbackDisposition::ExactVerifiedCost {
-                observed_cost: 15,
+                observed_remaining_to_verified_proof: ResourceVector::new(15, 0, 0, 0, 0, 0),
                 meter_receipt_digest: [41; 32],
                 completion_verifier_digest: [42; 32],
             },
@@ -742,7 +742,7 @@ fn main() {
             1,
             4,
             OnlineFeedbackDisposition::ExactVerifiedCost {
-                observed_cost: 12,
+                observed_remaining_to_verified_proof: ResourceVector::new(12, 0, 0, 0, 0, 0),
                 meter_receipt_digest: [48; 32],
                 completion_verifier_digest: [49; 32],
             },
@@ -765,7 +765,7 @@ fn main() {
             1,
             2,
             OnlineFeedbackDisposition::RightCensored {
-                observed_lower_bound: 21,
+                observed_resource_lower_bound: ResourceVector::new(21, 0, 0, 0, 0, 0),
                 meter_receipt_digest: [50; 32],
             },
         ))
