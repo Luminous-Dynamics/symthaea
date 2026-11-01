@@ -652,6 +652,14 @@ jobs:
           assert fixture["status"] == "verified_success"
           assert fixture["checked_target_statement_sha256"] == fixture["target_statement_sha256"]
           assert fixture["proof_path"] is None and fixture["run_receipt_path"] is None
+          assert all(key in schema["required"] for key in ("model_id", "model_version", "arm_policy_sha256", "arm_config_sha256", "target_integrity_receipt_sha256"))
+          plan_path = Path("data/benchmarks/proof-insight-transfer-v0/intervention-trials/fixtures/support-antichain-intervention.synthetic.json")
+          plan = json.loads(plan_path.read_text())
+          first_arm = next(arm for arm in plan["arms"] if arm["arm_id"] == fixture["arm_id"])
+          assert fixture["model_id"] == plan["model"]["model_id"]
+          assert fixture["model_version"] == plan["model"]["model_version"]
+          assert fixture["arm_policy_sha256"] == first_arm["policy_sha256"]
+          assert fixture["arm_config_sha256"] == first_arm["config_sha256"]
           print("PITB_INTERVENTION_OUTCOME_SCHEMA_PASS: exact target binding; synthetic artifact paths absent")
           PY
       - name: Validate strict checker, run and successor evidence receipt schemas
@@ -668,6 +676,9 @@ jobs:
               schema = json.loads(path.read_text())
               Draft202012Validator.check_schema(schema)
           checker, run, successor = [json.loads(path.read_text()) for path in paths]
+          common_identity = ("initial_state_receipt_sha256", "model_id", "model_version", "arm_policy_sha256", "arm_config_sha256")
+          for schema in (checker, run, successor):
+              assert all(key in schema["required"] and key in schema["properties"] for key in common_identity)
           assert checker["properties"]["evidence_kind"]["const"] == "checker"
           assert run["properties"]["evidence_kind"]["const"] == "run"
           assert "target_integrity_receipt_sha256" in run["required"]
