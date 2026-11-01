@@ -254,6 +254,57 @@
         "unknown_state_preservation"
       ],
       "target": "zero_false_passes_and_100_percent_exact_scope_binding"
+    },
+    {
+      "id": "owasp_mobile_application_security",
+      "platform": "android_and_apple_applications",
+      "status": "planned",
+      "standard": "OWASP MASVS",
+      "weakness_taxonomy": "OWASP MASWE",
+      "test_catalogue": "OWASP MASTG",
+      "tool_ablations": [
+        "MobSF_only",
+        "REA_only",
+        "REA_plus_Symthaea",
+        "Symthaea_without_REA_when_fair"
+      ],
+      "cases": [
+        "storage",
+        "cryptography",
+        "authentication_authorization",
+        "network",
+        "platform_interaction",
+        "code_quality",
+        "resilience",
+        "privacy"
+      ],
+      "primary_metrics": [
+        "control_test_mapping_coverage",
+        "precision",
+        "recall",
+        "false_positive_rate",
+        "false_negative_rate",
+        "evidence_citation_completeness",
+        "time_to_correct_finding"
+      ],
+      "target": "100_percent_selected_control_mapping_or_explicit_oracle_gap; zero_static_to_runtime_claim_upgrades",
+      "environment_note": "Keep Android and iOS separate. MobSF dynamic Android rooted/Frida-Gadget and iOS Corellium/jailbroken results are distinct configurations and not interchangeable with stock non-jailbroken hardware."
+    },
+    {
+      "id": "android_platform_compatibility",
+      "platform": "android",
+      "status": "planned",
+      "standards": [
+        "Android CTS",
+        "Android VTS"
+      ],
+      "primary_metrics": [
+        "CTS_regression_count",
+        "VTS_regression_count",
+        "test_plan_coverage"
+      ],
+      "target": "No untriaged compatibility regression attributable to migrated components",
+      "note": "CTS/VTS provide compatibility evidence, not a security certification or hardware attestation."
     }
   ],
   "negative_control_policy": {
@@ -278,5 +329,11 @@
     "report_ablation_results": true,
     "publish_exact_artifact_and_tool_digests": true,
     "never_pool_simulator_and_physical_device_performance": true
-  }
+  },
+  "issue_links": [
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9838",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9839",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9840",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9842"
+  ]
 }
