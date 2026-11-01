@@ -103,3 +103,8 @@ All are proposed targets, not achieved results.
 4. Add the full receipt-byte authentication and semantic-successor harness for repair operations.
 5. Complete the real cross-family relationship audit before any confirmatory held-out model experiment.
 6. Compare typed insight, graph retrieval, support-antichain prediction, typed repair, patching and rewriting under identical budgets, then replicate on a temporally later or independent repository cohort.
+
+
+### LeanLean repository compression track (2026-11-01)
+
+Added a separate LeanLean evaluation design and per-repository outcome receipt. The benchmark is 64 real Lean repositories, 12 hours each, with a paper Opus 5 compression reference of 48.3%. PITB's new cohort contract pins the dataset identifier, per-repository source commit, token-size band, comparator bundle, protected-declaration manifest, exact candidate/build/comparator receipts and resource budget. The 620 protected declarations are a **cohort total**, not a per-repository count. The design and contract are under `docs/research/pitb-leanlean-evaluation-2026-11-01.md` and `data/benchmarks/proof-insight-transfer-v0/leanlean-track/`. No LeanLean tasks have been downloaded or scored by PITB.
