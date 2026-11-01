@@ -69,6 +69,7 @@ class PyPhiReferenceAnchorManifestTests(unittest.TestCase):
         self.assertIn("upstream_builder_tpm_max_abs_deviation", provenance["required"])
         self.assertIn("upstream_builder_tpm_tolerance", provenance["required"])
         self.assertIn("model_input_semantics", provenance["required"])
+        self.assertIn("pyphi_wheel_sha256", provenance["required"])
         self.assertIn(
             "analysis_request_sha256",
             self.schema["properties"]["comparisons"]["items"]["required"],
