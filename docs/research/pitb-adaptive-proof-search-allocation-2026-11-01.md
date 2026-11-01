@@ -32,7 +32,7 @@ The v0 controller estimates the action-conditioned probability of verified proof
 LCB(a\mid s,\pi_c,H)=\max(0,\widehat{p}(\text{verified proof by }H\mid s,a,\pi_c)-1.96\,SE(a)).
 \]
 
-This is **not** a causal treatment-effect estimate or an incremental lift over a no-action counterfactual. It is a conditional success estimate for the chosen action followed by the registered continuation policy. The calibration receipt must use the same horizon and continuation-policy digest as the decision.
+This is **not** a causal treatment-effect estimate or an incremental lift over a no-action counterfactual. It is a conditional success estimate for the chosen action followed by the registered continuation policy. The calibration receipt must use the same horizon and continuation-policy digest as the decision. The 1.96 multiplier is a nominal normal-approximation penalty, not a guaranteed 95% lower confidence bound: the supplied standard errors are not yet empirically coverage-calibrated, and the current calibration receipt reports ECE/Brier rather than interval coverage. PITB must not claim statistical confidence guarantees until interval coverage is measured on authenticated held-out trajectories across preregistered strata.
 
 It then ranks feasible actions by:
 
@@ -101,7 +101,7 @@ All targets below are research goals, not measured results:
 | Cost per verified proof at matched success | ≥30% lower than A0 and ≥5 percentage points better than the published 25.8% cost reduction |
 | Cost-quality AUC | ≥10% improvement over A0 and ≥2.1 points over the published 7.9% gain |
 | Budget to matched accuracy | ≥30% lower than A0; surpass the 28.9% published simulation result |
-| Calibration | ECE ≤5% on a frozen validation calibration set; publish Brier score and reliability diagrams |
+| Calibration | ECE ≤5% on a frozen validation set; publish Brier score, reliability diagrams and 90–98% empirical coverage for nominal 95% intervals across preregistered strata |
 | Selective risk | Zero false claims of success; 100% credited proofs pass independent Lean replay |
 | Budget accounting | Zero cap violations; all action and branch costs reconcile |
 | Generalization | Same-direction cost-quality gain on SorryDB and a temporally later cohort |
