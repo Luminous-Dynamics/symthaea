@@ -5,7 +5,7 @@ use pod_meta_cost_to_go_lab::{
     FrontierCostCoefficients, JointCostEnvelope, LandmarkEpisode, LandmarkIpcwConfig,
     LandmarkTerminal, LinearProofFrontierCostModel, OnlineCompetingTerminal, OnlineCostDimension,
     OnlineFeedbackDisposition, OnlineFeedbackReceipt, OnlinePredictionStatement,
-    OnlineSelectionLedger, PrefixReplayEvaluator, ProofFrontierFeatures,
+    OnlineSelectionLedger, PrefixBudgetReceipt, PrefixReplayEvaluator, ProofFrontierFeatures,
     ReconciliationOutcome, RemainingCostForecast, ReservationId, ResourceVector,
     SelectedProofCalibrationExample, SelectedProofEnvelope,
     SelectionConditionedConformalCalibrator, SelectionReceipt, ShiftStatus,
@@ -991,6 +991,12 @@ fn main() {
         .append_forecast(prefix_forecast(4, 904, 1, 8))
         .unwrap();
     prefix_journal
+        .append_forecast(prefix_forecast(5, 905, 1, 8))
+        .unwrap();
+    prefix_journal
+        .append_forecast(prefix_forecast(6, 906, 1, 8))
+        .unwrap();
+    prefix_journal
         .append_outcome(prefix_outcome(
             1,
             2,
@@ -1018,6 +1024,24 @@ fn main() {
             ),
         ))
         .unwrap();
+    prefix_journal
+        .append_outcome(prefix_outcome(
+            5,
+            2,
+            ResourceVector::new(26, 1, 1, 1, 1, 1),
+            TerminalOutcome::RightCensored(
+                pod_meta_cost_to_go_lab::CensorReason::Timeout,
+            ),
+        ))
+        .unwrap();
+    prefix_journal
+        .append_outcome(prefix_outcome(
+            6,
+            2,
+            ResourceVector::new(8, 1, 2, 3, 4, 5),
+            TerminalOutcome::SufficientProof,
+        ))
+        .unwrap();
     let prefix_evaluation = PrefixReplayEvaluator::evaluate(&prefix_journal).unwrap();
     let prefix_report = &prefix_evaluation.report;
     println!(
@@ -1043,6 +1067,68 @@ fn main() {
         "PREFIX_REPLAY_ROW\ttask-family-partition\t{}\t{}",
         prefix_report.by_task_family.len(),
         prefix_report.by_task_family[0].task_family
+    );
+
+    let generous_budget = ResourceVector::new(30, 5, 7, 8, 10, 12);
+    let medium_budget = ResourceVector::new(20, 2, 3, 4, 5, 6);
+    let narrow_budget = ResourceVector::new(10, 2, 3, 4, 5, 6);
+    let prefix_budgets = vec![
+        PrefixBudgetReceipt {
+            run_id: 901,
+            decision_sequence: 1,
+            pre_state_digest: [11; 32],
+            remaining_budget: generous_budget,
+            evidence_digest: [31; 32],
+        },
+        PrefixBudgetReceipt {
+            run_id: 902,
+            decision_sequence: 1,
+            pre_state_digest: [11; 32],
+            remaining_budget: medium_budget,
+            evidence_digest: [32; 32],
+        },
+        PrefixBudgetReceipt {
+            run_id: 903,
+            decision_sequence: 1,
+            pre_state_digest: [11; 32],
+            remaining_budget: generous_budget,
+            evidence_digest: [33; 32],
+        },
+        PrefixBudgetReceipt {
+            run_id: 904,
+            decision_sequence: 1,
+            pre_state_digest: [11; 32],
+            remaining_budget: generous_budget,
+            evidence_digest: [34; 32],
+        },
+        PrefixBudgetReceipt {
+            run_id: 905,
+            decision_sequence: 1,
+            pre_state_digest: [11; 32],
+            remaining_budget: ResourceVector::new(25, 5, 7, 8, 10, 12),
+            evidence_digest: [35; 32],
+        },
+        PrefixBudgetReceipt {
+            run_id: 906,
+            decision_sequence: 1,
+            pre_state_digest: [11; 32],
+            remaining_budget: narrow_budget,
+            evidence_digest: [36; 32],
+        },
+    ];
+    let budgeted_replay =
+        PrefixReplayEvaluator::evaluate_with_budgets(&prefix_journal, &prefix_budgets, 0.8)
+            .unwrap();
+    let feasibility = budgeted_replay.report.feasibility;
+    println!(
+        "PREFIX_REPLAY_ROW\\tbudget-feasibility\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}",
+        feasibility.budgeted_prefixes,
+        feasibility.predicted_feasible,
+        feasibility.predicted_infeasible,
+        feasibility.actual_feasibility_known,
+        feasibility.false_feasible,
+        feasibility.false_infeasible,
+        feasibility.unknown_actual_outcomes
     );
 
 }
