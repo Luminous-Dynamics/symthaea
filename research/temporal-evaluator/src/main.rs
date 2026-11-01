@@ -10,6 +10,7 @@
 
 pub mod witness;
 pub mod joint_budget;
+pub mod interaction;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
