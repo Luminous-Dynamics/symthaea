@@ -1129,8 +1129,7 @@ fn self_test(path: &PathBuf) -> Result<()> {
 
     let mut renamed_creation = fixture.clone();
     renamed_creation["goal"]["creation_index_decimal"] = Value::String("999".into());
-    let (_, unchanged_goal): (Value, Evidence) = serde_json::from_value(renamed_creation.clone())
-        .map(|evidence| (renamed_creation, evidence))
+    let unchanged_goal: Evidence = serde_json::from_value(renamed_creation)
         .context("decode creation-index invariance control")?;
     validate_evidence(&unchanged_goal)?;
     println!("PITB_LEAN_EXPR_WIRE_INVARIANCE_PASS: diagnostic creation index excluded from structural identity");
@@ -1228,7 +1227,7 @@ fn run() -> Result<()> {
             println!(
                 concat!(
                     "PITB_LEAN_EXPR_WIRE_PASS: declarations={} local_instances={} ",
-                    "typing_edges={} provenance_edges={} environment={} target={} ",
+                    "typing_edges={} provenance_edges={} environment={} goal={} target={} ",
                     "context={} proof_state={}"
                 ),
                 evidence.local_context.declarations.len(),
