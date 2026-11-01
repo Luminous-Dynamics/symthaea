@@ -972,16 +972,29 @@ mod tests {
     }
 
     #[test]
-    fn selected_alternative_policy_is_audited_under_null_transitions() {
-        let mut plan = fixture();
-        // The optimizer's action is P1-driven, but P0 remains the only size measure.
-        // A valid input still produces an independently reconstructed P0 size.
-        let report = analyze_power_optimal_continuation(&plan).unwrap();
-        assert!((report.selected_policy_null_size - 0.026).abs() < 1e-12);
-        assert!((report.remaining_alpha_budget - 0.024).abs() < 1e-12);
-        plan.alternative_model_id = "different-alternative".into();
-        let changed = analyze_power_optimal_continuation(&plan).unwrap();
-        assert_ne!(report.plan_sha256, changed.plan_sha256);
+    fn alternative_model_changes_power_policy_but_not_null_validity() {
+        let baseline = analyze_power_optimal_continuation(&fixture()).unwrap();
+        assert!((baseline.selected_policy_null_size - 0.026).abs() < 1e-12);
+        assert!((baseline.remaining_alpha_budget - 0.024).abs() < 1e-12);
+
+        let mut weaker_alternative = fixture();
+        let early = weaker_alternative.continuation_processes.iter_mut()
+            .find(|process| process.history_node_id == "early").unwrap();
+        early.nodes.iter_mut().find(|node| node.node_id == "hit").unwrap()
+            .conditional_alternative_probability = 0.5;
+        early.nodes.iter_mut().find(|node| node.node_id == "miss").unwrap()
+            .conditional_alternative_probability = 0.5;
+        weaker_alternative.alternative_model_id = "weaker-early-signal".into();
+        let changed = analyze_power_optimal_continuation(&weaker_alternative).unwrap();
+        let early_policy = changed.continuation_processes.iter()
+            .find(|process| process.history_node_id == "early").unwrap();
+        assert!(early_policy.policy.iter().any(|decision| {
+            decision.node_id == "c-root"
+                && decision.action == PowerPolicyAction::StopAndApplyCurrentTest
+        }));
+        assert!(changed.maximum_adaptive_power < baseline.maximum_adaptive_power);
+        assert!(changed.selected_policy_null_size <= changed.significance_level);
+        assert_ne!(baseline.plan_sha256, changed.plan_sha256);
     }
 
     #[test]
