@@ -33,6 +33,7 @@ struct Evidence {
     schema_version: String,
     evidence_class: String,
     environment: Environment,
+    goal: GoalMetadata,
     target: Expr,
     local_context: LocalContext,
     digests: Digests,
@@ -80,8 +81,20 @@ struct ImportedOleanArtifact {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct GoalMetadata {
+    user_name: LeanName,
+    kind: String,
+    depth_decimal: String,
+    num_scope_args_decimal: String,
+    // Diagnostic-only creation order; excluded from structural identity.
+    creation_index_decimal: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Digests {
     environment_sha256: String,
+    goal_metadata_sha256: String,
     target_expr_sha256: String,
     context_sha256: String,
     proof_state_sha256: String,
@@ -594,6 +607,15 @@ fn compute_digests(evidence: &Evidence) -> DigestsComputed {
     });
     let environment_bytes = hex::decode(&environment_sha256)
         .expect("SHA-256 output is always valid hexadecimal");
+    let goal_metadata_sha256 = sha256_domain(b"GOAL-METADATA\0", |encoder| {
+        encoder.raw(&environment_bytes);
+        encode_name(encoder, &evidence.goal.user_name);
+        encoder.string(&evidence.goal.kind);
+        encoder.string(&evidence.goal.depth_decimal);
+        encoder.string(&evidence.goal.num_scope_args_decimal);
+    });
+    let goal_bytes = hex::decode(&goal_metadata_sha256)
+        .expect("SHA-256 output is always valid hexadecimal");
     let target_expr_sha256 = sha256_domain(b"TARGET\0", |encoder| {
         encoder.raw(&environment_bytes);
         encode_expr(encoder, &evidence.target);
@@ -608,11 +630,13 @@ fn compute_digests(evidence: &Evidence) -> DigestsComputed {
         .expect("SHA-256 output is always valid hexadecimal");
     let proof_state_sha256 = sha256_domain(b"PROOF-STATE\0", |encoder| {
         encoder.raw(&environment_bytes);
+        encoder.raw(&goal_bytes);
         encoder.raw(&target_bytes);
         encoder.raw(&context_bytes);
     });
     DigestsComputed {
         environment_sha256,
+        goal_metadata_sha256,
         target_expr_sha256,
         context_sha256,
         proof_state_sha256,
@@ -621,6 +645,7 @@ fn compute_digests(evidence: &Evidence) -> DigestsComputed {
 
 struct DigestsComputed {
     environment_sha256: String,
+    goal_metadata_sha256: String,
     target_expr_sha256: String,
     context_sha256: String,
     proof_state_sha256: String,
@@ -847,6 +872,13 @@ fn validate_evidence(evidence: &Evidence) -> Result<DigestsComputed> {
     }
     validate_relative_source_path(&environment.source_path)?;
     validate_artifact_manifests(environment)?;
+    if !matches!(evidence.goal.kind.as_str(), "natural" | "synthetic" | "synthetic_opaque") {
+        bail!("unsupported metavariable kind");
+    }
+    validate_name(&evidence.goal.user_name, 0)?;
+    validate_decimal(&evidence.goal.depth_decimal, "metavariable depth")?;
+    validate_decimal(&evidence.goal.num_scope_args_decimal, "metavariable scope argument count")?;
+    validate_decimal(&evidence.goal.creation_index_decimal, "metavariable creation index")?;
 
     let declarations = &evidence.local_context.declarations;
     if declarations.len() > MAX_CONTEXT_DECLARATIONS {
@@ -947,6 +979,11 @@ fn validate_evidence(evidence: &Evidence) -> Result<DigestsComputed> {
             "environment_sha256",
             evidence.digests.environment_sha256.as_str(),
             actual.environment_sha256.as_str(),
+        ),
+        (
+            "goal_metadata_sha256",
+            evidence.digests.goal_metadata_sha256.as_str(),
+            actual.goal_metadata_sha256.as_str(),
         ),
         (
             "target_expr_sha256",
@@ -1082,6 +1119,21 @@ fn self_test(path: &PathBuf) -> Result<()> {
     bad["environment"]["imported_olean_artifacts"][1]["path"] =
         Value::String("../outside.olean".into());
     reject_value("imported OLean path traversal", bad)?;
+    let mut bad = fixture.clone();
+    bad["goal"]["depth_decimal"] = Value::String("1".into());
+    reject_value("metavariable depth changes proof-state identity", bad)?;
+
+    let mut bad = fixture.clone();
+    bad["goal"]["kind"] = Value::String("synthetic_opaque".into());
+    reject_value("metavariable kind changes proof-state identity", bad)?;
+
+    let mut renamed_creation = fixture.clone();
+    renamed_creation["goal"]["creation_index_decimal"] = Value::String("999".into());
+    let (_, unchanged_goal): (Value, Evidence) = serde_json::from_value(renamed_creation.clone())
+        .map(|evidence| (renamed_creation, evidence))
+        .context("decode creation-index invariance control")?;
+    validate_evidence(&unchanged_goal)?;
+    println!("PITB_LEAN_EXPR_WIRE_INVARIANCE_PASS: diagnostic creation index excluded from structural identity");
 
 
     let mut bad = fixture.clone();
@@ -1184,6 +1236,7 @@ fn run() -> Result<()> {
                 typing_edges,
                 provenance_edges,
                 digests.environment_sha256,
+                digests.goal_metadata_sha256,
                 digests.target_expr_sha256,
                 digests.context_sha256,
                 digests.proof_state_sha256
