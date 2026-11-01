@@ -276,7 +276,9 @@ impl CoralSeatRound {
                 ));
             }
             let action_arm = match &payload.intent {
-                ActionIntent::EvaluateCandidate { direction_id, .. } => {
+                ActionIntent::EvaluateCandidate { direction_id, .. }
+                | ActionIntent::EvaluateCandidateVector { direction_id, .. }
+                | ActionIntent::ObserveCandidateReplicate { direction_id, .. } => {
                     CoralArm::Direction(direction_id.clone())
                 }
                 ActionIntent::ProposeDirection { .. } => CoralArm::New,
