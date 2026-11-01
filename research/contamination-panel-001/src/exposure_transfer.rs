@@ -27,6 +27,7 @@ pub const MIN_TRANSFER_FAMILIES: usize = 2;
 pub const MAX_TRANSFER_REPLICATES: usize = 1_000;
 pub const MAX_TRANSFER_ROWS_PER_REPLICATE: usize = 10_000;
 pub const MAX_ITEM_IDS_PER_ROW: usize = 100_000;
+pub const MAX_ITEM_IDS_PER_REPLICATE: usize = 500_000;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
@@ -352,6 +353,16 @@ fn validate_replicate_matrix(
     {
         return Err(format!(
             "strata length must be in 1..={MAX_TRANSFER_ROWS_PER_REPLICATE}"
+        ));
+    }
+
+    let total_item_ids = replicate.strata.iter().try_fold(0_usize, |total, row| {
+        total.checked_add(row.item_ids.len())
+            .ok_or_else(|| "replicate item-ID count overflows".to_owned())
+    })?;
+    if total_item_ids > MAX_ITEM_IDS_PER_REPLICATE {
+        return Err(format!(
+            "replicate item-ID count exceeds {MAX_ITEM_IDS_PER_REPLICATE}"
         ));
     }
 
