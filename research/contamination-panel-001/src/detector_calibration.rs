@@ -968,11 +968,19 @@ fn analyze_group(
                     disagreement_rate: None,
                 };
                 let left_eligible = target_eligibility
-                    .get(&(*target, left.detector_id.as_str(), left.detector_version.as_str()))
+                    .get(&(
+                        *target,
+                        left.detector_id.as_str(),
+                        left.detector_version.as_str(),
+                    ))
                     .copied()
                     .unwrap_or(false);
                 let right_eligible = target_eligibility
-                    .get(&(*target, right.detector_id.as_str(), right.detector_version.as_str()))
+                    .get(&(
+                        *target,
+                        right.detector_id.as_str(),
+                        right.detector_version.as_str(),
+                    ))
                     .copied()
                     .unwrap_or(false);
                 disagreement.calibration_resolution_sufficient = left_eligible && right_eligible;
@@ -1511,20 +1519,20 @@ mod tests {
         let mut study = minimal_study();
         for observation in &mut study.observations {
             if observation.split == ObservationSplitV1::CleanCalibration {
-                let index = observation.sample_id
+                let index = observation
+                    .sample_id
                     .strip_prefix("cal-")
                     .and_then(|value| value.parse::<usize>().ok())
                     .unwrap();
                 observation.source_cluster_id = format!("cal-block-{:03}", index / 2);
             }
             if observation.split == ObservationSplitV1::LockedTest {
-                observation.source_cluster_id = if observation.sample_id == "test-000"
-                    || observation.sample_id == "test-001"
-                {
-                    "test-clean-block".to_owned()
-                } else {
-                    "test-contaminated-block".to_owned()
-                };
+                observation.source_cluster_id =
+                    if observation.sample_id == "test-000" || observation.sample_id == "test-001" {
+                        "test-clean-block".to_owned()
+                    } else {
+                        "test-contaminated-block".to_owned()
+                    };
             }
         }
         let report = analyze_detector_calibration(&study).unwrap();
