@@ -123,14 +123,16 @@ fn main() {
         support_count: 128,
         shift_status: ShiftStatus::UnsupportedShift,
     };
-    let shifted_decision = assess_completion_feasibility(shifted_forecast, &safe, 0.90, 32);
+    let clear_budget = BudgetLedger::new(tokens(100));
+    let shifted_decision =
+        assess_completion_feasibility(shifted_forecast, &clear_budget, 0.90, 32);
     assert!(matches!(
         shifted_decision,
         pod_meta_cost_to_go_lab::AdmissionDecision::Abstain(_)
     ));
     shifted_forecast.shift_status = ShiftStatus::InDomain;
     assert!(matches!(
-        assess_completion_feasibility(shifted_forecast, &safe, 0.90, 32),
+        assess_completion_feasibility(shifted_forecast, &clear_budget, 0.90, 32),
         pod_meta_cost_to_go_lab::AdmissionDecision::Admit
     ));
     println!("CASE\tshift-aware-feasibility\tshift-abstains-in-domain-admits\t0\t0\t0\t0");
