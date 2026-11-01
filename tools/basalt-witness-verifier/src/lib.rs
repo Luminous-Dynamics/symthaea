@@ -604,6 +604,6 @@ mod tests {
         let seeds = [test_seed(7), test_seed(8), test_seed(9), test_seed(10)];
         let trust = build_trust(&seeds);
         let bytes = trust_bytes(&trust);
-        assert!(load_pinned_trust_store(&bytes, &"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string()).is_err());
+        assert!(load_pinned_trust_store(&bytes, "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").is_err());
     }
 }
