@@ -1403,6 +1403,9 @@ pub fn verify_mutants(trace: &Trace) -> Vec<(String, bool)> {
         .collect()
 }
 
+mod history;
+pub use history::{HistorySearchConfig, HistorySearchReport, verify_observed_history};
+
 #[cfg(test)]
 mod tests {
     use super::*;
