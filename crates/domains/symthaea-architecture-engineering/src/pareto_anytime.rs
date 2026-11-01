@@ -1869,6 +1869,67 @@ mod tests {
     }
 
     #[test]
+    fn untimed_synthetic_recorder_keeps_latency_unknown() {
+        let mut frozen = header();
+        frozen.cost_model_id = SYNTHETIC_OBJECTIVE_COST_MODEL_ID.to_owned();
+        frozen.cost_model_sha256 = synthetic_objective_evaluation_cost_model_sha256().unwrap();
+        frozen.required_resource_meters = vec![
+            ResourceMeter::EvaluatorCalls,
+            ResourceMeter::NormalizedChargeMicrounits,
+        ];
+        let mut history = AnytimeHistory::new(frozen).unwrap();
+        {
+            let mut recorder = AnytimeRecorder::new(&mut history).unwrap();
+            recorder.record_success(&[0.25, 0.75], &[0.0, 1.0], true, Vec::new()).unwrap();
+        }
+        let receipt = analyze_anytime_history(&history).unwrap();
+        assert_eq!(receipt.objective_evaluation_attempt_count, 1);
+        assert_eq!(receipt.total_resources.evaluator_calls, Some(1));
+        assert_eq!(receipt.elapsed_wall_millis, None);
+        assert_eq!(receipt.target_results[0].first_elapsed_wall_millis, None);
+        assert_eq!(receipt.target_results[0].final_elapsed_wall_millis, None);
+    }
+
+    #[test]
+    fn timed_and_untimed_events_cannot_be_mixed() {
+        let mut history = AnytimeHistory::new(header()).unwrap();
+        append_candidate(&mut history, 1, "candidate-a", "eval-a", vec![0.0, 1.0]);
+        let mixed = history.append(AnytimeEventDraft {
+            started_elapsed_millis: None,
+            completed_elapsed_millis: None,
+            resources: known_cost(1, 1024),
+            action: AnytimeAction::AuxiliaryAction {
+                action_id: "untimed-after-timed".to_owned(),
+                action_kind: "mixed-clock-control".to_owned(),
+            },
+        });
+        assert!(mixed.is_err());
+        assert_eq!(history.events().len(), 1);
+
+        let mut untimed = AnytimeHistory::new(header()).unwrap();
+        untimed.append(AnytimeEventDraft {
+            started_elapsed_millis: None,
+            completed_elapsed_millis: None,
+            resources: known_cost(1, 1024),
+            action: AnytimeAction::AuxiliaryAction {
+                action_id: "untimed-first".to_owned(),
+                action_kind: "untimed-control".to_owned(),
+            },
+        }).unwrap();
+        let timed_after_untimed = untimed.append(AnytimeEventDraft {
+            started_elapsed_millis: Some(0),
+            completed_elapsed_millis: Some(1),
+            resources: known_cost(1, 1024),
+            action: AnytimeAction::AuxiliaryAction {
+                action_id: "timed-second".to_owned(),
+                action_kind: "mixed-clock-control".to_owned(),
+            },
+        });
+        assert!(timed_after_untimed.is_err());
+        assert_eq!(untimed.events().len(), 1);
+    }
+
+    #[test]
     fn deserialized_history_rebuilds_incremental_append_state() {
         let mut original = AnytimeHistory::new(header()).unwrap();
         append_candidate(&mut original, 1, "candidate-a", "eval-a", vec![0.0, 1.0]);
