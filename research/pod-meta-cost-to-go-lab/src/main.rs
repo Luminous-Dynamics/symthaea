@@ -504,8 +504,9 @@ fn main() {
     );
     println!("LANDMARK_IPCW_ROW\tpositivity-violation\tabstain");
     let mut competing_control = make_landmark_completion(206, 7, 1, 1.0);
-    competing_control.terminal =
-        LandmarkTerminal::CompetingTerminal(pod_meta_cost_to_go_lab::CompetingProofTerminal::PermissionRevoked);
+    competing_control.terminal = LandmarkTerminal::CompetingTerminal(
+        pod_meta_cost_to_go_lab::CompetingProofTerminal::PermissionRevoked,
+    );
     competing_control.censoring_receipt = None;
     let competing_result = calibrate_landmark_ipcw(
         &[competing_control],
@@ -523,5 +524,4 @@ fn main() {
         Err(pod_meta_cost_to_go_lab::LandmarkIpcwError::CompetingRiskRequiresSeparateEstimator)
     );
     println!("LANDMARK_IPCW_ROW\tcompeting-terminal\trequires-separate-estimator");
-
 }
