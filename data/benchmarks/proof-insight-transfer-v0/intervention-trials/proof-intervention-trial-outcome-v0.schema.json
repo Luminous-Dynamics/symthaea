@@ -265,10 +265,7 @@
         "required": [
           "proof_sha256",
           "checker_receipt_sha256",
-          "semantic_gate_receipt_sha256",
-          "proof_path",
-          "checker_receipt_path",
-          "semantic_gate_receipt_path"
+          "semantic_gate_receipt_sha256"
         ],
         "properties": {
           "checker_passed": {
@@ -365,6 +362,70 @@
             "$ref": "#/$defs/relative_path"
           }
         }
+      }
+    },
+    {
+      "if": {
+        "allOf": [
+          {
+            "properties": {
+              "evidence_class": {
+                "const": "measured_outcome"
+              }
+            },
+            "required": [
+              "evidence_class"
+            ]
+          },
+          {
+            "properties": {
+              "status": {
+                "const": "verified_success"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        ]
+      },
+      "then": {
+        "required": [
+          "proof_path",
+          "checker_receipt_path",
+          "semantic_gate_receipt_path"
+        ]
+      }
+    },
+    {
+      "if": {
+        "allOf": [
+          {
+            "properties": {
+              "evidence_class": {
+                "const": "measured_outcome"
+              }
+            },
+            "required": [
+              "evidence_class"
+            ]
+          },
+          {
+            "properties": {
+              "successor_gate_status": {
+                "const": "passed"
+              }
+            },
+            "required": [
+              "successor_gate_status"
+            ]
+          }
+        ]
+      },
+      "then": {
+        "required": [
+          "successor_receipt_path"
+        ]
       }
     }
   ],
