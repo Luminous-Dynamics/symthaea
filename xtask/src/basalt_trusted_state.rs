@@ -2262,7 +2262,8 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
                     previous_seal_digest, seal_digest, observer_profile_digest,
                     boot_incarnation_digest, profile_transition_evidence_digest,
                     boot_transition_evidence_digest, log_origin_transition_evidence_digest,
-                    policy_transition_evidence_digest, log_id, tree_size, root_digest,
+                    policy_transition_evidence_digest, checkpoint_evidence_kind,
+                    checkpoint_evidence_digest, log_id, tree_size, root_digest,
                     checkpoint_digest, signer_policy_version, witness_policy_version,
                     policy_bundle_digest
              FROM basalt_accepted_receipts ORDER BY accepted_revision",
@@ -2285,11 +2286,13 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
                 row.get::<_, Option<String>>(13)?,
                 row.get::<_, Option<String>>(14)?,
                 row.get::<_, String>(15)?,
-                row.get::<_, String>(16)?,
+                row.get::<_, Option<String>>(16)?,
                 row.get::<_, String>(17)?,
                 row.get::<_, String>(18)?,
                 row.get::<_, String>(19)?,
                 row.get::<_, String>(20)?,
+                row.get::<_, String>(21)?,
+                row.get::<_, String>(22)?,
             ))
         })?;
         for row in rows {
@@ -2308,6 +2311,8 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
                 boot_transition_evidence_digest,
                 log_origin_transition_evidence_digest,
                 policy_transition_evidence_digest,
+                checkpoint_evidence_kind,
+                checkpoint_evidence_digest,
                 log_id,
                 tree_size,
                 root_digest,
@@ -2323,6 +2328,23 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
                 previous_seal_digest.is_none()
             } else {
                 previous_seal_digest.as_deref().is_some_and(valid_digest)
+            };
+            let checkpoint_evidence = match (
+                checkpoint_evidence_kind.as_str(),
+                checkpoint_evidence_digest,
+            ) {
+                ("pinned_bootstrap", Some(digest)) if valid_digest(&digest) => {
+                    CheckpointEvidence::VerifiedPinnedBootstrap {
+                        pinned_checkpoint_digest: digest,
+                    }
+                }
+                ("same_tree", None) => CheckpointEvidence::VerifiedSameTree,
+                ("consistent_extension", Some(digest)) if valid_digest(&digest) => {
+                    CheckpointEvidence::VerifiedConsistentExtension {
+                        consistency_proof_digest: digest,
+                    }
+                }
+                _ => anyhow::bail!("invalid persisted checkpoint transition evidence"),
             };
             let receipt = AcceptedReceipt {
                 source: SourceKey {
@@ -2347,6 +2369,7 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
                     root_digest,
                     checkpoint_digest,
                 },
+                checkpoint_evidence,
                 policy_versions: PolicyVersions {
                     signer: parse_sql_u64(&signer_policy, "accepted signer policy")?,
                     witness: parse_sql_u64(&witness_policy, "accepted witness policy")?,
@@ -2661,10 +2684,11 @@ where
           previous_seal_digest, seal_digest, observer_profile_digest, boot_incarnation_digest,
           profile_transition_evidence_digest, boot_transition_evidence_digest,
           log_origin_transition_evidence_digest, policy_transition_evidence_digest,
+          checkpoint_evidence_kind, checkpoint_evidence_digest,
           log_id, tree_size, root_digest, checkpoint_digest,
           signer_policy_version, witness_policy_version, policy_bundle_digest)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-                 ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
+                 ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
         params![
             receipt.receipt_digest,
             receipt.accepted_revision.to_string(),
@@ -2680,6 +2704,16 @@ where
             receipt.boot_transition_evidence_digest,
             receipt.log_origin_transition_evidence_digest,
             receipt.policy_transition_evidence_digest,
+            match &receipt.checkpoint_evidence {
+                CheckpointEvidence::VerifiedPinnedBootstrap { .. } => "pinned_bootstrap",
+                CheckpointEvidence::VerifiedSameTree => "same_tree",
+                CheckpointEvidence::VerifiedConsistentExtension { .. } => "consistent_extension",
+            },
+            match &receipt.checkpoint_evidence {
+                CheckpointEvidence::VerifiedPinnedBootstrap { pinned_checkpoint_digest } => Some(pinned_checkpoint_digest.as_str()),
+                CheckpointEvidence::VerifiedSameTree => None,
+                CheckpointEvidence::VerifiedConsistentExtension { consistency_proof_digest } => Some(consistency_proof_digest.as_str()),
+            },
             receipt.checkpoint.log_id,
             receipt.checkpoint.tree_size.to_string(),
             receipt.checkpoint.root_digest,
