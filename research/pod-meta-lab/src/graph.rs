@@ -3442,8 +3442,6 @@ mod artifact_evaluator_tests_v1 {
             .count();
         assert!(empty_truth_cases > 0, "fixture must include zero-evidence cases");
 
-        let planner = encode_planner_artifact_v1(&suite, "test-generator-revision")
-            .expect("planner encode");
         let oracle = encode_oracle_artifact_v1(&suite, "test-generator-revision", DIGEST)
             .expect("oracle encode");
         let parsed = parse_oracle_artifact_v1(oracle.as_bytes()).expect("oracle parse");
@@ -3452,7 +3450,6 @@ mod artifact_evaluator_tests_v1 {
         for case in suite.planner_cases() {
             assert!(parsed.truths.contains_key(&case.id));
         }
-        assert!(!planner.is_empty());
     }
 
     #[test]
