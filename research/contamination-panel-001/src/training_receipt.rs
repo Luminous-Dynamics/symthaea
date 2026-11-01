@@ -330,8 +330,12 @@ fn validate_arm_common(
         TrainingArmV1::Placebo => &design.placebo_training_corpus_sha256,
     };
     if &arm.training_corpus_sha256 != expected_corpus {
+        let arm_name = match expected_arm {
+            TrainingArmV1::Treatment => "treatment",
+            TrainingArmV1::Placebo => "placebo",
+        };
         return Err(format!(
-            "{expected_arm:?} training corpus digest does not match design"
+            "{arm_name} training corpus digest does not match design"
         ));
     }
     if arm.shared_training_corpus_sha256 != design.shared_training_corpus_sha256
@@ -383,7 +387,7 @@ fn validate_arm_common(
         .ok_or_else(|| format!("{expected_arm:?} observed token total overflows u64"))?;
     if arm.observed_total_training_token_count != observed_total {
         return Err(format!(
-            "{expected_arm:?} observed total token count does not equal component sum"
+            "{expected_arm:?} observed token count does not equal component sum"
         ));
     }
     if arm.observed_shared_training_token_count > design.shared_training_token_count
