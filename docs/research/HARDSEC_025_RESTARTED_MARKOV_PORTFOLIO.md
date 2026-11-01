@@ -1,6 +1,6 @@
 # HARDSEC-025 — Exact rational restarted Markov portfolio oracle
 
-**Status:** First finite-state implementation slice. It checks the restarted capital mixture and its conditional supermartingale inequality on one exact two-state fixture. It does **not** implement calibration confidence bounds or establish a runtime PFA guarantee for hardware telemetry.
+**Status:** First finite-state implementation slice. It checks the restarted capital mixture and its conditional supermartingale inequality on one exact two-state fixture. It includes an outward-rounded fixed-`N` Hoeffding envelope calculation on a deterministic synthetic tally, but does not establish empirical calibration coverage, a source-bound calibration receipt, or a runtime PFA guarantee for hardware telemetry.
 
 Issue: [HARDSEC-025 / #9704](https://github.com/Luminous-Dynamics/symthaea/issues/9704)  
 Parent research: [HARDSEC-024 / PR #9679](https://github.com/Luminous-Dynamics/symthaea/pull/9679)
