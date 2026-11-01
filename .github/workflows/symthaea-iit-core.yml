@@ -124,6 +124,10 @@ jobs:
       - name: Benchmark bounded macro mapping-family enumeration
         run: /usr/bin/time -v -o target/iit-benchmark-evidence/macro-mapping-families.time.txt target/release/examples/macro_mapping_family_sweep 2>&1 | tee target/iit-benchmark-evidence/macro-mapping-families.csv
 
+      - name: Sweep exact IIT selections across a one-parameter landscape
+        shell: bash
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/parameter-landscape.time.txt target/release/examples/sparse_phi_landscape_sweep 2>&1 | tee target/iit-benchmark-evidence/parameter-landscape.csv
+
       - name: Clippy the isolated crate
         run: cargo clippy --locked -p symthaea-iit --all-targets -- -D warnings 2>&1 | tee target/iit-benchmark-evidence/clippy.log
 
@@ -146,7 +150,8 @@ jobs:
             sparse-partition-score \
             sparse-full-system-search \
             min-fill-planner-comparison \
-            macro-mapping-families
+            macro-mapping-families \
+            parameter-landscape
           do
             csv="target/iit-benchmark-evidence/${stem}.csv"
             timing="target/iit-benchmark-evidence/${stem}.time.txt"
@@ -156,6 +161,11 @@ jobs:
             grep -q "Maximum resident set size (kbytes):" "$timing"
             printf 'PASS %s: CSV rows=%s; peak-RSS record present\n' "$stem" "$(( $(wc -l < "$csv") - 1 ))"
           done
+          test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape.csv | grep -c 'EXACT_SAMPLE_ONLY')" -eq 13
+          awk -F, 'NR > 1 && $9 != "true" { exit 1 }' target/iit-benchmark-evidence/parameter-landscape.csv
+          test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape.csv | cut -d, -f6 | sort -u | wc -l)" -eq 13
+          test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape.csv | cut -d, -f23 | sort -u | wc -l)" -eq 13
+          printf 'PASS parameter-landscape: 13 exact samples; unique model and result receipts; no interval certification claimed\\n'
 
       - name: Upload immutable IIT benchmark evidence
         if: always()
