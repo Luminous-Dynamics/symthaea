@@ -299,18 +299,20 @@ impl SelectionConditionedConformalCalibrator {
                     prediction.uncertainty_scale,
                     threshold,
                 )?;
-                Ok(SelectedProofEnvelope::Bounded(Box::new(SelectedProofUpperBound {
-                    upper,
-                    target_coverage: self.target_coverage,
-                    calibration_count: self.calibration_count,
-                    normalized_residual_threshold: threshold,
-                    model_digest: self.model_digest,
-                    selection_policy_digest: self.selection_policy_digest,
-                    selected_population_digest: self.selected_population_digest,
-                    calibration_digest: self.calibration_digest,
-                    frontier_digest: selection.frontier_digest,
-                    selected_operation_family: self.selected_operation_family,
-                })))
+                Ok(SelectedProofEnvelope::Bounded(Box::new(
+                    SelectedProofUpperBound {
+                        upper,
+                        target_coverage: self.target_coverage,
+                        calibration_count: self.calibration_count,
+                        normalized_residual_threshold: threshold,
+                        model_digest: self.model_digest,
+                        selection_policy_digest: self.selection_policy_digest,
+                        selected_population_digest: self.selected_population_digest,
+                        calibration_digest: self.calibration_digest,
+                        frontier_digest: selection.frontier_digest,
+                        selected_operation_family: self.selected_operation_family,
+                    },
+                )))
             }
         }
     }
