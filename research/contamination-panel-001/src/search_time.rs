@@ -5,7 +5,10 @@
 //! it does not prove that the perimeter captured every possible channel.
 //! Independent signer, proxy, sandbox and custody verification are separate.
 
-use crate::{fresh_instance::parse_timestamp, hash_domain};
+use crate::{
+    fresh_instance::{parse_timestamp, ExactLinearSolutionV1, FreshChallengeBundleV1},
+    hash_domain,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
