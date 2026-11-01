@@ -442,7 +442,6 @@ fn auc_and_average_precision(scores: &[(f64, bool)]) -> (Option<f64>, Option<f64
     )
 }
 
-
 fn full_holdout_auroc_bounds(
     conditional_auroc: Option<f64>,
     scored_positive: u64,
@@ -581,8 +580,8 @@ fn validate_request(request: &DetectorAgreementRequestV1) -> Result<Vec<Prepared
         ] {
             if !valid_opaque_id(value) {
                 return Err(format!(
-                "{label} must be a nonempty opaque ASCII identifier"
-            ));
+                    "{label} must be a nonempty opaque ASCII identifier"
+                ));
             }
         }
         if !sample_ids.insert(sample.sample_id.as_str()) {
