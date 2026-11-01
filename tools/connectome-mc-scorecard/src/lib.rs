@@ -723,7 +723,7 @@ pub fn evaluate(
 
 
 /// A replicate and seed declared before any method result is observed.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PlannedReplicate {
     pub replicate_id: String,
     pub seed: u64,
@@ -1589,7 +1589,7 @@ mod tests {
         assert_eq!(
             compare_paired_rejection_rate(
                 &[baseline, candidate],
-                &[PlannedReplicate { replicate_id: "1".into(), seed: 0 }],
+                &[PlannedReplicate { replicate_id: "1".into(), seed: 0, structural_beta: 0.0, null_is_true: true }],
                 "s", "baseline", "candidate", PairedComparisonConfig::default()
             ),
             Err(EvalError::InconsistentPairedTruth)
@@ -1639,7 +1639,7 @@ mod tests {
         assert_eq!(
             compare_paired_rejection_rate(
                 &[row],
-                &[PlannedReplicate { replicate_id: "1".into(), seed: 1 }],
+                &[PlannedReplicate { replicate_id: "1".into(), seed: 1, structural_beta: 0.0, null_is_true: true }],
                 "s", "m", "m", PairedComparisonConfig::default()
             ),
             Err(EvalError::SameMethodComparison)
