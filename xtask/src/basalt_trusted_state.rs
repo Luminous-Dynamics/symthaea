@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::time::Duration;
 
-use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
+use rusqlite::{params, Connection, OpenFlags, OptionalExtension, Transaction, TransactionBehavior};
 use sha2::{Digest, Sha256};
 
 const MAX_ID_BYTES: usize = 128;
@@ -1571,7 +1571,10 @@ impl SqliteTrustedStateStore {
             Err(error) => return Err(error.into()),
         }
 
-        let mut connection = Connection::open(path.as_ref())
+        let open_flags = OpenFlags::SQLITE_OPEN_READ_WRITE
+            | OpenFlags::SQLITE_OPEN_CREATE
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW;
+        let mut connection = Connection::open_with_flags(path.as_ref(), open_flags)
             .with_context(|| format!("open BASALT SQLite state store at {}", path.as_ref().display()))?;
         connection.busy_timeout(Duration::from_secs(5))?;
 
