@@ -152,7 +152,10 @@ fn portfolios() -> Vec<[Rational; 3]> {
 }
 
 fn calibration_ceil_div(numerator: u128, denominator: u128) -> u128 {
-    assert!(denominator > 0, "calibration division denominator must be positive");
+    assert!(
+        denominator > 0,
+        "calibration division denominator must be positive"
+    );
     numerator / denominator + u128::from(numerator % denominator != 0)
 }
 
@@ -167,7 +170,9 @@ fn calibration_fixed_mul_ceil(left: u128, right: u128) -> u128 {
 fn calibration_log_unit_interval_upper(z_numerator: u128, z_denominator: u128) -> u128 {
     assert!(z_denominator > 0, "log-series denominator must be positive");
     assert!(
-        z_numerator.checked_mul(3).is_some_and(|value| value <= z_denominator),
+        z_numerator
+            .checked_mul(3)
+            .is_some_and(|value| value <= z_denominator),
         "log-series argument must be in [0, 1/3]"
     );
 
@@ -197,8 +202,7 @@ fn calibration_log_unit_interval_upper(z_numerator: u128, z_denominator: u128) -
         .checked_mul(first_omitted_odd)
         .and_then(|value| value.checked_mul(3_u128.pow(first_omitted_odd as u32)))
         .expect("fixed-point log tail denominator overflow");
-    let tail_upper_scaled =
-        calibration_ceil_div(9 * FIXED_POINT_SCALE, tail_denominator);
+    let tail_upper_scaled = calibration_ceil_div(9 * FIXED_POINT_SCALE, tail_denominator);
 
     2 * series_sum_scaled + tail_upper_scaled
 }
@@ -256,8 +260,7 @@ fn fixed_n_hoeffding_upper_scaled(
     }
     assert!(samples <= u64::MAX as u128);
 
-    let log_inverse_delta_upper =
-        calibration_log_ratio_upper(delta_denominator, delta_numerator);
+    let log_inverse_delta_upper = calibration_log_ratio_upper(delta_denominator, delta_numerator);
     let radicand_upper = calibration_ceil_div(
         log_inverse_delta_upper
             .checked_mul(FIXED_POINT_SCALE)
@@ -289,10 +292,7 @@ fn upper_probability(current_state: usize, next_state: usize) -> Rational {
             .expect("envelope quantization overflow"),
         FIXED_POINT_SCALE,
     );
-    Rational::new(
-        quantized_numerator,
-        ENVELOPE_QUANTIZATION_DENOMINATOR,
-    )
+    Rational::new(quantized_numerator, ENVELOPE_QUANTIZATION_DENOMINATOR)
 }
 
 fn transition_probability(current_state: usize, next_state: usize) -> Rational {
@@ -548,9 +548,7 @@ mod tests {
         assert_eq!(upper_probability(1, 0), Rational::new(3, 5));
         assert_eq!(upper_probability(1, 1), Rational::new(3, 5));
         assert_eq!(
-            CALIBRATION_COORDINATE_COUNT
-                * CALIBRATION_DELTA_NUMERATOR
-                * 10,
+            CALIBRATION_COORDINATE_COUNT * CALIBRATION_DELTA_NUMERATOR * 10,
             CALIBRATION_DELTA_DENOMINATOR
         );
     }
