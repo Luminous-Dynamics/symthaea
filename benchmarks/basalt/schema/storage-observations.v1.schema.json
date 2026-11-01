@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/basalt/storage-observations.v1.schema.json",
+  "title": "BASALT observed backend execution v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "suite_id",
+    "version",
+    "trace_id",
+    "reference_trace_sha256",
+    "backend",
+    "raw_event_log_sha256",
+    "observed_operations",
+    "observed_faults",
+    "witness_observations",
+    "final_observation"
+  ],
+  "properties": {
+    "suite_id": { "const": "basalt-storage-observations" },
+    "version": { "const": 1 },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "reference_trace_sha256": { "$ref": "#/$defs/digest" },
+    "backend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "backend_id",
+        "engine_name",
+        "engine_version",
+        "adapter_commit_sha",
+        "executable_sha256",
+        "configuration_sha256",
+        "durability_profile"
+      ],
+      "properties": {
+        "backend_id": { "type": "string", "minLength": 1 },
+        "engine_name": { "type": "string", "minLength": 1 },
+        "engine_version": { "type": "string", "minLength": 1 },
+        "adapter_commit_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "executable_sha256": { "$ref": "#/$defs/digest" },
+        "configuration_sha256": { "$ref": "#/$defs/digest" },
+        "durability_profile": { "type": "string", "minLength": 1 }
+      }
+    },
+    "raw_event_log_sha256": { "$ref": "#/$defs/digest" },
+    "observed_operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/observed_operation" }
+    },
+    "observed_faults": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fault_id", "applied", "observed_at_ns", "runner_id"],
+        "properties": {
+          "fault_id": { "type": "string", "minLength": 1 },
+          "applied": { "type": "boolean" },
+          "observed_at_ns": { "type": "integer", "minimum": 0 },
+          "runner_id": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "witness_observations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/witness_observation" }
+    },
+    "final_observation": { "$ref": "#/$defs/final_observation" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "observed_operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op_id",
+        "runner_id",
+        "client_id",
+        "client_sequence",
+        "invoked_at_ns",
+        "completed_at_ns",
+        "outcome",
+        "receipt_id",
+        "receipt_acceptance_revision",
+        "current_authority_revision",
+        "observed_store_revision"
+      ],
+      "properties": {
+        "op_id": { "type": "string", "minLength": 1 },
+        "runner_id": { "type": "string", "minLength": 1 },
+        "client_id": { "type": "string", "minLength": 1 },
+        "client_sequence": { "type": "integer", "minimum": 0 },
+        "invoked_at_ns": { "type": "integer", "minimum": 0 },
+        "completed_at_ns": { "type": "integer", "minimum": 0 },
+        "outcome": {
+          "enum": [
+            "committed",
+            "duplicate",
+            "compare_conflict",
+            "indeterminate",
+            "retryable_abort",
+            "receipt_found",
+            "rejected_anti_rollback_unknown",
+            "rejected_anti_rollback"
+          ]
+        },
+        "receipt_id": { "type": ["string", "null"] },
+        "receipt_acceptance_revision": { "type": ["string", "null"] },
+        "current_authority_revision": { "type": ["string", "null"] },
+        "observed_store_revision": { "type": ["string", "null"] }
+      }
+    },
+    "witness_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "witness_id",
+        "sequence",
+        "authority_id",
+        "incarnation_id",
+        "authority_revision",
+        "state_digest",
+        "predecessor_witness_digest",
+        "signed_record_digest"
+      ],
+      "properties": {
+        "witness_id": { "type": "string", "minLength": 1 },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "authority_id": { "type": "string", "minLength": 1 },
+        "incarnation_id": { "type": "string", "minLength": 1 },
+        "authority_revision": { "type": "string", "minLength": 1 },
+        "state_digest": { "$ref": "#/$defs/digest" },
+        "predecessor_witness_digest": {
+          "type": ["string", "null"],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "signed_record_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "final_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_revision",
+        "state_digest",
+        "policy_digest",
+        "source_cursors",
+        "log_cursors",
+        "accepted_receipts"
+      ],
+      "properties": {
+        "authority_revision": { "type": "string", "minLength": 1 },
+        "state_digest": { "$ref": "#/$defs/digest" },
+        "policy_digest": { "$ref": "#/$defs/digest" },
+        "source_cursors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/source_cursor" }
+        },
+        "log_cursors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/log_cursor" }
+        },
+        "accepted_receipts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/receipt" }
+        }
+      }
+    },
+    "source_cursor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "generation", "cursor", "predecessor_digest"],
+      "properties": {
+        "source_id": { "type": "string", "minLength": 1 },
+        "generation": { "type": "integer", "minimum": 0 },
+        "cursor": { "type": "string", "minLength": 1 },
+        "predecessor_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "log_cursor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["log_origin_id", "checkpoint"],
+      "properties": {
+        "log_origin_id": { "type": "string", "minLength": 1 },
+        "checkpoint": { "type": "string", "minLength": 1 }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt_id", "receipt_digest", "receipt_acceptance_revision"],
+      "properties": {
+        "receipt_id": { "type": "string", "minLength": 1 },
+        "receipt_digest": { "$ref": "#/$defs/digest" },
+        "receipt_acceptance_revision": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
