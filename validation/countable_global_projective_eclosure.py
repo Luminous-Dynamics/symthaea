@@ -293,8 +293,11 @@ def verify_countable_global_projective_path(
         "local_constraint_terms_evaluated": sum(row["local_constraint_terms_evaluated"] for row in rows),
         "all_projective_identities_verified": all(row["projective_identity"] for row in rows),
         "all_true_null_losses_dominated": all(row["dominated"] for row in rows),
-        "coordinate_paths_monotone": monotone,
-        "supfdr_pathwise_condition_satisfied": monotone,
+        "raw_global_certificate_pathwise_monotone": monotone,
+        "supfdr_certificate_contract": (
+            "requires time-monotone projective intersection e-processes; "
+            "use a valid common running-maximum adjuster when raw paths are not monotone"
+        ),
         "path": rows,
         "scope": (
             "finite exact pathwise oracle; global countable-mixing theorem and "
