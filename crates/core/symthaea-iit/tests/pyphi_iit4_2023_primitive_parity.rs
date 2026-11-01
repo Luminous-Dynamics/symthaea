@@ -4,10 +4,12 @@
 
 use symthaea_iit::{primitive_repertoire_request_sha256, BinaryCausalModel, FormalismProfile, PrimitiveRepertoireOperation};
 
+#[allow(clippy::excessive_precision)] // preserve exact pinned PyPhi decimal spellings
 const TPM: [f64; 24] = [0.11920292202211757, 0.76852478349901776, 0.16798161486607552, 0.026596993576865863, 0.99888746396713979, 0.5, 0.97340300642313404, 0.40131233988754816, 0.16798161486607552, 0.88079707797788231, 0.99451370110054949, 0.5, 0.11920292202211757, 0.0054862988994504045, 0.5, 0.026596993576865863, 0.59868766011245189, 0.83201838513392445, 0.97340300642313404, 0.0011125360328603216, 0.5, 0.88079707797788231, 0.23147521650098227, 0.83201838513392445];
 const CM: [bool; 9] = [true,true,true,true,true,false,false,true,true];
 const STATE: [bool; 3] = [false,true,true];
 struct Case { id: &'static str, candidate: &'static [usize], mechanism: &'static [usize], cause_request: &'static str, cause: &'static [f64], effect_request: &'static str, effect: &'static [f64], forward_request: &'static str, forward: &'static [f64] }
+#[allow(clippy::excessive_precision)] // preserve exact pinned PyPhi golden vectors
 const CASES: &[Case] = &[
  Case {
   id: "AB-mechanism-empty", candidate: &[0, 1], mechanism: &[],
