@@ -2353,6 +2353,39 @@ mod tests {
     }
 
     #[test]
+    fn sparse_system_search_carries_digest_bound_theorem_certificate() {
+        let model = SparseBinaryCausalModel::new(
+            2,
+            vec![
+                SparseMechanismCpt::new(0, vec![1], vec![0.1, 0.9]).unwrap(),
+                SparseMechanismCpt::new(1, vec![0], vec![0.1, 0.9]).unwrap(),
+            ],
+        )
+        .unwrap();
+        let config = Iit4SystemPhiSearchConfig::default();
+        let result = model
+            .analyze_iit4_2023_system_phi_s(&[0, 1], &[false, false], config, 64)
+            .unwrap();
+
+        let certificate = result
+            .bound_certificate
+            .as_ref()
+            .expect("sparse no-TotalCut system should carry the theorem certificate");
+        certificate
+            .verify_binding(&model.model_sha256(), model.n_units, &[0, 1], false)
+            .unwrap();
+        assert_eq!(result.certified_upper_bound, Some(2));
+        if let Some(phi_s) = result.phi_s {
+            assert!(phi_s <= 2.0 + 10.0_f64.powi(-(config.decimal_precision as i32)));
+        }
+
+        let receipt = result.receipt_sha256().unwrap();
+        let mut tampered = result.clone();
+        tampered.bound_certificate.as_mut().unwrap().upper_bound = 3;
+        assert_ne!(receipt, tampered.receipt_sha256().unwrap());
+    }
+
+    #[test]
     fn sparse_system_search_reuses_partition_terms_across_state_pairs_with_dense_parity() {
         let dense = dense_ring_model(3);
         let sparse = SparseBinaryCausalModel::from_dense(&dense).unwrap();
