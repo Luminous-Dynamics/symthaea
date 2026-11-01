@@ -29,10 +29,25 @@ use std::{
     env,
     error::Error,
     fs,
-    io::{self, BufRead},
+    io::{self, BufRead, Read},
     path::Path,
     process,
 };
+
+fn read_bounded(path: &str, maximum_bytes: usize, label: &str) -> io::Result<Vec<u8>> {
+    let file = fs::File::open(path)?;
+    let limit = u64::try_from(maximum_bytes)
+        .map_err(|_| io::Error::other(format!("{label} byte limit exceeds u64")))?;
+    let mut bytes = Vec::new();
+    file.take(limit + 1).read_to_end(&mut bytes)?;
+    if bytes.len() > maximum_bytes {
+        return Err(io::Error::other(format!(
+            "{label} exceeds the {} byte safety bound",
+            maximum_bytes
+        )));
+    }
+    Ok(bytes)
+}
 
 fn decode_hex(input: &str) -> Result<Vec<u8>, String> {
     if input.len() % 2 != 0 {
@@ -290,10 +305,7 @@ fn audit_search_time_trace_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
                 .into(),
         );
     }
-    let trace_bytes = fs::read(&args[1])?;
-    if trace_bytes.len() > SEARCH_MAX_TRACE_BYTES {
-        return Err("search-time trace exceeds 256 MiB safety bound".into());
-    }
+    let trace_bytes = read_bounded(&args[1], SEARCH_MAX_TRACE_BYTES, "search-time trace")?;
     let trace: SearchTimeExposureTraceV1 = serde_json::from_slice(&trace_bytes)?;
     let report = audit_search_time_trace(&trace).map_err(io::Error::other)?;
     write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
@@ -325,10 +337,7 @@ fn audit_search_time_findings_cli(args: &[String]) -> Result<(), Box<dyn Error>>
     if !trace_audit.valid {
         return Err("search-time trace failed integrity audit".into());
     }
-    let findings_bytes = fs::read(&args[2])?;
-    if findings_bytes.len() > SEARCH_MAX_FINDINGS_BYTES {
-        return Err("search-time findings exceed 64 MiB safety bound".into());
-    }
+    let findings_bytes = read_bounded(&args[2], SEARCH_MAX_FINDINGS_BYTES, "search-time findings")?;
     let findings: SearchTimeExposureFindingsV1 =
         serde_json::from_slice(&findings_bytes)?;
     let report = audit_search_time_findings(&trace, &findings).map_err(io::Error::other)?;
