@@ -1,0 +1,17 @@
+[package]
+name = "pod-meta-efficiency-lab"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Deterministic benchmark for verified proof progress per unit computation"
+
+[workspace]
+
+[dependencies]
+pod-meta-lab = { path = "../pod-meta-lab" }
+
+[[bin]]
+name = "pod-meta-efficiency"
+path = "src/main.rs"
