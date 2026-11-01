@@ -6,6 +6,7 @@ from countable_global_projective_eclosure import (
     finite_weight_mass,
     projective_certificate,
     separate_local_closure,
+    verify_adjusted_projective_supfdr_path,
     verify_countable_global_projective_path,
     verify_weight_scheme_prefix,
 )
@@ -25,6 +26,32 @@ class CountableGlobalProjectiveEclosureTests(unittest.TestCase):
             self.assertTrue(result["matches"])
             self.assertEqual(result["prefix_mass"], 1 - Fraction(1, n + 1))
         self.assertEqual(coordinate_weight(1, "telescoping"), Fraction(1, 2))
+
+    def test_running_max_adjuster_preserves_countable_projective_history(self):
+        active = ((1,), (1, 2), (1, 2))
+        rejections = ((), (1,), (1,))
+        truth = (1, 2)
+        paths = {
+            1: (Fraction(1), Fraction(8), Fraction(2)),
+            2: (Fraction(1), Fraction(1), Fraction(1)),
+        }
+        result = verify_adjusted_projective_supfdr_path(
+            active, rejections, truth, paths, Fraction(1, 2),
+            thresholds=(2, 4, 8), increments=(1, 1, 1),
+        )
+        self.assertTrue(result["valid"], result)
+        self.assertEqual(result["full_true_adjusted_path"], (0, 2, 2))
+        self.assertTrue(result["adjusted_true_certificate_monotone"])
+        self.assertTrue(result["adjusted_projective_equalities_verified"])
+        self.assertTrue(result["all_local_constraints_certified"])
+        self.assertEqual(result["local_constraints_checked"], 1 + 3 + 3)
+
+    def test_adjuster_rejects_invalid_integral_budget(self):
+        with self.assertRaisesRegex(ValueError, "integral budget"):
+            verify_adjusted_projective_supfdr_path(
+                ((1,),), ((),), (1,), {1: (1,)}, Fraction(1, 2),
+                thresholds=(2, 4), increments=(2, 2),
+            )
 
     def test_invalid_weight_scheme_fails_even_for_empty_intersections(self):
         with self.assertRaisesRegex(ValueError, "weight scheme"):
