@@ -357,7 +357,7 @@ impl SeededStream {
         let offset = self.uniform_below(width)?;
         let value =
             i64::from(min) + i64::try_from(offset).map_err(|_| "sample offset overflows")?;
-        i32::try_from(value).map_err(|_| "sampled integer is outside i32")
+        i32::try_from(value).map_err(|_| "sampled integer is outside i32".to_owned())
     }
 }
 
