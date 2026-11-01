@@ -690,12 +690,16 @@ mod tests {
             attest(&checkpoint, &witness_keys[1], 71, old_challenge),
             attest(&checkpoint, &witness_keys[2], 72, old_challenge),
         ];
+        let mut old_replays = Vec::new();
+        for _ in 0..100 {
+            old_replays.extend(old_attestations.iter().cloned());
+        }
         assert_eq!(
             verify_checkpoint_quorum(
                 &checkpoint,
                 &evaluator_key.verifying_key(),
                 [100; 32],
-                &old_attestations,
+                &old_replays,
                 &witnesses(&witness_keys),
                 bft_policy(),
             ),
@@ -741,6 +745,7 @@ mod tests {
         invalid_signature.signature[0] ^= 0x80;
         let unknown_key = SigningKey::from_bytes(&[36; 32]);
         let responses = vec![
+            attest(&checkpoint, &witness_keys[0], 60, challenge),
             attest(&checkpoint, &witness_keys[0], 60, challenge),
             attest(&checkpoint, &witness_keys[1], 61, challenge),
             attest(&checkpoint, &witness_keys[2], 62, challenge),
