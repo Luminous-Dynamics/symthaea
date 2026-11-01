@@ -382,8 +382,10 @@ fn analyze_response_body(
     let answer_items = matching_answer_items(body, bundle);
     // Integer-pair answers are a small namespace and can occur by chance in
     // unrelated pages. Require a same-item identifier or task-context match.
+    let mut associated_items = context_items.clone();
+    associated_items.extend(metadata_items.iter().cloned());
     let associated_answer_items: BTreeSet<String> = answer_items
-        .intersection(&context_items.union(&metadata_items).cloned().collect())
+        .intersection(&associated_items)
         .cloned()
         .collect();
     if !associated_answer_items.is_empty() {
