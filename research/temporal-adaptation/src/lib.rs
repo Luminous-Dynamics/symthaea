@@ -45,6 +45,13 @@ impl ResourcePriceConfig {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResourcePriceSnapshot {
+    pub prices_ppm: [u64; 12],
+    pub smoothed_utilization_ppm: [u64; 12],
+    pub completed_episodes: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ResourcePriceState {
     prices_ppm: [u64; 12],
     smoothed_utilization_ppm: [u64; 12],
@@ -82,8 +89,31 @@ impl ResourcePriceState {
         self.completed_episodes
     }
 
-    pub const fn prices(&self) -> [u64; 12] {
-        self.prices_ppm
+    pub const fn snapshot(&self) -> ResourcePriceSnapshot {
+        ResourcePriceSnapshot {
+            prices_ppm: self.prices_ppm,
+            smoothed_utilization_ppm: self.smoothed_utilization_ppm,
+            completed_episodes: self.completed_episodes,
+        }
+    }
+
+    pub fn restore(
+        snapshot: ResourcePriceSnapshot,
+        config: ResourcePriceConfig,
+    ) -> Result<Self, PriceError> {
+        config.validate()?;
+        if snapshot.prices_ppm.iter().any(|price| *price > config.maximum_price_ppm)
+            || snapshot.smoothed_utilization_ppm.iter().any(|value| {
+                *value > config.maximum_observed_utilization_ppm
+            })
+        {
+            return Err(PriceError::SnapshotOutOfRange);
+        }
+        Ok(Self {
+            prices_ppm: snapshot.prices_ppm,
+            smoothed_utilization_ppm: snapshot.smoothed_utilization_ppm,
+            completed_episodes: snapshot.completed_episodes,
+        })
     }
 }
 
@@ -101,12 +131,14 @@ pub struct ResourcePriceUpdate {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ResourcePriceReceipt {
     pub completed_episode: u64,
+    pub config: ResourcePriceConfig,
     pub updates: Vec<ResourcePriceUpdate>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PriceError {
     InvalidConfig,
+    SnapshotOutOfRange,
     ArithmeticOverflow,
 }
 
@@ -114,6 +146,7 @@ impl fmt::Display for PriceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidConfig => write!(f, "resource price configuration is invalid"),
+            Self::SnapshotOutOfRange => write!(f, "persisted resource price snapshot exceeds configured bounds"),
             Self::ArithmeticOverflow => write!(f, "resource price update arithmetic overflowed"),
         }
     }
@@ -178,6 +211,7 @@ pub fn update_resource_prices(
 
     Ok(ResourcePriceReceipt {
         completed_episode: state.completed_episodes,
+        config,
         updates,
     })
 }
@@ -368,6 +402,32 @@ mod tests {
         let b = update_resource_prices(&mut right, usage, budget, config()).unwrap();
         assert_eq!(a, b);
         assert_eq!(left, right);
+    }
+
+    #[test]
+    fn snapshot_round_trip_preserves_all_adaptive_state() {
+        let mut state = ResourcePriceState::default();
+        update_resource_prices(
+            &mut state,
+            ResourceVector { observations: 9, ..ResourceVector::default() },
+            ResourceVector { observations: 10, ..ResourceVector::default() },
+            config(),
+        ).unwrap();
+        let restored = ResourcePriceState::restore(state.snapshot(), config()).unwrap();
+        assert_eq!(restored, state);
+    }
+
+    #[test]
+    fn out_of_range_snapshot_is_rejected() {
+        let snapshot = ResourcePriceSnapshot {
+            prices_ppm: [u64::MAX; 12],
+            smoothed_utilization_ppm: [0; 12],
+            completed_episodes: 1,
+        };
+        assert_eq!(
+            ResourcePriceState::restore(snapshot, config()),
+            Err(PriceError::SnapshotOutOfRange)
+        );
     }
 
     #[test]
