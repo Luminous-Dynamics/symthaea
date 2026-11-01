@@ -56,6 +56,14 @@ pub enum DesignError {
     EmptyLikelihoodScenarioSet,
     EmptyLikelihoodScenarioId,
     DuplicateLikelihoodScenarioId { scenario_id: String },
+    EmptyCalibrationCohort,
+    EmptyCalibrationUnitId,
+    EmptyMechanismFamilyId,
+    DuplicateCalibrationUnitId { unit_id: String },
+    DuplicateOmittedMechanismFamily { mechanism_family_id: String },
+    MechanismFamilyLeakage { mechanism_family_id: String },
+    NonFiniteNonconformityScore,
+    InvalidAdequacyScore,
     NumericalInstability,
 }
 
@@ -135,6 +143,30 @@ impl fmt::Display for DesignError {
             }
             Self::DuplicateLikelihoodScenarioId { scenario_id } => {
                 write!(f, "duplicate likelihood scenario identifier {scenario_id:?}")
+            }
+            Self::EmptyCalibrationCohort => {
+                write!(f, "in-scope and omitted-mechanism calibration cohorts must both be non-empty")
+            }
+            Self::EmptyCalibrationUnitId => {
+                write!(f, "calibration unit identifiers must not be empty")
+            }
+            Self::EmptyMechanismFamilyId => {
+                write!(f, "mechanism family identifiers must not be empty")
+            }
+            Self::DuplicateCalibrationUnitId { unit_id } => {
+                write!(f, "duplicate calibration unit identifier {unit_id:?}")
+            }
+            Self::DuplicateOmittedMechanismFamily { mechanism_family_id } => {
+                write!(f, "omitted-mechanism calibration must contain one aggregate score per independent family; duplicate {mechanism_family_id:?}")
+            }
+            Self::MechanismFamilyLeakage { mechanism_family_id } => {
+                write!(f, "mechanism family {mechanism_family_id:?} appears in both in-scope and omitted calibration cohorts")
+            }
+            Self::NonFiniteNonconformityScore => {
+                write!(f, "nonconformity scores must be finite")
+            }
+            Self::InvalidAdequacyScore => {
+                write!(f, "held-out adequacy score must be finite")
             }
             Self::NumericalInstability => {
                 write!(f, "entropy calculation exceeded its numerical tolerance")
@@ -268,6 +300,261 @@ pub fn evaluate_open_world_report(
         schema_version: "connectome-open-world-eig-v1",
         unresolved_hypothesis_id: UNRESOLVED_HYPOTHESIS_ID,
         ranked_experiments: rank_open_world_candidates(priors, candidates)?,
+    })
+}
+
+/// One independent unit used to calibrate model adequacy.
+///
+/// For the in-scope cohort, unit_id should denote an independent animal/session
+/// unit (or a preregistered aggregate at the animal level). For the omitted
+/// cohort, unit_id and mechanism_family_id must denote one independent held-out
+/// mechanism family after aggregating its recordings. Frames, neurons, and
+/// repeated recordings from one family are not independent calibration units.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AdequacyCalibrationUnit {
+    pub unit_id: String,
+    pub mechanism_family_id: String,
+    /// Higher values must mean worse predictive fit (for example, normalized
+    /// negative log predictive density), with normalization fixed in advance.
+    pub nonconformity_score: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AdequacyGateConfig {
+    /// Target upper bound for false ADEQUATE declarations on exchangeable
+    /// omitted-mechanism calibration units.
+    pub false_adequacy_alpha: f64,
+    /// Minimum one-sided lower confidence bound on in-scope acceptance.
+    pub minimum_in_scope_acceptance: f64,
+    /// One-sided Wilson lower-bound critical value.
+    pub wilson_z_critical: f64,
+}
+
+impl Default for AdequacyGateConfig {
+    fn default() -> Self {
+        Self {
+            false_adequacy_alpha: 0.05,
+            minimum_in_scope_acceptance: 0.80,
+            wilson_z_critical: 1.644_853_626_951_472_2,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AdequacyAcceptanceCalibration {
+    pub accepted_in_scope_units: usize,
+    pub total_in_scope_units: usize,
+    pub observed_acceptance_rate: f64,
+    pub one_sided_wilson_lower_bound: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AdequacyCalibrator {
+    pub false_adequacy_alpha: f64,
+    pub minimum_in_scope_acceptance: f64,
+    pub wilson_z_critical: f64,
+    pub in_scope_unit_count: usize,
+    /// One independent aggregate score per omitted mechanism family.
+    pub omitted_mechanism_family_count: usize,
+    /// Lower-tail conformal order statistic, one-based; zero means no usable
+    /// threshold can be formed at the requested false-adequacy alpha.
+    pub lower_order_statistic_k: usize,
+    /// A candidate is adequate only when its nonconformity score is strictly
+    /// less than this threshold. Strict comparison is conservative under ties.
+    pub nonconformity_threshold: Option<f64>,
+    pub false_adequacy_probability_bound: f64,
+    pub in_scope_acceptance: Option<AdequacyAcceptanceCalibration>,
+    /// False unless the threshold exists and the in-scope lower confidence
+    /// bound meets the preregistered useful-acceptance floor.
+    pub usable: bool,
+}
+
+/// A high nonconformity score indicates that the candidate set plus its
+/// observation model is inadequate or shifted under the declared calibration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AdequacyDecision {
+    AdequateUnderCalibration,
+    InadequateOrDistributionShift,
+    Unresolved,
+}
+
+fn wilson_one_sided_lower(
+    successes: usize,
+    trials: usize,
+    z_critical: f64,
+) -> Result<f64, DesignError> {
+    if trials == 0 || successes > trials || !z_critical.is_finite() || z_critical <= 0.0 {
+        return Err(DesignError::InvalidConfig);
+    }
+    let n = trials as f64;
+    let p = successes as f64 / n;
+    let z2 = z_critical * z_critical;
+    let denominator = 1.0 + z2 / n;
+    let center = (p + z2 / (2.0 * n)) / denominator;
+    let radicand = p * (1.0 - p) / n + z2 / (4.0 * n * n);
+    let lower = (center - z_critical * radicand.sqrt() / denominator).max(0.0);
+    if !lower.is_finite() {
+        return Err(DesignError::NumericalInstability);
+    }
+    Ok(lower)
+}
+
+/// Calibrate an open-world adequacy gate from independent in-scope
+/// animal/session units and independent omitted-mechanism family units.
+///
+/// The threshold is the k-th smallest omitted-family nonconformity score,
+/// where k = floor(alpha * (n_ood + 1)). A candidate is accepted only when its
+/// score is strictly smaller than that threshold. Under exchangeability with
+/// the omitted-family calibration population, and with ties handled strictly,
+/// the false-adequacy probability is bounded by k/(n_ood + 1).
+///
+/// This guarantee does not transport automatically to arbitrary future
+/// mechanisms. The omitted calibration families must be a defensible sample of
+/// the mechanism shifts against which the gate will be used. If k=0, or if the
+/// in-scope one-sided Wilson lower bound misses its useful-acceptance floor,
+/// the calibrator is not usable and all test decisions are UNRESOLVED.
+pub fn calibrate_model_adequacy(
+    in_scope_units: &[AdequacyCalibrationUnit],
+    omitted_mechanism_units: &[AdequacyCalibrationUnit],
+    config: AdequacyGateConfig,
+) -> Result<AdequacyCalibrator, DesignError> {
+    if in_scope_units.is_empty() || omitted_mechanism_units.is_empty() {
+        return Err(DesignError::EmptyCalibrationCohort);
+    }
+    if !config.false_adequacy_alpha.is_finite()
+        || config.false_adequacy_alpha <= 0.0
+        || config.false_adequacy_alpha >= 1.0
+        || !config.minimum_in_scope_acceptance.is_finite()
+        || config.minimum_in_scope_acceptance <= 0.0
+        || config.minimum_in_scope_acceptance >= 1.0
+        || !config.wilson_z_critical.is_finite()
+        || config.wilson_z_critical <= 0.0
+    {
+        return Err(DesignError::InvalidConfig);
+    }
+
+    let mut all_unit_ids = HashSet::with_capacity(in_scope_units.len() + omitted_mechanism_units.len());
+    let mut in_scope_families = HashSet::new();
+    let mut omitted_families = HashSet::new();
+
+    for unit in in_scope_units {
+        if unit.unit_id.trim().is_empty() {
+            return Err(DesignError::EmptyCalibrationUnitId);
+        }
+        if unit.mechanism_family_id.trim().is_empty() {
+            return Err(DesignError::EmptyMechanismFamilyId);
+        }
+        if !unit.nonconformity_score.is_finite() {
+            return Err(DesignError::NonFiniteNonconformityScore);
+        }
+        if !all_unit_ids.insert(unit.unit_id.as_str()) {
+            return Err(DesignError::DuplicateCalibrationUnitId {
+                unit_id: unit.unit_id.clone(),
+            });
+        }
+        in_scope_families.insert(unit.mechanism_family_id.as_str());
+    }
+
+    for unit in omitted_mechanism_units {
+        if unit.unit_id.trim().is_empty() {
+            return Err(DesignError::EmptyCalibrationUnitId);
+        }
+        if unit.mechanism_family_id.trim().is_empty() {
+            return Err(DesignError::EmptyMechanismFamilyId);
+        }
+        if !unit.nonconformity_score.is_finite() {
+            return Err(DesignError::NonFiniteNonconformityScore);
+        }
+        if !all_unit_ids.insert(unit.unit_id.as_str()) {
+            return Err(DesignError::DuplicateCalibrationUnitId {
+                unit_id: unit.unit_id.clone(),
+            });
+        }
+        if !omitted_families.insert(unit.mechanism_family_id.as_str()) {
+            return Err(DesignError::DuplicateOmittedMechanismFamily {
+                mechanism_family_id: unit.mechanism_family_id.clone(),
+            });
+        }
+    }
+
+    for family_id in omitted_families {
+        if in_scope_families.contains(family_id) {
+            return Err(DesignError::MechanismFamilyLeakage {
+                mechanism_family_id: family_id.to_owned(),
+            });
+        }
+    }
+
+    let mut omitted_scores: Vec<f64> = omitted_mechanism_units
+        .iter()
+        .map(|unit| unit.nonconformity_score)
+        .collect();
+    omitted_scores.sort_by(f64::total_cmp);
+
+    let n_ood = omitted_scores.len();
+    let k = (config.false_adequacy_alpha * (n_ood as f64 + 1.0)).floor() as usize;
+    let threshold = if k == 0 {
+        None
+    } else {
+        Some(omitted_scores[k - 1])
+    };
+    let false_adequacy_probability_bound = k as f64 / (n_ood as f64 + 1.0);
+
+    let in_scope_acceptance = if let Some(threshold) = threshold {
+        let accepted = in_scope_units
+            .iter()
+            .filter(|unit| unit.nonconformity_score < threshold)
+            .count();
+        let total = in_scope_units.len();
+        let lower = wilson_one_sided_lower(accepted, total, config.wilson_z_critical)?;
+        Some(AdequacyAcceptanceCalibration {
+            accepted_in_scope_units: accepted,
+            total_in_scope_units: total,
+            observed_acceptance_rate: accepted as f64 / total as f64,
+            one_sided_wilson_lower_bound: lower,
+        })
+    } else {
+        None
+    };
+
+    let usable = in_scope_acceptance.as_ref().is_some_and(|rate| {
+        rate.one_sided_wilson_lower_bound >= config.minimum_in_scope_acceptance
+    });
+
+    Ok(AdequacyCalibrator {
+        false_adequacy_alpha: config.false_adequacy_alpha,
+        minimum_in_scope_acceptance: config.minimum_in_scope_acceptance,
+        wilson_z_critical: config.wilson_z_critical,
+        in_scope_unit_count: in_scope_units.len(),
+        omitted_mechanism_family_count: n_ood,
+        lower_order_statistic_k: k,
+        nonconformity_threshold: threshold,
+        false_adequacy_probability_bound,
+        in_scope_acceptance,
+        usable,
+    })
+}
+
+/// Classify one already-aggregated held-out animal/session score. This does
+/// not name the omitted mechanism and does not distinguish an absent mechanism
+/// from observation-kernel, registration, or context-distribution shift.
+pub fn assess_model_adequacy(
+    calibrator: &AdequacyCalibrator,
+    nonconformity_score: f64,
+) -> Result<AdequacyDecision, DesignError> {
+    if !nonconformity_score.is_finite() {
+        return Err(DesignError::InvalidAdequacyScore);
+    }
+    if !calibrator.usable {
+        return Ok(AdequacyDecision::Unresolved);
+    }
+    let threshold = calibrator
+        .nonconformity_threshold
+        .ok_or(DesignError::NumericalInstability)?;
+    Ok(if nonconformity_score < threshold {
+        AdequacyDecision::AdequateUnderCalibration
+    } else {
+        AdequacyDecision::InadequateOrDistributionShift
     })
 }
 
@@ -1125,6 +1412,196 @@ mod tests {
         candidate.likelihood_scenarios.reverse();
         let second = evaluate_open_world_candidate(&priors, &candidate).unwrap();
         assert_eq!(first, second);
+    }
+
+    fn calibration_unit(
+        unit_id: &str,
+        family_id: &str,
+        nonconformity_score: f64,
+    ) -> AdequacyCalibrationUnit {
+        AdequacyCalibrationUnit {
+            unit_id: unit_id.to_owned(),
+            mechanism_family_id: family_id.to_owned(),
+            nonconformity_score,
+        }
+    }
+
+    fn adequacy_calibration_example() -> (
+        Vec<AdequacyCalibrationUnit>,
+        Vec<AdequacyCalibrationUnit>,
+    ) {
+        let in_scope = (0..20)
+            .map(|index| {
+                calibration_unit(
+                    &format!("animal-session-{index:02}"),
+                    "named-mechanism-family",
+                    index as f64 / 10.0,
+                )
+            })
+            .collect();
+        let omitted = (0..19)
+            .map(|index| {
+                calibration_unit(
+                    &format!("omitted-family-unit-{index:02}"),
+                    &format!("omitted-family-{index:02}"),
+                    10.0 + index as f64,
+                )
+            })
+            .collect();
+        (in_scope, omitted)
+    }
+
+    #[test]
+    fn adequacy_gate_needs_nineteen_omitted_families_at_five_percent() {
+        let (in_scope, mut omitted) = adequacy_calibration_example();
+        omitted.pop();
+        let calibrator = calibrate_model_adequacy(
+            &in_scope,
+            &omitted,
+            AdequacyGateConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(calibrator.omitted_mechanism_family_count, 18);
+        assert_eq!(calibrator.lower_order_statistic_k, 0);
+        assert!(calibrator.nonconformity_threshold.is_none());
+        assert!(!calibrator.usable);
+        assert_eq!(
+            assess_model_adequacy(&calibrator, 0.0).unwrap(),
+            AdequacyDecision::Unresolved
+        );
+    }
+
+    #[test]
+    fn adequacy_gate_calibrates_strict_threshold_and_in_scope_floor() {
+        let (in_scope, omitted) = adequacy_calibration_example();
+        let calibrator = calibrate_model_adequacy(
+            &in_scope,
+            &omitted,
+            AdequacyGateConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(calibrator.omitted_mechanism_family_count, 19);
+        assert_eq!(calibrator.lower_order_statistic_k, 1);
+        assert_eq!(calibrator.nonconformity_threshold, Some(10.0));
+        assert_eq!(calibrator.false_adequacy_probability_bound, 0.05);
+        let acceptance = calibrator.in_scope_acceptance.as_ref().unwrap();
+        assert_eq!(acceptance.accepted_in_scope_units, 20);
+        assert_eq!(acceptance.total_in_scope_units, 20);
+        assert!(acceptance.one_sided_wilson_lower_bound >= 0.80);
+        assert!(calibrator.usable);
+        assert_eq!(
+            assess_model_adequacy(&calibrator, 9.99).unwrap(),
+            AdequacyDecision::AdequateUnderCalibration
+        );
+        // Strict inequality makes ties conservative.
+        assert_eq!(
+            assess_model_adequacy(&calibrator, 10.0).unwrap(),
+            AdequacyDecision::InadequateOrDistributionShift
+        );
+    }
+
+    #[test]
+    fn adequacy_gate_abstains_when_in_scope_acceptance_floor_fails() {
+        let (mut in_scope, omitted) = adequacy_calibration_example();
+        for (index, unit) in in_scope.iter_mut().enumerate() {
+            unit.nonconformity_score = 10.0 + index as f64;
+        }
+        let calibrator = calibrate_model_adequacy(
+            &in_scope,
+            &omitted,
+            AdequacyGateConfig::default(),
+        )
+        .unwrap();
+        assert!(!calibrator.usable);
+        assert_eq!(
+            assess_model_adequacy(&calibrator, 0.0).unwrap(),
+            AdequacyDecision::Unresolved
+        );
+    }
+
+    #[test]
+    fn adequacy_gate_rejects_mechanism_family_leakage() {
+        let in_scope = vec![calibration_unit("id-1", "shared-family", 0.1)];
+        let omitted = vec![calibration_unit("ood-1", "shared-family", 10.0)];
+        assert_eq!(
+            calibrate_model_adequacy(
+                &in_scope,
+                &omitted,
+                AdequacyGateConfig::default()
+            ),
+            Err(DesignError::MechanismFamilyLeakage {
+                mechanism_family_id: "shared-family".to_owned()
+            })
+        );
+    }
+
+    #[test]
+    fn adequacy_gate_rejects_multiple_units_from_one_omitted_family() {
+        let in_scope = vec![calibration_unit("id-1", "in-family", 0.1)];
+        let omitted = vec![
+            calibration_unit("ood-1", "same-ood-family", 10.0),
+            calibration_unit("ood-2", "same-ood-family", 11.0),
+        ];
+        assert_eq!(
+            calibrate_model_adequacy(
+                &in_scope,
+                &omitted,
+                AdequacyGateConfig::default()
+            ),
+            Err(DesignError::DuplicateOmittedMechanismFamily {
+                mechanism_family_id: "same-ood-family".to_owned()
+            })
+        );
+    }
+
+    #[test]
+    fn adequacy_gate_rejects_duplicate_unit_ids_across_cohorts() {
+        let in_scope = vec![calibration_unit("shared-unit", "in-family", 0.1)];
+        let omitted = vec![calibration_unit("shared-unit", "ood-family", 10.0)];
+        assert_eq!(
+            calibrate_model_adequacy(
+                &in_scope,
+                &omitted,
+                AdequacyGateConfig::default()
+            ),
+            Err(DesignError::DuplicateCalibrationUnitId {
+                unit_id: "shared-unit".to_owned()
+            })
+        );
+    }
+
+    #[test]
+    fn adequacy_gate_rejects_non_finite_and_invalid_test_scores() {
+        let in_scope = vec![calibration_unit("id-1", "in-family", 0.1)];
+        let omitted = vec![calibration_unit("ood-1", "ood-family", 10.0)];
+        let mut bad = in_scope.clone();
+        bad[0].nonconformity_score = f64::NAN;
+        assert_eq!(
+            calibrate_model_adequacy(&bad, &omitted, AdequacyGateConfig::default()),
+            Err(DesignError::NonFiniteNonconformityScore)
+        );
+
+        let (in_scope, omitted) = adequacy_calibration_example();
+        let calibrator = calibrate_model_adequacy(
+            &in_scope, &omitted, AdequacyGateConfig::default()
+        ).unwrap();
+        assert_eq!(
+            assess_model_adequacy(&calibrator, f64::INFINITY),
+            Err(DesignError::InvalidAdequacyScore)
+        );
+    }
+
+    #[test]
+    fn adequacy_gate_rejects_invalid_config() {
+        let (in_scope, omitted) = adequacy_calibration_example();
+        let bad = AdequacyGateConfig {
+            false_adequacy_alpha: 0.0,
+            ..AdequacyGateConfig::default()
+        };
+        assert_eq!(
+            calibrate_model_adequacy(&in_scope, &omitted, bad),
+            Err(DesignError::InvalidConfig)
+        );
     }
 
     #[test]
