@@ -1,0 +1,36 @@
+name: BASALT Trace Verifier Formatting Candidate
+
+on:
+  pull_request:
+    paths:
+      - "tools/basalt-trace-verifier/**"
+      - ".github/workflows/basalt-format-candidate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  format-candidate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install pinned Rust formatter
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Format standalone verifier files in ephemeral workspace
+        run: |
+          cargo fmt --manifest-path tools/basalt-trace-verifier/Cargo.toml
+          mkdir -p "$RUNNER_TEMP/basalt-formatted/tools/basalt-trace-verifier/src"
+          cp tools/basalt-trace-verifier/src/lib.rs "$RUNNER_TEMP/basalt-formatted/tools/basalt-trace-verifier/src/lib.rs"
+          cp tools/basalt-trace-verifier/src/main.rs "$RUNNER_TEMP/basalt-formatted/tools/basalt-trace-verifier/src/main.rs"
+          printf '%s\n' "${{ github.event.pull_request.head.sha || github.sha }}" > "$RUNNER_TEMP/basalt-formatted/source-head.txt"
+      - name: Upload formatted source candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: basalt-rustfmt-candidate-${{ github.sha }}
+          path: "$RUNNER_TEMP/basalt-formatted/"
+          if-no-files-found: error
+          retention-days: 1
