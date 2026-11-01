@@ -155,3 +155,44 @@ Issue #9610 tracks incremental evidence-level nondominated archives and prefix m
 ### Empty-run resource semantics
 
 An empty history now reports unknown resource totals and fails strict resource qualification rather than presenting zero cost. The first retained event establishes the measured accumulation baseline. A not-started/unexecuted run is not evidence of free computation. An authored test covers the empty-history receipt.
+
+
+## 7. Optimizer trace integration checkpoint
+
+The in-repository reference runners now expose additive history-enabled entry points:
+
+- \`run_nsga2_zdt1_with_history\` / \`run_nsga2_dtlz2_with_history\`;
+- \`run_moead_zdt1_with_history\` / \`run_moead_dtlz2_with_history\`;
+- \`run_smsemoa_zdt1_with_history\` / \`run_smsemoa_dtlz2_with_history\`.
+
+Each runner records every initial and offspring objective evaluation at the point of evaluation, before environmental selection can discard it. Existing runner signatures remain unchanged and call the common private implementation with trace capture disabled. Authored equality tests compare complete final run reports with capture on/off and require history event count and evaluator-call count to equal the optimizer's declared objective-evaluation count.
+
+The first adapter deliberately uses a **synthetic objective-evaluation-unit cost model**, not measured hardware:
+- exactly one evaluator call and one normalized synthetic charge unit per objective-evaluation attempt;
+- CPU time, GPU time, energy, memory and other physical meters remain unknown;
+- history header must bind the exact canonical synthetic cost-model ID and digest;
+- fresh optimizer history must be empty and run-specific;
+- timed/untimed modes cannot be mixed.
+
+This is a mechanism-matched trace test, not a resource-efficiency result. A real execution adapter must provide actual monotonic timing and EventTape/OS/hardware measurement receipts.
+
+## 8. Exact timing semantics
+
+Event timestamps and elapsed receipt fields are optional. A run must use one clock mode throughout:
+- **Timed:** each event supplies both start and completion monotonic timestamps; the first event starts at zero; subsequent events are non-overlapping and ordered.
+- **Untimed:** every event has both timestamps absent; the resulting run and target receipts carry \`elapsed_wall_millis = None\`.
+
+Partial timestamps and transitions between timed and untimed event modes are rejected. This prevents synthetic deterministic runners from emitting zero milliseconds and being misread as zero latency. Zero-length intervals are permitted only when supplied as actual monotonic measurements by the caller; they are not generated as a synthetic placeholder.
+
+## 9. Artifact promotion integration checkpoint
+
+\`append_artifact_verified_promotion\` reconstructs the byte receipt from the frozen manifest and exact supplied artifact bytes, then checks:
+- manifest run ID and source commit equal the anytime history header;
+- manifest candidate ID refers to a successful candidate in that history;
+- manifest candidate-evidence digest equals the successful evaluation evidence digest;
+- byte-receipt verifier ID/build equal the frozen history verifier identity/build;
+- all artifact bytes, lengths, manifest digest, and receipt fields reconstruct.
+
+Only then does it append an \`ArtifactVerified\` event with the verifier receipt digest and charged resource vector. \`resolve_and_append_artifact_verified_promotion\` composes this with the explicit bounded resolver interface in \`evidence_artifact.rs\`.
+
+These APIs establish artifact byte integrity only. They do not establish semantic correctness, held-out scientific validity, authenticated verifier signatures, or resource-meter truth. EventTape/OS resource attestation and domain-specific verification remain separate integration steps.
