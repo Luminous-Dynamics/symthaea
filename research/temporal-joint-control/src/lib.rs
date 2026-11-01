@@ -239,7 +239,6 @@ pub fn select_joint_plan(
 
     let mut pareto = feasible
         .iter()
-        .iter()
         .filter(|candidate| {
             !feasible.iter().any(|other| {
                 other.plan_id != candidate.plan_id && dominates(other, candidate)
@@ -355,7 +354,7 @@ mod tests {
             plan_id: id,
             actions: action_ids.iter().map(|action_id| JointAction {
                 action_id: *action_id,
-                kind: match action_id {
+                kind: match *action_id {
                     10 => ActionKind::Observe,
                     20 => ActionKind::Retain,
                     30 => ActionKind::Compute,
