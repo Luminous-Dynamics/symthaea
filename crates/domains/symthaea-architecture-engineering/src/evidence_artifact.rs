@@ -79,6 +79,8 @@ pub struct EvidenceArtifactManifest {
     pub run_id: String,
     pub candidate_id: String,
     pub source_commit: String,
+    /// Root evidence digest used by the matching Anytime candidate evaluation.
+    pub candidate_evidence_sha256: String,
     /// Sorted by artifact_id by the constructor; order is part of the canonical manifest.
     pub artifacts: Vec<EvidenceArtifactReference>,
 }
@@ -90,6 +92,7 @@ struct ManifestDigestPayload<'a> {
     run_id: &'a str,
     candidate_id: &'a str,
     source_commit: &'a str,
+    candidate_evidence_sha256: &'a str,
     artifacts: &'a [EvidenceArtifactReference],
 }
 
@@ -98,6 +101,7 @@ impl EvidenceArtifactManifest {
         run_id: impl Into<String>,
         candidate_id: impl Into<String>,
         source_commit: impl Into<String>,
+        candidate_evidence_sha256: impl Into<String>,
         mut artifacts: Vec<EvidenceArtifactReference>,
     ) -> Result<Self, EvidenceArtifactError> {
         artifacts.sort_by(|left, right| left.artifact_id.cmp(&right.artifact_id));
@@ -107,6 +111,7 @@ impl EvidenceArtifactManifest {
             run_id: run_id.into(),
             candidate_id: candidate_id.into(),
             source_commit: source_commit.into(),
+            candidate_evidence_sha256: candidate_evidence_sha256.into(),
             artifacts,
         };
         manifest.validate()?;
@@ -132,6 +137,7 @@ impl EvidenceArtifactManifest {
             }
         }
         validate_commit(self.source_commit.as_str(), "manifest.source_commit")?;
+        validate_sha256(&self.candidate_evidence_sha256, "manifest.candidate_evidence_sha256")?;
         if self.artifacts.is_empty() {
             return Err(EvidenceArtifactError::new(
                 "manifest.artifacts",
@@ -177,6 +183,7 @@ impl EvidenceArtifactManifest {
             run_id: &self.run_id,
             candidate_id: &self.candidate_id,
             source_commit: &self.source_commit,
+            candidate_evidence_sha256: &self.candidate_evidence_sha256,
             artifacts: &self.artifacts,
         })
     }
@@ -403,6 +410,7 @@ mod tests {
             "run-1",
             "candidate-1",
             COMMIT,
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
             vec![
                 reference("candidate-source", EvidenceArtifactRole::CandidateSource, b"fn main() {}"),
                 reference("test-log", EvidenceArtifactRole::EvaluationLog, b"all tests passed"),
@@ -430,6 +438,7 @@ mod tests {
             "run-1",
             "candidate-1",
             COMMIT,
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
             vec![
                 reference("test-log", EvidenceArtifactRole::EvaluationLog, b"all tests passed"),
                 reference("candidate-source", EvidenceArtifactRole::CandidateSource, b"fn main() {}"),
