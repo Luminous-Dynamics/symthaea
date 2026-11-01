@@ -154,6 +154,6 @@ mod tests {
     #[test]
     fn large_microsecond_inputs_do_not_overflow_ratio_math() {
         assert_eq!(alpha_from_dt_tau_us(u64::MAX, 1), Ok(Q15_ONE));
-        assert_eq!(alpha_from_dt_tau_us(u64::MAX, u64::MAX), Ok(0));
+        assert_eq!(alpha_from_dt_tau_us(u64::MAX, u64::MAX), Ok(20_713));
     }
 }
