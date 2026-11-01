@@ -105,7 +105,7 @@ def _mip_cut_identity(sia: Any) -> tuple[str | None, list[list[int]] | None]:
         for source in CANDIDATE
         for target in CANDIDATE
     ]
-    encoded = b"SYMTHAEA-IIT-LANDSCAPE-CUT\\0v0.1\\0"
+    encoded = b"SYMTHAEA-IIT-LANDSCAPE-CUT\0v0.1\0"
     encoded += struct.pack("<Q", len(flat))
     encoded += bytes(int(value) for value in flat)
     import hashlib
