@@ -24,6 +24,7 @@ struct Ledger {
     evidence_class: String,
     task: TaskIdentity,
     arm_id: String,
+    snapshot_receipt_sha256: Option<String>,
     budget: Budget,
     actual: Actual,
     branches: Vec<Branch>,
@@ -164,8 +165,15 @@ fn validate(ledger: &Ledger) -> Result<()> {
     ) {
         bail!("unknown branch-ledger evidence class");
     }
-    if !matches!(ledger.arm_id.as_str(), "R0" | "R1" | "R2" | "R3" | "R4") {
+    if !matches!(ledger.arm_id.as_str(), "R0" | "R1" | "R2" | "R3" | "R4" | "R5") {
         bail!("unknown branch runtime arm");
+    }
+    if ledger.arm_id == "R5" {
+        if !valid_optional_digest(&ledger.snapshot_receipt_sha256) {
+            bail!("R5 live-snapshot execution requires a valid snapshot receipt digest");
+        }
+    } else if ledger.snapshot_receipt_sha256.is_some() {
+        bail!("snapshot receipt digest is permitted only for R5");
     }
     if !is_lower_hex(&ledger.task.task_id, 64)
         || !is_lower_hex(&ledger.task.repository_commit, 40)
@@ -527,6 +535,18 @@ fn self_test(path: &PathBuf) -> Result<()> {
     }
     validate(&fixture)?;
     println!("PITB_SPECULATIVE_BRANCH_FIXTURE_PASS: synthetic no-run ledger");
+
+    let mut missing_r5_receipt = fixture_value.clone();
+    missing_r5_receipt["arm_id"] = Value::from("R5");
+    must_reject("R5 without a live-snapshot receipt", missing_r5_receipt)?;
+
+    let mut linked_r5 = fixture_value.clone();
+    linked_r5["arm_id"] = Value::from("R5");
+    linked_r5["snapshot_receipt_sha256"] = Value::from("a".repeat(64));
+    let linked_r5_ledger: Ledger =
+        serde_json::from_value(linked_r5).context("decode synthetic R5 receipt link")?;
+    validate(&linked_r5_ledger)?;
+    println!("PITB_SPECULATIVE_BRANCH_R5_LINK_PASS: synthetic digest-shape only; not a measured snapshot");
 
     let success = synthetic_success(fixture_value);
     let success_ledger: Ledger =
