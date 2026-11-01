@@ -46,8 +46,8 @@ def log_admissible_power_adjuster_from_log_max(
     """Return log(A_beta(M)) from log(M), avoiding exponentiating large M."""
     log_m = float(log_running_max)
     b = float(beta)
-    if math.isnan(log_m) or log_m < 0.0:
-        raise ValueError("log running maximum must be nonnegative")
+    if not math.isfinite(log_m) or log_m < 0.0:
+        raise ValueError("log running maximum must be finite and nonnegative")
     if not math.isfinite(b) or b < 0.0 or b >= 1.0:
         raise ValueError("beta must lie in [0,1)")
     if log_m == 0.0:
