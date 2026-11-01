@@ -713,9 +713,7 @@ pub struct InformationOptionEvaluation {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InformationAcquisitionChoice {
     AcquireBestQuery,
-    Abstain {
-        reason: AbstainReason,
-    },
+    Abstain { reason: AbstainReason },
 }
 
 #[derive(Clone, Debug, PartialEq)]
