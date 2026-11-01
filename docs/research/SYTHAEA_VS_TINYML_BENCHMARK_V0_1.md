@@ -172,6 +172,23 @@ Run a small, bounded controller locally. Escalate rare ambiguous/novel cases to 
 
 These are hypothesis gates. No result should be promoted because it satisfies a target chosen after seeing the test set. Publish full Pareto fronts; do not hide tradeoffs in one weighted score.
 
+## Causal data path and prequential audit
+
+The synthetic stream now separates two different data types:
+- `TemporalObservation`: timestamp, sensor features and missing-feature mask only; no ground-truth label field exists on this model-facing type.
+- `DelayedGroundTruth`: evaluator-only label, release timestamp, regime transition and OOD metadata.
+
+The dataset fixture stores both streams for replay, but candidate model code should receive only the observation stream. This prevents the benchmark API from accidentally making labels available in the same per-event record as the prediction input.
+
+A prequential execution trace is a time-ordered sequence of:
+1. `Prediction` — timestamp, predicted class/abstention, positive-class Q15 probability and the model-state digest used;
+2. `LabelReleased` — timestamp and delayed ground truth, after the frozen availability time;
+3. `ModelUpdate` — timestamp plus before/after state digests.
+
+The auditor enforces one prediction and one delayed-label release per event, prediction strictly before that event's label-availability timestamp, matching label values at release, globally non-decreasing action time, no update before label release, one update at most per event, and a continuous model-state digest chain. It computes accuracy, balanced accuracy where both classes occur, coverage/selective accuracy, Brier score, false alarms/hour, missed events/hour, prediction latency and update count.
+
+This is a chronology/provenance check, not a sandbox that proves a candidate binary could not read the evaluator's memory. In a physical benchmark, the observation process and label evaluator should be isolated (separate processes/MCU or data interface) and the execution/action trace independently collected. State hashes bind claims but do not prove that the recorded model state was honestly produced.
+
 ## Current implementation status
 
 The new Rust module currently provides:
@@ -180,7 +197,7 @@ The new Rust module currently provides:
 - dataset source replay and digest validation;
 - a frozen three-track manifest with split digests and required baseline-family checks.
 
-The CLI reports HDC-LTC memory preflight. The next increment is a strict run-receipt evaluator, prequential-order evidence verifier, Pareto assessment and binding of per-event energy/metrology receipts. Tests are authored but not compiled or executed in this authoring environment. No on-device result or SOTA claim is made.
+The CLI reports HDC-LTC memory preflight. The next increment is to bind this prequential receipt to the per-event phase-energy and metrology receipts from #9755/#9744, then evaluate all candidates and return a multi-objective Pareto frontier. Tests are authored but not compiled or executed in this authoring environment. No on-device result or SOTA claim is made.
 
 ## Sources
 
