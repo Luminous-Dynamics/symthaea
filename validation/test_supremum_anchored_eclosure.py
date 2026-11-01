@@ -36,7 +36,7 @@ class SupremumAnchoredEclosureTests(unittest.TestCase):
             local_e_paths=local, alpha=Fraction(1, 10),
         ))
 
-    def test_exact_running_contribution_and_residual_budget(self):
+    def test_ever_rejected_indicator_and_residual_budget(self):
         universe = ("a", "b")
         baseline = [("a",), ("a", "b"), ("b",)]
         q = {"a": Fraction(1, 4), "b": Fraction(1, 2)}
