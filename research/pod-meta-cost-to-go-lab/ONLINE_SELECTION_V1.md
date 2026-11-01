@@ -1,6 +1,6 @@
 # Online Repeated-Selection Feedback Ledger V1
 
-**Status:** typed replay and descriptive metric-accounting baseline for issue [#9720](https://github.com/Luminous-Dynamics/symthaea/issues/9720). It is not CAP, an online calibration algorithm, a selection-corrected estimator, or a coverage guarantee.
+**Status:** typed replay ledger plus a narrow fixed-initial-holdout, decision-driven CAP baseline for issue [#9720](https://github.com/Luminous-Dynamics/symthaea/issues/9720). The replay ledger's observed FCR is descriptive accounting; the separate CAP interval routine implements only the fixed-holdout decision-driven construction described below.
 
 ## Objective
 
@@ -35,14 +35,33 @@ The module tests exact verified-label scoring, delayed replay prefixes, coverage
 
 The deterministic CLI matrix has five rows: complete/partial resolved feedback; delayed prefix; unknown then reconciled; definite censored miss; and competing terminal. The matrix verifies state-machine accounting only. It does not measure a predictor or calibrator.
 
+## Fixed-holdout, decision-driven CAP baseline
+
+`decision_driven_cap.rs` implements the fixed initial-holdout construction for a single scalar resource dimension. The selection rule is explicit: select the current example when its frozen score is no greater than `base_threshold + increment * prior_selected_count`. Its state uses only the prior binary selection count. After selection, the exact same current threshold is applied to every example in the independent, fixed initial holdout; only those picked residuals enter the split-conformal quantile. Later selected observations are never appended to this fixed holdout.
+
+The routine requires separate declared training and holdout partition digests, frozen predictor/score/policy/cohort identities, exact metered labels, and independent completion-verifier receipts. If the selected calibration subset is too small for the finite-sample conformal rank, it returns an unbounded interval rather than extrapolating. The three `CAP_DECISION_ROW` matrix rows cover a selected fixed-holdout interval, a later decision with an updated threshold, and insufficient support.
+
+The relevant CAP paper proves selection-conditional finite-sample coverage and real-time FCR control for its fixed-holdout decision-driven construction under i.i.d. holdout/test examples and a selection rule independent of the initial holdout; its full-holdout and symmetric-threshold variants require their own adaptive-pick rules/conditions. Our code implements the narrow fixed-holdout threshold family only. Partition digests are declarations, not cryptographic evidence of independence. This implementation does not handle arbitrary decision-driven policies, data-dependent model retraining, online drift, censored labels, partial feedback, competing risks, or simultaneous six-resource coverage.
+
+Before treating this as a production guarantee, the independence assumptions must be established by the data pipeline, not merely asserted in a config. Reproduce both the CAP positive cases and known-invalid selection/calibration constructions as negative controls. The 2025 analysis by Sale and Ramdas is a required cautionary reference: it identifies incorrect exchangeability arguments in some online selective-conformal strategies and provides corrected calibration-selection procedures.
+
+## Online feedback ledger distinction
+
+The online replay ledger in `online_selection.rs` remains a state-machine and descriptive-metric substrate. Its `observed_fcr` over resolved labels is not the CAP estimator or guarantee. CAP calibration currently consumes a declared fixed holdout of exact verified scalar costs; it does not ingest `RightCensored`, `CoverageBitOnly`, or competing-terminal observations. Those require a separately justified censoring/partial-feedback calibration method.
+
 ## Algorithm baselines and comparison protocol
 
 Compare at least selection-blind split conformal, the frozen selected-policy split-conformal baseline from #9698, a faithful CAP implementation for a selection rule covered by its published construction, online conformal/ACI, and an adversarial semi-bandit baseline where feedback is partial. Replay the same candidate pools, selections, episode seeds, labels, and policy digests in chronological order.
 
-CAP's JMLR 2025 result gives exact selection-conditional finite-sample coverage under the assumptions and selection-rule constructions in that paper, and discusses long-run FCR under its dynamic extensions. The ICLR 2026 adversarial semi-bandit work connects long-run coverage to regret under partial feedback. Neither result automatically transfers to proof-cost censoring or simultaneous resource vectors.
+CAP's JMLR 2025 result provides finite-sample selection-conditional coverage and real-time FCR control for specific decision-driven and symmetric-threshold constructions; compare our fixed-holdout implementation against the decision-driven theorem, not against every CAP variant. Sale and Ramdas (TMLR 2025) show that seemingly plausible online selection/calibration procedures can violate the required exchangeability, so include their corrected methods and failure cases. Online conformal under adversarial semi-bandit feedback is a separate comparator for partial labels. None of these results automatically transfers to proof-cost censoring or simultaneous resource vectors.
 
 Report selection rate, resolved-feedback fraction, per-tick and rolling-window observed FCR, interval width and proper scores, abstention, delay/backlog, censoring and competing-risk counts, coverage after policy/feature shift, and verified proof cost/completion. Add run-clustered uncertainty intervals. Keep task families and chronological holdouts disjoint.
 
 ## Theory and production gates
 
 Before claiming coverage control, specify the filtration, selection mechanism, feedback process, exchangeability or adversarial assumptions, censoring mechanism, target event, and repeated-statement unit. Reproduce CAP for a supported scalar selection rule before extending it. A six-resource statement needs a separate simultaneous event and theorem. Production use additionally needs cryptographic frontier receipts, signed state/evaluator/meter evidence, durable event storage, and an independent enforcement/verification authority.
+## Primary statistical references
+
+- Bao, Huo, Ren and Zou, CAP (JMLR 26, 2025): https://jmlr.org/papers/v26/24-0452.html
+- Sale and Ramdas, Online Selective Conformal Prediction: Errors and Solutions (TMLR 2025): https://arxiv.org/abs/2503.16809
+- Online conformal prediction with adversarial semi-bandit feedback (ICLR 2026): https://proceedings.iclr.cc/paper_files/paper/2026/hash/4eb5daabc45b45a9a312aa2c8fca8a74-Abstract-Conference.html
