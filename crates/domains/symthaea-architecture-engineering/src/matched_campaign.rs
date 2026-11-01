@@ -687,6 +687,8 @@ mod tests {
                 config: config_value,
                 has_hidden_oracle_access: policy_id == "oracle",
             },
+            objective_contract: None,
+            objective_contract_sha256: None,
         };
         let mut tape = EventTape::new(header).unwrap();
         let unknown = |reason: &str| MeterValue::Unknown {
