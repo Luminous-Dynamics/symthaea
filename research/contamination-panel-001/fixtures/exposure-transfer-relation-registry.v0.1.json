@@ -130,7 +130,8 @@
       "Min-K%++",
       "likelihood/perplexity and gradient-based methods where model access permits",
       "exact/normalized/n-gram, MinHash/SimHash, structural/AST, embedding and cross-encoder baselines",
-      "Syntax-aware contamination detection for code LLMs (EMNLP 2026 Findings), stratified by language and code transformation"
+      "Syntax-aware contamination detection for code LLMs (EMNLP 2026 Findings), stratified by language and code transformation",
+      "LaRA (layer-wise RSM/DC/RSI representation geometry; RL post-training white-box track)"
     ],
     "evaluation_runners": [
       "Inspect",
@@ -153,6 +154,7 @@
     "Global parameter updates can affect all evaluation strata; contrasts are not pure direct effects under unrestricted interference.",
     "A high novel-recipe same-skill score is evidence of transfer under the declared skill mapping, not proof of general intelligence.",
     "A passing synthetic fixture or content-digest audit is not an empirical result, external validation, FDR guarantee, or SOTA claim.",
-    "Code-specific syntax-aware detector results must be reported only in code strata and not generalized to mathematics, science, QA, tool use or multimodal domains."
+    "Code-specific syntax-aware detector results must be reported only in code strata and not generalized to mathematics, science, QA, tool use or multimodal domains.",
+    "LaRA representation-geometry anomaly scores are white-box evidence under a perturbation/clean-reference protocol, not proof of training membership or exposure-caused behavior."
   ]
 }
