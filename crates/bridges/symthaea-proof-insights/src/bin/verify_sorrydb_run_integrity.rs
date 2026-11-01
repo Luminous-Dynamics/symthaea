@@ -159,7 +159,8 @@ fn make_eligible_integrity(mut value: Value, run: &Value, evidence_root: &Path) 
 
     value["environment"]["lean_toolchain"] = json!(lean_version);
 
-    let source_bytes = b"theorem Synthetic.example : True := by trivial\n";
+    let mut source_bytes = vec![b'\\n'; 11];
+    source_bytes.extend_from_slice(b"     sorry\\n");
     let informal_bytes = b"A synthetic proposition used only to test the evidence bundle.\n";
     let lean_bytes = b"synthetic-lean-binary-v0";
     let lake_bytes = b"{\"version\":1}\n";
@@ -171,7 +172,8 @@ fn make_eligible_integrity(mut value: Value, run: &Value, evidence_root: &Path) 
     let vacuity_bytes = br#"{"status":"no_counterexample_found","method":"synthetic"}"#;
     let reviewer_bytes = br#"{"reviewer":"synthetic-reviewer-not-real","decision":"approved"}"#;
 
-    value["target"]["source_file_sha256"] = json!(sha256_hex(source_bytes));
+    value["target"]["source_file_sha256"] = json!(sha256_hex(&source_bytes));
+    value["target"]["source_span_sha256"] = json!(sha256_hex(b"sorry"));
     value["target"]["expected_informal_statement_sha256"] = json!(sha256_hex(informal_bytes));
     value["environment"]["lean_binary_sha256"] = json!(sha256_hex(lean_bytes));
     value["environment"]["lake_manifest_sha256"] = json!(sha256_hex(lake_bytes));
@@ -185,7 +187,7 @@ fn make_eligible_integrity(mut value: Value, run: &Value, evidence_root: &Path) 
     value["semantic_review"]["reviewer_attestation_sha256"] = json!(sha256_hex(reviewer_bytes));
 
     value["evidence_artifacts"] = json!({
-        "source_file":write_evidence_artifact(evidence_root,"source/Synthetic/Example.lean",source_bytes)?,
+        "source_file":write_evidence_artifact(evidence_root,"source/Synthetic/Example.lean",&source_bytes)?,
         "informal_statement":write_evidence_artifact(evidence_root,"spec/problem.txt",informal_bytes)?,
         "lean_binary":write_evidence_artifact(evidence_root,"toolchain/lean",lean_bytes)?,
         "lake_manifest":write_evidence_artifact(evidence_root,"project/lake-manifest.json",lake_bytes)?,
@@ -284,6 +286,17 @@ fn self_test(run_path: &PathBuf, integrity_path: &PathBuf) -> Result<()> {
     }
     fs::write(&source_artifact, &original_source)?;
     println!("PITB_SORRYDB_INTEGRITY_NEGATIVE_PASS: referenced source artifact byte tampering");
+
+    let mut span_mutation: Value = serde_json::from_slice(&integrity_bytes)?;
+    span_mutation["target"]["start_column"] = json!(4);
+    let span_mutation_bytes = json_bytes(&span_mutation)?;
+    let mut run_span_mutation: Value = serde_json::from_slice(&run_bytes)?;
+    run_span_mutation["task_integrity"]["receipt_sha256"] = json!(sha256_hex(&span_mutation_bytes));
+    let run_span_mutation_bytes = json_bytes(&run_span_mutation)?;
+    if verify_pair(&run_span_mutation_bytes, &span_mutation_bytes, &evidence_root).is_ok() {
+        bail!("source coordinate mutation did not invalidate the exact source-span digest");
+    }
+    println!("PITB_SORRYDB_INTEGRITY_NEGATIVE_PASS: source coordinates must select exact recorded source-span bytes");
 
     let escaped_path = evidence_root.join("source/escape.lean");
     #[cfg(unix)]
