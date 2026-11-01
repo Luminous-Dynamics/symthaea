@@ -617,7 +617,6 @@ pub fn audit_search_time_findings(
         .map(|event| (event.sequence, event))
         .collect();
     let mut seen = BTreeSet::new();
-    let mut allowed_events = true;
     let mut metadata = 0_u64;
     let mut context = 0_u64;
     let mut answer = 0_u64;
@@ -638,7 +637,6 @@ pub fn audit_search_time_findings(
                 )
             })?;
         if event.disposition != SearchEventDispositionV1::Allowed {
-            allowed_events = false;
             return Err(format!(
                 "finding references blocked event {}",
                 finding.event_sequence
@@ -682,9 +680,9 @@ pub fn audit_search_time_findings(
     }
     Ok(SearchTimeExposureFindingsAuditV1 {
         schema: SEARCH_FINDINGS_AUDIT_SCHEMA.to_owned(),
-        valid: digest_matches && allowed_events,
+        valid: digest_matches,
         findings_digest_matches: digest_matches,
-        all_findings_reference_allowed_events: allowed_events,
+        all_findings_reference_allowed_events: true,
         unique_event_sequences: true,
         metadata_only_count: metadata,
         context_bearing_count: context,
