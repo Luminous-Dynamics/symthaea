@@ -1068,19 +1068,10 @@ fn initial_model_state(trace: &Trace) -> ModelState {
     ModelState {
         revision: parse_revision(&trace.initial_state.authority_revision).unwrap_or(0),
         policy_digest: trace.initial_state.policy_digest.clone(),
-        sources: trace
-            .initial_state
-            .source_cursors
-            .iter()
-            .cloned()
-            .map(|cursor| (cursor.source_id.clone(), cursor))
-            .collect(),
-        logs: trace
-            .initial_state
-            .log_cursors
-            .iter()
-            .map(|cursor| (cursor.log_origin_id.clone(), cursor.checkpoint.clone()))
-            .collect(),
+        sources: trace.initial_state.source_cursors.iter().cloned()
+            .map(|cursor| (cursor.source_id.clone(), cursor)).collect(),
+        logs: trace.initial_state.log_cursors.iter()
+            .map(|cursor| (cursor.log_origin_id.clone(), cursor.checkpoint.clone())).collect(),
         receipts: BTreeMap::new(),
         indeterminate_receipts: BTreeSet::new(),
     }
@@ -1093,7 +1084,7 @@ fn apply_operation(
     errors: &mut Vec<String>,
 ) -> ComputedResult {
     match operation.kind.as_str() {
-            "advance" => advance(&mut state, trace, operation),
+            "advance" => advance(state, trace, operation),
             "receipt_lookup" => {
                 let receipt_id = operation.request.receipt_id.as_deref().unwrap_or("");
                 let receipt_digest = operation.request.receipt_digest.as_deref().unwrap_or("");
@@ -1166,11 +1157,11 @@ fn apply_operation(
                 );
                 ComputedResult::new("compare_conflict", Some(state.revision))
             }
-        };
+        }
 }
 
 fn replay(trace: &Trace, errors: &mut Vec<String>) -> BTreeMap<String, ComputedResult> {
-    let mut state =     let mut state = initial_model_state(trace);
+    let mut state = initial_model_state(trace);
 
     let operations: HashMap<String, &Operation> = trace
         .operations
@@ -1183,7 +1174,24 @@ fn replay(trace: &Trace, errors: &mut Vec<String>) -> BTreeMap<String, ComputedR
         let Some(operation) = operations.get(id).copied() else {
             continue;
         };
-        let computed = apply_operation(&mut state, trace, operation, errors);)
+        let computed = apply_operation(&mut state, trace, operation, errors);
+
+        if !expected_fields_match(&operation.expected_result, &computed) {
+            push_error(
+                errors,
+                format!(
+                    "{} expected {:?}, reducer computed {:?}",
+                    operation.op_id, operation.expected_result, computed
+                ),
+            );
+        }
+        results.insert(operation.op_id.clone(), computed);
+    }
+
+    let mut expected_sources = BTreeMap::<String, SourceCursor>::new();
+    for cursor in &trace.final_observation.source_cursors {
+        if expected_sources
+            .insert(cursor.source_id.clone(), cursor.clone())
             .is_some()
         {
             push_error(
@@ -1402,9 +1410,6 @@ pub fn verify_mutants(trace: &Trace) -> Vec<(String, bool)> {
         })
         .collect()
 }
-
-mod history;
-pub use history::{HistorySearchConfig, HistorySearchReport, verify_observed_history};
 
 #[cfg(test)]
 mod tests {
