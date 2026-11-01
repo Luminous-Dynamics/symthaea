@@ -1,0 +1,148 @@
+name: PITB LeanLean Per-Repository Outcome Contract
+
+on:
+  pull_request:
+    paths:
+      - "data/benchmarks/proof-insight-transfer-v0/leanlean-track/**"
+      - "docs/research/pitb-leanlean-evaluation-2026-11-01.md"
+      - ".github/workflows/pitb-leanlean-outcome-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  outcome-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pinned Draft 2020-12 validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv "$RUNNER_TEMP/pitb-leanlean-jsonschema"
+          "$RUNNER_TEMP/pitb-leanlean-jsonschema/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
+      - name: Validate fixture and protected-declaration integrity controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-leanlean-jsonschema/bin/python" - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker, ValidationError
+
+          base = Path("data/benchmarks/proof-insight-transfer-v0/leanlean-track")
+          schema = json.loads((base / "leanlean-outcome-v0.schema.json").read_text())
+          fixture = json.loads((base / "fixtures/leanlean-outcome.synthetic.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema, format_checker=FormatChecker())
+          validator.validate(fixture)
+          if fixture["evidence_class"] != "synthetic_contract_fixture" or fixture["run_status"] != "not_attempted":
+              raise SystemExit("LeanLean fixture must remain a no-run synthetic record")
+          if fixture["task"]["protected_declaration_count"] == 620:
+              raise SystemExit("fixture must represent a per-repository protected-declaration count, not the cohort total")
+          print("PITB_LEANLEAN_FIXTURE_PASS: one synthetic repository; no evaluation claim")
+
+          def schema_reject(label, value):
+              try:
+                  validator.validate(value)
+              except ValidationError:
+                  print("PITB_LEANLEAN_SCHEMA_NEGATIVE_PASS: " + label)
+                  return
+              raise SystemExit("schema accepted invalid record: " + label)
+
+          bad = copy.deepcopy(fixture)
+          bad["outcome"]["status"] = "verified_success"
+          schema_reject("synthetic record cannot claim comparator success", bad)
+
+          bad = copy.deepcopy(fixture)
+          bad["task"]["protected_declaration_count"] = 0
+          schema_reject("zero protected declarations", bad)
+
+          bad = copy.deepcopy(fixture)
+          bad["budget"]["max_wall_ms"] = 43200001
+          schema_reject("per-repository wall budget above 12 hours", bad)
+
+          bad = copy.deepcopy(fixture)
+          bad["budget"]["max_peak_rss_bytes"] = 68719476737
+          schema_reject("memory budget above 64 GiB", bad)
+
+          success = copy.deepcopy(fixture)
+          success["evidence_class"] = "measured_run"
+          success["run_status"] = "measured"
+          success["environment"]["baseline_build_status"] = "passed"
+          success["environment"]["candidate_build_status"] = "passed"
+          success["resources"].update({"wall_ms":3600000,"model_calls":10,"tokens":50000,"tool_calls":100,"lean_cpu_ms":2400000,"peak_rss_bytes":16000000000,"cost_microusd":1000000})
+          success["outcome"].update({
+              "status":"verified_success",
+              "official_compression_score":0.5,
+              "candidate_tokens":12500,
+              "candidate_protected_declarations":success["task"]["protected_declaration_count"],
+              "comparator_passed":True,
+              "clean_rebuild_passed":True,
+              "missing_protected_declarations":0,
+              "unapproved_axiom_changes":0,
+              "unapproved_trust_changes":0
+          })
+          success["receipts"].update({
+              "candidate_tree_sha256":"a"*64,
+              "candidate_commit":"b"*40,
+              "comparator_receipt_sha256":"c"*64,
+              "baseline_build_receipt_sha256":"d"*64,
+              "candidate_build_receipt_sha256":"e"*64,
+              "action_log_sha256":"f"*64
+          })
+          validator.validate(success)
+
+          def semantic_errors(row):
+              errors = []
+              if row["outcome"]["status"] == "verified_success":
+                  if row["outcome"]["candidate_protected_declarations"] != row["task"]["protected_declaration_count"]:
+                      errors.append("candidate protected declaration count differs from task manifest")
+                  if row["outcome"]["missing_protected_declarations"] != 0:
+                      errors.append("protected declarations are missing")
+                  if row["outcome"]["comparator_passed"] is not True or row["outcome"]["clean_rebuild_passed"] is not True:
+                      errors.append("comparator or clean rebuild did not pass")
+                  if row["outcome"]["unapproved_axiom_changes"] or row["outcome"]["unapproved_trust_changes"]:
+                      errors.append("unapproved axiom/trust changes")
+                  if any(value is None for value in row["receipts"].values()):
+                      errors.append("success is missing candidate/build/comparator/action receipts")
+                  for actual, cap in (
+                      ("wall_ms","max_wall_ms"),("model_calls","max_model_calls"),
+                      ("tokens","max_tokens"),("tool_calls","max_tool_calls"),
+                      ("lean_cpu_ms","max_lean_cpu_ms"),("peak_rss_bytes","max_peak_rss_bytes"),
+                      ("cost_microusd","max_cost_microusd")
+                  ):
+                      if row["resources"][actual] > row["budget"][cap]:
+                          errors.append(actual + " exceeds registered budget")
+              return errors
+
+          if semantic_errors(success):
+              raise SystemExit("matched synthetic success failed semantic joins: " + repr(semantic_errors(success)))
+          print("PITB_LEANLEAN_SYNTHETIC_SUCCESS_JOIN_PASS: protected count, clean build, comparator, trust and receipt joins")
+
+          bad = copy.deepcopy(success)
+          bad["outcome"]["candidate_protected_declarations"] += 1
+          if not semantic_errors(bad):
+              raise SystemExit("cross-field protected-declaration mismatch was not rejected")
+          print("PITB_LEANLEAN_SEMANTIC_NEGATIVE_PASS: candidate declaration count drift")
+
+          bad = copy.deepcopy(success)
+          bad["outcome"]["unapproved_axiom_changes"] = 1
+          if not semantic_errors(bad):
+              raise SystemExit("unapproved axiom control was not rejected")
+          print("PITB_LEANLEAN_SEMANTIC_NEGATIVE_PASS: unapproved axiom change")
+
+          bad = copy.deepcopy(success)
+          bad["resources"]["wall_ms"] = bad["budget"]["max_wall_ms"] + 1
+          if not semantic_errors(bad):
+              raise SystemExit("wall budget control was not rejected")
+          print("PITB_LEANLEAN_SEMANTIC_NEGATIVE_PASS: budget overrun")
+          print("PITB_LEANLEAN_OUTCOME_CONTRACT_PASS: synthetic schema and integrity controls only; no benchmark tasks executed")
+          PY
