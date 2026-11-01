@@ -2461,6 +2461,7 @@ fn validate_accepted_history(state: &TrustedState) -> anyhow::Result<()> {
 
     let mut expected_revision = 1_u64;
     let mut previous_policy: Option<&PolicyVersions> = None;
+    let mut last_checkpoint_by_log = BTreeMap::<String, LogCheckpoint>::new();
     let mut by_source = BTreeMap::<SourceKey, Vec<&AcceptedReceipt>>::new();
 
     for receipt in &ordered {
@@ -2508,6 +2509,41 @@ fn validate_accepted_history(state: &TrustedState) -> anyhow::Result<()> {
                 }
             }
         }
+        match last_checkpoint_by_log.get(&receipt.checkpoint.log_id) {
+            None => match &receipt.checkpoint_evidence {
+                CheckpointEvidence::VerifiedPinnedBootstrap { pinned_checkpoint_digest }
+                    if pinned_checkpoint_digest == &receipt.checkpoint.checkpoint_digest => {}
+                _ => anyhow::bail!("first checkpoint for a log lacks a matching pinned bootstrap"),
+            },
+            Some(previous) => {
+                if receipt.checkpoint.tree_size < previous.tree_size {
+                    anyhow::bail!("accepted checkpoint history moves to a smaller tree size");
+                }
+                if receipt.checkpoint.tree_size == previous.tree_size {
+                    if receipt.checkpoint.root_digest != previous.root_digest {
+                        anyhow::bail!("accepted checkpoint history contains a same-size fork");
+                    }
+                    if !matches!(
+                        receipt.checkpoint_evidence,
+                        CheckpointEvidence::VerifiedSameTree
+                    ) {
+                        anyhow::bail!("same-tree checkpoint refresh lacks same-tree evidence");
+                    }
+                } else if !matches!(
+                    &receipt.checkpoint_evidence,
+                    CheckpointEvidence::VerifiedConsistentExtension {
+                        consistency_proof_digest
+                    } if valid_digest(consistency_proof_digest)
+                ) {
+                    anyhow::bail!("larger checkpoint lacks a valid consistency-proof reference");
+                }
+            }
+        }
+        last_checkpoint_by_log.insert(
+            receipt.checkpoint.log_id.clone(),
+            receipt.checkpoint.clone(),
+        );
+
         previous_policy = Some(&receipt.policy_versions);
         by_source
             .entry(receipt.source.clone())
@@ -2820,6 +2856,17 @@ pub fn trusted_state_digest(state: &TrustedState) -> String {
         hash_state_optional_string(&mut hasher, receipt.boot_transition_evidence_digest.as_deref());
         hash_state_optional_string(&mut hasher, receipt.log_origin_transition_evidence_digest.as_deref());
         hash_state_optional_string(&mut hasher, receipt.policy_transition_evidence_digest.as_deref());
+        match &receipt.checkpoint_evidence {
+            CheckpointEvidence::VerifiedPinnedBootstrap { pinned_checkpoint_digest } => {
+                hasher.update([1_u8]);
+                hash_state_string(&mut hasher, pinned_checkpoint_digest);
+            }
+            CheckpointEvidence::VerifiedSameTree => hasher.update([2_u8]),
+            CheckpointEvidence::VerifiedConsistentExtension { consistency_proof_digest } => {
+                hasher.update([3_u8]);
+                hash_state_string(&mut hasher, consistency_proof_digest);
+            }
+        }
         hash_state_string(&mut hasher, &receipt.checkpoint.log_id);
         hash_state_u64(&mut hasher, receipt.checkpoint.tree_size);
         hash_state_string(&mut hasher, &receipt.checkpoint.root_digest);
