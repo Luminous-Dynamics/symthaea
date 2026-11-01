@@ -589,7 +589,7 @@ pub fn validate_value(value: &Value) -> Result<ProofGraphSummary> {
                 .get(dependency)
                 .and_then(|node| node.get("lifecycle_state"))
                 .and_then(Value::as_str)
-                .is_some_and(|state| matches!(state, "provisional" | "stable"))
+                == Some("stable")
         });
         if ready {
             ready_frontier.push(goal_id.clone());
@@ -605,10 +605,11 @@ pub fn validate_value(value: &Value) -> Result<ProofGraphSummary> {
     if string(value, "/scheduler_decision/selection_policy_id")? != BATCH_POLICY {
         bail!("unsupported deterministic proof-graph goal-batching policy");
     }
-    let max_selected = integer(value, "/scheduler_decision/max_selected_goals")? as usize;
-    if max_selected == 0 || max_selected > MAX_GOAL_GROUP {
+    let max_selected_raw = integer(value, "/scheduler_decision/max_selected_goals")?;
+    if max_selected_raw == 0 || max_selected_raw > MAX_GOAL_GROUP as u64 {
         bail!("max_selected_goals must be in 1..={MAX_GOAL_GROUP}");
     }
+    let max_selected = max_selected_raw as usize;
     let selected = string_array(value, "/scheduler_decision/selected_goal_ids")?;
     require_sorted(&selected, "/scheduler_decision/selected_goal_ids")?;
     let expected_selected = derive_selected_goal_ids(
