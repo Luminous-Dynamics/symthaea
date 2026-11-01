@@ -1109,7 +1109,7 @@ mod tests {
         assert_eq!(event.status, PhaseEnergyEventStatus::CompletePhaseCoverage);
         assert_eq!(event.phase_windows.len(), 3);
         assert!((event.total_event_energy_uj.unwrap() - 0.132).abs() < 1e-12);
-        assert!((event.phase_windows.iter().map(|window| window.energy_uj).sum::<f64>() - 0.000132).abs() < 1e-12);
+        assert!((event.phase_windows.iter().map(|window| window.energy_uj).sum::<f64>() - 0.132).abs() < 1e-12);
         verify_phase_energy_receipt_against_sources(
             samples(),
             &markers(10_000, 10_000),
@@ -1133,7 +1133,7 @@ mod tests {
         assert_eq!(event.status, PhaseEnergyEventStatus::UnattributedIntervalsPresent);
         assert!((event.unattributed_duration_ms.unwrap() - 0.01).abs() < 1e-12);
         assert!((event.unattributed_energy_uj.unwrap() - 0.033).abs() < 1e-12);
-        assert!((event.total_event_energy_uj.unwrap() - 0.000132).abs() < 1e-12);
+        assert!((event.total_event_energy_uj.unwrap() - 0.132).abs() < 1e-12);
     }
 
     #[test]
