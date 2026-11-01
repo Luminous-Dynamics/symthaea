@@ -344,14 +344,15 @@ pub fn validate_mlperf_tiny_static_contract(
         ));
     }
 
+    if contract.quality_policy != MlperfTinyQualityPolicy::EnforcePublishedTarget {
+        return Err(MlperfTinyContractError::new(
+            "quality_policy",
+            "MLPerf Tiny-aligned Closed and Open comparisons must both enforce the published task-quality target",
+        ));
+    }
+
     match contract.division {
         MlperfTinyDivision::Closed => {
-            if contract.quality_policy != MlperfTinyQualityPolicy::EnforcePublishedTarget {
-                return Err(MlperfTinyContractError::new(
-                    "quality_policy",
-                    "Closed division must enforce the task's published quality target",
-                ));
-            }
             for (field, value) in [
                 ("reference_model_sha256", contract.reference_model_sha256.as_deref()),
                 ("reference_weights_sha256", contract.reference_weights_sha256.as_deref()),
@@ -772,7 +773,7 @@ mod tests {
     fn open_contract() -> MlperfTinyStaticWorkloadContract {
         let mut contract = closed_contract(MlperfTinyTask::KeywordSpotting);
         contract.division = MlperfTinyDivision::Open;
-        contract.quality_policy = MlperfTinyQualityPolicy::ReportMeasuredQualityOnly;
+        contract.quality_policy = MlperfTinyQualityPolicy::EnforcePublishedTarget;
         contract.reference_model_sha256 = None;
         contract.reference_weights_sha256 = None;
         contract.reference_preprocessing_sha256 = None;
@@ -892,42 +893,15 @@ mod tests {
     }
 
     #[test]
-    fn quality_targets_are_enforced_only_when_the_pinned_policy_says_so() {
+    fn open_division_must_also_enforce_the_published_quality_target() {
         let mut contract = open_contract();
-        let mut run = MlperfTinyStaticRunReceipt {
-            schema: RUN_SCHEMA.into(),
-            version: VERSION.into(),
-            run_id: "open-run".into(),
-            contract_sha256: contract.contract_sha256.clone(),
-            candidate_artifact_sha256: contract.candidate_artifact_sha256.clone(),
-            candidate_configuration_sha256: contract.candidate_configuration_sha256.clone(),
-            target_id: contract.target_id.clone(),
-            board_revision: contract.board_revision.clone(),
-            cpu_core: contract.cpu_core.clone(),
-            accelerator_profile: contract.accelerator_profile.clone(),
-            hardware_tier: contract.hardware_tier,
-            device_session_sha256: sha('e'),
-            measurement_protocol_sha256: sha('f'),
-            quality_result: MlperfTinyQualityResult::Top1Accuracy {
-                score_ppm: 800_000,
-                sample_count: 1_000,
-            },
-            latency_samples_us: vec![100, 200],
-            p50_latency_us: 100,
-            p95_latency_us: 200,
-            p99_latency_us: 200,
-            peak_sram_bytes: 8_192,
-            flash_bytes: 16_384,
-            energy: None,
-            evaluator_output_sha256: sha('c'),
-            runner_receipt_sha256: sha('d'),
-            run_receipt_sha256: String::new(),
-        };
+        contract.quality_policy = MlperfTinyQualityPolicy::EnforcePublishedTarget;
         contract.contract_sha256 = compute_mlperf_tiny_contract_sha256(&contract).unwrap();
-        run.contract_sha256 = contract.contract_sha256.clone();
-        assert!(validate_mlperf_tiny_static_contract(&contract).is_ok());
-        run.run_receipt_sha256 = compute_mlperf_tiny_static_run_receipt_sha256(&run).unwrap();
-        validate_mlperf_tiny_static_run(&contract, &run).unwrap();
+        validate_mlperf_tiny_static_contract(&contract).unwrap();
+
+        contract.quality_policy = MlperfTinyQualityPolicy::ReportMeasuredQualityOnly;
+        contract.contract_sha256 = compute_mlperf_tiny_contract_sha256(&contract).unwrap();
+        assert!(validate_mlperf_tiny_static_contract(&contract).is_err());
     }
 
     #[test]
