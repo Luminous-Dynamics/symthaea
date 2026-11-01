@@ -179,6 +179,9 @@ pub enum EvalError {
     SeedAlignmentMismatch,
     InconsistentPairedTruth,
     InconsistentScenarioTruth,
+    NonFiniteMetricCalibrationValue,
+    InvalidMetricEffectMagnitude,
+    DuplicateMetricCalibrationReplicate,
     NumericOverflow,
 }
 
@@ -204,6 +207,9 @@ impl fmt::Display for EvalError {
             Self::SeedAlignmentMismatch => "paired replicate identifiers must carry identical random seeds",
             Self::InconsistentPairedTruth => "paired methods disagree on structural truth or null status",
             Self::InconsistentScenarioTruth => "structural beta and null status must be constant within a scenario/method group",
+            Self::NonFiniteMetricCalibrationValue => "metric-control scores must be finite",
+            Self::InvalidMetricEffectMagnitude => "known effect magnitudes must be finite and non-negative",
+            Self::DuplicateMetricCalibrationReplicate => "duplicate metric-calibration replicate within an effect-magnitude group",
             Self::NumericOverflow => "derived metric overflowed finite floating-point range",
         };
         f.write_str(message)
@@ -216,6 +222,79 @@ impl std::error::Error for EvalError {}
 pub struct FiniteInterval {
     pub lower: f64,
     pub upper: f64,
+}
+
+/// Metric orientation for paired positive-control calibration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MetricDirection {
+    HigherIsBetter,
+    LowerIsBetter,
+}
+
+/// Paired scores for an uninformative baseline and a known-positive predictor
+/// evaluated on the same replicate and effect magnitude.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MetricCalibrationObservation {
+    pub effect_magnitude: f64,
+    pub replicate_id: String,
+    pub seed: u64,
+    pub uninformative_metric_value: f64,
+    pub positive_control_metric_value: f64,
+}
+
+/// Calibration requirements are declared before looking at model-comparison
+/// results. Bounds use the supplied one-sided Wilson critical value.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MetricCalibrationConfig {
+    pub minimum_effect_magnitude: f64,
+    pub minimum_detection_probability: f64,
+    pub maximum_null_false_positive_probability: f64,
+    pub tie_tolerance: f64,
+    pub monotonicity_tolerance: f64,
+    pub wilson_z_critical: f64,
+}
+
+impl Default for MetricCalibrationConfig {
+    fn default() -> Self {
+        Self {
+            minimum_effect_magnitude: 1.0,
+            minimum_detection_probability: 0.80,
+            maximum_null_false_positive_probability: 0.20,
+            tie_tolerance: 1.0e-12,
+            monotonicity_tolerance: 1.0e-9,
+            wilson_z_critical: 1.644_853_626_951_472_2,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MetricCalibrationBin {
+    pub effect_magnitude: f64,
+    pub replicate_count: usize,
+    pub positive_control_wins: usize,
+    pub ties: usize,
+    pub positive_control_losses: usize,
+    pub positive_control_win_rate: f64,
+    pub one_sided_wilson_lower_bound: f64,
+    pub one_sided_wilson_upper_bound: f64,
+    /// Positive means the known-positive predictor scores better than the
+    /// uninformative predictor, after applying metric direction.
+    pub mean_oriented_improvement: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MetricCalibrationReport {
+    pub schema_version: &'static str,
+    pub metric_id: String,
+    pub direction: MetricDirection,
+    pub config: MetricCalibrationConfig,
+    pub bins: Vec<MetricCalibrationBin>,
+    pub zero_effect_false_positive_upper_bound: Option<f64>,
+    pub minimum_positive_control_detection_lower_bound: Option<f64>,
+    pub monotonicity_violations: usize,
+    /// The metric passed only the declared control grid and thresholds. This
+    /// is not a universal property of the metric outside that calibration.
+    pub calibrated_for_declared_grid: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -343,6 +422,180 @@ pub struct MethodScorecard {
     pub confidence_sets: ConfidenceSetDiagnostics,
     pub estimates: EstimateDiagnostics,
     pub resources: ResourceDiagnostics,
+}
+
+/// Calibrate whether a metric can detect a known positive intervention
+/// relative to an uninformative/no-change predictor across a declared grid.
+///
+/// Every positive-control score is paired with its uninformative score on the
+/// same replicate and seed. A zero-effect bin estimates spurious positive
+/// control wins; bins at or above minimum_effect_magnitude must meet the
+/// preregistered lower-bound detection requirement. Mean oriented improvement
+/// must be nondecreasing across positive effect magnitudes within tolerance.
+///
+/// This calibrates the metric on the supplied control grid only. It does not
+/// certify biological validity, causal identification, or model quality.
+pub fn calibrate_predictive_metric(
+    metric_id: &str,
+    direction: MetricDirection,
+    observations: &[MetricCalibrationObservation],
+    config: MetricCalibrationConfig,
+) -> Result<MetricCalibrationReport, EvalError> {
+    if metric_id.trim().is_empty() || observations.is_empty() {
+        return Err(EvalError::EmptyInput);
+    }
+    if !config.minimum_effect_magnitude.is_finite()
+        || config.minimum_effect_magnitude <= 0.0
+        || !config.minimum_detection_probability.is_finite()
+        || config.minimum_detection_probability <= 0.0
+        || config.minimum_detection_probability > 1.0
+        || !config.maximum_null_false_positive_probability.is_finite()
+        || config.maximum_null_false_positive_probability < 0.0
+        || config.maximum_null_false_positive_probability >= 1.0
+        || !config.tie_tolerance.is_finite()
+        || config.tie_tolerance < 0.0
+        || !config.monotonicity_tolerance.is_finite()
+        || config.monotonicity_tolerance < 0.0
+        || !config.wilson_z_critical.is_finite()
+        || config.wilson_z_critical <= 0.0
+    {
+        return Err(EvalError::InvalidConfig);
+    }
+
+    let mut ordered: Vec<&MetricCalibrationObservation> = observations.iter().collect();
+    for observation in &ordered {
+        if !observation.effect_magnitude.is_finite() || observation.effect_magnitude < 0.0 {
+            return Err(EvalError::InvalidMetricEffectMagnitude);
+        }
+        if observation.replicate_id.trim().is_empty() {
+            return Err(EvalError::EmptyIdentifier);
+        }
+        if !observation.uninformative_metric_value.is_finite()
+            || !observation.positive_control_metric_value.is_finite()
+        {
+            return Err(EvalError::NonFiniteMetricCalibrationValue);
+        }
+    }
+    ordered.sort_by(|left, right| {
+        left.effect_magnitude
+            .total_cmp(&right.effect_magnitude)
+            .then_with(|| left.replicate_id.cmp(&right.replicate_id))
+    });
+
+    let mut groups: Vec<(f64, Vec<&MetricCalibrationObservation>)> = Vec::new();
+    for observation in ordered {
+        if let Some((effect, group)) = groups.last_mut() {
+            if *effect == observation.effect_magnitude {
+                group.push(observation);
+                continue;
+            }
+        }
+        groups.push((observation.effect_magnitude, vec![observation]));
+    }
+
+    let mut bins = Vec::with_capacity(groups.len());
+    for (effect_magnitude, group) in groups {
+        let mut replicate_ids = BTreeSet::new();
+        let mut seeds = BTreeSet::new();
+        let mut wins = 0usize;
+        let mut ties = 0usize;
+        let mut losses = 0usize;
+        let mut improvement_sum = 0.0f64;
+
+        for observation in &group {
+            if !replicate_ids.insert(observation.replicate_id.as_str()) {
+                return Err(EvalError::DuplicateMetricCalibrationReplicate);
+            }
+            if !seeds.insert(observation.seed) {
+                return Err(EvalError::DuplicateSeed);
+            }
+            let improvement = match direction {
+                MetricDirection::HigherIsBetter => {
+                    observation.positive_control_metric_value
+                        - observation.uninformative_metric_value
+                }
+                MetricDirection::LowerIsBetter => {
+                    observation.uninformative_metric_value
+                        - observation.positive_control_metric_value
+                }
+            };
+            if !improvement.is_finite() {
+                return Err(EvalError::NumericOverflow);
+            }
+            improvement_sum += improvement;
+            if !improvement_sum.is_finite() {
+                return Err(EvalError::NumericOverflow);
+            }
+
+            if improvement > config.tie_tolerance {
+                wins += 1;
+            } else if improvement < -config.tie_tolerance {
+                losses += 1;
+            } else {
+                ties += 1;
+            }
+        }
+
+        let count = group.len();
+        let interval = wilson_interval(wins, count, config.wilson_z_critical)?
+            .ok_or(EvalError::NumericOverflow)?;
+        bins.push(MetricCalibrationBin {
+            effect_magnitude,
+            replicate_count: count,
+            positive_control_wins: wins,
+            ties,
+            positive_control_losses: losses,
+            positive_control_win_rate: wins as f64 / count as f64,
+            one_sided_wilson_lower_bound: interval.lower,
+            one_sided_wilson_upper_bound: interval.upper,
+            mean_oriented_improvement: improvement_sum / count as f64,
+        });
+    }
+
+    let zero_effect_bin = bins.iter().find(|bin| bin.effect_magnitude == 0.0);
+    let zero_effect_false_positive_upper_bound =
+        zero_effect_bin.map(|bin| bin.one_sided_wilson_upper_bound);
+
+    let qualifying_positive_bins: Vec<&MetricCalibrationBin> = bins
+        .iter()
+        .filter(|bin| bin.effect_magnitude >= config.minimum_effect_magnitude)
+        .collect();
+    let minimum_positive_control_detection_lower_bound = qualifying_positive_bins
+        .iter()
+        .map(|bin| bin.one_sided_wilson_lower_bound)
+        .min_by(f64::total_cmp);
+
+    let mut monotonicity_violations = 0usize;
+    let positive_bins: Vec<&MetricCalibrationBin> = bins
+        .iter()
+        .filter(|bin| bin.effect_magnitude > 0.0)
+        .collect();
+    for pair in positive_bins.windows(2) {
+        if pair[1].mean_oriented_improvement + config.monotonicity_tolerance
+            < pair[0].mean_oriented_improvement
+        {
+            monotonicity_violations += 1;
+        }
+    }
+
+    let calibrated_for_declared_grid = zero_effect_false_positive_upper_bound
+        .is_some_and(|bound| bound <= config.maximum_null_false_positive_probability)
+        && minimum_positive_control_detection_lower_bound
+            .is_some_and(|bound| bound >= config.minimum_detection_probability)
+        && !qualifying_positive_bins.is_empty()
+        && monotonicity_violations == 0;
+
+    Ok(MetricCalibrationReport {
+        schema_version: "connectome-metric-calibration-v1",
+        metric_id: metric_id.to_owned(),
+        direction,
+        config,
+        bins,
+        zero_effect_false_positive_upper_bound,
+        minimum_positive_control_detection_lower_bound,
+        monotonicity_violations,
+        calibrated_for_declared_grid,
+    })
 }
 
 pub fn wilson_interval(
@@ -1057,6 +1310,119 @@ mod tests {
                 upper: Some(upper),
             }],
         }
+    }
+
+    fn metric_calibration_observations(
+        effect_magnitude: f64,
+        improvements: &[f64],
+    ) -> Vec<MetricCalibrationObservation> {
+        improvements
+            .iter()
+            .enumerate()
+            .map(|(index, improvement)| MetricCalibrationObservation {
+                effect_magnitude,
+                replicate_id: format!("r{index:03}"),
+                seed: index as u64 + 1,
+                uninformative_metric_value: 0.0,
+                positive_control_metric_value: *improvement,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn metric_calibration_detects_positive_controls_and_null_specificity() {
+        let mut observations = metric_calibration_observations(0.0, &[0.0; 20]);
+        observations.extend(metric_calibration_observations(1.0, &[0.5; 20]));
+        observations.extend(metric_calibration_observations(2.0, &[1.0; 20]));
+        let report = calibrate_predictive_metric(
+            "calibrated-score",
+            MetricDirection::HigherIsBetter,
+            &observations,
+            MetricCalibrationConfig::default(),
+        ).unwrap();
+        assert_eq!(report.schema_version, "connectome-metric-calibration-v1");
+        assert_eq!(report.bins.len(), 3);
+        assert_eq!(report.bins[0].ties, 20);
+        assert_eq!(report.bins[1].positive_control_wins, 20);
+        assert!(report.zero_effect_false_positive_upper_bound.unwrap() <= 0.20);
+        assert!(report.minimum_positive_control_detection_lower_bound.unwrap() >= 0.80);
+        assert_eq!(report.monotonicity_violations, 0);
+        assert!(report.calibrated_for_declared_grid);
+    }
+
+    #[test]
+    fn metric_calibration_handles_lower_is_better_metrics() {
+        let mut observations = metric_calibration_observations(0.0, &[0.0; 20]);
+        let mut positive = metric_calibration_observations(1.0, &[0.0; 20]);
+        for row in &mut positive {
+            row.uninformative_metric_value = 1.0;
+        }
+        observations.extend(positive);
+        let report = calibrate_predictive_metric(
+            "rmse-like",
+            MetricDirection::LowerIsBetter,
+            &observations,
+            MetricCalibrationConfig::default(),
+        ).unwrap();
+        assert!(report.calibrated_for_declared_grid);
+        assert!(report.bins[1].mean_oriented_improvement > 0.0);
+    }
+
+    #[test]
+    fn metric_calibration_rejects_metrics_that_miss_positive_controls() {
+        let mut observations = metric_calibration_observations(0.0, &[0.0; 20]);
+        observations.extend(metric_calibration_observations(1.0, &[0.0; 20]));
+        let report = calibrate_predictive_metric(
+            "insensitive-metric",
+            MetricDirection::HigherIsBetter,
+            &observations,
+            MetricCalibrationConfig::default(),
+        ).unwrap();
+        assert!(!report.calibrated_for_declared_grid);
+        assert_eq!(report.bins[1].positive_control_wins, 0);
+        assert_eq!(report.minimum_positive_control_detection_lower_bound, Some(0.0));
+    }
+
+    #[test]
+    fn metric_calibration_rejects_non_monotonic_effect_sensitivity() {
+        let mut observations = metric_calibration_observations(0.0, &[0.0; 20]);
+        observations.extend(metric_calibration_observations(1.0, &[1.0; 20]));
+        observations.extend(metric_calibration_observations(2.0, &[0.5; 20]));
+        let report = calibrate_predictive_metric(
+            "non-monotone-metric",
+            MetricDirection::HigherIsBetter,
+            &observations,
+            MetricCalibrationConfig::default(),
+        ).unwrap();
+        assert_eq!(report.monotonicity_violations, 1);
+        assert!(!report.calibrated_for_declared_grid);
+    }
+
+    #[test]
+    fn metric_calibration_rejects_duplicate_seeds_and_non_finite_scores() {
+        let mut observations = metric_calibration_observations(0.0, &[0.0, 0.0]);
+        observations[1].seed = observations[0].seed;
+        assert_eq!(
+            calibrate_predictive_metric(
+                "duplicate-seed",
+                MetricDirection::HigherIsBetter,
+                &observations,
+                MetricCalibrationConfig::default(),
+            ),
+            Err(EvalError::DuplicateSeed)
+        );
+
+        let mut invalid = metric_calibration_observations(0.0, &[0.0]);
+        invalid[0].positive_control_metric_value = f64::NAN;
+        assert_eq!(
+            calibrate_predictive_metric(
+                "invalid-score",
+                MetricDirection::HigherIsBetter,
+                &invalid,
+                MetricCalibrationConfig::default(),
+            ),
+            Err(EvalError::NonFiniteMetricCalibrationValue)
+        );
     }
 
     #[test]
