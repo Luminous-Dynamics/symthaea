@@ -33,8 +33,14 @@
       }
     ],
     "log_cursors": [
-      { "log_origin_id": "log-A", "checkpoint": "la:0" },
-      { "log_origin_id": "log-B", "checkpoint": "lb:0" }
+      {
+        "log_origin_id": "log-A",
+        "checkpoint": "la:0"
+      },
+      {
+        "log_origin_id": "log-B",
+        "checkpoint": "lb:0"
+      }
     ]
   },
   "operations": [
@@ -43,7 +49,10 @@
       "client_id": "client-A",
       "client_sequence": 0,
       "kind": "advance",
-      "scope": { "source_id": "source-A", "log_origin_id": "log-A" },
+      "scope": {
+        "source_id": "source-A",
+        "log_origin_id": "log-A"
+      },
       "invoked_at_ns": 10,
       "completed_at_ns": 20,
       "request": {
@@ -70,7 +79,10 @@
       "client_id": "client-B",
       "client_sequence": 0,
       "kind": "advance",
-      "scope": { "source_id": "source-B", "log_origin_id": "log-B" },
+      "scope": {
+        "source_id": "source-B",
+        "log_origin_id": "log-B"
+      },
       "invoked_at_ns": 22,
       "completed_at_ns": 30,
       "request": {
@@ -97,10 +109,16 @@
       "client_id": "client-A",
       "client_sequence": 1,
       "kind": "receipt_lookup",
-      "scope": { "source_id": "source-A", "log_origin_id": "log-A" },
+      "scope": {
+        "source_id": "source-A",
+        "log_origin_id": "log-A"
+      },
       "invoked_at_ns": 40,
       "completed_at_ns": 45,
-      "happens_after": ["op-a-commit", "op-b-commit"],
+      "happens_after": [
+        "op-a-commit",
+        "op-b-commit"
+      ],
       "request": {
         "receipt_id": "receipt-A",
         "receipt_digest": "sha256:c2a02423003b98b568f46c55493e54df0a2bc3a7ac4661ea1c492f66f0f6b9bb"
@@ -118,10 +136,15 @@
       "client_id": "client-C",
       "client_sequence": 0,
       "kind": "advance",
-      "scope": { "source_id": "source-A", "log_origin_id": "log-A" },
+      "scope": {
+        "source_id": "source-A",
+        "log_origin_id": "log-A"
+      },
       "invoked_at_ns": 50,
       "completed_at_ns": 70,
-      "happens_after": ["op-a-commit"],
+      "happens_after": [
+        "op-a-commit"
+      ],
       "request": {
         "expected_source_generation": 1,
         "expected_source_predecessor_digest": "sha256:abb00378458194ee9fc8c490f2b7baa796047b32c6d2770067922805855fc1af",
@@ -146,10 +169,15 @@
       "client_id": "client-D",
       "client_sequence": 0,
       "kind": "advance",
-      "scope": { "source_id": "source-A", "log_origin_id": "log-A" },
+      "scope": {
+        "source_id": "source-A",
+        "log_origin_id": "log-A"
+      },
       "invoked_at_ns": 55,
       "completed_at_ns": 65,
-      "happens_after": ["op-a-commit"],
+      "happens_after": [
+        "op-a-commit"
+      ],
       "request": {
         "expected_source_generation": 1,
         "expected_source_predecessor_digest": "sha256:abb00378458194ee9fc8c490f2b7baa796047b32c6d2770067922805855fc1af",
@@ -174,10 +202,15 @@
       "client_id": "client-B",
       "client_sequence": 1,
       "kind": "advance",
-      "scope": { "source_id": "source-B", "log_origin_id": "log-B" },
+      "scope": {
+        "source_id": "source-B",
+        "log_origin_id": "log-B"
+      },
       "invoked_at_ns": 80,
       "completed_at_ns": 88,
-      "happens_after": ["op-b-commit"],
+      "happens_after": [
+        "op-b-commit"
+      ],
       "request": {
         "expected_source_generation": 1,
         "expected_source_predecessor_digest": "sha256:73a5fffb52b6b9a2c0489ddaacd8a6edcdc5f759352fef4612c810f7d0b75e8d",
@@ -202,10 +235,15 @@
       "client_id": "client-B",
       "client_sequence": 2,
       "kind": "receipt_lookup",
-      "scope": { "source_id": "source-B", "log_origin_id": "log-B" },
+      "scope": {
+        "source_id": "source-B",
+        "log_origin_id": "log-B"
+      },
       "invoked_at_ns": 90,
       "completed_at_ns": 95,
-      "happens_after": ["op-e-commit-lost-response"],
+      "happens_after": [
+        "op-e-commit-lost-response"
+      ],
       "request": {
         "receipt_id": "receipt-E",
         "receipt_digest": "sha256:f970491f6f3fd58cf8a56b9ce5eec07ebe84c239fac7aa55ce0e604fa24edba2"
@@ -223,10 +261,16 @@
       "client_id": "policy-admin",
       "client_sequence": 0,
       "kind": "policy_publish",
-      "scope": { "source_id": "__policy__", "log_origin_id": "__policy__" },
+      "scope": {
+        "source_id": "__policy__",
+        "log_origin_id": "__policy__"
+      },
       "invoked_at_ns": 100,
       "completed_at_ns": 108,
-      "happens_after": ["op-c-race-winner", "op-e-recovery-lookup"],
+      "happens_after": [
+        "op-c-race-winner",
+        "op-e-recovery-lookup"
+      ],
       "request": {
         "expected_policy_digest": "sha256:78f5e07fe4681ad5eb93f076018227865270dab5af263fcd09d7f10d5e9ad50e",
         "next_policy_digest": "sha256:a782a382cb699ca623ef37906490be0d826b23224589024f907d1d757a459b6f"
@@ -244,19 +288,25 @@
       "client_id": "client-A",
       "client_sequence": 2,
       "kind": "advance",
-      "scope": { "source_id": "source-A", "log_origin_id": "log-A" },
+      "scope": {
+        "source_id": "source-A",
+        "log_origin_id": "log-A"
+      },
       "invoked_at_ns": 115,
       "completed_at_ns": 120,
-      "happens_after": ["op-policy-publish", "op-c-race-winner"],
+      "happens_after": [
+        "op-policy-publish",
+        "op-c-race-winner"
+      ],
       "request": {
         "expected_source_generation": 2,
         "expected_source_predecessor_digest": "sha256:1d6988deab585b1a808936531845c3494836f89792368787ddcd94a020c09c36",
         "expected_log_checkpoint": "la:2",
         "expected_policy_digest": "sha256:78f5e07fe4681ad5eb93f076018227865270dab5af263fcd09d7f10d5e9ad50e",
         "receipt_id": "receipt-F",
-        "receipt_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000006",
+        "receipt_digest": "sha256:47652938eba6732918fca62ebcfb808137c883a0f086134c5a1a4d4d6f0bab0b",
         "next_source_cursor": "a:3",
-        "next_source_predecessor_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000006",
+        "next_source_predecessor_digest": "sha256:7bab2385bd7d9bfafd3568521b52e06fbed4157560c577b361d85e14bd84f937",
         "next_log_checkpoint": "la:3"
       },
       "result": {
@@ -274,17 +324,23 @@
       "retry_group_id": "retry-group-postgres-40001",
       "transaction_attempt": 1,
       "kind": "advance",
-      "scope": { "source_id": "source-B", "log_origin_id": "log-B" },
+      "scope": {
+        "source_id": "source-B",
+        "log_origin_id": "log-B"
+      },
       "invoked_at_ns": 150,
       "completed_at_ns": 160,
-      "happens_after": ["op-e-recovery-lookup", "op-policy-publish"],
+      "happens_after": [
+        "op-e-recovery-lookup",
+        "op-policy-publish"
+      ],
       "request": {
         "expected_source_generation": 2,
         "expected_source_predecessor_digest": "sha256:241c6f76803684f74623216edbfb458b5338fd9c711c778fdcb88cd3bb505e83",
         "expected_log_checkpoint": "lb:2",
         "expected_policy_digest": "sha256:a782a382cb699ca623ef37906490be0d826b23224589024f907d1d757a459b6f",
         "receipt_id": "receipt-G",
-        "receipt_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000007",
+        "receipt_digest": "sha256:667724a1b901d2de131530240ca76c98df3e55655f1a9203144a816029d3c2e7",
         "next_source_cursor": "b:3",
         "next_source_predecessor_digest": "sha256:63ff0b95aaae57e6c3bd7bef62138cb13b8d775e74bfffe4572edda7e4129248",
         "next_log_checkpoint": "lb:3"
@@ -304,17 +360,22 @@
       "retry_group_id": "retry-group-postgres-40001",
       "transaction_attempt": 2,
       "kind": "advance",
-      "scope": { "source_id": "source-B", "log_origin_id": "log-B" },
+      "scope": {
+        "source_id": "source-B",
+        "log_origin_id": "log-B"
+      },
       "invoked_at_ns": 162,
       "completed_at_ns": 178,
-      "happens_after": ["op-serializable-attempt-1"],
+      "happens_after": [
+        "op-serializable-attempt-1"
+      ],
       "request": {
         "expected_source_generation": 2,
         "expected_source_predecessor_digest": "sha256:241c6f76803684f74623216edbfb458b5338fd9c711c778fdcb88cd3bb505e83",
         "expected_log_checkpoint": "lb:2",
         "expected_policy_digest": "sha256:a782a382cb699ca623ef37906490be0d826b23224589024f907d1d757a459b6f",
         "receipt_id": "receipt-G",
-        "receipt_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000007",
+        "receipt_digest": "sha256:667724a1b901d2de131530240ca76c98df3e55655f1a9203144a816029d3c2e7",
         "next_source_cursor": "b:3",
         "next_source_predecessor_digest": "sha256:63ff0b95aaae57e6c3bd7bef62138cb13b8d775e74bfffe4572edda7e4129248",
         "next_log_checkpoint": "lb:3"
@@ -332,10 +393,15 @@
       "client_id": "restore-checker",
       "client_sequence": 0,
       "kind": "restore_verify",
-      "scope": { "source_id": "source-A", "log_origin_id": "log-A" },
+      "scope": {
+        "source_id": "source-A",
+        "log_origin_id": "log-A"
+      },
       "invoked_at_ns": 185,
       "completed_at_ns": 195,
-      "happens_after": ["op-serializable-attempt-2"],
+      "happens_after": [
+        "op-serializable-attempt-2"
+      ],
       "request": {
         "restored_incarnation_id": "incarnation-1",
         "restored_state_digest": "sha256:c1930b1ae009dbcc935a31fde2395b6e59468586756ff11db40c8bd4e74106e4",
@@ -421,8 +487,14 @@
       }
     ],
     "log_cursors": [
-      { "log_origin_id": "log-A", "checkpoint": "la:2" },
-      { "log_origin_id": "log-B", "checkpoint": "lb:3" }
+      {
+        "log_origin_id": "log-A",
+        "checkpoint": "la:2"
+      },
+      {
+        "log_origin_id": "log-B",
+        "checkpoint": "lb:3"
+      }
     ],
     "accepted_receipts": [
       {
@@ -447,23 +519,56 @@
       },
       {
         "receipt_id": "receipt-G",
-        "receipt_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000007",
+        "receipt_digest": "sha256:667724a1b901d2de131530240ca76c98df3e55655f1a9203144a816029d3c2e7",
         "receipt_acceptance_revision": "rev-6"
       }
     ]
   },
   "invariant_expectations": [
-    { "id": "ATOMIC_FOUR_RECORD_TRANSITION", "expected": "pass" },
-    { "id": "SINGLE_WINNER_PER_PREDECESSOR", "expected": "pass" },
-    { "id": "INDEPENDENT_SCOPE_PROGRESS", "expected": "pass" },
-    { "id": "EXACT_RETRY_IDEMPOTENCY", "expected": "pass" },
-    { "id": "RECEIPT_REVISION_IS_IMMUTABLE", "expected": "pass" },
-    { "id": "CURRENT_REVISION_IS_NOT_RECEIPT_REVISION", "expected": "pass" },
-    { "id": "WHOLE_TRANSACTION_RETRY", "expected": "pass" },
-    { "id": "POLICY_COMPARE_AT_COMMIT", "expected": "pass" },
-    { "id": "LOST_RESPONSE_RECOVERY", "expected": "pass" },
-    { "id": "RESTORE_REQUIRES_EXTERNAL_WITNESS", "expected": "pass" },
-    { "id": "NO_FALSE_FRESHNESS_ON_WITNESS_MISMATCH", "expected": "pass" }
+    {
+      "id": "ATOMIC_FOUR_RECORD_TRANSITION",
+      "expected": "pass"
+    },
+    {
+      "id": "SINGLE_WINNER_PER_PREDECESSOR",
+      "expected": "pass"
+    },
+    {
+      "id": "INDEPENDENT_SCOPE_PROGRESS",
+      "expected": "pass"
+    },
+    {
+      "id": "EXACT_RETRY_IDEMPOTENCY",
+      "expected": "pass"
+    },
+    {
+      "id": "RECEIPT_REVISION_IS_IMMUTABLE",
+      "expected": "pass"
+    },
+    {
+      "id": "CURRENT_REVISION_IS_NOT_RECEIPT_REVISION",
+      "expected": "pass"
+    },
+    {
+      "id": "WHOLE_TRANSACTION_RETRY",
+      "expected": "pass"
+    },
+    {
+      "id": "POLICY_COMPARE_AT_COMMIT",
+      "expected": "pass"
+    },
+    {
+      "id": "LOST_RESPONSE_RECOVERY",
+      "expected": "pass"
+    },
+    {
+      "id": "RESTORE_REQUIRES_EXTERNAL_WITNESS",
+      "expected": "pass"
+    },
+    {
+      "id": "NO_FALSE_FRESHNESS_ON_WITNESS_MISMATCH",
+      "expected": "pass"
+    }
   ],
   "negative_controls": [
     {
@@ -495,6 +600,158 @@
       "mutation_id": "mutant.restore-false-freshness",
       "mutation": "Accept the older restored state as fresh despite witness sequence 12 committing a different state digest; verifier must detect false freshness.",
       "must_be_detected": true
+    }
+  ],
+  "fixture_digest_catalog": [
+    {
+      "label": "policy-v1",
+      "preimage": "basalt-fixture:policy-v1",
+      "digest": "sha256:78f5e07fe4681ad5eb93f076018227865270dab5af263fcd09d7f10d5e9ad50e",
+      "role": "policy"
+    },
+    {
+      "label": "initial-state",
+      "preimage": "basalt-fixture:initial-state",
+      "digest": "sha256:94c01088d3dcea70cb089f1afdb82441629d4476d0bf2490f695fc032653403b",
+      "role": "state"
+    },
+    {
+      "label": "source-a-prev",
+      "preimage": "basalt-fixture:source-a-prev",
+      "digest": "sha256:f50e385bd35598365658bbebd8b69387df3b7e1c00d54dfb276c51b57b3b2d9f",
+      "role": "cursor_predecessor"
+    },
+    {
+      "label": "source-a-accepted",
+      "preimage": "basalt-fixture:source-a-accepted",
+      "digest": "sha256:abb00378458194ee9fc8c490f2b7baa796047b32c6d2770067922805855fc1af",
+      "role": "cursor_predecessor"
+    },
+    {
+      "label": "source-b-prev",
+      "preimage": "basalt-fixture:source-b-prev",
+      "digest": "sha256:da965b8960e4eb4806b46c8d7188a8d8e0b37125ef4a8b8c677aaaf0903e5b11",
+      "role": "cursor_predecessor"
+    },
+    {
+      "label": "source-b-accepted",
+      "preimage": "basalt-fixture:source-b-accepted",
+      "digest": "sha256:73a5fffb52b6b9a2c0489ddaacd8a6edcdc5f759352fef4612c810f7d0b75e8d",
+      "role": "cursor_predecessor"
+    },
+    {
+      "label": "receipt-a",
+      "preimage": "basalt-fixture:receipt-a",
+      "digest": "sha256:c2a02423003b98b568f46c55493e54df0a2bc3a7ac4661ea1c492f66f0f6b9bb",
+      "role": "receipt"
+    },
+    {
+      "label": "receipt-b",
+      "preimage": "basalt-fixture:receipt-b",
+      "digest": "sha256:f54ac447c7a6165aa0aa2f110995b09cbf4f0ad3384777496eaa171439d430d0",
+      "role": "receipt"
+    },
+    {
+      "label": "receipt-c",
+      "preimage": "basalt-fixture:receipt-c",
+      "digest": "sha256:99b39d5c8b033d1843707aa3d2157fe4e5e09ea9b9e2dab22007278181296a2d",
+      "role": "receipt"
+    },
+    {
+      "label": "receipt-d",
+      "preimage": "basalt-fixture:receipt-d",
+      "digest": "sha256:e6e5e001db3751afc63c090fdbb73fc9949747551652cbf902d32cdaeb7bd909",
+      "role": "receipt"
+    },
+    {
+      "label": "receipt-e",
+      "preimage": "basalt-fixture:receipt-e",
+      "digest": "sha256:f970491f6f3fd58cf8a56b9ce5eec07ebe84c239fac7aa55ce0e604fa24edba2",
+      "role": "receipt"
+    },
+    {
+      "label": "policy-v2",
+      "preimage": "basalt-fixture:policy-v2",
+      "digest": "sha256:a782a382cb699ca623ef37906490be0d826b23224589024f907d1d757a459b6f",
+      "role": "policy"
+    },
+    {
+      "label": "restored-old-state",
+      "preimage": "basalt-fixture:restored-old-state",
+      "digest": "sha256:c1930b1ae009dbcc935a31fde2395b6e59468586756ff11db40c8bd4e74106e4",
+      "role": "state"
+    },
+    {
+      "label": "witness-state",
+      "preimage": "basalt-fixture:witness-state",
+      "digest": "sha256:7792f2fd9bc92f0402afef5a6d458032b0d7d760bc340c1f9c98259969db3aa9",
+      "role": "state"
+    },
+    {
+      "label": "witness-record-1",
+      "preimage": "basalt-fixture:witness-record-1",
+      "digest": "sha256:4d88189f5944d2049c5c128d00801c88adb0e7ea39f0f6994a8fa4b7c2ac20d1",
+      "role": "witness_record"
+    },
+    {
+      "label": "witness-state-before-final",
+      "preimage": "basalt-fixture:witness-state-before-final",
+      "digest": "sha256:3fa18899d4f363314c22d5b5208860870c67ead32e66e07c2c874d0d455b3345",
+      "role": "state"
+    },
+    {
+      "label": "witness-record-2",
+      "preimage": "basalt-fixture:witness-record-2",
+      "digest": "sha256:1a4574ce2e837fa42105786b586fe823a2097e4ae1fc037ac067c4f3b12e1193",
+      "role": "witness_record"
+    },
+    {
+      "label": "final-state-v2",
+      "preimage": "basalt-fixture:final-state-v2",
+      "digest": "sha256:19c61ffd80a6c5a9ee3b97359d0e51342bcabec430df9ece176901e83b611c90",
+      "role": "state"
+    },
+    {
+      "label": "witness-record-3",
+      "preimage": "basalt-fixture:witness-record-3",
+      "digest": "sha256:bfd1d7c184eb03f632bb905415f063443b625b15e8a092e711d7e779971df6c6",
+      "role": "witness_record"
+    },
+    {
+      "label": "receipt-f",
+      "preimage": "basalt-fixture:receipt-f",
+      "digest": "sha256:47652938eba6732918fca62ebcfb808137c883a0f086134c5a1a4d4d6f0bab0b",
+      "role": "receipt"
+    },
+    {
+      "label": "receipt-g",
+      "preimage": "basalt-fixture:receipt-g",
+      "digest": "sha256:667724a1b901d2de131530240ca76c98df3e55655f1a9203144a816029d3c2e7",
+      "role": "receipt"
+    },
+    {
+      "label": "source-b-after-e",
+      "preimage": "basalt-fixture:source-b-after-e",
+      "digest": "sha256:241c6f76803684f74623216edbfb458b5338fd9c711c778fdcb88cd3bb505e83",
+      "role": "cursor_predecessor"
+    },
+    {
+      "label": "source-b-after-g",
+      "preimage": "basalt-fixture:source-b-after-g",
+      "digest": "sha256:63ff0b95aaae57e6c3bd7bef62138cb13b8d775e74bfffe4572edda7e4129248",
+      "role": "cursor_predecessor"
+    },
+    {
+      "label": "source-a-after-c",
+      "preimage": "basalt-fixture:source-a-after-c",
+      "digest": "sha256:1d6988deab585b1a808936531845c3494836f89792368787ddcd94a020c09c36",
+      "role": "cursor_predecessor"
+    },
+    {
+      "label": "source-a-alt",
+      "preimage": "basalt-fixture:source-a-alt",
+      "digest": "sha256:7bab2385bd7d9bfafd3568521b52e06fbed4157560c577b361d85e14bd84f937",
+      "role": "cursor_predecessor"
     }
   ]
 }
