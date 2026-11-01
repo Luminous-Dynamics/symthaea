@@ -650,7 +650,10 @@ mod tests {
         let runs = vec![run(1, vec![], measured(0, 0), JointExposure::default())];
         assert_eq!(qualify_joint_subsets(&registry(&[(0, 0)]), &runs, &[]), Err(JointBudgetError::ZeroActionId));
         assert!(matches!(
-            qualify_joint_subsets(&[JointActionDefinition { action_id: 1, conflict_group: 0 }, JointActionDefinition { action_id: 1, conflict_group: 0 }], &runs, &[]),
+            qualify_joint_subsets(&[
+                JointActionDefinition { action_id: 1, conflict_group: 0, action_semantics_sha256: [1; 32] },
+                JointActionDefinition { action_id: 1, conflict_group: 0, action_semantics_sha256: [1; 32] },
+            ], &runs, &[]),
             Err(JointBudgetError::DuplicateActionId { action_id: 1 })
         ));
     }
