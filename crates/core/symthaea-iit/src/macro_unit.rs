@@ -565,37 +565,37 @@ mod tests {
             (
                 MacroUnitSpec::coarse_grain(vec![0, 1], &[2], 4).unwrap(),
                 "6d1d396bb5b5f94064365e9b44763ea3f3075352dc7d7c0a3b6a3f3d0f972821",
-                "fc06f1aab62575d065424397a324069528bd4aabc0a602751f4696d88953cf93",
+                "92e44a61984b014fda4028d28660004f633b29555fe3676d27fa6a0f393339f8",
                 vec![false, false, false, true],
             ),
             (
                 MacroUnitSpec::coarse_grain(vec![0, 1], &[1], 4).unwrap(),
                 "8052c095831eaee3bb42b7ffd57f1cf63d942538dd2162f7a485f409c6b5bd7d",
-                "00b9c35b2761de5b901bc567261d04d39e11cbe7c215b54aa2d201b519e2d300",
+                "a17a4438aba7f19ae39dcd873e81b9f6712bb6c523b71bad4ade00868e18a656",
                 vec![false, true, true, false],
             ),
             (
                 MacroUnitSpec::coarse_grain(vec![0, 1, 2], &[1, 2], 8).unwrap(),
                 "62ade755a0ef46f57971dc503afb5f1cc93fef158b9665adae73fad761e8db52",
-                "6d825aa3fa9732c13d517bc59fedc881efea104f75dbce5509c796853777ed52",
+                "391c46f57f599fa7d8adaa3354093401c5e56f47fcc1ac077089b1534be63aab",
                 vec![false, true, true, true, true, true, true, false],
             ),
             (
                 MacroUnitSpec::blackbox(vec![0, 1], 2, &[0], 16).unwrap(),
                 "08f99240dd532f416f4853b61a56df4bb1be44db17ed466dd4625ef78ac35a2a",
-                "ede247fce344bf530d5dc78c57d3c21656fe0f89782173465ac904103e6d0add",
+                "2c5393822d234496a9948b2bfbbd5fd681c9621e7d958aec8f344eebbe25730c",
                 (0..16).map(|state| ((state >> 2) & 1) != 0).collect(),
             ),
             (
                 MacroUnitSpec::blackbox(vec![0, 1], 2, &[0, 1], 16).unwrap(),
                 "e055a4cd3c35ea97d152b41ef3dda99b26b0bcecddb3402592f010ef1af6f41a",
-                "f45aacca7d060506aad312cc42b65d97069f807227cabcbf8da483d95002f034",
+                "3b596a08be2b1d43c5ecc9a952813e1885caacd40fefbd10faea3bfb64f15339",
                 (0..16).map(|state| ((state >> 2) & 0b11) == 0b11).collect(),
             ),
             (
                 MacroUnitSpec::blackbox(vec![0, 1, 2], 2, &[1, 2], 64).unwrap(),
                 "a591b01aecb7a615d38e275299e93a9f7da970b7f23fad630cb98de617888061",
-                "5f23fea7a3d427b498b1d885abcf4b20f72da3bcd745df0dc0399908ce2631c7",
+                "9b55d56ff9eeb33cc2119d8b915bf6a06b7f3bf238d87a59660f6616f4223139",
                 (0..64).map(|state| ((state >> 4) & 0b11) == 0b11).collect(),
             ),
         ];
