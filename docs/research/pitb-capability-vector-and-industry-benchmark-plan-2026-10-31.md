@@ -175,3 +175,10 @@ The benchmark-integrity gate is now defined separately from all performance outc
 
 
 The SorryDB run contract now requires a content-addressed eligible target-integrity receipt on every measured run. The `verify_sorrydb_run_integrity` join verifier checks exact receipt bytes and source/task/environment identity; it is separate from the proof-attempt verifier and cannot turn a task's kernel-check into a semantic approval. The synthetic task/run fixtures remain explicitly unattempted.
+
+
+## Proof-graph scheduling and specialist orchestration
+
+CoCo-Prover (7 October 2026) is now a direct competitive baseline for code-proof economics. It joins per-declaration AND/OR proof hypergraphs with a cross-declaration lemma DAG, schedules dependency-ready goals symbolically, and routes bounded actions to deterministic automation, proof writers, lemma planners and recovery specialists. It reports up to 30.9% lower monetary cost on five Lean program-verification benchmarks, while noting higher wall-clock time in some settings and evaluation on only two repository-level benchmarks. PITB now has a separate two-level proof-graph state schema and Rust verifier, but not a live Lean scheduler. See `docs/research/pitb-proof-graph-scheduler-2026-11-01.md`.
+
+Aegis should be the next difficult code-verification cohort after environment and licensing review. EasyProver/Aegis reports 2,045 Rust-Lean pairs, 11,533 candidate specifications and 52.7% success on a stratified 2,000-task sample under a 30-minute per-statement budget. It is distinct from SorryDB's real open-hole completion tasks and from mathematical family transfer.
