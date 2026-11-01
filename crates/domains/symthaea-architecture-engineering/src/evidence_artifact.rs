@@ -497,6 +497,20 @@ fn digest_serializable<T: Serialize>(value: &T) -> Result<String, EvidenceArtifa
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
+
+    struct MemoryResolver(BTreeMap<String, Vec<u8>>);
+
+    impl EvidenceArtifactResolver for MemoryResolver {
+        fn resolve(&self, storage_locator: &str, max_bytes: u64) -> Result<Vec<u8>, String> {
+            let bytes = self.0.get(storage_locator).cloned()
+                .ok_or_else(|| "locator not found".to_owned())?;
+            if bytes.len() as u64 > max_bytes {
+                return Err("resolver byte ceiling exceeded".to_owned());
+            }
+            Ok(bytes)
+        }
+    }
 
     const COMMIT: &str = "0123456789abcdef0123456789abcdef01234567";
     const VERIFIER_BUILD: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -578,6 +592,55 @@ mod tests {
             VERIFIER_BUILD,
             &bytes,
             &tampered,
+        ).is_err());
+    }
+
+    #[test]
+    fn bounded_resolver_obeys_namespace_and_total_byte_policy() {
+        let manifest = manifest();
+        let bytes = resolved();
+        let map = bytes.iter().map(|artifact| {
+            let reference = manifest.artifacts.iter()
+                .find(|item| item.artifact_id == artifact.artifact_id).unwrap();
+            (reference.storage_locator.clone(), artifact.bytes.clone())
+        }).collect::<BTreeMap<_, _>>();
+        let resolver = MemoryResolver(map);
+        let policy = EvidenceArtifactResolvePolicy {
+            max_artifact_bytes: 1024,
+            max_total_bytes: 4096,
+            allowed_locator_prefixes: vec!["sha256:".to_owned()],
+        };
+        let (resolved_again, receipt) = resolve_and_verify_evidence_artifact_bytes(
+            &manifest,
+            "independent-verifier",
+            VERIFIER_BUILD,
+            &policy,
+            &resolver,
+        ).unwrap();
+        assert_eq!(resolved_again, bytes);
+        verify_evidence_artifact_byte_receipt(
+            &manifest,
+            "independent-verifier",
+            VERIFIER_BUILD,
+            &resolved_again,
+            &receipt,
+        ).unwrap();
+
+        let denied_namespace = EvidenceArtifactResolvePolicy {
+            allowed_locator_prefixes: vec!["holochain://".to_owned()],
+            ..policy.clone()
+        };
+        assert!(resolve_and_verify_evidence_artifact_bytes(
+            &manifest, "verifier", VERIFIER_BUILD, &denied_namespace, &resolver,
+        ).is_err());
+
+        let too_small = EvidenceArtifactResolvePolicy {
+            max_artifact_bytes: 4,
+            max_total_bytes: 4,
+            allowed_locator_prefixes: vec!["sha256:".to_owned()],
+        };
+        assert!(resolve_and_verify_evidence_artifact_bytes(
+            &manifest, "verifier", VERIFIER_BUILD, &too_small, &resolver,
         ).is_err());
     }
 
