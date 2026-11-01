@@ -122,6 +122,7 @@ def generate(output_path: Path) -> dict[str, Any]:
     import numpy as np
     import pyphi
     from pyphi.substrate import Substrate
+    from pyphi.system import System
 
     pyphi.config.progress_bars = False
 
@@ -177,11 +178,46 @@ def generate(output_path: Path) -> dict[str, Any]:
             raise RuntimeError(
                 f"landscape output order/value mismatch: {theta} != {expected['theta']}"
             )
+        substrate = builder(theta)
+        fixed_system = System(substrate, STATE, subset=CANDIDATE)
+        # The landscape SIA's .ties describes tied state-pair readings. Run
+        # the public fixed-system-state SIA path separately to recover the
+        # complete MIP tie family for this one selected cause/effect pair.
+        system_state = sia.system_state
+        cause_ties = getattr(system_state.cause, "ties", (system_state.cause,))
+        effect_ties = getattr(system_state.effect, "ties", (system_state.effect,))
+        if len(cause_ties) != 1 or len(effect_ties) != 1:
+            raise RuntimeError(
+                "landscape fixture unexpectedly has a cause/effect state tie; "
+                "the MIP tie oracle needs one fixed selected state pair"
+            )
+        fixed_state_sia = fixed_system.sia(
+            system_state=system_state,
+            formalism=FORMALISM,
+            parallel=False,
+            progress=False,
+        )
+        mip_tie_cuts = []
+        for tied_sia in fixed_state_sia.ties:
+            tied_sha, tied_edges = _mip_cut_identity(tied_sia)
+            if tied_sha is None or tied_edges is None:
+                raise RuntimeError("fixed-state PyPhi MIP tie has no cut identity")
+            mip_tie_cuts.append((tied_sha, tied_edges))
+        mip_tie_cuts = sorted({sha: edges for sha, edges in mip_tie_cuts}.items())
+        mip_tie_cut_sha256s = [sha for sha, _ in mip_tie_cuts]
+        mip_tie_cut_removed_edges = [edges for _, edges in mip_tie_cuts]
         mip_cut_sha256, mip_cut_removed_edges = _mip_cut_identity(sia)
+        if mip_cut_sha256 not in mip_tie_cut_sha256s:
+            raise RuntimeError(
+                "landscape SIA representative is missing from the fixed-state MIP tie set"
+            )
         point = {
             **expected,
             "mip_cut_sha256": mip_cut_sha256,
             "mip_cut_removed_edges": mip_cut_removed_edges,
+            "mip_tie_count": len(mip_tie_cut_sha256s),
+            "mip_tie_cut_sha256s": mip_tie_cut_sha256s,
+            "mip_tie_cut_removed_edges": mip_tie_cut_removed_edges,
             "phi": _json_value(raw.get("phi")),
             "signed_phi": _json_value(raw.get("signed_phi")),
             "normalized_phi": _json_value(raw.get("normalized_phi")),
@@ -239,6 +275,7 @@ def generate(output_path: Path) -> dict[str, Any]:
             "Every row is one exact PyPhi SIA sample at one parameter value; no interpolation is performed.",
             "Regime boundary entries are adjacent grid brackets where selection identity changes, not certified switch intervals.",
             "The oracle and Rust sweep bind identical canonical dense TPM, evaluation, candidate, state, formalism, quantity and parameter values.",
+            "The complete fixed-state MIP tie family is obtained by re-running public System.sia(system_state=...) for the selected cause/effect pair; landscape-level state-pair ties are a separate concept.",
             "PyPhi and Rust may use distinct native sparse/dense representation identities; the canonical dense digests identify the shared mathematical input.",
             "This artifact does not claim cross-engine parity until a separate verifier compares every common field and selection.",
             "IIT 4.0 (2026) is not evaluated.",
