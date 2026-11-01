@@ -277,6 +277,26 @@ fn analyze_causal_study_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
 }
 
 
+fn read_file_bounded(path: &str, maximum_bytes: u64) -> Result<Vec<u8>, Box<dyn Error>> {
+    let metadata = fs::metadata(path)?;
+    if metadata.len() > maximum_bytes {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("input file {path} exceeds {maximum_bytes} bytes"),
+        )
+        .into());
+    }
+    let bytes = fs::read(path)?;
+    if bytes.len() as u64 > maximum_bytes {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("input file {path} grew beyond {maximum_bytes} bytes while reading"),
+        )
+        .into());
+    }
+    Ok(bytes)
+}
+
 fn analyze_exposure_transfer_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 4 {
         return Err(
@@ -284,10 +304,11 @@ fn analyze_exposure_transfer_cli(args: &[String]) -> Result<(), Box<dyn Error>> 
                 .into(),
         );
     }
-    let base_study: ReplicatedCausalStudyV1 =
-        serde_json::from_slice(&fs::read(&args[1])?)?;
-    let transfer_study: ExposureTransferStudyV1 =
-        serde_json::from_slice(&fs::read(&args[2])?)?;
+    const MAX_STUDY_BYTES: u64 = 256 * 1024 * 1024;
+    let base_bytes = read_file_bounded(&args[1], MAX_STUDY_BYTES)?;
+    let transfer_bytes = read_file_bounded(&args[2], MAX_STUDY_BYTES)?;
+    let base_study: ReplicatedCausalStudyV1 = serde_json::from_slice(&base_bytes)?;
+    let transfer_study: ExposureTransferStudyV1 = serde_json::from_slice(&transfer_bytes)?;
     let report = analyze_exposure_transfer(&base_study, &transfer_study)
         .map_err(io::Error::other)?;
     write_bytes(&args[3], &serde_json::to_vec_pretty(&report)?)?;
