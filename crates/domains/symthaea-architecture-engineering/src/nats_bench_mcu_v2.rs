@@ -800,7 +800,7 @@ fn header_rows<const N: usize>(
     file: &str,
 ) -> Result<Vec<Vec<String>>, NatsBenchMcuV2ImportError> {
     let header = rows.remove(0);
-    if header.len() != N || header.iter().zip(expected).any(|(a, b)| a != b) {
+    if header.len() != N || header.iter().zip(expected).any(|(actual, expected)| actual.as_str() != *expected) {
         return Err(NatsBenchMcuV2ImportError::new(format!("{file}.header"), format!("expected {}", expected.join(","))));
     }
     for (i, row) in rows.iter().enumerate() {
@@ -1047,6 +1047,19 @@ mod tests {
         f.hw=f.hw.replace("|conv, op~0|", "|conv, op~0\"");
         f.refresh();
         assert!(import_nats_bench_mcu_v2(&f.manifest,f.bundle()).is_err());
+    }
+
+    #[test]
+    fn supplementary_rank_and_baseline_values_are_semantically_validated() {
+        let mut f = Fixture::new();
+        f.base = f.base.replace(",0.332", ",1.5");
+        f.refresh();
+        assert!(import_nats_bench_mcu_v2(&f.manifest, f.bundle()).unwrap_err().to_string().contains("invalid NAS baseline metric"));
+
+        let mut f = Fixture::new();
+        f.rank_summary = f.rank_summary.replace(",0.999", ",1.2");
+        f.refresh();
+        assert!(import_nats_bench_mcu_v2(&f.manifest, f.bundle()).unwrap_err().to_string().contains("invalid rank summary value"));
     }
 
     #[test]
