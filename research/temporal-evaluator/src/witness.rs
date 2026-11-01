@@ -308,29 +308,61 @@ pub fn verify_checkpoint_quorum(
         }
     }
 
-    let mut seen = BTreeSet::new();
+    // Network inputs are treated as untrusted, even when they claim a trusted
+    // identity. One Byzantine witness must not be able to abort a valid quorum
+    // by sending a stale challenge, malformed payload, bad signature, or a
+    // conflicting duplicate response.
+    let mut one_response_per_witness =
+        BTreeMap::<[u8; 16], &SignedWitnessAttestation>::new();
+    let mut equivocating_witnesses = BTreeSet::new();
+    for attestation in attestations {
+        let witness_id = attestation.payload.witness_id;
+        if !trusted.contains_key(&witness_id) {
+            continue;
+        }
+        match one_response_per_witness.get(&witness_id) {
+            None => {
+                one_response_per_witness.insert(witness_id, attestation);
+            }
+            Some(existing) if **existing == *attestation => {
+                // Exact retransmission: count the signed statement only once.
+            }
+            Some(_) => {
+                // Two different signed statements for the same query mean this
+                // identity cannot contribute a vote to this verification.
+                equivocating_witnesses.insert(witness_id);
+            }
+        }
+    }
+
     let mut highest_witness_epoch = 0_u64;
+    let mut stale_witnesses = 0_u16;
     let mut groups = BTreeMap::<(u64, [u8; 32], [u8; 32]), u16>::new();
 
-    for attestation in attestations {
-        let payload = &attestation.payload;
-        let trusted_key = trusted
-            .get(&payload.witness_id)
-            .ok_or(CheckpointError::UnknownWitness)?;
-        if !seen.insert(payload.witness_id) {
-            return Err(CheckpointError::DuplicateWitnessResponse);
+    for (witness_id, attestation) in one_response_per_witness {
+        if equivocating_witnesses.contains(&witness_id) {
+            continue;
         }
-        let message = payload.canonical_bytes()?;
+        let Some(trusted_key) = trusted.get(&witness_id) else {
+            continue;
+        };
+        let payload = &attestation.payload;
+        let Ok(message) = payload.canonical_bytes() else {
+            continue;
+        };
         let signature = Signature::from_bytes(&attestation.signature);
-        trusted_key
-            .verify_strict(&message, &signature)
-            .map_err(|_| CheckpointError::WitnessSignatureInvalid)?;
+        if trusted_key.verify_strict(&message, &signature).is_err() {
+            continue;
+        }
 
         if payload.evaluator_id != local.payload.evaluator_id {
             continue;
         }
         if payload.challenge != challenge {
-            return Err(CheckpointError::WitnessChallengeMismatch);
+            stale_witnesses = stale_witnesses
+                .checked_add(1)
+                .ok_or(CheckpointError::ArithmeticOverflow)?;
+            continue;
         }
 
         highest_witness_epoch = highest_witness_epoch.max(payload.checkpoint_epoch);
@@ -344,7 +376,6 @@ pub fn verify_checkpoint_quorum(
     }
 
     let mut current_epoch_matching = 0_u16;
-    let mut stale_witnesses = 0_u16;
     let mut higher_epoch_quorum = None;
     let mut conflicting_current_quorum = false;
 
@@ -662,43 +693,80 @@ mod tests {
                 &witnesses(&witness_keys),
                 bft_policy(),
             ),
-            Err(CheckpointError::WitnessChallengeMismatch)
+            Err(CheckpointError::InsufficientWitnessQuorum {
+                required: 3,
+                matching: 0,
+                stale: 3,
+            })
         );
     }
 
     #[test]
-    fn duplicate_unknown_and_invalid_witness_responses_are_rejected() {
+    fn one_stale_challenge_response_cannot_block_a_valid_bft_quorum() {
+        let evaluator_key = SigningKey::from_bytes(&[28; 32]);
+        let witness_keys = witness_keys(29);
+        let checkpoint = checkpoint(&evaluator_key, 2, [9; 32]);
+        let challenge = [77; 32];
+        let attestations = vec![
+            attest(&checkpoint, &witness_keys[0], 80, challenge),
+            attest(&checkpoint, &witness_keys[1], 81, challenge),
+            attest(&checkpoint, &witness_keys[2], 82, challenge),
+            attest(&checkpoint, &witness_keys[3], 83, [78; 32]),
+        ];
+        let result = verify_checkpoint_quorum(
+            &checkpoint,
+            &evaluator_key.verifying_key(),
+            challenge,
+            &attestations,
+            &witnesses(&witness_keys),
+            bft_policy(),
+        ).unwrap();
+        assert_eq!(result.confirming_witnesses, 3);
+        assert_eq!(result.stale_witnesses, 1);
+    }
+
+    #[test]
+    fn invalid_unknown_and_equivocating_responses_cannot_poison_valid_quorum() {
         let evaluator_key = SigningKey::from_bytes(&[31; 32]);
         let witness_keys = witness_keys(32);
         let checkpoint = checkpoint(&evaluator_key, 2, [9; 32]);
         let challenge = [99; 32];
-        let duplicate = vec![
+        let mut invalid_signature = attest(&checkpoint, &witness_keys[3], 62, challenge);
+        invalid_signature.signature[0] ^= 0x80;
+        let unknown_key = SigningKey::from_bytes(&[36; 32]);
+        let responses = vec![
             attest(&checkpoint, &witness_keys[0], 60, challenge),
-            attest(&checkpoint, &witness_keys[0], 61, challenge),
+            attest(&checkpoint, &witness_keys[1], 61, challenge),
+            attest(&checkpoint, &witness_keys[2], 62, challenge),
+            invalid_signature,
+            attest(&checkpoint, &unknown_key, 63, challenge),
         ];
-        assert_eq!(
-            verify_checkpoint_quorum(
-                &checkpoint,
-                &evaluator_key.verifying_key(),
-                challenge,
-                &duplicate,
-                &witnesses(&witness_keys),
-                bft_policy(),
-            ),
-            Err(CheckpointError::DuplicateWitnessResponse)
-        );
-        let unknown = SigningKey::from_bytes(&[36; 32]);
-        let unknown_response = vec![attest(&checkpoint, &unknown, 62, challenge)];
-        assert_eq!(
-            verify_checkpoint_quorum(
-                &checkpoint,
-                &evaluator_key.verifying_key(),
-                challenge,
-                &unknown_response,
-                &witnesses(&witness_keys),
-                bft_policy(),
-            ),
-            Err(CheckpointError::UnknownWitness)
-        );
+        let result = verify_checkpoint_quorum(
+            &checkpoint,
+            &evaluator_key.verifying_key(),
+            challenge,
+            &responses,
+            &witnesses(&witness_keys),
+            bft_policy(),
+        ).unwrap();
+        assert_eq!(result.confirming_witnesses, 3);
+        assert_eq!(result.stale_witnesses, 0);
+
+        let equivocal = vec![
+            attest(&checkpoint, &witness_keys[0], 70, challenge),
+            attest(&checkpoint, &witness_keys[1], 71, challenge),
+            attest(&checkpoint, &witness_keys[2], 72, challenge),
+            attest(&checkpoint, &witness_keys[3], 73, challenge),
+            attest(&checkpoint, &witness_keys[3], 74, challenge),
+        ];
+        let result = verify_checkpoint_quorum(
+            &checkpoint,
+            &evaluator_key.verifying_key(),
+            challenge,
+            &equivocal,
+            &witnesses(&witness_keys),
+            bft_policy(),
+        ).unwrap();
+        assert_eq!(result.confirming_witnesses, 3);
     }
 }
