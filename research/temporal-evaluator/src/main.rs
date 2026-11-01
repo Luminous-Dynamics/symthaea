@@ -8,6 +8,8 @@
 //!
 //! No function here supplies evaluator outcomes to candidate-side policies.
 
+pub mod witness;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 

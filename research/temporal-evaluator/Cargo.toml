@@ -6,4 +6,8 @@ license = "AGPL-3.0-or-later"
 publish = false
 description = "Evaluator-side counterfactual memory valuation and exact subset controls"
 
+[dependencies]
+ed25519-dalek = "3.0.0"
+sha2 = "0.10"
+
 [workspace]
