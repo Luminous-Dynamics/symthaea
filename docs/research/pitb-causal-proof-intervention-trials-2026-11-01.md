@@ -99,7 +99,7 @@ A null result is valuable: it distinguishes the value of semantic support select
 ## Remaining work
 
 1. Execute the outcome schema checks, compile/self-test the paired outcome analyzer, and inspect exact-head CI receipts.
-2. Add strict checker, run and successor receipt parsers with exact proof/target/environment/resource bindings; signed benchmark-integrity reviewer receipts are already required for measured success rows.
+2. Add trusted runner/verifier signatures or an independently attested execution environment to checker/run/successor receipts; their structures and identity joins are now parsed, but their origin is not yet cryptographically attested.
 3. Add preregistered paired randomization inference and multiplicity-controlled comparisons alongside the component-cluster bootstrap.
 4. Generate a real exhaustive support lattice from a pinned Lean context and build the first integrity-reviewed cohort.
 5. Run a small validation smoke trial; freeze models, prompts, contexts, policy and caps before held-out testing.
