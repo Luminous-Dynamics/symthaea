@@ -138,7 +138,10 @@ pub fn apply_decision_driven_cap(
 ) -> Result<DecisionDrivenCapResult, DecisionDrivenCapError> {
     validate_config(config)?;
     validate_current(config, current)?;
-    if holdout.iter().any(|point| point.example_id == current.example_id) {
+    if holdout
+        .iter()
+        .any(|point| point.example_id == current.example_id)
+    {
         return Err(DecisionDrivenCapError::CurrentHoldoutOverlap);
     }
 
@@ -182,11 +185,8 @@ pub fn apply_decision_driven_cap(
     residuals.sort_by_key(|(_, residual)| *residual);
     calibration_example_ids.sort_unstable();
 
-    let residual_quantile = conformal_residual_quantile(
-        config.alpha_numerator,
-        config.alpha_denominator,
-        &residuals,
-    )?;
+    let residual_quantile =
+        conformal_residual_quantile(config.alpha_numerator, config.alpha_denominator, &residuals)?;
     let interval = match residual_quantile {
         Some(radius) => Some(CapInterval {
             lower: current.predicted_cost.saturating_sub(radius),
@@ -377,9 +377,7 @@ mod tests {
             feature_cohort_digest: [3; 32],
             selection_score: score,
             predicted_cost: predicted,
-            observed_remaining_to_verified_proof: ResourceVector::new(
-                observed, 0, 0, 0, 0, 0,
-            ),
+            observed_remaining_to_verified_proof: ResourceVector::new(observed, 0, 0, 0, 0, 0),
             meter_receipt_digest: [4; 32],
             completion_verifier_digest: [5; 32],
         }
@@ -406,8 +404,8 @@ mod tests {
             point(4, 6, 10, 40),
         ];
         let mut state = DecisionDrivenCapState::new();
-        let result = apply_decision_driven_cap(config(), &mut state, &holdout, current(10, 5, 20))
-            .unwrap();
+        let result =
+            apply_decision_driven_cap(config(), &mut state, &holdout, current(10, 5, 20)).unwrap();
 
         assert!(result.selected);
         assert_eq!(result.selection_threshold, 5);
@@ -495,7 +493,10 @@ mod tests {
         .unwrap();
         assert_eq!(first.interval, second.interval);
         assert_eq!(first.residual_quantile, second.residual_quantile);
-        assert_eq!(first.calibration_example_ids, second.calibration_example_ids);
+        assert_eq!(
+            first.calibration_example_ids,
+            second.calibration_example_ids
+        );
     }
 
     #[test]
@@ -510,48 +511,28 @@ mod tests {
         let mut wrong_partition = point(1, 4, 10, 11);
         wrong_partition.holdout_partition_digest = [99; 32];
         assert_eq!(
-            apply_decision_driven_cap(
-                config(),
-                &mut state,
-                &[wrong_partition],
-                current(10, 5, 20)
-            ),
+            apply_decision_driven_cap(config(), &mut state, &[wrong_partition], current(10, 5, 20)),
             Err(DecisionDrivenCapError::CalibrationPartitionMismatch)
         );
 
         let mut wrong_model = point(1, 4, 10, 11);
         wrong_model.model_digest = [99; 32];
         assert_eq!(
-            apply_decision_driven_cap(
-                config(),
-                &mut state,
-                &[wrong_model],
-                current(10, 5, 20)
-            ),
+            apply_decision_driven_cap(config(), &mut state, &[wrong_model], current(10, 5, 20)),
             Err(DecisionDrivenCapError::CalibrationModelMismatch)
         );
 
         let mut missing_meter = point(1, 4, 10, 11);
         missing_meter.meter_receipt_digest = [0; 32];
         assert_eq!(
-            apply_decision_driven_cap(
-                config(),
-                &mut state,
-                &[missing_meter],
-                current(10, 5, 20)
-            ),
+            apply_decision_driven_cap(config(), &mut state, &[missing_meter], current(10, 5, 20)),
             Err(DecisionDrivenCapError::MissingMeterReceipt)
         );
 
         let mut wrong_score = point(1, 4, 10, 11);
         wrong_score.score_model_digest = [99; 32];
         assert_eq!(
-            apply_decision_driven_cap(
-                config(),
-                &mut state,
-                &[wrong_score],
-                current(10, 5, 20)
-            ),
+            apply_decision_driven_cap(config(), &mut state, &[wrong_score], current(10, 5, 20)),
             Err(DecisionDrivenCapError::CalibrationScoreModelMismatch)
         );
     }
