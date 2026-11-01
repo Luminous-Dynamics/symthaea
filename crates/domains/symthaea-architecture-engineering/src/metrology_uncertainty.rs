@@ -12,7 +12,9 @@ use std::fmt;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
-use crate::ppk2_trace_audit::{Ppk2TraceAuditReceipt, Ppk2SegmentMetrics};
+use crate::ppk2_trace_audit::{
+    validate_ppk2_trace_audit_receipt, Ppk2TraceAuditReceipt, Ppk2SegmentMetrics,
+};
 
 const MANIFEST_SCHEMA: &str = "symthaea.nas.metrology-uncertainty-manifest";
 const RECEIPT_SCHEMA: &str = "symthaea.nas.energy-uncertainty-receipt";
@@ -213,6 +215,8 @@ pub fn evaluate_ppk2_energy_uncertainty(
     manifest: &MetrologyUncertaintyManifest,
 ) -> Result<EnergyUncertaintyReceipt, MetrologyUncertaintyError> {
     validate_metrology_manifest(manifest)?;
+    validate_ppk2_trace_audit_receipt(trace)
+        .map_err(|error| MetrologyUncertaintyError::new("trace_receipt", error.to_string()))?;
     if !is_sha256(&trace.receipt_sha256) || !is_sha256(&trace.sample_csv_sha256) {
         return Err(MetrologyUncertaintyError::new(
             "trace_receipt_sha256",
@@ -459,6 +463,13 @@ mod tests {
         m.replicates_independent = false;
         m.manifest_sha256 = compute_metrology_manifest_sha256(&m).unwrap();
         assert!(evaluate_ppk2_energy_uncertainty(&trace(&[10.0, 11.0]), &m).is_err());
+    }
+
+    #[test]
+    fn rejects_tampered_trace_receipt_before_uncertainty_analysis() {
+        let mut t = trace(&[10.0, 11.0, 9.0]);
+        t.mean_segment_energy_uj = 0.0;
+        assert!(evaluate_ppk2_energy_uncertainty(&t, &manifest()).is_err());
     }
 
     #[test]
