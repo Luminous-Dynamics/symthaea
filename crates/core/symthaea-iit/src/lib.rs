@@ -47,6 +47,7 @@ pub use factor_graph::{
     BinaryFactor, BinaryLogFactor, CutsetFactorEliminationPlan, CutsetFrontierCandidate,
     CutsetFrontierRejection, CutsetLogFactorEliminationReport, CutsetPlanFrontierReport,
     FactorEliminationPlan, FactorEliminationReport, FactorGraphError, LogFactorEliminationReport,
+    MinFillPlannerWork,
 };
 
 mod sparse_causal;
