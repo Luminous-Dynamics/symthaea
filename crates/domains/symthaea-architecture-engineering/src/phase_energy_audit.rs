@@ -1010,7 +1010,7 @@ pub fn verify_phase_energy_receipt_against_sources(
     protocol: &ApplicationPhaseProtocolManifest,
     expected: &PhaseEnergyAuditReceipt,
 ) -> Result<(), PhaseEnergyAuditError> {
-    validate_phase_energy_audit_receipt(expected)?
+    validate_phase_energy_audit_receipt(expected)?;
     let rebuilt = audit_application_phase_energy(sample_csv, marker_csv, trace_config, mapping, protocol)?;
     if rebuilt.receipt != *expected {
         return Err(PhaseEnergyAuditError::new("receipt.source_reproduction", "recomputed phase receipt does not exactly match expected receipt"));
