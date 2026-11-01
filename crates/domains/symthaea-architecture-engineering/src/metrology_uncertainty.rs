@@ -111,7 +111,7 @@ pub struct EnergyComparison {
     pub difference_candidate_minus_reference_uj: f64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReplicationPlanKind {
     CandidateOnly,
@@ -791,6 +791,10 @@ pub fn compare_energy_uncertainty(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::multi_resource_budget::{
+        compute_resource_registry_sha256, ResourceBudgetLimit, ResourceClass,
+        ResourceDefinition,
+    };
     use crate::ppk2_trace_audit::{Ppk2SegmentMetrics, Ppk2TraceAuditReceipt};
 
     fn sha(ch: char) -> String {
@@ -952,22 +956,133 @@ mod tests {
         assert!(validate_energy_uncertainty_receipt(&receipt).is_err());
     }
 
+    fn replication_config(
+        candidate_costs: [u64; 2],
+        reference_costs: [u64; 2],
+        per_resource_budget: u64,
+        maximum_additional_replicates: usize,
+    ) -> ReplicationPlanningConfig {
+        let mut registry = ResourceRegistry {
+            schema: "symthaea.nas.resource-registry".into(),
+            version: "0.1.0".into(),
+            resources: vec![
+                ResourceDefinition {
+                    resource_id: "instrument_time".into(),
+                    unit: "seconds".into(),
+                    class: ResourceClass::InstrumentTime,
+                    cost_model_sha256: sha('e'),
+                },
+                ResourceDefinition {
+                    resource_id: "target_device_time".into(),
+                    unit: "seconds".into(),
+                    class: ResourceClass::TargetDeviceTime,
+                    cost_model_sha256: sha('f'),
+                },
+            ],
+            registry_sha256: String::new(),
+        };
+        registry.registry_sha256 = compute_resource_registry_sha256(&registry).unwrap();
+
+        let budget = ResourceBudget {
+            resource_registry_sha256: registry.registry_sha256.clone(),
+            limits: vec![
+                ResourceBudgetLimit {
+                    resource_id: "instrument_time".into(),
+                    unit: "seconds".into(),
+                    total_units: per_resource_budget,
+                    already_spent_units: 0,
+                    protected_reserve_units: 0,
+                },
+                ResourceBudgetLimit {
+                    resource_id: "target_device_time".into(),
+                    unit: "seconds".into(),
+                    total_units: per_resource_budget,
+                    already_spent_units: 0,
+                    protected_reserve_units: 0,
+                },
+            ],
+        };
+
+        let candidate_replicate_cost = ResourceCostVector {
+            action_id: "candidate_replicate".into(),
+            resource_registry_sha256: registry.registry_sha256.clone(),
+            resources: vec![
+                ResourceQuantity {
+                    resource_id: "instrument_time".into(),
+                    unit: "seconds".into(),
+                    units: candidate_costs[0],
+                    cost_model_sha256: sha('e'),
+                },
+                ResourceQuantity {
+                    resource_id: "target_device_time".into(),
+                    unit: "seconds".into(),
+                    units: candidate_costs[1],
+                    cost_model_sha256: sha('f'),
+                },
+            ],
+        };
+        let reference_replicate_cost = ResourceCostVector {
+            action_id: "reference_replicate".into(),
+            resource_registry_sha256: registry.registry_sha256.clone(),
+            resources: vec![
+                ResourceQuantity {
+                    resource_id: "instrument_time".into(),
+                    unit: "seconds".into(),
+                    units: reference_costs[0],
+                    cost_model_sha256: sha('e'),
+                },
+                ResourceQuantity {
+                    resource_id: "target_device_time".into(),
+                    unit: "seconds".into(),
+                    units: reference_costs[1],
+                    cost_model_sha256: sha('f'),
+                },
+            ],
+        };
+
+        ReplicationPlanningConfig {
+            resource_registry: registry,
+            resource_budget: budget,
+            candidate_replicate_cost,
+            reference_replicate_cost,
+            maximum_additional_replicates_per_side: maximum_additional_replicates,
+        }
+    }
+
     #[test]
-    fn replication_planner_finds_cheapest_candidate_only_action() {
+    fn replication_planner_finds_candidate_only_plan_with_vector_cost() {
         let candidate = evaluate_ppk2_energy_uncertainty(&trace(&[10.0, 12.0]), &manifest()).unwrap();
         let reference = evaluate_ppk2_energy_uncertainty(&trace(&[10.0, 10.0]), &manifest()).unwrap();
         let plan = plan_additional_energy_replicates(
             &candidate,
             &reference,
-            ReplicationPlanningConfig {
-                candidate_cost_per_replicate_units: 1,
-                reference_cost_per_replicate_units: 3,
-                resource_budget_units: 100,
-                maximum_additional_replicates_per_side: 10_000,
-            },
+            &replication_config([1, 5], [5, 1], 100_000, 10_000),
         ).unwrap();
         assert_eq!(plan.status, ReplicationPlanningStatus::AdditionalReplicatesRequired);
-        assert_eq!(plan.plan.unwrap().kind, ReplicationPlanKind::CandidateOnly);
+        assert_eq!(plan.plan_frontier.len(), 1);
+        assert_eq!(plan.plan_frontier[0].kind, ReplicationPlanKind::CandidateOnly);
+        assert_eq!(plan.plan_frontier[0].resource_cost.resources[0].units,
+            plan.plan_frontier[0].additional_candidate_replicates as u64);
+    }
+
+    #[test]
+    fn replication_planner_returns_resource_vector_tradeoff_frontier() {
+        let candidate = evaluate_ppk2_energy_uncertainty(&trace(&[10.0, 11.0]), &manifest()).unwrap();
+        let reference = evaluate_ppk2_energy_uncertainty(&trace(&[8.0, 9.0]), &manifest()).unwrap();
+        let plan = plan_additional_energy_replicates(
+            &candidate,
+            &reference,
+            &replication_config([1, 5], [5, 1], 1_000, 10),
+        ).unwrap();
+        assert_eq!(plan.status, ReplicationPlanningStatus::AdditionalReplicatesRequired);
+        let kinds: std::collections::HashSet<ReplicationPlanKind> =
+            plan.plan_frontier.iter().map(|item| item.kind).collect();
+        assert!(kinds.contains(&ReplicationPlanKind::CandidateOnly));
+        assert!(kinds.contains(&ReplicationPlanKind::ReferenceOnly));
+        assert!(kinds.contains(&ReplicationPlanKind::PairedCandidateAndReference));
+        for plan in &plan.plan_frontier {
+            assert!(plan.resource_cost.resources.iter().all(|item| item.units <= 1_000));
+        }
     }
 
     #[test]
@@ -980,32 +1095,23 @@ mod tests {
         let plan = plan_additional_energy_replicates(
             &candidate,
             &reference,
-            ReplicationPlanningConfig {
-                candidate_cost_per_replicate_units: 1,
-                reference_cost_per_replicate_units: 1,
-                resource_budget_units: 10_000,
-                maximum_additional_replicates_per_side: 1_000,
-            },
+            &replication_config([1, 1], [1, 1], 10_000, 1_000),
         ).unwrap();
         assert_eq!(plan.status, ReplicationPlanningStatus::MetrologyLimited);
-        assert!(plan.plan.is_none());
+        assert!(plan.plan_frontier.is_empty());
     }
 
     #[test]
-    fn replication_planner_respects_resource_budget_and_horizon() {
+    fn replication_planner_respects_each_vector_budget_component() {
         let candidate = evaluate_ppk2_energy_uncertainty(&trace(&[10.0, 12.0]), &manifest()).unwrap();
         let reference = evaluate_ppk2_energy_uncertainty(&trace(&[10.0, 10.0]), &manifest()).unwrap();
         let plan = plan_additional_energy_replicates(
             &candidate,
             &reference,
-            ReplicationPlanningConfig {
-                candidate_cost_per_replicate_units: 100,
-                reference_cost_per_replicate_units: 100,
-                resource_budget_units: 1,
-                maximum_additional_replicates_per_side: 10,
-            },
+            &replication_config([100, 100], [100, 100], 1, 10),
         ).unwrap();
         assert_eq!(plan.status, ReplicationPlanningStatus::NoPlanWithinBudgetOrHorizon);
+        assert!(plan.plan_frontier.is_empty());
     }
 
     #[test]
