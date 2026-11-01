@@ -143,3 +143,34 @@ This fixture proves only that the protocol can represent gold facts and a nearby
 ## Claim boundary
 
 A high gold-injection score does not prove good search. High retrieval recall does not prove good reading. A correct answer does not prove grounded reasoning. A retrieval event does not prove influence. A synthetic distractor test does not establish broad-world robustness. Keep those claims separate in every report.
+
+
+## Executable artifact qualification
+
+The Rust module src/retrieval_decomposition.rs validates:
+- canonical corpus and sealed-oracle SHA-256 digests (each computed with its own digest field cleared);
+- every document content hash and UTF-8 byte length;
+- exact byte spans and per-span SHA-256, with claim text equal to the cited source span for directly supported claims;
+- unique claim/document IDs and acyclic derived-claim dependencies;
+- exact arithmetic for the primary answer and each nearby distractor answer;
+- allowed evidence path document IDs;
+- experiment-to-corpus/oracle/benchmark bindings;
+- all six required experimental arms, unique task/replicate IDs, unique paired seed commitments, and per-replicate arm-order permutations;
+- candidate/oracle separation declaration.
+
+Audit the synthetic pilot:
+
+~~~sh
+cargo run --locked \
+  --manifest-path research/contamination-panel-001/Cargo.toml \
+  -- audit-retrieval-decomposition \
+  research/contamination-panel-001/fixtures/retrieval-decomposition-pilot-v1.corpus.json \
+  research/contamination-panel-001/fixtures/retrieval-decomposition-pilot-v1.oracle.json \
+  research/contamination-panel-001/fixtures/retrieval-decomposition-pilot-v1.experiment.json \
+  /secure/evaluator/retrieval-decomposition-audit.json
+~~~
+
+The report is an artifact-contract audit only. The included manifest deliberately has experiment_status=protocol_only; its model checkpoint, inference harness, prompt/decoding, budget, sample-size and seed bindings are fixture digests, not measurements or an executed run. The verifier does not run a search agent, score citations, establish semantic entailment, or estimate causal effects.
+
+The initial span gate is intentionally exact and conservative. Later real-web evaluation needs a separate blinded semantic-adjudication protocol, with exact/fuzzy/semantic matching methods, human reliability estimates and held-out adjudication items. Do not silently replace these exact synthetic controls with an LLM judge.
+
