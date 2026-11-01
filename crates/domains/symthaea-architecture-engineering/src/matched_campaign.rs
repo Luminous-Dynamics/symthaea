@@ -242,6 +242,7 @@ struct CommonContract<'a> {
     budget_limit_microunits: u64,
     initial_direction_ids: &'a [String],
     execution: &'a super::event_tape::ExecutionContract,
+    objective_contract_sha256: Option<&'a str>,
 }
 
 type CandidateRecord = (
@@ -374,6 +375,7 @@ pub fn reconcile_mechanism_matched_campaign(
             budget_limit_microunits: header.budget_limit_microunits,
             initial_direction_ids: &header.initial_direction_ids,
             execution: &header.execution,
+            objective_contract_sha256: header.objective_contract_sha256.as_deref(),
         };
         let contract_sha = digest_serializable(&contract)?;
         if let Some(expected_sha) = &common_contract_sha256 {
