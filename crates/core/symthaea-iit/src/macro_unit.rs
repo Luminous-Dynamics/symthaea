@@ -6,11 +6,15 @@
 //! postulates. It freezes the identity and truth-table semantics that those
 //! later computations must consume.
 
+use std::collections::BTreeSet;
+
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 const MACRO_MAPPING_MAGIC: &[u8] = b"SYMTHAEA-IIT-MACRO-MAPPING\0v0.1\0";
 const MACRO_UNIT_SPEC_MAGIC: &[u8] = b"SYMTHAEA-IIT-MACRO-UNIT-SPEC\0v0.2\0";
+const MACRO_MAPPING_SEARCH_MAGIC: &[u8] =
+    b"SYMTHAEA-IIT-MACRO-MAPPING-SEARCH\0v0.1\0";
 
 /// Errors for an invalid or over-budget macro-unit mapping.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
@@ -41,6 +45,12 @@ pub enum MacroUnitError {
     DuplicateBackgroundApportionment { unit: usize },
     #[error("background apportionment overlaps constituent micro unit {unit}")]
     BackgroundOverlapsConstituents { unit: usize },
+    #[error("default mapping-family candidate count overflows usize")]
+    CandidateCountOverflow,
+    #[error("mapping-family search requires at most {required} candidates, exceeding budget {limit}")]
+    CandidateBudgetExceeded { required: usize, limit: usize },
+    #[error("mapping-family search requires at most {required} truth-table entries, exceeding budget {limit}")]
+    TotalMappingEntryBudgetExceeded { required: usize, limit: usize },
     #[error("constant mappings do not define a non-trivial macro unit")]
     ConstantMapping,
     #[error("sequence-state index {index} is outside the mapping domain of {states} states")]
@@ -51,6 +61,38 @@ pub enum MacroUnitError {
     HistoryStateWidthMismatch { expected: usize, actual: usize },
     #[error("micro-history state is too narrow for constituent {unit}: width {actual}")]
     HistoryStateTooNarrow { unit: usize, actual: usize },
+}
+
+/// Explicit preflight limits for default coarse-grain/blackbox mapping enumeration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MacroMappingSearchLimits {
+    /// Maximum raw candidate mappings before duplicate/complement elimination.
+    pub max_candidate_upper_bound: usize,
+    /// Maximum aggregate entries across the preflight upper bound.
+    pub max_total_mapping_entries: usize,
+    /// Maximum entries in any single mapping truth table.
+    pub max_mapping_entries: usize,
+}
+
+/// Complete default-family mapping enumeration with deterministic identity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MacroMappingSearchReport {
+    /// Candidate mappings in PyPhi-compatible first-seen order.
+    pub candidates: Vec<MacroUnitSpec>,
+    /// Number of raw ON-count coarse-graining tables considered.
+    pub generated_coarse_grain: usize,
+    /// Number of raw blackbox output-subset tables considered.
+    pub generated_blackbox: usize,
+    /// Number of duplicate canonical mappings removed.
+    pub duplicates_removed: usize,
+    /// Raw candidate upper bound checked before allocation.
+    pub candidate_upper_bound: usize,
+    /// Aggregate truth-table entries in the deduplicated output.
+    pub total_mapping_entries: usize,
+    /// Digest of the complete candidate set, bounds and generation policy.
+    pub candidate_set_sha256: String,
+    /// Always true for a successfully returned report.
+    pub complete: bool,
 }
 
 /// A binary macro unit with an explicit constituent order, temporal grain,
@@ -80,6 +122,215 @@ pub struct MacroUnitSpec {
 }
 
 impl MacroUnitSpec {
+    /// Enumerate PyPhi-compatible default mapping families under explicit budgets.
+    ///
+    /// At update grain 1, this emits every non-degenerate ON-count coarse
+    /// graining, followed by every non-empty blackbox output subset. At larger
+    /// grains only blackbox families are emitted. Tables are canonicalized so
+    /// the all-OFF sequence maps to macro-state 0, then deduplicated while
+    /// preserving first-seen family order.
+    ///
+    /// The raw candidate upper bound and aggregate table-entry upper bound are
+    /// checked before candidate tables are allocated. This can conservatively
+    /// reject a search whose eventual de-duplicated set would fit; it never
+    /// allocates beyond the caller's declared limits.
+    pub fn enumerate_default_mapping_families(
+        constituents: Vec<usize>,
+        update_grain: usize,
+        background_apportionment: Vec<usize>,
+        limits: MacroMappingSearchLimits,
+    ) -> Result<MacroMappingSearchReport, MacroUnitError> {
+        if constituents.is_empty() {
+            return Err(MacroUnitError::EmptyConstituents);
+        }
+        for pair in constituents.windows(2) {
+            if pair[0] == pair[1] {
+                return Err(MacroUnitError::DuplicateConstituent { unit: pair[0] });
+            }
+            if pair[0] > pair[1] {
+                return Err(MacroUnitError::UnsortedConstituents {
+                    previous: pair[0],
+                    current: pair[1],
+                });
+            }
+        }
+        if update_grain == 0 {
+            return Err(MacroUnitError::ZeroUpdateGrain);
+        }
+        let (sequence_state_bits, mapping_entries) =
+            mapping_domain(constituents.len(), update_grain, limits.max_mapping_entries)?;
+
+        let n = constituents.len();
+        let blackbox_mask_count = 1usize
+            .checked_shl(n as u32)
+            .ok_or(MacroUnitError::CandidateCountOverflow)?;
+        let blackbox_upper = blackbox_mask_count - 1;
+        let coarse_upper = if update_grain == 1 {
+            1usize
+                .checked_shl(
+                    n.checked_add(1)
+                        .ok_or(MacroUnitError::CandidateCountOverflow)? as u32,
+                )
+                .ok_or(MacroUnitError::CandidateCountOverflow)?
+                .checked_sub(2)
+                .ok_or(MacroUnitError::CandidateCountOverflow)?
+        } else {
+            0
+        };
+        let candidate_upper_bound = coarse_upper
+            .checked_add(blackbox_upper)
+            .ok_or(MacroUnitError::CandidateCountOverflow)?;
+        if candidate_upper_bound > limits.max_candidate_upper_bound {
+            return Err(MacroUnitError::CandidateBudgetExceeded {
+                required: candidate_upper_bound,
+                limit: limits.max_candidate_upper_bound,
+            });
+        }
+        let total_upper_entries = candidate_upper_bound
+            .checked_mul(mapping_entries)
+            .ok_or(MacroUnitError::CandidateCountOverflow)?;
+        if total_upper_entries > limits.max_total_mapping_entries {
+            return Err(MacroUnitError::TotalMappingEntryBudgetExceeded {
+                required: total_upper_entries,
+                limit: limits.max_total_mapping_entries,
+            });
+        }
+
+        let state_mask = 1usize
+            .checked_shl(n as u32)
+            .ok_or(MacroUnitError::SequenceDomainOverflow)?
+            - 1;
+        let final_update_offset = (update_grain - 1)
+            .checked_mul(n)
+            .ok_or(MacroUnitError::SequenceDomainOverflow)?;
+        let mut seen = BTreeSet::<Vec<bool>>::new();
+        let mut candidates = Vec::with_capacity(candidate_upper_bound);
+        let mut generated_coarse_grain = 0usize;
+        let mut generated_blackbox = 0usize;
+
+        let mut add_mapping = |mapping: Vec<bool>| -> Result<(), MacroUnitError> {
+            let canonical = if mapping[0] {
+                mapping.into_iter().map(|value| !value).collect::<Vec<_>>()
+            } else {
+                mapping
+            };
+            if seen.insert(canonical.clone()) {
+                candidates.push(Self::new_with_background(
+                    constituents.clone(),
+                    update_grain,
+                    canonical,
+                    background_apportionment.clone(),
+                    limits.max_mapping_entries,
+                )?);
+            }
+            Ok(())
+        };
+
+        if update_grain == 1 {
+            let count_options = n
+                .checked_add(1)
+                .ok_or(MacroUnitError::CandidateCountOverflow)?;
+            let subset_limit = 1usize
+                .checked_shl(count_options as u32)
+                .ok_or(MacroUnitError::CandidateCountOverflow)?;
+            for on_count_mask in 1..subset_limit - 1 {
+                let mut mapping = Vec::with_capacity(mapping_entries);
+                for state in 0..mapping_entries {
+                    let on_count = (state & state_mask).count_ones() as usize;
+                    mapping.push(((on_count_mask >> on_count) & 1) != 0);
+                }
+                generated_coarse_grain = generated_coarse_grain
+                    .checked_add(1)
+                    .ok_or(MacroUnitError::CandidateCountOverflow)?;
+                add_mapping(mapping)?;
+            }
+        }
+
+        for output_mask in 1..blackbox_mask_count {
+            let mut mapping = Vec::with_capacity(mapping_entries);
+            for sequence_state in 0..mapping_entries {
+                let final_state = (sequence_state >> final_update_offset) & state_mask;
+                mapping.push((output_mask & final_state) == output_mask);
+            }
+            generated_blackbox = generated_blackbox
+                .checked_add(1)
+                .ok_or(MacroUnitError::CandidateCountOverflow)?;
+            add_mapping(mapping)?;
+        }
+
+        let duplicates_removed = candidate_upper_bound
+            .checked_sub(candidates.len())
+            .ok_or(MacroUnitError::CandidateCountOverflow)?;
+        let total_mapping_entries = candidates
+            .len()
+            .checked_mul(mapping_entries)
+            .ok_or(MacroUnitError::CandidateCountOverflow)?;
+        let candidate_set_sha256 = Self::candidate_set_digest(
+            &constituents,
+            update_grain,
+            &background_apportionment,
+            limits,
+            generated_coarse_grain,
+            generated_blackbox,
+            duplicates_removed,
+            &candidates,
+        );
+
+        let report = MacroMappingSearchReport {
+            candidates,
+            generated_coarse_grain,
+            generated_blackbox,
+            duplicates_removed,
+            candidate_upper_bound,
+            total_mapping_entries,
+            candidate_set_sha256,
+            complete: true,
+        };
+        debug_assert_eq!(
+            report.candidate_upper_bound,
+            report.generated_coarse_grain + report.generated_blackbox
+        );
+        let _ = sequence_state_bits;
+        Ok(report)
+    }
+
+    fn candidate_set_digest(
+        constituents: &[usize],
+        update_grain: usize,
+        background_apportionment: &[usize],
+        limits: MacroMappingSearchLimits,
+        coarse_count: usize,
+        blackbox_count: usize,
+        duplicates_removed: usize,
+        candidates: &[MacroUnitSpec],
+    ) -> String {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(MACRO_MAPPING_SEARCH_MAGIC);
+        bytes.extend_from_slice(&(constituents.len() as u64).to_le_bytes());
+        for unit in constituents {
+            bytes.extend_from_slice(&(*unit as u64).to_le_bytes());
+        }
+        bytes.extend_from_slice(&(update_grain as u64).to_le_bytes());
+        bytes.extend_from_slice(&(background_apportionment.len() as u64).to_le_bytes());
+        for unit in background_apportionment {
+            bytes.extend_from_slice(&(*unit as u64).to_le_bytes());
+        }
+        for limit in [
+            limits.max_candidate_upper_bound,
+            limits.max_total_mapping_entries,
+            limits.max_mapping_entries,
+        ] {
+            bytes.extend_from_slice(&(limit as u64).to_le_bytes());
+        }
+        for count in [coarse_count, blackbox_count, duplicates_removed, candidates.len()] {
+            bytes.extend_from_slice(&(count as u64).to_le_bytes());
+        }
+        for candidate in candidates {
+            bytes.extend_from_slice(candidate.spec_sha256.as_bytes());
+        }
+        Self::hex_digest(&bytes)
+    }
+
     /// Build the PyPhi-compatible coarse-graining family at update grain 1.
     ///
     /// A macro state is ON when the number of ON constituents belongs to
@@ -494,6 +745,82 @@ fn mapping_domain(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn default_mapping_family_enumeration_matches_pinned_pyphi_counts() {
+        let grain_one = MacroUnitSpec::enumerate_default_mapping_families(
+            vec![0, 1],
+            1,
+            Vec::new(),
+            MacroMappingSearchLimits {
+                max_candidate_upper_bound: 9,
+                max_total_mapping_entries: 36,
+                max_mapping_entries: 4,
+            },
+        )
+        .unwrap();
+        assert_eq!(grain_one.generated_coarse_grain, 6);
+        assert_eq!(grain_one.generated_blackbox, 3);
+        assert_eq!(grain_one.candidate_upper_bound, 9);
+        assert_eq!(grain_one.candidates.len(), 5);
+        assert_eq!(grain_one.duplicates_removed, 4);
+        assert_eq!(grain_one.total_mapping_entries, 20);
+        assert!(grain_one.complete);
+
+        let grain_two = MacroUnitSpec::enumerate_default_mapping_families(
+            vec![0, 1],
+            2,
+            Vec::new(),
+            MacroMappingSearchLimits {
+                max_candidate_upper_bound: 3,
+                max_total_mapping_entries: 48,
+                max_mapping_entries: 16,
+            },
+        )
+        .unwrap();
+        assert_eq!(grain_two.generated_coarse_grain, 0);
+        assert_eq!(grain_two.generated_blackbox, 3);
+        assert_eq!(grain_two.candidate_upper_bound, 3);
+        assert_eq!(grain_two.candidates.len(), 3);
+        assert_eq!(grain_two.total_mapping_entries, 48);
+        assert!(grain_two.complete);
+    }
+
+    #[test]
+    fn default_mapping_family_preflight_fails_before_candidate_allocation() {
+        assert_eq!(
+            MacroUnitSpec::enumerate_default_mapping_families(
+                vec![0, 1],
+                1,
+                Vec::new(),
+                MacroMappingSearchLimits {
+                    max_candidate_upper_bound: 8,
+                    max_total_mapping_entries: 36,
+                    max_mapping_entries: 4,
+                },
+            ),
+            Err(MacroUnitError::CandidateBudgetExceeded {
+                required: 9,
+                limit: 8
+            })
+        );
+        assert_eq!(
+            MacroUnitSpec::enumerate_default_mapping_families(
+                vec![0, 1],
+                1,
+                Vec::new(),
+                MacroMappingSearchLimits {
+                    max_candidate_upper_bound: 9,
+                    max_total_mapping_entries: 35,
+                    max_mapping_entries: 4,
+                },
+            ),
+            Err(MacroUnitError::TotalMappingEntryBudgetExceeded {
+                required: 36,
+                limit: 35
+            })
+        );
+    }
 
     #[test]
     fn complemented_mappings_share_shape_digest_but_preserve_orientation() {
