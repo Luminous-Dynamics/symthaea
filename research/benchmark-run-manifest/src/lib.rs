@@ -517,7 +517,18 @@ impl BenchmarkRunManifest {
                     return Err(ManifestError::InvalidScalerBinding);
                 }
             }
-            ScalerFitScope::FullDataset | ScalerFitScope::ExternalPretrained => {
+            ScalerFitScope::FullDataset => {
+                let state = self.preprocessing.scaler_state_sha256
+                    .as_ref().ok_or(ManifestError::InvalidScalerBinding)?;
+                let fit_data = self.preprocessing.scaler_fit_data_sha256
+                    .as_ref().ok_or(ManifestError::InvalidScalerBinding)?;
+                require_digest(state)?;
+                require_digest(fit_data)?;
+                if fit_data != &self.dataset.source_artifact_sha256 {
+                    return Err(ManifestError::InvalidScalerBinding);
+                }
+            }
+            ScalerFitScope::ExternalPretrained => {
                 let state = self.preprocessing.scaler_state_sha256
                     .as_ref().ok_or(ManifestError::InvalidScalerBinding)?;
                 let fit_data = self.preprocessing.scaler_fit_data_sha256
@@ -532,7 +543,9 @@ impl BenchmarkRunManifest {
             return Err(ManifestError::LeakageProtocolUsesFullDatasetScaler);
         }
         if let MissingnessPolicy::Impute { imputer_sha256 } = self.preprocessing.missingness_policy {
-            require_digest(&imputer_sha256)?;
+            if !nonzero(&imputer_sha256) {
+                return Err(ManifestError::InvalidMissingnessPolicy);
+            }
         }
         self.latency.boundary.validate()?;
         if self.latency.boundary.scope == MeasurementScope::TrainingPipeline
@@ -914,6 +927,17 @@ mod tests {
     fn train_only_scaler_must_bind_exact_train_membership() {
         let mut manifest = valid_manifest();
         manifest.preprocessing.scaler_fit_data_sha256 = Some(digest(42));
+        assert_eq!(manifest.validate(), Err(ManifestError::InvalidScalerBinding));
+    }
+
+    #[test]
+    fn full_dataset_scaler_binds_the_exact_source_artifact() {
+        let mut manifest = valid_manifest();
+        manifest.protocol_mode = ProtocolMode::OfficialReproduction;
+        manifest.preprocessing.scaler_fit_scope = ScalerFitScope::FullDataset;
+        manifest.preprocessing.scaler_fit_data_sha256 = Some(manifest.dataset.source_artifact_sha256);
+        assert_eq!(manifest.validate(), Ok(()));
+        manifest.preprocessing.scaler_fit_data_sha256 = Some(digest(99));
         assert_eq!(manifest.validate(), Err(ManifestError::InvalidScalerBinding));
     }
 
