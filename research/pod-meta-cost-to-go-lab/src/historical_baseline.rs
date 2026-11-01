@@ -46,6 +46,8 @@ pub struct HistoricalDimensionMetrics {
     pub q50_mean_signed_bias: Option<f64>,
     pub q90_marginal_coverage: Option<f64>,
     pub q95_marginal_coverage: Option<f64>,
+    pub censored_q90_definite_exceedances: usize,
+    pub censored_q95_definite_exceedances: usize,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -55,6 +57,8 @@ struct DimensionAccumulator {
     signed_error_sum: i128,
     q90_hits: usize,
     q95_hits: usize,
+    censored_q90_definite_exceedances: usize,
+    censored_q95_definite_exceedances: usize,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -106,6 +110,7 @@ pub enum HistoricalBaselineError {
     MissingTrainingPartitionDigest,
     MissingModelDigest,
     EmptyVerifiedTrainingCohort,
+    MissingCensoredObservation,
     TrainingRunOverlap,
     NumericOverflow,
 }
@@ -348,7 +353,29 @@ fn update_baseline_accumulator(
     }
     match row.terminal {
         None => increment(&mut accumulator.pending)?,
-        Some(TerminalOutcome::RightCensored(_)) => increment(&mut accumulator.right_censored)?,
+        Some(TerminalOutcome::RightCensored(_)) => {
+            increment(&mut accumulator.right_censored)?;
+            let lower_bound = row
+                .observed_work
+                .ok_or(HistoricalBaselineError::MissingCensoredObservation)?;
+            let lower = resource_values(lower_bound);
+            let q90 = resource_values(row.prediction.q90);
+            let q95 = resource_values(row.prediction.q95);
+            for index in 0..DIMENSION_COUNT {
+                if lower[index] > q90[index] {
+                    increment(
+                        &mut accumulator.dimensions[index]
+                            .censored_q90_definite_exceedances,
+                    )?;
+                }
+                if lower[index] > q95[index] {
+                    increment(
+                        &mut accumulator.dimensions[index]
+                            .censored_q95_definite_exceedances,
+                    )?;
+                }
+            }
+        },
         Some(TerminalOutcome::CompetingTerminal(_)) => {
             increment(&mut accumulator.competing_terminal)?
         }
@@ -408,6 +435,8 @@ fn dimension_metrics(
             q50_mean_signed_bias: mean_i128(value.signed_error_sum, value.count),
             q90_marginal_coverage: ratio(value.q90_hits, value.count),
             q95_marginal_coverage: ratio(value.q95_hits, value.count),
+            censored_q90_definite_exceedances: value.censored_q90_definite_exceedances,
+            censored_q95_definite_exceedances: value.censored_q95_definite_exceedances,
         }
     })
 }
