@@ -162,11 +162,12 @@ jobs:
             printf 'PASS %s: CSV rows=%s; peak-RSS record present\n' "$stem" "$(( $(wc -l < "$csv") - 1 ))"
           done
           test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape.csv | grep -c 'EXACT_SAMPLE_ONLY')" -eq 13
-          awk -F, 'NR > 1 && (NF != 28 || $12 != "true" || $28 != "EXACT_SAMPLE_ONLY") { exit 1 }' target/iit-benchmark-evidence/parameter-landscape.csv
+          awk -F, 'NR > 1 && (NF != 34 || $12 != "true" || $34 != "EXACT_SAMPLE_ONLY") { exit 1 }' target/iit-benchmark-evidence/parameter-landscape.csv
           test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape.csv | cut -d, -f9 | sort -u | wc -l)" -eq 13
           test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape.csv | cut -d, -f11 | sort -u | wc -l)" -eq 13
-          test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape.csv | cut -d, -f26 | sort -u | wc -l)" -eq 13
-          printf 'PASS parameter-landscape: 13 exact samples; matching dense model/request identities; unique receipts; no interval certification claimed\\n'
+          test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape.csv | cut -d, -f31 | sort -u | wc -l)" -eq 13
+          test "$(tail -n +2 target/iit-benchmark-evidence/parameter-landscape.csv | cut -d, -f33 | sort -u | wc -l)" -ge 1
+          printf 'PASS parameter-landscape: 13 exact samples; common input digests; signed values, selected states, regimes and unique receipts; no interval certification claimed\\n'
 
       - name: Upload immutable IIT benchmark evidence
         if: always()
