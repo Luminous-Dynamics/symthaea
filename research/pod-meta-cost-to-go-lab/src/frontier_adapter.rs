@@ -36,18 +36,32 @@ pub enum FrontierAdapterError {
     NoTargets,
     DuplicateTarget(String),
     DuplicateClaim(String),
-    DuplicateAlternative { claim_id: String, alternative_id: String },
-    EmptyAlternativeId { claim_id: String },
+    DuplicateAlternative {
+        claim_id: String,
+        alternative_id: String,
+    },
+    EmptyAlternativeId {
+        claim_id: String,
+    },
     DuplicateEvidence(String),
     DuplicateObligation(String),
     MissingTargetClaim(String),
-    MissingDependencyClaim { parent: String, dependency: String },
+    MissingDependencyClaim {
+        parent: String,
+        dependency: String,
+    },
     MissingObligation(String),
     MissingEvidence(String),
-    EvidenceSubjectMismatch { claim_id: String, evidence_id: String },
+    EvidenceSubjectMismatch {
+        claim_id: String,
+        evidence_id: String,
+    },
     EmptyEvidenceIdentity(String),
     EmptyObligationStateIdentity(String),
-    DuplicateRequirement { claim_id: String, alternative_id: String },
+    DuplicateRequirement {
+        claim_id: String,
+        alternative_id: String,
+    },
     DependencyCycle,
     CounterOverflow,
     ExecutionContextForEmptyFrontier,
@@ -102,7 +116,10 @@ pub fn extract_frontier_snapshot(
 
     let mut evidence_by_id = BTreeMap::<&str, &EvidenceRevision>::new();
     for evidence in &case.evidence {
-        if evidence_by_id.insert(evidence.id.as_str(), evidence).is_some() {
+        if evidence_by_id
+            .insert(evidence.id.as_str(), evidence)
+            .is_some()
+        {
             return Err(FrontierAdapterError::DuplicateEvidence(evidence.id.clone()));
         }
     }
@@ -127,9 +144,7 @@ pub fn extract_frontier_snapshot(
     target_ids.sort_unstable();
     for pair in target_ids.windows(2) {
         if pair[0] == pair[1] {
-            return Err(FrontierAdapterError::DuplicateTarget(
-                pair[0].to_owned(),
-            ));
+            return Err(FrontierAdapterError::DuplicateTarget(pair[0].to_owned()));
         }
     }
 
@@ -236,8 +251,7 @@ pub fn extract_frontier_snapshot(
                         if evidence_is_admissible(evidence, &case.query, &claim_id) {
                             direct_independence_groups
                                 .insert(evidence.independence_group_id.clone());
-                            available_evidence_families
-                                .insert(evidence.source_family_id.clone());
+                            available_evidence_families.insert(evidence.source_family_id.clone());
                         } else {
                             alternative_is_locally_admissible = false;
                             increment(&mut missing_evidence_requirements)?;
@@ -350,9 +364,7 @@ fn evidence_is_admissible(
 fn requirement_key(requirement: &ProofRequirement) -> (u8, &str, u8) {
     match requirement {
         ProofRequirement::Evidence(evidence_id) => (0, evidence_id, 0),
-        ProofRequirement::Claim { claim_id, polarity } => {
-            (1, claim_id, polarity_code(*polarity))
-        }
+        ProofRequirement::Claim { claim_id, polarity } => (1, claim_id, polarity_code(*polarity)),
     }
 }
 
@@ -812,7 +824,11 @@ mod tests {
                 min_independent_groups: 0,
             }],
         });
-        let child = case.claims.iter_mut().find(|claim| claim.id == "child").unwrap();
+        let child = case
+            .claims
+            .iter_mut()
+            .find(|claim| claim.id == "child")
+            .unwrap();
         child.alternatives[0]
             .requirements
             .push(ProofRequirement::Claim {
@@ -824,7 +840,10 @@ mod tests {
         let after = extract_frontier_snapshot(&case, &obligations, &context).unwrap();
         assert_eq!(before.features.maximum_dependency_depth, 1);
         assert_eq!(after.features.maximum_dependency_depth, 2);
-        assert_eq!(after.features.dependency_edges, before.features.dependency_edges + 1);
+        assert_eq!(
+            after.features.dependency_edges,
+            before.features.dependency_edges + 1
+        );
     }
 
     #[test]
@@ -833,11 +852,19 @@ mod tests {
         let before = extract_frontier_snapshot(&case, &obligations, &context).unwrap();
         case.evidence
             .push(evidence("e-root-2", "root", "family-c", "group-c"));
-        let root = case.claims.iter_mut().find(|claim| claim.id == "root").unwrap();
-        root.alternatives.push(evidence_alternative("root-alt-2", "e-root-2"));
+        let root = case
+            .claims
+            .iter_mut()
+            .find(|claim| claim.id == "root")
+            .unwrap();
+        root.alternatives
+            .push(evidence_alternative("root-alt-2", "e-root-2"));
 
         let after = extract_frontier_snapshot(&case, &obligations, &context).unwrap();
-        assert_eq!(after.features.admissible_alternatives, before.features.admissible_alternatives + 1);
+        assert_eq!(
+            after.features.admissible_alternatives,
+            before.features.admissible_alternatives + 1
+        );
         assert_eq!(after.features.distinct_evidence_families, 3);
     }
 
@@ -857,19 +884,20 @@ mod tests {
     fn a_supported_target_has_an_empty_cost_to_go_frontier() {
         let (case, _, _) = fixture();
         let obligations = vec![obligation("root", ObligationState::SupportedUnderProfile)];
-        let snapshot = extract_frontier_snapshot(
-            &case,
-            &obligations,
-            &FrontierAdapterContext::default(),
-        )
-        .unwrap();
+        let snapshot =
+            extract_frontier_snapshot(&case, &obligations, &FrontierAdapterContext::default())
+                .unwrap();
         assert_eq!(snapshot.features, ProofFrontierFeatures::default());
     }
 
     #[test]
     fn cycles_and_missing_references_fail_closed() {
         let (mut cycle, obligations, context) = fixture();
-        let child = cycle.claims.iter_mut().find(|claim| claim.id == "child").unwrap();
+        let child = cycle
+            .claims
+            .iter_mut()
+            .find(|claim| claim.id == "child")
+            .unwrap();
         child.alternatives[0]
             .requirements
             .push(ProofRequirement::Claim {
@@ -890,11 +918,10 @@ mod tests {
         );
 
         let (mut missing_dependency, obligations, context) = fixture();
-        missing_dependency.claims[0].alternatives[0].requirements[1] =
-            ProofRequirement::Claim {
-                claim_id: "not-present".into(),
-                polarity: Polarity::Supports,
-            };
+        missing_dependency.claims[0].alternatives[0].requirements[1] = ProofRequirement::Claim {
+            claim_id: "not-present".into(),
+            polarity: Polarity::Supports,
+        };
         assert!(matches!(
             extract_frontier_snapshot(&missing_dependency, &obligations, &context),
             Err(FrontierAdapterError::MissingDependencyClaim { .. })
@@ -959,12 +986,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
         let obligations = (0..NODES)
-            .map(|index| {
-                obligation(
-                    &format!("claim-{index:05}"),
-                    ObligationState::Open,
-                )
-            })
+            .map(|index| obligation(&format!("claim-{index:05}"), ObligationState::Open))
             .collect::<Vec<_>>();
         let case = PlannerCase {
             id: "long-chain".into(),
@@ -973,12 +995,9 @@ mod tests {
             claims,
             evidence: Vec::new(),
         };
-        let snapshot = extract_frontier_snapshot(
-            &case,
-            &obligations,
-            &FrontierAdapterContext::default(),
-        )
-        .unwrap();
+        let snapshot =
+            extract_frontier_snapshot(&case, &obligations, &FrontierAdapterContext::default())
+                .unwrap();
         assert_eq!(snapshot.features.unresolved_obligations, NODES as u64);
         assert_eq!(snapshot.features.dependency_edges, (NODES - 1) as u64);
         assert_eq!(
