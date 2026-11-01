@@ -25,7 +25,7 @@ The crate contains no future target or evaluator label. It does not define
 benchmark-specific train/validation/test splits: those must remain pinned to
 each benchmark's official protocol.
 
-Fifty-five Rust test functions are authored (16 core event contract, 12 bitemporal revision, 8 purged-split, 9 train-only-scaler, 10 Time-IMM adapter tests) for delayed-observation non-leakage,
+Fifty-six Rust test functions are authored (16 core event contract, 12 bitemporal revision, 8 purged-split, 10 train-only-scaler, 10 Time-IMM adapter tests) for delayed-observation non-leakage,
 out-of-order event times, missingness preservation, censored intervals,
 source-local sequence uniqueness, legitimate future-covariate availability,
 and input validation. No Cargo build, rustfmt, Clippy, tests or dataset adapter
