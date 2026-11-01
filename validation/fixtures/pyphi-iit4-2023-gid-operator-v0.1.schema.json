@@ -168,7 +168,7 @@
           "const": 5
         },
         "expected_state_count": {
-          "const": 19
+          "const": 18
         },
         "computed_state_count": {
           "const": 19
