@@ -19,7 +19,9 @@
     "attestation_challenge_freshness": "not_measured",
     "certificate_chain_status": "not_measured",
     "patch_level_binding_status": "not_measured",
-    "evidence_ids": []
+    "evidence_ids": [],
+    "reported_bootloader_lock_state": "not_measured",
+    "reported_verified_boot_state": "not_measured"
   },
   "hardware_protections": {
     "memory_tagging": {
