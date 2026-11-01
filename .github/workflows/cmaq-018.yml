@@ -149,7 +149,7 @@ jobs:
               Path("fixtures/structured-visual-action-bank.example.json").read_text()
           )
           validate(instance=structured_bank, schema=structured_schema)
-          assert len(structured_bank["channels"]) == 2
+          assert len(structured_bank["channels"]) == 3
           assert all(
               len(channel["outcome_samples"]) == len(structured_bank["action_ids"])
               for channel in structured_bank["channels"]
@@ -220,7 +220,7 @@ jobs:
           structured_digest = canonical_structured_bank_digest(structured_bank)
           assert structured_digest == structured_bank["joint_draw_bank_sha256"]
           assert structured_digest == (
-              "4c8f7c1de1ad1d886d873630a9e43c9f512d0a6665db7e4e610658d4cdd2de2b"
+              "9202be4068e45989a72461f350c6bcea5893d44fde1575df3d671c0dc107f468"
           )
           hostile_structured = json.loads(json.dumps(structured_bank))
           hostile_structured["channels"][0]["outcome_samples"][0][0] += 0.01
