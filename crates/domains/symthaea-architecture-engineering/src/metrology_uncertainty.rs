@@ -13,7 +13,8 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use crate::ppk2_trace_audit::{
-    validate_ppk2_trace_audit_receipt, Ppk2TraceAuditReceipt, Ppk2SegmentMetrics,
+    compute_ppk2_trace_audit_receipt_sha256, validate_ppk2_trace_audit_receipt,
+    Ppk2TraceAuditReceipt, Ppk2SegmentMetrics,
 };
 
 const MANIFEST_SCHEMA: &str = "symthaea.nas.metrology-uncertainty-manifest";
@@ -420,7 +421,7 @@ mod tests {
                 maximum_gap_ratio: 1.0,
             }
         }).collect();
-        Ppk2TraceAuditReceipt {
+        let mut receipt = Ppk2TraceAuditReceipt {
             schema: "symthaea.nas.ppk2-trace-audit".into(),
             version: "0.1.0".into(),
             sample_csv_sha256: sha('c'),
@@ -441,8 +442,10 @@ mod tests {
             median_sample_rate_hz: 100_000.0,
             maximum_observed_gap_ratio: 1.0,
             segments,
-            receipt_sha256: sha('d'),
-        }
+            receipt_sha256: String::new(),
+        };
+        receipt.receipt_sha256 = compute_ppk2_trace_audit_receipt_sha256(&receipt).unwrap();
+        receipt
     }
 
     #[test]
