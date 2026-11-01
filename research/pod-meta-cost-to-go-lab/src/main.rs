@@ -1191,48 +1191,20 @@ fn main() {
         global_fallback.support_count
     );
 
-    let mut historical_evaluation = ForecastJournal::default();
-    historical_evaluation
-        .append_forecast(prefix_forecast(811, 9901, 1, 7))
-        .unwrap();
-    historical_evaluation
-        .append_forecast(prefix_forecast(812, 9902, 1, 99))
-        .unwrap();
-    historical_evaluation
-        .append_forecast(prefix_forecast(813, 9903, 1, 7))
-        .unwrap();
-    historical_evaluation
-        .append_outcome(prefix_outcome(
-            811,
-            2,
-            ResourceVector::new(15, 1, 3, 0, 7, 12),
-            TerminalOutcome::SufficientProof,
-        ))
-        .unwrap();
-    historical_evaluation
-        .append_outcome(prefix_outcome(
-            812,
-            2,
-            ResourceVector::new(22, 2, 4, 1, 11, 17),
-            TerminalOutcome::SufficientProof,
-        ))
-        .unwrap();
-    historical_evaluation
-        .append_outcome(prefix_outcome(
-            813,
-            2,
-            ResourceVector::new(25, 3, 5, 2, 13, 20),
-            TerminalOutcome::RightCensored(pod_meta_cost_to_go_lab::CensorReason::Timeout),
-        ))
-        .unwrap();
-    let historical_report = historical_model.evaluate(&historical_evaluation).unwrap();
+    let historical_report = historical_model.evaluate(&prefix_journal).unwrap();
     println!(
-        "HISTORICAL_BASELINE_ROW\tevaluation-metrics\t{}\t{}\t{}\t{:.3}\t{:.3}",
+        "HISTORICAL_BASELINE_ROW\tpaired-evaluation\t{}\t{}\t{}\t{}\t{:.3}\t{:.3}",
         historical_report.report.total_prefixes,
         historical_report.report.completed_verified,
         historical_report.report.right_censored,
+        historical_report.report.global_fallback_prefixes,
         historical_report.report.dimensions[0].q50_mean_absolute_error.unwrap(),
         historical_report.report.dimensions[0].q90_marginal_coverage.unwrap()
+    );
+    println!(
+        "HISTORICAL_BASELINE_ROW\tcensored-exceedance\t{}\t{}",
+        historical_report.report.dimensions[0].censored_q90_definite_exceedances,
+        historical_report.report.dimensions[0].censored_q95_definite_exceedances
     );
     println!(
         "HISTORICAL_BASELINE_ROW\tfallback-usage\t{}\t{}",
