@@ -264,7 +264,10 @@ fn validate_observed_transition(
         ("target_embedding_sha256", &evidence.target_embedding_sha256),
         ("action_manifest_sha256", &evidence.action_manifest_sha256),
         ("action_binding_sha256", &evidence.action_binding_sha256),
-        ("predictor_parameters_sha256", &evidence.predictor_parameters_sha256),
+        (
+            "predictor_parameters_sha256",
+            &evidence.predictor_parameters_sha256,
+        ),
     ] {
         if !is_lower_hex_sha256(digest) {
             return Err(format!("{name} must be a lowercase SHA-256 digest"));
@@ -494,7 +497,9 @@ impl JepaEngine {
     ) -> Result<(f32, f64), String> {
         validate_observed_transition(&self.config, current_hv, next_observed_hv, evidence)?;
         if self.predictor_parameters_sha256() != evidence.predictor_parameters_sha256 {
-            return Err("forecast predictor parameter digest does not match the loaded JEPA model".into());
+            return Err(
+                "forecast predictor parameter digest does not match the loaded JEPA model".into(),
+            );
         }
         Ok(self.forward(current_hv, next_observed_hv, evidence.action_index, 1.0))
     }
@@ -582,12 +587,15 @@ impl JepaEngine {
         bytes.extend_from_slice(&(self.config.input_dim as u64).to_le_bytes());
         bytes.extend_from_slice(&(self.config.latent_dim as u64).to_le_bytes());
         bytes.extend_from_slice(&(self.config.num_actions as u64).to_le_bytes());
-        append_f32_values(&mut bytes, &[
-            self.config.ema_momentum,
-            self.config.learning_rate,
-            self.config.tau_factor_sensitivity,
-            self.config.variance_floor,
-        ]);
+        append_f32_values(
+            &mut bytes,
+            &[
+                self.config.ema_momentum,
+                self.config.learning_rate,
+                self.config.tau_factor_sensitivity,
+                self.config.variance_floor,
+            ],
+        );
         append_f64_value(&mut bytes, self.config.energy_cost_per_forward);
 
         bytes.extend_from_slice(&(self.context.input_dim as u64).to_le_bytes());
@@ -797,8 +805,14 @@ mod tests {
                 &"a".repeat(64),
                 &"b".repeat(64),
                 &[
-                    ActionCandidate { action_id: 1, action_index: 1 },
-                    ActionCandidate { action_id: 2, action_index: 2 },
+                    ActionCandidate {
+                        action_id: 1,
+                        action_index: 1,
+                    },
+                    ActionCandidate {
+                        action_id: 2,
+                        action_index: 2,
+                    },
                 ],
             )
             .unwrap();
@@ -821,9 +835,11 @@ mod tests {
         let next = random_hv(526);
         let mut evidence = observed_evidence(&current, &next, 2);
         evidence.predictor_parameters_sha256 = engine.predictor_parameters_sha256();
-        assert!(engine
-            .evaluate_observed_transition(&current, &next, &evidence)
-            .is_ok());
+        assert!(
+            engine
+                .evaluate_observed_transition(&current, &next, &evidence)
+                .is_ok()
+        );
 
         let mut changed = make_engine();
         changed
@@ -834,9 +850,11 @@ mod tests {
                 0.001,
             )
             .unwrap();
-        assert!(changed
-            .evaluate_observed_transition(&current, &next, &evidence)
-            .is_err());
+        assert!(
+            changed
+                .evaluate_observed_transition(&current, &next, &evidence)
+                .is_err()
+        );
     }
 
     #[test]
