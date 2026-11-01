@@ -100,6 +100,20 @@ pub struct ActionConditionedObservedOutcome {
     pub observation_delay_seconds: f32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ActionResponseMetrics {
+    pub action_count: usize,
+    pub zero_action_prediction_mse: f64,
+    pub mean_predicted_action_effect_norm: f64,
+    pub mean_observed_action_effect_norm: f64,
+    pub mean_action_effect_mse: f64,
+    pub mean_action_response_cosine: f64,
+    pub cosine_scored_action_count: usize,
+    pub missed_action_effect_count: usize,
+    pub false_positive_action_effect_count: usize,
+    pub both_null_action_effect_count: usize,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ActionConditionedPredictorError {
     InvalidConfiguration,
@@ -996,6 +1010,191 @@ impl ActionConditionedVisualResidualPredictor {
     }
 }
 
+/// Compare action-induced visual-state changes against one same-history
+/// no-op branch. This is an action-response diagnostic, not the exact ARC
+/// metric from CoCo and not a calibrated uncertainty or safety certificate.
+pub fn evaluate_action_response_set(
+    receipts: &[ActionConditionedForecastReceipt],
+    outcomes: &[ActionConditionedObservedOutcome],
+    zero_action_id: u64,
+) -> Result<ActionResponseMetrics, ActionConditionedPredictorError> {
+    if receipts.len() < 2 || receipts.len() != outcomes.len() {
+        return Err(ActionConditionedPredictorError::ActionSetMismatch);
+    }
+    let first = &receipts[0];
+    if first.action_set_size != receipts.len() {
+        return Err(ActionConditionedPredictorError::ActionSetMismatch);
+    }
+    let dim = first.predicted_future_hv.len();
+    if dim == 0 {
+        return Err(ActionConditionedPredictorError::InvalidVectorDimension);
+    }
+
+    let mut action_ids = Vec::with_capacity(receipts.len());
+    let mut descriptors = Vec::with_capacity(receipts.len());
+    let mut receipt_by_id = BTreeMap::new();
+    for receipt in receipts {
+        if receipt.schema_version != ACTION_CONDITIONED_PREDICTOR_STATE_SCHEMA_VERSION
+            || receipt.action_set_id != first.action_set_id
+            || receipt.action_set_size != first.action_set_size
+            || receipt.action_set_sha256 != first.action_set_sha256
+            || receipt.history_sha256 != first.history_sha256
+            || receipt.action_manifest_sha256 != first.action_manifest_sha256
+            || receipt.source_frame_sequence != first.source_frame_sequence
+            || receipt.horizon_seconds.to_bits() != first.horizon_seconds.to_bits()
+            || receipt.model_checkpoint_sha256 != first.model_checkpoint_sha256
+            || receipt.model_weights_sha256 != first.model_weights_sha256
+            || receipt.model_version != first.model_version
+            || receipt.predicted_future_hv.len() != dim
+            || !is_lower_hex_sha256(&receipt.predicted_future_hv_sha256)
+            || !is_lower_hex_sha256(&receipt.forecast_sha256)
+            || hash_f32_vector(
+                b"vis005-action-conditioned-prediction-v1",
+                &receipt.predicted_future_hv,
+            ) != receipt.predicted_future_hv_sha256
+            || hash_forecast_receipt(receipt) != receipt.forecast_sha256
+        {
+            return Err(ActionConditionedPredictorError::ActionSetMismatch);
+        }
+        action_ids.push(receipt.action_id);
+        descriptors.push((receipt.action_id, receipt.action_descriptor_sha256.clone()));
+        if receipt_by_id.insert(receipt.forecast_id, receipt).is_some() {
+            return Err(ActionConditionedPredictorError::ActionSetMismatch);
+        }
+    }
+    action_ids.sort_unstable();
+    if action_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(ActionConditionedPredictorError::DuplicateActionId);
+    }
+    descriptors.sort_unstable_by_key(|(action_id, _)| *action_id);
+    if hash_action_descriptors(&descriptors) != first.action_set_sha256
+        || !action_ids.contains(&zero_action_id)
+    {
+        return Err(ActionConditionedPredictorError::ActionSetMismatch);
+    }
+
+    let mut outcome_by_id = BTreeMap::new();
+    for outcome in outcomes {
+        if outcome_by_id.insert(outcome.forecast_id, outcome).is_some() {
+            return Err(ActionConditionedPredictorError::ActionSetMismatch);
+        }
+    }
+    if outcome_by_id.len() != receipts.len() {
+        return Err(ActionConditionedPredictorError::ActionSetMismatch);
+    }
+    for receipt in receipts {
+        let outcome = outcome_by_id.get(&receipt.forecast_id)
+            .ok_or(ActionConditionedPredictorError::UnknownForecast)?;
+        if outcome.actual_future_hv.len() != dim {
+            return Err(ActionConditionedPredictorError::InvalidVectorDimension);
+        }
+        if outcome.actual_future_hv.iter().any(|value| !value.is_finite()) {
+            return Err(ActionConditionedPredictorError::NonFiniteValue);
+        }
+        if outcome.observed_frame_sequence <= receipt.source_frame_sequence {
+            return Err(ActionConditionedPredictorError::ObservationNotLater);
+        }
+        if !outcome.observation_delay_seconds.is_finite()
+            || outcome.observation_delay_seconds < receipt.horizon_seconds
+        {
+            return Err(ActionConditionedPredictorError::ObservationBeforeTarget);
+        }
+    }
+
+    let zero_receipt = receipts.iter()
+        .find(|receipt| receipt.action_id == zero_action_id)
+        .ok_or(ActionConditionedPredictorError::ActionSetMismatch)?;
+    let zero_outcome = outcome_by_id.get(&zero_receipt.forecast_id)
+        .ok_or(ActionConditionedPredictorError::UnknownForecast)?;
+    let mut zero_mse = 0.0f64;
+    for (predicted, actual) in zero_receipt.predicted_future_hv.iter()
+        .zip(&zero_outcome.actual_future_hv)
+    {
+        let error = f64::from(*predicted) - f64::from(*actual);
+        zero_mse += error * error;
+    }
+    zero_mse /= dim as f64;
+
+    let mut predicted_norm_total = 0.0;
+    let mut observed_norm_total = 0.0;
+    let mut effect_mse_total = 0.0;
+    let mut cosine_total = 0.0;
+    let mut cosine_scored = 0usize;
+    let mut missed = 0usize;
+    let mut false_positive = 0usize;
+    let mut both_null = 0usize;
+    let mut action_count = 0usize;
+    const NULL_EPSILON: f64 = 1e-9;
+
+    for receipt in receipts {
+        if receipt.action_id == zero_action_id {
+            continue;
+        }
+        let outcome = outcome_by_id.get(&receipt.forecast_id)
+            .ok_or(ActionConditionedPredictorError::UnknownForecast)?;
+        let mut predicted_norm_sq = 0.0;
+        let mut observed_norm_sq = 0.0;
+        let mut effect_error_sq = 0.0;
+        let mut dot = 0.0;
+        for index in 0..dim {
+            let predicted_delta = f64::from(receipt.predicted_future_hv[index])
+                - f64::from(zero_receipt.predicted_future_hv[index]);
+            let observed_delta = f64::from(outcome.actual_future_hv[index])
+                - f64::from(zero_outcome.actual_future_hv[index]);
+            let difference = predicted_delta - observed_delta;
+            predicted_norm_sq += predicted_delta * predicted_delta;
+            observed_norm_sq += observed_delta * observed_delta;
+            effect_error_sq += difference * difference;
+            dot += predicted_delta * observed_delta;
+        }
+        let predicted_norm = predicted_norm_sq.sqrt();
+        let observed_norm = observed_norm_sq.sqrt();
+        predicted_norm_total += predicted_norm;
+        observed_norm_total += observed_norm;
+        effect_mse_total += effect_error_sq / dim as f64;
+        action_count += 1;
+        match (predicted_norm > NULL_EPSILON, observed_norm > NULL_EPSILON) {
+            (true, true) => {
+                cosine_total += (dot / (predicted_norm * observed_norm)).clamp(-1.0, 1.0);
+                cosine_scored += 1;
+            }
+            (false, true) => missed += 1,
+            (true, false) => false_positive += 1,
+            (false, false) => both_null += 1,
+        }
+    }
+    if action_count == 0 {
+        return Err(ActionConditionedPredictorError::ActionSetMismatch);
+    }
+    let divisor = action_count as f64;
+    let metrics = ActionResponseMetrics {
+        action_count,
+        zero_action_prediction_mse: zero_mse,
+        mean_predicted_action_effect_norm: predicted_norm_total / divisor,
+        mean_observed_action_effect_norm: observed_norm_total / divisor,
+        mean_action_effect_mse: effect_mse_total / divisor,
+        mean_action_response_cosine: if cosine_scored == 0 {
+            0.0
+        } else {
+            cosine_total / cosine_scored as f64
+        },
+        cosine_scored_action_count: cosine_scored,
+        missed_action_effect_count: missed,
+        false_positive_action_effect_count: false_positive,
+        both_null_action_effect_count: both_null,
+    };
+    if [
+        metrics.zero_action_prediction_mse,
+        metrics.mean_predicted_action_effect_norm,
+        metrics.mean_observed_action_effect_norm,
+        metrics.mean_action_effect_mse,
+        metrics.mean_action_response_cosine,
+    ].iter().any(|value| !value.is_finite()) {
+        return Err(ActionConditionedPredictorError::NonFiniteUpdate);
+    }
+    Ok(metrics)
+}
+
 fn hash_action_descriptors(action_descriptors: &[(u64, String)]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(b"vis005-action-conditioned-action-set-v1\0");
@@ -1252,6 +1451,88 @@ mod tests {
             assert!((reference[index] + inverse[index] - 2.0 * base[index]).abs() < 1e-7);
         }
         assert!(reference.iter().zip(base).any(|(predicted, base)| (predicted - base).abs() > 1e-6));
+    }
+
+
+    #[test]
+    fn action_response_evaluator_scores_effects_relative_to_same_history_noop() {
+        let mut model = predictor();
+        let candidates = vec![
+            ActionConditionedCandidateAction {
+                action_id: 0,
+                action_descriptor_sha256: digest('f'),
+                action_embedding: vec![0.0, 0.0],
+            },
+            ActionConditionedCandidateAction {
+                action_id: 1,
+                action_descriptor_sha256: digest('c'),
+                action_embedding: vec![1.0, 0.0],
+            },
+            ActionConditionedCandidateAction {
+                action_id: 2,
+                action_descriptor_sha256: digest('d'),
+                action_embedding: vec![-1.0, 0.0],
+            },
+        ];
+        let receipts = model.issue_action_set(
+            &digest('a'), 20, &digest('b'), &digest('e'), 1.0, &[0.0, 0.0], &candidates
+        ).unwrap();
+        let outcome = |action_id: u64, actual: Vec<f32>| ActionConditionedObservedOutcome {
+            forecast_id: receipts.iter().find(|r| r.action_id == action_id).unwrap().forecast_id,
+            actual_future_hv: actual,
+            observed_frame_sequence: 21,
+            observation_delay_seconds: 1.0,
+        };
+        let outcomes = vec![
+            outcome(2, vec![-1.0, 0.0]),
+            outcome(0, vec![0.0, 0.0]),
+            outcome(1, vec![1.0, 0.0]),
+        ];
+        let metrics = evaluate_action_response_set(&receipts, &outcomes, 0).unwrap();
+        assert_eq!(metrics.action_count, 2);
+        assert_eq!(metrics.zero_action_prediction_mse, 0.0);
+        assert_eq!(metrics.mean_predicted_action_effect_norm, 0.0);
+        assert_eq!(metrics.mean_observed_action_effect_norm, 1.0);
+        assert_eq!(metrics.mean_action_effect_mse, 1.0);
+        assert_eq!(metrics.mean_action_response_cosine, 0.0);
+        assert_eq!(metrics.cosine_scored_action_count, 0);
+        assert_eq!(metrics.missed_action_effect_count, 2);
+    }
+
+    #[test]
+    fn action_response_evaluator_rejects_wrong_zero_action_and_mutated_receipt() {
+        let mut model = predictor();
+        let candidates = vec![
+            ActionConditionedCandidateAction {
+                action_id: 0,
+                action_descriptor_sha256: digest('f'),
+                action_embedding: vec![0.0, 0.0],
+            },
+            ActionConditionedCandidateAction {
+                action_id: 1,
+                action_descriptor_sha256: digest('c'),
+                action_embedding: vec![1.0, 0.0],
+            },
+        ];
+        let receipts = model.issue_action_set(
+            &digest('a'), 20, &digest('b'), &digest('e'), 1.0, &[0.0, 0.0], &candidates
+        ).unwrap();
+        let outcomes = receipts.iter().map(|receipt| ActionConditionedObservedOutcome {
+            forecast_id: receipt.forecast_id,
+            actual_future_hv: vec![0.0, 0.0],
+            observed_frame_sequence: 21,
+            observation_delay_seconds: 1.0,
+        }).collect::<Vec<_>>();
+        assert_eq!(
+            evaluate_action_response_set(&receipts, &outcomes, 99),
+            Err(ActionConditionedPredictorError::ActionSetMismatch)
+        );
+        let mut tampered = receipts.clone();
+        tampered[1].predicted_future_hv[0] += 0.1;
+        assert_eq!(
+            evaluate_action_response_set(&tampered, &outcomes, 0),
+            Err(ActionConditionedPredictorError::ActionSetMismatch)
+        );
     }
 
     #[test]
