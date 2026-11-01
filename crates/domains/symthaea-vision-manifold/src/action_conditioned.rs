@@ -100,7 +100,7 @@ pub struct ActionConditionedObservedOutcome {
     pub observation_delay_seconds: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ActionResponseMetrics {
     pub action_count: usize,
     pub zero_action_prediction_mse: f64,
@@ -1035,6 +1035,17 @@ pub fn evaluate_action_response_set(
     let mut receipt_by_id = BTreeMap::new();
     for receipt in receipts {
         if receipt.schema_version != ACTION_CONDITIONED_PREDICTOR_STATE_SCHEMA_VERSION
+            || receipt.forecast_id == 0
+            || receipt.action_set_id == 0
+            || !is_lower_hex_sha256(&receipt.history_sha256)
+            || !is_lower_hex_sha256(&receipt.action_manifest_sha256)
+            || !is_lower_hex_sha256(&receipt.action_descriptor_sha256)
+            || !is_lower_hex_sha256(&receipt.model_checkpoint_sha256)
+            || !is_lower_hex_sha256(&receipt.action_set_sha256)
+            || !is_lower_hex_sha256(&receipt.model_weights_sha256)
+            || !is_lower_hex_sha256(&receipt.predicted_future_hv_sha256)
+            || !is_lower_hex_sha256(&receipt.forecast_sha256)
+            || receipt.predicted_future_hv.iter().any(|v| !v.is_finite())
             || receipt.action_set_id != first.action_set_id
             || receipt.action_set_size != first.action_set_size
             || receipt.action_set_sha256 != first.action_set_sha256
@@ -1583,6 +1594,12 @@ mod tests {
         tampered[1].predicted_future_hv[0] += 0.1;
         assert_eq!(
             evaluate_action_response_set(&tampered, &outcomes, 0),
+            Err(ActionConditionedPredictorError::ActionSetMismatch)
+        );
+        let mut malformed = receipts.clone();
+        malformed[0].history_sha256 = "not-a-digest".into();
+        assert_eq!(
+            evaluate_action_response_set(&malformed, &outcomes, 0),
             Err(ActionConditionedPredictorError::ActionSetMismatch)
         );
     }
