@@ -15,7 +15,7 @@
 //!   hardsec_context_sequential_monitor --plan plan.json \
 //!     --stream stream.json --receipt receipt.json
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
@@ -74,25 +74,34 @@ struct Args {
 }
 
 fn sha256(bytes: &[u8]) -> String {
-    Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 fn nonempty(value: &str, context: &str) -> Result<(), String> {
     if value.trim().is_empty() || value.chars().any(char::is_control) {
-        return Err(format!("{context} must be non-empty and contain no control characters"));
+        return Err(format!(
+            "{context} must be non-empty and contain no control characters"
+        ));
     }
     Ok(())
 }
 
 fn string_field<'a>(value: &'a Value, key: &str, context: &str) -> Result<&'a str, String> {
-    let result = value.get(key).and_then(Value::as_str)
+    let result = value
+        .get(key)
+        .and_then(Value::as_str)
         .ok_or_else(|| format!("{context}.{key} must be a string"))?;
     nonempty(result, &format!("{context}.{key}"))?;
     Ok(result)
 }
 
 fn f64_field(value: &Value, key: &str, context: &str) -> Result<f64, String> {
-    let result = value.get(key).and_then(Value::as_f64)
+    let result = value
+        .get(key)
+        .and_then(Value::as_f64)
         .ok_or_else(|| format!("{context}.{key} must be numeric"))?;
     if !result.is_finite() {
         return Err(format!("{context}.{key} must be finite"));
@@ -101,18 +110,24 @@ fn f64_field(value: &Value, key: &str, context: &str) -> Result<f64, String> {
 }
 
 fn usize_field(value: &Value, key: &str, context: &str) -> Result<usize, String> {
-    let raw = value.get(key).and_then(Value::as_u64)
+    let raw = value
+        .get(key)
+        .and_then(Value::as_u64)
         .ok_or_else(|| format!("{context}.{key} must be a non-negative integer"))?;
     usize::try_from(raw).map_err(|_| format!("{context}.{key} is outside the supported range"))
 }
 
 fn string_array(value: &Value, key: &str, context: &str) -> Result<Vec<String>, String> {
-    let values = value.get(key).and_then(Value::as_array)
+    let values = value
+        .get(key)
+        .and_then(Value::as_array)
         .ok_or_else(|| format!("{context}.{key} must be an array"))?;
     let mut seen = BTreeSet::new();
     let mut output = Vec::with_capacity(values.len());
     for (index, item) in values.iter().enumerate() {
-        let item = item.as_str().ok_or_else(|| format!("{context}.{key}[{index}] must be a string"))?;
+        let item = item
+            .as_str()
+            .ok_or_else(|| format!("{context}.{key}[{index}] must be a string"))?;
         nonempty(item, &format!("{context}.{key}[{index}]"))?;
         if !seen.insert(item.to_owned()) {
             return Err(format!("{context}.{key} contains duplicate entry {item}"));
@@ -128,7 +143,10 @@ fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> 
     }
     let monitor_id = string_field(value, "monitor_id", "plan")?.to_owned();
     let evidence_domain = string_field(value, "evidence_domain", "plan")?.to_owned();
-    if !matches!(evidence_domain.as_str(), "synthetic_fixture" | "simulator" | "physical_hardware") {
+    if !matches!(
+        evidence_domain.as_str(),
+        "synthetic_fixture" | "simulator" | "physical_hardware"
+    ) {
         return Err(format!("unsupported evidence_domain {evidence_domain}"));
     }
     let stream_id = string_field(value, "stream_id", "plan")?.to_owned();
@@ -136,8 +154,13 @@ fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> 
     if declared_evaluation_group != evaluation_group_id {
         return Err("stream evaluation_group_id does not match the preregistered plan".to_owned());
     }
-    let scoring_artifact_sha256 = string_field(value, "scoring_artifact_sha256", "plan")?.to_owned();
-    if scoring_artifact_sha256.len() != 64 || !scoring_artifact_sha256.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()) {
+    let scoring_artifact_sha256 =
+        string_field(value, "scoring_artifact_sha256", "plan")?.to_owned();
+    if scoring_artifact_sha256.len() != 64
+        || !scoring_artifact_sha256
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+    {
         return Err("plan.scoring_artifact_sha256 must be a lowercase SHA-256 digest".to_owned());
     }
     if string_field(value, "anomaly_score_direction", "plan")? != "higher_is_more_anomalous" {
@@ -149,8 +172,13 @@ fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> 
     if string_field(value, "pmu_qualification_required", "plan")? != QUALIFIED_PMU {
         return Err("unsupported pmu_qualification_required status".to_owned());
     }
-    if string_field(value, "conditional_superuniformity_status", "plan")? != "assumption_not_verified" {
-        return Err("v1 must explicitly mark conditional super-uniformity as assumption_not_verified".to_owned());
+    if string_field(value, "conditional_superuniformity_status", "plan")?
+        != "assumption_not_verified"
+    {
+        return Err(
+            "v1 must explicitly mark conditional super-uniformity as assumption_not_verified"
+                .to_owned(),
+        );
     }
 
     let alpha_budget = f64_field(value, "alpha_budget", "plan")?;
@@ -162,7 +190,9 @@ fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> 
         return Err("minimum_reference_scores must be at least two".to_owned());
     }
 
-    let betting_values = value.get("betting_mixture").and_then(Value::as_array)
+    let betting_values = value
+        .get("betting_mixture")
+        .and_then(Value::as_array)
         .ok_or("plan.betting_mixture must be an array")?;
     if betting_values.is_empty() {
         return Err("plan.betting_mixture must not be empty".to_owned());
@@ -180,10 +210,14 @@ fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> 
         betting_mixture.push(BettingTerm { lambda, weight });
     }
     if (weight_sum - 1.0).abs() > 1e-12 {
-        return Err(format!("betting mixture weights must sum to one (observed {weight_sum})"));
+        return Err(format!(
+            "betting mixture weights must sum to one (observed {weight_sum})"
+        ));
     }
 
-    let contexts_value = value.get("contexts").and_then(Value::as_array)
+    let contexts_value = value
+        .get("contexts")
+        .and_then(Value::as_array)
         .ok_or("plan.contexts must be an array")?;
     if contexts_value.is_empty() {
         return Err("plan.contexts must not be empty".to_owned());
@@ -200,28 +234,41 @@ fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> 
         }
         for group_id in &reference_group_ids {
             if group_id == evaluation_group_id {
-                return Err(format!("evaluation group {evaluation_group_id} overlaps a null-reference group"));
+                return Err(format!(
+                    "evaluation group {evaluation_group_id} overlaps a null-reference group"
+                ));
             }
             if !all_reference_groups.insert(group_id.clone()) {
-                return Err(format!("reference group {group_id} is reused across context references"));
+                return Err(format!(
+                    "reference group {group_id} is reused across context references"
+                ));
             }
         }
-        let score_values = item.get("reference_scores").and_then(Value::as_array)
+        let score_values = item
+            .get("reference_scores")
+            .and_then(Value::as_array)
             .ok_or_else(|| format!("{context}.reference_scores must be an array"))?;
         if score_values.len() < minimum_reference_scores {
-            return Err(format!("{context} has {} reference scores; at least {minimum_reference_scores} are required", score_values.len()));
+            return Err(format!(
+                "{context} has {} reference scores; at least {minimum_reference_scores} are required",
+                score_values.len()
+            ));
         }
         let mut scores = Vec::with_capacity(score_values.len());
         for (score_index, score_value) in score_values.iter().enumerate() {
-            let score = score_value.as_f64()
-                .ok_or_else(|| format!("{context}.reference_scores[{score_index}] must be numeric"))?;
+            let score = score_value.as_f64().ok_or_else(|| {
+                format!("{context}.reference_scores[{score_index}] must be numeric")
+            })?;
             if !score.is_finite() {
-                return Err(format!("{context}.reference_scores[{score_index}] must be finite"));
+                return Err(format!(
+                    "{context}.reference_scores[{score_index}] must be finite"
+                ));
             }
             scores.push(score);
         }
         scores.sort_by(f64::total_cmp);
-        let encoded = serde_json::to_vec(&scores).map_err(|e| format!("cannot encode reference scores: {e}"))?;
+        let encoded = serde_json::to_vec(&scores)
+            .map_err(|e| format!("cannot encode reference scores: {e}"))?;
         let reference = ContextReference {
             reference_id,
             reference_group_ids,
@@ -260,10 +307,15 @@ fn parse_stream(value: &Value, plan: &Plan) -> Result<Vec<StreamRecord>, String>
         return Err("evaluation_group_id does not match the preregistered plan".to_owned());
     }
     if string_field(value, "scoring_artifact_sha256", "stream")? != plan.scoring_artifact_sha256 {
-        return Err("stream scoring_artifact_sha256 does not match the preregistered score artifact".to_owned());
+        return Err(
+            "stream scoring_artifact_sha256 does not match the preregistered score artifact"
+                .to_owned(),
+        );
     }
 
-    let records = value.get("records").and_then(Value::as_array)
+    let records = value
+        .get("records")
+        .and_then(Value::as_array)
         .ok_or("stream.records must be an array")?;
     if records.is_empty() {
         return Err("stream.records must not be empty".to_owned());
@@ -274,7 +326,10 @@ fn parse_stream(value: &Value, plan: &Plan) -> Result<Vec<StreamRecord>, String>
         let context = format!("stream.records[{index}]");
         let sequence_index = usize_field(item, "sequence_index", &context)?;
         if sequence_index != index + 1 {
-            return Err(format!("{context}.sequence_index must be contiguous from one; expected {}, got {sequence_index}", index + 1));
+            return Err(format!(
+                "{context}.sequence_index must be contiguous from one; expected {}, got {sequence_index}",
+                index + 1
+            ));
         }
         let window_id = string_field(item, "window_id", &context)?.to_owned();
         if !window_ids.insert(window_id.clone()) {
@@ -283,10 +338,16 @@ fn parse_stream(value: &Value, plan: &Plan) -> Result<Vec<StreamRecord>, String>
         let context_id = string_field(item, "context_id", &context)?.to_owned();
         let anomaly_score = f64_field(item, "anomaly_score", &context)?;
         let sensor_state = string_field(item, "sensor_state", &context)?.to_owned();
-        if !matches!(sensor_state.as_str(), "valid" | "missing" | "stale" | "misaligned" | "multiplexed" | "untrusted") {
-            return Err(format!("{context}.sensor_state has unsupported state {sensor_state}"));
+        if !matches!(
+            sensor_state.as_str(),
+            "valid" | "missing" | "stale" | "misaligned" | "multiplexed" | "untrusted"
+        ) {
+            return Err(format!(
+                "{context}.sensor_state has unsupported state {sensor_state}"
+            ));
         }
-        let pmu_qualification_result = string_field(item, "pmu_qualification_result", &context)?.to_owned();
+        let pmu_qualification_result =
+            string_field(item, "pmu_qualification_result", &context)?.to_owned();
         output.push(StreamRecord {
             sequence_index,
             window_id,
@@ -317,7 +378,8 @@ fn log_mixture_bet(p_value: f64, mixture: &[BettingTerm]) -> Result<f64, String>
         return Err("p_value must be in (0,1]".to_owned());
     }
     let log_p = p_value.ln();
-    let terms: Vec<f64> = mixture.iter()
+    let terms: Vec<f64> = mixture
+        .iter()
         .map(|term| term.weight.ln() + term.lambda.ln() + (term.lambda - 1.0) * log_p)
         .collect();
     let max = terms.iter().copied().fold(f64::NEG_INFINITY, f64::max);
@@ -342,7 +404,12 @@ fn abstention_reason(record: &StreamRecord, plan: &Plan) -> Option<&'static str>
     None
 }
 
-fn audit_values(plan_value: &Value, stream_value: &Value, plan_bytes: &[u8], stream_bytes: &[u8]) -> Result<Value, String> {
+fn audit_values(
+    plan_value: &Value,
+    stream_value: &Value,
+    plan_bytes: &[u8],
+    stream_bytes: &[u8],
+) -> Result<Value, String> {
     let evaluation_group_id = string_field(stream_value, "evaluation_group_id", "stream")?;
     let plan = parse_plan(plan_value, evaluation_group_id)?;
     let records = parse_stream(stream_value, &plan)?;
@@ -370,7 +437,9 @@ fn audit_values(plan_value: &Value, stream_value: &Value, plan_bytes: &[u8], str
             continue;
         }
 
-        let reference = plan.contexts.get(&record.context_id)
+        let reference = plan
+            .contexts
+            .get(&record.context_id)
             .ok_or("context validation invariant failed")?;
         let p_value = empirical_upper_tail_p_value(&reference.scores, record.anomaly_score);
         let log_e_value = log_mixture_bet(p_value, &plan.betting_mixture)?;
@@ -407,14 +476,20 @@ fn audit_values(plan_value: &Value, stream_value: &Value, plan_bytes: &[u8], str
         }));
     }
 
-    let reference_reports: Vec<Value> = plan.contexts.iter().map(|(context_id, reference)| json!({
-        "context_id":context_id,
-        "reference_id":reference.reference_id,
-        "reference_digest":reference.digest,
-        "reference_score_count":reference.scores.len(),
-        "declared_reference_group_count":reference.reference_group_ids.len(),
-        "reference_group_ids":reference.reference_group_ids
-    })).collect();
+    let reference_reports: Vec<Value> = plan
+        .contexts
+        .iter()
+        .map(|(context_id, reference)| {
+            json!({
+                "context_id":context_id,
+                "reference_id":reference.reference_id,
+                "reference_digest":reference.digest,
+                "reference_score_count":reference.scores.len(),
+                "declared_reference_group_count":reference.reference_group_ids.len(),
+                "reference_group_ids":reference.reference_group_ids
+            })
+        })
+        .collect();
 
     let result = if first_alarm_index.is_some() {
         "alarm_threshold_crossed"
@@ -502,28 +577,39 @@ fn parse_args() -> Result<Args, String> {
             "--receipt" => &mut receipt,
             _ => return Err(format!("unknown argument {flag}")),
         };
-        let path = args.next().ok_or_else(|| format!("{flag} requires a path"))?;
+        let path = args
+            .next()
+            .ok_or_else(|| format!("{flag} requires a path"))?;
         if target.replace(PathBuf::from(path)).is_some() {
             return Err(format!("duplicate argument {flag}"));
         }
     }
     Ok(Args {
-        plan:plan.ok_or("missing required argument --plan")?,
-        stream:stream.ok_or("missing required argument --stream")?,
-        receipt:receipt.ok_or("missing required argument --receipt")?,
+        plan: plan.ok_or("missing required argument --plan")?,
+        stream: stream.ok_or("missing required argument --stream")?,
+        receipt: receipt.ok_or("missing required argument --receipt")?,
     })
 }
 
 fn validate_receipt_location(receipt: &Path, inputs: &[&Path]) -> Result<(), String> {
     if receipt.exists() {
-        return Err(format!("refusing to overwrite receipt {}", receipt.display()));
+        return Err(format!(
+            "refusing to overwrite receipt {}",
+            receipt.display()
+        ));
     }
-    let parent = receipt.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
-    let canonical_parent = fs::canonicalize(parent).map_err(|e| format!("receipt parent must exist: {e}"))?;
+    let parent = receipt
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let canonical_parent =
+        fs::canonicalize(parent).map_err(|e| format!("receipt parent must exist: {e}"))?;
     for input in inputs {
         let canonical_input = fs::canonicalize(input)
             .map_err(|e| format!("cannot canonicalize input {}: {e}", input.display()))?;
-        let input_parent = canonical_input.parent().ok_or("input has no parent directory")?;
+        let input_parent = canonical_input
+            .parent()
+            .ok_or("input has no parent directory")?;
         if canonical_parent.starts_with(input_parent) {
             return Err("receipt must be outside every input directory".to_owned());
         }
@@ -537,11 +623,17 @@ fn run() -> Result<(), String> {
     let (stream_bytes, stream) = read_input(&args.stream, "stream")?;
     validate_receipt_location(&args.receipt, &[args.plan.as_path(), args.stream.as_path()])?;
     let receipt = audit_values(&plan, &stream, &plan_bytes, &stream_bytes)?;
-    let encoded = serde_json::to_vec_pretty(&receipt).map_err(|e| format!("cannot encode receipt: {e}"))?;
-    let mut file = OpenOptions::new().write(true).create_new(true).open(&args.receipt)
+    let encoded =
+        serde_json::to_vec_pretty(&receipt).map_err(|e| format!("cannot encode receipt: {e}"))?;
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&args.receipt)
         .map_err(|e| format!("cannot create receipt without overwrite: {e}"))?;
-    file.write_all(&encoded).map_err(|e| format!("cannot write receipt: {e}"))?;
-    file.write_all(b"\n").map_err(|e| format!("cannot finish receipt: {e}"))?;
+    file.write_all(&encoded)
+        .map_err(|e| format!("cannot write receipt: {e}"))?;
+    file.write_all(b"\n")
+        .map_err(|e| format!("cannot finish receipt: {e}"))?;
     Ok(())
 }
 
@@ -560,8 +652,10 @@ mod tests {
     use super::*;
 
     fn fixture() -> (Value, Value, Vec<u8>, Vec<u8>) {
-        let plan_bytes = include_bytes!("../tests/fixtures/hardsec/context-sequential-v1/plan.json").to_vec();
-        let stream_bytes = include_bytes!("../tests/fixtures/hardsec/context-sequential-v1/stream.json").to_vec();
+        let plan_bytes =
+            include_bytes!("../tests/fixtures/hardsec/context-sequential-v1/plan.json").to_vec();
+        let stream_bytes =
+            include_bytes!("../tests/fixtures/hardsec/context-sequential-v1/stream.json").to_vec();
         let plan = serde_json::from_slice(&plan_bytes).unwrap();
         let stream = serde_json::from_slice(&stream_bytes).unwrap();
         (plan, stream, plan_bytes, stream_bytes)
@@ -584,13 +678,25 @@ mod tests {
         let (plan, stream, pb, sb) = fixture();
         let receipt = audit_values(&plan, &stream, &pb, &sb).unwrap();
         assert_eq!(receipt["result"], "alarm_threshold_crossed");
-        assert_eq!(receipt["sequential_monitor"]["first_alarm_sequence_index"], 4);
+        assert_eq!(
+            receipt["sequential_monitor"]["first_alarm_sequence_index"],
+            4
+        );
         assert_eq!(receipt["sequential_monitor"]["valid_observation_count"], 4);
         assert_eq!(receipt["sequential_monitor"]["abstention_count"], 3);
         assert_eq!(receipt["sequential_monitor"]["post_alarm_reset_count"], 0);
-        assert_eq!(receipt["statistical_guarantees"]["conditional_superuniformity_status"], "assumption_not_verified");
-        assert_eq!(receipt["statistical_guarantees"]["sequential_false_alarm_guarantee_status"], "not_established_from_inputs");
-        assert_eq!(receipt["statistical_guarantees"]["effective_sample_size_estimate"], Value::Null);
+        assert_eq!(
+            receipt["statistical_guarantees"]["conditional_superuniformity_status"],
+            "assumption_not_verified"
+        );
+        assert_eq!(
+            receipt["statistical_guarantees"]["sequential_false_alarm_guarantee_status"],
+            "not_established_from_inputs"
+        );
+        assert_eq!(
+            receipt["statistical_guarantees"]["effective_sample_size_estimate"],
+            Value::Null
+        );
     }
 
     #[test]
@@ -603,7 +709,10 @@ mod tests {
         let r = audit(&p, &s).unwrap();
         assert_eq!(r["result"], "no_alarm_threshold_crossed");
         assert_eq!(r["sequential_monitor"]["final_log_wealth"], 0.0);
-        assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["unseen_workload_context"], 1);
+        assert_eq!(
+            r["sequential_monitor"]["abstention_counts_by_reason"]["unseen_workload_context"],
+            1
+        );
     }
 
     #[test]
@@ -627,14 +736,21 @@ mod tests {
         }]);
         let r = audit(&p, &s).unwrap();
         assert_eq!(r["sequential_monitor"]["final_log_wealth"], 0.0);
-        assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["pmu_acquisition_not_qualified"], 1);
+        assert_eq!(
+            r["sequential_monitor"]["abstention_counts_by_reason"]["pmu_acquisition_not_qualified"],
+            1
+        );
     }
 
     #[test]
     fn reference_and_evaluation_group_overlap_is_rejected() {
         let (mut p, s, _, _) = fixture();
         p["contexts"][0]["reference_group_ids"] = json!(["heldout-execution-01"]);
-        assert!(audit(&p, &s).unwrap_err().contains("overlaps a null-reference group"));
+        assert!(
+            audit(&p, &s)
+                .unwrap_err()
+                .contains("overlaps a null-reference group")
+        );
     }
 
     #[test]
@@ -648,34 +764,49 @@ mod tests {
     fn non_contiguous_sequence_index_is_rejected() {
         let (p, mut s, _, _) = fixture();
         s["records"][1]["sequence_index"] = json!(4);
-        assert!(audit(&p, &s).unwrap_err().contains("must be contiguous from one"));
+        assert!(
+            audit(&p, &s)
+                .unwrap_err()
+                .contains("must be contiguous from one")
+        );
     }
 
     #[test]
     fn malformed_betting_weights_are_rejected() {
         let (mut p, s, _, _) = fixture();
         p["betting_mixture"][0]["weight"] = json!(0.1);
-        assert!(audit(&p, &s).unwrap_err().contains("weights must sum to one"));
+        assert!(
+            audit(&p, &s)
+                .unwrap_err()
+                .contains("weights must sum to one")
+        );
     }
 
     #[test]
     fn insufficient_reference_support_is_rejected() {
         let (mut p, s, _, _) = fixture();
-        p["contexts"][0]["reference_scores"] = json!([0.1,0.2,0.3]);
-        assert!(audit(&p, &s).unwrap_err().contains("reference scores; at least"));
+        p["contexts"][0]["reference_scores"] = json!([0.1, 0.2, 0.3]);
+        assert!(
+            audit(&p, &s)
+                .unwrap_err()
+                .contains("reference scores; at least")
+        );
     }
 
     #[test]
     fn context_specific_tail_rank_is_conservative_on_ties() {
         let (mut p, mut s, _, _) = fixture();
-        p["contexts"][0]["reference_scores"] = json!([1.0,1.0,2.0]);
+        p["contexts"][0]["reference_scores"] = json!([1.0, 1.0, 2.0]);
         p["minimum_reference_scores"] = json!(2);
         s["records"] = json!([{
             "sequence_index":1,"window_id":"tie-window","context_id":"compute",
             "anomaly_score":1.0,"sensor_state":"valid","pmu_qualification_result":QUALIFIED_PMU
         }]);
         let r = audit(&p, &s).unwrap();
-        assert_eq!(r["sequential_monitor"]["window_decisions"][0]["p_value"], 1.0);
+        assert_eq!(
+            r["sequential_monitor"]["window_decisions"][0]["p_value"],
+            1.0
+        );
     }
 
     #[test]
@@ -683,7 +814,10 @@ mod tests {
         let (p, s, pb, sb) = fixture();
         let first = audit_values(&p, &s, &pb, &sb).unwrap();
         let second = audit_values(&p, &s, &pb, &sb).unwrap();
-        assert_eq!(first["reference_policy"]["references"], second["reference_policy"]["references"]);
+        assert_eq!(
+            first["reference_policy"]["references"],
+            second["reference_policy"]["references"]
+        );
         assert_eq!(first["reference_policy"]["test_time_reference_updates"], 0);
     }
 
@@ -691,14 +825,22 @@ mod tests {
     fn scoring_artifact_digest_mismatch_is_rejected() {
         let (p, mut s, _, _) = fixture();
         s["scoring_artifact_sha256"] = json!("d".repeat(64));
-        assert!(audit(&p, &s).unwrap_err().contains("scoring_artifact_sha256 does not match"));
+        assert!(
+            audit(&p, &s)
+                .unwrap_err()
+                .contains("scoring_artifact_sha256 does not match")
+        );
     }
 
     #[test]
     fn wrong_evidence_domain_is_rejected() {
         let (p, mut s, _, _) = fixture();
         s["evidence_domain"] = json!("physical_hardware");
-        assert!(audit(&p, &s).unwrap_err().contains("evidence_domain must match"));
+        assert!(
+            audit(&p, &s)
+                .unwrap_err()
+                .contains("evidence_domain must match")
+        );
     }
 
     #[test]
