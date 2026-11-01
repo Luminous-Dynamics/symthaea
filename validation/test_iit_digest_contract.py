@@ -11,6 +11,7 @@ from validation.iit_digest_contract import (
     canonical_model_bytes,
     evaluation_digest,
     model_digest,
+    primitive_request_digest,
 )
 
 
@@ -80,6 +81,66 @@ class IitDigestContractTests(unittest.TestCase):
             ),
             "8b697dce9b5ad3786d4e15f7d5db39c563bce54ea3676976c07efea3f4698db0",
         )
+
+    def test_primitive_request_digest_matches_rust_golden_vector(self):
+        self.assertEqual(
+            primitive_request_digest(
+                self.model_bytes,
+                [1, 0],
+                [0, 1],
+                [1],
+                [1, 0],
+                "IIT_4_0_2023",
+                "iit4_cause_repertoire",
+            ),
+            "fa7932cb3687359cbdfb692dd2a4136a1665c13ddf414bc4a391fc11dd6b3bdf",
+        )
+
+    def test_primitive_request_binds_operation_and_purview_order(self):
+        base = primitive_request_digest(
+            self.model_bytes, [1, 0], [0, 1], [1], [1, 0],
+            "IIT_4_0_2023", "iit4_cause_repertoire",
+        )
+        variants = [
+            primitive_request_digest(
+                self.model_bytes, [1, 0], [0, 1], [1], [1, 0],
+                "IIT_4_0_2023", "iit4_effect_repertoire",
+            ),
+            primitive_request_digest(
+                self.model_bytes, [1, 0], [0, 1], [1], [0, 1],
+                "IIT_4_0_2023", "iit4_cause_repertoire",
+            ),
+            primitive_request_digest(
+                self.model_bytes, [1, 0], [0, 1], [0], [1, 0],
+                "IIT_4_0_2023", "iit4_cause_repertoire",
+            ),
+        ]
+        self.assertEqual(len(set(variants + [base])), 4)
+        # Candidate systems are sets; their input order does not change identity.
+        self.assertEqual(
+            base,
+            primitive_request_digest(
+                self.model_bytes, [1, 0], [1, 0], [1], [1, 0],
+                "IIT_4_0_2023", "iit4_cause_repertoire",
+            ),
+        )
+
+    def test_primitive_request_rejects_wrong_profile_and_outside_units(self):
+        with self.assertRaisesRegex(ValueError, "only IIT_4_0_2023"):
+            primitive_request_digest(
+                self.model_bytes, [1, 0], [0, 1], [1], [1, 0],
+                "IIT_4_0_2026", "iit4_cause_repertoire",
+            )
+        with self.assertRaisesRegex(ValueError, "mechanism must be contained"):
+            primitive_request_digest(
+                self.model_bytes, [1, 0], [0], [1], [0],
+                "IIT_4_0_2023", "iit4_cause_repertoire",
+            )
+        with self.assertRaisesRegex(ValueError, "purview must be contained"):
+            primitive_request_digest(
+                self.model_bytes, [1, 0], [0], [0], [1],
+                "IIT_4_0_2023", "iit4_cause_repertoire",
+            )
 
     def test_state_formalism_subset_and_quantity_change_request_digest(self):
         base = analysis_request_digest(
