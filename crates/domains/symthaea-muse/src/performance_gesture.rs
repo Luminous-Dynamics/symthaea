@@ -138,6 +138,16 @@ pub enum GestureParameter {
     PitchBend,
     VibratoRate,
     VibratoDepth,
+    /// Continuous damper-pedal travel; permits partial/half-pedaling.
+    PianoDamperPedalDepth,
+    /// Piano sostenuto pedal state, independent from sustain.
+    PianoSostenutoPedal,
+    /// Piano una-corda pedal state, independent from sustain/sostenuto.
+    PianoUnaCordaPedal,
+    /// Physical-model string/sympathetic resonance control when exposed.
+    PianoStringResonance,
+    /// Piano hammer hardness/voicing parameter when exposed by the model.
+    PianoHammerHardness,
 }
 
 /// Units are explicit. Normalized values are only meaningful alongside the
@@ -475,6 +485,18 @@ impl PerformanceGestureTrackV1 {
                         issues.push(format!(
                             "event[{index}] part scope is absent or spans multiple instrument/model assignments; use note-scoped gestures"
                         ));
+                    } else if let (Some(first), Some(last)) = (
+                        part_notes.iter().min_by(|a, b| a.onset.cmp_exact(b.onset)),
+                        part_notes.iter().filter_map(|note| note.onset.checked_add(note.duration))
+                            .max_by(|a, b| a.cmp_exact(*b)),
+                    ) {
+                        if event.at.cmp_exact(first.onset) == Ordering::Less
+                            || event.at.cmp_exact(last) == Ordering::Greater
+                        {
+                            issues.push(format!(
+                                "event[{index}] part-scoped gesture lies outside the part's score-time envelope"
+                            ));
+                        }
                     }
                 }
             }
@@ -542,6 +564,28 @@ impl PerformanceGestureTrackV1 {
                 issues.push(format!(
                     "{prefix}: beat position denominator must be positive and fraction reduced"
                 ));
+            }
+
+            let is_piano_control = matches!(
+                event.parameter,
+                GestureParameter::PianoDamperPedalDepth
+                    | GestureParameter::PianoSostenutoPedal
+                    | GestureParameter::PianoUnaCordaPedal
+                    | GestureParameter::PianoStringResonance
+                    | GestureParameter::PianoHammerHardness
+            );
+            if is_piano_control && !matches!(event.instrument_id.as_str(), "piano" | "piano.pp") {
+                issues.push(format!("{prefix}: piano-specific gesture targets a non-piano identity"));
+            }
+            if matches!(
+                event.parameter,
+                GestureParameter::PianoDamperPedalDepth
+                    | GestureParameter::PianoSostenutoPedal
+                    | GestureParameter::PianoUnaCordaPedal
+                    | GestureParameter::PianoStringResonance
+                    | GestureParameter::PianoHammerHardness
+            ) && !matches!(&event.target, GestureTarget::Part { .. }) {
+                issues.push(format!("{prefix}: piano pedal/model controls require part scope"));
             }
 
             if !value_matches_parameter(event.parameter, &event.value) {
@@ -640,7 +684,10 @@ fn value_matches_parameter(parameter: GestureParameter, value: &GestureValue) ->
             | GestureParameter::PluckPosition
             | GestureParameter::DampingAmount
             | GestureParameter::StrikePosition
-            | GestureParameter::EnvelopeLevel,
+            | GestureParameter::EnvelopeLevel
+            | GestureParameter::PianoDamperPedalDepth
+            | GestureParameter::PianoStringResonance
+            | GestureParameter::PianoHammerHardness,
             GestureValue::Scalar { unit, .. },
         ) => *unit == GestureUnit::Normalized,
         (
@@ -658,7 +705,10 @@ fn value_matches_parameter(parameter: GestureParameter, value: &GestureValue) ->
             GestureValue::Choice { .. },
         ) => true,
         (
-            GestureParameter::DamperPedal | GestureParameter::VibraphoneMotorEnabled,
+            GestureParameter::DamperPedal
+            | GestureParameter::VibraphoneMotorEnabled
+            | GestureParameter::PianoSostenutoPedal
+            | GestureParameter::PianoUnaCordaPedal,
             GestureValue::Boolean { .. },
         ) => true,
         _ => false,
@@ -688,7 +738,10 @@ fn scalar_domain_is_valid(
             | GestureParameter::PluckPosition
             | GestureParameter::DampingAmount
             | GestureParameter::StrikePosition
-            | GestureParameter::EnvelopeLevel,
+            | GestureParameter::EnvelopeLevel
+            | GestureParameter::PianoDamperPedalDepth
+            | GestureParameter::PianoStringResonance
+            | GestureParameter::PianoHammerHardness,
             GestureUnit::Normalized,
         ) => (0.0..=1.0).contains(&amount),
         (
@@ -1173,6 +1226,40 @@ mod tests {
         assert!(track.validate_against_identity_map(&"a".repeat(64), 2, &map)
             .unwrap_err().iter().any(|issue| issue.contains("spans multiple instrument/model assignments")));
     }
+    #[test]
+    fn piano_controls_have_distinct_units_and_scope() {
+        let mut pedal = event(
+            "damper-depth",
+            BeatPosition::new(1, 1).unwrap(),
+            GestureParameter::PianoDamperPedalDepth,
+            GestureValue::Scalar {
+                amount: 0.45,
+                unit: GestureUnit::Normalized,
+            },
+            GestureInterpolation::Linear,
+        );
+        pedal.instrument_id = "piano".to_string();
+        pedal.target = GestureTarget::Part { part_id: 2 };
+        assert!(PerformanceGestureTrackV1::new(vec![pedal.clone()]).validate().is_ok());
+
+        pedal.instrument_id = "violin".to_string();
+        assert!(PerformanceGestureTrackV1::new(vec![pedal]).validate().is_err());
+
+        let mut sostenuto = event(
+            "sostenuto",
+            BeatPosition::new(1, 1).unwrap(),
+            GestureParameter::PianoSostenutoPedal,
+            GestureValue::Boolean { value: true },
+            GestureInterpolation::Step,
+        );
+        sostenuto.instrument_id = "piano".to_string();
+        sostenuto.target = GestureTarget::Note {
+            part_id: 2,
+            note_id: "note-17".to_string(),
+        };
+        assert!(PerformanceGestureTrackV1::new(vec![sostenuto]).validate().is_err());
+    }
+
     #[test]
     fn schema_version_mismatch_is_rejected() {
         let track = PerformanceGestureTrackV1 {
