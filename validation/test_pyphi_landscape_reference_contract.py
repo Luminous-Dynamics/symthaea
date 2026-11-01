@@ -48,6 +48,7 @@ class PyPhiLandscapeReferenceContractTests(unittest.TestCase):
                 "mip_tie_count",
                 "mip_tie_cut_sha256s",
                 "mip_tie_cut_removed_edges",
+                "partition_scores",
                 "theta",
                 "partition",
                 "cause_state",
@@ -61,6 +62,13 @@ class PyPhiLandscapeReferenceContractTests(unittest.TestCase):
         props = point["properties"]
         for name in ("model_sha256", "evaluation_sha256", "analysis_request_sha256"):
             self.assertEqual(props[name]["pattern"], "^[0-9a-f]{64}$")
+        partition_scores = props["partition_scores"]
+        self.assertEqual(partition_scores["type"], "array")
+        score_required = set(partition_scores["items"]["required"])
+        self.assertTrue({
+            "cut_sha256", "signed_phi", "phi", "normalized_phi",
+            "signed_normalized_phi", "cause_signed_phi", "effect_signed_phi",
+        }.issubset(score_required))
 
     def test_schema_freezes_point_count_and_forbids_skipped_points(self):
         self.assertEqual(self.schema["properties"]["points"]["minItems"], 13)
