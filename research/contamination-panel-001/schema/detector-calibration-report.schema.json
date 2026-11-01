@@ -285,6 +285,7 @@
           "ground_truth",
           "raw_score",
           "normalized_risk_score",
+          "cluster_max_normalized_risk_score",
           "calibration_clean_support",
           "conformal_p_value"
         ],
@@ -357,6 +358,9 @@
                 "maximum": 1000
               }
             }
+          },
+          "cluster_max_normalized_risk_score": {
+            "type": "number"
           }
         }
       }
