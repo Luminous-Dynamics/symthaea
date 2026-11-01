@@ -2451,6 +2451,18 @@ mod tests {
     }
 
     #[test]
+    fn typed_objective_tape_rejects_legacy_scalar_evaluation_actions() {
+        let mut tape = EventTape::new(header_with_objective_contract(
+            EventTapeObjectiveMode::NoisyReplicates,
+        )).unwrap();
+        let (intent, outcome) = verified_evaluation("A", H5);
+        assert!(tape.append(event(
+            "scalar-in-noisy-tape", 0, 1, None, 0, intent, outcome, 2,
+        )).is_err());
+        assert!(tape.events().is_empty());
+    }
+
+    #[test]
     fn noisy_tape_charges_failures_but_only_successes_publish_objective_vectors() {
         let mut tape = EventTape::new(header_with_objective_contract(
             EventTapeObjectiveMode::NoisyReplicates,
