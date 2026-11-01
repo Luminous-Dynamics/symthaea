@@ -8,7 +8,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use super::splits::{ForecastWindow, PurgedSplitPlan};
+use super::splits::{EntitySplitBoundaries, ForecastWindow, PurgedSplitPlan};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WindowFeatureValue {
@@ -145,6 +145,53 @@ impl TrainOnlyStandardizer {
             return Err(ScalerError::InvalidSplitPlan);
         }
 
+        // A public plan is not trusted merely because its IDs form a partition.
+        // Recheck the per-entity chronology and target-horizon purge boundaries.
+        let mut boundaries = BTreeMap::<u64, &EntitySplitBoundaries>::new();
+        for boundary in &plan.boundaries {
+            if boundary.entity_id == 0
+                || boundary.validation_start_us >= boundary.test_start_us
+                || boundary.train_target_cutoff_us > boundary.validation_start_us
+                || boundary.validation_target_cutoff_us > boundary.test_start_us
+                || boundaries.insert(boundary.entity_id, boundary).is_some()
+            {
+                return Err(ScalerError::InvalidSplitPlan);
+            }
+        }
+        let entities: BTreeSet<u64> = window_by_id.values().copied().collect();
+        if entities != boundaries.keys().copied().collect() {
+            return Err(ScalerError::InvalidSplitPlan);
+        }
+
+        let train_ids: BTreeSet<u64> = plan.train_window_ids.iter().copied().collect();
+        let validation_ids: BTreeSet<u64> = plan.validation_window_ids.iter().copied().collect();
+        let test_ids: BTreeSet<u64> = plan.test_window_ids.iter().copied().collect();
+        let purged_train_ids: BTreeSet<u64> = plan.purged_train_window_ids.iter().copied().collect();
+        let purged_validation_ids: BTreeSet<u64> = plan.purged_validation_window_ids.iter().copied().collect();
+
+        for window in windows {
+            let boundary = boundaries.get(&window.entity_id)
+                .ok_or(ScalerError::InvalidSplitPlan)?;
+            let expected_partition = if window.forecast_origin_us < boundary.validation_start_us {
+                if window.target_end_exclusive_us <= boundary.train_target_cutoff_us {
+                    &train_ids
+                } else {
+                    &purged_train_ids
+                }
+            } else if window.forecast_origin_us < boundary.test_start_us {
+                if window.target_end_exclusive_us <= boundary.validation_target_cutoff_us {
+                    &validation_ids
+                } else {
+                    &purged_validation_ids
+                }
+            } else {
+                &test_ids
+            };
+            if !expected_partition.contains(&window.window_id) {
+                return Err(ScalerError::InvalidSplitPlan);
+            }
+        }
+
         let train_ids: BTreeSet<u64> = plan.train_window_ids.iter().copied().collect();
         let mut unique_values = BTreeMap::<(u64, u32, u64), f64>::new();
         for sample in samples {
@@ -252,6 +299,22 @@ mod tests {
 
     fn sample(window_id: u64, entity_id: u64, feature_id: u32, observation_id: u64, value: f64) -> WindowFeatureValue {
         WindowFeatureValue { window_id, entity_id, feature_id, observation_id, value }
+    }
+
+    #[test]
+    fn scaler_rejects_a_forged_partition_that_violates_target_purge() {
+        let windows = windows();
+        let mut split = plan(&windows);
+        let moved = split.train_window_ids.remove(0);
+        split.test_window_ids.push(moved);
+        assert_eq!(
+            TrainOnlyStandardizer::fit(
+                &windows,
+                &split,
+                &[sample(moved, 1, 1, 1, 1.0)]
+            ),
+            Err(ScalerError::InvalidSplitPlan)
+        );
     }
 
     #[test]
