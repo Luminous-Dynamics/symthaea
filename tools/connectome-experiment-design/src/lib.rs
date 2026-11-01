@@ -398,7 +398,7 @@ fn target_query_information_gain_bits(
         if answer.trim().is_empty() {
             return Err(DesignError::EmptyTargetQueryAnswer);
         }
-        let index = match answer_labels.iter().position(|label| *label == answer) {
+        let index = match answer_labels.iter().position(|label| *label == answer.as_str()) {
             Some(index) => index,
             None => {
                 answer_labels.push(answer.as_str());
