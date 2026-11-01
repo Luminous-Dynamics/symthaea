@@ -130,6 +130,133 @@ def build_supremum_anchored_certificates(
     return output
 
 
+def build_additive_anchored_auxiliary(
+    *,
+    universe: Iterable[str],
+    coordinate_budgets: Mapping[str, Fraction | int | str],
+    auxiliary_budgets: Mapping[str, Fraction | int | str],
+    coordinate_auxiliary_paths: Mapping[str, Sequence[Fraction | int | str]],
+) -> dict[frozenset[str], tuple[Fraction, ...]]:
+    """Allocate residual per-coordinate budgets and form valid subset mixtures.
+
+    External contract: each coordinate auxiliary process F_i,t has
+    E[sup_t F_i,t | H_i] <= 1. With sum_i(q_i+v_i)<=1, the constructed
+    F_S,t = sum_{i in S} v_i F_i,t / (1-c_S) has an expected running
+    supremum <= 1 for every intersection with positive residual.
+    """
+    ids = _ids(universe)
+    if set(coordinate_budgets) != set(ids) or set(auxiliary_budgets) != set(ids):
+        raise ValueError("q_i and v_i budgets must contain exactly the universe IDs")
+    if set(coordinate_auxiliary_paths) != set(ids):
+        raise ValueError("coordinate auxiliary paths must contain exactly the universe IDs")
+    q = {i: _q(coordinate_budgets[i]) for i in ids}
+    v = {i: _q(auxiliary_budgets[i]) for i in ids}
+    if any(x < 0 for x in (*q.values(), *v.values())):
+        raise ValueError("coordinate budgets must be nonnegative")
+    if sum(q.values(), Fraction(0)) + sum(v.values(), Fraction(0)) > 1:
+        raise ValueError("coordinate and auxiliary budgets must sum to at most one")
+    paths = {
+        i: tuple(_q(x) for x in coordinate_auxiliary_paths[i])
+        for i in ids
+    }
+    horizons = {len(path) for path in paths.values()}
+    if len(horizons) != 1:
+        raise ValueError("coordinate auxiliary paths must share one horizon")
+    if any(x < 0 for path in paths.values() for x in path):
+        raise ValueError("coordinate auxiliary path values must be nonnegative")
+    subsets = nonempty_subsets(ids)
+    output: dict[frozenset[str], tuple[Fraction, ...]] = {}
+    horizon = next(iter(horizons))
+    for intersection in subsets:
+        c_s = sum((q[i] for i in intersection), Fraction(0))
+        residual = 1 - c_s
+        weighted = tuple(
+            sum(
+                (v[i] * paths[i][t] for i in intersection),
+                Fraction(0),
+            )
+            for t in range(horizon)
+        )
+        if residual == 0:
+            if any(weighted):
+                raise ValueError("positive auxiliary mass has no residual intersection budget")
+            output[intersection] = tuple(Fraction(0) for _ in range(horizon))
+        else:
+            output[intersection] = tuple(value / residual for value in weighted)
+    return output
+
+
+def build_additive_anchored_coordinate_e_paths(
+    *,
+    universe: Iterable[str],
+    baseline_path: Sequence[Iterable[str]],
+    coordinate_budgets: Mapping[str, Fraction | int | str],
+    auxiliary_budgets: Mapping[str, Fraction | int | str],
+    coordinate_auxiliary_paths: Mapping[str, Sequence[Fraction | int | str]],
+    alpha: Fraction | int | str,
+) -> dict[str, tuple[Fraction, ...]]:
+    """Build per-hypothesis e-paths whose subset sums equal the anchored locals."""
+    ids = _ids(universe)
+    a = _q(alpha)
+    if not 0 < a <= 1:
+        raise ValueError("alpha must be in (0,1]")
+    if set(coordinate_budgets) != set(ids) or set(auxiliary_budgets) != set(ids):
+        raise ValueError("q_i and v_i budgets must contain exactly the universe IDs")
+    q = {i: _q(coordinate_budgets[i]) for i in ids}
+    v = {i: _q(auxiliary_budgets[i]) for i in ids}
+    if any(x < 0 for x in (*q.values(), *v.values())):
+        raise ValueError("coordinate budgets must be nonnegative")
+    if sum(q.values(), Fraction(0)) + sum(v.values(), Fraction(0)) > 1:
+        raise ValueError("coordinate and auxiliary budgets must sum to at most one")
+    baseline = _normalize_path(baseline_path, frozenset(ids), "baseline_path")
+    if not baseline:
+        raise ValueError("baseline_path must contain at least one round")
+    if set(coordinate_auxiliary_paths) != set(ids):
+        raise ValueError("coordinate auxiliary paths must contain exactly the universe IDs")
+    paths = {
+        i: tuple(_q(x) for x in coordinate_auxiliary_paths[i])
+        for i in ids
+    }
+    horizon = len(baseline)
+    if any(len(path) != horizon for path in paths.values()):
+        raise ValueError("coordinate auxiliary path horizon mismatch")
+    if any(x < 0 for path in paths.values() for x in path):
+        raise ValueError("coordinate auxiliary path values must be nonnegative")
+    ever = coordinate_ever_rejected(baseline, ids)
+    return {
+        i: tuple(ever[i][t] / a + v[i] * paths[i][t] for t in range(horizon))
+        for i in ids
+    }
+
+
+def select_additive_anchored_e_bh(
+    *,
+    coordinate_e_values: Mapping[str, Fraction | int | str],
+    alpha: Fraction | int | str,
+    anchor: Iterable[str] = (),
+) -> frozenset[str]:
+    """O(n log n) e-BH selector for additive anchored local e-values."""
+    ids = _ids(coordinate_e_values.keys())
+    values = {i: _q(coordinate_e_values[i]) for i in ids}
+    if any(x < 0 for x in values.values()):
+        raise ValueError("coordinate e-values must be nonnegative")
+    a = _q(alpha)
+    if not 0 < a <= 1:
+        raise ValueError("alpha must be in (0,1]")
+    base = frozenset(anchor)
+    if not base <= frozenset(ids):
+        raise ValueError("anchor contains unknown hypotheses")
+    ordered = sorted(ids, key=lambda i: (-values[i], i))
+    k_star = 0
+    for k in range(1, len(ordered) + 1):
+        if values[ordered[k - 1]] >= Fraction(1, 1) / (a * k):
+            k_star = k
+    chosen = frozenset(ordered[:k_star])
+    if not base <= chosen:
+        raise ValueError("anchored baseline is not certified by additive e-values")
+    return chosen
+
+
 def verify_closure_path(
     *,
     universe: Iterable[str],
