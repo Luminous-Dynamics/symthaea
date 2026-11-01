@@ -338,7 +338,7 @@ pub fn evaluate_detector_run(
 
     let mut truth_by_id = BTreeMap::new();
     for truth in &sealed_key.pair_truth {
-        if !valid_digest(&truth.pair_id) {
+        if !crate::valid_digest(&truth.pair_id) {
             return Err("sealed-key row contains an invalid pair ID".to_owned());
         }
         if truth.target_mechanism != truth.target_tier.target_mechanism() {
