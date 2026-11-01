@@ -186,6 +186,27 @@ Selecting the largest r satisfying the sorted e-value threshold is the e-BH rule
 
 This is an exact computational special case, not a universal replacement for intersection-specific evidence. It can be conservative because all auxiliary mass is coordinate-separable and because the safe baseline uses ever-rejected indicators. The richer #9695/#9684 intersection processes may certify sets that this additive e-BH restriction cannot.
 
+### Fixed-prior portfolio over auxiliary budget allocations
+
+A single vector v_i can be brittle when alternatives are heterogeneous. The additive construction now accepts a finite set of auxiliary allocations v_i^(j), each paired with coordinate auxiliary paths F_i,t^(j), and a fixed ex-ante prior pi_j. Every strategy must independently satisfy
+
+    sum_i(q_i + v_i^(j)) <= 1,
+    E_Hi[sup_t F_i,t^(j)] <= 1.
+
+The combined coordinate path is
+
+    e_i,t = J_i,t/alpha
+            + sum_j pi_j v_i^(j) F_i,t^(j).
+
+Because the prior is fixed and every component is valid,
+
+    sum_i(q_i + sum_j pi_j v_i^(j))
+      = sum_j pi_j sum_i(q_i+v_i^(j)) <= 1.
+
+Thus the portfolio remains valid and the intersection-local values remain additive. e-BH still gives the O(n log n) selector. This lets us hedge allocations for sparse, dense, clustered, or value-weighted alternatives without choosing the best allocation after seeing the confirmatory stream.
+
+The helper is build_additive_anchored_portfolio_e_paths in validation/supremum_anchored_eclosure.py. Tests verify exact convex-mixture arithmetic, baseline retention, closure feasibility, and rejection of invalid/post-hoc weight vectors.
+
 ### Scaling benchmark
 
 Run the exact-rational selector benchmark:
