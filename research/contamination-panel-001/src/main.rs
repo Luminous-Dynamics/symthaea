@@ -2,6 +2,7 @@ use contamination_panel_bench::{
     ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, GeneratorConfigV1,
     PublicChallengePacketV1, SealedChallengeKeyV1, audit_blinded_adjudications,
     causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
+    detector_agreement::{DetectorAgreementRequestV1, analyze_detector_agreement},
     detectors::{DetectorRunV1, DetectorSpecV1, evaluate_detector_run, score_public_packet},
     exposure_transfer::{ExposureTransferStudyV1, analyze_exposure_transfer},
     ftd::{
@@ -342,6 +343,44 @@ fn score_self_critique_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn analyze_detector_agreement_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench analyze-detector-agreement <agreement-request.json> <agreement-report.json>"
+                .into(),
+        );
+    }
+    const MAX_AGREEMENT_REQUEST_BYTES: u64 = 512 * 1024 * 1024;
+    let request_bytes = read_file_bounded(&args[1], MAX_AGREEMENT_REQUEST_BYTES)?;
+    let request: DetectorAgreementRequestV1 = serde_json::from_slice(&request_bytes)?;
+    let report = analyze_detector_agreement(&request).map_err(io::Error::other)?;
+    write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "samples={} detectors={} pairs={} clusters={} ensemble_fitted={} confirmatory_eligible={}",
+        report.sample_count,
+        report.detector_count,
+        report.pairwise_agreement.len(),
+        report.source_cluster_count,
+        report.ensemble_fitted,
+        report.confirmatory_eligible
+    );
+    for detector in &report.detector_summaries {
+        println!(
+            "detector={} coverage={:.1}‰ clean_coverage={} contaminated_coverage={} auc={:?} ap={:?} conditional_fpr={:?} worst_case_fpr={:?}",
+            detector.detector_id,
+            detector.coverage_permille,
+            detector.clean_coverage_permille,
+            detector.contaminated_coverage_permille,
+            detector.auroc,
+            detector.average_precision,
+            detector.conditional_fpr_permille,
+            detector.worst_case_fpr_permille
+        );
+    }
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
+}
+
 fn audit_training_receipt_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 6 {
         return Err(
@@ -429,9 +468,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
         Some("analyze-exposure-transfer") => analyze_exposure_transfer_cli(&args),
         Some("score-self-critique") => score_self_critique_cli(&args),
+        Some("analyze-detector-agreement") => analyze_detector_agreement_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | score-self-critique | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | score-self-critique | analyze-detector-agreement | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }

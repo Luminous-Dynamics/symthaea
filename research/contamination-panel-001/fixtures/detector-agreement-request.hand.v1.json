@@ -1,0 +1,162 @@
+{
+  "schema": "symthaea.detector_agreement_request.v1",
+  "study_id": "agreement-study-001",
+  "benchmark_id": "fresh-transfer-panel",
+  "benchmark_version": "v1",
+  "model_checkpoint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "holdout_manifest_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+  "detector_specs": [
+    {
+      "detector_id": "detector-a",
+      "detector_family": "output_level",
+      "detector_version": "v1",
+      "model_checkpoint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "feature_protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "score_orientation": "higher_is_contaminated",
+      "calibration": {
+        "calibration_cohort_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "calibration_policy_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "calibration_sample_count": 400,
+        "calibration_clean_count": 300,
+        "calibration_false_positive_count": 1,
+        "target_fpr_permille": 10,
+        "normalized_threshold": 0.5,
+        "threshold_fit_cohort_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "threshold_fit_sample_count": 800
+      }
+    },
+    {
+      "detector_id": "detector-b",
+      "detector_family": "output_level",
+      "detector_version": "v1",
+      "model_checkpoint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "feature_protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "score_orientation": "lower_is_contaminated",
+      "calibration": {
+        "calibration_cohort_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "calibration_policy_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "calibration_sample_count": 400,
+        "calibration_clean_count": 300,
+        "calibration_false_positive_count": 1,
+        "target_fpr_permille": 10,
+        "normalized_threshold": 0.5,
+        "threshold_fit_cohort_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "threshold_fit_sample_count": 800
+      }
+    }
+  ],
+  "samples": [
+    {
+      "sample_id": "clean-1",
+      "task_family": "math",
+      "difficulty_band": "medium",
+      "relation": "semantic_equivalent",
+      "source_cluster_id": "cluster-clean-a",
+      "truth": "clean",
+      "detector_results": [
+        {
+          "detector_id": "detector-a",
+          "result": {
+            "status": "scored",
+            "raw_score": 0.1,
+            "score_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "feature_protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        },
+        {
+          "detector_id": "detector-b",
+          "result": {
+            "status": "scored",
+            "raw_score": -0.1,
+            "score_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "feature_protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        }
+      ]
+    },
+    {
+      "sample_id": "clean-2",
+      "task_family": "math",
+      "difficulty_band": "medium",
+      "relation": "semantic_equivalent",
+      "source_cluster_id": "cluster-clean-b",
+      "truth": "clean",
+      "detector_results": [
+        {
+          "detector_id": "detector-a",
+          "result": {
+            "status": "scored",
+            "raw_score": 0.2,
+            "score_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "feature_protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        },
+        {
+          "detector_id": "detector-b",
+          "result": {
+            "status": "scored",
+            "raw_score": -0.2,
+            "score_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "feature_protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        }
+      ]
+    },
+    {
+      "sample_id": "contam-1",
+      "task_family": "math",
+      "difficulty_band": "medium",
+      "relation": "semantic_equivalent",
+      "source_cluster_id": "cluster-contam-a",
+      "truth": "contaminated",
+      "detector_results": [
+        {
+          "detector_id": "detector-a",
+          "result": {
+            "status": "scored",
+            "raw_score": 0.9,
+            "score_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "feature_protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        },
+        {
+          "detector_id": "detector-b",
+          "result": {
+            "status": "scored",
+            "raw_score": -0.9,
+            "score_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "feature_protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        }
+      ]
+    },
+    {
+      "sample_id": "contam-2",
+      "task_family": "math",
+      "difficulty_band": "medium",
+      "relation": "semantic_equivalent",
+      "source_cluster_id": "cluster-contam-b",
+      "truth": "contaminated",
+      "detector_results": [
+        {
+          "detector_id": "detector-a",
+          "result": {
+            "status": "scored",
+            "raw_score": 0.8,
+            "score_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "feature_protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        },
+        {
+          "detector_id": "detector-b",
+          "result": {
+            "status": "scored",
+            "raw_score": -0.8,
+            "score_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "feature_protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        }
+      ]
+    }
+  ]
+}

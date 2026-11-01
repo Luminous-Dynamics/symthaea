@@ -743,3 +743,73 @@ The paper primarily reports AUC and F1 at a Youden threshold. Symthaea must repr
 
 Self-Critique measures similarity of two entropy trajectories under a declared self-critique intervention. It is evidence of response-path rigidity under that probe, not proof of training membership, proof of exposure causing an answer or universal contamination detection. The released top-K partial entropy and full-vocabulary entropy are separate extraction modes. The kernel does not itself run a model, authenticate a checkpoint, or qualify the clean/non-member distribution. No SOTA improvement is claimed by this implementation alone.
 
+## Detector complementarity, disagreement and abstention (SCI-DETECTOR-DISAGREEMENT-001)
+
+Tracking: https://github.com/Luminous-Dynamics/symthaea/issues/9829
+
+The detector panel must not turn FTD, DVD, LaRA, Self-Critique and likelihood baselines into an uncalibrated majority vote. They measure different constructs and operate under different model-access assumptions. A high agreement score can be caused by class imbalance, shared blind spots or common missing data.
+
+This analyzer compares detectors on the same frozen holdout cohort and reports:
+- detector-level conditional AUROC and average precision on scored samples with determinate labels, plus worst-case full-holdout AUROC lower/upper bounds under missing scores;
+- overall, clean-class and contaminated-class score coverage;
+- conditional FPR/TPR on scored determinate samples;
+- worst-case FPR (every missing clean score counted as false positive);
+- TPR lower/upper bounds (missing contaminated scores counted as false negatives/true positives);
+- pairwise Spearman rank correlation over shared scored samples, including indeterminate-label samples;
+- pairwise decision contingency, raw agreement, positive agreement, negative agreement, Cohen's kappa and discordance on shared scored samples with determinate labels;
+- detector performance/coverage strata by task family × difficulty band × transfer relation.
+
+### Evidence contract
+
+Every sample must carry an explicit status for every declared detector: scored, abstained or unavailable. There are no implicit null rows. Scored observations bind a finite raw score, the score-evidence digest and the detector feature-protocol digest. Abstentions/unavailable outputs require a reason code.
+
+Each detector declares:
+- detector family/version and model checkpoint;
+- the score orientation (higher or lower means contamination);
+- a normalized fixed threshold in the common higher-is-contaminated orientation;
+- a threshold-fit cohort digest and sample count;
+- a separate calibration-validation cohort digest, calibration-policy digest, validation counts and empirical false-positive count;
+- target FPR in permille.
+
+The threshold-fit, calibration-validation and frozen holdout manifest digests must all differ. The threshold is fixed using the first cohort, empirically checked on the second, and evaluated only on the third. This is a declared three-way separation check, not proof of sample-level disjointness or authenticated calibration. The analyzer reports whether the validation FPR met the target; that is not a statistical guarantee. No threshold is tuned on holdout labels.
+
+### Interpretation rules
+
+- AUROC/AP are conditional. They exclude abstained/unavailable samples and indeterminate truth labels. Always read them with class-conditional coverage.
+- Worst-case FPR is conservative. A clean sample with no detector score is counted as a potential false positive.
+- TPR bounds expose selective missingness. The lower bound counts every missing contaminated score as a false negative; the upper bound counts each as a true positive.
+- Positive and negative agreement are separate. Raw agreement or kappa alone can conceal class imbalance.
+- Rank correlation is not binary decision agreement. It measures score ordering over common scored rows, while decision agreement uses only common determinate-label rows.
+- Pairwise metrics use identical examples. Each pair's common scored count and common clean/contaminated counts are retained.
+- No ensemble is fitted. Any future ensemble must be a separately preregistered detector with its own independent training/calibration data and holdout evaluation.
+
+### CLI
+
+    cargo run --locked --manifest-path research/contamination-panel-001/Cargo.toml -- \
+      analyze-detector-agreement detector-agreement-request.json detector-agreement-report.json
+
+### Initial qualification targets (not achieved results)
+
+- 100% explicit status coverage in the input matrix; zero missing or duplicate sample-detector cells.
+- Zero score protocol digest mismatches.
+- Every threshold bound to distinct threshold-fit, calibration-validation and holdout manifest digests.
+- Hand-computable AUC/AP, missing-output AUROC bounds, tie handling, Spearman, contingency and kappa fixtures.
+- Class-conditional coverage reported beside every conditional operating point.
+- Per-family × difficulty × relation strata retained; no pooled-only score.
+- Fixed TPR@FPR 1%, 5% and 10% comparison with calibration/test split separation in the upstream benchmark design.
+- No ensemble claim or statistical guarantee until independent calibration, model-pair clustering and multiplicity are addressed.
+
+### Research rationale and comparators
+
+The GEM 2026 systematic review of 55 studies reports that no detector method is consistently reliable across contamination tiers, model access settings and training stages: https://aclanthology.org/2026.gem-main.50/
+
+BeyondBench demonstrates algorithmically generated problem instances, large combinatorial task spaces and deterministically verifiable solutions as a contamination-resistant evaluation direction: https://proceedings.iclr.cc/paper_files/paper/2026/hash/22b4e30a7a660b17f1fb58ab49671e77-Abstract-Conference.html
+
+LiveBench uses periodically refreshed questions, objective answers and delayed release of the newest update: https://livebench.github.io/
+
+The complementary Symthaea contribution is not a replacement leaderboard. It measures detector behavior on controlled T1–T4 exposure panels and connects detector scores to randomized exposure effects, adjudication attrition and run-time exposure evidence.
+
+### Claim ceiling
+
+The report is descriptive and conditional on caller-supplied labels, scores, calibration digests and holdout manifest. Digest inequality does not prove actual sample disjointness; a complete status matrix does not authenticate the score-generation process; pairwise agreement does not establish truth. No confidence intervals, multiplicity-adjusted guarantees, ensemble, causal membership conclusion, FDR guarantee or SOTA improvement are claimed by this analyzer.
+

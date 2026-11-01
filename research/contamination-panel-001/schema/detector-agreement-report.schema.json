@@ -1,0 +1,667 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/detector-agreement-report-v1.json",
+  "title": "Detector agreement report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "study_id",
+    "benchmark_id",
+    "benchmark_version",
+    "model_checkpoint_sha256",
+    "holdout_manifest_sha256",
+    "request_sha256",
+    "detector_count",
+    "sample_count",
+    "clean_count",
+    "contaminated_count",
+    "indeterminate_truth_count",
+    "source_cluster_count",
+    "detector_summaries",
+    "pairwise_agreement",
+    "family_relation_strata",
+    "threshold_selection_used_holdout_labels",
+    "ensemble_fitted",
+    "intervals_multiplicity_adjusted",
+    "independently_authenticated",
+    "confirmatory_eligible",
+    "analysis_status",
+    "issues",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.detector_agreement_report.v1"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "model_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "holdout_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "request_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "detector_count": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 64
+    },
+    "sample_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000
+    },
+    "clean_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "contaminated_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "indeterminate_truth_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "source_cluster_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "detector_summaries": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "detector_id",
+          "detector_family",
+          "detector_version",
+          "score_orientation",
+          "threshold_fit_cohort_sha256",
+          "calibration_cohort_sha256",
+          "calibration_policy_sha256",
+          "threshold_fit_sample_count",
+          "calibration_sample_count",
+          "calibration_clean_count",
+          "calibration_false_positive_count",
+          "calibration_empirical_fpr_permille",
+          "target_fpr_permille",
+          "calibration_meets_target_empirically",
+          "normalized_threshold",
+          "sample_count",
+          "clean_count",
+          "contaminated_count",
+          "indeterminate_truth_count",
+          "scored_count",
+          "abstained_count",
+          "unavailable_count",
+          "scored_clean_count",
+          "scored_contaminated_count",
+          "scored_indeterminate_count",
+          "predicted_contaminated_count",
+          "true_positive_count",
+          "false_positive_count",
+          "true_negative_count",
+          "false_negative_count",
+          "coverage_permille",
+          "clean_coverage_permille",
+          "contaminated_coverage_permille",
+          "auroc",
+          "average_precision",
+          "full_holdout_auroc_lower_bound",
+          "full_holdout_auroc_upper_bound",
+          "conditional_fpr_permille",
+          "conditional_tpr_permille",
+          "worst_case_fpr_permille",
+          "tpr_lower_bound_permille",
+          "tpr_upper_bound_permille",
+          "independent_source_cluster_count"
+        ],
+        "properties": {
+          "detector_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "detector_family": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "detector_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "score_orientation": {
+            "type": "string",
+            "enum": [
+              "higher_is_contaminated",
+              "lower_is_contaminated"
+            ]
+          },
+          "calibration_cohort_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "calibration_policy_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "calibration_sample_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "calibration_clean_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "calibration_false_positive_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "calibration_empirical_fpr_permille": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "target_fpr_permille": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "calibration_meets_target_empirically": {
+            "type": "boolean"
+          },
+          "normalized_threshold": {
+            "type": "number"
+          },
+          "sample_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "clean_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "contaminated_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "indeterminate_truth_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "scored_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "abstained_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unavailable_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "scored_clean_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "scored_contaminated_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "scored_indeterminate_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "predicted_contaminated_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "true_positive_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "false_positive_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "true_negative_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "false_negative_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "coverage_permille": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "clean_coverage_permille": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "contaminated_coverage_permille": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "auroc": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "average_precision": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "conditional_fpr_permille": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "conditional_tpr_permille": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "worst_case_fpr_permille": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "tpr_lower_bound_permille": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "tpr_upper_bound_permille": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "independent_source_cluster_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "threshold_fit_cohort_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "threshold_fit_sample_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "full_holdout_auroc_lower_bound": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "full_holdout_auroc_upper_bound": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "pairwise_agreement": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2016,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "left_detector_id",
+          "right_detector_id",
+          "common_scored_count",
+          "spearman_rank_correlation",
+          "common_labeled_count",
+          "common_clean_count",
+          "common_contaminated_count",
+          "contingency",
+          "raw_decision_agreement_permille",
+          "positive_agreement_permille",
+          "negative_agreement_permille",
+          "cohen_kappa",
+          "decision_disagreement_permille"
+        ],
+        "properties": {
+          "left_detector_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "right_detector_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "common_scored_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "spearman_rank_correlation": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -1,
+            "maximum": 1
+          },
+          "common_labeled_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "common_clean_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "common_contaminated_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "contingency": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "left_positive_right_positive",
+              "left_positive_right_negative",
+              "left_negative_right_positive",
+              "left_negative_right_negative"
+            ],
+            "properties": {
+              "left_positive_right_positive": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "left_positive_right_negative": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "left_negative_right_positive": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "left_negative_right_negative": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "raw_decision_agreement_permille": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "positive_agreement_permille": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "negative_agreement_permille": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "cohen_kappa": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -1,
+            "maximum": 1
+          },
+          "decision_disagreement_permille": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "family_relation_strata": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "detector_id",
+          "task_family",
+          "difficulty_band",
+          "relation",
+          "sample_count",
+          "clean_count",
+          "contaminated_count",
+          "indeterminate_truth_count",
+          "scored_count",
+          "abstained_count",
+          "unavailable_count",
+          "scored_clean_count",
+          "scored_contaminated_count",
+          "coverage_permille",
+          "clean_coverage_permille",
+          "contaminated_coverage_permille",
+          "auroc",
+          "average_precision",
+          "full_holdout_auroc_lower_bound",
+          "full_holdout_auroc_upper_bound",
+          "conditional_fpr_permille",
+          "conditional_tpr_permille"
+        ],
+        "properties": {
+          "detector_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "task_family": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "exact_replay",
+              "surface_variant",
+              "semantic_equivalent",
+              "fresh_same_recipe",
+              "novel_recipe_same_skill",
+              "unrelated_control"
+            ]
+          },
+          "sample_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "clean_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "contaminated_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "indeterminate_truth_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "scored_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "abstained_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unavailable_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "scored_clean_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "scored_contaminated_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "coverage_permille": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "clean_coverage_permille": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "contaminated_coverage_permille": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "auroc": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "average_precision": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "conditional_fpr_permille": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "conditional_tpr_permille": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "difficulty_band": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "full_holdout_auroc_lower_bound": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "full_holdout_auroc_upper_bound": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "threshold_selection_used_holdout_labels": {
+      "const": false
+    },
+    "ensemble_fitted": {
+      "const": false
+    },
+    "intervals_multiplicity_adjusted": {
+      "const": false
+    },
+    "independently_authenticated": {
+      "const": false
+    },
+    "confirmatory_eligible": {
+      "const": false
+    },
+    "analysis_status": {
+      "const": "exploratory_detector_complementarity"
+    },
+    "issues": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

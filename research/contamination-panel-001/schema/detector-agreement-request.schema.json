@@ -1,0 +1,306 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/detector-agreement-request-v1.json",
+  "title": "Detector agreement request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "study_id",
+    "benchmark_id",
+    "benchmark_version",
+    "model_checkpoint_sha256",
+    "holdout_manifest_sha256",
+    "detector_specs",
+    "samples"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.detector_agreement_request.v1"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "model_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "holdout_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "detector_specs": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "detector_id",
+          "detector_family",
+          "detector_version",
+          "model_checkpoint_sha256",
+          "feature_protocol_sha256",
+          "score_orientation",
+          "calibration"
+        ],
+        "properties": {
+          "detector_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "detector_family": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "detector_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "model_checkpoint_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "feature_protocol_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "score_orientation": {
+            "type": "string",
+            "enum": [
+              "higher_is_contaminated",
+              "lower_is_contaminated"
+            ]
+          },
+          "calibration": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "threshold_fit_cohort_sha256",
+              "threshold_fit_sample_count",
+              "calibration_cohort_sha256",
+              "calibration_policy_sha256",
+              "calibration_sample_count",
+              "calibration_clean_count",
+              "calibration_false_positive_count",
+              "target_fpr_permille",
+              "normalized_threshold"
+            ],
+            "properties": {
+              "calibration_cohort_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "calibration_policy_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "calibration_sample_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "calibration_clean_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "calibration_false_positive_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "target_fpr_permille": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 500
+              },
+              "normalized_threshold": {
+                "type": "number"
+              },
+              "threshold_fit_cohort_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "threshold_fit_sample_count": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "samples": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sample_id",
+          "task_family",
+          "difficulty_band",
+          "relation",
+          "source_cluster_id",
+          "truth",
+          "detector_results"
+        ],
+        "properties": {
+          "sample_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "task_family": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "difficulty_band": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "exact_replay",
+              "surface_variant",
+              "semantic_equivalent",
+              "fresh_same_recipe",
+              "novel_recipe_same_skill",
+              "unrelated_control"
+            ]
+          },
+          "source_cluster_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "truth": {
+            "type": "string",
+            "enum": [
+              "clean",
+              "contaminated",
+              "indeterminate"
+            ]
+          },
+          "detector_results": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "detector_id",
+                "result"
+              ],
+              "properties": {
+                "detector_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[A-Za-z0-9._:-]+$"
+                },
+                "result": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "status",
+                        "raw_score",
+                        "score_evidence_sha256",
+                        "feature_protocol_sha256"
+                      ],
+                      "properties": {
+                        "status": {
+                          "const": "scored"
+                        },
+                        "raw_score": {
+                          "type": "number"
+                        },
+                        "score_evidence_sha256": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{64}$"
+                        },
+                        "feature_protocol_sha256": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{64}$"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "status",
+                        "reason_code"
+                      ],
+                      "properties": {
+                        "status": {
+                          "const": "abstained"
+                        },
+                        "reason_code": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128,
+                          "pattern": "^[A-Za-z0-9._:-]+$"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "status",
+                        "reason_code"
+                      ],
+                      "properties": {
+                        "status": {
+                          "const": "unavailable"
+                        },
+                        "reason_code": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128,
+                          "pattern": "^[A-Za-z0-9._:-]+$"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
