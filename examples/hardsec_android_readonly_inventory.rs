@@ -248,7 +248,6 @@ fn capture_profile(
     .collect::<Vec<_>>();
 
     let cpu_rows = cpuinfo.map(cpu_feature_rows).unwrap_or_default();
-    let cpu_features = union_features(&cpu_rows);
     let mut cpu_feature_evidence_ids = Vec::new();
     if cpuinfo.is_some() {
         let canonical = cpu_rows
@@ -479,9 +478,15 @@ mod tests {
                     .get(arguments[1])
                     .cloned()
                     .unwrap_or_default())
-            } else if arguments == ["cat", "/proc/cpuinfo"] {
+            } else if arguments.len() == 2
+                && arguments[0] == "cat"
+                && arguments[1] == "/proc/cpuinfo"
+            {
                 Ok("Features : fp asimd mte paca pacg bti\\n".to_owned())
-            } else if arguments == ["simpleperf", "list"] {
+            } else if arguments.len() == 2
+                && arguments[0] == "simpleperf"
+                && arguments[1] == "list"
+            {
                 Ok("List of hardware events:\\ncpu-cycles\\ninstructions\\n".to_owned())
             } else {
                 Err("unexpected ADB command".to_owned())
