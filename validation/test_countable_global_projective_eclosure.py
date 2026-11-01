@@ -26,6 +26,12 @@ class CountableGlobalProjectiveEclosureTests(unittest.TestCase):
             self.assertEqual(result["prefix_mass"], 1 - Fraction(1, n + 1))
         self.assertEqual(coordinate_weight(1, "telescoping"), Fraction(1, 2))
 
+    def test_invalid_weight_scheme_fails_even_for_empty_intersections(self):
+        with self.assertRaisesRegex(ValueError, "weight scheme"):
+            projective_certificate((), {}, scheme="adaptive-current-active")
+        with self.assertRaisesRegex(ValueError, "weight scheme"):
+            finite_weight_mass((), scheme="adaptive-current-active")
+
     def test_global_weight_budget_is_not_renormalized_at_arrival(self):
         self.assertEqual(finite_weight_mass((1, 2), "geometric"), Fraction(3, 4))
         values = {1: Fraction(8), 2: Fraction(16)}
