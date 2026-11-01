@@ -471,7 +471,7 @@ mod tests {
         state: ModelState,
     ) -> usize {
         if remaining == 0 {
-            return usize::from(final_state_matches(&state, trace));
+            return if final_state_matches(&state, trace) { 1 } else { 0 };
         }
         let mut total = 0usize;
         for index in 0..trace.operations.len() {
