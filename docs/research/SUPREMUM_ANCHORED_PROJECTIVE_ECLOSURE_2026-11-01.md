@@ -207,6 +207,8 @@ Thus the portfolio remains valid and the intersection-local values remain additi
 
 The helper is build_additive_anchored_portfolio_e_paths in validation/supremum_anchored_eclosure.py. Tests verify exact convex-mixture arithmetic, baseline retention, closure feasibility, and rejection of invalid/post-hoc weight vectors.
 
+The new pathwise SupFDR regression test also constructs e-BH rejections at every time, verifies all intersection closure inequalities at every step, confirms baseline retention, and checks the pathwise bound for a designated true-null intersection.
+
 A reproducible synthetic stress runner is included at validation/benchmark_supremum_anchored_portfolios.py. It uses Bernoulli likelihood-ratio e-processes under p0=.001, one weighted anytime-e baseline, and four alternative-specific auxiliary e-process experts, each transformed by an admissible running-maximum adjuster. It measures all-null, sparse mild/strong, and dense regimes; reports estimated SupFDR with Monte Carlo standard error, power, baseline retention and extra discoveries; and compares each fixed expert with the fixed-prior portfolio. The best single expert selected after looking at the same run is reported only as an invalid oracle ceiling, not as a valid procedure.
 
 Run:
@@ -226,7 +228,7 @@ A separate local NumPy implementation of the same factor and selector equations 
 | Scenario | Method | Estimated SupFDR | Monte Carlo SE | Final power |
 |---|---|---:|---:|---:|
 | All null | Fixed-prior portfolio | 0.00000 | 0.00000 | n/a |
-| All null | Highest-crossing single expert (p1=.80,beta=.75) | 0.00040 | 0.00028 | n/a |
+| All null | Post-hoc best-power expert (tie; first declared) | n/a | n/a | n/a |
 | Sparse mild (10%, p=.05) | Fixed-prior portfolio | 0.00000 | 0.00000 | 5.14% |
 | Sparse mild | Best single expert (p1=.80,beta=.75) | 0.00000 | 0.00000 | 5.40% |
 | Sparse strong (10%, p=.40) | Fixed-prior portfolio | 0.00019 | 0.00011 | 99.12% |
@@ -234,7 +236,7 @@ A separate local NumPy implementation of the same factor and selector equations 
 | Dense (70%, p=.20) | Fixed-prior portfolio | 0.00001 | 0.00001 | 80.96% |
 | Dense | Best single expert (p1=.20,beta=.50) | 0.00008 | 0.00002 | 89.77% |
 
-Baseline retention was exactly 100% for every method/scenario in this finite run. Under the global null, the fixed-prior portfolio made no discoveries in 5,000 streams; this is not evidence of zero risk. The best single expert was selected post hoc from the same simulated run and is an invalid procedure; it is shown only as a diagnostic upper-bound reference. The valid comparison is the fixed-prior portfolio versus each predeclared single expert.
+Baseline retention was exactly 100% for every method/scenario in this finite run. Under the global null, the fixed-prior portfolio made no discoveries in 5,000 streams; this is not evidence of zero risk. The benchmark's post-hoc best-power selector has a complete power tie under the global null, so its row is not a meaningful false-discovery comparator there. In nonnull scenarios it selects the single expert with highest observed final power from the same simulated run; that is an invalid procedure and is shown only as an oracle ceiling. The valid comparison is the fixed-prior portfolio versus each predeclared single expert.
 
 The fixed prior pays power relative to a well-matched expert in the dense regime, but avoids selecting that expert on the same data. The estimated SupFDR values are Monte Carlo diagnostics and do not establish the guarantee. The theorem follows from the per-coordinate risk budgets, valid likelihood-ratio e-processes, admissible adjusters and fixed mixture.
 
