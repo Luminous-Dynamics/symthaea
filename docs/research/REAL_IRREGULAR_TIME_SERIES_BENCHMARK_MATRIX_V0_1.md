@@ -257,3 +257,30 @@ Nine source-authored scaler tests cover validation/test isolation, overlap
 deduplication, conflicting duplicate rejection, entity/feature separation,
 constant/singleton handling, input-order determinism, split plan validation,
 and non-finite values.
+
+
+## 12. Concrete Time-IMM CSV adapter
+
+The current Time-IMM repository (tree commit
+`e934cef23d526817dcf0d1a66c6f82274c96c04b`) contains the EPA-Air/Bexar
+per-entity files:
+- `time_series.csv` blob `c12a34fa63f6fdab7b9608a3c581b0d929a2626e`,
+  4,370 data rows, columns
+  `date_time,record_id,temp,pm2_5,aqi,ozone`;
+- `text.csv` blob `01840c5b62c699e2a3a9b5d6198067c383df8485`,
+  18 data rows, columns `date_time,record_id,text`.
+
+The visible date_time values are naive local wall-time strings such as
+`2024-01-01 00:00:00`; no timezone or separate arrival timestamp is present
+in these CSV rows. The new `research/irregular-event-contract/src/time_imm.rs`
+adapter parses both schemas but requires the caller to specify an IANA/fixed
+timezone and an explicit availability policy. It rejects ambiguous/nonexistent
+DST times, records timezone and availability-policy digests, hashes exact
+source files and canonical rows, preserves text payload whitespace, and returns
+a quantization-error bound for numeric fixed-point conversion.
+
+This makes dataset ingestion executable without falsely inferring physical
+arrival time. The illustrative America/Chicago parser test is a timezone
+mechanics test, not yet a certified production timezone declaration for the
+dataset. The dataset-specific timezone must be verified before any real-data
+claim. No Time-IMM dataset benchmark has been executed.
