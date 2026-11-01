@@ -12,6 +12,11 @@
 //! source generation.
 
 use std::collections::BTreeMap;
+use std::path::Path;
+use std::time::Duration;
+
+use rusqlite::{params, Connection, Transaction, TransactionBehavior};
+use sha2::{Digest, Sha256};
 
 const MAX_ID_BYTES: usize = 128;
 
@@ -1186,3 +1191,767 @@ mod tests {
         assert_eq!(state.accepted_receipt_count(), 2);
     }
 }
+
+
+// ---------------------------------------------------------------------------
+// SQLite durable backend prototype
+// ---------------------------------------------------------------------------
+//
+// This backend makes the local transaction boundary executable. It is not an
+// external anti-rollback anchor: an attacker who can restore an old database
+// snapshot can restore an old, internally consistent state. The state digest
+// detects accidental/inconsistent modification only; it is unkeyed.
+//
+// One SQLite row per logical record keeps source/log/receipt history queryable.
+// Every accepted receipt transition is written under one BEGIN IMMEDIATE
+// transaction. WAL + synchronous=FULL is set and checked on every connection.
+// The exact expected in-memory snapshot is compared after acquiring the writer
+// transaction; the revision alone is not sufficient.
+
+const SQLITE_SCHEMA: &str = "
+CREATE TABLE IF NOT EXISTS basalt_state_meta (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    revision TEXT NOT NULL,
+    signer_policy_version TEXT,
+    witness_policy_version TEXT,
+    policy_bundle_digest TEXT,
+    state_digest TEXT NOT NULL,
+    CHECK (
+        (signer_policy_version IS NULL AND witness_policy_version IS NULL AND policy_bundle_digest IS NULL)
+        OR
+        (signer_policy_version IS NOT NULL AND witness_policy_version IS NOT NULL AND policy_bundle_digest IS NOT NULL)
+    )
+);
+
+CREATE TABLE IF NOT EXISTS basalt_log_cursors (
+    log_id TEXT PRIMARY KEY,
+    tree_size TEXT NOT NULL,
+    root_digest TEXT NOT NULL,
+    checkpoint_digest TEXT NOT NULL
+) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS basalt_source_cursors (
+    host_id TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    partition_id TEXT NOT NULL,
+    generation TEXT NOT NULL,
+    seal_digest TEXT NOT NULL,
+    receipt_digest TEXT NOT NULL,
+    observer_profile_digest TEXT NOT NULL,
+    boot_incarnation_digest TEXT NOT NULL,
+    PRIMARY KEY (host_id, source_id, partition_id)
+) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS basalt_accepted_receipts (
+    receipt_digest TEXT PRIMARY KEY,
+    host_id TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    partition_id TEXT NOT NULL,
+    generation TEXT NOT NULL,
+    previous_seal_digest TEXT,
+    seal_digest TEXT NOT NULL,
+    observer_profile_digest TEXT NOT NULL,
+    boot_incarnation_digest TEXT NOT NULL,
+    log_id TEXT NOT NULL,
+    tree_size TEXT NOT NULL,
+    root_digest TEXT NOT NULL,
+    checkpoint_digest TEXT NOT NULL,
+    signer_policy_version TEXT NOT NULL,
+    witness_policy_version TEXT NOT NULL,
+    policy_bundle_digest TEXT NOT NULL,
+    UNIQUE (host_id, source_id, partition_id, generation),
+    FOREIGN KEY (host_id, source_id, partition_id)
+        REFERENCES basalt_source_cursors(host_id, source_id, partition_id),
+    FOREIGN KEY (log_id) REFERENCES basalt_log_cursors(log_id)
+) WITHOUT ROWID;
+";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DurableStoreError {
+    Transition(TransitionError),
+    Storage(String),
+    CommitOutcomeIndeterminate(String),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SqliteCommitStage {
+    SourceCursorWritten,
+    LogCursorWritten,
+    ReceiptWritten,
+    MetaWritten,
+}
+
+pub struct SqliteTrustedStateStore {
+    connection: Connection,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SqliteStoreReport {
+    pub report_version: u32,
+    pub backend: String,
+    pub journal_mode: String,
+    pub synchronous_level: i64,
+    pub revision: u64,
+    pub log_cursor_count: usize,
+    pub source_cursor_count: usize,
+    pub accepted_receipt_count: usize,
+    pub state_digest: String,
+    pub local_atomicity_backend_configured: bool,
+    pub local_snapshot_digest_consistent: bool,
+    pub anti_rollback_qualified: bool,
+    pub signature_verification_performed: bool,
+    pub external_freshness_established: bool,
+}
+
+impl SqliteTrustedStateStore {
+    /// Opens or initializes the local state store with a pinned durability
+    /// configuration. The parent directory must already exist.
+    pub fn open(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let mut connection = Connection::open(path.as_ref())
+            .with_context(|| format!("open BASALT SQLite state store at {}", path.as_ref().display()))?;
+        connection.busy_timeout(Duration::from_secs(5))?;
+
+        connection.pragma_update(None, "journal_mode", "WAL")?;
+        let journal_mode: String =
+            connection.pragma_query_value(None, "journal_mode", |row| row.get(0))?;
+        if !journal_mode.eq_ignore_ascii_case("wal") {
+            anyhow::bail!("BASALT SQLite backend requires WAL mode, got {journal_mode}");
+        }
+
+        // SQLite documents synchronous=FULL as syncing the WAL at each
+        // transaction commit. This is a local durability choice, not rollback
+        // protection against restoration of the complete database snapshot.
+        connection.pragma_update(None, "synchronous", 2_i64)?;
+        let synchronous_level: i64 =
+            connection.pragma_query_value(None, "synchronous", |row| row.get(0))?;
+        if synchronous_level != 2 {
+            anyhow::bail!(
+                "BASALT SQLite backend requires synchronous=FULL (2), got {synchronous_level}"
+            );
+        }
+        connection.pragma_update(None, "foreign_keys", 1_i64)?;
+
+        connection.execute_batch(SQLITE_SCHEMA)?;
+        {
+            let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            let existing: Option<i64> = tx
+                .query_row(
+                    "SELECT singleton FROM basalt_state_meta WHERE singleton = 1",
+                    [],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            if existing.is_none() {
+                let initial = TrustedState::new();
+                tx.execute(
+                    "INSERT INTO basalt_state_meta
+                     (singleton, revision, signer_policy_version, witness_policy_version,
+                      policy_bundle_digest, state_digest)
+                     VALUES (1, '0', NULL, NULL, NULL, ?1)",
+                    params![trusted_state_digest(&initial)],
+                )?;
+            }
+            tx.commit()?;
+        }
+
+        // Fail closed on malformed, inconsistent or tampered persisted state.
+        let _ = read_sqlite_state(&connection)?;
+        Ok(Self { connection })
+    }
+
+    pub fn read_state(&self) -> anyhow::Result<TrustedState> {
+        read_sqlite_state(&self.connection)
+    }
+
+    /// Prepares against the exact state currently read from the database.
+    /// The returned plan is still only a proposal until commit_plan succeeds.
+    pub fn preview(&self, candidate: &Candidate) -> anyhow::Result<TransitionDecision> {
+        self.read_state()?
+            .preview(candidate)
+            .map_err(|error| anyhow::anyhow!("BASALT state transition rejected: {error:?}"))
+    }
+
+    pub fn commit_plan(
+        &mut self,
+        plan: AdvancePlan,
+    ) -> Result<CommitOutcome, DurableStoreError> {
+        self.commit_plan_with_hook(plan, |_| Ok(()))
+    }
+
+    fn commit_plan_with_hook<F>(
+        &mut self,
+        plan: AdvancePlan,
+        mut after_stage: F,
+    ) -> Result<CommitOutcome, DurableStoreError>
+    where
+        F: FnMut(SqliteCommitStage) -> anyhow::Result<()>,
+    {
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|error| DurableStoreError::Storage(error.to_string()))?;
+
+        let current = read_sqlite_state(&tx)
+            .map_err(|error| DurableStoreError::Storage(error.to_string()))?;
+
+        if current.revision != plan.expected_revision {
+            return Err(DurableStoreError::Transition(
+                TransitionError::CompareConflict {
+                    expected: plan.expected_revision,
+                    actual: current.revision,
+                },
+            ));
+        }
+        if current != plan.expected_state {
+            return Err(DurableStoreError::Transition(
+                TransitionError::StateSnapshotMismatch {
+                    revision: current.revision,
+                },
+            ));
+        }
+
+        let next_revision = current
+            .revision
+            .checked_add(1)
+            .ok_or_else(|| DurableStoreError::Transition(TransitionError::RevisionOverflow))?;
+        if plan.next_state.revision != next_revision
+            || !plan.next_state.accepted_receipts.contains_key(&plan.receipt_digest)
+        {
+            return Err(DurableStoreError::Transition(
+                TransitionError::InvalidAdvancePlan,
+            ));
+        }
+
+        write_sqlite_transition(&tx, &plan)
+            .map_err(|error| DurableStoreError::Storage(error.to_string()))?;
+        after_stage(SqliteCommitStage::SourceCursorWritten)
+            .map_err(|error| DurableStoreError::Storage(error.to_string()))?;
+        after_stage(SqliteCommitStage::LogCursorWritten)
+            .map_err(|error| DurableStoreError::Storage(error.to_string()))?;
+        after_stage(SqliteCommitStage::ReceiptWritten)
+            .map_err(|error| DurableStoreError::Storage(error.to_string()))?;
+        after_stage(SqliteCommitStage::MetaWritten)
+            .map_err(|error| DurableStoreError::Storage(error.to_string()))?;
+
+        tx.commit().map_err(|error| {
+            DurableStoreError::CommitOutcomeIndeterminate(error.to_string())
+        })?;
+        Ok(CommitOutcome::Committed {
+            revision: plan.next_state.revision,
+        })
+    }
+
+    pub fn report(&self) -> anyhow::Result<SqliteStoreReport> {
+        let state = self.read_state()?;
+        let journal_mode: String =
+            self.connection
+                .pragma_query_value(None, "journal_mode", |row| row.get(0))?;
+        let synchronous_level: i64 =
+            self.connection
+                .pragma_query_value(None, "synchronous", |row| row.get(0))?;
+        Ok(SqliteStoreReport {
+            report_version: 1,
+            backend: "sqlite-wal-full-v1".to_string(),
+            journal_mode,
+            synchronous_level,
+            revision: state.revision,
+            log_cursor_count: state.log_cursors.len(),
+            source_cursor_count: state.source_cursors.len(),
+            accepted_receipt_count: state.accepted_receipts.len(),
+            state_digest: trusted_state_digest(&state),
+            local_atomicity_backend_configured: synchronous_level == 2,
+            local_snapshot_digest_consistent: true,
+            // No independent anti-rollback/freshness anchor is connected here.
+            anti_rollback_qualified: false,
+            signature_verification_performed: false,
+            external_freshness_established: false,
+        })
+    }
+}
+
+fn parse_sql_u64(value: &str, field: &str) -> anyhow::Result<u64> {
+    value
+        .parse::<u64>()
+        .with_context(|| format!("invalid persisted u64 in {field}"))
+}
+
+fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
+    let (
+        revision_text,
+        signer_policy_text,
+        witness_policy_text,
+        policy_bundle_digest,
+        expected_state_digest,
+    ): (String, Option<String>, Option<String>, Option<String>, String) =
+        connection.query_row(
+            "SELECT revision, signer_policy_version, witness_policy_version,
+                    policy_bundle_digest, state_digest
+             FROM basalt_state_meta WHERE singleton = 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+        )?;
+
+    let revision = parse_sql_u64(&revision_text, "revision")?;
+    let policy_versions = match (
+        signer_policy_text,
+        witness_policy_text,
+        policy_bundle_digest,
+    ) {
+        (None, None, None) => None,
+        (Some(signer), Some(witness), Some(bundle_digest)) => {
+            let signer = parse_sql_u64(&signer, "signer_policy_version")?;
+            let witness = parse_sql_u64(&witness, "witness_policy_version")?;
+            if signer == 0 || witness == 0 || !valid_digest(&bundle_digest) {
+                anyhow::bail!("invalid persisted policy version or digest");
+            }
+            Some(PolicyVersions {
+                signer,
+                witness,
+                bundle_digest,
+            })
+        }
+        _ => anyhow::bail!("partial persisted policy-version tuple"),
+    };
+
+    let mut state = TrustedState {
+        revision,
+        log_cursors: BTreeMap::new(),
+        source_cursors: BTreeMap::new(),
+        accepted_receipts: BTreeMap::new(),
+        policy_versions,
+    };
+
+    {
+        let mut statement = connection.prepare(
+            "SELECT log_id, tree_size, root_digest, checkpoint_digest
+             FROM basalt_log_cursors ORDER BY log_id",
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+            ))
+        })?;
+        for row in rows {
+            let (log_id, tree_size, root_digest, checkpoint_digest) = row?;
+            let checkpoint = LogCheckpoint {
+                log_id: log_id.clone(),
+                tree_size: parse_sql_u64(&tree_size, "tree_size")?,
+                root_digest,
+                checkpoint_digest,
+            };
+            if !valid_id(&checkpoint.log_id)
+                || checkpoint.tree_size == 0
+                || !valid_digest(&checkpoint.root_digest)
+                || !valid_digest(&checkpoint.checkpoint_digest)
+                || state.log_cursors.insert(log_id, checkpoint).is_some()
+            {
+                anyhow::bail!("invalid or duplicate persisted log cursor");
+            }
+        }
+    }
+
+    {
+        let mut statement = connection.prepare(
+            "SELECT host_id, source_id, partition_id, generation, seal_digest,
+                    receipt_digest, observer_profile_digest, boot_incarnation_digest
+             FROM basalt_source_cursors ORDER BY host_id, source_id, partition_id",
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, String>(7)?,
+            ))
+        })?;
+        for row in rows {
+            let (
+                host_id,
+                source_id,
+                partition_id,
+                generation,
+                seal_digest,
+                receipt_digest,
+                observer_profile_digest,
+                boot_incarnation_digest,
+            ) = row?;
+            let key = SourceKey {
+                provisioned_host_id: host_id,
+                source_id,
+                partition_id,
+            };
+            let cursor = SourceCursor {
+                generation: parse_sql_u64(&generation, "source generation")?,
+                seal_digest,
+                receipt_digest,
+                observer_profile_digest,
+                boot_incarnation_digest,
+            };
+            if !valid_id(&key.provisioned_host_id)
+                || !valid_id(&key.source_id)
+                || !valid_id(&key.partition_id)
+                || cursor.generation == 0
+                || !valid_digest(&cursor.seal_digest)
+                || !valid_digest(&cursor.receipt_digest)
+                || !valid_digest(&cursor.observer_profile_digest)
+                || !valid_digest(&cursor.boot_incarnation_digest)
+                || state.source_cursors.insert(key, cursor).is_some()
+            {
+                anyhow::bail!("invalid or duplicate persisted source cursor");
+            }
+        }
+    }
+
+    {
+        let mut statement = connection.prepare(
+            "SELECT receipt_digest, host_id, source_id, partition_id, generation,
+                    previous_seal_digest, seal_digest, observer_profile_digest,
+                    boot_incarnation_digest, log_id, tree_size, root_digest,
+                    checkpoint_digest, signer_policy_version, witness_policy_version,
+                    policy_bundle_digest
+             FROM basalt_accepted_receipts ORDER BY receipt_digest",
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, Option<String>>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, String>(7)?,
+                row.get::<_, String>(8)?,
+                row.get::<_, String>(9)?,
+                row.get::<_, String>(10)?,
+                row.get::<_, String>(11)?,
+                row.get::<_, String>(12)?,
+                row.get::<_, String>(13)?,
+                row.get::<_, String>(14)?,
+                row.get::<_, String>(15)?,
+            ))
+        })?;
+        for row in rows {
+            let (
+                receipt_digest,
+                host_id,
+                source_id,
+                partition_id,
+                generation,
+                previous_seal_digest,
+                seal_digest,
+                observer_profile_digest,
+                boot_incarnation_digest,
+                log_id,
+                tree_size,
+                root_digest,
+                checkpoint_digest,
+                signer_policy,
+                witness_policy,
+                bundle_digest,
+            ) = row?;
+            let generation = parse_sql_u64(&generation, "accepted receipt generation")?;
+            let previous_valid = if generation == 1 {
+                previous_seal_digest.is_none()
+            } else {
+                previous_seal_digest.as_deref().is_some_and(valid_digest)
+            };
+            let receipt = AcceptedReceipt {
+                source: SourceKey {
+                    provisioned_host_id: host_id,
+                    source_id,
+                    partition_id,
+                },
+                generation,
+                previous_seal_digest,
+                seal_digest,
+                receipt_digest: receipt_digest.clone(),
+                observer_profile_digest,
+                boot_incarnation_digest,
+                checkpoint: LogCheckpoint {
+                    log_id,
+                    tree_size: parse_sql_u64(&tree_size, "accepted tree_size")?,
+                    root_digest,
+                    checkpoint_digest,
+                },
+                policy_versions: PolicyVersions {
+                    signer: parse_sql_u64(&signer_policy, "accepted signer policy")?,
+                    witness: parse_sql_u64(&witness_policy, "accepted witness policy")?,
+                    bundle_digest,
+                },
+            };
+            if !valid_digest(&receipt_digest)
+                || !valid_id(&receipt.source.provisioned_host_id)
+                || !valid_id(&receipt.source.source_id)
+                || !valid_id(&receipt.source.partition_id)
+                || !previous_valid
+                || !valid_digest(&receipt.seal_digest)
+                || !valid_digest(&receipt.observer_profile_digest)
+                || !valid_digest(&receipt.boot_incarnation_digest)
+                || !valid_id(&receipt.checkpoint.log_id)
+                || receipt.checkpoint.tree_size == 0
+                || !valid_digest(&receipt.checkpoint.root_digest)
+                || !valid_digest(&receipt.checkpoint.checkpoint_digest)
+                || receipt.policy_versions.signer == 0
+                || receipt.policy_versions.witness == 0
+                || !valid_digest(&receipt.policy_versions.bundle_digest)
+                || state.accepted_receipts.insert(receipt_digest, receipt).is_some()
+            {
+                anyhow::bail!("invalid or duplicate persisted accepted receipt");
+            }
+        }
+    }
+
+    for (key, cursor) in &state.source_cursors {
+        let accepted = state
+            .accepted_receipts
+            .get(&cursor.receipt_digest)
+            .ok_or_else(|| anyhow::anyhow!("source cursor has no accepted receipt record"))?;
+        if &accepted.source != key
+            || accepted.generation != cursor.generation
+            || accepted.seal_digest != cursor.seal_digest
+            || accepted.observer_profile_digest != cursor.observer_profile_digest
+            || accepted.boot_incarnation_digest != cursor.boot_incarnation_digest
+        {
+            anyhow::bail!("source cursor does not match its accepted receipt");
+        }
+    }
+
+    for (log_id, cursor) in &state.log_cursors {
+        if !state.accepted_receipts.values().any(|receipt| {
+            receipt.checkpoint.log_id == *log_id && receipt.checkpoint == *cursor
+        }) {
+            anyhow::bail!("log cursor has no matching accepted receipt checkpoint");
+        }
+    }
+
+    let actual_state_digest = trusted_state_digest(&state);
+    if actual_state_digest != expected_state_digest {
+        anyhow::bail!("persisted trusted-state digest mismatch");
+    }
+    Ok(state)
+}
+
+fn write_sqlite_transition(
+    transaction: &Transaction<'_>,
+    plan: &AdvancePlan,
+) -> anyhow::Result<()> {
+    let receipt = plan
+        .next_state
+        .accepted_receipts
+        .get(&plan.receipt_digest)
+        .ok_or_else(|| anyhow::anyhow!("advance plan receipt is absent from next state"))?;
+    let source = plan
+        .next_state
+        .source_cursors
+        .get(&receipt.source)
+        .ok_or_else(|| anyhow::anyhow!("advance plan source cursor is absent from next state"))?;
+    let checkpoint = plan
+        .next_state
+        .log_cursors
+        .get(&receipt.checkpoint.log_id)
+        .ok_or_else(|| anyhow::anyhow!("advance plan log cursor is absent from next state"))?;
+    let policies = plan
+        .next_state
+        .policy_versions
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("advance plan policy versions are absent"))?;
+
+    transaction.execute(
+        "INSERT INTO basalt_source_cursors
+         (host_id, source_id, partition_id, generation, seal_digest, receipt_digest,
+          observer_profile_digest, boot_incarnation_digest)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+         ON CONFLICT(host_id, source_id, partition_id) DO UPDATE SET
+          generation=excluded.generation,
+          seal_digest=excluded.seal_digest,
+          receipt_digest=excluded.receipt_digest,
+          observer_profile_digest=excluded.observer_profile_digest,
+          boot_incarnation_digest=excluded.boot_incarnation_digest",
+        params![
+            receipt.source.provisioned_host_id,
+            receipt.source.source_id,
+            receipt.source.partition_id,
+            source.generation.to_string(),
+            source.seal_digest,
+            source.receipt_digest,
+            source.observer_profile_digest,
+            source.boot_incarnation_digest,
+        ],
+    )?;
+
+    transaction.execute(
+        "INSERT INTO basalt_log_cursors (log_id, tree_size, root_digest, checkpoint_digest)
+         VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT(log_id) DO UPDATE SET
+          tree_size=excluded.tree_size,
+          root_digest=excluded.root_digest,
+          checkpoint_digest=excluded.checkpoint_digest",
+        params![
+            checkpoint.log_id,
+            checkpoint.tree_size.to_string(),
+            checkpoint.root_digest,
+            checkpoint.checkpoint_digest,
+        ],
+    )?;
+
+    transaction.execute(
+        "INSERT INTO basalt_accepted_receipts
+         (receipt_digest, host_id, source_id, partition_id, generation,
+          previous_seal_digest, seal_digest, observer_profile_digest,
+          boot_incarnation_digest, log_id, tree_size, root_digest,
+          checkpoint_digest, signer_policy_version, witness_policy_version,
+          policy_bundle_digest)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+        params![
+            receipt.receipt_digest,
+            receipt.source.provisioned_host_id,
+            receipt.source.source_id,
+            receipt.source.partition_id,
+            receipt.generation.to_string(),
+            receipt.previous_seal_digest,
+            receipt.seal_digest,
+            receipt.observer_profile_digest,
+            receipt.boot_incarnation_digest,
+            receipt.checkpoint.log_id,
+            receipt.checkpoint.tree_size.to_string(),
+            receipt.checkpoint.root_digest,
+            receipt.checkpoint.checkpoint_digest,
+            receipt.policy_versions.signer.to_string(),
+            receipt.policy_versions.witness.to_string(),
+            receipt.policy_versions.bundle_digest,
+        ],
+    )?;
+
+    let updated = transaction.execute(
+        "UPDATE basalt_state_meta
+         SET revision=?1, signer_policy_version=?2, witness_policy_version=?3,
+             policy_bundle_digest=?4, state_digest=?5
+         WHERE singleton=1",
+        params![
+            plan.next_state.revision.to_string(),
+            policies.signer.to_string(),
+            policies.witness.to_string(),
+            policies.bundle_digest,
+            trusted_state_digest(&plan.next_state),
+        ],
+    )?;
+    if updated != 1 {
+        anyhow::bail!("expected exactly one BASALT state-meta row to advance");
+    }
+    Ok(())
+}
+
+fn hash_state_string(hasher: &mut Sha256, value: &str) {
+    hasher.update((value.len() as u64).to_be_bytes());
+    hasher.update(value.as_bytes());
+}
+
+fn hash_state_u64(hasher: &mut Sha256, value: u64) {
+    hasher.update(value.to_be_bytes());
+}
+
+fn hash_state_optional_string(hasher: &mut Sha256, value: Option<&str>) {
+    match value {
+        Some(value) => {
+            hasher.update([1_u8]);
+            hash_state_string(hasher, value);
+        }
+        None => hasher.update([0_u8]),
+    }
+}
+
+/// Deterministic, domain-separated digest of the normalized local state.
+/// It detects accidental inconsistency; it is not keyed and cannot prevent a
+/// capable attacker from restoring/recomputing an older complete database.
+pub fn trusted_state_digest(state: &TrustedState) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"basalt.trusted-state.snapshot.v1\0");
+    hash_state_u64(&mut hasher, state.revision);
+
+    match &state.policy_versions {
+        Some(policy) => {
+            hasher.update([1_u8]);
+            hash_state_u64(&mut hasher, policy.signer);
+            hash_state_u64(&mut hasher, policy.witness);
+            hash_state_string(&mut hasher, &policy.bundle_digest);
+        }
+        None => hasher.update([0_u8]),
+    }
+
+    hash_state_u64(&mut hasher, state.log_cursors.len() as u64);
+    for (log_id, checkpoint) in &state.log_cursors {
+        hash_state_string(&mut hasher, log_id);
+        hash_state_u64(&mut hasher, checkpoint.tree_size);
+        hash_state_string(&mut hasher, &checkpoint.root_digest);
+        hash_state_string(&mut hasher, &checkpoint.checkpoint_digest);
+    }
+
+    hash_state_u64(&mut hasher, state.source_cursors.len() as u64);
+    for (key, cursor) in &state.source_cursors {
+        hash_state_string(&mut hasher, &key.provisioned_host_id);
+        hash_state_string(&mut hasher, &key.source_id);
+        hash_state_string(&mut hasher, &key.partition_id);
+        hash_state_u64(&mut hasher, cursor.generation);
+        hash_state_string(&mut hasher, &cursor.seal_digest);
+        hash_state_string(&mut hasher, &cursor.receipt_digest);
+        hash_state_string(&mut hasher, &cursor.observer_profile_digest);
+        hash_state_string(&mut hasher, &cursor.boot_incarnation_digest);
+    }
+
+    hash_state_u64(&mut hasher, state.accepted_receipts.len() as u64);
+    for (digest, receipt) in &state.accepted_receipts {
+        hash_state_string(&mut hasher, digest);
+        hash_state_string(&mut hasher, &receipt.source.provisioned_host_id);
+        hash_state_string(&mut hasher, &receipt.source.source_id);
+        hash_state_string(&mut hasher, &receipt.source.partition_id);
+        hash_state_u64(&mut hasher, receipt.generation);
+        hash_state_optional_string(&mut hasher, receipt.previous_seal_digest.as_deref());
+        hash_state_string(&mut hasher, &receipt.seal_digest);
+        hash_state_string(&mut hasher, &receipt.receipt_digest);
+        hash_state_string(&mut hasher, &receipt.observer_profile_digest);
+        hash_state_string(&mut hasher, &receipt.boot_incarnation_digest);
+        hash_state_string(&mut hasher, &receipt.checkpoint.log_id);
+        hash_state_u64(&mut hasher, receipt.checkpoint.tree_size);
+        hash_state_string(&mut hasher, &receipt.checkpoint.root_digest);
+        hash_state_string(&mut hasher, &receipt.checkpoint.checkpoint_digest);
+        hash_state_u64(&mut hasher, receipt.policy_versions.signer);
+        hash_state_u64(&mut hasher, receipt.policy_versions.witness);
+        hash_state_string(&mut hasher, &receipt.policy_versions.bundle_digest);
+    }
+
+    let digest = hasher.finalize();
+    let hex: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
+    format!("sha256:{hex}")
+}
+
+#[cfg(test)]
+fn temporary_sqlite_path(label: &str) -> std::path::PathBuf {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    std::env::temp_dir().join(format!(
+        "basalt-{label}-{}-{nonce}-{}.sqlite",
+        std::process::id(),
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    ))
+}
+
+#[cfg(test)]
+fn cleanup_sqlite_path(path: &Path) {
+    let _ = std::fs::remove_file(path);
+    let _ = std::fs::remove_file(path.with_extension("sqlite-wal"));
+    let _ = std::fs::remove_file(path.with_extension("sqlite-shm"));
+}
+
