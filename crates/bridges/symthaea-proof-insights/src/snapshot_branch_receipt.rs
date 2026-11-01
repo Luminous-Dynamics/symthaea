@@ -100,6 +100,24 @@ fn safe_relative_path(value: &str) -> Result<()> {
     Ok(())
 }
 
+pub fn compute_live_proof_state_sha256(value: &Value) -> Result<String> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"PITB-LIVE-PROOF-STATE-V0\\0");
+    for path in [
+        "/environment/environment_sha256",
+        "/proof_state/goal_metadata_sha256",
+        "/proof_state/target_expr_sha256",
+        "/proof_state/local_context_sha256",
+        "/proof_state/metavar_context_sha256",
+    ] {
+        let digest = string(value, path)?;
+        require_digest(digest, path, 64)?;
+        let bytes = hex::decode(digest).context("decode live proof-state component digest")?;
+        hasher.update(bytes);
+    }
+    Ok(hex::encode(hasher.finalize()))
+}
+
 pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<ReceiptSummary> {
     if string(value, "/schema_version")? != SCHEMA_VERSION {
         bail!("unsupported snapshot receipt schema version");
@@ -124,6 +142,11 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<ReceiptSu
 
     let environment_sha256 = string(value, "/environment/environment_sha256")?.to_owned();
     require_digest(&environment_sha256, "environment_sha256", 64)?;
+    let computed_live_state = compute_live_proof_state_sha256(value)?;
+    let claimed_live_state = string(value, "/proof_state/proof_state_sha256")?;
+    if claimed_live_state != computed_live_state {
+        bail!("snapshot proof_state_sha256 does not bind environment, goal, target, local context and MetavarContext");
+    }
     for path in [
         "/environment/lean_binary_sha256",
         "/environment/lean_runtime_manifest_sha256",
