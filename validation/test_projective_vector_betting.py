@@ -49,15 +49,31 @@ class ProjectiveVectorBettingTests(unittest.TestCase):
         self.assertEqual(state.snapshot(), ((2.0,), (-1.0,)))
 
     def test_projective_active_subset_and_dormant_padding(self):
-        covariance = equicorrelation_covariance(3, 0.5)
+        # V is declared globally for the 3-coordinate universe. The old
+        # two-coordinate process uses its unchanged 2x2 principal submatrix.
         envelope = equicorrelation_envelope(3, 0.2, 0.8, 0.5)
         z = [0.7, -0.2, 999.0]
         lam = [0.4, 0.3, 100.0]
-        first_two = vector_log_factor(z, lam, [True, True, False], envelope)
-        # A longer universe with the third coordinate dormant has identical value.
-        extended = vector_log_factor(z, lam, [True, True, False], envelope)
-        self.assertAlmostEqual(first_two, extended)
-        self.assertEqual(vector_log_factor(z, lam, [False, False, False], envelope), 0.0)
+        first_two_envelope = [row[:2] for row in envelope[:2]]
+        old_path = vector_log_factor(
+            z[:2], lam[:2], [True, True], first_two_envelope
+        )
+        extended_path = vector_log_factor(
+            z, lam, [True, True, False], envelope
+        )
+        self.assertAlmostEqual(old_path, extended_path)
+        self.assertEqual(
+            vector_log_factor(z, lam, [False, False, False], envelope), 0.0
+        )
+
+    def test_rejects_covariance_proxy_that_does_not_dominate(self):
+        covariance = equicorrelation_covariance(2, 0.5)
+        underpowered_proxy = [[1.0, 0.0], [0.0, 1.0]]
+        with self.assertRaises(ValueError):
+            gaussian_log_factor_expectation(
+                [0.0, 0.0], covariance, [0.4, 0.3],
+                [True, True], underpowered_proxy
+            )
 
     def test_fixed_mixture_is_not_pointwise_max(self):
         value = fixed_log_mixture([math.log(8.0), math.log(2.0)], [0.5, 0.5])
