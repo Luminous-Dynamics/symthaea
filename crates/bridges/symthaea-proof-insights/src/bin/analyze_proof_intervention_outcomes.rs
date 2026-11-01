@@ -277,13 +277,19 @@ fn validate_and_analyze(
         .context("plan arms must be an array")?;
     let mut arm_ids = Vec::new();
     let mut arm_roles = BTreeMap::<String, String>::new();
+    let mut arm_policy_sha256 = BTreeMap::<String, String>::new();
+    let mut arm_config_sha256 = BTreeMap::<String, String>::new();
     let mut arm_successes = BTreeMap::<String, u64>::new();
     let mut arm_costs = BTreeMap::<String, u128>::new();
     for arm in arms {
         let arm_id = string(arm, "/arm_id")?.to_owned();
         let role = string(arm, "/role")?.to_owned();
+        let arm_policy = string(arm, "/policy_sha256")?.to_owned();
+        let arm_config = string(arm, "/config_sha256")?.to_owned();
         arm_ids.push(arm_id.clone());
         let _ = arm_roles.insert(arm_id.clone(), role);
+        let _ = arm_policy_sha256.insert(arm_id.clone(), arm_policy);
+        let _ = arm_config_sha256.insert(arm_id.clone(), arm_config);
         let _ = arm_successes.insert(arm_id.clone(), 0);
         let _ = arm_costs.insert(arm_id, 0);
     }
@@ -356,6 +362,17 @@ fn validate_and_analyze(
                 bail!("outcome {run_id} has {label} drift from its paired assignment");
             }
         }
+        if string(outcome, "/model_id")? != string(plan, "/model/model_id")?
+            || string(outcome, "/model_version")? != string(plan, "/model/model_version")?
+        {
+            bail!("outcome {run_id} model identity/version differs from frozen trial plan");
+        }
+        if string(outcome, "/arm_policy_sha256")? != arm_policy_sha256[&arm_id]
+            || string(outcome, "/arm_config_sha256")? != arm_config_sha256[&arm_id]
+        {
+            bail!("outcome {run_id} arm policy/configuration differs from frozen arm definition");
+        }
+
         if string(outcome, "/evaluation_horizon_id")? != horizon
             || string(outcome, "/continuation_policy_sha256")? != continuation
         {
@@ -439,8 +456,13 @@ fn validate_and_analyze(
                 lean_toolchain: string(outcome, "/lean_toolchain")?,
                 environment_sha256: string(outcome, "/environment_sha256")?,
                 initial_proof_state_sha256: string(outcome, "/initial_proof_state_sha256")?,
+                initial_state_receipt_sha256: string(outcome, "/initial_state_receipt_sha256")?,
                 target_statement_sha256: string(outcome, "/target_statement_sha256")?,
                 model_seed_sha256: string(outcome, "/model_seed_sha256")?,
+                model_id: string(outcome, "/model_id")?,
+                model_version: string(outcome, "/model_version")?,
+                arm_policy_sha256: string(outcome, "/arm_policy_sha256")?,
+                arm_config_sha256: string(outcome, "/arm_config_sha256")?,
                 evaluation_horizon_id: horizon,
                 continuation_policy_sha256: continuation,
                 execution_order_index: expected_index as u64,
@@ -848,6 +870,10 @@ fn synthesize_outcomes(plan: &Value) -> Result<Vec<Value>> {
                 "initial_state_receipt_sha256":pair["initial_state_receipt_sha256"],
                 "target_statement_sha256":pair["target_statement_sha256"],
                 "model_seed_sha256":pair["model_seed_sha256"],
+                "model_id":plan["model"]["model_id"],
+                "model_version":plan["model"]["model_version"],
+                "arm_policy_sha256":arm["policy_sha256"],
+                "arm_config_sha256":arm["config_sha256"],
                 "evaluation_horizon_id":horizon,
                 "continuation_policy_sha256":continuation,
                 "execution_order_index":position,
