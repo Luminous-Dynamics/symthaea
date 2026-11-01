@@ -455,7 +455,6 @@ fn validate_replicate(
         .training_rng_seed_commitment_sha256
         != replicate.design.training_rng_seed_commitment_sha256
         || replicate.training_receipt_audit.design_sha256 != replicate.manifest.design_sha256
-        || replicate.training_receipt_audit.manifest_sha256 != replicate.manifest.manifest_sha256
         || replicate
             .training_receipt_audit
             .intervention_manifest_sha256
@@ -1209,8 +1208,8 @@ mod tests {
             experiment_id: design.experiment_id.clone(),
             replicate_id: suffix.clone(),
             design_sha256: manifest.design_sha256.clone(),
-            manifest_sha256: manifest.manifest_sha256.clone(),
-            seed_commitment_sha256: manifest.randomization_seed_commitment_sha256.clone(),
+            intervention_manifest_sha256: manifest.manifest_sha256.clone(),
+            training_rng_seed_commitment_sha256: design.training_rng_seed_commitment_sha256.clone(),
             training_rng_seed_commitment_sha256: design.training_rng_seed_commitment_sha256.clone(),
             treatment_run_id: format!("treatment-run-{index}"),
             placebo_run_id: format!("placebo-run-{index}"),
