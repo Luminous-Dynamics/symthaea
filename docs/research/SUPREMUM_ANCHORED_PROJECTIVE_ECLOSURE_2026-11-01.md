@@ -219,6 +219,26 @@ python validation/benchmark_supremum_anchored_portfolios.py \
 
 This remains a synthetic model-specific benchmark, not an industry-wide SOTA comparison. Its statistical guarantee follows from the likelihood-ratio e-processes, admissible adjusters and ex-ante budget condition, not from the simulated SupFDR estimate. Tests are authored but not run from a repository checkout.
 
+### Independent exploratory reference run
+
+A separate local NumPy implementation of the same factor and selector equations was run with n=60, T=20, 5,000 streams per scenario, alpha=.05, p0=.001, q_total=.02, v_total=.98, baseline likelihood alternative p1=.05, and four auxiliary experts p1={.01,.05,.20,.80} with beta={0,.25,.50,.75}. The prior was uniform and fixed before the run. The registered alternative groups occupied the first 10% (sparse) or 70% (dense) of coordinates.
+
+| Scenario | Method | Estimated SupFDR | Monte Carlo SE | Final power |
+|---|---|---:|---:|---:|
+| All null | Fixed-prior portfolio | 0.00000 | 0.00000 | n/a |
+| All null | Highest-crossing single expert (p1=.80,beta=.75) | 0.00040 | 0.00028 | n/a |
+| Sparse mild (10%, p=.05) | Fixed-prior portfolio | 0.00000 | 0.00000 | 5.14% |
+| Sparse mild | Best single expert (p1=.80,beta=.75) | 0.00000 | 0.00000 | 5.40% |
+| Sparse strong (10%, p=.40) | Fixed-prior portfolio | 0.00019 | 0.00011 | 99.12% |
+| Sparse strong | Best single expert (p1=.20,beta=.50) | 0.00003 | 0.00003 | 99.57% |
+| Dense (70%, p=.20) | Fixed-prior portfolio | 0.00001 | 0.00001 | 80.96% |
+| Dense | Best single expert (p1=.20,beta=.50) | 0.00008 | 0.00002 | 89.77% |
+
+Baseline retention was exactly 100% for every method/scenario in this finite run. Under the global null, the fixed-prior portfolio made no discoveries in 5,000 streams; this is not evidence of zero risk. The best single expert was selected post hoc from the same simulated run and is an invalid procedure; it is shown only as a diagnostic upper-bound reference. The valid comparison is the fixed-prior portfolio versus each predeclared single expert.
+
+The fixed prior pays power relative to a well-matched expert in the dense regime, but avoids selecting that expert on the same data. The estimated SupFDR values are Monte Carlo diagnostics and do not establish the guarantee. The theorem follows from the per-coordinate risk budgets, valid likelihood-ratio e-processes, admissible adjusters and fixed mixture.
+
+
 
 ### Scaling benchmark
 
