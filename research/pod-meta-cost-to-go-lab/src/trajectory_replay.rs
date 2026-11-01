@@ -1,6 +1,4 @@
-use crate::{
-    HistoricalCostBaseline, ProofFrontierFeatures, ResourceVector, TerminalOutcome,
-};
+use crate::{HistoricalCostBaseline, ProofFrontierFeatures, ResourceVector, TerminalOutcome};
 
 const RESOURCE_DIMENSIONS: usize = 6;
 
@@ -98,10 +96,7 @@ impl PrefixCostForecast {
 pub trait PrefixForecaster {
     fn model_digest(&self) -> [u8; 32];
 
-    fn predict(
-        &self,
-        prefix: &PrefixView,
-    ) -> Result<PrefixCostForecast, PrefixForecasterError>;
+    fn predict(&self, prefix: &PrefixView) -> Result<PrefixCostForecast, PrefixForecasterError>;
 }
 
 /// Simple baseline using the last observed action cost, or a declared cold
@@ -146,10 +141,7 @@ impl PrefixForecaster for LastObservedActionForecaster {
         self.model_digest
     }
 
-    fn predict(
-        &self,
-        prefix: &PrefixView,
-    ) -> Result<PrefixCostForecast, PrefixForecasterError> {
+    fn predict(&self, prefix: &PrefixView) -> Result<PrefixCostForecast, PrefixForecasterError> {
         self.validate()?;
         let unit_cost = prefix
             .last_observed_action_cost
@@ -330,9 +322,7 @@ impl ActionTrajectory {
             if is_zero(action.meter_receipt_digest) {
                 return Err(TrajectoryReplayError::MissingMeterReceipt);
             }
-            if index > 0
-                && self.actions[index - 1].post_state_digest != action.pre_state_digest
-            {
+            if index > 0 && self.actions[index - 1].post_state_digest != action.pre_state_digest {
                 return Err(TrajectoryReplayError::BrokenStateChain);
             }
             if action.kind == TrajectoryActionKind::IndependentVerifier
@@ -344,18 +334,10 @@ impl ActionTrajectory {
 
         match self.terminal.outcome {
             Some(TerminalOutcome::SufficientProof) => {
-                if self
-                    .terminal
-                    .evaluator_receipt_digest
-                    .is_none_or(is_zero)
-                {
+                if self.terminal.evaluator_receipt_digest.is_none_or(is_zero) {
                     return Err(TrajectoryReplayError::MissingTerminalEvidence);
                 }
-                if self
-                    .terminal
-                    .completion_verifier_digest
-                    .is_none_or(is_zero)
-                {
+                if self.terminal.completion_verifier_digest.is_none_or(is_zero) {
                     return Err(TrajectoryReplayError::MissingCompletionVerifier);
                 }
                 if self.actions.last().map(|action| action.kind)
@@ -679,11 +661,7 @@ mod tests {
     }
 
     fn forecaster() -> LastObservedActionForecaster {
-        LastObservedActionForecaster::new(
-            [70; 32],
-            ResourceVector::new(2, 1, 1, 0, 1, 1),
-        )
-        .unwrap()
+        LastObservedActionForecaster::new([70; 32], ResourceVector::new(2, 1, 1, 0, 1, 1)).unwrap()
     }
 
     #[test]
@@ -703,8 +681,7 @@ mod tests {
     fn changing_suffix_cost_does_not_change_earlier_prefix_or_forecast() {
         let original = trace(Some(TerminalOutcome::SufficientProof));
         let mut altered = original.clone();
-        altered.actions[1].measured_cost =
-            ResourceVector::new(200, 7, 9, 4, 12, 18);
+        altered.actions[1].measured_cost = ResourceVector::new(200, 7, 9, 4, 12, 18);
         let original_prefix = original.prefix_view(1).unwrap();
         let altered_prefix = altered.prefix_view(1).unwrap();
         assert_eq!(original_prefix, altered_prefix);
@@ -822,10 +799,7 @@ mod tests {
         let cold_start = trace(Some(TerminalOutcome::SufficientProof))
             .prefix_view(0)
             .unwrap();
-        assert_eq!(
-            predictor.predict(&cold_start).unwrap().q50.tokens,
-            4
-        );
+        assert_eq!(predictor.predict(&cold_start).unwrap().q50.tokens, 4);
     }
 
     #[test]
