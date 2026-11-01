@@ -183,7 +183,7 @@
           "items": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 10000,
+            "maxItems": 10001,
             "items": {
               "type": "number",
               "minimum": 0,
@@ -205,7 +205,7 @@
           "items": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 10000,
+            "maxItems": 10001,
             "items": {
               "type": "number",
               "minimum": 0,
