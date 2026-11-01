@@ -364,12 +364,19 @@ pub fn validate_mlperf_tiny_static_contract(
                 })?;
                 require_digest(field, value)?;
             }
-            if contract.candidate_model_sha256 != contract.reference_model_sha256.as_deref().unwrap_or("")
-                || contract.candidate_weights_sha256 != contract.reference_weights_sha256.as_deref().unwrap_or("")
-            {
+            if contract.candidate_model_sha256 != contract.reference_model_sha256.as_deref().unwrap_or("") {
                 return Err(MlperfTinyContractError::new(
                     "reference_model",
-                    "Closed division must preserve the exact reference model and weights",
+                    "Closed division must preserve the exact reference model graph",
+                ));
+            }
+            let reference_weights = contract.reference_weights_sha256.as_deref().unwrap_or("");
+            if contract.candidate_weights_sha256 != reference_weights
+                && contract.candidate_quantization_recipe_sha256.is_none()
+            {
+                return Err(MlperfTinyContractError::new(
+                    "candidate_weights_sha256",
+                    "Closed division may transform reference weights only through a pinned quantization recipe",
                 ));
             }
             if contract.preprocessing_sha256 != contract.reference_preprocessing_sha256.as_deref().unwrap_or("")
@@ -905,9 +912,14 @@ mod tests {
     }
 
     #[test]
-    fn closed_contract_rejects_reference_weight_substitution() {
+    fn closed_contract_allows_only_pinned_quantization_weight_transformations() {
         let mut contract = closed_contract(MlperfTinyTask::KeywordSpotting);
         contract.candidate_weights_sha256 = sha('9');
+        contract.contract_sha256 = compute_mlperf_tiny_contract_sha256(&contract).unwrap();
+        validate_mlperf_tiny_static_contract(&contract).unwrap();
+
+        contract.candidate_quantization_recipe_sha256 = None;
+        contract.calibration_split_sha256 = None;
         contract.contract_sha256 = compute_mlperf_tiny_contract_sha256(&contract).unwrap();
         assert!(validate_mlperf_tiny_static_contract(&contract).is_err());
     }
