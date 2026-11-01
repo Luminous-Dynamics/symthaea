@@ -250,6 +250,7 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<Integrity
     check_digest(&statement_sha256, "target.statement_sha256", 64)?;
     let task_manifest = string(value, "/dataset/task_manifest_sha256")?;
     check_digest(task_manifest, "dataset.task_manifest_sha256", 64)?;
+    let _ = optional_digest_field(value, "/reviewer_key_registry_sha256")?;
     let repository_commit = string(value, "/target/repository_commit")?;
     check_digest(repository_commit, "target.repository_commit", 40)?;
     check_relative_path(string(value, "/target/source_path")?)?;
@@ -778,7 +779,11 @@ pub fn verify_bytes(bytes: &[u8], expected_sha256: Option<&str>) -> Result<Integ
         }
     }
     let value: Value = serde_json::from_slice(bytes).context("parse benchmark integrity receipt")?;
-    validate_value(&value, actual_sha256)
+    let summary = validate_value(&value, actual_sha256)?;
+    if summary.integrity_status == "eligible" {
+        bail!("eligible receipts require exact evidence artifacts and a reviewer signature from a pinned key registry");
+    }
+    Ok(summary)
 }
 
 pub fn verify_file(path: &Path, expected_sha256: Option<&str>) -> Result<IntegritySummary> {
@@ -791,12 +796,19 @@ pub fn verify_bytes_with_evidence_root(
     expected_sha256: Option<&str>,
     evidence_root: &Path,
 ) -> Result<IntegritySummary> {
-    let mut summary = verify_bytes(bytes, expected_sha256)?;
+    let actual_receipt_sha256 = hex::encode(Sha256::digest(bytes));
+    if let Some(expected) = expected_sha256 {
+        check_digest(expected, "expected receipt SHA-256", 64)?;
+        if expected != actual_receipt_sha256 {
+            bail!("benchmark integrity receipt bytes do not match the expected SHA-256");
+        }
+    }
     let value: Value =
         serde_json::from_slice(bytes).context("parse benchmark integrity receipt for evidence bundle")?;
+    let mut summary = validate_value(&value, actual_receipt_sha256)?;
     summary.verified_evidence_artifact_count = verify_evidence_artifacts(&value, evidence_root)?;
-    if summary.integrity_status == "eligible" && summary.verified_evidence_artifact_count != 11 {
-        bail!("eligible integrity receipt did not verify all eleven evidence artifacts");
+    if summary.integrity_status == "eligible" {
+        bail!("eligible receipts require an externally pinned reviewer registry and Ed25519 signature verification");
     }
     Ok(summary)
 }
