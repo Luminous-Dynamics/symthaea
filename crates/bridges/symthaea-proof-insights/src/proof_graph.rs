@@ -184,6 +184,7 @@ pub fn validate_value(value: &Value) -> Result<ProofGraphSummary> {
             bail!("declaration {id} has an unsupported lifecycle state");
         }
         let dependencies = string_array(row, &format!("{prefix}/dependency_ids"))?;
+        require_sorted(&dependencies, &format!("{prefix}/dependency_ids"))?;
         if dependencies.iter().any(|dependency| dependency == &id) {
             bail!("declaration {id} cannot depend on itself");
         }
@@ -258,6 +259,7 @@ pub fn validate_value(value: &Value) -> Result<ProofGraphSummary> {
     }
 
     let roots = string_array(value, "/root_declaration_ids")?;
+    require_sorted(&roots, "/root_declaration_ids")?;
     if roots.is_empty() {
         bail!("at least one root declaration is required");
     }
@@ -285,6 +287,11 @@ pub fn validate_value(value: &Value) -> Result<ProofGraphSummary> {
         let declaration_id = string(row, &format!("{prefix}/declaration_id"))?;
         if !declarations.contains_key(declaration_id) {
             bail!("goal {id} references missing declaration {declaration_id}");
+        }
+        if string(&declarations[declaration_id], "/lifecycle_state")? == "discarded"
+            && string(row, &format!("{prefix}/status"))? != "discarded"
+        {
+            bail!("goal {id} is active beneath a discarded declaration");
         }
         check_digest(
             string(row, &format!("{prefix}/normalized_goal_sha256"))?,
@@ -334,6 +341,7 @@ pub fn validate_value(value: &Value) -> Result<ProofGraphSummary> {
         }
         let status = string(row, &format!("{prefix}/status"))?;
         let subgoals = string_array(row, &format!("{prefix}/subgoal_ids"))?;
+        require_sorted(&subgoals, &format!("{prefix}/subgoal_ids"))?;
         let transition = optional_digest(row, &format!("{prefix}/transition_receipt_sha256"))?;
         let terminal_proof = optional_digest(row, &format!("{prefix}/terminal_proof_sha256"))?;
         let terminal_receipt = optional_digest(row, &format!("{prefix}/terminal_receipt_sha256"))?;
@@ -415,6 +423,22 @@ pub fn validate_value(value: &Value) -> Result<ProofGraphSummary> {
             if !witness {
                 bail!("closed goal {goal_id} has no applied AND/OR proof hyperedge with all subgoals closed");
             }
+            let terminal_witness = applied_steps_by_goal
+                .get(goal_id)
+                .into_iter()
+                .flatten()
+                .find(|(_, subgoals)| subgoals.is_empty());
+            if let Some((step_id, _)) = terminal_witness {
+                let terminal = step_rows
+                    .iter()
+                    .find(|step| step.get("step_id").and_then(Value::as_str) == Some(step_id.as_str()))
+                    .context("terminal proof step missing")?;
+                if string(terminal, "/terminal_proof_sha256")? != string(goal, "/closure_proof_sha256")?
+                    || string(terminal, "/terminal_receipt_sha256")? != string(goal, "/closure_receipt_sha256")?
+                {
+                    bail!("closed goal {goal_id} closure proof does not match its terminal Lean proof step");
+                }
+            }
         } else if status == "open" {
             let has_closed_witness = applied_steps_by_goal.get(goal_id).is_some_and(|steps| {
                 steps.iter().any(|(_, subgoals)| {
@@ -434,7 +458,16 @@ pub fn validate_value(value: &Value) -> Result<ProofGraphSummary> {
     }
 
     for (declaration_id, declaration) in &declarations {
-        if string(declaration, "/lifecycle_state")? == "stable" {
+        let lifecycle = string(declaration, "/lifecycle_state")?;
+        if lifecycle == "discarded"
+            && goals.values().any(|goal| {
+                goal.get("declaration_id").and_then(Value::as_str) == Some(declaration_id)
+                    && goal.get("status").and_then(Value::as_str) != Some("discarded")
+            })
+        {
+            bail!("discarded declaration {declaration_id} still has non-discarded goal nodes");
+        }
+        if lifecycle == "stable" {
             let declaration_goals: Vec<&Value> = goals
                 .values()
                 .filter(|goal| goal.get("declaration_id").and_then(Value::as_str) == Some(declaration_id))
