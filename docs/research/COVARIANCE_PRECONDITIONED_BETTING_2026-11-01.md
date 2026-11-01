@@ -116,6 +116,27 @@ A paired exploratory run used 20,000 streams per cell, d=5, 60 rounds, alpha=.05
 
 The preconditioned method substantially improves dense-alternative crossing relative to these two simple betting baselines while retaining high sparse-alternative crossing. Its sampled all-null crossing rate increases with rho but remains below alpha. This is an intersection-level diagnostic, not a proof of calibration or a closed-FDR/SupFDR result. Different methods use different predictable bet paths, so the power comparison is descriptive under the registered Gaussian law, not a dominance theorem.
 
+### Fixed-prior strategy portfolio under the same global V
+
+A second independent local run used the runner's SHA-derived cell seeds and the same 20,000-stream / 60-round / d=5 configuration. It compared the fixed eta=.05 expert, a uniform fixed-prior mixture over eta={.025,.05,.10,.20}, a fixed 50/50 mixture of coordinate-local and eta-mixture e-processes, and an equal-weight mixture of coordinate-wise e-processes (valid under arbitrary cross-coordinate dependence when each marginal factor is valid).
+
+| rho | Method | All-null | Sparse | Dense |
+|---:|---|---:|---:|---:|
+| .2 | eta=.05 | 0.045% [0.024, 0.086] | 94.815% [94.499, 95.114] | 86.690% [86.212, 87.154] |
+| .2 | fixed eta mixture | 0.035% [0.017, 0.072] | 91.675% [91.284, 92.050] | 82.685% [82.154, 83.203] |
+| .2 | 50/50 vector + eta mixture | 0.040% [0.020, 0.079] | 96.560% [96.298, 96.804] | 74.090% [73.478, 74.693] |
+| .2 | coordinate e-process mixture | 0.005% [0.001, 0.028] | 93.360% [93.007, 93.697] | 54.090% [53.399, 54.780] |
+| .5 | eta=.05 | 0.385% [0.308, 0.481] | 95.510% [95.214, 95.788] | 81.320% [80.774, 81.854] |
+| .5 | fixed eta mixture | 0.250% [0.190, 0.329] | 92.595% [92.224, 92.950] | 77.330% [76.745, 77.905] |
+| .5 | 50/50 vector + eta mixture | 0.145% [0.101, 0.208] | 97.120% [96.879, 97.343] | 69.690% [69.049, 70.323] |
+| .5 | coordinate e-process mixture | 0.005% [0.001, 0.028] | 93.530% [93.181, 93.863] | 45.845% [45.155, 46.537] |
+| .8 | eta=.05 | 1.465% [1.308, 1.641] | 96.020% [95.740, 96.282] | 77.685% [77.103, 78.257] |
+| .8 | fixed eta mixture | 1.330% [1.180, 1.498] | 93.500% [93.150, 93.833] | 74.355% [73.745, 74.955] |
+| .8 | 50/50 vector + eta mixture | 0.705% [0.598, 0.831] | 97.540% [97.316, 97.746] | 67.530% [66.878, 68.175] |
+| .8 | coordinate e-process mixture | 0.020% [0.008, 0.051] | 93.605% [93.257, 93.936] | 38.515% [37.843, 39.192] |
+
+This comparison highlights the trade-off: a fixed prior over eta avoids selecting the best learning rate on the same data; the 50/50 vector/eta portfolio improves sparse crossing but pays dense-signal power; the coordinate mixture is much more conservative and avoids modeling cross-coordinate dependence. These are single-intersection diagnostics only. They do not establish closed-FDR or SupFDR validity by themselves; the proof contract must hold for each component and their fixed mixture.
+
 The simulation used independent local NumPy code and seeds 9776, 9806 and 9836 for rho=.2,.5,.8. It was not produced by the checked-in benchmark runner and not by CI. The runner now uses the global projective kernel and emits Wilson intervals so the result can be reproduced in the repository environment.
 
 ## 6. Earlier fixed-dimension envelope experiments (historical)
