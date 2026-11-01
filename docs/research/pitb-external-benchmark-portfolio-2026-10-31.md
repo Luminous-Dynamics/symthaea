@@ -130,6 +130,7 @@ Register a distinct runtime ablation on SorryDB after the environment smoke is c
 | R2 | Recursive delegation with private workspaces and asynchronous returns | Value of adaptive branching |
 | R3 | R2 plus parallel tactic probes and separate agent/Lean admission caps | Value of local parallelism |
 | R4 | R3 plus PITB context evidence, typed insights, support selection and repair routing | Value of PITB's evidence layer |
+| R5 | R4 plus post-elaboration proof-state snapshot reuse, immutable shared environment, and branch-local metavariable state | Value of Level-2 live-state branching; requires a separate snapshot/cache-isolation receipt |
 
 Match the same model, task set, toolchain, prompt family, checker, trust policy, and total resource envelope. Measure branch fan-out, useful-child-return rate, duplicate-work rate, branch survival, tactic-probe success rate, total Lean CPU time, elaborator queue time, warm-cache hit rate, p50/p95 time-to-first-verified-proof, model tokens, and cost per verified proof. Compare multiple budget caps. A larger search tree is not itself a result.
 
@@ -181,3 +182,12 @@ Resource accounting separates elapsed wall-clock from summed branch wall-work. P
 
 
 LeanEval is a useful complementary destination for open challenge problems: it aims to capture difficult Lean formalization tasks with reviewer-vetted statements and automatically comparator-checked submissions. Its public leaderboard is evolving and currently small, so treat it as a prospective external challenge set rather than a stable fixed-cohort benchmark. See https://lean-lang.org/eval/.
+
+
+### Live elaboration snapshot baseline (R5)
+
+The R5 systems arm is motivated by *Keep the Proof State Live* (2026). The paper reports 5.6–50× wall-time speedups across 48 miniF2F-v2 problems (45 prove-phase cases and three full end-to-end runs), with a 9.7× median and 14× average on the 45 hand-crafted prove-phase cases. Its mechanism captures the post-elaboration snapshot (Environment, MetavarContext, LocalContext), shares the immutable Environment, and copies the mutable MetavarContext per branch. It is not just an import cache: the branch avoids re-elaborating the theorem body. The paper's patched binary is based on Lean 4.25.1; PITB must treat it as a separate implementation/toolchain baseline, not assume the patch works on the SorryDB toolchains. Source: https://arxiv.org/abs/2605.25556.
+
+R5 must match R4's model, task, branch portfolio, checker, trust tier and total resource envelope. The only intended intervention is post-elaboration state reuse. It must record the exact snapshot receipt, branch-local metavariable-context copy, environment identity, and cache policy. The conservative v0 cache policy is **discard mutable tactic/typeclass caches at branch fork and rebuild them branch-locally**; a future dependency-validated shared-cache arm is separate. This is particularly important because Lean 4.36.0-rc2 adds cross-command typeclass cache persistence and explicit invalidation for environment/instance/reducibility/option changes, and fixes stale cache entries surviving SavedState restore (release-candidate notes, 27 October 2026): https://lean-lang.org/doc/reference/latest/releases/v4.36.0/.
+
+Required metrics: snapshot capture time, branch restore/start p50/p95, branches started, elapsed wall time, summed branch wall-work, Lean CPU time, memory, cache invalidations, verified branches per second, and cost per independently verified proof. Compare R4 cold re-elaboration against R5 post-elaboration snapshotting at equal total work and budget. Do not cite wall-time speedup alone if total CPU/memory or proof yield deteriorates.
