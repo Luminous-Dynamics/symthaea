@@ -16,6 +16,15 @@ Recent benchmark reviews support an important strategic distinction:
 - [World-In-World](https://proceedings.iclr.cc/paper_files/paper/2026/hash/5b4263be85820683d78675cc18d2efc7-Abstract-Conference.html), ICLR 2026, is a closed-loop platform. Its reported findings emphasize controllability and post-training action-observation data rather than visual quality alone, and show that inference-time compute can change task performance.
 - [Rollback](https://arxiv.org/abs/2610.36068), dated 2026-10-26, uses rollback to decision points, alternative action branches and real robot feedback to improve policies. Its reported task gains are task-specific and must not be compared numerically with a different task suite.
 
+### Additional action-faithful and policy-evaluation references
+
+- [DreamTrue: Action-Faithful Robot World Model with Counterfactual Post-Training](https://arxiv.org/abs/2610.12468), submitted 2026-10-08, reports action-following improvements for the AgiBot World Challenge and a reduction in human-assessed interaction defects from 48.12% to 6.25%. These are author-reported results, not independently reproduced here. The useful comparison is action-following and failure/interaction-defect rates, not a pooled visual score.
+- [dWorldEval / Scaling Robot Policy Evaluation via Discrete Diffusion World Model](https://proceedings.mlr.press/v306/li26hi.html), ICML 2026, highlights a critical evaluator failure: generated futures can "self-correct" policy failures into false positives or create artifacts for OOD controls. It uses action-first tokens, sparse keyframe memory and progress-as-text to assess LIBERO, RoboTwin and real-robot tasks. This makes false-success / optimism-bias controls mandatory for our evaluator.
+- [WBench](https://arxiv.org/abs/2605.25874), submitted 2026-05-25, uses 289 cases, 1,058 interaction turns and 22 automatic submetrics across video quality, setting adherence, interaction adherence, consistency and physics compliance, validated against human judgments. It is a strong multi-turn interaction diagnostic, but its judge and adapter protocol still define the scope of comparison.
+- [WorldRoamBench](https://worldmodelbenchmark.com/benchmarks/), September 2026 revision, evaluates continuous-interaction stability, action following, visual drift, physics plausibility and scene/subject memory over 10–60 second cases. It is useful for rollout drift; it does not substitute for matched-action ground truth.
+
+These additions reinforce the layered approach: DreamTrue for action following, dWorldEval for policy-evaluator reliability, WBench for multi-turn adherence/consistency and WorldRoamBench for temporal drift. Pair them with WorldOracle's paired real execution and our D0/D1/W1/W2/W3 decision-value protocol rather than collapsing them into one leaderboard.
+
 **Implication:** do not enter a visual realism leaderboard and claim world-model superiority. Build a bridge benchmark with the same histories, actions, direct-policy baseline, simulator truth, resource budget and downstream task outcomes. This is where the current programme can make a distinct contribution.
 
 ## 2. Evaluation ladder
