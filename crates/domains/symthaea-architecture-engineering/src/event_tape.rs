@@ -1133,11 +1133,6 @@ impl EventTape {
                                 evidence_byte_receipt_sha256.as_deref(),
                                 &format!("{path}.outcome"),
                             )?;
-                            validate_noisy_artifact_reference(
-                                evidence_artifact.as_ref(),
-                                evidence_sha256.as_deref(),
-                                &format!("{path}.outcome"),
-                            )?;
                             if failure_reason.is_some() {
                                 return Err(EventTapeError::new(format!("{path}.outcome.failure_reason"), "verified evaluations cannot have a failure reason"));
                             }
