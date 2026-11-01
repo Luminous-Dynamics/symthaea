@@ -46,9 +46,9 @@ jobs:
           test "$(grep -c '^ONLINE_FCR_ROW' cost-to-go-ledger.tsv)" -eq 5
           test "$(grep -c '^CAP_DECISION_ROW' cost-to-go-ledger.tsv)" -eq 3
           test "$(grep -c '^PREFIX_REPLAY_ROW' cost-to-go-ledger.tsv)" -eq 5
-          test "$(grep -c '^HISTORICAL_BASELINE_ROW' cost-to-go-ledger.tsv)" -eq 3
+          test "$(grep -c '^HISTORICAL_BASELINE_ROW' cost-to-go-ledger.tsv)" -eq 4
           grep '^PREFIX_REPLAY_ROW' cost-to-go-ledger.tsv | awk -F '\t' '$2 == "budget-feasibility" && $3 == 7 && $4 == 4 && $5 == 2 && $6 == 5 && $7 == 1 && $8 == 1 && $9 == 2 && $10 == 1 { found=1 } END { exit !found }'
-          grep '^HISTORICAL_BASELINE_ROW' cost-to-go-ledger.tsv | awk -F '\t' '$2 == "profile-support" && $3 == 3 && $4 == 2 && $5 == 2 { profiles=1 } $2 == "evaluation-metrics" && $3 == 3 && $4 == 2 && $5 == 1 && $6 == 3.500 && $7 == 0.500 { metrics=1 } $2 == "fallback-usage" && $3 == 1 && $4 == 2 { fallback=1 } END { exit !(profiles && metrics && fallback) }'
+          grep '^HISTORICAL_BASELINE_ROW' cost-to-go-ledger.tsv | awk -F '\t' '$2 == "profile-support" && $3 == 3 && $4 == 2 && $5 == 2 { profiles=1 } $2 == "paired-evaluation" && $3 == 7 && $4 == 3 && $5 == 2 && $6 == 5 && $7 == 5.333 && $8 == 1.000 { metrics=1 } $2 == "censored-exceedance" && $3 == 2 && $4 == 2 { censored=1 } $2 == "fallback-usage" && $3 == 5 && $4 == 2 { fallback=1 } END { exit !(profiles && metrics && censored && fallback) }'
           if grep '^CASE' cost-to-go-ledger.tsv | awk -F '\t' '$7 != 0 { if ($2 == "hard-cap-overrun-visible") { intentional++ } else { bad=1 } } END { if (intentional != 1) bad=1; exit bad }'; then
             echo "Exactly one deliberate hard-cap negative control recorded a cap violation; all other cases remained within limits."
           else
