@@ -193,11 +193,14 @@ This is a chronology/provenance check, not a sandbox that proves a candidate bin
 
 The new Rust module currently provides:
 - source-layout HDC-LTC memory payload estimation and SRAM reserve assessment;
-- deterministic temporal stream generation with sudden/gradual/recurring drift, timestamp jitter, feature dropout, out-of-distribution events and delayed labels;
-- dataset source replay and digest validation;
-- a frozen three-track manifest with split digests and required baseline-family checks.
+- deterministic temporal stream generation with sudden/gradual/recurring drift, timestamp jitter, true zero-filled feature dropout, out-of-distribution events and delayed labels;
+- model-facing observation records with no label field, and an evaluator-owned combined dataset whose delayed-label field is private and which does not implement Debug/Serialize;
+- dataset source replay and digest validation over a private canonical representation;
+- a frozen three-track manifest with split digests and required baseline-family checks;
+- prequential execution-trace auditing with prediction-before-label availability, delayed label release, post-label update ordering, a continuous model-state SHA-256 chain, and event-level accuracy, balanced accuracy, coverage, selective accuracy, Brier score, false alarms/hour, missed events/hour and prediction latency;
+- exact hash commitments from the prequential trace to per-run energy and metrology receipts.
 
-The CLI reports HDC-LTC memory preflight. The next increment is to bind this prequential receipt to the per-event phase-energy and metrology receipts from #9755/#9744, then evaluate all candidates and return a multi-objective Pareto frontier. Tests are authored but not compiled or executed in this authoring environment. No on-device result or SOTA claim is made.
+The CLI reports HDC-LTC memory preflight. The next increment is to verify the contents of the bound phase-energy and metrology receipts from #9755/#9744, compute adaptation/recovery and retention metrics by regime, and evaluate all candidates on matched tracks to return a multi-objective Pareto frontier. Fourteen synthetic tests are authored but not compiled or executed in this authoring environment. No on-device result or SOTA claim is made.
 
 ## Sources
 
