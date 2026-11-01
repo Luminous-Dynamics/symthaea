@@ -1,10 +1,12 @@
 //! Pure reference state machine for BASALT trusted source-epoch advancement.
 //!
-//! This module models only the state-transition layer. It does not verify DSSE
-//! signatures, signer authorization, Merkle inclusion/consistency proofs,
-//! witness signatures, freshness, storage durability, or an external rollback
-//! anchor. Evidence variants are inputs from separately verified adapters and
-//! are deliberately named as such. Passing this model is not a trust verdict.
+//! The pure reference state machine models state-transition semantics only;
+//! evidence variants are inputs from separately verified adapters. The optional
+//! SQLite backend below implements a local WAL/FULL transaction adapter, but
+//! this module does not verify DSSE signatures, signer authorization, Merkle
+//! inclusion/consistency proofs, witness signatures, external freshness,
+//! physical storage/VFS durability, or protection against malicious snapshot
+//! rollback. Passing either the model or local adapter is not a trust verdict.
 //!
 //! The source cursor key is stable across observer-profile and boot changes:
 //! (provisioned host identity, source ID, partition ID). Profile and boot
