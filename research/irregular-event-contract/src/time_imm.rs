@@ -229,7 +229,7 @@ impl TimeImmCsvAdapter {
     /// timezone interpretation, availability policy and feature mapping.
     pub fn config_sha256(&self) -> [u8; 32] {
         let mut h = Sha256::new();
-        h.update(b"SYMTHAEA-TIME-IMM-ADAPTER-CONFIG-V1\\0");
+        h.update(b"SYMTHAEA-TIME-IMM-ADAPTER-CONFIG-V1\0");
         hash_config_string(&mut h, &self.config.dataset_id);
         hash_config_string(&mut h, &self.config.expected_record_id);
         h.update(timestamp_zone_sha256(self.config.naive_timestamp_zone.as_ref()));
