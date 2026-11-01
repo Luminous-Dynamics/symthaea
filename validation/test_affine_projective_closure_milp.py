@@ -121,6 +121,9 @@ class AffineProjectiveClosureMilpTests(unittest.TestCase):
         )
         self.assertFalse(bad_capacity["valid"])
         self.assertIn("capacity_exceeded", [row[0] for row in bad_capacity["failures"]])
+        fast_bad_capacity = verify_affine_binary_decision(bad_capacity_model, rejection)
+        self.assertFalse(fast_bad_capacity["valid"])
+        self.assertIn("capacity_exceeded", [row[0] for row in fast_bad_capacity["failures"]])
 
         bad_persistence_model = build_affine_closure_milp(
             (1, 2, 3),
@@ -134,6 +137,11 @@ class AffineProjectiveClosureMilpTests(unittest.TestCase):
         )
         self.assertFalse(bad_persistence["valid"])
         self.assertIn("persistence_violation", [row[0] for row in bad_persistence["failures"]])
+        fast_bad_persistence = verify_affine_binary_decision(
+            bad_persistence_model, {1: 0, 2: 1, 3: 0}
+        )
+        self.assertFalse(fast_bad_persistence["valid"])
+        self.assertIn("persistence_violation", [row[0] for row in fast_bad_persistence["failures"]])
 
     def test_differential_equivalence_to_all_subsets_and_rejection_masks(self):
         alpha = Fraction(1, 2)
