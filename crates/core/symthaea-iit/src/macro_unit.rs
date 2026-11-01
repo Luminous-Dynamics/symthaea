@@ -294,9 +294,11 @@ impl MacroUnitSpec {
             update_grain,
             &background_apportionment,
             limits,
-            generated_coarse_grain,
-            generated_blackbox,
-            duplicates_removed,
+            [
+                generated_coarse_grain,
+                generated_blackbox,
+                duplicates_removed,
+            ],
             &candidates,
         );
 
@@ -322,11 +324,10 @@ impl MacroUnitSpec {
         update_grain: usize,
         background_apportionment: &[usize],
         limits: MacroMappingSearchLimits,
-        coarse_count: usize,
-        blackbox_count: usize,
-        duplicates_removed: usize,
+        candidate_counts: [usize; 3],
         candidates: &[MacroUnitSpec],
     ) -> String {
+        let [coarse_count, blackbox_count, duplicates_removed] = candidate_counts;
         let mut bytes = Vec::new();
         bytes.extend_from_slice(MACRO_MAPPING_SEARCH_MAGIC);
         bytes.extend_from_slice(&(constituents.len() as u64).to_le_bytes());
