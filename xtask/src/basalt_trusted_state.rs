@@ -1272,7 +1272,7 @@ mod tests {
     }
 
     #[test]
-    fn sqlite_lost_ack_after_commit_recovers_by_exact_receipt_digest() {
+    fn sqlite_exact_receipt_retry_after_restart_discovers_committed_state() {
         let path = temporary_sqlite_path("lost-ack");
         let candidate = fixture_candidate();
         {
