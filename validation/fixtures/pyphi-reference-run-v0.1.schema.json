@@ -51,7 +51,8 @@
         "analysis_request_digest_semantics",
         "upstream_builder_tpm_max_abs_deviation",
         "upstream_builder_tpm_tolerance",
-        "model_input_semantics"
+        "model_input_semantics",
+        "pyphi_wheel_sha256"
       ],
       "properties": {
         "distribution": {
@@ -120,6 +121,9 @@
         "model_input_semantics": {
           "type": "string",
           "minLength": 20
+        },
+        "pyphi_wheel_sha256": {
+          "const": "a7a43bd5af5c47fbc72c40bdab079b06ac3c737c0a834c270e43ba075c50c620"
         }
       }
     },
