@@ -44,6 +44,15 @@ The six acceleration values are expressed in g. The documented activity codes ar
 
 The nominal sample period is 20 ms. A gap is counted when an observed adjacent-row interval exceeds 30 ms (1.5× nominal), and is reported—not interpolated, filled, or silently resampled. Other downstream definitions of missingness can use the retained row stream and interval data.
 
+## Versioned target-label profiles
+
+The parser exposes numeric source codes, including neutral variants `Label130` and `Label140`. Classification experiments select an explicit, digest-bound profile from `harth_label_profile.rs`:
+
+- `harth.native-12.v1`: all twelve raw source codes remain separate target classes. For contiguous classifier output, the profile maps the sorted raw-code list `[1,2,3,4,5,6,7,8,13,14,130,140]` to target IDs `1..=12`; the raw code is retained separately in each parsed row.
+- `harth.paper-merged-9.v1`: reproduces the original paper's nine-class merge: raw labels 3/6/140 map to Standing; 7/130 map to Sitting; labels 1,2,4,5,8,13,14 remain their respective seven classes. Target IDs are contiguous `1..=9`.
+
+The profile identifier and complete raw-to-target mapping are domain-separated and SHA-256 committed. Every training/evaluation manifest must pin both the raw dataset archive digest and the selected profile digest. Do not use the paper's merged-nine profile while reporting results for the native twelve-label task.
+
 ## Leakage and temporal protocol
 
 The independent split unit is the participant/source-family recording. Freeze participant identities into Training, Development, Calibration and Confirmatory before:
