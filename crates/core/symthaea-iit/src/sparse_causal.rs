@@ -30,7 +30,7 @@ const SPARSE_EQ4_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-RECEIPT\0v0.5\
 const SPARSE_PARTITION_SCORE_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-PARTITION-SCORE-REQUEST\0v0.1\0";
 const SPARSE_SYSTEM_SEARCH_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-SYSTEM-SEARCH-REQUEST\0v0.1\0";
 pub const SPARSE_IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID: &str =
-    "symthaea-iit/sparse-iit4-2023-system-search/0.6.0";
+    "symthaea-iit/sparse-iit4-2023-system-search/0.7.0";
 const SPARSE_PARTITION_SCORE_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-PARTITION-SCORE-RECEIPT\0v0.3\0";
 pub const SPARSE_IIT4_EQ4_ALGORITHM_ID: &str = "symthaea-iit/sparse-iit4-eq4-minfill/0.5.0";
 pub const SPARSE_IIT4_PARTITION_SCORE_ALGORITHM_ID: &str =
@@ -1394,7 +1394,13 @@ impl SparseBinaryCausalModel {
             if scores.is_empty() {
                 return Err(SystemPhiError::ZeroSeveredConnections);
             }
-            let winner_index = crate::select_pyphi_sia_partition(&partitions, &scores, epsilon);
+            let tied_partition_indices =
+                crate::pyphi_sia_partition_tie_indices(&partitions, &scores, epsilon);
+            let winner_index = tied_partition_indices[0];
+            let tied_partitions = tied_partition_indices
+                .iter()
+                .map(|index| partitions[*index].clone())
+                .collect::<Vec<_>>();
             let winner_score = scores[winner_index].clone();
             let competing_normalized = scores
                 .iter()
@@ -1407,6 +1413,7 @@ impl SparseBinaryCausalModel {
             state_pair_results.push(Iit4SystemPhiStatePairResult {
                 system_state,
                 winning_partition: partitions[winner_index].clone(),
+                tied_partitions,
                 score: winner_score,
                 partition_margin,
             });
@@ -2447,6 +2454,20 @@ mod tests {
                 sparse_pair.winning_partition.cut_matrix(),
                 dense_pair.winning_partition.cut_matrix()
             );
+            let sparse_tied_cuts = sparse_pair
+                .tied_partitions
+                .iter()
+                .map(|partition| partition.cut_matrix().to_vec())
+                .collect::<Vec<_>>();
+            let dense_tied_cuts = dense_pair
+                .tied_partitions
+                .iter()
+                .map(|partition| partition.cut_matrix().to_vec())
+                .collect::<Vec<_>>();
+            assert_eq!(sparse_tied_cuts, dense_tied_cuts);
+            assert!(sparse_pair.tied_partitions.iter().any(|partition| {
+                partition.cut_matrix() == sparse_pair.winning_partition.cut_matrix()
+            }));
             assert_eq!(sparse_pair.score.severed_connections, dense_pair.score.severed_connections);
             assert!((sparse_pair.score.signed_phi - dense_pair.score.signed_phi).abs() <= 1e-12);
             assert!((sparse_pair.score.normalized_phi - dense_pair.score.normalized_phi).abs() <= 1e-12);
