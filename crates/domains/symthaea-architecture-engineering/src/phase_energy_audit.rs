@@ -900,8 +900,12 @@ pub fn validate_phase_energy_audit_receipt(
             PhaseEnergyEventStatus::MissingRequiredPhase => {
                 missing_count += 1;
                 if event.missing_required_phase_ids.is_empty()
+                    || event.missing_required_phase_ids.iter().any(|phase_id| !event.missing_phase_ids.contains(phase_id))
                     || event.total_event_energy_uj.is_some()
                     || event.total_event_duration_ms.is_some()
+                    || event.event_start_ppk2_time_ms.is_some()
+                    || event.event_end_ppk2_time_ms.is_some()
+                    || event.maximum_event_current_ua.is_some()
                     || event.total_event_boundary_alignment_uncertainty_uj.is_some()
                     || event.unattributed_energy_uj.is_some()
                     || event.unattributed_duration_ms.is_some()
@@ -965,7 +969,12 @@ pub fn validate_phase_energy_audit_receipt(
                 let close = |left: f64, right: f64| {
                     (left - right).abs() <= 1e-8 * left.abs().max(right.abs()).max(1.0)
                 };
-                if end <= start
+                let first_phase_start = event.phase_windows.first().map(|window| window.start_ppk2_time_ms);
+                let last_phase_end = event.phase_windows.last().map(|window| window.end_ppk2_time_ms);
+                if event.phase_windows.is_empty()
+                    || first_phase_start.is_none_or(|value| !close(value, start))
+                    || last_phase_end.is_none_or(|value| !close(value, end))
+                    || end <= start
                     || !close(end - start, duration)
                     || !close(duration - declared_duration, gap_duration)
                     || !close(energy - declared_energy, gap_energy)
@@ -1152,6 +1161,68 @@ mod tests {
         assert_eq!(event.status, PhaseEnergyEventStatus::MissingRequiredPhase);
         assert!(event.total_event_energy_uj.is_none());
         assert_eq!(event.missing_required_phase_ids, vec!["inference".to_owned()]);
+    }
+
+    #[test]
+    fn missing_optional_phase_is_not_reported_as_complete_coverage() {
+        let csv = concat!(
+            "event_id,segment_id,phase_id,edge,marker_timestamp_ns,sequence,clock_domain_id,marker_source_id\n",
+            "e1,e1,wake,START,0,0,logic-analyzer-clock,gpio-sync-1\n",
+            "e1,e1,wake,END,10000,1,logic-analyzer-clock,gpio-sync-1\n",
+            "e1,e1,inference,START,10000,2,logic-analyzer-clock,gpio-sync-1\n",
+            "e1,e1,inference,END,30000,3,logic-analyzer-clock,gpio-sync-1\n",
+            "e1,e1,postprocess,START,30000,4,logic-analyzer-clock,gpio-sync-1\n",
+            "e1,e1,postprocess,END,40000,5,logic-analyzer-clock,gpio-sync-1\n",
+        );
+        let mut protocol = protocol(1.0);
+        protocol.phases[1].required = false;
+        protocol.protocol_sha256 = compute_application_phase_protocol_sha256(&protocol).unwrap();
+        let without_optional = csv.replace(
+            "e1,e1,inference,START,10000,2,logic-analyzer-clock,gpio-sync-1\n", ""
+        ).replace(
+            "e1,e1,inference,END,30000,3,logic-analyzer-clock,gpio-sync-1\n", ""
+        );
+        // Required first/last phases keep event boundaries observable, but an omitted declared
+        // optional phase remains explicitly unattributed rather than producing a complete label.
+        let result = audit_application_phase_energy(
+            samples(), &without_optional, trace_config(), &mapping(), &protocol,
+        ).unwrap();
+        let event = &result.receipt.events[0];
+        assert_eq!(event.status, PhaseEnergyEventStatus::UnattributedIntervalsPresent);
+        assert_eq!(event.missing_phase_ids, vec!["inference".to_owned()]);
+        assert!(event.total_event_energy_uj.is_some());
+    }
+
+    #[test]
+    fn receipt_validator_rejects_rehashed_energy_substitution() {
+        let result = audit_application_phase_energy(
+            samples(), &markers(10_000, 10_000), trace_config(), &mapping(), &protocol(0.0),
+        ).unwrap();
+        validate_phase_energy_audit_receipt(&result.receipt).unwrap();
+
+        let mut forged = result.receipt.clone();
+        forged.events[0].phase_windows[0].energy_uj += 0.01;
+        forged.receipt_sha256 = compute_phase_energy_audit_receipt_sha256(&forged).unwrap();
+        assert!(validate_phase_energy_audit_receipt(&forged).is_err());
+    }
+
+    #[test]
+    fn rejects_reusing_one_ppk2_segment_for_multiple_application_events() {
+        let marker = markers(10_000, 10_000).replace(
+            "e1,e1,postprocess,END,40000,5,logic-analyzer-clock,gpio-sync-1\n",
+            concat!(
+                "e1,e1,postprocess,END,40000,5,logic-analyzer-clock,gpio-sync-1\n",
+                "e2,e1,wake,START,0,0,logic-analyzer-clock,gpio-sync-1\n",
+                "e2,e1,wake,END,10000,1,logic-analyzer-clock,gpio-sync-1\n",
+                "e2,e1,inference,START,10000,2,logic-analyzer-clock,gpio-sync-1\n",
+                "e2,e1,inference,END,30000,3,logic-analyzer-clock,gpio-sync-1\n",
+                "e2,e1,postprocess,START,30000,4,logic-analyzer-clock,gpio-sync-1\n",
+                "e2,e1,postprocess,END,40000,5,logic-analyzer-clock,gpio-sync-1\n",
+            )
+        );
+        assert!(audit_application_phase_energy(
+            samples(), &marker, trace_config(), &mapping(), &protocol(0.0),
+        ).unwrap_err().to_string().contains("only one application event"));
     }
 
     #[test]
