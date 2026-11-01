@@ -45,6 +45,54 @@ fn self_test(path: &PathBuf) -> Result<()> {
     println!("PITB_PROOF_GRAPH_FIXTURE_PASS: two target roots share one stable helper; two ready goals batch into one specialist action");
 
     let mut bad = value.clone();
+    bad["scheduler_decision"]["selected_goal_ids"] = json!(["goal-target-root"]);
+    must_reject("scheduler omits a goal from the maximal shared-helper batch", bad)?;
+
+    let mut capped = value.clone();
+    capped["scheduler_decision"]["max_selected_goals"] = json!(1);
+    capped["scheduler_decision"]["selected_goal_ids"] = json!(["goal-target-root"]);
+    let capped_summary = proof_graph::validate_value(&capped)?;
+    if capped_summary.selected_goal_ids != vec!["goal-target-root".to_owned()] {
+        bail!("scheduler did not apply the registered deterministic batch cap");
+    }
+    println!("PITB_PROOF_GRAPH_BATCH_CAP_PASS: lexical deterministic truncation under a one-goal cap");
+
+    let mut stopped = value.clone();
+    for goal in stopped["goal_nodes"].as_array_mut().context("goal nodes array")? {
+        if goal["status"] == "open" {
+            goal["status"] = json!("discarded");
+            goal["closure_proof_sha256"] = Value::Null;
+            goal["closure_receipt_sha256"] = Value::Null;
+            goal["closure_kernel_verified"] = Value::Bool(false);
+            goal["closure_contains_sorry_ax"] = Value::Bool(false);
+        }
+    }
+    stopped["scheduler_decision"]["ready_frontier_goal_ids"] = json!([]);
+    stopped["scheduler_decision"]["selected_goal_ids"] = json!([]);
+    stopped["scheduler_decision"]["specialist"] = json!("stop");
+    stopped["scheduler_decision"]["reasoning_effort"] = json!("none");
+    stopped["scheduler_decision"]["max_specialist_calls"] = json!(0);
+    stopped["resource_ledger"]["actual"]["router_model_calls"] = json!(0);
+    stopped["resource_ledger"]["actual"]["specialist_model_calls"] = json!(0);
+    stopped["resource_ledger"]["actual"]["model_calls"] = json!(0);
+    stopped["resource_ledger"]["actual"]["router_cost_microusd"] = json!(0);
+    stopped["resource_ledger"]["actual"]["specialist_cost_microusd"] = json!(0);
+    let stop_summary = proof_graph::validate_value(&stopped)?;
+    if !stop_summary.ready_frontier_goal_ids.is_empty() || !stop_summary.selected_goal_ids.is_empty() {
+        bail!("scheduler did not stop with an empty dependency-ready frontier");
+    }
+    println!("PITB_PROOF_GRAPH_STOP_PASS: no work invented when the ready frontier is empty");
+
+    let mut bad = stopped.clone();
+    bad["scheduler_decision"]["specialist"] = json!("proof_writer");
+    bad["scheduler_decision"]["reasoning_effort"] = json!("medium");
+    bad["scheduler_decision"]["max_specialist_calls"] = json!(1);
+    bad["resource_ledger"]["actual"]["router_model_calls"] = json!(1);
+    bad["resource_ledger"]["actual"]["specialist_model_calls"] = json!(1);
+    bad["resource_ledger"]["actual"]["model_calls"] = json!(2);
+    must_reject("model specialist invoked with no ready goals", bad)?;
+
+    let mut bad = value.clone();
     bad["declarations"][2]["lifecycle_state"] = json!("provisional");
     bad["declarations"][2]["proof_receipt_sha256"] = Value::Null;
     bad["declarations"][2]["kernel_verified"] = Value::Bool(false);
