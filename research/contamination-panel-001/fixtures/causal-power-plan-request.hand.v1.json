@@ -1,0 +1,43 @@
+{
+  "schema": "symthaea.causal_power_plan_request.v1",
+  "study_id": "causal-power-fixture-001",
+  "benchmark_id": "contamination-panel",
+  "benchmark_version": "v1",
+  "primary_estimand_id": "treatment-minus-placebo-accuracy",
+  "independent_unit": "independent_model_pair",
+  "alpha_permille": 50,
+  "test_tail": "two_sided",
+  "multiplicity_policy": "none",
+  "contrast_count": 1,
+  "target_power_permille": 800,
+  "target_ci_half_width_permille": 100,
+  "max_gross_model_pair_replicates": 20,
+  "attrition_rates_permille": [
+    0,
+    200
+  ],
+  "items_per_pair_scenarios": [
+    10,
+    100
+  ],
+  "effect_scenarios": [
+    {
+      "scenario_id": "low",
+      "true_effect_permille": 50,
+      "between_pair_sd_permille": 220,
+      "within_pair_item_sd_permille": 350
+    },
+    {
+      "scenario_id": "central",
+      "true_effect_permille": 100,
+      "between_pair_sd_permille": 180,
+      "within_pair_item_sd_permille": 300
+    },
+    {
+      "scenario_id": "high",
+      "true_effect_permille": 150,
+      "between_pair_sd_permille": 180,
+      "within_pair_item_sd_permille": 300
+    }
+  ]
+}
