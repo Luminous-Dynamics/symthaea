@@ -12,12 +12,20 @@ class ProjectiveVectorBettingBenchmarkTests(unittest.TestCase):
     def test_declared_envelope_covers_rho_grid(self):
         import numpy as np
 
-        envelope = covariance_envelope(5, 0.2, 0.8, 0.5)
+        envelope = covariance_envelope(5, 0.2, 0.8)
         for rho in np.linspace(0.2, 0.8, 21):
             self.assertGreaterEqual(
                 float(np.linalg.eigvalsh(envelope - covariance(5, float(rho))).min()),
                 -1e-9,
             )
+
+    def test_projective_envelope_principal_submatrices_are_dimension_invariant(self):
+        import numpy as np
+
+        small = covariance_envelope(3, 0.2, 0.8)
+        large = covariance_envelope(8, 0.2, 0.8)
+        self.assertTrue(np.allclose(large[:3, :3], small))
+        self.assertTrue(np.allclose(small, 0.8 * np.eye(3) + 0.8 * np.ones((3, 3))))
 
     def test_fixed_intersection_result_schema(self):
         rows = run_fixed_intersection(
