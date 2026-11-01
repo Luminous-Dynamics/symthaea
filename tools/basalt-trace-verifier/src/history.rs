@@ -467,12 +467,12 @@ mod tests {
     #[test]
     fn finds_a_legal_order_without_using_the_reference_tie_break() {
         let mut trace = fixture();
-        trace.reference_linearization_order.clear();
+        trace.reference_linearization_order = vec!["this-order-is-not-authoritative".to_string()];
         trace.operations.reverse();
         let report = verify_observed_history(&trace, &HistorySearchConfig::default());
         assert_eq!(report.status, "pass", "{:#?}", report.counterexamples);
         assert_eq!(report.linearization.len(), trace.operations.len());
-        assert_ne!(report.linearization, trace.reference_linearization_order);
+        assert!(!report.linearization.contains(&"this-order-is-not-authoritative".to_string()));
     }
 
     #[test]
@@ -481,7 +481,7 @@ mod tests {
         trace
             .operations
             .iter_mut()
-            .find(|operation| operation.op_id == "op-a-commit")
+            .find(|operation| operation.op_id == "op-restore-old-snapshot")
             .unwrap()
             .expected_result
             .outcome = "compare_conflict".to_string();
