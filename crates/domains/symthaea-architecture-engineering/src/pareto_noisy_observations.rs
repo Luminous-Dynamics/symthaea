@@ -1,0 +1,1187 @@
+//! Time-uniform uncertainty intervals and confidence-aware Pareto relations.
+//!
+//! This module handles repeated, noisy objective observations without collapsing objectives
+//! into a scalar score. Each objective must declare valid observation bounds. A union-bound
+//! alpha-spending schedule provides simultaneous Hoeffding intervals across the frozen
+//! candidate/objective family and every replicate prefix. Claims are conditional on independent
+//! bounded observations and honest evidence/seed provenance.
+//!
+//! No hypervolume approximation or normality assumption is used here.
+
+use std::collections::{BTreeMap, BTreeSet};
+use std::error::Error;
+use std::fmt;
+
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+
+use super::pareto_anytime::{
+    analyze_anytime_history, AnytimeAction, AnytimeHistory, AnytimeRunReceipt, EvaluationOutcome,
+};
+use super::pareto_objectives::ObjectiveDirection;
+
+const SCHEMA: &str = "symthaea.architecture-engineering.noisy-pareto-observations";
+const VERSION: &str = "0.2.0";
+const JOINT_REPORT_SCHEMA: &str = "symthaea.architecture-engineering.noisy-anytime-campaign-report";
+const JOINT_REPORT_VERSION: &str = "0.1.0";
+/// Current report classification is pairwise O(N^2 d); keep the accepted family bounded.
+const MAX_NOISY_PARETO_CANDIDATES: usize = 1_024;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NoisyParetoError {
+    pub path: String,
+    pub message: String,
+}
+
+impl NoisyParetoError {
+    fn new(path: impl Into<String>, message: impl Into<String>) -> Self {
+        Self { path: path.into(), message: message.into() }
+    }
+}
+
+impl fmt::Display for NoisyParetoError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {}", self.path, self.message)
+    }
+}
+
+impl Error for NoisyParetoError {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NoisyObjectiveSpec {
+    pub objective_id: String,
+    pub direction: ObjectiveDirection,
+    /// Certified lower bound for every single-replicate observation, not a normalization anchor.
+    pub observation_lower_bound: f64,
+    /// Certified upper bound for every single-replicate observation, not a normalization anchor.
+    pub observation_upper_bound: f64,
+    /// Digest of the independent certificate supporting these observation bounds.
+    pub bounds_certificate_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NoisyObservationPlan {
+    pub schema: String,
+    pub version: String,
+    pub campaign_id: String,
+    pub sampling_protocol_id: String,
+    pub sampling_protocol_sha256: String,
+    pub noise_model_id: String,
+    pub noise_model_sha256: String,
+    pub objective_specs: Vec<NoisyObjectiveSpec>,
+    /// Family-wise error budget across the frozen candidate/objective family and all prefixes.
+    pub familywise_alpha: f64,
+    /// Frozen upper bound used for the union-bound allocation across candidates.
+    pub max_candidates: usize,
+    /// Minimum independent replicates required before a candidate enters confidence comparisons.
+    pub minimum_replicates: usize,
+}
+
+impl NoisyObservationPlan {
+    pub fn new(
+        campaign_id: impl Into<String>,
+        sampling_protocol_id: impl Into<String>,
+        sampling_protocol_sha256: impl Into<String>,
+        noise_model_id: impl Into<String>,
+        noise_model_sha256: impl Into<String>,
+        objective_specs: Vec<NoisyObjectiveSpec>,
+        familywise_alpha: f64,
+        max_candidates: usize,
+        minimum_replicates: usize,
+    ) -> Result<Self, NoisyParetoError> {
+        let plan = Self {
+            schema: SCHEMA.to_owned(),
+            version: VERSION.to_owned(),
+            campaign_id: campaign_id.into(),
+            sampling_protocol_id: sampling_protocol_id.into(),
+            sampling_protocol_sha256: sampling_protocol_sha256.into(),
+            noise_model_id: noise_model_id.into(),
+            noise_model_sha256: noise_model_sha256.into(),
+            objective_specs,
+            familywise_alpha,
+            max_candidates,
+            minimum_replicates,
+        };
+        plan.validate()?;
+        Ok(plan)
+    }
+
+    pub fn validate(&self) -> Result<(), NoisyParetoError> {
+        if self.schema != SCHEMA || self.version != VERSION {
+            return Err(NoisyParetoError::new("plan.schema", "unsupported noisy-observation schema/version"));
+        }
+        if self.campaign_id.trim().is_empty()
+            || self.sampling_protocol_id.trim().is_empty()
+            || self.noise_model_id.trim().is_empty()
+        {
+            return Err(NoisyParetoError::new("plan", "campaign, sampling protocol, and noise model IDs must be non-empty"));
+        }
+        validate_sha256(&self.sampling_protocol_sha256, "plan.sampling_protocol_sha256")?;
+        validate_sha256(&self.noise_model_sha256, "plan.noise_model_sha256")?;
+        if !(2..=16).contains(&self.objective_specs.len()) {
+            return Err(NoisyParetoError::new("plan.objective_specs", "v0.1 uncertainty-front analysis supports two through sixteen objectives"));
+        }
+        if !self.familywise_alpha.is_finite() || !(0.0..1.0).contains(&self.familywise_alpha) {
+            return Err(NoisyParetoError::new("plan.familywise_alpha", "family-wise alpha must be finite and strictly between zero and one"));
+        }
+        if self.max_candidates == 0
+            || self.max_candidates > MAX_NOISY_PARETO_CANDIDATES
+            || self.minimum_replicates == 0
+        {
+            return Err(NoisyParetoError::new(
+                "plan",
+                format!("candidate limit must be in 1..={MAX_NOISY_PARETO_CANDIDATES} and minimum replicates must be positive"),
+            ));
+        }
+        let alpha_coordinate = self.familywise_alpha
+            / (self.max_candidates as f64 * self.objective_specs.len() as f64);
+        if !alpha_coordinate.is_finite() || alpha_coordinate <= 0.0 {
+            return Err(NoisyParetoError::new("plan.familywise_alpha", "per-coordinate alpha allocation underflows the supported floating-point range"));
+        }
+        let mut ids = BTreeSet::new();
+        for (index, objective) in self.objective_specs.iter().enumerate() {
+            if objective.objective_id.trim().is_empty() || !ids.insert(objective.objective_id.as_str()) {
+                return Err(NoisyParetoError::new(format!("plan.objective_specs[{index}].objective_id"), "objective IDs must be non-empty and unique"));
+            }
+            validate_sha256(&objective.bounds_certificate_sha256, &format!("plan.objective_specs[{index}].bounds_certificate_sha256"))?;
+            if !objective.observation_lower_bound.is_finite()
+                || !objective.observation_upper_bound.is_finite()
+                || objective.observation_lower_bound >= objective.observation_upper_bound
+                || !(objective.observation_upper_bound - objective.observation_lower_bound).is_finite()
+            {
+                return Err(NoisyParetoError::new(format!("plan.objective_specs[{index}].bounds"), "observation bounds must be finite and strictly increasing"));
+            }
+        }
+        Ok(())
+    }
+
+    /// Summable alpha allocation for the n-th replicate prefix of one candidate/objective.
+    /// Since sum_{n=1..infinity} 1/(n(n+1)) = 1, the union bound across all prefixes
+    /// spends at most the frozen per-candidate/per-objective alpha allocation.
+    pub fn alpha_at_prefix(&self, replicate_count: u64) -> Result<f64, NoisyParetoError> {
+        self.validate()?;
+        if replicate_count == 0 {
+            return Err(NoisyParetoError::new("replicate_count", "confidence prefix must be one-based"));
+        }
+        let alpha_coordinate = self.familywise_alpha
+            / (self.max_candidates as f64 * self.objective_specs.len() as f64);
+        let n = replicate_count as f64;
+        let alpha = alpha_coordinate / (n * (n + 1.0));
+        if !alpha.is_finite() || alpha <= 0.0 {
+            return Err(NoisyParetoError::new("replicate_count", "per-prefix alpha underflowed or became non-finite"));
+        }
+        Ok(alpha)
+    }
+
+    pub fn plan_sha256(&self) -> Result<String, NoisyParetoError> {
+        self.validate()?;
+        digest_serializable(self)
+    }
+}
+
+/// One independently seeded noisy objective-vector observation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NoisyReplicate {
+    pub replicate_id: String,
+    /// The seed is provenance, not proof of statistical independence.
+    pub sample_seed: u64,
+    pub objective_values: Vec<f64>,
+    /// Digest of the retained raw observation artifact.
+    pub evidence_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CandidateSamples {
+    decision_sha256: String,
+    samples: BTreeMap<String, NoisyReplicate>,
+    seeds: BTreeSet<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObjectiveConfidenceInterval {
+    pub objective_id: String,
+    pub sample_count: u64,
+    pub sample_mean: f64,
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+    /// Per-coordinate, per-prefix alpha from the frozen summable spending schedule.
+    pub alpha_at_prefix: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConfidenceParetoStatus {
+    InsufficientReplicates,
+    CertainlyDominated,
+    CertainlyNondominatedAmongObserved,
+    Unresolved,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NoisyCandidateSummary {
+    pub candidate_id: String,
+    pub decision_sha256: String,
+    pub sample_count: u64,
+    pub confidence_intervals: Vec<ObjectiveConfidenceInterval>,
+    pub certainly_dominated_by: Vec<String>,
+    pub possibly_dominated_by: Vec<String>,
+    pub status: ConfidenceParetoStatus,
+    pub sample_set_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NoisyParetoReport {
+    pub schema: String,
+    pub version: String,
+    pub campaign_id: String,
+    pub plan_sha256: String,
+    pub candidate_summaries: Vec<NoisyCandidateSummary>,
+    /// Conditional family-wise confidence guarantee for the candidate/objective/prefix family.
+    pub nominal_familywise_confidence: f64,
+    /// Unique sample-seed values are enforced within each candidate. This does not prove independence.
+    pub unique_replicate_seeds_enforced: bool,
+    pub report_sha256: String,
+}
+
+#[derive(Serialize)]
+struct NoisyReportPayload<'a> {
+    schema: &'a str,
+    version: &'a str,
+    campaign_id: &'a str,
+    plan_sha256: &'a str,
+    candidate_summaries: &'a [NoisyCandidateSummary],
+    nominal_familywise_confidence: f64,
+    unique_replicate_seeds_enforced: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NoisyParetoStudy {
+    plan: NoisyObservationPlan,
+    candidates: BTreeMap<String, CandidateSamples>,
+    decision_owners: BTreeMap<String, String>,
+    /// Rebuilt once after deserialization; immutable private state makes subsequent appends incremental.
+    #[serde(skip)]
+    validated: bool,
+}
+
+impl NoisyParetoStudy {
+    pub fn new(plan: NoisyObservationPlan) -> Result<Self, NoisyParetoError> {
+        plan.validate()?;
+        Ok(Self {
+            plan,
+            candidates: BTreeMap::new(),
+            decision_owners: BTreeMap::new(),
+            validated: true,
+        })
+    }
+
+    pub fn plan(&self) -> &NoisyObservationPlan {
+        &self.plan
+    }
+
+    pub fn append(
+        &mut self,
+        candidate_id: impl Into<String>,
+        decision_sha256: impl Into<String>,
+        replicate: NoisyReplicate,
+    ) -> Result<(), NoisyParetoError> {
+        if !self.validated {
+            self.validate()?;
+            self.validated = true;
+        } else {
+            // The plan and sample/index maps are private; newly constructed/appended state is
+            // checked locally. Replaying every prior replicate on each append would be O(n^2).
+            self.plan.validate()?;
+        }
+        let candidate_id = candidate_id.into();
+        let decision_sha256 = decision_sha256.into();
+        if candidate_id.trim().is_empty() {
+            return Err(NoisyParetoError::new("candidate_id", "candidate ID must be non-empty"));
+        }
+        validate_sha256(&decision_sha256, "decision_sha256")?;
+        if replicate.replicate_id.trim().is_empty() {
+            return Err(NoisyParetoError::new("replicate.replicate_id", "replicate ID must be non-empty"));
+        }
+        validate_sha256(&replicate.evidence_sha256, "replicate.evidence_sha256")?;
+        if replicate.objective_values.len() != self.plan.objective_specs.len() {
+            return Err(NoisyParetoError::new("replicate.objective_values", "objective vector dimension mismatch"));
+        }
+        for (index, (value, spec)) in replicate.objective_values.iter()
+            .zip(&self.plan.objective_specs).enumerate()
+        {
+            if !value.is_finite()
+                || *value < spec.observation_lower_bound
+                || *value > spec.observation_upper_bound
+            {
+                return Err(NoisyParetoError::new(
+                    format!("replicate.objective_values[{index}]"),
+                    "observation is non-finite or outside the frozen certified bounds",
+                ));
+            }
+        }
+
+        if self.decision_owners.get(&decision_sha256).is_some_and(|owner| owner != &candidate_id) {
+            return Err(NoisyParetoError::new("decision_sha256", "identical decision bytes must share one canonical candidate ID"));
+        }
+        let existing = self.candidates.get(&candidate_id);
+        if existing.is_none() && self.candidates.len() >= self.plan.max_candidates {
+            return Err(NoisyParetoError::new("candidates", "frozen maximum candidate count exceeded"));
+        }
+        if existing.is_some_and(|state| state.decision_sha256 != decision_sha256) {
+            return Err(NoisyParetoError::new("decision_sha256", "candidate decision digest changed"));
+        }
+        if existing.is_some_and(|state| {
+            state.samples.contains_key(&replicate.replicate_id)
+                || state.seeds.contains(&replicate.sample_seed)
+        }) {
+            return Err(NoisyParetoError::new("replicate", "replicate ID and seed must both be unique within a candidate"));
+        }
+
+        // All validation is complete before state mutation.
+        self.decision_owners.entry(decision_sha256.clone()).or_insert_with(|| candidate_id.clone());
+        let state = self.candidates.entry(candidate_id).or_insert_with(|| CandidateSamples {
+            decision_sha256,
+            samples: BTreeMap::new(),
+            seeds: BTreeSet::new(),
+        });
+        state.seeds.insert(replicate.sample_seed);
+        state.samples.insert(replicate.replicate_id.clone(), replicate);
+        Ok(())
+    }
+
+    pub fn validate(&self) -> Result<(), NoisyParetoError> {
+        self.plan.validate()?;
+        if self.candidates.len() > self.plan.max_candidates {
+            return Err(NoisyParetoError::new("candidates", "candidate count exceeds frozen limit"));
+        }
+        let mut expected_owners = BTreeMap::<String, String>::new();
+        for (candidate_id, state) in &self.candidates {
+            if candidate_id.trim().is_empty() || state.samples.is_empty() {
+                return Err(NoisyParetoError::new("candidates", "candidate IDs and observation sets must be non-empty"));
+            }
+            validate_sha256(&state.decision_sha256, "candidate.decision_sha256")?;
+            if expected_owners.insert(state.decision_sha256.clone(), candidate_id.clone()).is_some() {
+                return Err(NoisyParetoError::new("candidate.decision_sha256", "identical decision digest appears under multiple candidate IDs"));
+            }
+            if state.samples.values().any(|sample| {
+                sample.replicate_id.trim().is_empty()
+                    || sample.objective_values.len() != self.plan.objective_specs.len()
+            }) {
+                return Err(NoisyParetoError::new("candidate.samples", "invalid replicate record"));
+            }
+            let mut sample_ids = BTreeSet::new();
+            let mut sample_seeds = BTreeSet::new();
+            for sample in state.samples.values() {
+                if !sample_ids.insert(sample.replicate_id.as_str()) || !sample_seeds.insert(sample.sample_seed) {
+                    return Err(NoisyParetoError::new("candidate.samples", "duplicate replicate ID or seed"));
+                }
+                validate_sha256(&sample.evidence_sha256, "candidate.sample.evidence_sha256")?;
+                for (value, spec) in sample.objective_values.iter().zip(&self.plan.objective_specs) {
+                    if !value.is_finite() || *value < spec.observation_lower_bound || *value > spec.observation_upper_bound {
+                        return Err(NoisyParetoError::new("candidate.samples", "replicate value outside frozen observation bounds"));
+                    }
+                }
+            }
+            if sample_seeds != state.seeds {
+                return Err(NoisyParetoError::new("candidate.seeds", "cached seed index differs from the retained replicate set"));
+            }
+        }
+        if expected_owners != self.decision_owners {
+            return Err(NoisyParetoError::new("decision_owners", "decision ownership index differs from candidate records"));
+        }
+        Ok(())
+    }
+
+    pub fn report(&self) -> Result<NoisyParetoReport, NoisyParetoError> {
+        self.validate()?;
+        let plan_sha256 = self.plan.plan_sha256()?;
+        let mut summaries = Vec::with_capacity(self.candidates.len());
+        for (candidate_id, samples) in &self.candidates {
+            summaries.push(self.summarize_candidate(candidate_id, samples)?);
+        }
+        let mut by_id = summaries.iter().map(|item| (item.candidate_id.clone(), item.clone()))
+            .collect::<BTreeMap<_, _>>();
+        let ids = by_id.keys().cloned().collect::<Vec<_>>();
+        for candidate_id in &ids {
+            let candidate = by_id.get(candidate_id).cloned().ok_or_else(|| NoisyParetoError::new("report", "candidate summary disappeared"))?;
+            if candidate.sample_count < self.plan.minimum_replicates as u64 {
+                continue;
+            }
+            let mut certain = Vec::new();
+            let mut possible = Vec::new();
+            for other_id in &ids {
+                if other_id == candidate_id {
+                    continue;
+                }
+                let other = by_id.get(other_id).ok_or_else(|| NoisyParetoError::new("report", "comparison summary disappeared"))?;
+                if other.sample_count < self.plan.minimum_replicates as u64 {
+                    continue;
+                }
+                if certainly_dominates(other, &candidate, &self.plan.objective_specs) {
+                    certain.push(other_id.clone());
+                }
+                if possibly_dominates(other, &candidate, &self.plan.objective_specs) {
+                    possible.push(other_id.clone());
+                }
+            }
+            let status = if !certain.is_empty() {
+                ConfidenceParetoStatus::CertainlyDominated
+            } else if possible.is_empty() {
+                ConfidenceParetoStatus::CertainlyNondominatedAmongObserved
+            } else {
+                ConfidenceParetoStatus::Unresolved
+            };
+            let entry = by_id.get_mut(candidate_id).ok_or_else(|| NoisyParetoError::new("report", "candidate summary disappeared"))?;
+            entry.certainly_dominated_by = certain;
+            entry.possibly_dominated_by = possible;
+            entry.status = status;
+        }
+        summaries = by_id.into_values().collect();
+
+        let nominal_familywise_confidence = 1.0 - self.plan.familywise_alpha;
+        let payload = NoisyReportPayload {
+            schema: SCHEMA,
+            version: VERSION,
+            campaign_id: &self.plan.campaign_id,
+            plan_sha256: &plan_sha256,
+            candidate_summaries: &summaries,
+            nominal_familywise_confidence,
+            unique_replicate_seeds_enforced: true,
+        };
+        let report_sha256 = digest_serializable(&payload)?;
+        Ok(NoisyParetoReport {
+            schema: SCHEMA.to_owned(),
+            version: VERSION.to_owned(),
+            campaign_id: self.plan.campaign_id.clone(),
+            plan_sha256,
+            candidate_summaries: summaries,
+            nominal_familywise_confidence,
+            unique_replicate_seeds_enforced: true,
+            report_sha256,
+        })
+    }
+
+    fn summarize_candidate(
+        &self,
+        candidate_id: &str,
+        state: &CandidateSamples,
+    ) -> Result<NoisyCandidateSummary, NoisyParetoError> {
+        let sample_count = u64::try_from(state.samples.len())
+            .map_err(|_| NoisyParetoError::new("candidate.sample_count", "sample count exceeds u64"))?;
+        let mut confidence_intervals = Vec::with_capacity(self.plan.objective_specs.len());
+        for (index, spec) in self.plan.objective_specs.iter().enumerate() {
+            let mut sum = 0.0;
+            let mut compensation = 0.0;
+            for sample in state.samples.values() {
+                let value = sample.objective_values[index];
+                // Compensated (Kahan) summation in canonical replicate-ID order.
+                let adjusted = value - compensation;
+                let next = sum + adjusted;
+                compensation = (next - sum) - adjusted;
+                sum = next;
+            }
+            let mean = sum / sample_count as f64;
+            let alpha_at_prefix = self.plan.alpha_at_prefix(sample_count)?;
+            let n = sample_count as f64;
+            let radius = (spec.observation_upper_bound - spec.observation_lower_bound)
+                * ((2.0 / alpha_at_prefix).ln() / (2.0 * n)).sqrt();
+            if !mean.is_finite() || !radius.is_finite() || !alpha_at_prefix.is_finite() || alpha_at_prefix <= 0.0 {
+                return Err(NoisyParetoError::new(
+                    format!("candidate[{candidate_id}].objective[{index}]"),
+                    "confidence interval calculation overflowed or became non-finite",
+                ));
+            }
+            confidence_intervals.push(ObjectiveConfidenceInterval {
+                objective_id: spec.objective_id.clone(),
+                sample_count,
+                sample_mean: mean,
+                lower_bound: (mean - radius).max(spec.observation_lower_bound),
+                upper_bound: (mean + radius).min(spec.observation_upper_bound),
+                alpha_at_prefix,
+            });
+        }
+        let sample_set_sha256 = digest_serializable(&state.samples)?;
+        let status = if sample_count < self.plan.minimum_replicates as u64 {
+            ConfidenceParetoStatus::InsufficientReplicates
+        } else {
+            ConfidenceParetoStatus::Unresolved
+        };
+        Ok(NoisyCandidateSummary {
+            candidate_id: candidate_id.to_owned(),
+            decision_sha256: state.decision_sha256.clone(),
+            sample_count,
+            confidence_intervals,
+            certainly_dominated_by: Vec::new(),
+            possibly_dominated_by: Vec::new(),
+            status,
+            sample_set_sha256,
+        })
+    }
+}
+
+/// Digest-bound joint report that reconstructs noisy samples from the same hash-chained
+/// history that accounts for successful and failed replicate costs.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NoisyAnytimeCampaignReport {
+    pub schema: String,
+    pub version: String,
+    pub run_id: String,
+    pub plan_sha256: String,
+    pub history_tip_sha256: String,
+    pub attempted_observation_count: u64,
+    pub successful_replicate_count: u64,
+    pub failed_observation_count: u64,
+    pub anytime_receipt: AnytimeRunReceipt,
+    pub noisy_pareto_report: NoisyParetoReport,
+    pub report_sha256: String,
+}
+
+#[derive(Serialize)]
+struct NoisyAnytimeCampaignReportPayload<'a> {
+    schema: &'a str,
+    version: &'a str,
+    run_id: &'a str,
+    plan_sha256: &'a str,
+    history_tip_sha256: &'a str,
+    attempted_observation_count: u64,
+    successful_replicate_count: u64,
+    failed_observation_count: u64,
+    anytime_receipt: &'a AnytimeRunReceipt,
+    noisy_pareto_report: &'a NoisyParetoReport,
+}
+
+/// Reconstruct a noisy confidence report exclusively from the frozen plan and the
+/// hash-chained CandidateNoisyObservation events. Failed/invalid/timed-out observations
+/// remain in the anytime receipt and resource totals, but never enter sample means or
+/// confidence intervals. Objective vectors are retained directly in the event chain;
+/// evidence digests point to optional external raw artifacts and are not byte-verified here.
+pub fn analyze_noisy_anytime_history(
+    plan: &NoisyObservationPlan,
+    history: &AnytimeHistory,
+) -> Result<NoisyAnytimeCampaignReport, NoisyParetoError> {
+    plan.validate()?;
+    history.validate().map_err(|error| NoisyParetoError::new(
+        "history",
+        error.to_string(),
+    ))?;
+    let plan_sha256 = plan.plan_sha256()?;
+    let header = history.header();
+    if header.noisy_observation_plan_sha256.as_deref() != Some(plan_sha256.as_str()) {
+        return Err(NoisyParetoError::new(
+            "history.header.noisy_observation_plan_sha256",
+            "history header does not preregister this exact noisy-observation plan",
+        ));
+    }
+    if header.objective_specs.len() != plan.objective_specs.len()
+        || header.objective_specs.iter().zip(&plan.objective_specs).any(|(history_spec, noisy_spec)| {
+            history_spec.objective_id != noisy_spec.objective_id
+                || history_spec.direction != noisy_spec.direction
+        })
+    {
+        return Err(NoisyParetoError::new(
+            "history.header.objective_specs",
+            "history objective IDs/order/directions differ from the frozen noisy-observation plan",
+        ));
+    }
+
+    let mut study = NoisyParetoStudy::new(plan.clone())?;
+    let mut attempted_observation_count = 0u64;
+    let mut successful_replicate_count = 0u64;
+    let mut failed_observation_count = 0u64;
+
+    for event in history.events() {
+        let AnytimeAction::CandidateNoisyObservation {
+            observation_plan_sha256,
+            candidate_id,
+            decision_sha256,
+            replicate_id,
+            sample_seed,
+            outcome,
+            objective_values,
+            evidence_sha256,
+            failure_reason: _,
+        } = &event.action else {
+            continue;
+        };
+        if observation_plan_sha256 != &plan_sha256 {
+            return Err(NoisyParetoError::new(
+                format!("history.events[{}].observation_plan_sha256", event.ordinal),
+                "event plan digest differs from the frozen noisy-observation plan",
+            ));
+        }
+        attempted_observation_count = attempted_observation_count.checked_add(1).ok_or_else(|| {
+            NoisyParetoError::new("history.attempted_observation_count", "counter overflow")
+        })?;
+        match outcome {
+            EvaluationOutcome::Succeeded => {
+                let values = objective_values.as_ref().ok_or_else(|| NoisyParetoError::new(
+                    format!("history.events[{}].objective_values", event.ordinal),
+                    "validated successful noisy event is missing objective values",
+                ))?;
+                let evidence = evidence_sha256.as_ref().ok_or_else(|| NoisyParetoError::new(
+                    format!("history.events[{}].evidence_sha256", event.ordinal),
+                    "validated successful noisy event is missing evidence digest",
+                ))?;
+                study.append(candidate_id.clone(), decision_sha256.clone(), NoisyReplicate {
+                    replicate_id: replicate_id.clone(),
+                    sample_seed: *sample_seed,
+                    objective_values: values.clone(),
+                    evidence_sha256: evidence.clone(),
+                })?;
+                successful_replicate_count = successful_replicate_count.checked_add(1).ok_or_else(|| {
+                    NoisyParetoError::new("history.successful_replicate_count", "counter overflow")
+                })?;
+            }
+            EvaluationOutcome::Failed | EvaluationOutcome::Invalid | EvaluationOutcome::TimedOut => {
+                failed_observation_count = failed_observation_count.checked_add(1).ok_or_else(|| {
+                    NoisyParetoError::new("history.failed_observation_count", "counter overflow")
+                })?;
+            }
+        }
+    }
+
+    let anytime_receipt = analyze_anytime_history(history).map_err(|error| {
+        NoisyParetoError::new("history.anytime_receipt", error.to_string())
+    })?;
+    if anytime_receipt.objective_evaluation_attempt_count != attempted_observation_count {
+        return Err(NoisyParetoError::new(
+            "history.anytime_receipt.objective_evaluation_attempt_count",
+            "generic anytime attempt count differs from noisy replicate-event count",
+        ));
+    }
+    if attempted_observation_count != successful_replicate_count + failed_observation_count {
+        return Err(NoisyParetoError::new(
+            "history.observation_counts",
+            "successful and failed observations do not reconcile to total attempts",
+        ));
+    }
+
+    let noisy_pareto_report = study.report()?;
+    let history_tip_sha256 = history.history_tip_sha256();
+    let run_id = header.run_id.clone();
+    let payload = NoisyAnytimeCampaignReportPayload {
+        schema: JOINT_REPORT_SCHEMA,
+        version: JOINT_REPORT_VERSION,
+        run_id: &run_id,
+        plan_sha256: &plan_sha256,
+        history_tip_sha256: &history_tip_sha256,
+        attempted_observation_count,
+        successful_replicate_count,
+        failed_observation_count,
+        anytime_receipt: &anytime_receipt,
+        noisy_pareto_report: &noisy_pareto_report,
+    };
+    let report_sha256 = digest_serializable(&payload)?;
+    Ok(NoisyAnytimeCampaignReport {
+        schema: JOINT_REPORT_SCHEMA.to_owned(),
+        version: JOINT_REPORT_VERSION.to_owned(),
+        run_id,
+        plan_sha256,
+        history_tip_sha256,
+        attempted_observation_count,
+        successful_replicate_count,
+        failed_observation_count,
+        anytime_receipt,
+        noisy_pareto_report,
+        report_sha256,
+    })
+}
+
+/// Reconstruct and compare every field of a stored noisy/anytime joint report.
+pub fn verify_noisy_anytime_campaign_report(
+    plan: &NoisyObservationPlan,
+    history: &AnytimeHistory,
+    report: &NoisyAnytimeCampaignReport,
+) -> Result<(), NoisyParetoError> {
+    let reconstructed = analyze_noisy_anytime_history(plan, history)?;
+    if &reconstructed != report {
+        return Err(NoisyParetoError::new(
+            "report",
+            "noisy/anytime campaign report differs from exact history and plan reconstruction",
+        ));
+    }
+    Ok(())
+}
+
+fn utility_interval(
+    summary: &NoisyCandidateSummary,
+    specs: &[NoisyObjectiveSpec],
+) -> (Vec<f64>, Vec<f64>) {
+    let mut lower = Vec::with_capacity(specs.len());
+    let mut upper = Vec::with_capacity(specs.len());
+    for (interval, spec) in summary.confidence_intervals.iter().zip(specs) {
+        match spec.direction {
+            ObjectiveDirection::Maximize => {
+                lower.push(interval.lower_bound);
+                upper.push(interval.upper_bound);
+            }
+            ObjectiveDirection::Minimize => {
+                lower.push(-interval.upper_bound);
+                upper.push(-interval.lower_bound);
+            }
+        }
+    }
+    (lower, upper)
+}
+
+fn certainly_dominates(
+    left: &NoisyCandidateSummary,
+    right: &NoisyCandidateSummary,
+    specs: &[NoisyObjectiveSpec],
+) -> bool {
+    let (left_lower, _) = utility_interval(left, specs);
+    let (_, right_upper) = utility_interval(right, specs);
+    dominates(&left_lower, &right_upper)
+}
+
+fn possibly_dominates(
+    left: &NoisyCandidateSummary,
+    right: &NoisyCandidateSummary,
+    specs: &[NoisyObjectiveSpec],
+) -> bool {
+    let (_, left_upper) = utility_interval(left, specs);
+    let (right_lower, _) = utility_interval(right, specs);
+    dominates(&left_upper, &right_lower)
+}
+
+fn dominates(left: &[f64], right: &[f64]) -> bool {
+    left.len() == right.len()
+        && left.iter().zip(right).all(|(a, b)| a >= b)
+        && left.iter().zip(right).any(|(a, b)| a > b)
+}
+
+fn validate_sha256(value: &str, path: &str) -> Result<(), NoisyParetoError> {
+    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)) {
+        return Err(NoisyParetoError::new(path, "expected lowercase 64-character SHA-256 digest"));
+    }
+    Ok(())
+}
+
+fn digest_serializable<T: Serialize>(value: &T) -> Result<String, NoisyParetoError> {
+    let bytes = serde_json::to_vec(value)
+        .map_err(|error| NoisyParetoError::new("serialization", format!("cannot serialize noisy Pareto receipt: {error}")))?;
+    let digest = Sha256::digest(bytes);
+    Ok(digest.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::pareto_anytime::{
+        AnytimeEventDraft, AnytimeHistoryHeader, AnytimeTarget, AnytimeTargetMetric,
+        AnytimeTargetPlan, ResourceCost, ResourceMeter, TargetAttainmentStatus,
+    };
+    use super::super::pareto_objectives::ParetoObjectiveSpec;
+
+    const H1: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const H2: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const H3: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    const H4: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+
+    fn plan() -> NoisyObservationPlan {
+        NoisyObservationPlan::new(
+            "noisy-zdt-like",
+            "independent-counter-based-replicates-v0.1",
+            H3,
+            "bounded-additive-fixed-noise-v0.1",
+            H4,
+            vec![
+                NoisyObjectiveSpec {
+                    objective_id: "quality".to_owned(),
+                    direction: ObjectiveDirection::Maximize,
+                    observation_lower_bound: 0.0,
+                    observation_upper_bound: 1.0,
+                    bounds_certificate_sha256: H1.to_owned(),
+                },
+                NoisyObjectiveSpec {
+                    objective_id: "cost".to_owned(),
+                    direction: ObjectiveDirection::Minimize,
+                    observation_lower_bound: 0.0,
+                    observation_upper_bound: 1.0,
+                    bounds_certificate_sha256: H2.to_owned(),
+                },
+            ],
+            0.05,
+            10,
+            2,
+        ).unwrap()
+    }
+
+    fn sample(replicate: usize, seed: u64, values: [f64; 2]) -> NoisyReplicate {
+        NoisyReplicate {
+            replicate_id: format!("replicate-{replicate:04}"),
+            sample_seed: seed,
+            objective_values: values.to_vec(),
+            evidence_sha256: H2.to_owned(),
+        }
+    }
+
+    #[test]
+    fn plan_digest_binds_sampling_noise_and_bounds_certificates() {
+        let baseline = plan();
+        let baseline_digest = baseline.plan_sha256().unwrap();
+
+        let mut changed_sampling = baseline.clone();
+        changed_sampling.sampling_protocol_sha256 =
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_owned();
+        assert_ne!(baseline_digest, changed_sampling.plan_sha256().unwrap());
+
+        let mut changed_noise = baseline.clone();
+        changed_noise.noise_model_sha256 =
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_owned();
+        assert_ne!(baseline_digest, changed_noise.plan_sha256().unwrap());
+
+        let mut changed_bounds = baseline.clone();
+        changed_bounds.objective_specs[0].bounds_certificate_sha256 =
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_owned();
+        assert_ne!(baseline_digest, changed_bounds.plan_sha256().unwrap());
+    }
+
+    #[test]
+    fn alpha_spending_is_summable_and_plan_caps_are_enforced() {
+        let plan = plan();
+        let alpha_coordinate = 0.05 / (10.0 * 2.0);
+        let spent = (1..=10_000u64)
+            .map(|n| plan.alpha_at_prefix(n).unwrap())
+            .sum::<f64>();
+        assert!(spent <= alpha_coordinate + 1e-12);
+        assert!(plan.alpha_at_prefix(0).is_err());
+
+        assert!(NoisyObservationPlan::new(
+            "too-many-candidates",
+            plan.sampling_protocol_id.clone(),
+            plan.sampling_protocol_sha256.clone(),
+            plan.noise_model_id.clone(),
+            plan.noise_model_sha256.clone(),
+            plan.objective_specs.clone(),
+            0.05,
+            MAX_NOISY_PARETO_CANDIDATES + 1,
+            2,
+        ).is_err());
+    }
+
+    #[test]
+    fn time_uniform_confidence_intervals_shrink_with_more_replicates() {
+        let mut study = NoisyParetoStudy::new(plan()).unwrap();
+        for i in 0..32 {
+            study.append("candidate-a", H1, sample(i, i as u64 + 1, [0.7, 0.4])).unwrap();
+        }
+        let short = study.report().unwrap().candidate_summaries.remove(0);
+        for i in 32..512 {
+            study.append("candidate-a", H1, sample(i, i as u64 + 1, [0.7, 0.4])).unwrap();
+        }
+        let long = study.report().unwrap().candidate_summaries.remove(0);
+        let short_width = short.confidence_intervals[0].upper_bound - short.confidence_intervals[0].lower_bound;
+        let long_width = long.confidence_intervals[0].upper_bound - long.confidence_intervals[0].lower_bound;
+        assert!(long_width < short_width);
+    }
+
+    #[test]
+    fn certain_dominance_and_unresolved_tradeoffs_are_distinguished() {
+        let mut study = NoisyParetoStudy::new(plan()).unwrap();
+        for i in 0..512 {
+            study.append("candidate-a", H1, sample(i, i as u64 + 1, [0.9, 0.1])).unwrap();
+            study.append("candidate-b", H2, sample(i, i as u64 + 10_000, [0.1, 0.9])).unwrap();
+        }
+        let report = study.report().unwrap();
+        let a = report.candidate_summaries.iter().find(|item| item.candidate_id == "candidate-a").unwrap();
+        let b = report.candidate_summaries.iter().find(|item| item.candidate_id == "candidate-b").unwrap();
+        assert_eq!(a.status, ConfidenceParetoStatus::CertainlyNondominatedAmongObserved);
+        assert_eq!(b.status, ConfidenceParetoStatus::CertainlyDominated);
+        assert_eq!(b.certainly_dominated_by, vec!["candidate-a".to_owned()]);
+
+        let mut uncertain = NoisyParetoStudy::new(plan()).unwrap();
+        uncertain.append("a", H1, sample(1, 1, [0.6, 0.4])).unwrap();
+        uncertain.append("a", H1, sample(2, 2, [0.4, 0.6])).unwrap();
+        uncertain.append("b", H2, sample(1, 3, [0.5, 0.5])).unwrap();
+        uncertain.append("b", H2, sample(2, 4, [0.5, 0.5])).unwrap();
+        assert!(uncertain.report().unwrap().candidate_summaries.iter()
+            .all(|item| item.status == ConfidenceParetoStatus::Unresolved));
+    }
+
+    #[test]
+    fn replicate_ids_seeds_bounds_and_decision_aliases_are_enforced() {
+        let mut study = NoisyParetoStudy::new(plan()).unwrap();
+        study.append("a", H1, sample(1, 7, [0.5, 0.5])).unwrap();
+        assert!(study.append("a", H1, sample(1, 8, [0.5, 0.5])).is_err());
+        assert!(study.append("a", H1, sample(2, 7, [0.5, 0.5])).is_err());
+        assert!(study.append("b", H1, sample(1, 9, [0.5, 0.5])).is_err());
+        assert!(study.append("a", H1, sample(3, 10, [1.5, 0.5])).is_err());
+        assert_eq!(study.candidates["a"].samples.len(), 1);
+        assert!(!study.candidates.contains_key("b"));
+        study.validate().unwrap();
+    }
+
+    #[test]
+    fn deserialized_study_rebuilds_validation_cache_and_resumes_deterministically() {
+        let mut uninterrupted = NoisyParetoStudy::new(plan()).unwrap();
+        for i in 0..20 {
+            uninterrupted.append("a", H1, sample(i, i as u64 + 1, [0.7, 0.3])).unwrap();
+        }
+        let encoded = serde_json::to_vec(&uninterrupted).unwrap();
+        let mut resumed: NoisyParetoStudy = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(resumed.report().unwrap(), uninterrupted.report().unwrap());
+        for i in 20..40 {
+            let replicate = sample(i, i as u64 + 1, [0.7, 0.3]);
+            uninterrupted.append("a", H1, replicate.clone()).unwrap();
+            resumed.append("a", H1, replicate).unwrap();
+        }
+        assert_eq!(resumed.report().unwrap(), uninterrupted.report().unwrap());
+        resumed.validate().unwrap();
+    }
+
+    #[test]
+    fn seeded_optional_stopping_coverage_simulation_is_a_diagnostic_regression() {
+        // This is not a proof of Hoeffding's inequality or replicate independence.
+        // It is a deterministic stress test of the implementation across every prefix.
+        const PATHS: usize = 128;
+        const HORIZON: usize = 128;
+        let mut paths_with_any_miss = 0usize;
+
+        for path_index in 0..PATHS {
+            let mut rng = 0x9e37_79b9_7f4a_7c15u64
+                .wrapping_add((path_index as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15));
+            if rng == 0 {
+                rng = 1;
+            }
+            let mut study = NoisyParetoStudy::new(plan()).unwrap();
+            let mut missed_any_prefix = false;
+
+            for replicate_index in 0..HORIZON {
+                // xorshift64*: deterministic pseudorandom Bernoulli(0.5) diagnostic stream.
+                rng ^= rng >> 12;
+                rng ^= rng << 25;
+                rng ^= rng >> 27;
+                let bits = rng.wrapping_mul(0x2545_f491_4f6c_dd1d);
+                let observation = (bits >> 63) as f64;
+                let sample_seed = rng.max(1);
+
+                study.append(
+                    "candidate-a",
+                    H1,
+                    NoisyReplicate {
+                        replicate_id: format!("path-{path_index:04}-replicate-{replicate_index:04}"),
+                        sample_seed,
+                        objective_values: vec![observation, observation],
+                        evidence_sha256: H2.to_owned(),
+                    },
+                ).unwrap();
+
+                let report = study.report().unwrap();
+                let interval = &report.candidate_summaries[0].confidence_intervals[0];
+                if 0.5 < interval.lower_bound || 0.5 > interval.upper_bound {
+                    missed_any_prefix = true;
+                }
+            }
+            paths_with_any_miss += if missed_any_prefix { 1 } else { 0 };
+        }
+
+        // For the tested coordinate, the frozen alpha allocation is 0.05/(10 candidates * 2 objectives).
+        // The limit is intentionally looser than the expected failure count to avoid treating
+        // a finite Monte Carlo simulation as a statistical proof.
+        assert!(
+            paths_with_any_miss <= 4,
+            "unexpected optional-stopping coverage failures: {paths_with_any_miss}/{PATHS}",
+        );
+    }
+
+    #[test]
+    fn report_digest_is_independent_of_observation_insertion_order() {
+        let mut left = NoisyParetoStudy::new(plan()).unwrap();
+        let mut right = NoisyParetoStudy::new(plan()).unwrap();
+        for i in 0..20 {
+            left.append("a", H1, sample(i, i as u64 + 1, [0.7, 0.3])).unwrap();
+        }
+        for i in (0..20).rev() {
+            right.append("a", H1, sample(i, i as u64 + 1, [0.7, 0.3])).unwrap();
+        }
+        assert_eq!(left.report().unwrap(), right.report().unwrap());
+    }
+
+    fn noisy_history(plan: &NoisyObservationPlan) -> AnytimeHistory {
+        let target_plan = AnytimeTargetPlan::new(vec![
+            AnytimeTarget {
+                target_id: "recorded-hv".to_owned(),
+                metric: AnytimeTargetMetric::Hypervolume,
+                threshold: 0.1,
+                minimum_evidence_level: super::super::pareto_anytime::EvidenceLevel::Recorded,
+            },
+        ], vec![vec![1.0, 0.0], vec![0.0, 1.0]]).unwrap();
+        let specs = plan.objective_specs.iter().map(|spec| ParetoObjectiveSpec {
+            objective_id: spec.objective_id.clone(),
+            direction: spec.direction,
+            scale_lower: spec.observation_lower_bound,
+            scale_upper: spec.observation_upper_bound,
+        }).collect::<Vec<_>>();
+        let header = AnytimeHistoryHeader::new(
+            "noisy-run",
+            "0123456789abcdef0123456789abcdef01234567",
+            "noisy-reference-sampler",
+            H1,
+            H2,
+            "fixed-noisy-evaluator",
+            H2,
+            "independent-verifier",
+            H3,
+            H4,
+            "noisy-zdt-like",
+            17,
+            specs,
+            vec![-0.1, -0.1],
+            target_plan,
+            "measured-noisy-cost-v0.1",
+            H2,
+            20,
+            vec![
+                ResourceMeter::EvaluatorCalls,
+                ResourceMeter::NormalizedChargeMicrounits,
+            ],
+        ).unwrap().with_noisy_observation_plan(plan.plan_sha256().unwrap()).unwrap();
+        AnytimeHistory::new(header).unwrap()
+    }
+
+    fn append_noisy_observation(
+        history: &mut AnytimeHistory,
+        plan: &NoisyObservationPlan,
+        candidate_id: &str,
+        decision_sha256: &str,
+        replicate_id: &str,
+        sample_seed: u64,
+        outcome: EvaluationOutcome,
+        objective_values: Option<Vec<f64>>,
+        evidence_sha256: Option<&str>,
+        failure_reason: Option<&str>,
+    ) -> Result<String, super::super::pareto_anytime::AnytimeError> {
+        history.append(AnytimeEventDraft {
+            started_elapsed_millis: None,
+            completed_elapsed_millis: None,
+            resources: ResourceCost::known(1, 1, 0, 1024, 0, 1, 0, 0, 0, 1, 0, 1),
+            action: AnytimeAction::CandidateNoisyObservation {
+                observation_plan_sha256: plan.plan_sha256().unwrap(),
+                candidate_id: candidate_id.to_owned(),
+                decision_sha256: decision_sha256.to_owned(),
+                replicate_id: replicate_id.to_owned(),
+                sample_seed,
+                outcome,
+                objective_values,
+                evidence_sha256: evidence_sha256.map(str::to_owned),
+                failure_reason: failure_reason.map(str::to_owned),
+            },
+        })
+    }
+
+    #[test]
+    fn noisy_anytime_replay_charges_failures_but_excludes_them_from_samples() {
+        let plan = plan();
+        let mut history = noisy_history(&plan);
+        append_noisy_observation(&mut history, &plan, "candidate-a", H1, "a-1", 1,
+            EvaluationOutcome::Succeeded, Some(vec![0.9, 0.1]), Some(H3), None).unwrap();
+        append_noisy_observation(&mut history, &plan, "candidate-a", H1, "a-2", 2,
+            EvaluationOutcome::Succeeded, Some(vec![0.8, 0.2]), Some(H4), None).unwrap();
+        append_noisy_observation(&mut history, &plan, "candidate-b", H2, "b-1", 11,
+            EvaluationOutcome::Succeeded, Some(vec![0.1, 0.9]), Some(H3), None).unwrap();
+        append_noisy_observation(&mut history, &plan, "candidate-b", H2, "b-2", 12,
+            EvaluationOutcome::Succeeded, Some(vec![0.2, 0.8]), Some(H4), None).unwrap();
+        append_noisy_observation(&mut history, &plan, "candidate-a", H1, "a-failed", 3,
+            EvaluationOutcome::TimedOut, None, None, Some("replicate acquisition timed out")).unwrap();
+
+        let report = analyze_noisy_anytime_history(&plan, &history).unwrap();
+        assert_eq!(report.attempted_observation_count, 5);
+        assert_eq!(report.successful_replicate_count, 4);
+        assert_eq!(report.failed_observation_count, 1);
+        assert_eq!(report.anytime_receipt.objective_evaluation_attempt_count, 5);
+        assert_eq!(report.anytime_receipt.total_resources.evaluator_calls, Some(5));
+        assert_eq!(report.anytime_receipt.total_resources.normalized_charge_microunits, Some(5));
+        assert!(report.anytime_receipt.target_results.iter().all(|target| {
+            target.status == TargetAttainmentStatus::NotApplicableInNoisyMode
+                && target.final_metric_value.is_none()
+        }));
+        assert_eq!(report.noisy_pareto_report.candidate_summaries.len(), 2);
+        assert!(report.noisy_pareto_report.candidate_summaries.iter().all(|item| item.sample_count == 2));
+        verify_noisy_anytime_campaign_report(&plan, &history, &report).unwrap();
+
+        let mut tampered = report.clone();
+        tampered.failed_observation_count = 0;
+        assert!(verify_noisy_anytime_campaign_report(&plan, &history, &tampered).is_err());
+    }
+
+    #[test]
+    fn noisy_anytime_replay_rejects_a_plan_not_frozen_in_the_header() {
+        let frozen = plan();
+        let history = noisy_history(&frozen);
+        let mut changed = frozen.clone();
+        changed.noise_model_sha256 = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_owned();
+        assert!(analyze_noisy_anytime_history(&changed, &history).is_err());
+    }
+
+    #[test]
+    fn noisy_event_rejects_unregistered_plan_digest_and_deterministic_mixing() {
+        let plan = plan();
+        let mut history = noisy_history(&plan);
+        let wrong_plan = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+        let rejected = history.append(AnytimeEventDraft {
+            started_elapsed_millis: None,
+            completed_elapsed_millis: None,
+            resources: ResourceCost::known(1, 1, 0, 1024, 0, 1, 0, 0, 0, 1, 0, 1),
+            action: AnytimeAction::CandidateNoisyObservation {
+                observation_plan_sha256: wrong_plan.to_owned(),
+                candidate_id: "candidate-a".to_owned(),
+                decision_sha256: H1.to_owned(),
+                replicate_id: "wrong-plan".to_owned(),
+                sample_seed: 3,
+                outcome: EvaluationOutcome::Succeeded,
+                objective_values: Some(vec![0.5, 0.5]),
+                evidence_sha256: Some(H3.to_owned()),
+                failure_reason: None,
+            },
+        });
+        assert!(rejected.is_err());
+        assert!(history.events().is_empty());
+
+        history.append(AnytimeEventDraft {
+            started_elapsed_millis: None,
+            completed_elapsed_millis: None,
+            resources: ResourceCost::known(1, 1, 0, 1024, 0, 1, 0, 0, 0, 1, 0, 1),
+            action: AnytimeAction::CandidateNoisyObservation {
+                observation_plan_sha256: plan.plan_sha256().unwrap(),
+                candidate_id: "candidate-a".to_owned(),
+                decision_sha256: H1.to_owned(),
+                replicate_id: "valid-noisy".to_owned(),
+                sample_seed: 4,
+                outcome: EvaluationOutcome::Succeeded,
+                objective_values: Some(vec![0.5, 0.5]),
+                evidence_sha256: Some(H3.to_owned()),
+                failure_reason: None,
+            },
+        }).unwrap();
+        let deterministic = history.append(AnytimeEventDraft {
+            started_elapsed_millis: None,
+            completed_elapsed_millis: None,
+            resources: ResourceCost::known(1, 1, 0, 1024, 0, 1, 0, 0, 0, 1, 0, 1),
+            action: AnytimeAction::CandidateEvaluation {
+                evaluation_id: "deterministic-mix".to_owned(),
+                candidate_id: "candidate-a".to_owned(),
+                attempt: 1,
+                decision_sha256: H1.to_owned(),
+                outcome: EvaluationOutcome::Succeeded,
+                objective_values: Some(vec![0.5, 0.5]),
+                feasible: Some(true),
+                constraint_violations: Vec::new(),
+                evidence_sha256: Some(H3.to_owned()),
+                failure_reason: None,
+            },
+        });
+        assert!(deterministic.is_err());
+        assert_eq!(history.events().len(), 1);
+    }
+
+}

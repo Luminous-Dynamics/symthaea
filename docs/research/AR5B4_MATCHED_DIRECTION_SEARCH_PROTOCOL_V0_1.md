@@ -21,12 +21,19 @@ This decomposes the research lifecycle into separate failure surfaces. A high pr
 
 ## 2. What the current implementation does — and does not — establish
 
-The existing sequential direction campaign has four deterministic payoff families:
+The current sequential direction campaign now has eight deterministic payoff families plus one seeded stochastic family:
 
 - delayed breakthrough;
 - no-new-direction null;
 - new-operator breakthrough;
-- rank reversal.
+- rank reversal;
+- deceptive proxy (a high initial score collapses while a slower arm ends higher);
+- deterministic heteroscedastic reward profiles;
+- correlated directions (near-parallel payoff profiles for two initial arms);
+- strict null/no-breakthrough (equal outcomes and no beneficial NEW direction);
+- seeded stochastic heteroscedastic rewards.
+
+The stochastic generator keys each potential observation by campaign seed, direction ID and within-direction evaluation index, so all policies see the same realized potential reward for the same arm/seed/index regardless of action ordering. Expected arm means remain evaluator-side metadata; only noisy observations are exposed to policies. Simple regret is computed against the best expected score among tested candidates, not the luckiest realized sample. The deterministic high-variance fixture remains a separate variance-pattern control. Multi-objective trade-offs, heterogeneous execution costs, semantic alias injection and verifier-label corruption remain separate planned controls.
 
 Before policy-controlled actions, all policies receive the same three initial direction evaluations (A, B, C). Each subsequent action is either one direction evaluation or one NEW-direction proposal. Each action costs one synthetic unit. The verifier is currently a deterministic fixture that owns the payoff schedule and admits the one configured new operator direction.
 
@@ -145,20 +152,17 @@ MAP-Elites is relevant only when behavior descriptors have a defensible interpre
 
 ## 6. Landscape design
 
-Keep the original four landscapes as regression fixtures. Expand to at least six independent landscape families before confirmatory claims:
+The executable scalar suite currently has nine payoff families (eight deterministic plus one seeded stochastic; listed in Section 2). Before confirmatory claims, extend it with separately versioned controls for:
 
-1. delayed breakthrough and early leader saturation;
-2. true null (no NEW direction is better);
-3. out-of-grammar primitive discovery;
-4. rank reversal / changing regimes;
-5. deceptive proxy and correlated directions;
-6. heteroscedastic noise and unequal evaluation variance;
-7. multi-objective improvement with resource trade-offs;
-8. heterogeneous costs, hard caps and unknown resource estimates;
-9. duplicate semantic aliases and verifier disagreement;
-10. negative controls where all candidate families are equivalent or every improvement is illusory.
+1. multi-objective quality/robustness/resource trade-offs, scored as vectors with hypervolume/reference-point sensitivity;
+2. heterogeneous candidate execution costs, hard caps, retries and explicitly unknown resource estimates;
+3. duplicate semantic aliases and verifier-label disagreement/error injection;
+4. a sealed no-new-opportunity null and a verifier-corruption negative control;
+5. held-out grammar expansion and cross-family transfer.
 
-The six-family criterion is a floor, not a sample-size guarantee. Use at least 100 paired landscape instances/seeds per family for the initial confirmatory campaign, then set final sample size using pilot variance, a predeclared minimum effect and multiplicity control. Seeds generated from the same payoff template are not independent landscapes; uncertainty must be clustered at the independent landscape/template level.
+The seeded stochastic family is a synthetic noise control, not real experimental telemetry. Do not label the scalar benchmark as multi-objective.
+
+The six-family criterion is a floor, not a sample-size guarantee. The inference implementation now has explicit tiers: Pilot requires at least six independent landscape clusters and four paired seeds per landscape; Confirmatory requires at least 100 independent landscape clusters and four paired seeds per landscape. The 100-landscape floor is an initial protocol minimum, not a power guarantee. Set final sample size using pilot variance, a predeclared minimum practical effect and multiplicity control. Seeds generated from the same payoff template are not independent landscapes; uncertainty must be clustered at the independent landscape/template level.
 
 Use two separate tracks:
 
@@ -174,7 +178,7 @@ Use fixed total charged resource, not evaluation count alone, as the primary den
 ### Primary endpoints
 
 - held-out verified score / objective at fixed charged budget;
-- simple regret against a declared feasible optimum or lower bound;
+- simple regret against a declared feasible optimum or lower bound (for stochastic surfaces, use expected reward, not the maximum lucky observation);
 - probability of hitting a predeclared target before budget exhaustion;
 - charged resources to first verified improvement and to target;
 - worst-family performance and transfer retention.
@@ -247,3 +251,17 @@ Do not compare reported scores from different task sets, models, budgets, judge 
 The current policy harness demonstrates deterministic policy discrimination on four handcrafted payoff schedules. The two added policies are controls authored for the next comparison, not demonstrated improvements. The authored unit tests have not been compiled or executed yet.
 
 Even after the harness passes, only a matched synthetic campaign can support statements about scheduler behavior on those synthetic landscapes. A claim that Symthaea beats SOTA in scientific discovery or code optimization requires independent, held-out, budget-matched reproduction against the external systems and separate scientific integrity qualification.
+
+## Evidence-backed offer-set source state
+
+The event-tape/manifest path now has a stronger evidence-bundle option in `offer_set_evidence.rs`. For each decision boundary, the bundle must retain the complete evaluator-owned state object, not only a source-state digest. Validation recomputes the state digest, re-derives the offer snapshot, checks its boundary and visible-prefix cutoff, and binds the artifact to the EventTape's campaign, policy, and source commit. The bundle set is then matched across policies before paired inference.
+
+Use `analyze_qualified_paired_metric_with_state_evidence` for the strongest current end-to-end qualification path. The older `analyze_qualified_paired_metric` remains useful for compatibility but proves only that the supplied manifests are internally consistent with their declared state digests; it cannot independently rehash source-state bytes that were not retained.
+
+The new path raises the artifact-retention bar: the evaluator must preserve the state needed to explain eligibility, including the rule/data needed to derive available directions and NEW permission. If this cannot be exported, the run must remain unqualified for the stronger evidence-backed track. Hash validity is not source authentication or evaluator independence.
+
+The source-state envelope is policy-neutral by design: campaign/source commit and decision-boundary identity are included in the state digest, but policy ID is carried by the per-policy manifest/bundle. The retained JSON object must expose the exact `available_direction_ids` and `new_proposal_allowed` fields plus the underlying evaluator `state` object. The validator rejects a mismatch between those derived fields and the extracted snapshot, and the same state artifact must hash identically for all policies observing the same evaluator state.
+
+For exact evidence binding, create an `OfferSetEvidenceBoundPlan` from the paired inference plan, tapes and validated evidence bundles. It records the order-independent SHA-256 of the complete per-policy evidence-bundle set. The strongest analysis API recomputes and compares this digest before proceeding, so replacing an internally valid source-state artifact after plan creation is rejected. Preserve the bound plan in a timestamped preregistration record before confirmatory outcome inspection; a digest alone does not establish when the plan was frozen.
+
+The evidence-bound plan constructor also verifies at freeze time that the paired-inference plan's EventTape-set digest equals the exact supplied, strictly qualified tape set; that the campaign ID matches; and that baseline/challenger IDs are distinct members of the tape set. The later analysis call rechecks the tape digest through the paired-inference path and rechecks the exact source-state bundle-set digest. This prevents a plan from being created against one tape set and later used with another.
