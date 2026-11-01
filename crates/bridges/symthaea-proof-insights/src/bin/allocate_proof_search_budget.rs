@@ -353,10 +353,11 @@ fn self_test(path: &PathBuf) -> Result<()> {
 
     // A cheaper action that is not feasible under one remaining cap cannot be selected.
     let mut bad = value.clone();
-    bad["remaining_budget"]["tool_calls"] = json!(3);
+    bad["actions"][1]["expected_resources"]["tool_calls"] = json!(9);
+    bad["remaining_budget"]["tool_calls"] = json!(8);
     let decision = choose(&bad, &hex::encode(Sha256::digest(serde_json::to_vec(&bad)?)))?;
-    if decision["selected_action"]["action_id"] == "retrieve-01" {
-        bail!("action exceeding one remaining resource cap was selected");
+    if decision["selected_action"]["action_id"] != "continue-01" {
+        bail!("action exceeding one remaining resource cap was not excluded before ranking");
     }
     println!("PITB_PROOF_SEARCH_ALLOCATION_PASS: multidimensional budget feasibility");
 
