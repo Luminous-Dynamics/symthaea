@@ -118,6 +118,9 @@ jobs:
       - name: Benchmark exact sparse system-search reuse
         run: /usr/bin/time -v -o target/iit-benchmark-evidence/sparse-full-system-search.time.txt target/release/examples/sparse_system_search_reuse_sweep --repeats 5 --max-units 2048 2>&1 | tee target/iit-benchmark-evidence/sparse-full-system-search.csv
 
+      - name: Compare legacy and optimized min-fill planners on identical graphs
+        run: /usr/bin/time -v -o target/iit-benchmark-evidence/min-fill-planner-comparison.time.txt target/release/examples/min_fill_planner_comparison_sweep 2>&1 | tee target/iit-benchmark-evidence/min-fill-planner-comparison.csv
+
       - name: Clippy the isolated crate
         run: cargo clippy --locked -p symthaea-iit --all-targets -- -D warnings 2>&1 | tee target/iit-benchmark-evidence/clippy.log
 
@@ -139,6 +142,7 @@ jobs:
             sparse-eq4-topologies \
             sparse-partition-score \
             sparse-full-system-search
+            min-fill-planner-comparison
           do
             csv="target/iit-benchmark-evidence/${stem}.csv"
             timing="target/iit-benchmark-evidence/${stem}.time.txt"
