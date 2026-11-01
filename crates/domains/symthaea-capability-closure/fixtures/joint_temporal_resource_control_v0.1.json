@@ -95,12 +95,29 @@
   },
   "validation_status": {
     "candidate_test_functions_authored": 12,
-    "evaluator_test_functions_authored": 13,
+    "evaluator_test_functions_authored": 14,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
     "rust_tests_executed": false,
     "hardware_energy_measured": false,
-    "benchmark_executed": false
+    "benchmark_executed": false,
+    "evaluator_interaction_test_functions_authored": 6
+  },
+  "evaluator_attribution": {
+    "module": "research/temporal-evaluator/src/interaction.rs",
+    "method": "paired marginal effects and pairwise difference-in-differences",
+    "metrics": [
+      "wrong_belief_us",
+      "abstention_us",
+      "missing_output_us"
+    ],
+    "positive_interaction": "synergy",
+    "negative_interaction": "antagonism",
+    "exact_integer_sums": true,
+    "reports_incompatible_context_counts": true,
+    "reports_over_budget_context_counts": true,
+    "shapiro_or_universal_causal_claim": false,
+    "test_functions_authored": 6
   }
 }
