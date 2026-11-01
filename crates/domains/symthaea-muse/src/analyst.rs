@@ -1396,6 +1396,7 @@ pub fn verify_composer_trace(
     }
 
     let mut states = BTreeMap::<&str, ObligationState>::new();
+    let mut definitions = BTreeMap::<&str, &ObligationDefinitionV1>::new();
     for transition in &trace.obligation_transitions {
         let id = format!("{}:{:?}", transition.obligation_id, transition.to);
         check_assertion(&mut records, &mut issues, &id, &transition.assertion);
@@ -1422,14 +1423,75 @@ pub fn verify_composer_trace(
         {
             issues.push(TraceVerificationIssue {
                 code: "obligation-evidence-missing".into(),
-                record_id: id,
+                record_id: id.clone(),
                 message: "Obligation transition lacks valid score evidence.".into(),
             });
+        }
+
+        if let Some(definition) = transition.definition.as_ref() {
+            if let Some(previous) = definitions.get(transition.obligation_id.as_str()) {
+                if *previous != definition {
+                    issues.push(TraceVerificationIssue {
+                        code: "obligation-definition-changed".into(),
+                        record_id: id.clone(),
+                        message: "Typed obligation definition changed during its lifecycle.".into(),
+                    });
+                }
+            } else {
+                definitions.insert(transition.obligation_id.as_str(), definition);
+            }
+        }
+
+        if transition.to == ObligationState::Fulfilled {
+            match transition.definition.as_ref() {
+                None => issues.push(TraceVerificationIssue {
+                    code: "obligation-definition-missing".into(),
+                    record_id: id.clone(),
+                    message: "Legacy fulfilled transition has no typed definition; semantic fulfillment is insufficiently evidenced.".into(),
+                }),
+                Some(definition) if transition.score_event_ids.is_empty()
+                    || transition.score_event_ids.iter().any(|event| !events.contains_key(event.as_str())) => {}
+                Some(definition) => {
+                    if let Err(error) = verify_obligation_semantics(
+                        definition,
+                        &transition.score_event_ids,
+                        composition,
+                    ) {
+                        let (code, message) = match error {
+                            ObligationSemanticError::Insufficient(code, message)
+                            | ObligationSemanticError::Contradiction(code, message) => (code, message),
+                        };
+                        issues.push(TraceVerificationIssue {
+                            code: code.into(),
+                            record_id: id.clone(),
+                            message,
+                        });
+                    }
+                }
+            }
         }
         states.insert(transition.obligation_id.as_str(), transition.to.clone());
     }
     let failed: BTreeSet<_> = issues.iter().map(|item| item.record_id.as_str()).collect();
     let checked_records = records.len();
+    let semantic_insufficiency = issues.iter().any(|issue| {
+        matches!(
+            issue.code.as_str(),
+            "obligation-definition-missing"
+                | "obligation-definition-version-unsupported"
+                | "obligation-kind-not-yet-qualified"
+                | "obligation-motif-definition-unavailable"
+        )
+    });
+    let semantic_discrepancy = issues.iter().any(|issue| {
+        !matches!(
+            issue.code.as_str(),
+            "obligation-definition-missing"
+                | "obligation-definition-version-unsupported"
+                | "obligation-kind-not-yet-qualified"
+                | "obligation-motif-definition-unavailable"
+        )
+    });
     TraceVerificationReport {
         verifier_version: VERSION.into(),
         source_trace_schema_version: trace.trace_schema_version,
@@ -1441,6 +1503,10 @@ pub fn verify_composer_trace(
             source: EvidenceSource::SymbolicallyVerified,
             verification_status: if issues.is_empty() {
                 VerificationStatus::Verified
+            } else if semantic_discrepancy {
+                VerificationStatus::Discrepancy
+            } else if semantic_insufficiency {
+                VerificationStatus::InsufficientEvidence
             } else {
                 VerificationStatus::Discrepancy
             },
@@ -1452,6 +1518,7 @@ pub fn verify_composer_trace(
             uncertainty: None,
             limitations: vec![
                 "Verifier v1 checks references, lifecycle, and annotations; it does not yet re-derive harmonic cadence type.".into(),
+                "Only ReturnMotif, EnterVoice, and ReachClimax typed obligations have score-side semantic checks; other typed kinds remain insufficient evidence.".into(),
             ],
         },
         issues,
