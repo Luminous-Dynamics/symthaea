@@ -1,6 +1,7 @@
 use pod_meta_cost_to_go_lab::{
-    BudgetLedger, EffectDisposition, ReconciliationOutcome, RemainingCostForecast, ReservationId,
-    ResourceVector, ShiftStatus, StateEvidence, assess_completion_feasibility,
+    BudgetLedger, EffectDisposition, ForecastId, ForecastJournal, ForecastOutcomeReceipt,
+    ForecastReceipt, ReconciliationOutcome, RemainingCostForecast, ReservationId, ResourceVector,
+    ShiftStatus, StateEvidence, TerminalOutcome, assess_completion_feasibility,
 };
 
 fn tokens(value: u128) -> ResourceVector {
@@ -226,3 +227,78 @@ fn main() {
             .unwrap_or_else(|| "-".to_owned())
     );
 }
+    let mut journal = ForecastJournal::default();
+    let journal_forecast = RemainingCostForecast {
+        pre_state_digest: [1; 32],
+        frontier_digest: [2; 32],
+        model_digest: [3; 32],
+        calibration_digest: [4; 32],
+        completion_probability: 0.95,
+        remaining_q50: tokens(20),
+        remaining_q90: tokens(40),
+        remaining_q95: tokens(50),
+        mandatory_verification_reserve: tokens(5),
+        support_count: 128,
+        shift_status: ShiftStatus::InDomain,
+    };
+    journal
+        .append_forecast(ForecastReceipt {
+            id: ForecastId(101),
+            run_id: 31,
+            decision_sequence: 1,
+            task_family: 21,
+            operation_family: 3,
+            forecast: journal_forecast,
+        })
+        .unwrap();
+    journal
+        .append_outcome(ForecastOutcomeReceipt {
+            forecast_id: ForecastId(101),
+            observed_sequence: 2,
+            observed_work: tokens(18),
+            terminal: TerminalOutcome::SufficientProof,
+            evidence_digest: [5; 32],
+            meter_digest: [6; 32],
+            verifier_digest: Some([7; 32]),
+        })
+        .unwrap();
+    journal
+        .append_forecast(ForecastReceipt {
+            id: ForecastId(102),
+            run_id: 31,
+            decision_sequence: 3,
+            task_family: 22,
+            operation_family: 4,
+            forecast: journal_forecast,
+        })
+        .unwrap();
+    journal
+        .append_outcome(ForecastOutcomeReceipt {
+            forecast_id: ForecastId(102),
+            observed_sequence: 4,
+            observed_work: tokens(12),
+            terminal: TerminalOutcome::RightCensored(
+                pod_meta_cost_to_go_lab::CensorReason::BudgetExhausted,
+            ),
+            evidence_digest: [8; 32],
+            meter_digest: [9; 32],
+            verifier_digest: None,
+        })
+        .unwrap();
+    assert_eq!(journal.forecast_count(), 2);
+    assert_eq!(journal.outcome_count(), 2);
+    println!(
+        "FORECAST_JOURNAL_ROW\timmutable-pre-action-receipt\t{}\t{}",
+        journal.forecast_count(),
+        journal.outcome_count()
+    );
+    println!(
+        "FORECAST_JOURNAL_ROW\tseparate-verifier-and-censor-outcomes\t{}\t{}",
+        journal
+            .outcome(ForecastId(101))
+            .is_some_and(|outcome| outcome.verifier_digest.is_some()),
+        journal
+            .outcome(ForecastId(102))
+            .is_some_and(|outcome| matches!(outcome.terminal, TerminalOutcome::RightCensored(_)))
+    );
+
