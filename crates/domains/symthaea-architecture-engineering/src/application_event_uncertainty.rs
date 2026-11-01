@@ -555,3 +555,249 @@ pub fn compare_application_event_energy(
     Ok(comparison)
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::phase_energy_audit::{
+        audit_application_phase_energy, compute_application_phase_protocol_sha256,
+        compute_phase_clock_mapping_sha256, ApplicationEventOutcome, ApplicationPhaseDefinition,
+        PhaseClockMappingManifest,
+    };
+    use crate::ppk2_trace_audit::Ppk2TraceAuditConfig;
+    use crate::metrology_uncertainty::compute_metrology_manifest_sha256;
+    use std::fmt::Write as _;
+
+    fn sha(ch: char) -> String {
+        std::iter::repeat_n(ch, 64).collect()
+    }
+
+    fn phase_protocol() -> ApplicationPhaseProtocolManifest {
+        let mut protocol = ApplicationPhaseProtocolManifest {
+            schema: "symthaea.nas.application-phase-protocol".into(),
+            version: VERSION.into(),
+            benchmark_id: "edge-event-energy-test".into(),
+            protocol_id: "wake-infer-post-v1".into(),
+            phases: vec![
+                ApplicationPhaseDefinition { phase_id: "wake".into(), order: 0, required: true },
+                ApplicationPhaseDefinition { phase_id: "inference".into(), order: 1, required: true },
+                ApplicationPhaseDefinition { phase_id: "postprocess".into(), order: 2, required: true },
+            ],
+            accepted_success_outcomes: vec![ApplicationEventOutcome::Correct],
+            outcome_evaluator_sha256: sha('e'),
+            maximum_unattributed_duration_ms: 0.0,
+            protocol_sha256: String::new(),
+        };
+        protocol.protocol_sha256 = compute_application_phase_protocol_sha256(&protocol).unwrap();
+        protocol
+    }
+
+    fn clock_mapping() -> PhaseClockMappingManifest {
+        let mut mapping = PhaseClockMappingManifest {
+            schema: "symthaea.nas.phase-clock-mapping".into(),
+            version: VERSION.into(),
+            mapping_id: "test-clock-map".into(),
+            marker_clock_domain_id: "logic-analyzer-clock".into(),
+            marker_source_id: "gpio-sync-1".into(),
+            ppk2_clock_domain_id: "ppk2-time-ms".into(),
+            marker_origin_ns: 0,
+            ppk2_origin_ms: 0.0,
+            ppk2_ms_per_marker_ns: 1e-6,
+            scale_tolerance_fraction: 0.001,
+            maximum_alignment_error_ms: 0.0001,
+            clock_calibration_evidence_sha256: sha('f'),
+            mapping_sha256: String::new(),
+        };
+        mapping.mapping_sha256 = compute_phase_clock_mapping_sha256(&mapping).unwrap();
+        mapping
+    }
+
+    fn phase_receipt(
+        currents_ua: &[u64],
+        artifact_tag: char,
+        device_tag: char,
+    ) -> PhaseEnergyAuditReceipt {
+        let mut samples = String::from("segment_id,time_ms,current_uA\n");
+        let mut markers = String::from(
+            "event_id,segment_id,phase_id,edge,marker_timestamp_ns,sequence,clock_domain_id,marker_source_id\n"
+        );
+        let mut outcomes = String::from(
+            "event_id,outcome,artifact_sha256,device_session_sha256,input_sha256,output_sha256,quality_metric_id,quality_value,deadline_met,retry_count\n"
+        );
+
+        for (index, current) in currents_ua.iter().enumerate() {
+            let event_id = format!("event-{index}");
+            for sample_index in 0..=4 {
+                let time_ms = sample_index as f64 / 100.0;
+                writeln!(&mut samples, "{event_id},{time_ms:.2},{current}").unwrap();
+            }
+            let marker_rows = [
+                ("wake", "START", 0u64, 0u64),
+                ("wake", "END", 10_000u64, 1u64),
+                ("inference", "START", 10_000u64, 2u64),
+                ("inference", "END", 30_000u64, 3u64),
+                ("postprocess", "START", 30_000u64, 4u64),
+                ("postprocess", "END", 40_000u64, 5u64),
+            ];
+            for (phase, edge, timestamp, sequence) in marker_rows {
+                writeln!(
+                    &mut markers,
+                    "{event_id},{event_id},{phase},{edge},{timestamp},{sequence},logic-analyzer-clock,gpio-sync-1"
+                ).unwrap();
+            }
+            writeln!(
+                &mut outcomes,
+                "{event_id},correct,{},{},{},{},accuracy,1.0,true,0",
+                sha(artifact_tag),
+                sha(device_tag),
+                sha('c'),
+                sha('d'),
+            ).unwrap();
+        }
+
+        let config = Ppk2TraceAuditConfig {
+            voltage_v: 3.3,
+            expected_sample_rate_hz: 100_000.0,
+            sample_rate_tolerance_fraction: 0.01,
+            maximum_gap_ratio: 1.1,
+        };
+        audit_application_phase_energy(
+            &samples,
+            &markers,
+            &outcomes,
+            config,
+            &clock_mapping(),
+            &phase_protocol(),
+        ).unwrap().receipt
+    }
+
+    fn repeat_protocol(
+        phase_protocol_sha: &str,
+        artifact_tag: char,
+        device_tag: char,
+    ) -> ApplicationEventRepeatabilityProtocol {
+        let mut protocol = ApplicationEventRepeatabilityProtocol {
+            schema: REPEAT_SCHEMA.into(),
+            version: VERSION.into(),
+            benchmark_id: "edge-event-energy-test".into(),
+            repeatability_id: "matched-event-repeats-v1".into(),
+            target_id: "nrf5340-fixture".into(),
+            board_revision: "board-rev-a".into(),
+            phase_protocol_sha256: phase_protocol_sha.into(),
+            replicate_design_sha256: sha('a'),
+            candidate_artifact_sha256: sha(artifact_tag),
+            device_session_sha256: sha(device_tag),
+            matched_input_sha256: sha('c'),
+            voltage_source_id: "calibrated-vdd-source".into(),
+            voltage_readback_sha256: sha('b'),
+            minimum_replicates: 3,
+            protocol_sha256: String::new(),
+        };
+        protocol.protocol_sha256 = compute_application_event_repeatability_protocol_sha256(&protocol).unwrap();
+        protocol
+    }
+
+    fn metrology_manifest() -> MetrologyUncertaintyManifest {
+        let mut manifest = MetrologyUncertaintyManifest {
+            schema: "symthaea.nas.metrology-uncertainty-manifest".into(),
+            version: VERSION.into(),
+            instrument_model: "Nordic PPK2".into(),
+            instrument_serial: "fixture-ppk2-01".into(),
+            current_range_id: "range-r3".into(),
+            calibration_certificate_sha256: sha('d'),
+            type_b_relative_standard_uncertainty: 0.01,
+            type_b_basis: "fixture calibration standard uncertainty budget".into(),
+            type_a_type_b_uncorrelated: true,
+            coverage_factor: 2.0,
+            replicate_protocol_sha256: sha('a'),
+            replicates_independent: true,
+            manifest_sha256: String::new(),
+        };
+        manifest.manifest_sha256 = compute_metrology_manifest_sha256(&manifest).unwrap();
+        manifest
+    }
+
+    fn evaluated(currents: &[u64], artifact: char, device: char) -> ApplicationEventEnergyUncertaintyReceipt {
+        let phase = phase_receipt(currents, artifact, device);
+        let phase_protocol = phase_protocol();
+        let repeat = repeat_protocol(&phase_protocol.protocol_sha256, artifact, device);
+        evaluate_application_event_energy_uncertainty(
+            &phase,
+            &phase_protocol,
+            &repeat,
+            &metrology_manifest(),
+        ).unwrap()
+    }
+
+    #[test]
+    fn only_matched_successful_complete_events_enter_type_a_repeats() {
+        let receipt = evaluated(&[1_000, 1_100, 900], '8', '9');
+        assert_eq!(receipt.matched_attempt_count, 3);
+        assert_eq!(receipt.replicate_count, 3);
+        assert_eq!(receipt.successful_complete_replicate_count, 3);
+        assert!((receipt.mean_energy_uj - 0.132).abs() < 1e-9);
+        assert!(receipt.type_a_standard_uncertainty_uj > 0.0);
+        assert!(receipt.type_b_standard_uncertainty_uj > 0.0);
+        assert!(receipt.maximum_boundary_alignment_bound_uj > 0.0);
+        assert!(
+            (receipt.expanded_total_uncertainty_uj
+                - receipt.expanded_statistical_uncertainty_uj
+                - receipt.maximum_boundary_alignment_bound_uj).abs() < 1e-12
+        );
+        validate_application_event_energy_uncertainty_receipt(&receipt).unwrap();
+    }
+
+    #[test]
+    fn event_energy_comparison_requires_disjoint_uncertainty_intervals() {
+        let candidate = evaluated(&[1_000, 1_100, 900], '8', '9');
+        let reference = evaluated(&[2_000, 2_200, 1_800], '1', '2');
+        let result = compare_application_event_energy(&candidate, &reference).unwrap();
+        assert_eq!(result.decision, ApplicationEventEnergyDecision::CandidateStrictlyLower);
+        assert!(is_sha256(&result.comparison_sha256));
+    }
+
+    #[test]
+    fn close_event_energy_intervals_remain_indeterminate() {
+        let candidate = evaluated(&[1_000, 1_001, 999], '8', '9');
+        let reference = evaluated(&[990, 991, 989], '1', '2');
+        let result = compare_application_event_energy(&candidate, &reference).unwrap();
+        assert_eq!(result.decision, ApplicationEventEnergyDecision::IndeterminateIntervalsOverlap);
+    }
+
+    #[test]
+    fn rejects_fewer_repeats_than_preregistered_minimum() {
+        let phase = phase_receipt(&[1_000, 1_100], '8', '9');
+        let protocol = phase_protocol();
+        let repeat = repeat_protocol(&protocol.protocol_sha256, '8', '9');
+        let result = evaluate_application_event_energy_uncertainty(
+            &phase, &protocol, &repeat, &metrology_manifest(),
+        );
+        assert!(result.unwrap_err().to_string().contains("requires at least 3"));
+    }
+
+    #[test]
+    fn rejects_artifact_or_device_session_mixing() {
+        let phase = phase_receipt(&[1_000, 1_100, 900], '8', '9');
+        let protocol = phase_protocol();
+        let repeat = repeat_protocol(&protocol.protocol_sha256, '1', '9');
+        let result = evaluate_application_event_energy_uncertainty(
+            &phase, &protocol, &repeat, &metrology_manifest(),
+        );
+        assert!(result.unwrap_err().to_string().contains("deployment identity"));
+    }
+
+    #[test]
+    fn rejects_rehashed_uncertainty_interval_tampering() {
+        let mut receipt = evaluated(&[1_000, 1_100, 900], '8', '9');
+        receipt.lower_bound_uj = 0.0;
+        assert!(validate_application_event_energy_uncertainty_receipt(&receipt).is_err());
+    }
+
+    #[test]
+    fn comparison_rejects_different_calibration_or_voltage_readback() {
+        let candidate = evaluated(&[1_000, 1_100, 900], '8', '9');
+        let mut reference = evaluated(&[2_000, 2_100, 1_900], '1', '2');
+        reference.voltage_readback_sha256 = sha('7');
+        assert!(compare_application_event_energy(&candidate, &reference).is_err());
+    }
+}
