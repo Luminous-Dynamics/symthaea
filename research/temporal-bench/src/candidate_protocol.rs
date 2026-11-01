@@ -142,7 +142,7 @@ fn read_frame<R: Read>(
     reader
         .read_exact(&mut header)
         .map_err(|error| CandidateProtocolError::Io(error.to_string()))?;
-    if header[0..8] != FRAME_MAGIC {
+    if header[0..8] != FRAME_MAGIC[..] {
         return Err(CandidateProtocolError::InvalidMagic);
     }
     let version = u16::from_le_bytes([header[8], header[9]]);
@@ -167,15 +167,21 @@ fn read_frame<R: Read>(
             received: sequence,
         });
     }
-    let declared_len = u32::from_le_bytes([
+    let declared_len_u32 = u32::from_le_bytes([
         header[20], header[21], header[22], header[23],
-    ]) as usize;
-    if declared_len > MAX_FRAME_PAYLOAD_BYTES {
+    ]);
+    if declared_len_u32 > MAX_FRAME_PAYLOAD_BYTES as u32 {
         return Err(CandidateProtocolError::PayloadTooLarge {
-            declared: declared_len,
+            declared: usize::try_from(declared_len_u32).unwrap_or(usize::MAX),
             maximum: MAX_FRAME_PAYLOAD_BYTES,
         });
     }
+    let declared_len = usize::try_from(declared_len_u32).map_err(|_| {
+        CandidateProtocolError::PayloadTooLarge {
+            declared: usize::MAX,
+            maximum: MAX_FRAME_PAYLOAD_BYTES,
+        }
+    })?;
     let mut expected_digest = [0_u8; 32];
     expected_digest.copy_from_slice(&header[24..56]);
     let mut payload = vec![0_u8; declared_len];
@@ -198,10 +204,12 @@ fn push_u32(output: &mut Vec<u8>, value: u32) {
 }
 
 fn take_u64(payload: &[u8], offset: &mut usize) -> Result<u64, CandidateProtocolError> {
+    let end = (*offset).checked_add(8)
+        .ok_or(CandidateProtocolError::InvalidPayload("u64 offset overflow"))?;
     let bytes = payload
-        .get(*offset..offset.saturating_add(8))
+        .get(*offset..end)
         .ok_or(CandidateProtocolError::InvalidPayload("truncated u64"))?;
-    *offset += 8;
+    *offset = end;
     Ok(u64::from_le_bytes([
         bytes[0], bytes[1], bytes[2], bytes[3],
         bytes[4], bytes[5], bytes[6], bytes[7],
@@ -209,10 +217,12 @@ fn take_u64(payload: &[u8], offset: &mut usize) -> Result<u64, CandidateProtocol
 }
 
 fn take_u32(payload: &[u8], offset: &mut usize) -> Result<u32, CandidateProtocolError> {
+    let end = (*offset).checked_add(4)
+        .ok_or(CandidateProtocolError::InvalidPayload("u32 offset overflow"))?;
     let bytes = payload
-        .get(*offset..offset.saturating_add(4))
+        .get(*offset..end)
         .ok_or(CandidateProtocolError::InvalidPayload("truncated u32"))?;
-    *offset += 4;
+    *offset = end;
     Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
 }
 
@@ -220,7 +230,8 @@ fn take_u8(payload: &[u8], offset: &mut usize) -> Result<u8, CandidateProtocolEr
     let value = *payload
         .get(*offset)
         .ok_or(CandidateProtocolError::InvalidPayload("truncated u8"))?;
-    *offset += 1;
+    *offset = (*offset).checked_add(1)
+        .ok_or(CandidateProtocolError::InvalidPayload("u8 offset overflow"))?;
     Ok(value)
 }
 
@@ -239,6 +250,17 @@ fn encode_observation(observation: &PublicObservation) -> Result<Vec<u8>, Candid
         return Err(CandidateProtocolError::InvalidPayload(
             "sample counters do not sum to total samples",
         ));
+    }
+    if let Some(measurement) = observation.last_measurement {
+        let modality_count = match measurement.sensor {
+            ActiveSensingSensor::LowPower => observation.low_power_samples,
+            ActiveSensingSensor::HighFidelity => observation.high_fidelity_samples,
+        };
+        if modality_count == 0 {
+            return Err(CandidateProtocolError::InvalidPayload(
+                "latest measurement modality has no corresponding sample count",
+            ));
+        }
     }
     let mut payload = Vec::with_capacity(40);
     push_u64(&mut payload, observation.step);
@@ -319,6 +341,17 @@ fn decode_observation(payload: &[u8]) -> Result<PublicObservation, CandidateProt
         return Err(CandidateProtocolError::InvalidPayload(
             "sample counters do not sum to total samples",
         ));
+    }
+    if let Some(measurement) = last_measurement {
+        let modality_count = match measurement.sensor {
+            ActiveSensingSensor::LowPower => low_power_samples,
+            ActiveSensingSensor::HighFidelity => high_fidelity_samples,
+        };
+        if modality_count == 0 {
+            return Err(CandidateProtocolError::InvalidPayload(
+                "latest measurement modality has no corresponding sample count",
+            ));
+        }
     }
     match (last_measurement, last_measurement_age_steps) {
         (None, None) => {}
