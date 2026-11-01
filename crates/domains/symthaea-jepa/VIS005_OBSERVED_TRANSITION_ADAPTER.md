@@ -38,7 +38,7 @@ train_observed_transition and evaluate_observed_transition reject:
 
 The crate recomputes the source/target embedding SHA-256 over a domain-separated canonical byte encoding: domain tag, little-endian u64 dimension, then each exact f32 IEEE-754 bit pattern in little-endian order. This binds the values supplied to JEPA. It does not prove that the HDC embeddings were honestly derived from the raw observation bytes; the adapter must bind those bytes and digests independently.
 
-The transition clock requires source observation ≤ forecast issuance ≤ action start ≤ requested target ≤ actual target, and action end ≥ action start. The actual target may be late only within the explicitly declared maximum lateness. This preserves a precise requested horizon while allowing bounded sensor timing jitter.
+The transition clock requires source observation ≤ forecast issuance ≤ action start ≤ action end ≤ requested target ≤ actual target. The actual target may be late only within the explicitly declared maximum lateness. The actual target may be late only within the explicitly declared maximum lateness. This preserves a precise requested horizon while allowing bounded sensor timing jitter.
 
 The learning method additionally rejects zero, negative, non-finite or greater-than-one learning rates. The evaluator path does not update model weights.
 
