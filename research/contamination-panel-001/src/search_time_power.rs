@@ -315,12 +315,17 @@ fn validate_config(config: &SearchTimePowerConfigV1) -> Result<Vec<u8>, String> 
             "candidate grid exceeds {SEARCH_POWER_MAX_BLOCK_TRIALS} simulation block-trials"
         ));
     }
-    if !config.baseline_score_permille.is_finite()
-        || !(0.0..=1_000.0).contains(&config.baseline_score_permille)
+    if config.score_floor_permille >= config.score_ceiling_permille
+        || config.score_ceiling_permille > 1_000
+        || !config.baseline_score_permille.is_finite()
+        || config.baseline_score_permille < f64::from(config.score_floor_permille)
+        || config.baseline_score_permille > f64::from(config.score_ceiling_permille)
         || !config.smallest_effect_of_interest_permille.is_finite()
         || !(0.1..=1_000.0).contains(&config.smallest_effect_of_interest_permille)
+        || config.failure_score_threshold_permille < config.score_floor_permille
+        || config.failure_score_threshold_permille > config.score_ceiling_permille
     {
-        return Err("baseline and smallest effect of interest must be finite and in bounds".to_owned());
+        return Err("baseline, score bounds, failure threshold and smallest effect of interest are inconsistent".to_owned());
     }
     for (value, label) in [
         (config.shared_block_noise_sd_permille, "shared_block_noise_sd_permille"),
@@ -332,8 +337,15 @@ fn validate_config(config: &SearchTimePowerConfigV1) -> Result<Vec<u8>, String> 
             return Err(format!("{label} must be finite and in [0, 1000]"));
         }
     }
+    if !config.carryover_after_network_access_permille.is_finite()
+        || !(-1_000.0..=1_000.0).contains(&config.carryover_after_network_access_permille)
+    {
+        return Err("carryover_after_network_access_permille must be finite and in [-1000, 1000]".to_owned());
+    }
     if config.within_block_correlation_permille > 999
         || config.missing_block_rate_permille > 999
+        || config.budget_truncation_rate_permille > 999
+        || config.outcome_dependent_failure_rate_permille > 999
         || config.alpha_permille != 50
         || config.maximum_type_i_upper_permille < config.alpha_permille
         || config.maximum_type_i_upper_permille > 500
