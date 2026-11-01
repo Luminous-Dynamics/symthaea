@@ -1285,8 +1285,11 @@ fn min_fill_order_scopes(
                 affected.insert(*neighbour);
             }
             if let Some(edges) = adjacency.get(neighbour) {
+                checked_accumulate_counter(
+                    &mut planner_work.affected_adjacency_visits,
+                    edges.len(),
+                )?;
                 for candidate in edges.iter().copied() {
-                    checked_increment(&mut planner_work.affected_adjacency_visits)?;
                     if candidate != variable && active.contains(&candidate) {
                         let hits = neighbour_hits.entry(candidate).or_default();
                         *hits = hits.checked_add(1).ok_or(FactorGraphError::IndexOverflow)?;
@@ -1449,9 +1452,17 @@ fn min_fill_order_scopes_full_rescan(
             }
         }
 
+        let neighbour_degree = neighbours.len();
+        let clique_pair_count = neighbour_degree
+            .checked_mul(neighbour_degree.saturating_sub(1))
+            .ok_or(FactorGraphError::IndexOverflow)?
+            / 2;
+        checked_accumulate_counter(
+            &mut planner_work.clique_pair_checks,
+            clique_pair_count,
+        )?;
         for (left_index, left) in neighbours.iter().copied().enumerate() {
             for right in neighbours.iter().copied().skip(left_index + 1) {
-                checked_increment(&mut planner_work.clique_pair_checks)?;
                 adjacency.entry(left).or_default().insert(right);
                 adjacency.entry(right).or_default().insert(left);
             }
@@ -1499,10 +1510,15 @@ fn fill_score_full_rescan(
         .into_iter()
         .filter(|neighbour| adjacency.contains_key(neighbour))
         .collect::<Vec<_>>();
+    let degree = neighbours.len();
+    let pair_checks = degree
+        .checked_mul(degree.saturating_sub(1))
+        .ok_or(FactorGraphError::IndexOverflow)?
+        / 2;
+    checked_accumulate_counter(&mut planner_work.fill_score_adjacency_visits, pair_checks)?;
     let mut fill_edges = 0usize;
     for (left_index, left) in neighbours.iter().copied().enumerate() {
         for right in neighbours.iter().copied().skip(left_index + 1) {
-            checked_increment(&mut planner_work.fill_score_adjacency_visits)?;
             if !adjacency[&left].contains(&right) {
                 fill_edges = fill_edges
                     .checked_add(1)
@@ -1562,7 +1578,16 @@ fn fill_score(
 }
 
 fn checked_increment(counter: &mut usize) -> Result<(), FactorGraphError> {
-    *counter = counter.checked_add(1).ok_or(FactorGraphError::IndexOverflow)?;
+    checked_accumulate_counter(counter, 1)
+}
+
+fn checked_accumulate_counter(
+    counter: &mut usize,
+    amount: usize,
+) -> Result<(), FactorGraphError> {
+    *counter = counter
+        .checked_add(amount)
+        .ok_or(FactorGraphError::IndexOverflow)?;
     Ok(())
 }
 
