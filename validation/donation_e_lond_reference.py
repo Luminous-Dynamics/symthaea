@@ -350,6 +350,10 @@ class DonationELONDIndex:
 
     def verify(self) -> bool:
         """Independent O(t) recomputation of wealth and threshold."""
+        if len(self.e_values) != len(self.gamma) or len(self.gamma) != len(self.rejected):
+            return False
+        if self.gamma_mass != sum(self.gamma, Fraction(0)):
+            return False
         if not self.e_values:
             return self.nonrejected_wealth == 0 and self.root is None
         # Rebuild exact expected wealth from the complete prefix.
@@ -429,9 +433,11 @@ def run_donation_e_lond(
             "rejection_count": len(baseline_rejected),
         })
         donation_rows.append(donation)
-        if not index.verify():
-            raise AssertionError(f"donation index disagrees with O(t) scan at time {t}")
-        index.assert_valid_avl()
+    # Run the independent O(t) scan once after the O(t log t) online pass.
+    # Verifying every prefix here would accidentally make the wrapper O(t^2).
+    if not index.verify():
+        raise AssertionError("donation index disagrees with final O(t) scan")
+    index.assert_valid_avl()
     return {
         "delta": level,
         "count": len(evidence),
