@@ -13,6 +13,14 @@ import math
 from typing import Any, Iterable, Mapping, Sequence
 
 POLICY_ID = "lagged-last-active-mean-positive-v1"
+POLICY_SPEC = (
+    "At PRE_OBSERVATION round t, inspect only the previously observed scores "
+    "of the most recently active hypothesis. If it has at least min_observations "
+    "and its arithmetic mean is strictly greater than mean_threshold, activate "
+    "exactly the next stable hypothesis ID. Otherwise activate none. After this "
+    "decision is committed, request and record current-round scores for exactly "
+    "the active set. Active sets are nested and activation is at most one ID per round."
+)
 SCHEMA = "predictable-arrival-ledger-v1"
 
 
@@ -128,6 +136,7 @@ def _build_ledger(
     header = {
         "schema": SCHEMA,
         "policy_id": POLICY_ID,
+        "policy_spec_digest": _digest(POLICY_SPEC),
         "parameters": {
             "initial_active_count": initial_active_count,
             "min_observations": min_observations,
@@ -338,8 +347,18 @@ def verify_predictable_arrival_ledger(ledger: Mapping[str, Any]) -> dict[str, An
     events = ledger.get("events")
     if not isinstance(header, dict) or not isinstance(events, list) or not events:
         raise ValueError("ledger header and nonempty events are required")
-    if header.get("schema") != SCHEMA or header.get("policy_id") != POLICY_ID:
-        raise ValueError("unsupported arrival ledger schema or policy")
+    expected_header_keys = {
+        "schema", "policy_id", "policy_spec_digest", "parameters",
+        "hypothesis_ids", "decision_phase", "observation_phase",
+    }
+    if set(header) != expected_header_keys:
+        raise ValueError("ledger header fields do not match the pinned schema")
+    if (
+        header.get("schema") != SCHEMA
+        or header.get("policy_id") != POLICY_ID
+        or header.get("policy_spec_digest") != _digest(POLICY_SPEC)
+    ):
+        raise ValueError("unsupported arrival ledger schema or policy specification")
     if header.get("decision_phase") != "PRE_OBSERVATION":
         raise ValueError("arrival decision must precede current-round observation")
     if header.get("observation_phase") != "POST_DECISION":
@@ -368,6 +387,14 @@ def verify_predictable_arrival_ledger(ledger: Mapping[str, Any]) -> dict[str, An
     for round_index, event in enumerate(events):
         if not isinstance(event, dict):
             raise ValueError("event must be an object")
+        expected_event_keys = {
+            "round", "decision_phase", "observation_phase", "active_before",
+            "activated", "active_after", "pre_history_digest",
+            "decision_input_hash", "decision_output_hash",
+            "previous_event_hash", "observed_scores", "event_hash",
+        }
+        if set(event) != expected_event_keys:
+            raise ValueError("event fields do not match the pinned schema")
         event_core = {key: value for key, value in event.items() if key != "event_hash"}
         if event.get("round") != round_index:
             raise ValueError("round sequence is not contiguous")
