@@ -301,6 +301,175 @@ def verify_countable_global_projective_path(
     }
 
 
+def validate_running_max_adjuster(
+    thresholds: Sequence[int | float | str | Fraction],
+    increments: Sequence[int | float | str | Fraction],
+) -> tuple[tuple[Fraction, ...], tuple[Fraction, ...], Fraction]:
+    c = tuple(as_fraction(x) for x in thresholds)
+    a = tuple(as_fraction(x) for x in increments)
+    if len(c) != len(a):
+        raise ValueError("adjuster threshold and increment lengths differ")
+    if any(x <= 1 for x in c):
+        raise ValueError("adjuster thresholds must exceed one")
+    if any(c[i] >= c[i + 1] for i in range(len(c) - 1)):
+        raise ValueError("adjuster thresholds must be strictly increasing")
+    if any(x < 0 for x in a):
+        raise ValueError("adjuster increments must be nonnegative")
+    budget = sum((a[i] / c[i] for i in range(len(c))), Fraction(0))
+    if budget > 1:
+        raise ValueError("adjuster violates integral budget sum(a_j/c_j) <= 1")
+    return c, a, budget
+
+
+def adjusted_running_max_path(
+    raw_path: Sequence[int | float | str | Fraction],
+    thresholds: Sequence[int | float | str | Fraction],
+    increments: Sequence[int | float | str | Fraction],
+) -> tuple[Fraction, ...]:
+    """A(1 vee max_{u<=t} E_u), an e-process by the adjuster theorem."""
+    c, a, _budget = validate_running_max_adjuster(thresholds, increments)
+    running_max = Fraction(1)
+    adjusted = []
+    for raw in raw_path:
+        value = as_fraction(raw)
+        if value < 0:
+            raise ValueError("raw intersection e-values must be nonnegative")
+        running_max = max(running_max, value)
+        adjusted.append(sum(
+            (increment for threshold, increment in zip(c, a) if running_max >= threshold),
+            Fraction(0),
+        ))
+    return tuple(adjusted)
+
+
+def verify_adjusted_projective_supfdr_path(
+    active_by_time: Sequence[Iterable[int]],
+    rejections_by_time: Sequence[Iterable[int]],
+    true_null_ids: Iterable[int],
+    coordinate_paths: CoordinatePaths,
+    alpha: int | float | str | Fraction,
+    thresholds: Sequence[int | float | str | Fraction],
+    increments: Sequence[int | float | str | Fraction],
+    *,
+    scheme: str = "geometric",
+) -> dict:
+    """Replay adjusted local closure and countable true-set projectivity.
+
+    This path uses full finite-subset verification; the raw affine O(n)
+    separator is not valid after applying a nonlinear running-max adjuster.
+    """
+    _validate_scheme(scheme)
+    c, a, budget = validate_running_max_adjuster(thresholds, increments)
+    level = as_fraction(alpha)
+    if not 0 < level < 1:
+        raise ValueError("alpha must lie strictly between zero and one")
+    active, rejected, paths, truth = _normalize_path_inputs(
+        active_by_time, rejections_by_time, coordinate_paths, true_null_ids,
+    )
+    all_ids = sorted(set(truth).union(*(set(row) for row in active)))
+    time_count = len(active)
+    values_by_time = [
+        {i: paths[i][t] for i in all_ids}
+        for t in range(time_count)
+    ]
+
+    full_true_raw = tuple(
+        projective_certificate(truth, values_by_time[t], scheme=scheme)
+        for t in range(time_count)
+    )
+    full_true_adjusted = adjusted_running_max_path(full_true_raw, c, a)
+
+    failures = []
+    rows = []
+    constraints_checked = 0
+    for t, (active_t, rejected_t) in enumerate(zip(active, rejected)):
+        subsets = nonempty_subsets(active_t)
+        local_rows = []
+        for subset in subsets:
+            raw_history = tuple(
+                projective_certificate(subset, values_by_time[u], scheme=scheme)
+                for u in range(t + 1)
+            )
+            adjusted_history = adjusted_running_max_path(raw_history, c, a)
+            adjusted_value = adjusted_history[-1]
+            loss = fdp(rejected_t, subset)
+            slack = level * adjusted_value - loss
+            constraints_checked += 1
+            local_rows.append({
+                "intersection": subset,
+                "raw_current": raw_history[-1],
+                "adjusted_current": adjusted_value,
+                "fdp": loss,
+                "slack": slack,
+                "certified": slack >= 0,
+            })
+            if slack < 0:
+                failures.append(("adjusted_local_closure_violation", t, subset, loss, level * adjusted_value))
+
+        active_true = tuple(i for i in truth if i in set(active_t))
+        active_true_history = tuple(
+            projective_certificate(active_true, values_by_time[u], scheme=scheme)
+            for u in range(t + 1)
+        )
+        active_true_adjusted = adjusted_running_max_path(active_true_history, c, a)
+        full_true_prefix = full_true_adjusted[:t + 1]
+        identity = active_true_adjusted == full_true_prefix
+        if not identity:
+            failures.append(("adjusted_projective_history_mismatch", t))
+        actual_loss = fdp(rejected_t, active_true)
+        global_adjusted = full_true_adjusted[t]
+        if actual_loss > level * global_adjusted:
+            failures.append(("adjusted_true_loss_not_dominated", t, actual_loss, level * global_adjusted))
+        rows.append({
+            "time": t,
+            "active": active_t,
+            "rejections": rejected_t,
+            "active_true_nulls": active_true,
+            "local_constraints_checked": len(local_rows),
+            "local_constraints_certified": all(row["certified"] for row in local_rows),
+            "local_constraints": local_rows,
+            "active_true_adjusted_history": active_true_adjusted,
+            "full_true_adjusted_prefix": full_true_prefix,
+            "adjusted_projective_identity": identity,
+            "actual_true_null_fdp": actual_loss,
+            "global_adjusted_true_certificate": global_adjusted,
+            "true_loss_dominated": actual_loss <= level * global_adjusted,
+        })
+
+    monotone = all(
+        full_true_adjusted[t] <= full_true_adjusted[t + 1]
+        for t in range(time_count - 1)
+    )
+    return {
+        "valid": not failures,
+        "failures": failures,
+        "schema": "adjusted-countable-global-projective-supfdr-oracle-v1",
+        "weight_scheme": scheme,
+        "adjuster": {
+            "thresholds": c,
+            "increments": a,
+            "integral_budget": budget,
+        },
+        "finite_true_null_ids": truth,
+        "full_true_raw_path": full_true_raw,
+        "full_true_adjusted_path": full_true_adjusted,
+        "adjusted_true_certificate_monotone": monotone,
+        "adjusted_projective_equalities_verified": all(
+            row["adjusted_projective_identity"] for row in rows
+        ),
+        "local_constraints_checked": constraints_checked,
+        "all_local_constraints_certified": all(
+            row["local_constraints_certified"] for row in rows
+        ),
+        "all_true_losses_dominated": all(row["true_loss_dominated"] for row in rows),
+        "path": rows,
+        "scope": (
+            "finite exact adjusted-path replay; the adjuster theorem supplies "
+            "stochastic e-process validity only when the raw input is an e-process"
+        ),
+    }
+
+
 def verify_weight_scheme_prefix(scheme: str = "geometric", n: int = 100) -> dict:
     if isinstance(n, bool) or not isinstance(n, int) or n < 1:
         raise ValueError("n must be a positive integer")
