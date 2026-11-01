@@ -684,7 +684,6 @@ fn replicate_effect(replicate: &CausalReplicateInputV1) -> Result<ReplicateEffec
     let exposed_mean = sample_mean(&exposed_advantages)?;
     let unexposed_mean = sample_mean(&unexposed_advantages)?;
     let stratified_localization = stratum_localization(&replicate.cluster_outcomes, None)?;
-    let item_base = item_base_success as f64 * 1_000.0 / item_total as f64;
     let item_treatment = item_treatment_success as f64 * 1_000.0 / item_total as f64;
     let item_placebo = item_placebo_success as f64 * 1_000.0 / item_total as f64;
 
@@ -1209,7 +1208,6 @@ mod tests {
             replicate_id: suffix.clone(),
             design_sha256: manifest.design_sha256.clone(),
             intervention_manifest_sha256: manifest.manifest_sha256.clone(),
-            training_rng_seed_commitment_sha256: design.training_rng_seed_commitment_sha256.clone(),
             training_rng_seed_commitment_sha256: design.training_rng_seed_commitment_sha256.clone(),
             treatment_run_id: format!("treatment-run-{index}"),
             placebo_run_id: format!("placebo-run-{index}"),
