@@ -139,6 +139,28 @@ class PredictableArrivalLedgerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             verify_predictable_arrival_ledger(reordered)
 
+    def test_policy_spec_and_event_schema_tampering_fail(self):
+        ledger = build_predictable_arrival_ledger(
+            _scores(), ["h1", "h2", "h3"], min_observations=2
+        )
+        changed_header = copy.deepcopy(ledger)
+        changed_header["header"]["policy_spec_digest"] = "0" * 64
+        # Recompute only the header hash: the verifier must still reject an
+        # unknown policy specification, not merely detect an old digest.
+        changed_header["header_hash"] = hashlib.sha256(
+            __import__("json").dumps(
+                changed_header["header"], sort_keys=True,
+                separators=(",", ":"), ensure_ascii=False,
+            ).encode("utf-8")
+        ).hexdigest()
+        with self.assertRaisesRegex(ValueError, "policy specification"):
+            verify_predictable_arrival_ledger(changed_header)
+
+        changed_event = copy.deepcopy(ledger)
+        changed_event["events"][0]["unrecognized_field"] = "injected"
+        with self.assertRaisesRegex(ValueError, "event fields"):
+            verify_predictable_arrival_ledger(changed_event)
+
     def test_event_chain_tamper_fails(self):
         ledger = build_predictable_arrival_ledger(
             _scores(), ["h1", "h2", "h3"], min_observations=2
