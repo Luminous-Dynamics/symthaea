@@ -4,7 +4,8 @@ use pod_meta_cost_to_go_lab::{
     DecisionDrivenCapState, EffectDisposition, ForecastId, ForecastJournal,
     ForecastOutcomeReceipt, ForecastReceipt, FrontierCostCoefficients, HistoricalCostBaseline,
     JointCostEnvelope, LandmarkEpisode, LandmarkIpcwConfig, LandmarkTerminal,
-    LastObservedActionForecaster, LinearProofFrontierCostModel, OnlineCompetingTerminal,
+    InterventionAssignmentEvidence, LastObservedActionForecaster, LinearProofFrontierCostModel,
+    MatchedInterventionSet, OnlineCompetingTerminal,
     OnlineCostDimension, OnlineFeedbackDisposition, OnlineFeedbackReceipt,
     OnlinePredictionStatement, OnlineSelectionLedger, PrefixBudgetReceipt, PrefixReplayEngine,
     PrefixReplayEvaluator, ProofFrontierFeatures, ReconciliationOutcome, RemainingCostForecast,
@@ -194,6 +195,53 @@ fn action_trajectory(terminal: Option<TerminalOutcome>) -> ActionTrajectory {
             outcome: terminal,
             evaluator_receipt_digest: terminal.map(|_| [60; 32]),
             completion_verifier_digest: success.then_some([61; 32]),
+        },
+    }
+}
+
+fn matched_intervention_trial(run_id: u64, family: u32, first_cost: u128) -> ActionTrajectory {
+    let next_frontier = if family == 2 { 1 } else { 0 };
+    ActionTrajectory {
+        run_id,
+        task_family: 7,
+        seed: 88,
+        initial_budget: Some(ResourceVector::new(100, 10, 20, 10, 40, 50)),
+        actions: vec![
+            trajectory_action(
+                1,
+                TrajectoryActionKind::ProofOperation,
+                family,
+                1,
+                2,
+                ResourceVector::new(first_cost, 1, 2, 0, 3, 4),
+                trajectory_features(2),
+                vec![2, 3],
+            ),
+            trajectory_action(
+                2,
+                TrajectoryActionKind::ProofOperation,
+                8,
+                2,
+                3,
+                ResourceVector::new(5, 1, 1, 0, 2, 3),
+                trajectory_features(next_frontier),
+                vec![8, 9],
+            ),
+            trajectory_action(
+                3,
+                TrajectoryActionKind::IndependentVerifier,
+                90,
+                3,
+                4,
+                ResourceVector::new(5, 1, 1, 0, 2, 3),
+                ProofFrontierFeatures::default(),
+                vec![90],
+            ),
+        ],
+        terminal: TrajectoryTerminalRecord {
+            outcome: Some(TerminalOutcome::SufficientProof),
+            evaluator_receipt_digest: Some([60; 32]),
+            completion_verifier_digest: Some([61; 32]),
         },
     }
 }
@@ -1347,4 +1395,42 @@ fn main() {
         "TRAJECTORY_REPLAY_ROW\tterminal-label-isolation\t{}\t{}",
         terminal_prefix_unchanged, terminal_label_changed
     );
+    let matched_interventions = MatchedInterventionSet {
+        experiment_digest: [90; 32],
+        task_family: 7,
+        seed: 88,
+        initial_budget: Some(ResourceVector::new(100, 10, 20, 10, 40, 50)),
+        pre_state_digest: [1; 32],
+        frontier_digest: [41; 32],
+        frontier_features: trajectory_features(2),
+        candidate_pool_digest: [31; 32],
+        admissible_operation_families: vec![2, 3],
+        assignment: InterventionAssignmentEvidence::DeterministicSimulation {
+            simulator_digest: [91; 32],
+        },
+        trials: vec![
+            matched_intervention_trial(201, 2, 10),
+            matched_intervention_trial(202, 3, 15),
+        ],
+    };
+    let matched_contrast = matched_interventions.verified_contrasts().unwrap()[0];
+    println!(
+        "INTERVENTION_SET_ROW\tmatched-simulation-contrast\t{}\t{}\t{}\t{}\t{}",
+        matched_contrast.baseline_operation_family,
+        matched_contrast.alternative_operation_family,
+        matched_contrast.resource_cost_delta.tokens,
+        matched_contrast.proof_progress_delta,
+        matches!(
+            matched_contrast.interpretation,
+            pod_meta_cost_to_go_lab::InterventionInterpretation::SimulatedContrast
+        )
+    );
+    let mut mismatched_intervention = matched_interventions.clone();
+    mismatched_intervention.trials[1].actions[0].pre_state_digest = [99; 32];
+    println!(
+        "INTERVENTION_SET_ROW\tpre-state-negative-control\t{}",
+        mismatched_intervention.validate()
+            == Err(pod_meta_cost_to_go_lab::InterventionSetError::PreStateMismatch)
+    );
+
 }
