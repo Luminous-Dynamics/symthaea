@@ -1091,7 +1091,6 @@ impl EventTape {
                         evidence_sha256,
                         evidence_manifest_sha256,
                         evidence_byte_receipt_sha256,
-                        evidence_artifact,
                         failure_reason,
                     },
                 ) => {
@@ -1131,6 +1130,11 @@ impl EventTape {
                                 evidence_sha256.as_deref(),
                                 evidence_manifest_sha256.as_deref(),
                                 evidence_byte_receipt_sha256.as_deref(),
+                                &format!("{path}.outcome"),
+                            )?;
+                            validate_noisy_artifact_reference(
+                                evidence_artifact.as_ref(),
+                                evidence_sha256.as_deref(),
                                 &format!("{path}.outcome"),
                             )?;
                             if failure_reason.is_some() {
@@ -1176,6 +1180,7 @@ impl EventTape {
                         evidence_sha256,
                         evidence_manifest_sha256,
                         evidence_byte_receipt_sha256,
+                        evidence_artifact,
                         failure_reason,
                     },
                 ) => {
