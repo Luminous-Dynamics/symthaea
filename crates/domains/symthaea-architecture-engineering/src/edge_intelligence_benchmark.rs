@@ -158,7 +158,7 @@ pub fn assess_hdc_ltc_sram_budget(
 // ============================================================================
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum TemporalDriftSchedule {
     Stationary,
     Sudden { at_event: usize, to_regime: u8 },
