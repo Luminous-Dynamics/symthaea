@@ -125,6 +125,26 @@ fn self_test(path: &PathBuf) -> Result<()> {
 
 
     let mut bad = eligible.clone();
+    bad["semantic_review"]["review_scope"] = json!("statement_to_source");
+    bad["integrity_status"] = json!("pending");
+    let scope_bytes = serde_json::to_vec(&bad)?;
+    let scope_summary = benchmark_integrity::verify_bytes(&scope_bytes, None)?;
+    if scope_summary.integrity_status != "pending" {
+        bail!("source-only review incorrectly approved semantic target meaning");
+    }
+    println!("PITB_BENCHMARK_INTEGRITY_PENDING_PASS: source-coordinate review alone is not semantic approval");
+
+    let mut bad = eligible.clone();
+    bad["target"]["expected_informal_statement_sha256"] = Value::Null;
+    bad["integrity_status"] = json!("pending");
+    let mapping_bytes = serde_json::to_vec(&bad)?;
+    let mapping_summary = benchmark_integrity::verify_bytes(&mapping_bytes, None)?;
+    if mapping_summary.integrity_status != "pending" {
+        bail!("combined semantic review without intended informal statement digest was approved");
+    }
+    println!("PITB_BENCHMARK_INTEGRITY_PENDING_PASS: combined review requires intended informal statement identity");
+
+    let mut bad = eligible.clone();
     bad["semantic_review"]["reviewer_attestation_sha256"] = Value::Null;
     must_reject("approved semantic review has no attestation", bad)?;
 
