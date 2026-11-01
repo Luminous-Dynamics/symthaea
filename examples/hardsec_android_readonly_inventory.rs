@@ -682,7 +682,9 @@ mod tests {
         properties.insert("serialno", "PRIVATE-SERIAL-DO-NOT-EXPORT".to_owned());
 
         let profile = capture_profile(&properties, None, None);
-        let output = serde_json::to_string(&profile).unwrap().to_ascii_lowercase();
+        let output = serde_json::to_string(&profile)
+            .unwrap()
+            .to_ascii_lowercase();
 
         assert!(!contains_forbidden_identifier_key(&profile));
         assert!(!output.contains("490154203237518"));
