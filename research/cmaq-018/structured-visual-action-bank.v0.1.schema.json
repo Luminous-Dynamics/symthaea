@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-018-structured-visual-action-bank-v0.1.json",
+  "title": "CMAQ-018 structured visual-belief joint action bank",
+  "description": "Multiple typed visual-belief outcome channels sharing one exact observed history, action manifest and joint draw axis. Channel values remain separate and are never collapsed into an arbitrary scalar.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "claim_ceiling",
+    "history_sha256",
+    "horizon_steps",
+    "action_manifest_sha256",
+    "action_ids",
+    "joint_draw_ids",
+    "joint_draw_bank_sha256",
+    "coupling",
+    "channels"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-018-structured-visual-action-bank-v0.1"
+    },
+    "claim_ceiling": {
+      "const": "synthetic_structured_payload_integrity_only_no_visual_predictor_or_calibration_claim"
+    },
+    "history_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "horizon_steps": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "action_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "action_ids": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "joint_draw_ids": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "joint_draw_bank_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 of the canonical structured-bank byte encoding."
+    },
+    "coupling": {
+      "enum": [
+        "shared_posterior_and_world_noise",
+        "paired_exogenous_disturbance",
+        "deterministic_shared_latent"
+      ]
+    },
+    "channels": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "channel_id",
+          "kind",
+          "unit",
+          "outcome_samples"
+        ],
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "geometry",
+              "motion",
+              "contact",
+              "visibility",
+              "task_utility",
+              "terminal_risk",
+              "other"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "outcome_samples": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-rust-invariants": [
+    "channel_id values are unique and non-empty after trimming",
+    "unit and channel descriptors are non-empty after trimming",
+    "action_ids and joint_draw_ids are unique and each sample matrix is [action][joint_draw]",
+    "every channel shares the exact same history, action IDs, joint draw IDs and coupling",
+    "joint_draw_bank_sha256 is recomputed over all channel IDs, semantic tags, units and exact f64 sample bits",
+    "each channel is evaluated independently; heterogeneous state, probability, risk and utility channels are not scalarized"
+  ]
+}
