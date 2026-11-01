@@ -1,0 +1,270 @@
+{
+  "schema_version": "1.0.0",
+  "run_id": "randi2023-intervention-holdout-preflight-v1",
+  "status": "INCOMPLETE_REQUIRES_ARTIFACTS",
+  "evidence_tier": "T3_MEASURED_BIOLOGICAL_INTERVENTION",
+  "claim_ceiling": "BIOLOGICAL_INTERVENTION_PREDICTION",
+  "dataset": {
+    "name": "Randi et al. 2023 C. elegans neural signal propagation atlas",
+    "version": "Nature 2023 version of record; source materialization pending",
+    "source_uri": "https://doi.org/10.1038/s41586-023-06683-4",
+    "dataset_manifest_sha256": null,
+    "independent_unit": "animal_session",
+    "outcome_type": "calcium_fluorescence",
+    "notes": "Planned use of time-resolved optogenetically evoked responses. Individual animal/session artifacts and control pairing must be verified before execution.",
+    "data_level": "unknown",
+    "aggregation_scope": "unknown",
+    "evaluation_eligibility": "not_yet_verified",
+    "generator_family": "biological_dataset",
+    "dgp_scenario_id": null,
+    "instrument_assignment_level": "not_applicable",
+    "oracle_state": "NOT_APPLICABLE"
+  },
+  "connectome": {
+    "name": "C. elegans anatomical connectome source set",
+    "version": "White 1986 plus Witvliet 2021 materializations; exact version selection pending",
+    "source_uri": "https://osf.io/qxhjd/",
+    "structural_digest_sha256": null,
+    "annotation_digest_sha256": null,
+    "edge_semantics": "typed_mixed",
+    "uncertainty_recorded": true,
+    "notes": "Do not treat effective response as proof of a direct synaptic edge. Preserve extrasynaptic and unknown mechanisms."
+  },
+  "observation_model": {
+    "family": "calcium_indicator",
+    "separate_from_latent_dynamics": true,
+    "parameters_sha256": null,
+    "scoring_space": "measured_observation",
+    "notes": "Indicator parameters and preprocessing have not been materialized."
+  },
+  "split_protocol": {
+    "strategies": [
+      "leave_animal_session_out",
+      "leave_target_neuron_out",
+      "leave_perturbation_combination_out",
+      "temporal_forward_holdout"
+    ],
+    "split_unit": "animal_session",
+    "split_digest_sha256": null,
+    "preprocessing_fit_scope": "train_only",
+    "random_cell_time_split": false,
+    "train_ids_artifact_sha256": null,
+    "test_ids_artifact_sha256": null,
+    "exclusion_log_sha256": null,
+    "notes": "Pre-registration only. Exact animal/session and target assignments are not materialized."
+  },
+  "intervention_protocol": {
+    "paired_treatment_control": true,
+    "control_arm_count": 1,
+    "target_holdout": true,
+    "factorial_interactions": false,
+    "pulse_order_holdout": false,
+    "protocol_digest_sha256": null,
+    "control_types": [
+      "no_stimulation"
+    ],
+    "notes": "Control-arm pairing and exact per-animal mapping must be verified against source records. This is a requirement placeholder, not proof that pairing has been audited."
+  },
+  "models": [
+    {
+      "model_id": "connectome_candidate",
+      "family": "candidate_connectome_dynamics",
+      "role": "candidate",
+      "parameter_count": null,
+      "tuning_budget": "To be frozen before test access",
+      "status": "PLANNED"
+    },
+    {
+      "model_id": "activity_only_nonlinear",
+      "family": "activity_only_nonlinear_state_space",
+      "role": "baseline",
+      "parameter_count": null,
+      "tuning_budget": "Same training observations and tuning budget as candidate",
+      "status": "PLANNED"
+    },
+    {
+      "model_id": "cell_type_connectome",
+      "family": "fixed_connectome_shared_cell_type_parameters",
+      "role": "baseline",
+      "parameter_count": null,
+      "tuning_budget": "Same training observations and tuning budget as candidate",
+      "status": "PLANNED"
+    },
+    {
+      "model_id": "degree_type_rewire",
+      "family": "degree_type_preserving_rewire",
+      "role": "negative_control",
+      "parameter_count": null,
+      "tuning_budget": "Same graph size and optimizer budget; multiple rewiring seeds",
+      "status": "PLANNED"
+    }
+  ],
+  "baseline_matrix": {
+    "sham_mean": true,
+    "non_graph_linear": true,
+    "activity_only_nonlinear": true,
+    "cell_type_tied_connectome": true,
+    "capacity_matched_activity_only": true,
+    "degree_type_preserving_rewire": true,
+    "edge_sign_weight_null": true,
+    "common_input_confound": true
+  },
+  "metric_contract": {
+    "metric_ids": [
+      "trajectory_rmse",
+      "trajectory_crps",
+      "treatment_control_effect_rmse",
+      "response_sign_accuracy",
+      "mechanism_macro_f1",
+      "interval_coverage_50",
+      "interval_coverage_80",
+      "interval_coverage_95",
+      "anatomy_incremental_gain"
+    ],
+    "definitions_sha256": null,
+    "primary_metric_ids": [
+      "trajectory_rmse",
+      "treatment_control_effect_rmse",
+      "trajectory_crps"
+    ]
+  },
+  "uncertainty": {
+    "independent_unit": "animal_session",
+    "interval_method": "cluster_bootstrap",
+    "bootstrap_replicates": 1000,
+    "coverage_levels": [
+      0.5,
+      0.8,
+      0.95
+    ],
+    "notes": "Cluster by animal/session; do not treat neurons or time points as independent animals."
+  },
+  "artifacts": {
+    "dataset_manifest_sha256": null,
+    "connectome_sha256": null,
+    "split_manifest_sha256": null,
+    "model_predictions_sha256": null,
+    "sealed_outcomes_sha256": null,
+    "metric_report_sha256": null,
+    "evaluator_sha256": null,
+    "environment_sha256": null,
+    "reproduction_config_sha256": null,
+    "observed_csv_sha256": null,
+    "public_data_manifest_sha256": null,
+    "dgp_oracle_sha256": null,
+    "prediction_freeze_receipt_sha256": null
+  },
+  "notes": "Incomplete preflight example only. Dataset, connectome, splits, preprocessing, predictions, outcomes, evaluator, environment and score report are not materialized. No model has been trained or scored; no biological result is claimed.",
+  "direct_effect_support": {
+    "status": "INCOMPLETE_REQUIRES_ARTIFACTS",
+    "method": "not_applicable",
+    "support_basis": "unknown",
+    "bound_g": null,
+    "nominal_confidence_level": null,
+    "f_critical_value": null,
+    "control_type": "not_applicable",
+    "control_cohort_id": null,
+    "control_artifact_sha256": null,
+    "normalized_gram_sha256": null,
+    "target_normalized_gram_sha256": null,
+    "transport_multiplier": null,
+    "applied_bound_g": null,
+    "prespecified_before_unblind": false,
+    "transportability_proven": false,
+    "notes": "No matched negative-control cohort or direct-effect support has been materialized. Do not run or claim pAR inference until the direct-effect support is prespecified and its source/calibration provenance is complete.",
+    "sensitivity_ladder_g": []
+  },
+  "causal_inference_baselines": {
+    "analysis_regime": {
+      "independent_cluster_count": null,
+      "randomized_assignment_unit_count": null,
+      "instrument_count": null,
+      "endogenous_regressor_count": null,
+      "cluster_structure": "unknown",
+      "cluster_count_and_leverage_reported": false
+    },
+    "clusteriv_020": {
+      "status": "REGISTERED_NOT_RUN",
+      "package_version": "0.2.0",
+      "variance_estimators": [],
+      "cjar_calibrations": [],
+      "cjar_confidence_set_topology_reported": false,
+      "cjs_confidence_set_topology_reported": false,
+      "effective_first_stage_reported": false,
+      "cluster_leverage_reported": false,
+      "one_way_cluster_scope_acknowledged": true,
+      "single_endogenous_regressor_scope_acknowledged": true,
+      "not_run_or_not_applicable_reason": "External package adapter, package environment, data and matched design have not been materialized.",
+      "cjar_test_side": "upper_tail_one_sided",
+      "cjar_confidence_set_shapes": [],
+      "cjs_confidence_set_shapes": [],
+      "confidence_set_endpoint_matrix_preserved": false,
+      "f_cj_reported": false,
+      "f_eff_reported": false,
+      "maxlev_reported": false,
+      "crossfit_nonpositive_variance_convention_recorded": false
+    },
+    "stata19_weakrobust": {
+      "status": "REGISTERED_NOT_RUN",
+      "stata_version": "19",
+      "tests": [],
+      "vce_modes": [],
+      "confidence_set_topology_reported": false,
+      "simulation_replications": null,
+      "not_run_or_not_applicable_reason": "Stata 19 is registered as a commercial comparator but no execution or licence-backed environment is available in this preflight.",
+      "clr_simulation_seed": null,
+      "ci_grid_points": null,
+      "confidence_set_shapes": []
+    },
+    "wang_zhang_2024_wild_ar": {
+      "status": "REGISTERED_NOT_RUN",
+      "paper_doi": "10.1016/j.jeconom.2024.105727",
+      "bootstrap_replications": null,
+      "seed": null,
+      "fixed_cluster_asymptotic_regime_acknowledged": true,
+      "weak_iv_ar_used": false,
+      "not_run_or_not_applicable_reason": "No wild-bootstrap implementation or biological cluster design is materialized; fixed-number-of-large-clusters assumptions need separate assessment."
+    },
+    "randomization_itt": {
+      "status": "REGISTERED_NOT_RUN",
+      "estimand": "assignment_ITT_only",
+      "assignment_mechanism": "unknown",
+      "assignment_unit_count": null,
+      "independent_cluster_count": null,
+      "allocation_count": null,
+      "exact_p_value_reported": false,
+      "claim_ceiling": "NOT_VALIDATED",
+      "not_run_or_not_applicable_reason": "PR #9673 is a synthetic reference only; no real randomization receipt or outcome data are materialized."
+    },
+    "independent_row_par_reference": {
+      "status": "REGISTERED_NOT_RUN",
+      "conditional_gaussian_assumption_acknowledged": true,
+      "homoskedastic_assumption_acknowledged": true,
+      "independent_rows_assumption_acknowledged": true,
+      "not_for_clustered_inference_acknowledged": true,
+      "full_g_sensitivity_ladder_reported": false,
+      "not_run_or_not_applicable_reason": "Synthetic mathematical reference only. Must not be used as clustered animal/session inference."
+    },
+    "clustered_iv_dgp": {
+      "status": "REGISTERED_NOT_RUN",
+      "scenario_id": null,
+      "generator_algorithm": "splitmix64-box-muller-cos-open01-v2",
+      "seed": null,
+      "instrument_assignment_level": "unknown",
+      "independent_cluster_count": null,
+      "assignment_unit_count": null,
+      "instrument_count": null,
+      "structural_beta": null,
+      "first_stage_coefficients": [],
+      "direct_effect_coefficients": [],
+      "registered_direct_effect_rms_bound": null,
+      "realized_direct_effect_sample_rms": null,
+      "direct_effect_support_status": "UNKNOWN",
+      "dataset_csv_sha256": null,
+      "manifest_sha256": null,
+      "cluster_sizes_sha256": null,
+      "known_truth_released_before_estimation": false,
+      "not_run_or_not_applicable_reason": "PR #9678 provides the DGP generator and presets, but no dataset has been generated, hashed or used for an estimator run in this preflight."
+    }
+  }
+}
