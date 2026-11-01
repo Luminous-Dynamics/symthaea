@@ -518,10 +518,10 @@ pub fn replay_noisy_event_tape(
                             return Err(EventTapeNoisyError::new(format!("{path}.evidence"), "bundle reused across events"));
                         }
                         let replicate = NoisyReplicate {
-                            replicate_id: replicate_id.clone(),
+                            replicate_id: replicate_id.to_owned(),
                             sample_seed: *sample_seed,
-                            objective_values: values.clone(),
-                            evidence_sha256: artifact_sha.clone(),
+                            objective_values: values.to_vec(),
+                            evidence_sha256: artifact_sha.to_owned(),
                         };
                         let actual_manifest_sha = bundle.manifest.manifest_sha256().map_err(|error| EventTapeNoisyError::new(format!("{path}.manifest"), error.to_string()))?;
                         if &actual_manifest_sha != manifest_sha || &bundle.receipt.receipt_sha256 != receipt_sha {
@@ -565,6 +565,7 @@ pub fn replay_noisy_event_tape(
                     | NoisyObservationDisposition::TimedOut | NoisyObservationDisposition::VerifierRejected => {
                         if objective_values.is_some() || evidence_sha256.is_some()
                             || evidence_manifest_sha256.is_some() || evidence_byte_receipt_sha256.is_some()
+                            || evidence_artifact.is_some()
                         {
                             return Err(EventTapeNoisyError::new(format!("{path}.outcome"), "failed observation must not publish values or successful evidence"));
                         }
