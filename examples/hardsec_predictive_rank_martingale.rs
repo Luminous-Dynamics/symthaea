@@ -832,8 +832,14 @@ mod tests {
         let plan=parse_plan(&p).unwrap();
         let data=parse_data(&d,&plan).unwrap();
         let n=data.calibration_samples.len();
-        let counts=vec![3_u64;n+1];
+        // At t=4, the prior rank history contains exactly three ranks total.
+        // A count of three in every bin is not a reachable Pólya-urn history.
+        let mut counts=vec![0_u64;n+1];
+        counts[0]=1;
+        counts[n]=2;
         let pi=predictive_law(&counts,n,4);
+        assert_eq!(counts.iter().sum::<u64>(),3);
+        assert!((pi.iter().sum::<f64>()-1.0).abs()<1e-12);
         for (_,kind,_) in plan.features{
             let h=feature_values(&kind,n);
             let mean=h.iter().zip(pi.iter()).map(|(a,b)|a*b).sum::<f64>();

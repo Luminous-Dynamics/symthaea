@@ -114,7 +114,17 @@ These are internal research gates, not standards and not achieved measurements. 
 
 The highest-value open problem is to derive a valid sequential rank law when source telemetry is dependent. A promising direction is a **predictable upper envelope** u_(t,j) for each conditional null rank probability, with a predeclared probability budget for the event that the envelope ever fails. If a time-uniform construction can justify Pr(R_t=j | F_(t-1)) <= u_(t,j) simultaneously, then a predictable distribution q_t can use the conservative factor q_(t,R_t)/u_(t,R_t); on the envelope event its conditional expected factor is at most one. The hard part is constructing and independently qualifying the simultaneous conditional-probability envelope for PMU streams without assuming the desired answer.
 
-Until that proof and its hardware assumptions exist, keep iid PRM and dependent-PMU diagnostics as separate claim classes. A robust monitor should abstain or fall back to a non-confirmatory diagnostic when those conditions are not established.
+The proof programme is tracked in [HARDSEC-024 / issue #9679](https://github.com/Luminous-Dynamics/symthaea/issues/9679). Until that proof and its hardware assumptions exist, keep iid PRM and dependent-PMU diagnostics as separate claim classes. A robust monitor should abstain or fall back to a non-confirmatory diagnostic when those conditions are not established.
+
+## 8. Published detector comparisons and interpretation
+
+The 2026 HARPY-V-GEM5 study reports very high within-workload results (above 99% on selected known-workload configurations), but its leave-one-program-out results are substantially more variable and attack-dependent. The paper describes near-zero results for some attack/program combinations, showing why random-window accuracy and pooled means are insufficient for zero-day generalization. It is a simulator benchmark and must not be described as a physical-board result. See [Pujol et al. (2026), DOI 10.1007/s00521-026-12467-4](https://doi.org/10.1007/s00521-026-12467-4).
+
+The separate physical HARPY-V evaluation on a XuanTie C910 reports high precision/classification in its tested setting but also reports substantial interference when multiple counters are collected concurrently, requiring isolated collection conditions for affected measurements. It reports roughly 0.2 ms perf collection overhead per 10 ms sampling interval in its stated setup. This makes HARDSEC-018 metrology a necessary part of any detector comparison, not an optional profiling appendix. See [Pou et al. (2026), Cybersecurity 9, 222](https://doi.org/10.1186/s42400-026-00406-0).
+
+T-SMADE reports 95.42% average detection for its Evasive Spectre-NOP setting and 100% for Evasive Spectre-memory in its evaluated dataset/configuration. These are useful comparator operating points, not universal bounds on adaptive attackers. See [T-SMADE (2024)](https://www.mdpi.com/2079-9292/13/23/4674).
+
+Do not rank these headline figures against PRM/CCTM or a Symthaea detector unless attack effects, sampling units, platforms, holdouts, thresholds, false-alert budgets, and instrumentation costs are reproduced on a common test protocol. The benchmark remains planned, not executed.
 
 ## References
 
