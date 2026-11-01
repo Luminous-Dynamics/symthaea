@@ -487,6 +487,17 @@ pub enum AnytimeAction {
         evidence_sha256: Option<String>,
         failure_reason: Option<String>,
     },
+    CandidateNoisyObservation {
+        observation_plan_sha256: String,
+        candidate_id: String,
+        decision_sha256: String,
+        replicate_id: String,
+        sample_seed: u64,
+        outcome: EvaluationOutcome,
+        objective_values: Option<Vec<f64>>,
+        evidence_sha256: Option<String>,
+        failure_reason: Option<String>,
+    },
     CandidateVerification {
         candidate_id: String,
         evidence_sha256: String,
@@ -662,11 +673,21 @@ impl AnytimeHistory {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HistoryMode {
+    Deterministic,
+    Noisy,
+}
+
 #[derive(Debug, Clone)]
 struct HistoryValidationState {
     previous_digest: String,
     previous_completion: Option<u64>,
     clock_mode: Option<bool>,
+    history_mode: Option<HistoryMode>,
+    noisy_plan_sha256: Option<String>,
+    noisy_replicate_ids: BTreeSet<(String, String)>,
+    noisy_sample_seeds: BTreeSet<(String, u64)>,
     evaluation_ids: BTreeSet<String>,
     auxiliary_ids: BTreeSet<String>,
     attempts: BTreeMap<String, u32>,
@@ -682,6 +703,10 @@ impl HistoryValidationState {
             previous_digest: header_sha256,
             previous_completion: None,
             clock_mode: None,
+            history_mode: None,
+            noisy_plan_sha256: None,
+            noisy_replicate_ids: BTreeSet::new(),
+            noisy_sample_seeds: BTreeSet::new(),
             evaluation_ids: BTreeSet::new(),
             auxiliary_ids: BTreeSet::new(),
             attempts: BTreeMap::new(),
@@ -772,6 +797,12 @@ fn validate_and_apply_event(
             evidence_sha256,
             failure_reason,
         } => {
+            if state.history_mode == Some(HistoryMode::Noisy) {
+                return Err(AnytimeError::new(
+                    format!("{path}.kind"),
+                    "deterministic and noisy candidate evaluation modes cannot be mixed in one run",
+                ));
+            }
             let next_objective_attempts = state.objective_attempts.checked_add(1)
                 .ok_or_else(|| AnytimeError::new(
                     format!("{path}.objective_attempts"),
@@ -923,6 +954,7 @@ fn validate_and_apply_event(
             }
 
             // All fallible validation is complete. Only now mutate the incremental state.
+            state.history_mode = Some(HistoryMode::Deterministic);
             state.objective_attempts = next_objective_attempts;
             state.evaluation_ids.insert(evaluation_id.clone());
             state.attempts.insert(candidate_id.clone(), *attempt);
@@ -934,12 +966,126 @@ fn validate_and_apply_event(
                 state.successful.entry(candidate_id.clone()).or_insert(candidate);
             }
         }
+        AnytimeAction::CandidateNoisyObservation {
+            observation_plan_sha256,
+            candidate_id,
+            decision_sha256,
+            replicate_id,
+            sample_seed,
+            outcome,
+            objective_values,
+            evidence_sha256,
+            failure_reason,
+        } => {
+            if state.history_mode == Some(HistoryMode::Deterministic) {
+                return Err(AnytimeError::new(
+                    format!("{path}.kind"),
+                    "deterministic and noisy candidate evaluation modes cannot be mixed in one run",
+                ));
+            }
+            validate_sha256(observation_plan_sha256, &format!("{path}.observation_plan_sha256"))?;
+            validate_sha256(decision_sha256, &format!("{path}.decision_sha256"))?;
+            if candidate_id.trim().is_empty() || replicate_id.trim().is_empty() {
+                return Err(AnytimeError::new(
+                    format!("{path}.identity"),
+                    "noisy candidate and replicate IDs must be non-empty",
+                ));
+            }
+            if state.noisy_plan_sha256.as_ref().is_some_and(|digest| digest != observation_plan_sha256) {
+                return Err(AnytimeError::new(
+                    format!("{path}.observation_plan_sha256"),
+                    "noisy observation plan digest changed within a run",
+                ));
+            }
+            let replicate_key = (candidate_id.clone(), replicate_id.clone());
+            let seed_key = (candidate_id.clone(), *sample_seed);
+            if state.noisy_replicate_ids.contains(&replicate_key)
+                || state.noisy_sample_seeds.contains(&seed_key)
+            {
+                return Err(AnytimeError::new(
+                    format!("{path}.replicate"),
+                    "replicate IDs and sample seeds must be unique within each candidate",
+                ));
+            }
+            if state.decisions.get(candidate_id).is_some_and(|previous| previous != decision_sha256) {
+                return Err(AnytimeError::new(
+                    format!("{path}.decision_sha256"),
+                    "candidate decision digest changed across noisy replicates",
+                ));
+            }
+            if state.decision_owners.get(decision_sha256).is_some_and(|owner| owner != candidate_id) {
+                return Err(AnytimeError::new(
+                    format!("{path}.decision_sha256"),
+                    "identical decision bytes must share one canonical candidate ID",
+                ));
+            }
+            let next_objective_attempts = state.objective_attempts.checked_add(1)
+                .ok_or_else(|| AnytimeError::new(format!("{path}.objective_attempts"), "objective-attempt counter overflow"))?;
+            if next_objective_attempts > header.max_objective_evaluation_attempts {
+                return Err(AnytimeError::new(
+                    format!("{path}.objective_attempts"),
+                    "objective-evaluation attempt budget exceeded",
+                ));
+            }
+
+            match outcome {
+                EvaluationOutcome::Succeeded => {
+                    let values = objective_values.as_ref().ok_or_else(|| AnytimeError::new(
+                        format!("{path}.objective_values"),
+                        "successful noisy observation requires an objective vector",
+                    ))?;
+                    if values.len() != header.objective_specs.len() || values.iter().any(|value| !value.is_finite()) {
+                        return Err(AnytimeError::new(
+                            format!("{path}.objective_values"),
+                            "noisy observation dimension mismatch or non-finite value",
+                        ));
+                    }
+                    let evidence = evidence_sha256.as_ref().ok_or_else(|| AnytimeError::new(
+                        format!("{path}.evidence_sha256"),
+                        "successful noisy observation requires raw evidence digest",
+                    ))?;
+                    validate_sha256(evidence, &format!("{path}.evidence_sha256"))?;
+                    if failure_reason.is_some() {
+                        return Err(AnytimeError::new(
+                            format!("{path}.failure_reason"),
+                            "successful noisy observation cannot carry failure reason",
+                        ));
+                    }
+                }
+                _ => {
+                    if objective_values.is_some() || evidence_sha256.is_some() {
+                        return Err(AnytimeError::new(
+                            path.clone(),
+                            "failed/invalid/timed-out noisy observation cannot enter the statistical sample",
+                        ));
+                    }
+                    if failure_reason.as_ref().is_none_or(|reason| reason.trim().is_empty()) {
+                        return Err(AnytimeError::new(
+                            format!("{path}.failure_reason"),
+                            "failed noisy observation requires an explicit reason",
+                        ));
+                    }
+                }
+            }
+
+            // All checks are complete before mutating the incremental validation state.
+            state.history_mode = Some(HistoryMode::Noisy);
+            state.noisy_plan_sha256.get_or_insert_with(|| observation_plan_sha256.clone());
+            state.noisy_replicate_ids.insert(replicate_key);
+            state.noisy_sample_seeds.insert(seed_key);
+            state.objective_attempts = next_objective_attempts;
+            state.decisions.entry(candidate_id.clone()).or_insert_with(|| decision_sha256.clone());
+            state.decision_owners.entry(decision_sha256.clone()).or_insert_with(|| candidate_id.clone());
+        }
         AnytimeAction::CandidateVerification {
             candidate_id,
             evidence_sha256,
             level,
             verifier_receipt_sha256,
         } => {
+            if state.history_mode == Some(HistoryMode::Noisy) {
+                return Err(AnytimeError::new(format!("{path}.kind"), "noisy histories require replicate-specific verification integration"));
+            }
             if candidate_id.trim().is_empty() {
                 return Err(AnytimeError::new(
                     format!("{path}.candidate_id"),
@@ -992,6 +1138,9 @@ fn validate_and_apply_event(
             verifier_receipt_sha256,
             rejection_reason,
         } => {
+            if state.history_mode == Some(HistoryMode::Noisy) {
+                return Err(AnytimeError::new(format!("{path}.kind"), "noisy histories require replicate-specific verification integration"));
+            }
             if candidate_id.trim().is_empty() {
                 return Err(AnytimeError::new(
                     format!("{path}.candidate_id"),
