@@ -5,9 +5,46 @@ use pod_meta_cost_to_go_lab::{
     LinearProofFrontierCostModel, ProofFrontierFeatures, ReconciliationOutcome,
     RemainingCostForecast, ReservationId, ResourceVector, SelectedProofCalibrationExample,
     SelectedProofEnvelope, SelectionConditionedConformalCalibrator, SelectionReceipt, ShiftStatus,
-    SplitVectorConformalCalibrator, StateEvidence, TerminalOutcome, assess_completion_feasibility,
+    OnlineCompetingTerminal, OnlineCostDimension, OnlineFeedbackDisposition, OnlineFeedbackReceipt,
+    OnlinePredictionStatement, OnlineSelectionLedger, SplitVectorConformalCalibrator, StateEvidence,
+    TerminalOutcome, assess_completion_feasibility,
     assess_joint_resource_fit, calibrate_landmark_ipcw,
 };
+
+fn online_statement(id: u64, episode: u64, decision: u64, tick: u64) -> OnlinePredictionStatement {
+    OnlinePredictionStatement {
+        statement_id: id,
+        selection: SelectionReceipt {
+            episode_id: episode,
+            decision_sequence: decision,
+            candidate_pool_digest: [1; 32],
+            selection_policy_digest: [2; 32],
+            selected_population_digest: [3; 32],
+            pre_state_digest: [4; 32],
+            frontier_digest: [5; 32],
+            selected_operation_id: format!("op-{id}"),
+            selected_operation_family: 7,
+        },
+        dimension: OnlineCostDimension::Tokens,
+        lower_bound: 10,
+        upper_bound: 20,
+        issued_at_tick: tick,
+    }
+}
+
+fn online_feedback(
+    sequence: u64,
+    statement_id: u64,
+    tick: u64,
+    disposition: OnlineFeedbackDisposition,
+) -> OnlineFeedbackReceipt {
+    OnlineFeedbackReceipt {
+        receipt_sequence: sequence,
+        statement_id,
+        received_at_tick: tick,
+        disposition,
+    }
+}
 
 fn tokens(value: u128) -> ResourceVector {
     ResourceVector::new(value, 0, 0, 0, 0, 0)
@@ -626,4 +663,139 @@ fn main() {
         SelectedProofEnvelope::Unbounded { .. }
     ));
     println!("SELECTION_CONFORMAL_ROW\tselected-sample-too-small\tunbounded");
+
+    let mut online_full = OnlineSelectionLedger::new();
+    online_full.append_statement(online_statement(1, 601, 1, 1)).unwrap();
+    online_full.append_statement(online_statement(2, 602, 1, 2)).unwrap();
+    online_full
+        .append_feedback(online_feedback(
+            1,
+            1,
+            3,
+            OnlineFeedbackDisposition::ExactVerifiedCost {
+                observed_cost: 15,
+                meter_receipt_digest: [41; 32],
+                completion_verifier_digest: [42; 32],
+            },
+        ))
+        .unwrap();
+    online_full
+        .append_feedback(online_feedback(
+            2,
+            2,
+            4,
+            OnlineFeedbackDisposition::CoverageBitOnly {
+                covered: false,
+                meter_receipt_digest: [43; 32],
+                evaluator_receipt_digest: [44; 32],
+            },
+        ))
+        .unwrap();
+    let full_report = online_full.report(4);
+    println!(
+        "ONLINE_FCR_ROW\tfull-feedback\t{}\t{}\t{:.3}",
+        full_report.resolved_coverage_statements,
+        full_report.coverage_misses,
+        full_report.observed_fcr.unwrap()
+    );
+
+    let mut online_delayed = OnlineSelectionLedger::new();
+    online_delayed
+        .append_statement(online_statement(1, 603, 1, 1))
+        .unwrap();
+    online_delayed
+        .append_feedback(online_feedback(
+            1,
+            1,
+            5,
+            OnlineFeedbackDisposition::CoverageBitOnly {
+                covered: true,
+                meter_receipt_digest: [45; 32],
+                evaluator_receipt_digest: [46; 32],
+            },
+        ))
+        .unwrap();
+    let delayed_report = online_delayed.report(3);
+    println!(
+        "ONLINE_FCR_ROW\tdelayed-prefix\t{}\t{}",
+        delayed_report.pending_feedback,
+        delayed_report.resolved_coverage_statements
+    );
+
+    let mut online_unknown = OnlineSelectionLedger::new();
+    online_unknown
+        .append_statement(online_statement(1, 604, 1, 1))
+        .unwrap();
+    online_unknown
+        .append_feedback(online_feedback(
+            1,
+            1,
+            2,
+            OnlineFeedbackDisposition::ActionOutcomeUnknown {
+                action_id_digest: [47; 32],
+            },
+        ))
+        .unwrap();
+    online_unknown
+        .append_feedback(online_feedback(
+            2,
+            1,
+            4,
+            OnlineFeedbackDisposition::ExactVerifiedCost {
+                observed_cost: 12,
+                meter_receipt_digest: [48; 32],
+                completion_verifier_digest: [49; 32],
+            },
+        ))
+        .unwrap();
+    let unknown_report = online_unknown.report(4);
+    println!(
+        "ONLINE_FCR_ROW\tunknown-reconciled\t{}\t{}",
+        unknown_report.action_outcome_unknown,
+        unknown_report.resolved_coverage_statements
+    );
+
+    let mut online_censored = OnlineSelectionLedger::new();
+    online_censored
+        .append_statement(online_statement(1, 605, 1, 1))
+        .unwrap();
+    online_censored
+        .append_feedback(online_feedback(
+            1,
+            1,
+            2,
+            OnlineFeedbackDisposition::RightCensored {
+                observed_lower_bound: 21,
+                meter_receipt_digest: [50; 32],
+            },
+        ))
+        .unwrap();
+    let censored_report = online_censored.report(2);
+    println!(
+        "ONLINE_FCR_ROW\tcensored-definite-miss\t{}\t{}",
+        censored_report.coverage_misses,
+        censored_report.right_censored_unresolved
+    );
+
+    let mut online_competing = OnlineSelectionLedger::new();
+    online_competing
+        .append_statement(online_statement(1, 606, 1, 1))
+        .unwrap();
+    online_competing
+        .append_feedback(online_feedback(
+            1,
+            1,
+            2,
+            OnlineFeedbackDisposition::CompetingTerminal {
+                terminal: OnlineCompetingTerminal::PermissionRevoked,
+                evaluator_receipt_digest: [51; 32],
+            },
+        ))
+        .unwrap();
+    let competing_report = online_competing.report(2);
+    println!(
+        "ONLINE_FCR_ROW\tcompeting-terminal\t{}\t{}",
+        competing_report.competing_terminal,
+        competing_report.resolved_coverage_statements
+    );
 }
