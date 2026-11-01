@@ -1272,6 +1272,29 @@ mod tests {
     }
 
     #[test]
+    fn sqlite_lost_ack_after_commit_recovers_by_exact_receipt_digest() {
+        let path = temporary_sqlite_path("lost-ack");
+        let candidate = fixture_candidate();
+        {
+            let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+            let plan = match store.preview(&candidate).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database has no receipt"),
+            };
+            store.commit_plan(plan).unwrap();
+        }
+        {
+            let reopened = SqliteTrustedStateStore::open(&path).unwrap();
+            assert_eq!(
+                reopened.preview(&candidate).unwrap(),
+                TransitionDecision::AlreadyCommitted { revision: 1 }
+            );
+            assert_eq!(reopened.read_state().unwrap().accepted_receipt_count(), 1);
+        }
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
     fn sqlite_two_connections_recover_exact_retry_after_compare_conflict() {
         let path = temporary_sqlite_path("two-connection");
         let mut first = SqliteTrustedStateStore::open(&path).unwrap();
