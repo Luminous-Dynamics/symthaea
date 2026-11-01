@@ -383,6 +383,7 @@ pub struct WitnessSetChainReport {
 pub struct VerifiedWitnessSet {
     pub report: WitnessSetChainReport,
     metadata: WitnessSetMetadata,
+    root_genesis_pin_sha256: String,
 }
 
 struct PreparedRoot {
@@ -561,7 +562,7 @@ pub fn verify_trust_root_chain(
     if root.previous_trust_root_digest.is_some() {
         return Err("pinned genesis trust root must have no predecessor".to_string());
     }
-    let mut prepared = prepare_root(&root)?;
+    let prepared = prepare_root(&root)?;
     let mut root_digest = witness_trust_root_digest(genesis_bytes);
     let genesis_pin = expected_genesis_sha256.to_string();
     let mut versions = vec![root.trust_root_version.clone()];
@@ -569,7 +570,6 @@ pub fn verify_trust_root_chain(
         metadata: root.clone(),
         prepared,
     }];
-    let mut prepared = prepare_root(&root)?;
     if root.trust_root_version != "1" {
         return Err("genesis trust_root_version must be 1".to_string());
     }
@@ -579,13 +579,18 @@ pub fn verify_trust_root_chain(
         let expected_version = old_version
             .checked_add(1)
             .ok_or_else(|| "trust-root version overflow".to_string())?;
-        let old_verified = verify_dsse_payload_with_verifiers(
-            envelope,
-            TRUST_ROOT_PAYLOAD_TYPE,
-            &prepared.verifiers,
-            root.root_threshold,
-        )
-        .map_err(|error| format!("successor root {index} lacks old-root threshold: {error}"))?;
+        let old_verified = {
+            let current_root = trusted_roots
+                .last()
+                .ok_or_else(|| "verified root chain unexpectedly empty".to_string())?;
+            verify_dsse_payload_with_verifiers(
+                envelope,
+                TRUST_ROOT_PAYLOAD_TYPE,
+                &current_root.prepared.verifiers,
+                current_root.metadata.root_threshold,
+            )
+            .map_err(|error| format!("successor root {index} lacks old-root threshold: {error}"))?
+        };
         let successor: WitnessTrustRoot =
             parse_strict_canonical_json(&old_verified.payload, "successor trust root")?;
         let next_version = parse_canonical_u64(&successor.trust_root_version, "successor trust root version")?;
@@ -624,7 +629,6 @@ pub fn verify_trust_root_chain(
             prepared: next_prepared,
         });
         root = successor;
-        prepared = prepare_root(&root)?;
     }
 
     let report = TrustRootChainReport {
@@ -635,7 +639,10 @@ pub fn verify_trust_root_chain(
         latest_root_digest: root_digest,
         verified_root_versions: versions,
         latest_root_threshold: root.root_threshold,
-        latest_active_root_keys: prepared.verifiers.len(),
+        latest_active_root_keys: trusted_roots
+            .last()
+            .map(|trusted| trusted.prepared.verifiers.len())
+            .unwrap_or(0),
         initial_witness_set_id: root.initial_witness_set_id.clone(),
         initial_witness_set_version: root.initial_witness_set_version.clone(),
         initial_witness_set_digest: root.initial_witness_set_digest.clone(),
@@ -765,6 +772,9 @@ pub fn verify_witness_set_metadata(
             }
         }
         Some(previous_verified) => {
+            if previous_verified.root_genesis_pin_sha256 != root_chain.report.genesis_pin_sha256 {
+                return Err("previous witness-set handle belongs to a different pinned trust-root chain".to_string());
+            }
             let previous = &previous_verified.metadata;
             let expected_version = parse_canonical_u64(&previous.witness_set_version, "previous witness set version")?
                 .checked_add(1)
@@ -797,6 +807,7 @@ pub fn verify_witness_set_metadata(
     Ok(VerifiedWitnessSet {
         report,
         metadata: set,
+        root_genesis_pin_sha256: root_chain.report.genesis_pin_sha256.clone(),
     })
 }
 
