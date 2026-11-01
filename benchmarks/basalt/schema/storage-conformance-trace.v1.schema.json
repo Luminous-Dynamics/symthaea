@@ -79,10 +79,11 @@
     "final_observation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["authority_revision", "state_digest", "source_cursors", "log_cursors", "accepted_receipts"],
+      "required": ["authority_revision", "state_digest", "policy_digest", "source_cursors", "log_cursors", "accepted_receipts"],
       "properties": {
         "authority_revision": { "type": "string", "minLength": 1 },
         "state_digest": { "$ref": "#/$defs/digest" },
+        "policy_digest": { "$ref": "#/$defs/digest" },
         "source_cursors": {
           "type": "array",
           "items": { "$ref": "#/$defs/source_cursor" }
@@ -179,7 +180,7 @@
         "op_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$" },
         "client_id": { "type": "string", "minLength": 1 },
         "client_sequence": { "type": "integer", "minimum": 0 },
-        "kind": { "enum": ["advance", "receipt_lookup", "restore_verify"] },
+        "kind": { "enum": ["advance", "receipt_lookup", "restore_verify", "policy_publish"] },
         "scope": {
           "type": "object",
           "additionalProperties": false,
@@ -207,7 +208,8 @@
             "next_log_checkpoint": { "type": "string", "minLength": 1 },
             "restored_incarnation_id": { "type": "string", "minLength": 1 },
             "restored_state_digest": { "$ref": "#/$defs/digest" },
-            "witness_sequence_seen": { "type": "integer", "minimum": 0 }
+            "witness_sequence_seen": { "type": "integer", "minimum": 0 },
+            "next_policy_digest": { "$ref": "#/$defs/digest" }
           }
         },
         "result": {
@@ -268,6 +270,16 @@
             "properties": {
               "request": {
                 "required": ["restored_incarnation_id", "restored_state_digest", "witness_sequence_seen"]
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "policy_publish" } }, "required": ["kind"] },
+          "then": {
+            "properties": {
+              "request": {
+                "required": ["expected_policy_digest", "next_policy_digest"]
               }
             }
           }
