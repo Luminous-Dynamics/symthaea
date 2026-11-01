@@ -177,27 +177,35 @@ impl TrainOnlyStandardizer {
         let purged_train_ids: BTreeSet<u64> = plan.purged_train_window_ids.iter().copied().collect();
         let purged_validation_ids: BTreeSet<u64> = plan.purged_validation_window_ids.iter().copied().collect();
 
+        let mut eligible_partition_counts = BTreeMap::<u64, [usize; 3]>::new();
         for window in windows {
             let boundary = boundaries.get(&window.entity_id)
                 .ok_or(ScalerError::InvalidSplitPlan)?;
-            let expected_partition = if window.forecast_origin_us < boundary.validation_start_us {
-                if window.target_end_exclusive_us <= boundary.train_target_cutoff_us {
-                    &train_ids
+            let (expected_partition, partition_index) =
+                if window.forecast_origin_us < boundary.validation_start_us {
+                    if window.target_end_exclusive_us <= boundary.train_target_cutoff_us {
+                        (&train_ids, 0)
+                    } else {
+                        (&purged_train_ids, 3)
+                    }
+                } else if window.forecast_origin_us < boundary.test_start_us {
+                    if window.target_end_exclusive_us <= boundary.validation_target_cutoff_us {
+                        (&validation_ids, 1)
+                    } else {
+                        (&purged_validation_ids, 4)
+                    }
                 } else {
-                    &purged_train_ids
-                }
-            } else if window.forecast_origin_us < boundary.test_start_us {
-                if window.target_end_exclusive_us <= boundary.validation_target_cutoff_us {
-                    &validation_ids
-                } else {
-                    &purged_validation_ids
-                }
-            } else {
-                &test_ids
-            };
+                    (&test_ids, 2)
+                };
             if !expected_partition.contains(&window.window_id) {
                 return Err(ScalerError::InvalidSplitPlan);
             }
+            if partition_index < 3 {
+                eligible_partition_counts.entry(window.entity_id).or_default()[partition_index] += 1;
+            }
+        }
+        if eligible_partition_counts.values().any(|counts| counts.iter().any(|count| *count == 0)) {
+            return Err(ScalerError::InvalidSplitPlan);
         }
 
         let train_ids: BTreeSet<u64> = plan.train_window_ids.iter().copied().collect();
