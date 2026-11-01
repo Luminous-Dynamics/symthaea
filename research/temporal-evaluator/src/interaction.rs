@@ -311,9 +311,14 @@ mod tests {
     use super::*;
 
     fn registry(items: &[(u64, u64)]) -> Vec<JointActionDefinition> {
-        items.iter().map(|(action_id, conflict_group)| JointActionDefinition {
-            action_id: *action_id,
-            conflict_group: *conflict_group,
+        items.iter().map(|(action_id, conflict_group)| {
+            let mut action_semantics_sha256 = [0_u8; 32];
+            action_semantics_sha256[..8].copy_from_slice(&action_id.to_le_bytes());
+            JointActionDefinition {
+                action_id: *action_id,
+                conflict_group: *conflict_group,
+                action_semantics_sha256,
+            }
         }).collect()
     }
 
