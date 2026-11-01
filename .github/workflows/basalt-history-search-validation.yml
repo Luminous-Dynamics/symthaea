@@ -1,0 +1,72 @@
+name: BASALT History Search Exact-Tree Validation
+
+on:
+  pull_request:
+    paths:
+      - "tools/basalt-trace-verifier/**"
+      - "benchmarks/basalt/schema/storage-conformance-trace.v1.schema.json"
+      - "benchmarks/basalt/storage-conformance-trace.v1.json"
+      - ".github/workflows/basalt-history-search-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-normalize:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Normalize source and verify formatting
+        run: |
+          cargo fmt --manifest-path tools/basalt-trace-verifier/Cargo.toml
+          cargo fmt --manifest-path tools/basalt-trace-verifier/Cargo.toml -- --check
+      - name: Run deterministic reducer and bounded history-search tests
+        run: cargo test --locked --manifest-path tools/basalt-trace-verifier/Cargo.toml
+      - name: Run strict Clippy
+        run: cargo clippy --locked --manifest-path tools/basalt-trace-verifier/Cargo.toml --all-targets -- -D warnings
+      - name: Run checked-in deterministic reference trace
+        run: cargo run --locked --manifest-path tools/basalt-trace-verifier/Cargo.toml -- --trace benchmarks/basalt/storage-conformance-trace.v1.json --schema benchmarks/basalt/schema/storage-conformance-trace.v1.schema.json --out "$RUNNER_TEMP/basalt-reference-report.json"
+      - name: Commit only the validated formatted source tree
+        env:
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/basalt-trace-verifier/src/lib.rs tools/basalt-trace-verifier/src/history.rs
+          tree_before="$(git write-tree)"
+          if ! git diff --cached --quiet; then
+            git commit -m "style(basalt): format bounded history-search verifier"
+          fi
+          tree_after="$(git rev-parse HEAD^{tree})"
+          test "$tree_before" = "$tree_after"
+          git push origin "HEAD:refs/heads/$PR_HEAD_REF"
+          mkdir -p basalt-history-validation
+          {
+            echo "validated_tree_sha=$tree_after"
+            echo "validated_commit_sha=$(git rev-parse HEAD)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "cargo_fmt=pass"
+            echo "cargo_test_locked=pass"
+            echo "cargo_clippy_locked=pass"
+            echo "reference_cli=pass"
+          } > basalt-history-validation/validation.txt
+      - name: Upload exact tested-tree receipt and reference report
+        uses: actions/upload-artifact@v4
+        with:
+          name: basalt-history-validation-${{ github.sha }}
+          path: |
+            basalt-history-validation/validation.txt
+            ${{ runner.temp }}/basalt-reference-report.json
+          if-no-files-found: error
+          retention-days: 7
