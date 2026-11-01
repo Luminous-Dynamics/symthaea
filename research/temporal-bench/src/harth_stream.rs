@@ -58,8 +58,8 @@ pub enum HarthActivity {
     Lying = 8,
     CyclingSitting = 13,
     CyclingStanding = 14,
-    TransportSitting = 130,
-    TransportStanding = 140,
+    Label130 = 130,
+    Label140 = 140,
 }
 
 impl HarthActivity {
@@ -75,8 +75,8 @@ impl HarthActivity {
             8 => Some(Self::Lying),
             13 => Some(Self::CyclingSitting),
             14 => Some(Self::CyclingStanding),
-            130 => Some(Self::TransportSitting),
-            140 => Some(Self::TransportStanding),
+            130 => Some(Self::Label130),
+            140 => Some(Self::Label140),
             _ => None,
         }
     }
@@ -571,7 +571,7 @@ mod tests {
         assert_eq!(summary.maximum_delta_ns, Some(20_000_000));
         assert_eq!(summary.gap_count, 0);
         assert_eq!(rows[0].acceleration_g, [0.1, -0.2, 1.0, 0.3, -0.4, 0.9]);
-        assert_eq!(rows[1].activity, HarthActivity::TransportStanding);
+        assert_eq!(rows[1].activity, HarthActivity::Label140);
         assert_eq!(rows[0].row_index, 0);
     }
 
