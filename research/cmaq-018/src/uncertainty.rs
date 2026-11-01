@@ -167,6 +167,7 @@ pub struct VisualChannelActionPredictionInterval {
     pub kind: VisualBeliefChannelKind,
     pub unit: String,
     pub action_id: u64,
+    pub draw_count: usize,
     pub interval: PredictiveInterval,
 }
 
@@ -229,6 +230,7 @@ pub enum IntervalError {
     DuplicateVisualChannelId,
     InvalidVisualChannelDescriptor,
     StructuredChannelSampleCardinalityMismatch,
+    NonUtilitySelectionChannel,
 }
 
 /// Construct a central empirical interval from predictive samples.
@@ -562,6 +564,7 @@ pub fn structured_action_prediction_intervals(
                 kind: channel.kind,
                 unit: channel.unit.clone(),
                 action_id: *action_id,
+                draw_count: bank.joint_draw_ids.len(),
                 interval: central_interval(&channel.outcome_samples[*row_index], nominal_coverage)?,
             });
         }
@@ -607,6 +610,52 @@ fn structured_action_effect_interval_validated(
         right_action_id,
         paired_draw_count: bank.joint_draw_ids.len(),
         interval,
+    })
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StructuredActionDecision {
+    Certified { action_id: u64 },
+    Abstain { reason: AbstainReason },
+}
+
+/// Select using only one explicitly named TaskUtility channel. Geometry,
+/// contact and risk channels remain constraints/diagnostics; this function
+/// never silently scalarizes or combines them with utility.
+pub fn select_structured_task_action(
+    bank: &StructuredJointActionSetSamples,
+    utility_channel_id: &str,
+    nominal_coverage: f64,
+) -> Result<StructuredActionDecision, IntervalError> {
+    validate_structured_joint_action_set(bank)?;
+    validate_nominal_coverage(nominal_coverage)?;
+    let channel = bank
+        .channels
+        .iter()
+        .find(|channel| channel.channel_id == utility_channel_id)
+        .ok_or(IntervalError::InvalidVisualChannelDescriptor)?;
+    if channel.kind != VisualBeliefChannelKind::TaskUtility {
+        return Err(IntervalError::NonUtilitySelectionChannel);
+    }
+    let mut actions: Vec<(u64, usize)> = bank
+        .action_ids
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(index, action_id)| (action_id, index))
+        .collect();
+    actions.sort_unstable_by_key(|(action_id, _)| *action_id);
+    let intervals: Vec<PredictiveInterval> = actions
+        .iter()
+        .map(|(_, index)| central_interval(&channel.outcome_samples[*index], nominal_coverage))
+        .collect::<Result<_, _>>()?;
+    Ok(match select_interval_dominant_action(&intervals)? {
+        RobustActionDecision::Certified { action_index } => {
+            StructuredActionDecision::Certified {
+                action_id: actions[action_index].0,
+            }
+        }
+        RobustActionDecision::Abstain { reason } => StructuredActionDecision::Abstain { reason },
     })
 }
 
@@ -1394,6 +1443,36 @@ mod tests {
         assert_eq!(
             validate_structured_joint_action_set_shape(&bad_shape),
             Err(IntervalError::StructuredChannelSampleCardinalityMismatch)
+        );
+    }
+
+
+    #[test]
+    fn structured_action_selection_uses_only_named_task_utility_channel() {
+        let mut bank = structured_visual_bank_fixture();
+        bank.channels.push(VisualBeliefChannelSamples {
+            channel_id: "task.utility".into(),
+            kind: VisualBeliefChannelKind::TaskUtility,
+            unit: "utility".into(),
+            outcome_samples: vec![
+                vec![5.0, 5.0, 5.0, 5.0, 5.0],
+                vec![3.0, 3.0, 3.0, 3.0, 3.0],
+                vec![4.0, 4.0, 4.0, 4.0, 4.0],
+            ],
+        });
+        bank.joint_draw_bank_sha256 =
+            compute_structured_joint_draw_bank_sha256(&bank).unwrap();
+        assert_eq!(
+            select_structured_task_action(&bank, "task.utility", 0.8).unwrap(),
+            StructuredActionDecision::Certified { action_id: 17 }
+        );
+        assert_eq!(
+            select_structured_task_action(&bank, "object_42.position.x", 0.8),
+            Err(IntervalError::NonUtilitySelectionChannel)
+        );
+        assert_eq!(
+            select_structured_task_action(&bank, "missing.utility", 0.8),
+            Err(IntervalError::InvalidVisualChannelDescriptor)
         );
     }
 
