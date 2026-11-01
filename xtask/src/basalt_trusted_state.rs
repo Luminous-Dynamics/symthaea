@@ -1573,6 +1573,88 @@ mod tests {
     }
 
     #[test]
+    fn sqlite_rejects_unsupported_schema_version() {
+        let path = temporary_sqlite_path("schema-version");
+        {
+            let store = SqliteTrustedStateStore::open(&path).unwrap();
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_state_meta SET schema_version=99 WHERE singleton=1",
+                    [],
+                )
+                .unwrap();
+        }
+        assert!(SqliteTrustedStateStore::open(&path).is_err());
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_rejects_noncanonical_decimal_state_numbers() {
+        let path = temporary_sqlite_path("noncanonical-u64");
+        {
+            let store = SqliteTrustedStateStore::open(&path).unwrap();
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_state_meta SET revision='00' WHERE singleton=1",
+                    [],
+                )
+                .unwrap();
+        }
+        assert!(SqliteTrustedStateStore::open(&path).is_err());
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_validates_contiguous_accepted_revision_history() {
+        let path = temporary_sqlite_path("revision-history-gap");
+        {
+            let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+            let candidate = fixture_candidate();
+            let plan = match store.preview(&candidate).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database"),
+            };
+            store.commit_plan(plan).unwrap();
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_accepted_receipts SET accepted_revision='2' WHERE receipt_digest=?1",
+                    params![candidate.receipt_digest],
+                )
+                .unwrap();
+        }
+        assert!(SqliteTrustedStateStore::open(&path).is_err());
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_rejects_acceptance_history_with_missing_transition_evidence() {
+        let path = temporary_sqlite_path("transition-evidence-history");
+        {
+            let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+            let candidate = fixture_candidate();
+            let plan = match store.preview(&candidate).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database"),
+            };
+            store.commit_plan(plan).unwrap();
+            store
+                .connection
+                .execute(
+                    "UPDATE basalt_accepted_receipts
+                     SET policy_transition_evidence_digest=NULL
+                     WHERE receipt_digest=?1",
+                    params![candidate.receipt_digest],
+                )
+                .unwrap();
+        }
+        assert!(SqliteTrustedStateStore::open(&path).is_err());
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
     fn sqlite_unkeyed_state_digest_detects_inconsistent_database_edits() {
         let path = temporary_sqlite_path("digest-corruption");
         let mut store = SqliteTrustedStateStore::open(&path).unwrap();
@@ -1700,6 +1782,7 @@ pub struct SqliteTrustedStateStore {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct SqliteStoreReport {
     pub report_version: u32,
+    pub schema_version: u32,
     pub backend: String,
     pub journal_mode: String,
     pub synchronous_level: i64,
@@ -1903,6 +1986,7 @@ impl SqliteTrustedStateStore {
                 .pragma_query_value(None, "synchronous", |row| row.get(0))?;
         Ok(SqliteStoreReport {
             report_version: 1,
+            schema_version: SQLITE_SCHEMA_VERSION as u32,
             backend: "sqlite-wal-full-v1".to_string(),
             journal_mode,
             synchronous_level,
@@ -1911,7 +1995,8 @@ impl SqliteTrustedStateStore {
             source_cursor_count: state.source_cursors.len(),
             accepted_receipt_count: state.accepted_receipts.len(),
             state_digest: trusted_state_digest(&state),
-            local_atomicity_backend_configured: synchronous_level == 2,
+            local_atomicity_backend_configured: journal_mode.eq_ignore_ascii_case("wal")
+                && synchronous_level == 2,
             local_snapshot_digest_consistent: true,
             // No independent anti-rollback/freshness anchor is connected here.
             anti_rollback_qualified: false,
@@ -1922,9 +2007,13 @@ impl SqliteTrustedStateStore {
 }
 
 fn parse_sql_u64(value: &str, field: &str) -> anyhow::Result<u64> {
-    value
+    let parsed = value
         .parse::<u64>()
-        .with_context(|| format!("invalid persisted u64 in {field}"))
+        .with_context(|| format!("invalid persisted u64 in {field}"))?;
+    if parsed.to_string() != value {
+        anyhow::bail!("non-canonical persisted u64 encoding in {field}");
+    }
+    Ok(parsed)
 }
 
 fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
