@@ -1,3 +1,6 @@
+pub mod online_selection;
+pub use online_selection::*;
+
 pub mod selection_conformal;
 pub use selection_conformal::*;
 
