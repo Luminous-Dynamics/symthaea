@@ -1,8 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::{
-    ActionTrajectory, PrefixOutcomeLabel, ResourceVector, TrajectoryActionKind,
-};
+use crate::{ActionTrajectory, PrefixOutcomeLabel, ResourceVector, TrajectoryActionKind};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InterventionAssignmentEvidence {
@@ -116,16 +114,16 @@ impl MatchedInterventionSet {
             return Err(InterventionSetError::MissingExperimentDigest);
         }
         let assignment_digest_valid = match self.assignment {
-            InterventionAssignmentEvidence::DeterministicSimulation {
-                simulator_digest,
-            } => !is_zero(simulator_digest),
+            InterventionAssignmentEvidence::DeterministicSimulation { simulator_digest } => {
+                !is_zero(simulator_digest)
+            }
             InterventionAssignmentEvidence::RandomizedLiveTrial {
                 protocol_digest,
                 allocation_receipt_digest,
             } => !is_zero(protocol_digest) && !is_zero(allocation_receipt_digest),
-            InterventionAssignmentEvidence::ObservationalMatchedRuns {
-                protocol_digest,
-            } => !is_zero(protocol_digest),
+            InterventionAssignmentEvidence::ObservationalMatchedRuns { protocol_digest } => {
+                !is_zero(protocol_digest)
+            }
         };
         if !assignment_digest_valid {
             return Err(InterventionSetError::MissingAssignmentDigest);
@@ -234,11 +232,7 @@ impl MatchedInterventionSet {
                         .map_err(|_| InterventionSetError::ArithmeticOverflow)?,
                 )
                 .ok_or(InterventionSetError::ArithmeticOverflow)?;
-            observed.push((
-                first.operation_family,
-                cost,
-                progress,
-            ));
+            observed.push((first.operation_family, cost, progress));
         }
         observed.sort_by_key(|entry| entry.0);
         let (baseline_family, baseline_cost, baseline_progress) = observed[0];
@@ -303,9 +297,7 @@ fn is_zero(digest: [u8; 32]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        ActionTrajectory, TrajectoryActionReceipt, TrajectoryTerminalRecord,
-    };
+    use crate::{ActionTrajectory, TrajectoryActionReceipt, TrajectoryTerminalRecord};
 
     fn features(unresolved: u64) -> crate::ProofFrontierFeatures {
         crate::ProofFrontierFeatures {
@@ -342,7 +334,13 @@ mod tests {
             frontier_digest: [4; 32],
             frontier_features: frontier,
             measured_cost: ResourceVector::new(
-                if seq == 1 && family == 2 { 10 } else if seq == 1 { 15 } else { 5 },
+                if seq == 1 && family == 2 {
+                    10
+                } else if seq == 1 {
+                    15
+                } else {
+                    5
+                },
                 1,
                 1,
                 0,
@@ -476,20 +474,18 @@ mod tests {
 
     #[test]
     fn incomplete_or_duplicated_alternative_coverage_is_rejected() {
-        let mut incomplete =
-            set(InterventionAssignmentEvidence::DeterministicSimulation {
-                simulator_digest: [8; 32],
-            });
+        let mut incomplete = set(InterventionAssignmentEvidence::DeterministicSimulation {
+            simulator_digest: [8; 32],
+        });
         incomplete.trials.pop();
         assert_eq!(
             incomplete.validate(),
             Err(InterventionSetError::TrialCountMismatch)
         );
 
-        let mut duplicate =
-            set(InterventionAssignmentEvidence::DeterministicSimulation {
-                simulator_digest: [8; 32],
-            });
+        let mut duplicate = set(InterventionAssignmentEvidence::DeterministicSimulation {
+            simulator_digest: [8; 32],
+        });
         duplicate.trials[1].actions[0].operation_family = 2;
         assert_eq!(
             duplicate.validate(),
@@ -499,12 +495,12 @@ mod tests {
 
     #[test]
     fn censored_outcomes_cannot_be_silently_used_as_effect_labels() {
-        let mut matched =
-            set(InterventionAssignmentEvidence::DeterministicSimulation {
-                simulator_digest: [8; 32],
-            });
-        matched.trials[1].terminal.outcome =
-            Some(crate::TerminalOutcome::RightCensored(crate::CensorReason::Timeout));
+        let mut matched = set(InterventionAssignmentEvidence::DeterministicSimulation {
+            simulator_digest: [8; 32],
+        });
+        matched.trials[1].terminal.outcome = Some(crate::TerminalOutcome::RightCensored(
+            crate::CensorReason::Timeout,
+        ));
         matched.trials[1].terminal.completion_verifier_digest = None;
         assert_eq!(
             matched.verified_contrasts(),
