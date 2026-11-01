@@ -64,7 +64,10 @@ pub enum JournalEvent {
 pub enum RecoveryError {
     EmptyIdentity,
     InvalidIdempotencyContract,
-    InvalidTransition { from: ActionPhase, operation: &'static str },
+    InvalidTransition {
+        from: ActionPhase,
+        operation: &'static str,
+    },
     RetryWouldRiskDuplicateEffect,
     CompensationUnsupported,
     CompensationNotAuthorized,
@@ -105,10 +108,18 @@ impl ActionLifecycle {
         })
     }
 
-    pub fn phase(&self) -> ActionPhase { self.phase }
-    pub fn dispatch_attempts(&self) -> u32 { self.dispatch_attempts }
-    pub fn intent(&self) -> &ActionIntent { &self.intent }
-    pub fn events(&self) -> &[JournalEvent] { &self.events }
+    pub fn phase(&self) -> ActionPhase {
+        self.phase
+    }
+    pub fn dispatch_attempts(&self) -> u32 {
+        self.dispatch_attempts
+    }
+    pub fn intent(&self) -> &ActionIntent {
+        &self.intent
+    }
+    pub fn events(&self) -> &[JournalEvent] {
+        &self.events
+    }
 
     fn require_phase(
         &self,
@@ -118,7 +129,10 @@ impl ActionLifecycle {
         if self.phase == expected {
             Ok(())
         } else {
-            Err(RecoveryError::InvalidTransition { from: self.phase, operation })
+            Err(RecoveryError::InvalidTransition {
+                from: self.phase,
+                operation,
+            })
         }
     }
 
@@ -126,7 +140,9 @@ impl ActionLifecycle {
         self.require_phase(ActionPhase::Prepared, "dispatch")?;
         self.dispatch_attempts = self.dispatch_attempts.saturating_add(1);
         self.phase = ActionPhase::Dispatched;
-        self.events.push(JournalEvent::Dispatched { attempt: self.dispatch_attempts });
+        self.events.push(JournalEvent::Dispatched {
+            attempt: self.dispatch_attempts,
+        });
         Ok(())
     }
 
@@ -144,9 +160,18 @@ impl ActionLifecycle {
         Ok(())
     }
 
-    pub fn reconcile(&mut self, observation: StateObservation) -> Result<ActionPhase, RecoveryError> {
-        if !matches!(self.phase, ActionPhase::UnknownOutcome | ActionPhase::Acknowledged) {
-            return Err(RecoveryError::InvalidTransition { from: self.phase, operation: "reconcile" });
+    pub fn reconcile(
+        &mut self,
+        observation: StateObservation,
+    ) -> Result<ActionPhase, RecoveryError> {
+        if !matches!(
+            self.phase,
+            ActionPhase::UnknownOutcome | ActionPhase::Acknowledged
+        ) {
+            return Err(RecoveryError::InvalidTransition {
+                from: self.phase,
+                operation: "reconcile",
+            });
         }
         match observation {
             StateObservation::Committed { state_identity } => {
@@ -154,14 +179,16 @@ impl ActionLifecycle {
                     return Err(RecoveryError::ObservationDoesNotMatchExpectedState);
                 }
                 self.phase = ActionPhase::ReconciledCommitted;
-                self.events.push(JournalEvent::ReconciledCommitted { state_identity });
+                self.events
+                    .push(JournalEvent::ReconciledCommitted { state_identity });
             }
             StateObservation::NotCommitted { state_identity } => {
                 if state_identity != self.intent.pre_state_identity {
                     return Err(RecoveryError::ObservationDoesNotMatchExpectedState);
                 }
                 self.phase = ActionPhase::ReconciledNotCommitted;
-                self.events.push(JournalEvent::ReconciledNotCommitted { state_identity });
+                self.events
+                    .push(JournalEvent::ReconciledNotCommitted { state_identity });
             }
             StateObservation::Unavailable => {
                 self.phase = ActionPhase::UnknownOutcome;
@@ -178,17 +205,32 @@ impl ActionLifecycle {
             ActionPhase::ReconciledNotCommitted => {}
             ActionPhase::UnknownOutcome
                 if self.intent.dispatch_semantics == DispatchSemantics::IdempotencyKeyEnforced
-                    && self.intent.idempotency_key.as_deref().is_some_and(|key| !key.is_empty()) => {}
-            ActionPhase::UnknownOutcome => return Err(RecoveryError::RetryWouldRiskDuplicateEffect),
-            other => return Err(RecoveryError::InvalidTransition { from: other, operation: "authorize_retry" }),
+                    && self
+                        .intent
+                        .idempotency_key
+                        .as_deref()
+                        .is_some_and(|key| !key.is_empty()) => {}
+            ActionPhase::UnknownOutcome => {
+                return Err(RecoveryError::RetryWouldRiskDuplicateEffect);
+            }
+            other => {
+                return Err(RecoveryError::InvalidTransition {
+                    from: other,
+                    operation: "authorize_retry",
+                });
+            }
         }
         let next_attempt = self.dispatch_attempts.saturating_add(1);
         self.phase = ActionPhase::Prepared;
-        self.events.push(JournalEvent::RetryAuthorized { next_attempt });
+        self.events
+            .push(JournalEvent::RetryAuthorized { next_attempt });
         Ok(())
     }
 
-    pub fn prepare_compensation(&mut self, authorization_granted: bool) -> Result<(), RecoveryError> {
+    pub fn prepare_compensation(
+        &mut self,
+        authorization_granted: bool,
+    ) -> Result<(), RecoveryError> {
         self.require_phase(ActionPhase::ReconciledCommitted, "prepare_compensation")?;
         if !self.intent.compensation_supported {
             return Err(RecoveryError::CompensationUnsupported);
@@ -201,21 +243,28 @@ impl ActionLifecycle {
         Ok(())
     }
 
-    pub fn confirm_compensation(&mut self, observed_state_identity: impl Into<String>) -> Result<(), RecoveryError> {
+    pub fn confirm_compensation(
+        &mut self,
+        observed_state_identity: impl Into<String>,
+    ) -> Result<(), RecoveryError> {
         self.require_phase(ActionPhase::CompensationPrepared, "confirm_compensation")?;
         let observed_state_identity = observed_state_identity.into();
         if observed_state_identity != self.intent.pre_state_identity {
             return Err(RecoveryError::ObservationDoesNotMatchExpectedState);
         }
         self.phase = ActionPhase::Compensated;
-        self.events.push(JournalEvent::Compensated { state_identity: observed_state_identity });
+        self.events.push(JournalEvent::Compensated {
+            state_identity: observed_state_identity,
+        });
         Ok(())
     }
 
     /// An unknown dispatched outcome is surfaced distinctly from a proven no-effect abort.
     pub fn stop(&mut self) -> Result<ActionPhase, RecoveryError> {
         match self.phase {
-            ActionPhase::Prepared | ActionPhase::ReconciledNotCommitted | ActionPhase::Compensated => {
+            ActionPhase::Prepared
+            | ActionPhase::ReconciledNotCommitted
+            | ActionPhase::Compensated => {
                 self.phase = ActionPhase::SafelyAborted;
                 self.events.push(JournalEvent::SafelyAborted);
             }
@@ -223,7 +272,12 @@ impl ActionLifecycle {
                 self.phase = ActionPhase::StoppedUnknownOutcome;
                 self.events.push(JournalEvent::StoppedUnknownOutcome);
             }
-            other => return Err(RecoveryError::InvalidTransition { from: other, operation: "stop" }),
+            other => {
+                return Err(RecoveryError::InvalidTransition {
+                    from: other,
+                    operation: "stop",
+                });
+            }
         }
         Ok(self.phase)
     }
@@ -255,9 +309,16 @@ mod tests {
         action.dispatch().unwrap();
         action.acknowledgement_lost().unwrap();
         assert_eq!(action.phase(), ActionPhase::UnknownOutcome);
-        assert_eq!(action.authorize_retry(), Err(RecoveryError::RetryWouldRiskDuplicateEffect));
         assert_eq!(
-            action.reconcile(StateObservation::Committed { state_identity: "state-after".into() }).unwrap(),
+            action.authorize_retry(),
+            Err(RecoveryError::RetryWouldRiskDuplicateEffect)
+        );
+        assert_eq!(
+            action
+                .reconcile(StateObservation::Committed {
+                    state_identity: "state-after".into()
+                })
+                .unwrap(),
             ActionPhase::ReconciledCommitted
         );
     }
@@ -267,7 +328,11 @@ mod tests {
         let mut action = ActionLifecycle::new(intent(DispatchSemantics::NonIdempotent)).unwrap();
         action.dispatch().unwrap();
         action.acknowledgement_lost().unwrap();
-        action.reconcile(StateObservation::NotCommitted { state_identity: "state-before".into() }).unwrap();
+        action
+            .reconcile(StateObservation::NotCommitted {
+                state_identity: "state-before".into(),
+            })
+            .unwrap();
         action.authorize_retry().unwrap();
         assert_eq!(action.phase(), ActionPhase::Prepared);
         action.dispatch().unwrap();
@@ -276,7 +341,8 @@ mod tests {
 
     #[test]
     fn idempotency_contract_allows_same_key_retry_after_unknown_outcome() {
-        let mut action = ActionLifecycle::new(intent(DispatchSemantics::IdempotencyKeyEnforced)).unwrap();
+        let mut action =
+            ActionLifecycle::new(intent(DispatchSemantics::IdempotencyKeyEnforced)).unwrap();
         let key = action.intent().idempotency_key.clone();
         action.dispatch().unwrap();
         action.acknowledgement_lost().unwrap();
@@ -292,7 +358,9 @@ mod tests {
         action.dispatch().unwrap();
         action.acknowledgement_lost().unwrap();
         assert_eq!(
-            action.reconcile(StateObservation::Committed { state_identity: "unexpected".into() }),
+            action.reconcile(StateObservation::Committed {
+                state_identity: "unexpected".into()
+            }),
             Err(RecoveryError::ObservationDoesNotMatchExpectedState)
         );
         assert_eq!(action.phase(), ActionPhase::UnknownOutcome);
@@ -303,19 +371,27 @@ mod tests {
         let mut action = ActionLifecycle::new(intent(DispatchSemantics::NonIdempotent)).unwrap();
         action.dispatch().unwrap();
         action.acknowledgement_lost().unwrap();
-        assert_eq!(action.reconcile(StateObservation::Unavailable).unwrap(), ActionPhase::UnknownOutcome);
+        assert_eq!(
+            action.reconcile(StateObservation::Unavailable).unwrap(),
+            ActionPhase::UnknownOutcome
+        );
         assert_eq!(action.stop().unwrap(), ActionPhase::StoppedUnknownOutcome);
     }
 
     #[test]
     fn safe_abort_is_distinct_from_stopping_with_unknown_effect() {
-        let mut not_dispatched = ActionLifecycle::new(intent(DispatchSemantics::NonIdempotent)).unwrap();
+        let mut not_dispatched =
+            ActionLifecycle::new(intent(DispatchSemantics::NonIdempotent)).unwrap();
         assert_eq!(not_dispatched.stop().unwrap(), ActionPhase::SafelyAborted);
 
-        let mut unresolved = ActionLifecycle::new(intent(DispatchSemantics::NonIdempotent)).unwrap();
+        let mut unresolved =
+            ActionLifecycle::new(intent(DispatchSemantics::NonIdempotent)).unwrap();
         unresolved.dispatch().unwrap();
         unresolved.acknowledgement_lost().unwrap();
-        assert_eq!(unresolved.stop().unwrap(), ActionPhase::StoppedUnknownOutcome);
+        assert_eq!(
+            unresolved.stop().unwrap(),
+            ActionPhase::StoppedUnknownOutcome
+        );
     }
 
     #[test]
@@ -323,8 +399,15 @@ mod tests {
         let mut action = ActionLifecycle::new(intent(DispatchSemantics::NonIdempotent)).unwrap();
         action.dispatch().unwrap();
         action.acknowledge().unwrap();
-        action.reconcile(StateObservation::Committed { state_identity: "state-after".into() }).unwrap();
-        assert_eq!(action.prepare_compensation(false), Err(RecoveryError::CompensationNotAuthorized));
+        action
+            .reconcile(StateObservation::Committed {
+                state_identity: "state-after".into(),
+            })
+            .unwrap();
+        assert_eq!(
+            action.prepare_compensation(false),
+            Err(RecoveryError::CompensationNotAuthorized)
+        );
         action.prepare_compensation(true).unwrap();
         assert_eq!(
             action.confirm_compensation("wrong-state"),
@@ -342,13 +425,19 @@ mod tests {
         action.acknowledgement_lost().unwrap();
         action.reconcile(StateObservation::Unavailable).unwrap();
         assert_eq!(action.events().len(), initial_len + 3);
-        assert!(matches!(action.events().last(), Some(JournalEvent::OutcomeStillUnknown)));
+        assert!(matches!(
+            action.events().last(),
+            Some(JournalEvent::OutcomeStillUnknown)
+        ));
     }
 
     #[test]
     fn idempotency_semantics_require_a_nonempty_key() {
         let mut invalid = intent(DispatchSemantics::IdempotencyKeyEnforced);
         invalid.idempotency_key = Some(String::new());
-        assert_eq!(ActionLifecycle::new(invalid), Err(RecoveryError::InvalidIdempotencyContract));
+        assert_eq!(
+            ActionLifecycle::new(invalid),
+            Err(RecoveryError::InvalidIdempotencyContract)
+        );
     }
 }
