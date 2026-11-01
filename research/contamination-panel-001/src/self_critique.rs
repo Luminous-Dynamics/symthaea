@@ -156,8 +156,8 @@ fn summarize_topk_tail(
             return Err(format!("{label} top-K step {index} contains an invalid probability"));
         }
         let mass = probabilities.iter().sum::<f64>();
-        if !mass.is_finite() || mass > 1.0 + 1.0e-6 {
-            return Err(format!("{label} top-K step {index} probability mass exceeds one"));
+        if !mass.is_finite() || mass <= 0.0 || mass > 1.0 + 1.0e-6 {
+            return Err(format!("{label} top-K step {index} probability mass must be in (0, 1]"));
         }
         let entropy = probabilities
             .iter()
@@ -181,7 +181,7 @@ fn summarize_topk_tail(
         } else {
             -missing_mass * (missing_mass / missing_categories as f64).ln()
         };
-        probability_mass += mass;
+        probability_mass += mass.min(1.0);
         tail_mass += missing_mass;
         tail_lower += lower;
         tail_upper += upper;
@@ -368,7 +368,7 @@ pub fn score_self_critique_request(
             let vocabulary = request
                 .vocabulary_size
                 .ok_or_else(|| "vllm_top_k_raw_partial requires vocabulary_size".to_owned())?;
-            if top_k == 0 || vocabulary <= top_k {
+            if top_k == 0 || top_k > 10_000 || vocabulary <= top_k || vocabulary > 1_000_000 {
                 return Err("top_k must be positive and vocabulary_size must exceed top_k".to_owned());
             }
             if request.initial_topk_probability_steps.is_none()
