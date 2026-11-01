@@ -23,6 +23,7 @@ hardsec-temporal-dependence-audit = []
 hardsec-markov-conditional-rank-oracle = []
 hardsec-markov-transition-cs-audit = []
 hardsec-mobile-device-profile-audit = []
+hardsec-android-readonly-inventory = []
 
 [dependencies]
 serde_json = "=1.0.150"
@@ -82,3 +83,8 @@ required-features = ["hardsec-markov-transition-cs-audit"]
 name = "hardsec_mobile_device_profile_audit"
 path = "../../examples/hardsec_mobile_device_profile_audit.rs"
 required-features = ["hardsec-mobile-device-profile-audit"]
+
+[[example]]
+name = "hardsec_android_readonly_inventory"
+path = "../../examples/hardsec_android_readonly_inventory.rs"
+required-features = ["hardsec-android-readonly-inventory"]
