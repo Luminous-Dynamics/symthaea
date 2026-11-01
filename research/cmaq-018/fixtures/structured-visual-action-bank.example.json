@@ -1,0 +1,79 @@
+{
+  "schema_version": "cmaq-018-structured-visual-action-bank-v0.1",
+  "claim_ceiling": "synthetic_structured_payload_integrity_only_no_visual_predictor_or_calibration_claim",
+  "history_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "horizon_steps": 5,
+  "action_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "action_ids": [
+    17,
+    3,
+    9
+  ],
+  "joint_draw_ids": [
+    100,
+    101,
+    102,
+    103,
+    104
+  ],
+  "joint_draw_bank_sha256": "4c8f7c1de1ad1d886d873630a9e43c9f512d0a6665db7e4e610658d4cdd2de2b",
+  "coupling": "shared_posterior_and_world_noise",
+  "channels": [
+    {
+      "channel_id": "gripper.contact_probability",
+      "kind": "contact",
+      "unit": "probability",
+      "outcome_samples": [
+        [
+          0.9,
+          0.8,
+          0.95,
+          0.85,
+          0.9
+        ],
+        [
+          0.5,
+          0.4,
+          0.55,
+          0.45,
+          0.5
+        ],
+        [
+          0.2,
+          0.1,
+          0.25,
+          0.15,
+          0.2
+        ]
+      ]
+    },
+    {
+      "channel_id": "object_42.position.x",
+      "kind": "geometry",
+      "unit": "m",
+      "outcome_samples": [
+        [
+          10,
+          20,
+          30,
+          40,
+          50
+        ],
+        [
+          9,
+          19,
+          29,
+          39,
+          49
+        ],
+        [
+          8,
+          18,
+          28,
+          38,
+          48
+        ]
+      ]
+    }
+  ]
+}
