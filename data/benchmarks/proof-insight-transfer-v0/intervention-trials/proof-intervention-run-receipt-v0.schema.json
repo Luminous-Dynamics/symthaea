@@ -135,16 +135,6 @@
         }
       ]
     },
-    "semantic_gate_receipt_sha256": {
-      "oneOf": [
-        {
-          "$ref": "#/$defs/sha256"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
     "successor_receipt_sha256": {
       "oneOf": [
         {
@@ -163,6 +153,16 @@
     },
     "mutable_caches_isolated": {
       "const": true
+    },
+    "target_integrity_receipt_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "allOf": [
