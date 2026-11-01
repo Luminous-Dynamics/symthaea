@@ -1,8 +1,9 @@
 //! Success-driven deployment quota sizing under an explicit Bernoulli yield contract.
 //!
 //! This computes the smallest attempt budget that reaches a requested number of verified
-//! deployment successes with a specified probability, assuming independent attempts with a
-//! stationary success probability no lower than a pre-qualified floor.
+//! deployment successes with a specified probability, assuming either iid attempts with
+//! success probability no lower than a pre-qualified floor, or a valid conditional lower
+//! bound on each attempt's success probability given the full prior history.
 //!
 //! This is a planning calculation, not a qualification engine: it pins the external floor
 //! evidence by digest but does not inspect or independently validate that evidence.
@@ -165,8 +166,10 @@ fn validate_floor_fields(
     Ok(())
 }
 
-/// Find the smallest n for which P(X < quota) <= delta under
-/// X ~ Binomial(n, p_floor). Independence/stationarity are external premises.
+/// Find the smallest n for which P(X < quota) <= delta under the binomial lower-bound model.
+/// The result is conservative for iid attempts with p >= p_floor, or when every attempt has
+/// conditional success probability >= p_floor given all previous outcomes (which stochastically
+/// dominates Binomial(n, p_floor)). Those external premises are not established here.
 pub fn plan_deployment_quota(
     floor: &DeploymentSuccessFloor,
     requested_verified_successes: u64,
