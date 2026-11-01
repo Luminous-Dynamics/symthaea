@@ -53,6 +53,9 @@ pub enum DesignError {
     MissingUnresolvedHypothesis,
     ZeroUnresolvedPrior,
     InconsistentHypothesisOrder,
+    EmptyTargetQueryId,
+    TargetQueryHypothesisCountMismatch { expected: usize, actual: usize },
+    EmptyTargetQueryAnswer,
     EmptyLikelihoodScenarioSet,
     EmptyLikelihoodScenarioId,
     DuplicateLikelihoodScenarioId { scenario_id: String },
@@ -134,7 +137,14 @@ impl fmt::Display for DesignError {
                 write!(f, "OTHER_OR_UNRESOLVED must have a positive caller-supplied prior")
             }
             Self::InconsistentHypothesisOrder => {
-                write!(f, "all ranked open-world candidates must use identical hypothesis IDs in identical prior order")
+                write!(f, "all ranked open-world candidates and target queries must use identical hypothesis IDs in identical prior order")
+            }
+            Self::EmptyTargetQueryId => write!(f, "target causal query identifier must not be empty"),
+            Self::TargetQueryHypothesisCountMismatch { expected, actual } => {
+                write!(f, "target query has {actual} answer labels; expected {expected} hypotheses")
+            }
+            Self::EmptyTargetQueryAnswer => {
+                write!(f, "target query answer labels must not be empty")
             }
             Self::EmptyLikelihoodScenarioSet => {
                 write!(f, "open-world candidate must declare at least one likelihood scenario")
@@ -304,6 +314,288 @@ pub fn evaluate_open_world_report(
         schema_version: "connectome-open-world-eig-v1",
         unresolved_hypothesis_id: UNRESOLVED_HYPOTHESIS_ID,
         ranked_experiments: rank_open_world_candidates(priors, candidates)?,
+    })
+}
+
+/// A scientific question represented as an answer class for every
+/// candidate mechanism hypothesis, including OTHER_OR_UNRESOLVED.
+///
+/// The answer labels must encode the declared causal query (for example,
+/// positive/negative/unresolved for a target intervention effect). They are
+/// not free-form model descriptions. Hypothesis order must exactly match each
+/// open-world candidate's hypothesis_ids.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TargetCausalQuery {
+    pub id: String,
+    pub hypothesis_ids: Vec<String>,
+    pub answer_by_hypothesis: Vec<String>,
+}
+
+/// Query-specific information gain under one admissible likelihood scenario.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScenarioTargetQueryGain {
+    pub scenario_id: String,
+    pub information_gain_bits: f64,
+    pub information_gain_bits_per_cost: f64,
+}
+
+/// Worst- and best-case information about a declared causal answer, over the
+/// supplied finite likelihood ambiguity set.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OpenWorldTargetQueryScore {
+    pub experiment_id: String,
+    pub query_id: String,
+    pub cost: f64,
+    pub unresolved_prior_mass: f64,
+    pub worst_case_scenario_id: String,
+    pub best_case_scenario_id: String,
+    pub worst_case_information_gain_bits: f64,
+    pub best_case_information_gain_bits: f64,
+    pub worst_case_information_gain_bits_per_cost: f64,
+    pub best_case_information_gain_bits_per_cost: f64,
+    pub scenario_scores: Vec<ScenarioTargetQueryGain>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RankedTargetQueryExperiment {
+    pub experiment_id: String,
+    pub score: OpenWorldTargetQueryScore,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TargetQueryExperimentReport {
+    pub schema_version: &'static str,
+    pub query: TargetCausalQuery,
+    pub ranked_experiments: Vec<RankedTargetQueryExperiment>,
+}
+
+/// Calculate I(Q;Y) for a categorical target answer Q and experimental
+/// observation Y. Hypotheses that imply the same answer are marginalized
+/// together; this prevents information about irrelevant within-answer
+/// mechanism distinctions from dominating the scientific objective.
+fn target_query_information_gain_bits(
+    priors: &[f64],
+    answer_by_hypothesis: &[String],
+    likelihoods_by_hypothesis: &[Vec<f64>],
+    outcome_count: usize,
+) -> Result<f64, DesignError> {
+    if answer_by_hypothesis.len() != priors.len() {
+        return Err(DesignError::TargetQueryHypothesisCountMismatch {
+            expected: priors.len(),
+            actual: answer_by_hypothesis.len(),
+        });
+    }
+    if likelihoods_by_hypothesis.len() != priors.len() {
+        return Err(DesignError::LikelihoodRowCountMismatch {
+            expected: priors.len(),
+            actual: likelihoods_by_hypothesis.len(),
+        });
+    }
+
+    let mut answer_labels: Vec<&str> = Vec::new();
+    let mut answer_index_by_hypothesis = Vec::with_capacity(answer_by_hypothesis.len());
+    for answer in answer_by_hypothesis {
+        if answer.trim().is_empty() {
+            return Err(DesignError::EmptyTargetQueryAnswer);
+        }
+        let index = match answer_labels.iter().position(|label| *label == answer) {
+            Some(index) => index,
+            None => {
+                answer_labels.push(answer.as_str());
+                answer_labels.len() - 1
+            }
+        };
+        answer_index_by_hypothesis.push(index);
+    }
+
+    let mut answer_priors = vec![0.0; answer_labels.len()];
+    let mut joint_answer_outcome =
+        vec![vec![0.0; outcome_count]; answer_labels.len()];
+    let mut outcome_marginals = vec![0.0; outcome_count];
+
+    for hypothesis_index in 0..priors.len() {
+        let answer_index = answer_index_by_hypothesis[hypothesis_index];
+        answer_priors[answer_index] += priors[hypothesis_index];
+
+        let likelihood_row = &likelihoods_by_hypothesis[hypothesis_index];
+        if likelihood_row.len() != outcome_count {
+            return Err(DesignError::LikelihoodOutcomeCountMismatch {
+                hypothesis_index,
+                expected: outcome_count,
+                actual: likelihood_row.len(),
+            });
+        }
+        for outcome_index in 0..outcome_count {
+            let joint = priors[hypothesis_index] * likelihood_row[outcome_index];
+            joint_answer_outcome[answer_index][outcome_index] += joint;
+            outcome_marginals[outcome_index] += joint;
+        }
+    }
+
+    let prior_entropy = entropy_bits(&answer_priors);
+    let mut expected_posterior_entropy = 0.0;
+    for (outcome_index, &outcome_mass) in outcome_marginals.iter().enumerate() {
+        if outcome_mass <= 0.0 {
+            continue;
+        }
+        let posterior_answers: Vec<f64> = joint_answer_outcome
+            .iter()
+            .map(|row| row[outcome_index] / outcome_mass)
+            .collect();
+        expected_posterior_entropy += outcome_mass * entropy_bits(&posterior_answers);
+    }
+
+    let mut information_gain = prior_entropy - expected_posterior_entropy;
+    if information_gain < 0.0 && information_gain >= -ROUND_OFF_TOLERANCE {
+        information_gain = 0.0;
+    }
+    if information_gain > prior_entropy
+        && information_gain <= prior_entropy + ROUND_OFF_TOLERANCE
+    {
+        information_gain = prior_entropy;
+    }
+    if !information_gain.is_finite()
+        || information_gain < 0.0
+        || information_gain > prior_entropy + ROUND_OFF_TOLERANCE
+    {
+        return Err(DesignError::NumericalInstability);
+    }
+    Ok(information_gain)
+}
+
+/// Evaluate a candidate against a target causal query rather than the full
+/// mechanism identity. The result is worst-case query information across the
+/// candidate's declared likelihood scenarios; it is not decision utility or
+/// an expected treatment benefit.
+pub fn evaluate_open_world_target_query(
+    priors: &[f64],
+    candidate: &OpenWorldCandidateExperiment,
+    query: &TargetCausalQuery,
+) -> Result<OpenWorldTargetQueryScore, DesignError> {
+    if query.id.trim().is_empty() {
+        return Err(DesignError::EmptyTargetQueryId);
+    }
+    if query.hypothesis_ids != candidate.hypothesis_ids {
+        return Err(DesignError::InconsistentHypothesisOrder);
+    }
+    if query.answer_by_hypothesis.len() != candidate.hypothesis_ids.len() {
+        return Err(DesignError::TargetQueryHypothesisCountMismatch {
+            expected: candidate.hypothesis_ids.len(),
+            actual: query.answer_by_hypothesis.len(),
+        });
+    }
+
+    // Reuse the open-world validator. This checks the positive-prior
+    // OTHER_OR_UNRESOLVED state, priors, candidate metadata and every scenario.
+    let open_world_score = evaluate_open_world_candidate(priors, candidate)?;
+
+    let mut scenario_scores = Vec::with_capacity(candidate.likelihood_scenarios.len());
+    for scenario in &candidate.likelihood_scenarios {
+        let information_gain_bits = target_query_information_gain_bits(
+            priors,
+            &query.answer_by_hypothesis,
+            &scenario.likelihoods_by_hypothesis,
+            candidate.outcomes.len(),
+        )?;
+        scenario_scores.push(ScenarioTargetQueryGain {
+            scenario_id: scenario.id.clone(),
+            information_gain_bits,
+            information_gain_bits_per_cost: information_gain_bits / candidate.cost,
+        });
+    }
+    scenario_scores.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
+
+    let mut worst = &scenario_scores[0];
+    let mut best = &scenario_scores[0];
+    for score in &scenario_scores[1..] {
+        if score.information_gain_bits_per_cost < worst.information_gain_bits_per_cost {
+            worst = score;
+        }
+        if score.information_gain_bits_per_cost > best.information_gain_bits_per_cost {
+            best = score;
+        }
+    }
+
+    Ok(OpenWorldTargetQueryScore {
+        experiment_id: candidate.id.clone(),
+        query_id: query.id.clone(),
+        cost: candidate.cost,
+        unresolved_prior_mass: open_world_score.unresolved_prior_mass,
+        worst_case_scenario_id: worst.scenario_id.clone(),
+        best_case_scenario_id: best.scenario_id.clone(),
+        worst_case_information_gain_bits: worst.information_gain_bits,
+        best_case_information_gain_bits: best.information_gain_bits,
+        worst_case_information_gain_bits_per_cost: worst.information_gain_bits_per_cost,
+        best_case_information_gain_bits_per_cost: best.information_gain_bits_per_cost,
+        scenario_scores,
+    })
+}
+
+/// Rank experiments by worst-case information about a declared causal
+/// question per unit cost. All candidates must share the query's exact
+/// hypothesis identity and prior ordering.
+pub fn rank_open_world_candidates_for_query(
+    priors: &[f64],
+    candidates: &[OpenWorldCandidateExperiment],
+    query: &TargetCausalQuery,
+) -> Result<Vec<RankedTargetQueryExperiment>, DesignError> {
+    validate_priors(priors)?;
+    if candidates.is_empty() {
+        return Err(DesignError::NoCandidateExperiments);
+    }
+    let reference_hypotheses = &candidates[0].hypothesis_ids;
+    if query.hypothesis_ids != *reference_hypotheses {
+        return Err(DesignError::InconsistentHypothesisOrder);
+    }
+    if candidates
+        .iter()
+        .any(|candidate| candidate.hypothesis_ids != *reference_hypotheses)
+    {
+        return Err(DesignError::InconsistentHypothesisOrder);
+    }
+
+    let mut ids = HashSet::with_capacity(candidates.len());
+    let mut ranked = Vec::with_capacity(candidates.len());
+    for candidate in candidates {
+        if !ids.insert(candidate.id.as_str()) {
+            return Err(DesignError::DuplicateExperimentId {
+                experiment_id: candidate.id.clone(),
+            });
+        }
+        ranked.push(RankedTargetQueryExperiment {
+            experiment_id: candidate.id.clone(),
+            score: evaluate_open_world_target_query(priors, candidate, query)?,
+        });
+    }
+
+    ranked.sort_by(|left, right| {
+        right
+            .score
+            .worst_case_information_gain_bits_per_cost
+            .total_cmp(&left.score.worst_case_information_gain_bits_per_cost)
+            .then_with(|| {
+                right
+                    .score
+                    .worst_case_information_gain_bits
+                    .total_cmp(&left.score.worst_case_information_gain_bits)
+            })
+            .then_with(|| left.experiment_id.cmp(&right.experiment_id))
+    });
+    Ok(ranked)
+}
+
+/// Build a versioned goal-oriented experiment-design report.
+pub fn evaluate_target_query_report(
+    priors: &[f64],
+    candidates: &[OpenWorldCandidateExperiment],
+    query: TargetCausalQuery,
+) -> Result<TargetQueryExperimentReport, DesignError> {
+    let ranked_experiments =
+        rank_open_world_candidates_for_query(priors, candidates, &query)?;
+    Ok(TargetQueryExperimentReport {
+        schema_version: "connectome-target-query-eig-v1",
+        query,
+        ranked_experiments,
     })
 }
 
@@ -1444,6 +1736,161 @@ mod tests {
         candidate.likelihood_scenarios.reverse();
         let second = evaluate_open_world_candidate(&priors, &candidate).unwrap();
         assert_eq!(first, second);
+    }
+
+    fn target_query_example() -> TargetCausalQuery {
+        TargetCausalQuery {
+            id: "increase-functional-output".to_owned(),
+            hypothesis_ids: vec![
+                "mechanism_a".to_owned(),
+                "mechanism_b".to_owned(),
+                "mechanism_no_effect".to_owned(),
+                UNRESOLVED_HYPOTHESIS_ID.to_owned(),
+            ],
+            answer_by_hypothesis: vec![
+                "positive".to_owned(),
+                "positive".to_owned(),
+                "negative".to_owned(),
+                "unresolved".to_owned(),
+            ],
+        }
+    }
+
+    fn target_query_candidate(
+        id: &str,
+        likelihoods: Vec<Vec<f64>>,
+    ) -> OpenWorldCandidateExperiment {
+        OpenWorldCandidateExperiment {
+            id: id.to_owned(),
+            cost: 1.0,
+            outcomes: vec!["response".to_owned(), "no_response".to_owned()],
+            hypothesis_ids: vec![
+                "mechanism_a".to_owned(),
+                "mechanism_b".to_owned(),
+                "mechanism_no_effect".to_owned(),
+                UNRESOLVED_HYPOTHESIS_ID.to_owned(),
+            ],
+            likelihood_scenarios: vec![LikelihoodScenario {
+                id: "declared-likelihood".to_owned(),
+                likelihoods_by_hypothesis: likelihoods,
+            }],
+        }
+    }
+
+    #[test]
+    fn target_query_eig_ignores_irrelevant_within_answer_mechanism_information() {
+        let priors = [0.3, 0.3, 0.3, 0.1];
+        let candidate = target_query_candidate(
+            "mechanism-discriminator",
+            vec![
+                vec![1.0, 0.0],
+                vec![0.0, 1.0],
+                vec![0.5, 0.5],
+                vec![0.5, 0.5],
+            ],
+        );
+        let query = target_query_example();
+        let global = evaluate_open_world_candidate(&priors, &candidate).unwrap();
+        let goal = evaluate_open_world_target_query(&priors, &candidate, &query).unwrap();
+        assert!((global.worst_case_information_gain_bits - 0.6).abs() < 1.0e-12);
+        assert_eq!(goal.worst_case_information_gain_bits, 0.0);
+    }
+
+    #[test]
+    fn target_query_ranking_can_reverse_global_eig_ranking() {
+        let priors = [0.3, 0.3, 0.3, 0.1];
+        let mechanism_discriminator = target_query_candidate(
+            "mechanism-discriminator",
+            vec![
+                vec![1.0, 0.0],
+                vec![0.0, 1.0],
+                vec![0.5, 0.5],
+                vec![0.5, 0.5],
+            ],
+        );
+        let outcome_discriminator = target_query_candidate(
+            "outcome-discriminator",
+            vec![
+                vec![0.9, 0.1],
+                vec![0.9, 0.1],
+                vec![0.1, 0.9],
+                vec![0.5, 0.5],
+            ],
+        );
+        let global = rank_open_world_candidates(
+            &priors,
+            &[mechanism_discriminator.clone(), outcome_discriminator.clone()],
+        ).unwrap();
+        assert_eq!(global[0].experiment_id, "mechanism-discriminator");
+
+        let query = target_query_example();
+        let goal = rank_open_world_candidates_for_query(
+            &priors,
+            &[mechanism_discriminator, outcome_discriminator],
+            &query,
+        ).unwrap();
+        assert_eq!(goal[0].experiment_id, "outcome-discriminator");
+        assert!(goal[0].score.worst_case_information_gain_bits > 0.43);
+        assert_eq!(goal[1].score.worst_case_information_gain_bits, 0.0);
+    }
+
+    #[test]
+    fn target_query_rejects_hypothesis_order_mismatch() {
+        let priors = [0.3, 0.3, 0.3, 0.1];
+        let candidate = target_query_candidate(
+            "candidate",
+            vec![
+                vec![0.9, 0.1],
+                vec![0.9, 0.1],
+                vec![0.1, 0.9],
+                vec![0.5, 0.5],
+            ],
+        );
+        let mut query = target_query_example();
+        query.hypothesis_ids.swap(0, 1);
+        assert_eq!(
+            evaluate_open_world_target_query(&priors, &candidate, &query),
+            Err(DesignError::InconsistentHypothesisOrder)
+        );
+    }
+
+    #[test]
+    fn target_query_rejects_empty_answer_labels() {
+        let priors = [0.3, 0.3, 0.3, 0.1];
+        let candidate = target_query_candidate(
+            "candidate",
+            vec![
+                vec![0.9, 0.1],
+                vec![0.9, 0.1],
+                vec![0.1, 0.9],
+                vec![0.5, 0.5],
+            ],
+        );
+        let mut query = target_query_example();
+        query.answer_by_hypothesis[3] = "   ".to_owned();
+        assert_eq!(
+            evaluate_open_world_target_query(&priors, &candidate, &query),
+            Err(DesignError::EmptyTargetQueryAnswer)
+        );
+    }
+
+    #[test]
+    fn target_query_report_is_versioned_and_keeps_query_definition() {
+        let priors = [0.3, 0.3, 0.3, 0.1];
+        let candidate = target_query_candidate(
+            "outcome-discriminator",
+            vec![
+                vec![0.9, 0.1],
+                vec![0.9, 0.1],
+                vec![0.1, 0.9],
+                vec![0.5, 0.5],
+            ],
+        );
+        let query = target_query_example();
+        let report = evaluate_target_query_report(&priors, &[candidate], query.clone()).unwrap();
+        assert_eq!(report.schema_version, "connectome-target-query-eig-v1");
+        assert_eq!(report.query, query);
+        assert_eq!(report.ranked_experiments.len(), 1);
     }
 
     fn calibration_unit(
