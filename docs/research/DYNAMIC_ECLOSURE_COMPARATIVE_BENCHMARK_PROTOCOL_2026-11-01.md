@@ -156,6 +156,9 @@ Sweep stationary, autocorrelated, periodic, abrupt-shift and time-varying covari
 ### Arrivals and filtration
 - deterministic staggered arrivals;
 - random predictable arrivals based on lagged observations;
+- event-ordered replay with pre-observation arrival receipts and independent decision-policy verifier;
+- same-round lookahead negative controls that remain hash-consistent but fail policy replay;
+- late, duplicated, reordered and omitted source-event attacks against the arrival ledger;
 - bursty arrivals and long dormant periods;
 - explicit same-round lookahead negative controls;
 - continuing evidence after activation;
@@ -237,6 +240,8 @@ No wall-clock timestamps are included in a manifest. Method-specific assumptions
 
 Every run should emit:
 - the canonical JSON manifest and its SHA-256 digest;
+- the pre-observation arrival-decision event chain, policy-spec digest, prior-history digest and active-roster transitions;
+- independently authenticated source timestamp/sequence receipts and a monotonic checkpoint where available;
 - source and generator SHAs;
 - PR/commit head SHA;
 - alpha, guarantee class, scenario, seed, sample count and horizon;
@@ -254,7 +259,8 @@ Current files:
 - \`validation/test_dynamic_eclosure_benchmark_manifest.py\` — reproducibility, seed tampering, guarantee-class mismatch, filtration mismatch, invalid alpha/metadata and duplicate-method controls.
 
 Next:
-1. Add thin method adapters for each research track without forcing unlike procedures into one false abstraction.
+1. Add the auditable predictable-arrival replay adapter (#9806 / draft event-ledger PR) and distinguish simulator ordering from trusted source chronology.
+2. Add thin method adapters for each research track without forcing unlike procedures into one false abstraction.
 2. Add common exact null increment and shared-control Gaussian generators.
 3. Build the small-family cross-method oracle (n=2..12).
 4. Run exploratory null/alternative sweeps.
