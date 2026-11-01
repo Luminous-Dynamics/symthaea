@@ -44,9 +44,10 @@ fn find_forbidden_key(value: &Value, path: &str) -> Option<String> {
             }
             None
         }
-        Value::Array(values) => values.iter().enumerate().find_map(|(index, child)| {
-            find_forbidden_key(child, &format!("{path}[{index}]"))
-        }),
+        Value::Array(values) => values
+            .iter()
+            .enumerate()
+            .find_map(|(index, child)| find_forbidden_key(child, &format!("{path}[{index}]"))),
         _ => None,
     }
 }
@@ -66,7 +67,9 @@ fn validate_profile(profile: &Value) -> Result<(), String> {
     }
 
     if let Some(path) = find_forbidden_key(profile, "$") {
-        return Err(format!("privacy-sensitive field is forbidden in profile: {path}"));
+        return Err(format!(
+            "privacy-sensitive field is forbidden in profile: {path}"
+        ));
     }
 
     let sources = evidence_sources(profile);
@@ -80,49 +83,69 @@ fn validate_profile(profile: &Value) -> Result<(), String> {
             || profile["claim_ceiling"]["pmu_measurement_qualified"] != false
             || profile["claim_ceiling"]["physical_attack_resistance_established"] != false
         {
-            return Err("synthetic fixtures cannot claim runtime, PMU, or physical qualification".to_owned());
+            return Err(
+                "synthetic fixtures cannot claim runtime, PMU, or physical qualification"
+                    .to_owned(),
+            );
         }
         if profile["boot_integrity"]["verified_boot_state"] != "not_measured"
             || profile["boot_integrity"]["attestation_security_level"] != "not_measured"
             || profile["pmu_acquisition"]["access_status"] != "not_measured"
         {
-            return Err("synthetic fixture cannot imply device boot, attestation, or PMU measurements".to_owned());
+            return Err(
+                "synthetic fixture cannot imply device boot, attestation, or PMU measurements"
+                    .to_owned(),
+            );
         }
     }
 
     if profile["boot_integrity"]["certificate_chain_status"] == "trusted"
         && !sources.contains(&"hardware_attestation_verified")
     {
-        return Err("trusted attestation chain requires a hardware_attestation_verified evidence source".to_owned());
+        return Err(
+            "trusted attestation chain requires a hardware_attestation_verified evidence source"
+                .to_owned(),
+        );
     }
 
     if profile["boot_integrity"]["attestation_challenge_freshness"] == "fresh_verified"
         && !sources.contains(&"hardware_attestation_verified")
     {
-        return Err("fresh attestation challenge requires a hardware_attestation_verified evidence source".to_owned());
+        return Err(
+            "fresh attestation challenge requires a hardware_attestation_verified evidence source"
+                .to_owned(),
+        );
     }
 
     if profile["pmu_acquisition"]["read_overhead_status"] == "qualified"
         && !sources.contains(&"physical_lab_measurement")
     {
-        return Err("qualified PMU read overhead requires physical_lab_measurement evidence".to_owned());
+        return Err(
+            "qualified PMU read overhead requires physical_lab_measurement evidence".to_owned(),
+        );
     }
 
     if profile["pmu_acquisition"]["observer_effect_status"] == "within_budget"
         && !sources.contains(&"physical_lab_measurement")
     {
-        return Err("within-budget observer effect requires physical_lab_measurement evidence".to_owned());
+        return Err(
+            "within-budget observer effect requires physical_lab_measurement evidence".to_owned(),
+        );
     }
 
     if profile["pmu_acquisition"]["access_status"] == "permitted"
         && !sources.contains(&"privileged_device_tool")
         && !sources.contains(&"physical_lab_measurement")
     {
-        return Err("PMU access claim requires privileged device-tool or physical measurement evidence".to_owned());
+        return Err(
+            "PMU access claim requires privileged device-tool or physical measurement evidence"
+                .to_owned(),
+        );
     }
 
     if profile["device"]["platform"] == "android"
-        && profile["hardware_protections"]["memory_tagging"]["hardware_support"] == "vendor_documented"
+        && profile["hardware_protections"]["memory_tagging"]["hardware_support"]
+            == "vendor_documented"
         && profile["hardware_protections"]["memory_tagging"]["runtime_state"] == "enabled_verified"
         && !sources.iter().any(|source| {
             matches!(
@@ -134,7 +157,10 @@ fn validate_profile(profile: &Value) -> Result<(), String> {
             )
         })
     {
-        return Err("Android MTE runtime enablement cannot be inferred from vendor documentation alone".to_owned());
+        return Err(
+            "Android MTE runtime enablement cannot be inferred from vendor documentation alone"
+                .to_owned(),
+        );
     }
 
     Ok(())
@@ -217,7 +243,10 @@ mod tests {
             profile["hardware_protections"]["memory_tagging"]["runtime_state"],
             "not_measured"
         );
-        assert_eq!(profile["boot_integrity"]["verified_boot_state"], "not_measured");
+        assert_eq!(
+            profile["boot_integrity"]["verified_boot_state"],
+            "not_measured"
+        );
         assert_eq!(profile["pmu_acquisition"]["access_status"], "not_measured");
     }
 
