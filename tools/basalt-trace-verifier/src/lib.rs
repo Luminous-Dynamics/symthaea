@@ -49,7 +49,7 @@ pub struct InitialState {
     pub log_cursors: Vec<LogCursor>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct SourceCursor {
     pub source_id: String,
@@ -58,7 +58,7 @@ pub struct SourceCursor {
     pub predecessor_digest: String,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct LogCursor {
     pub log_origin_id: String,
@@ -204,13 +204,13 @@ pub struct VerificationReport {
     pub counterexamples: Vec<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 struct ModelReceipt {
     receipt_digest: String,
     acceptance_revision: u64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 struct ModelState {
     revision: u64,
     policy_digest: String,
@@ -1064,8 +1064,8 @@ fn advance(state: &mut ModelState, trace: &Trace, operation: &Operation) -> Comp
     }
 }
 
-fn replay(trace: &Trace, errors: &mut Vec<String>) -> BTreeMap<String, ComputedResult> {
-    let mut state = ModelState {
+fn initial_model_state(trace: &Trace) -> ModelState {
+    ModelState {
         revision: parse_revision(&trace.initial_state.authority_revision).unwrap_or(0),
         policy_digest: trace.initial_state.policy_digest.clone(),
         sources: trace
@@ -1083,19 +1083,16 @@ fn replay(trace: &Trace, errors: &mut Vec<String>) -> BTreeMap<String, ComputedR
             .collect(),
         receipts: BTreeMap::new(),
         indeterminate_receipts: BTreeSet::new(),
-    };
-    let operations: HashMap<String, &Operation> = trace
-        .operations
-        .iter()
-        .map(|op| (op.op_id.clone(), op))
-        .collect();
-    let mut results = BTreeMap::new();
+    }
+}
 
-    for id in &trace.reference_linearization_order {
-        let Some(operation) = operations.get(id).copied() else {
-            continue;
-        };
-        let computed = match operation.kind.as_str() {
+fn apply_operation(
+    state: &mut ModelState,
+    trace: &Trace,
+    operation: &Operation,
+    errors: &mut Vec<String>,
+) -> ComputedResult {
+    match operation.kind.as_str() {
             "advance" => advance(&mut state, trace, operation),
             "receipt_lookup" => {
                 let receipt_id = operation.request.receipt_id.as_deref().unwrap_or("");
@@ -1170,23 +1167,23 @@ fn replay(trace: &Trace, errors: &mut Vec<String>) -> BTreeMap<String, ComputedR
                 ComputedResult::new("compare_conflict", Some(state.revision))
             }
         };
+}
 
-        if !expected_fields_match(&operation.expected_result, &computed) {
-            push_error(
-                errors,
-                format!(
-                    "{} expected {:?}, reducer computed {:?}",
-                    operation.op_id, operation.expected_result, computed
-                ),
-            );
-        }
-        results.insert(operation.op_id.clone(), computed);
-    }
+fn replay(trace: &Trace, errors: &mut Vec<String>) -> BTreeMap<String, ComputedResult> {
+    let mut state =     let mut state = initial_model_state(trace);
 
-    let mut expected_sources = BTreeMap::<String, SourceCursor>::new();
-    for cursor in &trace.final_observation.source_cursors {
-        if expected_sources
-            .insert(cursor.source_id.clone(), cursor.clone())
+    let operations: HashMap<String, &Operation> = trace
+        .operations
+        .iter()
+        .map(|op| (op.op_id.clone(), op))
+        .collect();
+    let mut results = BTreeMap::new();
+
+    for id in &trace.reference_linearization_order {
+        let Some(operation) = operations.get(id).copied() else {
+            continue;
+        };
+        let computed = apply_operation(&mut state, trace, operation, errors);)
             .is_some()
         {
             push_error(
