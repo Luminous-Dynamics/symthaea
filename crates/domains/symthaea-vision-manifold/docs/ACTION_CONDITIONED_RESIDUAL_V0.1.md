@@ -137,3 +137,30 @@ Do not infer calibration from the deterministic point residual. It emits no pred
 ## Claim ceiling
 
 This module is a deterministic diagonal residual baseline with observation-supervised updates, full-action-set forecast issuance, frozen-model scoring, checkpointable pending receipts and content hashes. It does not prove causal correctness, cross-episode generalization, calibrated uncertainty, robust action selection, benchmark/SOTA improvement, physical safety or independent hardware/simulator provenance. The exact-head Rust tests and CI must pass before code qualification; real matched-branch results are a separate gate.
+
+
+
+## Same-history action-response evaluation
+
+The public evaluate_action_response_set function takes a complete set of forecast receipts, later real-observation outcomes and the explicitly identified no-op action ID. It joins outcomes by forecast ID, validates the complete canonical action-set digest and forecast content hashes, and computes each non-no-op action's vector change relative to the no-op branch:
+
+    predicted_effect(a) = predicted_future(a) - predicted_future(no_op)
+    realized_effect(a)  = observed_future(a)  - observed_future(no_op)
+
+It reports no-op-branch prediction MSE, predicted/observed action-effect norms, effect-vector MSE, mean cosine between predicted and realized effects, and separate counts for missed effects (prediction near zero, realized effect nonzero), false-positive effects (predicted effect nonzero, realized effect near zero), and both-null effects.
+
+This is a vector-valued same-history effect diagnostic that complements the scalar-per-channel CMAQ-018 joint action-bank intervals. The metric is intentionally not called CoCo ARC or Drift Energy; the protocols are not identical. The schema and known-answer fixtures are:
+- action-response-metrics.v0.1.schema.json
+- action-response-metrics.aligned.example.json
+- action-response-metrics.missed-effects.example.json
+
+The tests exercise both perfect response alignment after a supervised update and an action-insensitive model that misses both realized action effects.
+
+## External frontier alignment
+
+Two recent research directions shape the next qualification stage:
+
+- OpenWAM (paper v1, 2026-10-06) evaluates composable video/action generation programs and separate inverse/forward dynamics models. Its LIBERO-Long counterfactual set contains 32,000 same-simulator segments from ten tasks; its FDM panel tests 16 actions per starting context. The reported 16-way outcome-identification gain from 21.1% (demo-only) to 71.3% (counterfactual-only) is a useful external design reference, not a comparable result for this compact residual.
+- CoCo (2026-08-05) highlights statistical shortcutting by visual inertia and motivates zero-action, inverse-action and mirror-scene consistency, with Action Response Consistency and Drift Energy. This module currently tests zero-action residual identity, inverse-action antisymmetry and a simpler predicted-versus-realized effect-vector score. Multi-step inverse rollbacks and mirrored-scene equivariance require a richer spatial/action dynamics model.
+
+See [OpenWAM](https://openwam.stanford.edu/), [CoCo](https://arxiv.org/abs/2608.04653), and the programme's [frontier benchmark matrix](../../../../research/cmaq-018/INDUSTRY_BENCHMARK_MATRIX_2026-11-01.md). Their published success scores are not claimed by this implementation.
