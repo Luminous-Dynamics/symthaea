@@ -221,3 +221,8 @@ CoCo-Prover (7 October 2026) reports up to 30.9% lower monetary cost than the st
 EasyProver/Aegis (28 October 2026) reports 669/672 PutnamBench, 597/600 NTP4VC and 189/189 VERINA obligations by proof or refutation. Aegis adds harder code-verification tasks derived from real safe-Rust implementations: 2,045 Rust-Lean pairs and 11,533 candidate specifications; EasyProver solves 52.7% of a stratified 2,000-statement sample within 30 minutes per statement. Source: https://arxiv.org/abs/2610.38174.
 
 PITB's new proof-graph state contract borrows the two-level graph abstraction but focuses on independently auditable proof-state identities, stable/provisional/discarded helper lifecycles, exact rollback propagation, deterministic frontier recomputation and multi-resource reconciliation. The checked-in graph is synthetic; there is no live Lean capture or measured performance yet. See `docs/research/pitb-proof-graph-scheduler-2026-11-01.md`.
+
+
+### Causal intervention evaluation is a separate capability
+
+PITB added a matched randomized support-antichain experiment with full-context, predicted-support, oracle-support and size-matched random-support arms. The paired analyzer reports intention-to-treat risk differences and component-cluster bootstrap intervals, with exact state/target/seed/resource joins. This is experimental infrastructure, not a measured treatment effect; confirmatory status remains blocked pending receipt-semantic and signature verification. See `docs/research/pitb-causal-proof-intervention-trials-2026-11-01.md`.
