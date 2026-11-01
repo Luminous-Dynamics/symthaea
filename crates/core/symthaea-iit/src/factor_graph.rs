@@ -1172,7 +1172,7 @@ fn min_fill_order_scopes(
         }
     }
 
-    let active: BTreeSet<usize> = eliminate.iter().copied().collect();
+    let mut active: BTreeSet<usize> = eliminate.iter().copied().collect();
     let mut planner_work = MinFillPlannerWork::default();
 
     // The incremental score cache is valuable when a high-degree hub shares
