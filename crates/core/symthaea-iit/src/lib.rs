@@ -493,6 +493,8 @@ pub struct Iit4SystemPhiAnalysis {
     pub search_config: Iit4SystemPhiSearchConfig,
     /// Certified Table 2 ceiling when the theorem's assumptions hold; None outside that domain.
     pub certified_upper_bound: Option<usize>,
+    /// Exact model/request theorem-domain certificate when the bound applies.
+    pub bound_certificate: Option<Iit4SystemPhiBoundCertificate>,
     pub status: Iit4SystemPhiStatus,
     pub phi_s: Option<f64>,
     pub selected_state_pair_index: Option<usize>,
@@ -532,6 +534,14 @@ impl Iit4SystemPhiAnalysis {
         receipt_usize(&mut bytes, self.search_config.max_partition_score_evaluations);
         bytes.push(u8::from(self.search_config.include_total_cut));
         receipt_optional_usize(&mut bytes, self.certified_upper_bound);
+        match &self.bound_certificate {
+            Some(certificate) => {
+                bytes.push(1);
+                receipt_string(&mut bytes, &certificate.canonical_digest());
+                receipt_string(&mut bytes, &certificate.certificate_sha256);
+            }
+            None => bytes.push(0),
+        }
 
         bytes.push(match self.status {
             Iit4SystemPhiStatus::ExactUniqueStatePair => 0,
@@ -2712,6 +2722,11 @@ impl BinaryCausalModel {
                 candidate_system.len(),
                 config.include_total_cut,
             ),
+            bound_certificate: certify_iit4_2023_system_phi_upper_bound(
+                self,
+                candidate_system,
+                config.include_total_cut,
+            ),
             status,
             phi_s,
             selected_state_pair_index: None,
@@ -2874,6 +2889,11 @@ impl BinaryCausalModel {
             candidate_system.len(),
             config.include_total_cut,
         );
+        let bound_certificate = certify_iit4_2023_system_phi_upper_bound(
+            self,
+            candidate_system,
+            config.include_total_cut,
+        );
         validate_certified_iit4_2023_system_phi(
             phi_s,
             certified_upper_bound,
@@ -2886,6 +2906,7 @@ impl BinaryCausalModel {
             algorithm_id: IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID,
             search_config: config,
             certified_upper_bound,
+            bound_certificate,
             status,
             phi_s,
             selected_state_pair_index,
@@ -3886,6 +3907,23 @@ mod tests {
             .unwrap();
         assert_eq!(result.receipt_sha256().unwrap(), repeated.receipt_sha256().unwrap());
         assert_eq!(result.certified_upper_bound, Some(2));
+        let certificate = result
+            .bound_certificate
+            .as_ref()
+            .expect("eligible search should carry its theorem-instantiation certificate");
+        assert_eq!(certificate.upper_bound, 2);
+        assert!(certificate.verify(&model, &[0, 1], false).is_ok());
+
+        let mut changed_certificate = result.clone();
+        changed_certificate
+            .bound_certificate
+            .as_mut()
+            .unwrap()
+            .upper_bound += 1;
+        assert_ne!(
+            result.receipt_sha256().unwrap(),
+            changed_certificate.receipt_sha256().unwrap()
+        );
 
         let mut changed_bound = result.clone();
         changed_bound.certified_upper_bound = Some(3);
