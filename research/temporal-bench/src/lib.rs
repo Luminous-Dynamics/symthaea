@@ -11,6 +11,7 @@ use std::fmt;
 use digest::CanonicalHasher;
 
 pub mod digest;
+pub mod edge_adapter;
 pub mod dms;
 pub mod evidence;
 pub mod fast_event;
