@@ -89,8 +89,7 @@ impl OptionalContinuationPlan {
             first_stage_outcomes,
             continuation_branches,
         };
-        plan.clone().canonicalize()?;
-        Ok(plan)
+        plan.canonicalize()
     }
 
     /// Canonicalize every ID-indexed table and validate the finite null experiment.
@@ -192,8 +191,8 @@ impl OptionalContinuationPlan {
     }
 
     pub fn plan_sha256(&self) -> Result<String, OptionalContinuationError> {
-        self.clone().canonicalize()?;
-        digest(self)
+        let canonical = self.clone().canonicalize()?;
+        digest(&canonical)
     }
 }
 
