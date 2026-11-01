@@ -78,7 +78,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     println!(
-        "landscape_algorithm_id,formalism,parameter_name,theta,grid_index,sparse_model_sha256,sparse_evaluation_sha256,sparse_request_sha256,canonical_dense_model_sha256,canonical_dense_evaluation_sha256,canonical_dense_analysis_request_sha256,complete,status,phi_s,signed_phi,normalized_phi,signed_normalized_phi,selected_state_pair_index,tied_state_pair_indices,cause_state_family,effect_state_family,cause_selection_margin,effect_selection_margin,selected_cause_state,selected_effect_state,winning_mip_cut_sha256,winning_mip_parts,winning_mip_directions,partition_margin,partition_score_evaluations,receipt_sha256,elapsed_ns,selection_regime,qualification"
+        "landscape_algorithm_id,formalism,parameter_name,theta,grid_index,sparse_model_sha256,sparse_evaluation_sha256,sparse_request_sha256,canonical_dense_model_sha256,canonical_dense_evaluation_sha256,canonical_dense_analysis_request_sha256,complete,status,phi_s,signed_phi,normalized_phi,signed_normalized_phi,selected_state_pair_index,tied_state_pair_indices,cause_state_family,effect_state_family,cause_selection_margin,effect_selection_margin,selected_cause_state,selected_effect_state,winning_mip_cut_sha256,tied_mip_cut_sha256s,mip_tie_count,winning_mip_parts,winning_mip_directions,partition_margin,partition_score_evaluations,receipt_sha256,elapsed_ns,selection_regime,qualification"
     );
 
     let mut previous_selection_identity: Option<String> = None;
@@ -121,6 +121,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         let winning_cut_sha256 = selected
             .map(|result| cut_digest(result.winning_partition.cut_matrix()))
             .unwrap_or_else(|| "NA".to_owned());
+        let tied_mip_cut_sha256s = selected
+            .map(|result| result.tied_partitions.iter()
+                .map(|partition| cut_digest(partition.cut_matrix()))
+                .collect::<Vec<_>>()
+                .join(";"))
+            .unwrap_or_else(|| "NA".to_owned());
+        let mip_tie_count = selected
+            .map(|result| result.tied_partitions.len().to_string())
+            .unwrap_or_else(|| "NA".to_owned());
         let winning_parts = selected
             .map(|result| partition_parts(&result.winning_partition))
             .unwrap_or_else(|| "NA".to_owned());
@@ -155,7 +164,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let elapsed_ns = started.elapsed().as_nanos();
 
         println!(
-            "{},{},target0_parent_state_3_probability,{:.8},{},{},{},{},{},{},{},{},{:?},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},EXACT_SAMPLE_ONLY",
+            "{},{},target0_parent_state_3_probability,{:.8},{},{},{},{},{},{},{},{},{:?},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},EXACT_SAMPLE_ONLY",
             LANDSCAPE_ALGORITHM_ID,
             FORMALISM,
             theta,
@@ -181,6 +190,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             selected_cause_state,
             selected_effect_state,
             winning_cut_sha256,
+            tied_mip_cut_sha256s,
+            mip_tie_count,
             winning_parts,
             winning_directions,
             optional_float(partition_margin),
