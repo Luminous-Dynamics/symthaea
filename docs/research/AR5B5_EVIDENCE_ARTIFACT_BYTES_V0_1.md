@@ -93,3 +93,7 @@ cargo clippy -p symthaea-architecture-engineering --all-targets -- -D warnings
 \`\`\`
 
 No compilation, test, clippy, or benchmark pass is claimed until exact-head evidence is retained.
+
+## 7. Schema version note
+
+The expanded evidence artifact manifest and byte receipt schemas are `0.2.0`. They now bind the root candidate-evidence digest in addition to run/candidate/source-commit identity. Earlier `0.1.0` documents/receipts are not interchangeable; migrations must be explicit.
