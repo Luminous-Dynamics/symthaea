@@ -248,7 +248,6 @@ fn make_eligible_integrity(
     let signature = signing_key.sign(&signed_payload);
     attestation["signature_ed25519_hex"] = json!(hex::encode(signature.to_bytes()));
     let reviewer_bytes = json_bytes(&attestation)?;
-    value["semantic_review"]["reviewer_attestation_sha256"] = json!(sha256_hex(&reviewer_bytes));
 
     value["evidence_artifacts"] = json!({
         "source_file":write_evidence_artifact(evidence_root,"source/Synthetic/Example.lean",&source_bytes)?,
