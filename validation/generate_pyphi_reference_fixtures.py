@@ -27,6 +27,19 @@ PINNED_PYPHI_VERSION = "2.0.0rc4"
 EXPECTED_EXAMPLE = "pyphi.examples.iit4_2023_fig1a_substrate()"
 EXPECTED_FORMALISM = "IIT_4_0_2023"
 EXPECTED_STATE = (0, 1, 1)
+# Cross-language identity vectors captured from the successful pinned PyPhi
+# run and asserted by the Rust Fig. 1A fixture. These make input parity strict:
+# a one-ULP TPM change is a different model until both sides explicitly agree.
+EXPECTED_MODEL_SHA256 = "6d67ba617b5d2ccbba711cb44f4753286a45ae6ded16fc1a544a77dc8e931ac1"
+EXPECTED_EVALUATION_SHA256 = "1442d185bc5d2c23e3c6fc92e94f21d1c492cbe41a451cebd1d51fa36e862744"
+EXPECTED_ANALYSIS_REQUEST_SHA256 = {
+    "system-phi-s-A": "9b98c27017572e39052d64f69c82369a1d682efa0ad7823359c256faf2cc53eb",
+    "system-phi-s-AB": "83e7343053f4747a1cea57749b9a94f46baa2617bf31add6f4a94b8578a2468f",
+    "AB-cause-phi": "f4f89b92bda0672e4268a6bf55a2fccf1b6cf1dca634f4bead5c1c4b2a96b1dd",
+    "AB-effect-phi": "e7d0791d0c96cdb3dc08c7ccdd98a49da3037cee7abc9e984bb20925acb2e390",
+    "AB-structure-Phi": "3337af98aceae37804adb85dbc827d38f89f9b1c1943ffd22cb24ec753f706de",
+    "system-phi-s-ABC": "ea88d7dc1612dc72bd51d999cf582199ad76e0fd8fb90dfcd65f4788aa16fbfa",
+}
 EXPECTED_QUANTITY_IDS = {
     "system-phi-s-A": "iit4_system_phi_s",
     "system-phi-s-AB": "iit4_system_phi_s",
@@ -179,6 +192,16 @@ def run(output_path: Path) -> dict[str, Any]:
     model_sha256, evaluation_sha256, reference_manifest_sha256, canonical_model, model_bytes = _model_digest(
         substrate, state, formalism
     )
+    if model_sha256 != EXPECTED_MODEL_SHA256:
+        raise RuntimeError(
+            f"PyPhi model digest differs from the shared Rust fixture: "
+            f"expected {EXPECTED_MODEL_SHA256}, found {model_sha256}"
+        )
+    if evaluation_sha256 != EXPECTED_EVALUATION_SHA256:
+        raise RuntimeError(
+            f"PyPhi evaluation digest differs from the shared Rust fixture: "
+            f"expected {EXPECTED_EVALUATION_SHA256}, found {evaluation_sha256}"
+        )
     measured = _extract_measurements(pyphi, substrate, state, formalism)
 
     comparisons = []
@@ -200,6 +223,15 @@ def run(output_path: Path) -> dict[str, Any]:
             "absolute_tolerance": tolerance,
             "matches_anchor": error <= tolerance,
         })
+
+    for comparison in comparisons:
+        expected_request_sha256 = EXPECTED_ANALYSIS_REQUEST_SHA256[comparison["id"]]
+        if comparison["analysis_request_sha256"] != expected_request_sha256:
+            raise RuntimeError(
+                f"analysis request digest differs for {comparison['id']}: "
+                f"expected {expected_request_sha256}, "
+                f"found {comparison['analysis_request_sha256']}"
+            )
 
     passed = all(item["matches_anchor"] for item in comparisons)
     artifact = {
