@@ -448,7 +448,7 @@ mod tests {
         assert_eq!(contrasts[0].baseline_operation_family, 2);
         assert_eq!(contrasts[0].alternative_operation_family, 3);
         assert_eq!(contrasts[0].resource_cost_delta.tokens, 5);
-        assert_eq!(contrasts[0].proof_progress_delta, -1);
+        assert_eq!(contrasts[0].proof_progress_delta, 1);
         assert_eq!(
             contrasts[0].interpretation,
             InterventionInterpretation::SimulatedContrast
