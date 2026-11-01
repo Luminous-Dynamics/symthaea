@@ -73,6 +73,38 @@ This is an exact O(|I_t|) separation test. When the positive-part sum exceeds al
 
 This reduces the cost of checking one proposed rejection set from O(2^n) to O(n). If an outer exact action optimizer still enumerates 2^n candidate rejection sets, its closure-checking component can fall from O(4^n) to O(n 2^n). The action-optimization problem itself is not yet solved by this separator; it still needs an exact branch-and-bound or MILP treatment under cumulative capacity and persistence constraints.
 
+### Stronger result: an exact O(n)-size MILP for the full local closure
+
+The separator can be embedded directly in the action optimizer. Let x_i in {0,1} encode rejection, r=sum_i x_i, and d_i=w_i(M_{i,t}-1). For any subset S, the local closure inequality is equivalent to
+
+    sum_{i in S} (x_i - alpha*r*d_i) <= alpha*r.
+
+Because the maximum over all subsets is the sum of positive parts, the entire local-closure family is equivalent to the existence of y_i satisfying
+
+    y_i >= 0
+    y_i >= x_i - alpha*r*d_i                for every i
+    sum_i y_i <= alpha*r.
+
+This remains valid when r=0: the binary/count constraints force x=0 and the only feasible auxiliary vector is y=0. The formulation is necessary and sufficient, not a relaxation.
+
+The capacity-aware decision problem can therefore be written as a mixed-integer linear program:
+
+    maximize   sum_i v_i*x_i
+    subject to r = sum_i x_i
+               x_i in {0,1}; 0 <= r <= n
+               y_i >= 0
+               y_i >= x_i - alpha*r*w_i*(M_i-1)
+               sum_i y_i <= alpha*r
+               sum_i c_i*x_i <= B_t
+               x_i = 1 for every previously committed rejection.
+
+There are n binary x variables, one count variable r, n continuous y variables, n+2 closure/count rows, plus capacity and persistence rows: O(n) variables and constraints. The closure logic no longer introduces 2^n rows. The overall problem is still a 0-1 optimization problem (NP-hard in general); this does not imply linear-time optimization. It gives a compact exact formulation suitable for HiGHS/CBC/SCIP/Gurobi/CP-SAT comparisons, with exact rational post-solution verification.
+
+The new `validation/affine_projective_closure_milp.py` builds the model with exact Fraction coefficients and provides an independent verifier that checks both the MILP rows and the original exhaustive subset inequalities. `validation/test_affine_projective_closure_milp.py` differentially compares the exact MILP feasibility witness against direct enumeration for all rejection masks and rational evidence grids for n=1..4. The MILP builder does not call or depend on a solver, and no solver performance claim is made.
+
+This is the key implementation target: preserve the small exhaustive verifier as the oracle, use the compact MILP for action selection, and independently replay every proposed solution against the original local-intersection definition before issuing a decision receipt.
+
+
 **Guarantee boundary:** this O(n) separator applies to the raw affine intersection certificates used for the stopped-FDR construction. It does not automatically apply after a nonlinear running-maximum adjuster is applied separately to every intersection: the adjusted value A(max_{s<=t} E_s^{S,w}) is no longer an additive function of the current coordinate values. For SupFDR, use the projectivity-preserving adjuster from the #9538 track and keep exhaustive local-constraint checking until a separate valid separator for the adjusted family is derived. The raw-coordinate monotonicity field in the oracle is only a path diagnostic, not evidence that the supplied coordinate paths are valid e-processes; in particular, a nontrivial valid e-process started at one is not generally pathwise nondecreasing.
 
 
@@ -133,7 +165,7 @@ Run from the repository root:
 
     PYTHONPATH=validation python -m unittest -v test_countable_global_projective_eclosure.py
 
-The latest exact suite includes 18 tests, including exhaustive separator-vs-subset differential checks and adjusted-SupFDR historical projectivity fixtures.
+The source test suites now contain 25 test methods across the global-projective oracle and MILP model. The 16-test raw-separator suite had previously passed locally; the nine newly authored adjusted-path and MILP tests have not yet been executed in this environment.
 
 ## 7. Prior-art boundary
 
