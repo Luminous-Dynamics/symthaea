@@ -1,0 +1,34 @@
+[package]
+name = "pod-meta-lab"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+autobins = false
+license = "AGPL-3.0-or-later"
+description = "Standalone deterministic research harness for proof-obligation-driven metareasoning"
+
+[workspace]
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "pod-meta-demo"
+path = "src/main.rs"
+
+[[bin]]
+name = "poar-v1"
+path = "src/bin/poar_v1.rs"
+
+[[bin]]
+name = "poar-graph-export"
+path = "src/bin/poar_graph_export.rs"
+
+[[bin]]
+name = "poar-graph-eval"
+path = "src/bin/poar_artifact_eval.rs"
+
+[[bin]]
+name = "poar-prediction-demo"
+path = "src/bin/poar_prediction_demo.rs"
