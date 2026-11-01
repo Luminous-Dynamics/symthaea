@@ -203,25 +203,30 @@ fn parse_mode() -> Result<Mode> {
         "--verify" => {
             let mut expected_sha256 = None;
             let mut evidence_root = None;
+            let mut reviewer_registry_path = None;
+            let mut expected_registry_sha256 = None;
             while let Some(flag) = args.next() {
                 match flag.as_str() {
                     "--expected-sha256" if expected_sha256.is_none() => {
-                        expected_sha256 = Some(args.next().context("missing expected SHA-256")?);
+                        expected_sha256 = Some(args.next().context("missing expected receipt SHA-256")?);
                     }
                     "--evidence-root" if evidence_root.is_none() => {
                         evidence_root = Some(PathBuf::from(args.next().context("missing evidence root")?));
+                    }
+                    "--reviewer-key-registry" if reviewer_registry_path.is_none() => {
+                        reviewer_registry_path = Some(PathBuf::from(args.next().context("missing reviewer key registry path")?));
+                    }
+                    "--expected-registry-sha256" if expected_registry_sha256.is_none() => {
+                        expected_registry_sha256 = Some(args.next().context("missing expected reviewer registry SHA-256")?);
                     }
                     _ => bail!("unknown or duplicate argument {flag}"),
                 }
             }
             let evidence_root = evidence_root.context("--evidence-root is required for verification")?;
-            let reviewer_registry_path = None;
-            let reviewer_registry_path = reviewer_registry_path;
-            // The reviewer registry is a required independent pin, not a field
-            // supplied by the benchmark receipt itself.
-            let reviewer_registry_path = args.next().map(PathBuf::from);
-            let reviewer_registry_path = reviewer_registry_path.context("--reviewer-key-registry is required")?;
-            let expected_registry_sha256 = args.next().context("--expected-registry-sha256 is required")?;
+            let reviewer_registry_path =
+                reviewer_registry_path.context("--reviewer-key-registry is required")?;
+            let expected_registry_sha256 =
+                expected_registry_sha256.context("--expected-registry-sha256 is required")?;
             Ok(Mode::Verify { path, expected_sha256, evidence_root, reviewer_registry_path, expected_registry_sha256 })
         }
         _ => bail!("unknown action {action}"),
