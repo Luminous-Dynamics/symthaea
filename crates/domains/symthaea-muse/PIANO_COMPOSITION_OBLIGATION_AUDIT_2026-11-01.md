@@ -202,3 +202,28 @@ No training run, renderer capability, compile, test, or listener result is claim
 ## Implementation handoff
 
 The implementation work is tracked separately in [#9797 — Verify typed compositional obligations against realized scores](https://github.com/Luminous-Dynamics/symthaea/issues/9797). The issue turns the audit findings into explicit work packages and adversarial fixtures. This document remains a design addendum; #9797 is the source implementation target.
+
+## Research and implementation continuation — 2026-11-01
+
+### Evaluator reliability is a separate problem
+
+MIREX 2026 now includes a Music Evaluation via CMI-RewardBench task that tests whether automatic music evaluators agree with human pairwise choices. Its published result page reports a 249-pair core set and a 618-sample extended set with vocal/instrumental subsets. The top listed CloudEar-overall evaluator reports 73.9% core accuracy and 72.6% on the instrumental extension. These are broad music evaluator results, not piano-only calibration evidence. The ICML 2026 CMI-RewardBench paper adds CMI-Pref human annotations and reward models; its evaluation must be treated as an evaluator baseline, not listener ground truth.
+
+Use this as a new research layer: independently test all automated judges against a piano-only, composition-disjoint, blinded human panel. Keep musicality, intention adherence, performance plausibility and audio integrity separate. Evaluator outputs remain diagnostic and may not become a live generation reward.
+
+Sources:
+- https://music-ir.org/mirex/wiki/2026:Music_Evaluation_via_CMI-RewardBench_Results
+- https://proceedings.mlr.press/v306/ma26am.html
+- https://github.com/Haiwen-Xia/CMI-RewardBench
+
+Implementation: [#9832 — score-grounded typed obligation verification](https://github.com/Luminous-Dynamics/symthaea/pull/9832). Evaluator follow-up: [#9833 — piano evaluator reliability against human preferences](https://github.com/Luminous-Dynamics/symthaea/issues/9833).
+
+### Industry scope boundary
+
+Qwen-Music (2026) is a substantial end-to-end audio/song-generation comparator. Its authors describe a semantic tokenizer, music LLM with melody planning, a generative renderer, training on more than five million hours of multilingual music, and evaluations against current proprietary text-to-music services. It is not a like-for-like symbolic solo-piano composer or expressive piano-performance model. Compare it in a separate end-to-end audio/instruction lane; do not conflate whole-song generation with piano score quality.
+
+Source: https://arxiv.org/abs/2607.11699
+
+MAESTRO v3.0.0 is the recommended aligned piano-performance corpus baseline where its CC BY-NC-SA 4.0 terms are compatible. Pin the exact release and split; v3 reports 1,276 performances, 198.7 hours and 7.04 million notes. MAESTRO v2 added sostenuto (CC 66) and una-corda (CC 67) alongside sustain (CC 64), which makes it especially important not to collapse expressive piano performance to note-only MIDI.
+
+Source: https://magenta.withgoogle.com/datasets/maestro
