@@ -575,6 +575,7 @@ mod tests {
                 2,
                 3,
                 OnlineFeedbackDisposition::RightCensored {
+                    action_id_digest: [9; 32],
                     observed_resource_lower_bound: ResourceVector::new(15, 0, 0, 0, 0, 0),
                     meter_receipt_digest: [7; 32],
                 },
