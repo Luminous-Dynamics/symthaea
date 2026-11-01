@@ -563,3 +563,9 @@ A passing schema, synthetic fixture or content-digest audit establishes internal
 
 Comparator interpretation: published headline metrics are not directly rankable unless model checkpoint, exposure mechanism, training stage, task family, evaluation access, detector score direction, operating FPR and split protocol match. Report paper-reported numbers, official-code reproductions and Symthaea's fresh-holdout results as separate columns.
 
+### Relation adjudication qualification
+
+Every relation × task-family × difficulty cell carries an evaluator-only adjudication report digest, at least three distinct blinded reviewer pseudonyms, a final accepted / indeterminate / rejected decision and the minimum observed per-item agreement in permille. The implementation requires at least 800‰ agreement for a cell to be scoreable. The semantic_equivalent and novel_recipe_same_skill strata require 1000‰ agreement on every included item; indeterminate/rejected labels fail closed. Reviewer pseudonyms and report digests must remain identical across model-pair replicates.
+
+This is a conservative protocol choice to avoid relabeling ambiguous semantics as transferable skill. It does not prove reviewer independence or identity: these fields are self-declared until a pinned external reviewer-identity and custody verifier is added. A digest proves only that the declared report content is unchanged.
+
