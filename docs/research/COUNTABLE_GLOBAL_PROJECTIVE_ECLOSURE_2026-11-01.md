@@ -100,7 +100,7 @@ The capacity-aware decision problem can therefore be written as a mixed-integer 
 
 There are n binary x variables, one count variable r, n continuous y variables, n+2 closure/count rows, plus capacity and persistence rows: O(n) variables and constraints. The closure logic no longer introduces 2^n rows. The overall problem is still a 0-1 optimization problem (NP-hard in general); this does not imply linear-time optimization. It gives a compact exact formulation suitable for HiGHS/CBC/SCIP/Gurobi/CP-SAT comparisons, with exact rational post-solution verification.
 
-The new `validation/affine_projective_closure_milp.py` builds the model with exact Fraction coefficients and provides an independent verifier that checks both the MILP rows and the original exhaustive subset inequalities. `validation/test_affine_projective_closure_milp.py` differentially compares the exact MILP feasibility witness against direct enumeration for all rejection masks and rational evidence grids for n=1..4. The MILP builder does not call or depend on a solver, and no solver performance claim is made.
+The new `validation/affine_projective_closure_milp.py` builds the model with exact Fraction coefficients, emits CPLEX-LP-compatible text with each row scaled to exact integer coefficients, and provides an independent verifier that checks both the MILP rows and the original exhaustive subset inequalities. `validation/test_affine_projective_closure_milp.py` differentially compares the exact MILP feasibility witness against direct enumeration for all rejection masks and rational evidence grids for n=1..4, and checks that the LP export preserves rational coefficients. The builder does not call or depend on a solver, and no solver performance claim is made.
 
 This is the key implementation target: preserve the small exhaustive verifier as the oracle, use the compact MILP for action selection, and independently replay every proposed solution against the original local-intersection definition before issuing a decision receipt.
 
@@ -165,7 +165,7 @@ Run from the repository root:
 
     PYTHONPATH=validation python -m unittest -v test_countable_global_projective_eclosure.py
 
-The source test suites now contain 25 test methods across the global-projective oracle and MILP model. The 16-test raw-separator suite had previously passed locally; the nine newly authored adjusted-path and MILP tests have not yet been executed in this environment.
+The source test suites now contain 26 test methods across the global-projective oracle and MILP model. The 16-test raw-separator suite had previously passed locally; the ten newly authored adjusted-path and MILP tests have not yet been executed in this environment.
 
 ## 7. Prior-art boundary
 
