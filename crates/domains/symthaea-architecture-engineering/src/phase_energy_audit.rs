@@ -146,7 +146,6 @@ pub struct PhaseEnergyWindowMetrics {
     pub boundary_alignment_error_bound_ms: f64,
     /// Worst-case energy impact of both uncertain phase boundaries under the maximum observed current.
     pub boundary_alignment_energy_uncertainty_uj: f64,
-    pub boundary_alignment_energy_uncertainty_uj: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
