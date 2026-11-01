@@ -267,7 +267,7 @@ fn validate_observed_transition(
         || evidence.max_target_lateness_seconds < 0.0
         || !(times[0] <= times[1]
             && times[1] <= times[2]
-            && times[2] <= times[4]
+            && times[3] <= times[4]
             && times[4] <= times[5]
             && times[2] <= times[3])
     {
@@ -671,6 +671,15 @@ mod tests {
 
         let mut evidence = observed_evidence(&current, &next, 2);
         evidence.forecast_issued_at_seconds = evidence.action_started_at_seconds + 0.001;
+        assert!(
+            engine
+                .train_observed_transition(&current, &next, &evidence, 0.001)
+                .is_err()
+        );
+
+        let mut evidence = observed_evidence(&current, &next, 2);
+        evidence.action_ended_at_seconds =
+            evidence.requested_target_time_seconds + 0.001;
         assert!(
             engine
                 .train_observed_transition(&current, &next, &evidence, 0.001)
