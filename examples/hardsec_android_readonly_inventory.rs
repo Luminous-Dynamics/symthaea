@@ -120,14 +120,6 @@ fn feature_support(rows: &[BTreeSet<String>], required: &[&str]) -> &'static str
     }
 }
 
-fn union_features(rows: &[BTreeSet<String>]) -> Vec<String> {
-    rows.iter()
-        .flat_map(|row| row.iter().cloned())
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect()
-}
-
 fn parse_simpleperf_event_names(output: &str) -> Vec<String> {
     output
         .lines()
@@ -140,7 +132,7 @@ fn parse_simpleperf_event_names(output: &str) -> Vec<String> {
             if candidate.len() > 128
                 || !candidate.chars().all(|character| {
                     character.is_ascii_alphanumeric()
-                        || matches!(character, '_' | '-' | '.' | ':')
+                        || matches!(character, '_' | '-' | '.' | ':' | '/')
                 })
             {
                 return None;
