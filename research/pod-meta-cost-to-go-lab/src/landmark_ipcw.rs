@@ -140,17 +140,32 @@ impl LandmarkIpcwCalibration {
 /// event-observed sum; IPCW reweights the observed proof events. Competing
 /// terminal events after tau are rejected rather than treated as ordinary
 /// censoring. This is a research adaptation, not a theorem reproduction.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LandmarkIpcwConfig {
+    pub landmark_work_units: u64,
+    pub miscoverage: f64,
+    pub minimum_censoring_survival_probability: f64,
+    pub model_digest: [u8; 32],
+    pub censor_model_digest: [u8; 32],
+    pub calibration_partition_digest: [u8; 32],
+    pub nuisance_training_partition_digest: [u8; 32],
+    pub population_cohort_digest: [u8; 32],
+}
+
 pub fn calibrate_landmark_ipcw(
     episodes: &[LandmarkEpisode],
-    landmark_work_units: u64,
-    miscoverage: f64,
-    minimum_censoring_survival_probability: f64,
-    model_digest: [u8; 32],
-    censor_model_digest: [u8; 32],
-    calibration_partition_digest: [u8; 32],
-    nuisance_training_partition_digest: [u8; 32],
-    population_cohort_digest: [u8; 32],
+    config: LandmarkIpcwConfig,
 ) -> Result<LandmarkIpcwCalibration, LandmarkIpcwError> {
+    let LandmarkIpcwConfig {
+        landmark_work_units,
+        miscoverage,
+        minimum_censoring_survival_probability,
+        model_digest,
+        censor_model_digest,
+        calibration_partition_digest,
+        nuisance_training_partition_digest,
+        population_cohort_digest,
+    } = config;
     if episodes.is_empty() {
         return Err(LandmarkIpcwError::EmptyCalibrationSet);
     }
@@ -507,14 +522,16 @@ mod tests {
     fn calibrate(rows: &[LandmarkEpisode]) -> Result<LandmarkIpcwCalibration, LandmarkIpcwError> {
         calibrate_landmark_ipcw(
             rows,
-            5,
-            0.10,
-            0.05,
-            MODEL,
-            CENSOR_MODEL,
-            CALIBRATION,
-            TRAINING,
-            COHORT,
+            LandmarkIpcwConfig {
+                landmark_work_units: 5,
+                miscoverage: 0.10,
+                minimum_censoring_survival_probability: 0.05,
+                model_digest: MODEL,
+                censor_model_digest: CENSOR_MODEL,
+                calibration_partition_digest: CALIBRATION,
+                nuisance_training_partition_digest: TRAINING,
+                population_cohort_digest: COHORT,
+            },
         )
     }
 
@@ -604,14 +621,16 @@ mod tests {
         assert_eq!(
             calibrate_landmark_ipcw(
                 &rows,
-                5,
-                0.10,
-                0.05,
-                MODEL,
-                CENSOR_MODEL,
-                CALIBRATION,
-                CALIBRATION,
-                COHORT,
+                LandmarkIpcwConfig {
+                    landmark_work_units: 5,
+                    miscoverage: 0.10,
+                    minimum_censoring_survival_probability: 0.05,
+                    model_digest: MODEL,
+                    censor_model_digest: CENSOR_MODEL,
+                    calibration_partition_digest: CALIBRATION,
+                    nuisance_training_partition_digest: CALIBRATION,
+                    population_cohort_digest: COHORT,
+                },
             ),
             Err(LandmarkIpcwError::CensoringReceiptPartitionMismatch)
         );
@@ -661,14 +680,16 @@ mod tests {
         assert_eq!(
             calibrate_landmark_ipcw(
                 &rows,
-                5,
-                0.10,
-                0.05,
-                MODEL,
-                CENSOR_MODEL,
-                [0; 32],
-                TRAINING,
-                COHORT,
+                LandmarkIpcwConfig {
+                    landmark_work_units: 5,
+                    miscoverage: 0.10,
+                    minimum_censoring_survival_probability: 0.05,
+                    model_digest: MODEL,
+                    censor_model_digest: CENSOR_MODEL,
+                    calibration_partition_digest: [0; 32],
+                    nuisance_training_partition_digest: TRAINING,
+                    population_cohort_digest: COHORT,
+                },
             ),
             Err(LandmarkIpcwError::MissingCalibrationPartitionDigest)
         );
@@ -693,14 +714,16 @@ mod tests {
         assert_eq!(
             calibrate_landmark_ipcw(
                 &rows,
-                5,
-                1.0,
-                0.05,
-                MODEL,
-                CENSOR_MODEL,
-                CALIBRATION,
-                TRAINING,
-                COHORT,
+                LandmarkIpcwConfig {
+                    landmark_work_units: 5,
+                    miscoverage: 1.0,
+                    minimum_censoring_survival_probability: 0.05,
+                    model_digest: MODEL,
+                    censor_model_digest: CENSOR_MODEL,
+                    calibration_partition_digest: CALIBRATION,
+                    nuisance_training_partition_digest: TRAINING,
+                    population_cohort_digest: COHORT,
+                },
             ),
             Err(LandmarkIpcwError::InvalidMiscoverage)
         );
