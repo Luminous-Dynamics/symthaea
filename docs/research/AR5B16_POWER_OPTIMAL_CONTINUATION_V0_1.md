@@ -79,6 +79,8 @@ The DP selects the third policy. Re-evaluating that policy under P0:
 
 The prior first-stage-only policy has power 0.065 and null size 0.05. In this synthetic fixture, continuation raises power to 0.0758 while the separately evaluated null size falls to 0.026. This is a constructed example of the mechanism, not empirical evidence of general power gains.
 
+An alternative-misspecification sensitivity test halves the early continuation hit probability under P1 (0.8 → 0.5, with the miss probability adjusted to preserve mass). The policy then stops at the early continuation root rather than buying the low-yield continuation observation. The overall power falls to **0.0618** and selected-policy P0 size remains **0.03**. This illustrates that P1 misspecification changes both selected policy and power while the P0 certificate remains separately checked.
+
 ## 4. Fail-closed controls
 
 The implementation rejects:
