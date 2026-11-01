@@ -393,6 +393,394 @@ pub fn validate_temporal_stream_dataset(
 }
 
 // ============================================================================
+// Causal prequential execution trace
+// ============================================================================
+
+const PREQUENTIAL_TRACE_SCHEMA: &str = "symthaea.prequential-execution-trace";
+const PREQUENTIAL_RECEIPT_SCHEMA: &str = "symthaea.prequential-audit-receipt";
+const PREQUENTIAL_DOMAIN: &[u8] = b"symthaea.prequential-execution-trace.v0.1";
+const PREQUENTIAL_RECEIPT_DOMAIN: &[u8] = b"symthaea.prequential-audit-receipt.v0.1";
+
+/// Actions are serialized in actual execution order. Labels are not part of observations.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PrequentialAction {
+    Prediction {
+        event_index: usize,
+        timestamp_us: u64,
+        predicted_class: Option<u8>,
+        positive_probability_q15: u16,
+        model_state_sha256: String,
+    },
+    LabelReleased {
+        event_index: usize,
+        timestamp_us: u64,
+        label: u8,
+    },
+    ModelUpdate {
+        event_index: usize,
+        timestamp_us: u64,
+        state_before_sha256: String,
+        state_after_sha256: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PrequentialExecutionTrace {
+    pub schema: String,
+    pub version: String,
+    pub run_id: String,
+    pub candidate_id: String,
+    pub candidate_artifact_sha256: String,
+    pub dataset_sha256: String,
+    pub initial_model_state_sha256: String,
+    /// Exact phase-energy and metrology receipt commitments for this candidate/run.
+    pub energy_receipt_sha256: String,
+    pub metrology_receipt_sha256: String,
+    pub actions: Vec<PrequentialAction>,
+    pub execution_trace_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PrequentialMetrics {
+    pub event_count: usize,
+    pub correct_count: usize,
+    pub abstention_count: usize,
+    pub accuracy: f64,
+    pub balanced_accuracy: Option<f64>,
+    pub coverage: f64,
+    pub selective_accuracy: Option<f64>,
+    pub brier_score: f64,
+    pub false_alarms_per_hour: f64,
+    pub missed_events_per_hour: f64,
+    pub mean_prediction_latency_us: f64,
+    pub label_release_count: usize,
+    pub model_update_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PrequentialAuditReceipt {
+    pub schema: String,
+    pub version: String,
+    pub run_id: String,
+    pub candidate_id: String,
+    pub candidate_artifact_sha256: String,
+    pub dataset_sha256: String,
+    pub execution_trace_sha256: String,
+    pub energy_receipt_sha256: String,
+    pub metrology_receipt_sha256: String,
+    pub metrics: PrequentialMetrics,
+    pub receipt_sha256: String,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PredictionObservation {
+    timestamp_us: u64,
+    predicted_class: Option<u8>,
+    positive_probability_q15: u16,
+}
+
+pub fn compute_prequential_execution_trace_sha256(
+    trace: &PrequentialExecutionTrace,
+) -> Result<String, EdgeBenchmarkError> {
+    let mut canonical = trace.clone();
+    canonical.execution_trace_sha256.clear();
+    let bytes = serde_json::to_vec(&canonical)
+        .map_err(|error| EdgeBenchmarkError::new("prequential_trace", error.to_string()))?;
+    Ok(digest(PREQUENTIAL_DOMAIN, &bytes))
+}
+
+fn compute_prequential_receipt_sha256(
+    receipt: &PrequentialAuditReceipt,
+) -> Result<String, EdgeBenchmarkError> {
+    let mut canonical = receipt.clone();
+    canonical.receipt_sha256.clear();
+    let bytes = serde_json::to_vec(&canonical)
+        .map_err(|error| EdgeBenchmarkError::new("prequential_receipt", error.to_string()))?;
+    Ok(digest(PREQUENTIAL_RECEIPT_DOMAIN, &bytes))
+}
+
+/// Validate the event/action chronology and recompute metrics from delayed labels.
+///
+/// Invariants:
+/// - one prediction and one delayed label release per observation;
+/// - prediction timestamp is at/after the observation and strictly before label availability;
+/// - label release is at/after the frozen availability timestamp and carries the right label;
+/// - a model update can occur only after that event's label is released;
+/// - predictions bind the current model-state digest, and every update advances the state chain;
+/// - action timestamps are globally non-decreasing in execution order.
+pub fn audit_prequential_execution(
+    dataset: &TemporalStreamDataset,
+    trace: &PrequentialExecutionTrace,
+) -> Result<PrequentialAuditReceipt, EdgeBenchmarkError> {
+    validate_temporal_stream_dataset(dataset)?;
+    if trace.schema != PREQUENTIAL_TRACE_SCHEMA || trace.version != BENCHMARK_VERSION {
+        return Err(EdgeBenchmarkError::new("prequential_trace.schema_version", "unsupported trace schema/version"));
+    }
+    if trace.run_id.trim().is_empty() || trace.candidate_id.trim().is_empty() {
+        return Err(EdgeBenchmarkError::new("prequential_trace.identity", "run and candidate IDs must be non-empty"));
+    }
+    for (field, value) in [
+        ("candidate_artifact_sha256", trace.candidate_artifact_sha256.as_str()),
+        ("dataset_sha256", trace.dataset_sha256.as_str()),
+        ("initial_model_state_sha256", trace.initial_model_state_sha256.as_str()),
+        ("energy_receipt_sha256", trace.energy_receipt_sha256.as_str()),
+        ("metrology_receipt_sha256", trace.metrology_receipt_sha256.as_str()),
+        ("execution_trace_sha256", trace.execution_trace_sha256.as_str()),
+    ] {
+        if !is_sha256(value) {
+            return Err(EdgeBenchmarkError::new(
+                format!("prequential_trace.{field}"),
+                "must be lowercase SHA-256 hex",
+            ));
+        }
+    }
+    if trace.dataset_sha256 != dataset.dataset_sha256 {
+        return Err(EdgeBenchmarkError::new("prequential_trace.dataset_sha256", "trace is bound to a different dataset"));
+    }
+    if trace.actions.is_empty() {
+        return Err(EdgeBenchmarkError::new("prequential_trace.actions", "execution action list must not be empty"));
+    }
+    if compute_prequential_execution_trace_sha256(trace)? != trace.execution_trace_sha256 {
+        return Err(EdgeBenchmarkError::new("prequential_trace.execution_trace_sha256", "canonical trace digest mismatch"));
+    }
+    if dataset.observations.len() != dataset.delayed_labels.len() || dataset.observations.is_empty() {
+        return Err(EdgeBenchmarkError::new("dataset.inventory", "observation and delayed-label inventories must be equal and non-empty"));
+    }
+
+    let count = dataset.observations.len();
+    let mut predictions = vec![None::<PredictionObservation>; count];
+    let mut label_released = vec![false; count];
+    let mut label_release_times = vec![None::<u64>; count];
+    let mut updates_seen = vec![false; count];
+    let mut current_state_sha256 = trace.initial_model_state_sha256.clone();
+    let mut previous_action_time = None::<u64>;
+    let mut update_count = 0usize;
+
+    for (action_index, action) in trace.actions.iter().enumerate() {
+        let action_time = match action {
+            PrequentialAction::Prediction { timestamp_us, .. }
+            | PrequentialAction::LabelReleased { timestamp_us, .. }
+            | PrequentialAction::ModelUpdate { timestamp_us, .. } => *timestamp_us,
+        };
+        if previous_action_time.is_some_and(|previous| action_time < previous) {
+            return Err(EdgeBenchmarkError::new(
+                format!("prequential_trace.actions[{action_index}].timestamp_us"),
+                "action timestamps must be non-decreasing in execution order",
+            ));
+        }
+        previous_action_time = Some(action_time);
+
+        match action {
+            PrequentialAction::Prediction {
+                event_index,
+                timestamp_us,
+                predicted_class,
+                positive_probability_q15,
+                model_state_sha256,
+            } => {
+                if *event_index >= count {
+                    return Err(EdgeBenchmarkError::new(format!("prequential_trace.actions[{action_index}].event_index"), "event index is out of range"));
+                }
+                if predictions[*event_index].is_some() {
+                    return Err(EdgeBenchmarkError::new(format!("prequential_trace.actions[{action_index}]"), "duplicate prediction for event"));
+                }
+                if predicted_class.is_some_and(|label| label > 1) {
+                    return Err(EdgeBenchmarkError::new(format!("prequential_trace.actions[{action_index}].predicted_class"), "binary prediction must be 0, 1 or abstain"));
+                }
+                if *positive_probability_q15 > 32_768 {
+                    return Err(EdgeBenchmarkError::new(format!("prequential_trace.actions[{action_index}].positive_probability_q15"), "must be in Q0.15 range [0,32768]"));
+                }
+                let observation = &dataset.observations[*event_index];
+                let delayed_label = &dataset.delayed_labels[*event_index];
+                if observation.event_index != *event_index || delayed_label.event_index != *event_index {
+                    return Err(EdgeBenchmarkError::new("dataset.event_identity", "observation and label indices must match their array position"));
+                }
+                if *timestamp_us < observation.timestamp_us {
+                    return Err(EdgeBenchmarkError::new(format!("prequential_trace.actions[{action_index}].timestamp_us"), "prediction precedes observation"));
+                }
+                if *timestamp_us >= delayed_label.label_available_at_us {
+                    return Err(EdgeBenchmarkError::new(
+                        format!("prequential_trace.actions[{action_index}].timestamp_us"),
+                        "prediction is not strictly before ground-truth label availability",
+                    ));
+                }
+                if *model_state_sha256 != current_state_sha256 || !is_sha256(model_state_sha256) {
+                    return Err(EdgeBenchmarkError::new(
+                        format!("prequential_trace.actions[{action_index}].model_state_sha256"),
+                        "prediction does not bind the current model-state digest",
+                    ));
+                }
+                predictions[*event_index] = Some(PredictionObservation {
+                    timestamp_us: *timestamp_us,
+                    predicted_class: *predicted_class,
+                    positive_probability_q15: *positive_probability_q15,
+                });
+            }
+            PrequentialAction::LabelReleased { event_index, timestamp_us, label } => {
+                if *event_index >= count {
+                    return Err(EdgeBenchmarkError::new(format!("prequential_trace.actions[{action_index}].event_index"), "event index is out of range"));
+                }
+                if predictions[*event_index].is_none() {
+                    return Err(EdgeBenchmarkError::new(
+                        format!("prequential_trace.actions[{action_index}]"),
+                        "label release occurs before the event prediction",
+                    ));
+                }
+                if label_released[*event_index] {
+                    return Err(EdgeBenchmarkError::new(format!("prequential_trace.actions[{action_index}]"), "duplicate delayed-label release"));
+                }
+                let expected = &dataset.delayed_labels[*event_index];
+                if *label > 1 || *label != expected.label || *timestamp_us < expected.label_available_at_us {
+                    return Err(EdgeBenchmarkError::new(
+                        format!("prequential_trace.actions[{action_index}]"),
+                        "released label differs from ground truth or arrives before its availability time",
+                    ));
+                }
+                label_released[*event_index] = true;
+                label_release_times[*event_index] = Some(*timestamp_us);
+            }
+            PrequentialAction::ModelUpdate {
+                event_index,
+                timestamp_us,
+                state_before_sha256,
+                state_after_sha256,
+            } => {
+                if *event_index >= count {
+                    return Err(EdgeBenchmarkError::new(format!("prequential_trace.actions[{action_index}].event_index"), "event index is out of range"));
+                }
+                if !label_released[*event_index] {
+                    return Err(EdgeBenchmarkError::new(
+                        format!("prequential_trace.actions[{action_index}]"),
+                        "model update occurs before the corresponding label is released",
+                    ));
+                }
+                if updates_seen[*event_index] {
+                    return Err(EdgeBenchmarkError::new(format!("prequential_trace.actions[{action_index}]"), "more than one update recorded for one event"));
+                }
+                let release_time = label_release_times[*event_index].ok_or_else(|| {
+                    EdgeBenchmarkError::new(format!("prequential_trace.actions[{action_index}]"), "missing label release timestamp")
+                })?;
+                if *timestamp_us < release_time {
+                    return Err(EdgeBenchmarkError::new(format!("prequential_trace.actions[{action_index}].timestamp_us"), "update occurs before its label release"));
+                }
+                if !is_sha256(state_before_sha256)
+                    || !is_sha256(state_after_sha256)
+                    || *state_before_sha256 != current_state_sha256
+                {
+                    return Err(EdgeBenchmarkError::new(
+                        format!("prequential_trace.actions[{action_index}].state_digest"),
+                        "update must consume the current model-state digest and produce a valid digest",
+                    ));
+                }
+                current_state_sha256 = state_after_sha256.clone();
+                updates_seen[*event_index] = true;
+                update_count += 1;
+            }
+        }
+    }
+
+    if predictions.iter().any(Option::is_none) || label_released.iter().any(|released| !released) {
+        return Err(EdgeBenchmarkError::new(
+            "prequential_trace.actions",
+            "every observation requires exactly one prediction and one delayed-label release",
+        ));
+    }
+
+    let mut true_positive = 0usize;
+    let mut true_negative = 0usize;
+    let mut false_positive = 0usize;
+    let mut false_negative = 0usize;
+    let mut correct = 0usize;
+    let mut accepted = 0usize;
+    let mut abstentions = 0usize;
+    let mut brier_sum = 0.0f64;
+    let mut prediction_latency_sum = 0u128;
+
+    for index in 0..count {
+        let prediction = predictions[index].ok_or_else(|| {
+            EdgeBenchmarkError::new("prequential_trace.predictions", "missing prediction after inventory check")
+        })?;
+        let label = dataset.delayed_labels[index].label;
+        let probability = prediction.positive_probability_q15 as f64 / 32_768.0;
+        let target = label as f64;
+        brier_sum += (probability - target) * (probability - target);
+        prediction_latency_sum += (prediction.timestamp_us - dataset.observations[index].timestamp_us) as u128;
+
+        match prediction.predicted_class {
+            Some(predicted) => {
+                accepted += 1;
+                if predicted == label { correct += 1; }
+                match (predicted, label) {
+                    (1, 1) => true_positive += 1,
+                    (0, 0) => true_negative += 1,
+                    (1, 0) => false_positive += 1,
+                    (0, 1) => false_negative += 1,
+                    _ => {}
+                }
+            }
+            None => {
+                abstentions += 1;
+                if label == 1 { false_negative += 1; }
+            }
+        }
+    }
+
+    let positive_total = true_positive + false_negative;
+    let negative_total = true_negative + false_positive;
+    let balanced_accuracy = if positive_total > 0 && negative_total > 0 {
+        Some(0.5 * (
+            true_positive as f64 / positive_total as f64
+                + true_negative as f64 / negative_total as f64
+        ))
+    } else {
+        None
+    };
+    let selective_accuracy = if accepted > 0 { Some(correct as f64 / accepted as f64) } else { None };
+    let first_time = dataset.observations.first().expect("non-empty checked").timestamp_us;
+    let last_time = dataset.observations.last().expect("non-empty checked").timestamp_us;
+    let exposure_us = (last_time.saturating_sub(first_time))
+        .saturating_add(dataset.config.base_interval_us)
+        .max(1) as f64;
+    let exposure_hours = exposure_us / 3_600_000_000.0;
+
+    let metrics = PrequentialMetrics {
+        event_count: count,
+        correct_count: correct,
+        abstention_count: abstentions,
+        accuracy: correct as f64 / count as f64,
+        balanced_accuracy,
+        coverage: accepted as f64 / count as f64,
+        selective_accuracy,
+        brier_score: brier_sum / count as f64,
+        false_alarms_per_hour: false_positive as f64 / exposure_hours,
+        missed_events_per_hour: false_negative as f64 / exposure_hours,
+        mean_prediction_latency_us: prediction_latency_sum as f64 / count as f64,
+        label_release_count: count,
+        model_update_count: update_count,
+    };
+
+    let mut receipt = PrequentialAuditReceipt {
+        schema: PREQUENTIAL_RECEIPT_SCHEMA.to_owned(),
+        version: BENCHMARK_VERSION.to_owned(),
+        run_id: trace.run_id.clone(),
+        candidate_id: trace.candidate_id.clone(),
+        candidate_artifact_sha256: trace.candidate_artifact_sha256.clone(),
+        dataset_sha256: dataset.dataset_sha256.clone(),
+        execution_trace_sha256: trace.execution_trace_sha256.clone(),
+        energy_receipt_sha256: trace.energy_receipt_sha256.clone(),
+        metrology_receipt_sha256: trace.metrology_receipt_sha256.clone(),
+        metrics,
+        receipt_sha256: String::new(),
+    };
+    receipt.receipt_sha256 = compute_prequential_receipt_sha256(&receipt)?;
+    Ok(receipt)
+}
+
+// ============================================================================
 // Frozen comparison manifest
 // ============================================================================
 
