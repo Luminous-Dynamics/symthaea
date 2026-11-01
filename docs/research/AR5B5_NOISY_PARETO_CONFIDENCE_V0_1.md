@@ -138,3 +138,17 @@ The study uses private candidate/sample/seed indexes. New study construction val
 ## 10. Schema version note
 
 The expanded noisy observation plan/report schema is `0.2.0`. It binds sampling-protocol and noise-model identifiers/digests and each objective's bounds-certificate digest. Earlier `0.1.0` plans are not equivalent and must not be silently upgraded.
+## 11. Anytime-history replay and resource accounting
+
+Noisy candidate actions are now replayable through `AnytimeHistory`. The frozen history header contains an optional `noisy_observation_plan_sha256`; the noisy plan must be registered before the first event and every noisy observation event must match it. This avoids treating an event-supplied plan digest as post hoc preregistration.
+
+`analyze_noisy_anytime_history(plan, history)` reconstructs the `NoisyParetoStudy` from successful `CandidateNoisyObservation` records. Failed, invalid and timed-out attempts are retained in the hash chain and charged in the generic anytime receipt, but are excluded from sample means and confidence intervals. The joint report binds:
+- noisy plan digest;
+- history tip digest and run ID;
+- full anytime resource receipt;
+- attempted, successful and failed replicate counts;
+- confidence-aware Pareto report digest.
+
+The adapter checks objective ID, order and direction equality between the noisy plan and history header. Deterministic and noisy evaluation modes cannot be mixed. The generic anytime attempt counter counts both modes.
+
+**Important limitation:** the event chain retains objective vectors and evidence digests, but this adapter does not resolve external raw artifact bytes or independently verify their contents. A later replicate-specific byte-verification path must bind every sample digest to immutable bytes and a verifier receipt. The current joint report is reproducible from the event chain, not a claim of external artifact authenticity.
