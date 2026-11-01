@@ -58,8 +58,8 @@ pub enum HarthActivity {
     Lying = 8,
     CyclingSitting = 13,
     CyclingStanding = 14,
-    CyclingSittingInactive = 130,
-    CyclingStandingInactive = 140,
+    TransportSitting = 130,
+    TransportStanding = 140,
 }
 
 impl HarthActivity {
