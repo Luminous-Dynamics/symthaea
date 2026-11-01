@@ -169,6 +169,8 @@ def verify_local_closure(
     if any(isinstance(x, bool) or not isinstance(x, int) or x < 1 for x in active_ids):
         raise ValueError("hypothesis ids must be positive integers")
     rejected_ids = tuple(sorted(rejections))
+    if any(isinstance(x, bool) or not isinstance(x, int) or x < 1 for x in rejected_ids):
+        raise ValueError("rejection ids must be positive integers")
     if len(set(rejected_ids)) != len(rejected_ids):
         raise ValueError("the rejection set contains duplicate ids")
     if not set(rejected_ids).issubset(active_ids):
@@ -181,7 +183,11 @@ def verify_local_closure(
 
     failures = []
     rows = []
-    for intersection in nonempty_subsets(active_ids):
+    active_intersections = nonempty_subsets(active_ids)
+    prior_budget = verify_finite_prior_budget(active_ids, prior)
+    if not prior_budget["valid"]:
+        failures.append(("active_intersection_prior_budget_invalid", prior_budget["failures"]))
+    for intersection in active_intersections:
         path = intersection_processes.get(intersection)
         if path is None:
             failures.append(("missing_intersection_process", intersection))
@@ -221,6 +227,7 @@ def verify_local_closure(
         "failures": failures,
         "constraints_checked": len(rows),
         "expected_constraints": (1 << len(active_ids)) - 1,
+        "active_intersection_prior_mass": prior_budget["finite_prefix_mass"],
         "minimum_slack": min((row["slack"] for row in rows), default=None),
         "constraints": rows,
         "scope": "exact pathwise finite-family closure check; component e-process validity is external",
