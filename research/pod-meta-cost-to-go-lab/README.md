@@ -14,7 +14,8 @@ The lab separates forecast estimation from resource enforcement. Its initial exe
 - a non-parametric time-to-sufficient-proof baseline separates right-censoring from competing terminal events;
 - an append-only forecast journal stores pre-execution predictions separately from evaluator, meter, and verifier outcomes;
 - a proof-frontier structural baseline feeds one-sided split-conformal simultaneous resource-vector envelopes;
-- a landmark IPCW calibration baseline adapts time-varying history-conditioned censoring weights to proof-completion resource scores.
+- a landmark IPCW calibration baseline adapts time-varying history-conditioned censoring weights to proof-completion resource scores;
+- selected-policy conformal calibration conditions joint proof-cost envelopes on the frozen scheduler selection mechanism.
 
 ## Run
 
@@ -32,3 +33,4 @@ This slice is not yet a frontier-conditioned remaining-cost predictor, IPCW esti
 
 No Rust test, formatting, Clippy, or matrix result is claimed until the exact PR head has qualified.
 The landmark IPCW tranche is stacked on the proof-frontier/vector-conformal baseline. The boxed joint-envelope payload and borrow-based budget-fit interface are qualified on the current #9689 base; the IPCW branch must be requalified against that exact base before its own status can be claimed.
+- selection-conditioned split conformal calibrates only independently verified outcomes from a frozen selected-policy cohort.
