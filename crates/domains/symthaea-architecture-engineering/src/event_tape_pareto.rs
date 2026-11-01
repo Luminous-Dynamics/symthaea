@@ -775,6 +775,8 @@ mod tests {
                 config: policy_config,
                 has_hidden_oracle_access: false,
             },
+            objective_contract: None,
+            objective_contract_sha256: None,
         }
     }
 
