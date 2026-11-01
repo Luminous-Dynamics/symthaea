@@ -6,7 +6,7 @@
   "required": ["schema_version", "result", "claim_scope", "policy_sha256", "profile_sha256", "obligations", "claim_ceiling"],
   "properties": {
     "schema_version": { "const": "hardsec-mobile-policy-receipt-v1" },
-    "result": { "enum": ["all_policy_obligations_satisfied_for_declared_scope", "policy_not_satisfied_or_evidence_incomplete"] },
+    "result": { "enum": ["obligations_compiled_verification_not_performed"] },
     "claim_scope": { "type": "string" },
     "policy_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "profile_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
