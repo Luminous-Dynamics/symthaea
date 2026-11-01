@@ -16,11 +16,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use super::pareto_anytime::{
-    analyze_anytime_history, AnytimeAction, AnytimeEventDraft, AnytimeHistory,
-    AnytimeHistoryHeader, AnytimeRunReceipt, AnytimeTarget, AnytimeTargetMetric,
-    AnytimeTargetPlan, EvaluationOutcome, ResourceCost, ResourceMeter, TargetAttainmentStatus,
+    analyze_anytime_history, AnytimeAction, AnytimeHistory, AnytimeRunReceipt, EvaluationOutcome,
 };
-use super::pareto_objectives::{ObjectiveDirection, ParetoObjectiveSpec};
+use super::pareto_objectives::ObjectiveDirection;
 
 const SCHEMA: &str = "symthaea.architecture-engineering.noisy-pareto-observations";
 const VERSION: &str = "0.2.0";
@@ -770,6 +768,11 @@ fn digest_serializable<T: Serialize>(value: &T) -> Result<String, NoisyParetoErr
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::pareto_anytime::{
+        AnytimeEventDraft, AnytimeHistoryHeader, AnytimeTarget, AnytimeTargetMetric,
+        AnytimeTargetPlan, ResourceCost, ResourceMeter, TargetAttainmentStatus,
+    };
+    use super::super::pareto_objectives::ParetoObjectiveSpec;
 
     const H1: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const H2: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
