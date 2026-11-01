@@ -336,6 +336,12 @@ fn validate_candidate_bundle(
     if prequential.metrics.false_alarms_per_hour > manifest.maximum_false_alarms_per_hour {
         rejection_reasons.push("false_alarm_limit_exceeded".to_owned());
     }
+    if prequential.metrics.missed_events_per_hour > manifest.maximum_missed_events_per_hour {
+        rejection_reasons.push("missed_event_limit_exceeded".to_owned());
+    }
+    if prequential.metrics.coverage < manifest.minimum_coverage {
+        rejection_reasons.push("coverage_below_minimum".to_owned());
+    }
     if latency > manifest.target.p95_deadline_ms as f64 {
         rejection_reasons.push("p95_deadline_missed".to_owned());
     }
