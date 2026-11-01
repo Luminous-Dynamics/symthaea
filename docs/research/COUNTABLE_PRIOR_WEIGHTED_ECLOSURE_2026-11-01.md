@@ -139,7 +139,7 @@ The implementation adds:
 - exact Elias-gamma prefix-code weights over finite intersections;
 - canonical finite-intersection IDs and exact rational arithmetic;
 - exhaustive local closure checking over all nonempty subsets of the active family;
-- fail-closed behavior for missing component processes, malformed IDs, negative values, and incomplete paths;
+- fail-closed behavior for missing component processes, malformed IDs, negative values, incomplete paths, and a finite active-subset prior mass above one;
 - enumeration of locally certified rejection sets for a finite active family;
 - exact finite-truth fixtures checking pathwise mixture domination and a finite-prefix prior-budget audit.
 
@@ -151,7 +151,7 @@ Run from the repository root:
 
 ## 6. Further negative controls and stress tests
 
-The current exact tests cover prefix-code uniqueness/Kraft mass on a finite prefix, finite prior-budget checks, missing intersection processes, data-dependent prior selection, random non-nested active sets, exact rational boundaries, and pathwise mixture domination.
+The current exact tests cover prefix-code uniqueness/Kraft mass on a finite prefix, finite prior-budget checks both standalone and inside the local verifier, missing intersection processes, invalid rejection-ID types, data-dependent prior selection, random non-nested active sets, exact rational boundaries, and pathwise mixture domination.
 
 The next controls should include a deliberately invalid component process, evidence-after-activation that invalidates a component, omitted true-intersection constraints, all-null/sparse/moderate/dense alternatives, independent/common-shock/block/adversarial dependence, singleton/clustered/widely spaced true-null sets, and fixed-seed preregistered simulations. Simulation diagnostics cannot establish the theorem.
 
