@@ -36,10 +36,24 @@ impl HarthLabelProfile {
     /// NativeTwelve returns the original numeric ID, including 130 and 140.
     /// PaperMergedNineV1 uses the original paper's reported label aggregation:
     /// 3/6/140 -> Standing and 7/130 -> Sitting.
-    pub fn target_class_id(self, raw: HarthActivity) -> u16 {
+    pub fn target_class_id(self, raw: HarthActivity) -> u8 {
         let code = raw.code();
         match self {
-            Self::NativeTwelve => code,
+            Self::NativeTwelve => match code {
+                1 => 1,
+                2 => 2,
+                3 => 3,
+                4 => 4,
+                5 => 5,
+                6 => 6,
+                7 => 7,
+                8 => 8,
+                13 => 9,
+                14 => 10,
+                130 => 11,
+                140 => 12,
+                _ => 0,
+            },
             Self::PaperMergedNineV1 => match code {
                 1 => 1,   // Walking
                 2 => 2,   // Running
@@ -60,11 +74,22 @@ impl HarthLabelProfile {
         let mut hasher = CanonicalHasher::new(b"symthaea.temporal.harth-label-profile.v1");
         hasher.bytes(self.profile_id().as_bytes());
         hasher.u8(self.class_count());
-        for raw_code in [1_u16, 2, 3, 4, 5, 6, 7, 8, 13, 14, 130, 140] {
-            hasher.u16(raw_code);
-            let raw = HarthActivity::from_code(raw_code)
-                .expect("HARTH profile code list must match the validated raw label set");
-            hasher.u16(self.target_class_id(raw));
+        for raw in [
+            HarthActivity::Walking,
+            HarthActivity::Running,
+            HarthActivity::Shuffling,
+            HarthActivity::StairsAscending,
+            HarthActivity::StairsDescending,
+            HarthActivity::Standing,
+            HarthActivity::Sitting,
+            HarthActivity::Lying,
+            HarthActivity::CyclingSitting,
+            HarthActivity::CyclingStanding,
+            HarthActivity::Label130,
+            HarthActivity::Label140,
+        ] {
+            hasher.u16(raw.code());
+            hasher.u8(self.target_class_id(raw));
         }
         hasher.finish()
     }
@@ -78,7 +103,15 @@ mod tests {
     fn native_profile_preserves_all_twelve_numeric_label_ids() {
         for code in [1_u16, 2, 3, 4, 5, 6, 7, 8, 13, 14, 130, 140] {
             let raw = HarthActivity::from_code(code).unwrap();
-            assert_eq!(HarthLabelProfile::NativeTwelve.target_class_id(raw), code);
+            assert_eq!(
+                HarthLabelProfile::NativeTwelve.target_class_id(raw),
+                [1_u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12][
+                    [1_u16, 2, 3, 4, 5, 6, 7, 8, 13, 14, 130, 140]
+                        .iter()
+                        .position(|candidate| *candidate == code)
+                        .unwrap()
+                ]
+            );
         }
         assert_eq!(HarthLabelProfile::NativeTwelve.class_count(), 12);
     }
