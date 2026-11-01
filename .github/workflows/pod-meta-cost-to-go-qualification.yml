@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - "research/pod-meta-proof-cost-to-go-2026-11-01"
+      - "research/pod-meta-online-selection-fcr-2026-11-01"
     paths:
       - ".github/workflows/pod-meta-cost-to-go-qualification.yml"
       - "research/pod-meta-cost-to-go-lab/**"
@@ -41,6 +42,7 @@ jobs:
           test "$(grep -c '^VECTOR_CONFORMAL_ROW' cost-to-go-ledger.tsv)" -eq 3
           test "$(grep -c '^LANDMARK_IPCW_ROW' cost-to-go-ledger.tsv)" -eq 3
           test "$(grep -c '^SELECTION_CONFORMAL_ROW' cost-to-go-ledger.tsv)" -eq 3
+          test "$(grep -c '^ONLINE_FCR_ROW' cost-to-go-ledger.tsv)" -eq 5
           if grep '^CASE' cost-to-go-ledger.tsv | awk -F '\t' '$7 != 0 && $2 != "hard-cap-overrun-visible" { bad=1 } END { exit bad }'; then
             echo "Only the deliberate hard-cap negative control recorded a cap violation."
           else
