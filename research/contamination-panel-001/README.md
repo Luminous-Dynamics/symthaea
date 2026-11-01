@@ -705,3 +705,105 @@ The normalized threshold is computed with exact integer comparisons; it is not a
 
 This helps prevent near-singular systems from being accidentally mixed into the same task difficulty band. It does not yet make the problem generator psychometrically calibrated: difficulty also depends on coefficient/solution magnitudes, cancellation, representation, and model-specific skill. These factors need separate calibration experiments.
 
+
+
+## Search-time contamination and retrieval exposure
+
+The module src/search_time.rs records and audits inference-time information-access traces. It covers web search, browser navigation, HTTP APIs, remote MCP, vector stores, local caches, mounted files, agent memory and explicitly unknown/other channels.
+
+This is the third complementary lane next to static benchmarks and post-freeze fresh instances. Fresh question instances do not help if an agent can search for the task or retrieve its answer while being evaluated.
+
+### Trace contract
+
+Each run trace binds:
+- run, benchmark/version, checkpoint and challenge-packet identities;
+- network policy and enforcement-build digests;
+- access mode: network-disabled, allowlisted or unrestricted;
+- allowlisted normalized-destination digests (required only in allowlisted mode);
+- every known information channel as instrumented or explicitly unobserved;
+- contiguous event sequence and unique invocation IDs;
+- event channel/provider, normalized destination digest, request digest, response digest/byte count, UTC time and allowed/blocked disposition;
+- previous-event digest, event digest and final trace root.
+
+Blocked events cannot claim response bytes. Accepted response bytes require an exact response digest. Timestamps must be real UTC calendar values and monotonic with event sequence.
+
+### Offline audit
+
+~~~sh
+cargo run --locked -- audit-search-time-trace \
+  /secure/evaluator/search-time-trace.json \
+  /secure/evaluator/search-time-trace-audit.json
+~~~
+
+The auditor replays the event chain, validates per-event and root digests, checks sequence/time invariants, verifies network-disabled policy behavior, checks allowlisted network destinations, and rejects event channels missing from the declared instrumentation set.
+
+The declaration must account for all known channel types as either instrumented or unobserved. Merely omitting a channel does not make the perimeter complete.
+
+### Evaluator-supplied retrieval findings
+
+The separate findings artifact binds a classification to an allowed event and the exact trace root. Each finding records:
+- metadata-only, context-bearing, answer-bearing or unknown;
+- matched benchmark item IDs;
+- digest of evaluator-side matching evidence;
+- method (exact, fuzzy, semantic review, human adjudication or other);
+- confidence in permille.
+
+Audit findings:
+
+~~~sh
+cargo run --locked -- audit-search-time-findings \
+  /secure/evaluator/search-time-trace.json \
+  /secure/evaluator/search-time-findings.json \
+  /secure/evaluator/search-time-findings-audit.json
+~~~
+
+The current module validates classification record bindings; it does not implement fuzzy/semantic matching. Raw page content, search queries, credentials and private URLs must stay in evaluator-controlled storage. The public findings file should contain only digests, item references, method and bounded/redacted evidence as policy permits.
+
+### Claim boundary
+
+Hash-chain replay establishes internal integrity of the supplied trace, not completeness of the network/proxy/tool instrumentation. A well-formed trace cannot rule out an unobserved cache, side channel, local file, external process or compromised logger. The audit hard-codes complete_mediation_verified=false and independently_verified=false.
+
+Likewise, an answer-bearing retrieval event is evidence of access, not proof that the retrieved content caused the model's answer. Causal influence needs a paired network-disabled versus network-enabled experiment with matched budgets and independent run replication.
+
+Schemas:
+- schema/search-time-exposure-trace.schema.json
+- schema/search-time-exposure-audit.schema.json
+- schema/search-time-exposure-findings.schema.json
+- schema/search-time-exposure-findings-audit.schema.json
+
+
+
+The CLI refuses trace files larger than 256 MiB and findings files larger than 64 MiB using bounded reads (limit + 1 bytes), before JSON deserialization. The library auditor separately caps event/finding counts and allowlist entries.
+
+
+### Evaluator-only response-body matching
+
+The matcher accepts retained raw response bodies from evaluator-controlled storage and checks them against the exact fresh challenge packet and sealed oracle. It emits only response digests, matched item IDs, deterministic class labels and method metadata.
+
+~~~sh
+cargo run --locked -- match-search-time-bodies \
+  /secure/evaluator/search-time-trace.json \
+  /secure/evaluator/fresh-public-packet.json \
+  /secure/evaluator/fresh-sealed-oracle.json \
+  /secure/evaluator/fresh-manifest.json \
+  /secure/evaluator/retained-response-bodies.json \
+  /secure/evaluator/unavailable-body-event-sequences.json \
+  /secure/evaluator/search-time-findings.json
+~~~
+
+The retained-response-body file is an evaluator-only array containing the event sequence, content type, exact UTF-8 response body and response-body digest. The digest domain is \`search-time-response-body.v1\`; the corresponding trace event must use the same digest and exact byte count.
+
+The matching precedence is:
+1. **Answer-bearing:** an exact JSON integer pair matching a sealed oracle solution, associated in the same body with that item's unique item ID or task-text context. Small integer pairs alone are not sufficient.
+2. **Context-bearing:** exact normalized task-text sequence, or at least two distinct shared six-token shingles (lexical near-duplicate rule).
+3. **Metadata-only:** exact benchmark/batch/task-family or task-item identifier. A generic version string such as v1 is not sufficient by itself.
+4. **Unknown:** no deterministic match under the rules above.
+
+The exact-answer association rule is intentionally conservative: a bare solution pair can occur by chance in unrelated JSON. It requires the matching item ID or task context in the same response body. The six-token overlap rule is a candidate duplicate detector, not a semantic paraphrase detector. Its 800-permille field is an ordinal rule-strength marker, not a calibrated probability. Exact rules receive 1000. Do not interpret either as posterior confidence.
+
+Every allowed event with response bytes must be represented by retained body evidence or explicitly listed as unavailable. This is enforced in the findings audit. Coverage is reported as retained response-body evidence divided by all response-bearing allowed events; unavailable bodies are never silently counted as clean.
+
+Raw response body text is not copied into the findings report. Keep the source bodies in evaluator-only storage. This is necessary both for oracle secrecy and to avoid publishing private browsing contents, credentials or unrelated personal information.
+
+Tests include four deterministic synthetic classes: exact answer, full task-text context, task-item metadata, and unrelated unknown content. The matcher is intentionally deterministic and auditable; future semantic models must be separately versioned, calibrated against human adjudication, and accompanied by false-positive/false-negative confidence bounds.
+

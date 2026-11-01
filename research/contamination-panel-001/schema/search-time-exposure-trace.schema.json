@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/search-time-exposure-trace-v1.json",
+  "title": "Search-time exposure trace v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "run_id",
+    "benchmark_id",
+    "benchmark_version",
+    "model_checkpoint_sha256",
+    "challenge_packet_sha256",
+    "network_policy_sha256",
+    "enforcement_build_sha256",
+    "policy_id",
+    "access_mode",
+    "allowlisted_destination_sha256s",
+    "instrumented_channels",
+    "unobserved_channels",
+    "events",
+    "event_count",
+    "trace_root_sha256",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.search_time_exposure_trace.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_checkpoint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "challenge_packet_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "network_policy_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "enforcement_build_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "access_mode": {
+      "type": "string",
+      "enum": [
+        "network_disabled",
+        "allowlisted",
+        "unrestricted"
+      ]
+    },
+    "allowlisted_destination_sha256s": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "instrumented_channels": {
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "enum": [
+          "web_search",
+          "browser_navigation",
+          "http_api",
+          "remote_mcp",
+          "vector_store",
+          "local_cache",
+          "mounted_file",
+          "agent_memory",
+          "other"
+        ]
+      }
+    },
+    "unobserved_channels": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "web_search",
+          "browser_navigation",
+          "http_api",
+          "remote_mcp",
+          "vector_store",
+          "local_cache",
+          "mounted_file",
+          "agent_memory",
+          "other"
+        ]
+      }
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 1000000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence",
+          "invocation_id",
+          "channel",
+          "provider_or_tool",
+          "destination_sha256",
+          "request_sha256",
+          "response_sha256",
+          "response_bytes",
+          "occurred_at_utc",
+          "disposition",
+          "previous_event_sha256",
+          "event_sha256"
+        ],
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "invocation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "web_search",
+              "browser_navigation",
+              "http_api",
+              "remote_mcp",
+              "vector_store",
+              "local_cache",
+              "mounted_file",
+              "agent_memory",
+              "other"
+            ]
+          },
+          "provider_or_tool": {
+            "type": "string",
+            "minLength": 1
+          },
+          "destination_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "request_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "response_sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "response_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "occurred_at_utc": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+          },
+          "disposition": {
+            "type": "string",
+            "enum": [
+              "allowed",
+              "blocked"
+            ]
+          },
+          "previous_event_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "event_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "event_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "trace_root_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

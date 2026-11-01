@@ -224,7 +224,9 @@ pub(crate) fn parse_timestamp(value: &str, label: &str) -> Result<(), String> {
         _ => 0,
     };
     if year == 0 || day == 0 || day > max_day || hour > 23 || minute > 59 || second > 59 {
-        return Err(format!("{label} contains an impossible date or clock value"));
+        return Err(format!(
+            "{label} contains an impossible date or clock value"
+        ));
     }
     Ok(())
 }
@@ -250,11 +252,16 @@ fn validate_config(config: &FreshChallengeConfigV1, seed: &[u8]) -> Result<(), S
         return Err("batch, benchmark and task-family identities must be nonempty".to_owned());
     }
     if !(1..=FRESH_MAX_ITEMS).contains(&config.requested_item_count) {
-        return Err(format!("requested_item_count must be in [1, {FRESH_MAX_ITEMS}]"));
+        return Err(format!(
+            "requested_item_count must be in [1, {FRESH_MAX_ITEMS}]"
+        ));
     }
     for (value, label) in [
         (&config.model_checkpoint_sha256, "model_checkpoint_sha256"),
-        (&config.checkpoint_freeze_receipt_sha256, "checkpoint_freeze_receipt_sha256"),
+        (
+            &config.checkpoint_freeze_receipt_sha256,
+            "checkpoint_freeze_receipt_sha256",
+        ),
         (&config.generator_source_sha256, "generator_source_sha256"),
         (&config.generator_binary_sha256, "generator_binary_sha256"),
         (&config.runtime_image_sha256, "runtime_image_sha256"),
@@ -263,22 +270,34 @@ fn validate_config(config: &FreshChallengeConfigV1, seed: &[u8]) -> Result<(), S
         validate_digest(value, label)?;
     }
     if config.generator_config_sha256 != canonical_config_digest(config)? {
-        return Err("generator_config_sha256 does not match canonical configuration contents".to_owned());
+        return Err(
+            "generator_config_sha256 does not match canonical configuration contents".to_owned(),
+        );
     }
     parse_timestamp(&config.checkpoint_frozen_at_utc, "checkpoint_frozen_at_utc")?;
-    parse_timestamp(&config.challenge_generated_at_utc, "challenge_generated_at_utc")?;
+    parse_timestamp(
+        &config.challenge_generated_at_utc,
+        "challenge_generated_at_utc",
+    )?;
     if config.checkpoint_frozen_at_utc >= config.challenge_generated_at_utc {
-        return Err("checkpoint freeze timestamp must precede fresh challenge generation".to_owned());
+        return Err(
+            "checkpoint freeze timestamp must precede fresh challenge generation".to_owned(),
+        );
     }
     if seed.len() < FRESH_MIN_SEED_BYTES {
-        return Err(format!("fresh challenge seed must contain at least {} bytes", FRESH_MIN_SEED_BYTES));
+        return Err(format!(
+            "fresh challenge seed must contain at least {} bytes",
+            FRESH_MIN_SEED_BYTES
+        ));
     }
     if config.matrix_coefficient_min >= config.matrix_coefficient_max
         || config.solution_component_min >= config.solution_component_max
         || config.minimum_absolute_determinant < 1
         || !(1..=1_000).contains(&config.minimum_normalized_determinant_margin_permille)
     {
-        return Err("invalid matrix/solution bounds, determinant or normalized stability margin".to_owned());
+        return Err(
+            "invalid matrix/solution bounds, determinant or normalized stability margin".to_owned(),
+        );
     }
     if config.matrix_coefficient_min < -1_000
         || config.matrix_coefficient_max > 1_000
@@ -287,10 +306,9 @@ fn validate_config(config: &FreshChallengeConfigV1, seed: &[u8]) -> Result<(), S
     {
         return Err("initial exact-arithmetic generator bounds absolute coefficients and solutions to <=1000".to_owned());
     }
-    if i64::from(config.matrix_coefficient_max)
-        - i64::from(config.matrix_coefficient_min) > 1_000
-        || i64::from(config.solution_component_max)
-            - i64::from(config.solution_component_min) > 1_000
+    if i64::from(config.matrix_coefficient_max) - i64::from(config.matrix_coefficient_min) > 1_000
+        || i64::from(config.solution_component_max) - i64::from(config.solution_component_min)
+            > 1_000
     {
         return Err("initial fresh algebra generator supports parameter widths <=1000".to_owned());
     }
@@ -337,8 +355,9 @@ impl SeededStream {
         let width = u64::try_from(i64::from(max) - i64::from(min) + 1)
             .map_err(|_| "integer sampling range is invalid")?;
         let offset = self.uniform_below(width)?;
-        let value = i64::from(min) + i64::try_from(offset).map_err(|_| "sample offset overflows")?;
-        i32::try_from(value).map_err(|_| "sampled integer is outside i32")
+        let value =
+            i64::from(min) + i64::try_from(offset).map_err(|_| "sample offset overflows")?;
+        i32::try_from(value).map_err(|_| "sampled integer is outside i32".to_owned())
     }
 }
 
@@ -350,13 +369,11 @@ fn determinant(parameters: &LinearSystemParametersV1) -> i64 {
 /// Exact floor of the row-normalized determinant magnitude in permille.
 /// Computes the integer threshold with u128 arithmetic, avoiding floating
 /// point differences at generation cutoffs.
-pub(crate) fn normalized_determinant_margin_permille(
-    parameters: &LinearSystemParametersV1,
-) -> u16 {
-    let row_one_sq = (i128::from(parameters.a11).pow(2)
-        + i128::from(parameters.a12).pow(2)) as u128;
-    let row_two_sq = (i128::from(parameters.a21).pow(2)
-        + i128::from(parameters.a22).pow(2)) as u128;
+pub(crate) fn normalized_determinant_margin_permille(parameters: &LinearSystemParametersV1) -> u16 {
+    let row_one_sq =
+        (i128::from(parameters.a11).pow(2) + i128::from(parameters.a12).pow(2)) as u128;
+    let row_two_sq =
+        (i128::from(parameters.a21).pow(2) + i128::from(parameters.a22).pow(2)) as u128;
     if row_one_sq == 0 || row_two_sq == 0 {
         return 0;
     }
@@ -434,7 +451,8 @@ fn oracle_packet_digest(packet: &SealedFreshOraclePacketV1) -> Result<String, St
 }
 
 fn item_set_digest(tasks: &[PublicFreshTaskV1]) -> Result<String, String> {
-    let items: Vec<(&str, &str)> = tasks.iter()
+    let items: Vec<(&str, &str)> = tasks
+        .iter()
         .map(|task| (task.item_id.as_str(), task.task_text_sha256.as_str()))
         .collect();
     let bytes = serde_json::to_vec(&items)
@@ -470,16 +488,27 @@ pub fn generate_fresh_challenge_bundle(
     for index in 0..config.requested_item_count {
         let mut accepted = None;
         for _attempt in 0..10_000 {
-            let a11 = stream.range_i32(config.matrix_coefficient_min, config.matrix_coefficient_max)?;
-            let a12 = stream.range_i32(config.matrix_coefficient_min, config.matrix_coefficient_max)?;
-            let a21 = stream.range_i32(config.matrix_coefficient_min, config.matrix_coefficient_max)?;
-            let a22 = stream.range_i32(config.matrix_coefficient_min, config.matrix_coefficient_max)?;
+            let a11 =
+                stream.range_i32(config.matrix_coefficient_min, config.matrix_coefficient_max)?;
+            let a12 =
+                stream.range_i32(config.matrix_coefficient_min, config.matrix_coefficient_max)?;
+            let a21 =
+                stream.range_i32(config.matrix_coefficient_min, config.matrix_coefficient_max)?;
+            let a22 =
+                stream.range_i32(config.matrix_coefficient_min, config.matrix_coefficient_max)?;
             let solution = ExactLinearSolutionV1 {
-                x: stream.range_i32(config.solution_component_min, config.solution_component_max)?,
-                y: stream.range_i32(config.solution_component_min, config.solution_component_max)?,
+                x: stream
+                    .range_i32(config.solution_component_min, config.solution_component_max)?,
+                y: stream
+                    .range_i32(config.solution_component_min, config.solution_component_max)?,
             };
             let mut parameters = LinearSystemParametersV1 {
-                a11, a12, a21, a22, b1: 0, b2: 0,
+                a11,
+                a12,
+                a21,
+                a22,
+                b1: 0,
+                b2: 0,
             };
             if determinant(&parameters).abs() < config.minimum_absolute_determinant {
                 continue;
@@ -499,8 +528,9 @@ pub fn generate_fresh_challenge_bundle(
             accepted = Some((parameters, solution, text, task_digest));
             break;
         }
-        let (parameters, solution, text, task_digest) = accepted
-            .ok_or_else(|| format!("could not generate a unique nonsingular task at index {index}"))?;
+        let (parameters, solution, text, task_digest) = accepted.ok_or_else(|| {
+            format!("could not generate a unique nonsingular task at index {index}")
+        })?;
         let item_id = format!("{}-item-{index:06}", config.batch_id);
         if !item_ids.insert(item_id.clone()) || !task_digests.insert(task_digest.clone()) {
             return Err("fresh generator produced duplicate item or task digest".to_owned());
@@ -543,7 +573,9 @@ pub fn generate_fresh_challenge_bundle(
         item_count: u64::from(config.requested_item_count),
         tasks,
         public_packet_sha256: String::new(),
-        claim_boundary: "fresh_instance_challenge_only_no_claim_of_task_recipe_novelty_or_training_data_absence".to_owned(),
+        claim_boundary:
+            "fresh_instance_challenge_only_no_claim_of_task_recipe_novelty_or_training_data_absence"
+                .to_owned(),
     };
     public_packet.public_packet_sha256 = public_packet_digest(&public_packet)?;
 
@@ -555,7 +587,8 @@ pub fn generate_fresh_challenge_bundle(
         item_count: u64::from(config.requested_item_count),
         entries,
         sealed_oracle_sha256: String::new(),
-        claim_boundary: "evaluator_only_secret_seed_hidden_parameters_and_exact_oracle_answers".to_owned(),
+        claim_boundary: "evaluator_only_secret_seed_hidden_parameters_and_exact_oracle_answers"
+            .to_owned(),
     };
     sealed_oracle_packet.sealed_oracle_sha256 = oracle_packet_digest(&sealed_oracle_packet)?;
     let item_set_sha256 = item_set_digest(&public_packet.tasks)?;
@@ -635,25 +668,28 @@ pub fn audit_fresh_challenge_bundle(
         let observed_margin = normalized_determinant_margin_permille(&entry.parameters);
         minimum_observed_margin = minimum_observed_margin.min(observed_margin);
         all_nonsingular &= determinant.abs() >= config.minimum_absolute_determinant;
-        all_stability_margins_satisfied &=
-            observed_margin >= config.minimum_normalized_determinant_margin_permille
-                && entry.normalized_determinant_margin_permille == observed_margin;
+        all_stability_margins_satisfied &= observed_margin
+            >= config.minimum_normalized_determinant_margin_permille
+            && entry.normalized_determinant_margin_permille == observed_margin;
         let (b1, b2) = compute_rhs(&entry.parameters, &entry.solution)?;
         all_answers_exact &= b1 == entry.parameters.b1 && b2 == entry.parameters.b2;
         let parameter_bytes = serde_json::to_vec(&entry.parameters)
             .map_err(|error| format!("cannot serialize hidden parameters: {error}"))?;
-        all_answers_exact &= hash_domain(b"fresh-task-parameters.v1", &parameter_bytes)
-            == entry.parameter_sha256;
+        all_answers_exact &=
+            hash_domain(b"fresh-task-parameters.v1", &parameter_bytes) == entry.parameter_sha256;
         let answer_bytes = serde_json::to_vec(&entry.solution)
             .map_err(|error| format!("cannot serialize exact solution: {error}"))?;
-        all_answers_exact &= hash_domain(b"fresh-task-answer.v1", &answer_bytes)
-            == entry.answer_sha256;
+        all_answers_exact &=
+            hash_domain(b"fresh-task-answer.v1", &answer_bytes) == entry.answer_sha256;
     }
     let public_value = serde_json::to_value(&bundle.public_packet)
         .map_err(|error| format!("cannot serialize public packet: {error}"))?;
-    let public_keys: BTreeSet<String> = public_value.as_object()
+    let public_keys: BTreeSet<String> = public_value
+        .as_object()
         .ok_or_else(|| "public packet must serialize to an object".to_owned())?
-        .keys().cloned().collect();
+        .keys()
+        .cloned()
+        .collect();
     let expected_public_keys: BTreeSet<String> = [
         "schema",
         "batch_id",
@@ -671,30 +707,40 @@ pub fn audit_fresh_challenge_bundle(
         "tasks",
         "public_packet_sha256",
         "claim_boundary",
-    ].iter().map(|value| (*value).to_owned()).collect();
+    ]
+    .iter()
+    .map(|value| (*value).to_owned())
+    .collect();
     let tasks_have_only_public_fields = bundle.public_packet.tasks.iter().all(|task| {
-        serde_json::to_value(task).ok().and_then(|value| {
-            let keys: BTreeSet<String> = value.as_object()?.keys().cloned().collect();
-            let expected: BTreeSet<String> =
-                ["item_id", "task_text", "task_text_sha256"]
-                    .iter().map(|value| (*value).to_owned()).collect();
-            Some(keys == expected)
-        }).unwrap_or(false)
+        serde_json::to_value(task)
+            .ok()
+            .and_then(|value| {
+                let keys: BTreeSet<String> = value.as_object()?.keys().cloned().collect();
+                let expected: BTreeSet<String> = ["item_id", "task_text", "task_text_sha256"]
+                    .iter()
+                    .map(|value| (*value).to_owned())
+                    .collect();
+                Some(keys == expected)
+            })
+            .unwrap_or(false)
     });
     let public_serialized = serde_json::to_string(&bundle.public_packet)
         .map_err(|error| format!("cannot serialize public packet: {error}"))?;
-    let public_contains_no_seed_or_answers =
-        public_keys == expected_public_keys
-            && tasks_have_only_public_fields
-            && !public_serialized.contains(&bundle.sealed_oracle_packet.generation_seed_hex)
-            && !public_serialized.contains("generation_seed_hex")
-            && !public_serialized.contains("solution")
-            && !public_serialized.contains("parameters")
-            && !public_serialized.contains("answer_sha256");
-    if !all_nonsingular || !all_stability_margins_satisfied
-        || !all_answers_exact || !public_contains_no_seed_or_answers
+    let public_contains_no_seed_or_answers = public_keys == expected_public_keys
+        && tasks_have_only_public_fields
+        && !public_serialized.contains(&bundle.sealed_oracle_packet.generation_seed_hex)
+        && !public_serialized.contains("generation_seed_hex")
+        && !public_serialized.contains("solution")
+        && !public_serialized.contains("parameters")
+        && !public_serialized.contains("answer_sha256");
+    if !all_nonsingular
+        || !all_stability_margins_satisfied
+        || !all_answers_exact
+        || !public_contains_no_seed_or_answers
     {
-        return Err("fresh challenge public/oracle separation or exact answer validation failed".to_owned());
+        return Err(
+            "fresh challenge public/oracle separation or exact answer validation failed".to_owned(),
+        );
     }
     Ok(FreshChallengeAuditV1 {
         schema: FRESH_AUDIT_SCHEMA.to_owned(),
@@ -761,39 +807,74 @@ mod tests {
 
     #[test]
     fn strict_schemas_match_serialized_fixture_bundle_fields() {
-        let config_schema: Value = serde_json::from_str(include_str!(
-            "../schema/fresh-instance-config.schema.json"
-        )).unwrap();
+        let config_schema: Value =
+            serde_json::from_str(include_str!("../schema/fresh-instance-config.schema.json"))
+                .unwrap();
         let public_schema: Value = serde_json::from_str(include_str!(
             "../schema/fresh-instance-public-packet.schema.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let oracle_schema: Value = serde_json::from_str(include_str!(
             "../schema/fresh-instance-sealed-oracle.schema.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let manifest_schema: Value = serde_json::from_str(include_str!(
             "../schema/fresh-instance-manifest.schema.json"
-        )).unwrap();
-        let audit_schema: Value = serde_json::from_str(include_str!(
-            "../schema/fresh-instance-audit.schema.json"
-        )).unwrap();
+        ))
+        .unwrap();
+        let audit_schema: Value =
+            serde_json::from_str(include_str!("../schema/fresh-instance-audit.schema.json"))
+                .unwrap();
         let config: FreshChallengeConfigV1 = serde_json::from_str(include_str!(
             "../fixtures/fresh-instance-linear-system-config.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let bundle = generate_fresh_challenge_bundle(&config, &seed()).unwrap();
         let audit = audit_fresh_challenge_bundle(&config, &seed(), &bundle).unwrap();
 
         for (schema, value, version) in [
-            (&config_schema, serde_json::to_value(&config).unwrap(), FRESH_CONFIG_SCHEMA),
-            (&public_schema, serde_json::to_value(&bundle.public_packet).unwrap(), FRESH_PUBLIC_SCHEMA),
-            (&oracle_schema, serde_json::to_value(&bundle.sealed_oracle_packet).unwrap(), FRESH_ORACLE_SCHEMA),
-            (&manifest_schema, serde_json::to_value(&bundle.manifest).unwrap(), FRESH_MANIFEST_SCHEMA),
-            (&audit_schema, serde_json::to_value(&audit).unwrap(), FRESH_AUDIT_SCHEMA),
+            (
+                &config_schema,
+                serde_json::to_value(&config).unwrap(),
+                FRESH_CONFIG_SCHEMA,
+            ),
+            (
+                &public_schema,
+                serde_json::to_value(&bundle.public_packet).unwrap(),
+                FRESH_PUBLIC_SCHEMA,
+            ),
+            (
+                &oracle_schema,
+                serde_json::to_value(&bundle.sealed_oracle_packet).unwrap(),
+                FRESH_ORACLE_SCHEMA,
+            ),
+            (
+                &manifest_schema,
+                serde_json::to_value(&bundle.manifest).unwrap(),
+                FRESH_MANIFEST_SCHEMA,
+            ),
+            (
+                &audit_schema,
+                serde_json::to_value(&audit).unwrap(),
+                FRESH_AUDIT_SCHEMA,
+            ),
         ] {
-            assert_eq!(schema["properties"]["schema"]["const"].as_str(), Some(version));
-            let required: BTreeSet<String> = schema["required"].as_array().unwrap()
-                .iter().map(|item| item.as_str().unwrap().to_owned()).collect();
-            let properties: BTreeSet<String> = schema["properties"].as_object().unwrap()
-                .keys().cloned().collect();
+            assert_eq!(
+                schema["properties"]["schema"]["const"].as_str(),
+                Some(version)
+            );
+            let required: BTreeSet<String> = schema["required"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|item| item.as_str().unwrap().to_owned())
+                .collect();
+            let properties: BTreeSet<String> = schema["properties"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect();
             let actual: BTreeSet<String> = value.as_object().unwrap().keys().cloned().collect();
             assert_eq!(required, properties);
             assert_eq!(actual, properties);
@@ -801,10 +882,19 @@ mod tests {
 
         let public_task_properties: BTreeSet<String> =
             public_schema["properties"]["tasks"]["items"]["properties"]
-                .as_object().unwrap().keys().cloned().collect();
-        let actual_public_task: BTreeSet<String> = serde_json::to_value(
-            &bundle.public_packet.tasks[0]
-        ).unwrap().as_object().unwrap().keys().cloned().collect();
+                .as_object()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect();
+        let actual_public_task: BTreeSet<String> =
+            serde_json::to_value(&bundle.public_packet.tasks[0])
+                .unwrap()
+                .as_object()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect();
         assert_eq!(public_task_properties, actual_public_task);
         assert!(!public_task_properties.contains("solution"));
         assert!(!public_task_properties.contains("generation_seed_hex"));
@@ -812,19 +902,46 @@ mod tests {
         let first_oracle = &bundle.sealed_oracle_packet.entries[0];
         let oracle_entry_schema = &oracle_schema["properties"]["entries"]["items"]["properties"];
         let actual_entry: BTreeSet<String> = serde_json::to_value(first_oracle)
-            .unwrap().as_object().unwrap().keys().cloned().collect();
-        let expected_entry: BTreeSet<String> = oracle_entry_schema.as_object()
-            .unwrap().keys().cloned().collect();
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+        let expected_entry: BTreeSet<String> = oracle_entry_schema
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(actual_entry, expected_entry);
         let actual_parameters: BTreeSet<String> = serde_json::to_value(&first_oracle.parameters)
-            .unwrap().as_object().unwrap().keys().cloned().collect();
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         let expected_parameters: BTreeSet<String> = oracle_entry_schema["parameters"]["properties"]
-            .as_object().unwrap().keys().cloned().collect();
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(actual_parameters, expected_parameters);
         let actual_solution: BTreeSet<String> = serde_json::to_value(&first_oracle.solution)
-            .unwrap().as_object().unwrap().keys().cloned().collect();
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         let expected_solution: BTreeSet<String> = oracle_entry_schema["solution"]["properties"]
-            .as_object().unwrap().keys().cloned().collect();
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(actual_solution, expected_solution);
     }
 
@@ -867,11 +984,14 @@ mod tests {
         assert!(!keys.contains("sealed_oracle_packet"));
         for task in &bundle.public_packet.tasks {
             let task_value: serde_json::Value = serde_json::to_value(task).unwrap();
-            let task_keys: BTreeSet<String> = task_value.as_object().unwrap().keys().cloned().collect();
+            let task_keys: BTreeSet<String> =
+                task_value.as_object().unwrap().keys().cloned().collect();
             assert_eq!(
                 task_keys,
                 ["item_id", "task_text", "task_text_sha256"]
-                    .iter().map(|value| (*value).to_owned()).collect()
+                    .iter()
+                    .map(|value| (*value).to_owned())
+                    .collect()
             );
         }
     }
@@ -904,8 +1024,11 @@ mod tests {
     fn out_of_range_stability_margin_fails_closed() {
         let mut config = config();
         config.minimum_normalized_determinant_margin_permille = 1_001;
-        assert!(generate_fresh_challenge_bundle(&config, &seed())
-            .unwrap_err().contains("invalid matrix/solution bounds"));
+        assert!(
+            generate_fresh_challenge_bundle(&config, &seed())
+                .unwrap_err()
+                .contains("invalid matrix/solution bounds")
+        );
     }
 
     #[test]
@@ -923,16 +1046,22 @@ mod tests {
     fn generator_config_digest_is_bound_to_actual_config_fields() {
         let mut invalid = config();
         invalid.matrix_coefficient_max -= 1;
-        assert!(generate_fresh_challenge_bundle(&invalid, &seed())
-            .unwrap_err().contains("does not match canonical configuration"));
+        assert!(
+            generate_fresh_challenge_bundle(&invalid, &seed())
+                .unwrap_err()
+                .contains("does not match canonical configuration")
+        );
     }
 
     #[test]
     fn checkpoint_must_be_frozen_before_generation() {
         let mut invalid = config();
         invalid.checkpoint_frozen_at_utc = "2026-10-31T18:10:00Z".to_owned();
-        assert!(generate_fresh_challenge_bundle(&invalid, &seed())
-            .unwrap_err().contains("must precede"));
+        assert!(
+            generate_fresh_challenge_bundle(&invalid, &seed())
+                .unwrap_err()
+                .contains("must precede")
+        );
     }
 
     #[test]
@@ -947,9 +1076,14 @@ mod tests {
     fn duplicate_or_mutated_bundle_content_fails_regeneration_audit() {
         let config = config();
         let mut bundle = generate_fresh_challenge_bundle(&config, &seed()).unwrap();
-        bundle.public_packet.tasks[0].task_text.push_str(" modified");
-        assert!(audit_fresh_challenge_bundle(&config, &seed(), &bundle)
-            .unwrap_err().contains("differs from deterministic regeneration"));
+        bundle.public_packet.tasks[0]
+            .task_text
+            .push_str(" modified");
+        assert!(
+            audit_fresh_challenge_bundle(&config, &seed(), &bundle)
+                .unwrap_err()
+                .contains("differs from deterministic regeneration")
+        );
     }
 
     #[test]

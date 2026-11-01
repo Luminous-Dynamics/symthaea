@@ -17,8 +17,7 @@ pub const PUBLIC_PACKET_SCHEMA: &str = "symthaea.contamination_panel_public_pack
 pub const SEALED_KEY_SCHEMA: &str = "symthaea.contamination_panel_sealed_key.v1";
 pub const MANIFEST_SCHEMA: &str = "symthaea.contamination_panel_manifest.v1";
 pub const ADJUDICATION_SCHEMA: &str = "symthaea.contamination_panel_adjudication.v1";
-pub const ADJUDICATION_REPORT_SCHEMA: &str =
-    "symthaea.contamination_panel_adjudication_report.v1";
+pub const ADJUDICATION_REPORT_SCHEMA: &str = "symthaea.contamination_panel_adjudication_report.v1";
 pub const BLIND_PROTOCOL_VERSION: &str = "blind-pair-review-v1";
 pub const GENERATOR_VERSION: &str = "contamination-panel-generator-v1";
 pub const MIN_SEED_BYTES: usize = 32;
@@ -393,9 +392,7 @@ fn inverse_task_prompt(a: u32, b: u32, slope: u32) -> String {
 }
 
 fn polynomial_task_prompt(a: u32, b: u32, slope: u32) -> String {
-    format!(
-        "For q(t) = t squared + {slope}t + {b}, calculate q({a})."
-    )
+    format!("For q(t) = t squared + {slope}t + {b}, calculate q({a}).")
 }
 
 struct PairConstructionV1 {
@@ -438,7 +435,10 @@ fn construct_pair(tier: TierV1, positive: bool, a: u32, b: u32, slope: u32) -> P
             left_text: base.clone(),
             right_text: format!(
                 "  {}\n",
-                base.to_uppercase().replace("(", " ( ").replace(")", " )").replace(",", " ,")
+                base.to_uppercase()
+                    .replace("(", " ( ")
+                    .replace(")", " )")
+                    .replace(",", " ,")
             ),
             relationship: PlantedRelationshipV1::SurfaceVariantSameInstance,
             mechanisms: vec![
@@ -558,10 +558,18 @@ pub fn generate_challenge_bundle(
                 let mut mechanisms = construction.mechanisms;
                 let relationship = construction.relationship;
                 let transformation_family = construction.transformation_family;
-                let mut left_source_lineage_sha256 =
-                    source_digest(&generation_key, ordinal, 0, construction.same_source_lineage);
-                let mut right_source_lineage_sha256 =
-                    source_digest(&generation_key, ordinal, 1, construction.same_source_lineage);
+                let mut left_source_lineage_sha256 = source_digest(
+                    &generation_key,
+                    ordinal,
+                    0,
+                    construction.same_source_lineage,
+                );
+                let mut right_source_lineage_sha256 = source_digest(
+                    &generation_key,
+                    ordinal,
+                    1,
+                    construction.same_source_lineage,
+                );
                 let mut left_recipe_family_sha256 =
                     recipe_digest(&generation_key, ordinal, 0, construction.same_recipe_family);
                 let mut right_recipe_family_sha256 =
@@ -569,7 +577,8 @@ pub fn generate_challenge_bundle(
 
                 // Deterministically randomize pair orientation independently of
                 // tier and control label; the public packet exposes no side marker.
-                let reverse = keyed_digest(&generation_key, b"pair-orientation", ordinal, 0)[0] & 1 == 1;
+                let reverse =
+                    keyed_digest(&generation_key, b"pair-orientation", ordinal, 0)[0] & 1 == 1;
                 if reverse {
                     std::mem::swap(&mut left_item_id, &mut right_item_id);
                     std::mem::swap(&mut left_text, &mut right_text);
@@ -689,7 +698,9 @@ pub fn generate_challenge_bundle(
 
 fn validate_pair_packet(packet: &PublicChallengePacketV1) -> Result<(), String> {
     if packet.schema != PUBLIC_PACKET_SCHEMA {
-        return Err(format!("public packet schema must be {PUBLIC_PACKET_SCHEMA}"));
+        return Err(format!(
+            "public packet schema must be {PUBLIC_PACKET_SCHEMA}"
+        ));
     }
     if packet.generation_id.trim().is_empty() || packet.pairs.is_empty() {
         return Err("public packet must have a generation_id and at least one pair".to_owned());
@@ -702,7 +713,10 @@ fn validate_pair_packet(packet: &PublicChallengePacketV1) -> Result<(), String> 
             || !valid_digest(&pair.right_item_id)
             || !valid_digest(&pair.pair_digest_sha256)
         {
-            return Err(format!("pair {} contains an invalid digest or identifier", pair.pair_id));
+            return Err(format!(
+                "pair {} contains an invalid digest or identifier",
+                pair.pair_id
+            ));
         }
         if pair.left_text.trim().is_empty() || pair.right_text.trim().is_empty() {
             return Err(format!("pair {} has empty task text", pair.pair_id));
@@ -714,10 +728,16 @@ fn validate_pair_packet(packet: &PublicChallengePacketV1) -> Result<(), String> 
             || !item_ids.insert(pair.left_item_id.as_str())
             || !item_ids.insert(pair.right_item_id.as_str())
         {
-            return Err(format!("public packet repeats or aliases item IDs for pair {}", pair.pair_id));
+            return Err(format!(
+                "public packet repeats or aliases item IDs for pair {}",
+                pair.pair_id
+            ));
         }
         if pair_digest(pair)? != pair.pair_digest_sha256 {
-            return Err(format!("pair {} digest does not match public content", pair.pair_id));
+            return Err(format!(
+                "pair {} digest does not match public content",
+                pair.pair_id
+            ));
         }
     }
     Ok(())
@@ -788,8 +808,7 @@ pub fn audit_blinded_adjudications(
                 record.pair_id
             ));
         }
-        if !valid_digest(&record.rationale_sha256)
-            || !valid_digest(&record.evidence_bundle_sha256)
+        if !valid_digest(&record.rationale_sha256) || !valid_digest(&record.evidence_bundle_sha256)
         {
             return Err(format!(
                 "adjudication for pair {} must bind rationale and evidence digests",
@@ -903,16 +922,16 @@ pub fn audit_blinded_adjudications(
         return Err("adjudication panel contains an unexpected pair grouping".to_owned());
     }
 
-    let repeated_reviewer_assignments_across_pairs = reviewer_assignments
-        .values()
-        .try_fold(0_u64, |total, count| {
-            total
-                .checked_add(count.saturating_sub(1))
-                .ok_or_else(|| "repeated reviewer assignment counter overflow".to_owned())
-        })?;
-    let repeated_independence_group_assignments_across_pairs = group_assignments
-        .values()
-        .try_fold(0_u64, |total, count| {
+    let repeated_reviewer_assignments_across_pairs =
+        reviewer_assignments
+            .values()
+            .try_fold(0_u64, |total, count| {
+                total
+                    .checked_add(count.saturating_sub(1))
+                    .ok_or_else(|| "repeated reviewer assignment counter overflow".to_owned())
+            })?;
+    let repeated_independence_group_assignments_across_pairs =
+        group_assignments.values().try_fold(0_u64, |total, count| {
             total
                 .checked_add(count.saturating_sub(1))
                 .ok_or_else(|| "repeated independence-group assignment counter overflow".to_owned())
@@ -1024,13 +1043,15 @@ mod tests {
             assert_eq!(rows.len(), 4);
             assert_eq!(
                 rows.iter()
-                    .filter(|row| row.target_control_label == TargetControlLabelV1::PositiveForTargetTier)
+                    .filter(|row| row.target_control_label
+                        == TargetControlLabelV1::PositiveForTargetTier)
                     .count(),
                 2
             );
             assert_eq!(
                 rows.iter()
-                    .filter(|row| row.target_control_label == TargetControlLabelV1::NegativeForTargetTier)
+                    .filter(|row| row.target_control_label
+                        == TargetControlLabelV1::NegativeForTargetTier)
                     .count(),
                 2
             );
@@ -1081,9 +1102,11 @@ mod tests {
             positive.left_source_lineage_sha256,
             positive.right_source_lineage_sha256
         );
-        assert!(positive.planted_mechanisms_present.contains(
-            &ExposureMechanismV1::ExactInstance
-        ));
+        assert!(
+            positive
+                .planted_mechanisms_present
+                .contains(&ExposureMechanismV1::ExactInstance)
+        );
 
         let negative = key
             .pair_truth
@@ -1101,9 +1124,11 @@ mod tests {
             negative.left_recipe_family_sha256,
             negative.right_recipe_family_sha256
         );
-        assert!(!negative.planted_mechanisms_present.contains(
-            &ExposureMechanismV1::ExactInstance
-        ));
+        assert!(
+            !negative
+                .planted_mechanisms_present
+                .contains(&ExposureMechanismV1::ExactInstance)
+        );
     }
 
     #[test]
@@ -1135,12 +1160,18 @@ mod tests {
     #[test]
     fn public_manifest_binds_both_artifacts_and_seed_commitment() {
         let bundle = generate_challenge_bundle(&config(), &seed(13)).unwrap();
-        let manifest: ChallengeManifestV1 =
-            serde_json::from_slice(&bundle.manifest_bytes).unwrap();
+        let manifest: ChallengeManifestV1 = serde_json::from_slice(&bundle.manifest_bytes).unwrap();
         assert_eq!(manifest.public_packet_sha256, bundle.public_packet_sha256);
         assert_eq!(manifest.sealed_key_sha256, bundle.sealed_key_sha256);
-        assert_eq!(manifest.seed_commitment_sha256, bundle.seed_commitment_sha256);
-        assert!(manifest.claim_boundary.contains("not_evidence_of_real_model_training_exposure"));
+        assert_eq!(
+            manifest.seed_commitment_sha256,
+            bundle.seed_commitment_sha256
+        );
+        assert!(
+            manifest
+                .claim_boundary
+                .contains("not_evidence_of_real_model_training_exposure")
+        );
     }
 
     #[test]
@@ -1200,10 +1231,16 @@ mod tests {
         assert_eq!(report.distinct_reviewer_count_total, 3);
         assert_eq!(report.distinct_independence_group_count_total, 3);
         assert_eq!(report.repeated_reviewer_assignments_across_pairs, 45);
-        assert_eq!(report.repeated_independence_group_assignments_across_pairs, 45);
+        assert_eq!(
+            report.repeated_independence_group_assignments_across_pairs,
+            45
+        );
         assert_eq!(report.disputed_pair_count, 0);
         assert_eq!(report.insufficient_evidence_pair_count, 0);
-        assert_eq!(report.reviewer_identity, "pseudonymous_self_declared_not_authenticated");
+        assert_eq!(
+            report.reviewer_identity,
+            "pseudonymous_self_declared_not_authenticated"
+        );
     }
 
     #[test]
@@ -1220,7 +1257,11 @@ mod tests {
 
         let report = audit_blinded_adjudications(&packet, &records).unwrap();
         assert_eq!(report.disputed_pair_count, 1);
-        let row = report.pairs.iter().find(|row| row.pair_id == *target).unwrap();
+        let row = report
+            .pairs
+            .iter()
+            .find(|row| row.pair_id == *target)
+            .unwrap();
         assert_eq!(row.resolution, "disputed");
     }
 
@@ -1230,15 +1271,19 @@ mod tests {
         let packet = packet(&bundle);
         let mut records = valid_records(&packet);
         records[1].reviewer_pseudonym = records[0].reviewer_pseudonym.clone();
-        assert!(audit_blinded_adjudications(&packet, &records)
-            .unwrap_err()
-            .contains("repeats reviewer"));
+        assert!(
+            audit_blinded_adjudications(&packet, &records)
+                .unwrap_err()
+                .contains("repeats reviewer")
+        );
 
         let mut records = valid_records(&packet);
         records[1].independence_group = records[0].independence_group.clone();
-        assert!(audit_blinded_adjudications(&packet, &records)
-            .unwrap_err()
-            .contains("duplicate independence group"));
+        assert!(
+            audit_blinded_adjudications(&packet, &records)
+                .unwrap_err()
+                .contains("duplicate independence group")
+        );
     }
 
     #[test]
@@ -1247,15 +1292,19 @@ mod tests {
         let packet = packet(&bundle);
         let mut records = valid_records(&packet);
         records.pop();
-        assert!(audit_blinded_adjudications(&packet, &records)
-            .unwrap_err()
-            .contains("requires exactly 3 adjudicators"));
+        assert!(
+            audit_blinded_adjudications(&packet, &records)
+                .unwrap_err()
+                .contains("requires exactly 3 adjudicators")
+        );
 
         let mut records = valid_records(&packet);
         records[0].pair_id = "not-a-real-pair".to_owned();
-        assert!(audit_blinded_adjudications(&packet, &records)
-            .unwrap_err()
-            .contains("unknown pair"));
+        assert!(
+            audit_blinded_adjudications(&packet, &records)
+                .unwrap_err()
+                .contains("unknown pair")
+        );
     }
 
     #[test]
@@ -1264,9 +1313,11 @@ mod tests {
         let packet = packet(&bundle);
         let mut records = valid_records(&packet);
         records[0].reviewer_aware_of_tier = true;
-        assert!(audit_blinded_adjudications(&packet, &records)
-            .unwrap_err()
-            .contains("not blinded"));
+        assert!(
+            audit_blinded_adjudications(&packet, &records)
+                .unwrap_err()
+                .contains("not blinded")
+        );
     }
 
     #[test]
@@ -1280,7 +1331,12 @@ mod tests {
         let report = audit_blinded_adjudications(&packet, &records).unwrap();
         assert_eq!(report.insufficient_evidence_pair_count, 16);
         assert_eq!(report.adjudicated_pair_count, 0);
-        assert!(report.pairs.iter().all(|pair| pair.resolution == "insufficient_evidence"));
+        assert!(
+            report
+                .pairs
+                .iter()
+                .all(|pair| pair.resolution == "insufficient_evidence")
+        );
     }
 
     #[test]
@@ -1311,3 +1367,5 @@ pub mod causal_analysis;
 pub mod fresh_instance;
 
 pub mod fresh_scoring;
+
+pub mod search_time;

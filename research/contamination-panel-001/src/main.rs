@@ -1,22 +1,29 @@
 use contamination_panel_bench::{
-    ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, DetectorRunV1,
+    ADJUDICATION_REPORT_SCHEMA, AdjudicationRecordV1, ChallengeManifestV1, GeneratorConfigV1,
+    PublicChallengePacketV1, SealedChallengeKeyV1, audit_blinded_adjudications,
     causal_analysis::{ReplicatedCausalStudyV1, analyze_replicated_causal_study},
+    detectors::{DetectorRunV1, DetectorSpecV1, evaluate_detector_run, score_public_packet},
     fresh_instance::{
         FreshChallengeBundleV1, FreshChallengeConfigV1, FreshChallengeManifestV1,
-        FreshPublicChallengePacketV1, SealedFreshOraclePacketV1,
-        audit_fresh_challenge_bundle, generate_fresh_challenge_bundle,
+        FreshPublicChallengePacketV1, SealedFreshOraclePacketV1, audit_fresh_challenge_bundle,
+        generate_fresh_challenge_bundle,
     },
-    fresh_scoring::{FreshScoreReportV1, score_fresh_submission, verify_fresh_score_report_integrity},
-    DetectorSpecV1, PublicChallengePacketV1, SealedChallengeKeyV1,
-    audit_blinded_adjudications, detectors::{evaluate_detector_run, score_public_packet},
+    fresh_scoring::{
+        FreshScoreReportV1, score_fresh_submission, verify_fresh_score_report_integrity,
+    },
     ftd::{
-        empirical_reference_p_values, ftd_weighted_cauchy_bh, FeaturePValuesV1,
-        FtdWeightPolicyV1, ReferenceTailV1, ScoreObservationV1,
+        FeaturePValuesV1, FtdWeightPolicyV1, ReferenceTailV1, ScoreObservationV1,
+        empirical_reference_p_values, ftd_weighted_cauchy_bh,
     },
-    generate_challenge_bundle, GeneratorConfigV1,
+    generate_challenge_bundle,
     intervention::{
-        RandomizedInterventionDesignV1, RandomizedInterventionManifestV1,
-        audit_intervention, randomize_intervention,
+        RandomizedInterventionDesignV1, RandomizedInterventionManifestV1, audit_intervention,
+        randomize_intervention,
+    },
+    search_time::{
+        SEARCH_MAX_FINDINGS_BYTES, SEARCH_MAX_TOTAL_BODY_BYTES, SEARCH_MAX_TRACE_BYTES,
+        SearchCapturedResponseBodyV1, SearchTimeExposureFindingsV1, SearchTimeExposureTraceV1,
+        analyze_search_time_response_bodies, audit_search_time_findings, audit_search_time_trace,
     },
     training_receipt::validate_paired_training_execution_receipt,
 };
@@ -24,10 +31,25 @@ use std::{
     env,
     error::Error,
     fs,
-    io::{self, BufRead},
+    io::{self, BufRead, Read},
     path::Path,
     process,
 };
+
+fn read_bounded(path: &str, maximum_bytes: usize, label: &str) -> io::Result<Vec<u8>> {
+    let file = fs::File::open(path)?;
+    let limit = u64::try_from(maximum_bytes)
+        .map_err(|_| io::Error::other(format!("{label} byte limit exceeds u64")))?;
+    let mut bytes = Vec::new();
+    file.take(limit + 1).read_to_end(&mut bytes)?;
+    if bytes.len() > maximum_bytes {
+        return Err(io::Error::other(format!(
+            "{label} exceeds the {} byte safety bound",
+            maximum_bytes
+        )));
+    }
+    Ok(bytes)
+}
 
 fn decode_hex(input: &str) -> Result<Vec<u8>, String> {
     if input.len() % 2 != 0 {
@@ -147,14 +169,9 @@ fn ftd_pvalues(args: &[String]) -> Result<(), Box<dyn Error>> {
     let reference_scores: Vec<f64> = serde_json::from_slice(&fs::read(&args[3])?)?;
     let test_scores: Vec<ScoreObservationV1> = serde_json::from_slice(&fs::read(&args[4])?)?;
     let seed = decode_hex(&args[5]).map_err(io::Error::other)?;
-    let p_values = empirical_reference_p_values(
-        &args[1],
-        direction,
-        &reference_scores,
-        &test_scores,
-        &seed,
-    )
-    .map_err(io::Error::other)?;
+    let p_values =
+        empirical_reference_p_values(&args[1], direction, &reference_scores, &test_scores, &seed)
+            .map_err(io::Error::other)?;
     let bytes = serde_json::to_vec_pretty(&p_values)?;
     write_bytes(&args[6], &bytes)?;
     println!(
@@ -174,28 +191,22 @@ fn ftd_fuse(args: &[String]) -> Result<(), Box<dyn Error>> {
                 .into(),
         );
     }
-    let feature_p_values: Vec<FeaturePValuesV1> =
-        serde_json::from_slice(&fs::read(&args[1])?)?;
+    let feature_p_values: Vec<FeaturePValuesV1> = serde_json::from_slice(&fs::read(&args[1])?)?;
     let alpha = args[2].parse::<f64>()?;
     let (weight_policy, temperature) = match args[3].as_str() {
-        "paper" if args[4] == "none" => {
-            (FtdWeightPolicyV1::PaperNormalizedRejectionCounts, None)
-        }
+        "paper" if args[4] == "none" => (FtdWeightPolicyV1::PaperNormalizedRejectionCounts, None),
         "official" if args[4] != "none" => (
             FtdWeightPolicyV1::OfficialRepositorySoftmaxSharpened,
             Some(args[4].parse::<u16>()?),
         ),
         "paper" => return Err("paper policy requires temperature=none".into()),
-        "official" => return Err("official policy requires an integer temperature in thousandths".into()),
+        "official" => {
+            return Err("official policy requires an integer temperature in thousandths".into());
+        }
         _ => return Err("weight policy must be paper or official".into()),
     };
-    let report = ftd_weighted_cauchy_bh(
-        &feature_p_values,
-        alpha,
-        weight_policy,
-        temperature,
-    )
-    .map_err(io::Error::other)?;
+    let report = ftd_weighted_cauchy_bh(&feature_p_values, alpha, weight_policy, temperature)
+        .map_err(io::Error::other)?;
     let bytes = serde_json::to_vec_pretty(&report)?;
     write_bytes(&args[5], &bytes)?;
     println!(
@@ -244,8 +255,7 @@ fn audit_intervention_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
         );
     }
     let design: RandomizedInterventionDesignV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
-    let manifest: RandomizedInterventionManifestV1 =
-        serde_json::from_slice(&fs::read(&args[2])?)?;
+    let manifest: RandomizedInterventionManifestV1 = serde_json::from_slice(&fs::read(&args[2])?)?;
     let seed = decode_hex(&args[3]).map_err(io::Error::other)?;
     let report = audit_intervention(&design, &manifest, &seed).map_err(io::Error::other)?;
     write_bytes(&args[4], &serde_json::to_vec_pretty(&report)?)?;
@@ -262,8 +272,7 @@ fn audit_intervention_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
 fn verify_fresh_score_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 2 {
         return Err(
-            "usage: contamination-panel-bench verify-fresh-score <score-report.json>"
-                .into(),
+            "usage: contamination-panel-bench verify-fresh-score <score-report.json>".into(),
         );
     }
     let report: FreshScoreReportV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
@@ -278,6 +287,135 @@ fn verify_fresh_score_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn match_search_time_bodies_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 8 {
+        return Err(
+            "usage: contamination-panel-bench match-search-time-bodies <trace.json> <public-packet.json> <sealed-oracle.json> <manifest.json> <response-bodies.json> <unavailable-event-sequences.json> <findings.json>"
+                .into(),
+        );
+    }
+    let trace_bytes = read_bounded(&args[1], SEARCH_MAX_TRACE_BYTES, "search-time trace")?;
+    let trace: SearchTimeExposureTraceV1 = serde_json::from_slice(&trace_bytes)?;
+    let trace_audit = audit_search_time_trace(&trace).map_err(io::Error::other)?;
+    if !trace_audit.valid {
+        return Err("search-time trace failed integrity audit".into());
+    }
+    let bundle = FreshChallengeBundleV1 {
+        public_packet: serde_json::from_slice::<FreshPublicChallengePacketV1>(&fs::read(
+            &args[2],
+        )?)?,
+        sealed_oracle_packet: serde_json::from_slice::<SealedFreshOraclePacketV1>(&fs::read(
+            &args[3],
+        )?)?,
+        manifest: serde_json::from_slice::<FreshChallengeManifestV1>(&fs::read(&args[4])?)?,
+    };
+    let body_bytes = read_bounded(
+        &args[5],
+        SEARCH_MAX_TOTAL_BODY_BYTES + 32 * 1024 * 1024,
+        "response-body evidence file",
+    )?;
+    let response_bodies: Vec<SearchCapturedResponseBodyV1> = serde_json::from_slice(&body_bytes)?;
+    let unavailable_bytes = read_bounded(
+        &args[6],
+        SEARCH_MAX_FINDINGS_BYTES,
+        "unavailable event-sequence file",
+    )?;
+    let unavailable: Vec<u64> = serde_json::from_slice(&unavailable_bytes)?;
+    let findings =
+        analyze_search_time_response_bodies(&trace, &bundle, &response_bodies, &unavailable)
+            .map_err(io::Error::other)?;
+    write_bytes(&args[7], &serde_json::to_vec_pretty(&findings)?)?;
+    println!(
+        "body_events={} inspected={} unavailable={} metadata={} context={} answer={} unknown={}",
+        findings.response_body_event_count,
+        findings.response_body_evidence_count,
+        findings.unavailable_body_event_sequences.len(),
+        findings
+            .findings
+            .iter()
+            .filter(|item| item.exposure_class
+                == contamination_panel_bench::search_time::SearchExposureClassV1::MetadataOnly)
+            .count(),
+        findings
+            .findings
+            .iter()
+            .filter(|item| item.exposure_class
+                == contamination_panel_bench::search_time::SearchExposureClassV1::ContextBearing)
+            .count(),
+        findings
+            .findings
+            .iter()
+            .filter(|item| item.exposure_class
+                == contamination_panel_bench::search_time::SearchExposureClassV1::AnswerBearing)
+            .count(),
+        findings
+            .findings
+            .iter()
+            .filter(|item| item.exposure_class
+                == contamination_panel_bench::search_time::SearchExposureClassV1::Unknown)
+            .count()
+    );
+    println!(
+        "Raw bodies and sealed answers were used locally and are not copied to the findings artifact."
+    );
+    Ok(())
+}
+
+fn audit_search_time_trace_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench audit-search-time-trace <trace.json> <audit-report.json>"
+                .into(),
+        );
+    }
+    let trace_bytes = read_bounded(&args[1], SEARCH_MAX_TRACE_BYTES, "search-time trace")?;
+    let trace: SearchTimeExposureTraceV1 = serde_json::from_slice(&trace_bytes)?;
+    let report = audit_search_time_trace(&trace).map_err(io::Error::other)?;
+    write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "valid={} events={} allowed={} blocked={} coverage={} complete_mediation_verified={}",
+        report.valid,
+        report.event_count,
+        report.allowed_event_count,
+        report.blocked_event_count,
+        report.coverage_status,
+        report.complete_mediation_verified
+    );
+    Ok(())
+}
+
+fn audit_search_time_findings_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 4 {
+        return Err(
+            "usage: contamination-panel-bench audit-search-time-findings <trace.json> <findings.json> <audit-report.json>"
+                .into(),
+        );
+    }
+    let trace_bytes = fs::read(&args[1])?;
+    if trace_bytes.len() > SEARCH_MAX_TRACE_BYTES {
+        return Err("search-time trace exceeds 256 MiB safety bound".into());
+    }
+    let trace: SearchTimeExposureTraceV1 = serde_json::from_slice(&trace_bytes)?;
+    let trace_audit = audit_search_time_trace(&trace).map_err(io::Error::other)?;
+    if !trace_audit.valid {
+        return Err("search-time trace failed integrity audit".into());
+    }
+    let findings_bytes = read_bounded(&args[2], SEARCH_MAX_FINDINGS_BYTES, "search-time findings")?;
+    let findings: SearchTimeExposureFindingsV1 = serde_json::from_slice(&findings_bytes)?;
+    let report = audit_search_time_findings(&trace, &findings).map_err(io::Error::other)?;
+    write_bytes(&args[3], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "valid={} metadata={} context={} answer={} unknown={}",
+        report.valid,
+        report.metadata_only_count,
+        report.context_bearing_count,
+        report.answer_bearing_count,
+        report.unknown_count
+    );
+    println!("Classification evidence is evaluator-supplied; causal influence is not established.");
+    Ok(())
+}
+
 fn score_fresh_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 6 {
         return Err(
@@ -286,8 +424,12 @@ fn score_fresh_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
         );
     }
     let bundle = FreshChallengeBundleV1 {
-        public_packet: serde_json::from_slice::<FreshPublicChallengePacketV1>(&fs::read(&args[1])?)?,
-        sealed_oracle_packet: serde_json::from_slice::<SealedFreshOraclePacketV1>(&fs::read(&args[2])?)?,
+        public_packet: serde_json::from_slice::<FreshPublicChallengePacketV1>(&fs::read(
+            &args[1],
+        )?)?,
+        sealed_oracle_packet: serde_json::from_slice::<SealedFreshOraclePacketV1>(&fs::read(
+            &args[2],
+        )?)?,
         manifest: serde_json::from_slice::<FreshChallengeManifestV1>(&fs::read(&args[3])?)?,
     };
     let submission_bytes = fs::read(&args[4])?;
@@ -321,7 +463,10 @@ fn generate_fresh_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     let seed = decode_hex(&args[2]).map_err(io::Error::other)?;
     let bundle = generate_fresh_challenge_bundle(&config, &seed).map_err(io::Error::other)?;
     write_bytes(&args[3], &serde_json::to_vec_pretty(&bundle.public_packet)?)?;
-    write_bytes(&args[4], &serde_json::to_vec_pretty(&bundle.sealed_oracle_packet)?)?;
+    write_bytes(
+        &args[4],
+        &serde_json::to_vec_pretty(&bundle.sealed_oracle_packet)?,
+    )?;
     write_bytes(&args[5], &serde_json::to_vec_pretty(&bundle.manifest)?)?;
     println!(
         "batch={} items={} public_sha256={} manifest_sha256={}",
@@ -344,8 +489,12 @@ fn audit_fresh_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     let config: FreshChallengeConfigV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
     let seed = decode_hex(&args[2]).map_err(io::Error::other)?;
     let bundle = FreshChallengeBundleV1 {
-        public_packet: serde_json::from_slice::<FreshPublicChallengePacketV1>(&fs::read(&args[3])?)?,
-        sealed_oracle_packet: serde_json::from_slice::<SealedFreshOraclePacketV1>(&fs::read(&args[4])?)?,
+        public_packet: serde_json::from_slice::<FreshPublicChallengePacketV1>(&fs::read(
+            &args[3],
+        )?)?,
+        sealed_oracle_packet: serde_json::from_slice::<SealedFreshOraclePacketV1>(&fs::read(
+            &args[4],
+        )?)?,
         manifest: serde_json::from_slice::<FreshChallengeManifestV1>(&fs::read(&args[5])?)?,
     };
     let report = audit_fresh_challenge_bundle(&config, &seed, &bundle).map_err(io::Error::other)?;
@@ -392,16 +541,12 @@ fn audit_training_receipt_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
         );
     }
     let design: RandomizedInterventionDesignV1 = serde_json::from_slice(&fs::read(&args[1])?)?;
-    let manifest: RandomizedInterventionManifestV1 =
-        serde_json::from_slice(&fs::read(&args[2])?)?;
+    let manifest: RandomizedInterventionManifestV1 = serde_json::from_slice(&fs::read(&args[2])?)?;
     let seed = decode_hex(&args[3]).map_err(io::Error::other)?;
     let receipt_bytes = fs::read(&args[4])?;
-    let report = validate_paired_training_execution_receipt(
-        &design,
-        &manifest,
-        &seed,
-        &receipt_bytes,
-    ).map_err(io::Error::other)?;
+    let report =
+        validate_paired_training_execution_receipt(&design, &manifest, &seed, &receipt_bytes)
+            .map_err(io::Error::other)?;
     write_bytes(&args[5], &serde_json::to_vec_pretty(&report)?)?;
     println!(
         "valid={} execution_consistent={} ready_for_external_verification={} independently_verified={}",
@@ -410,7 +555,10 @@ fn audit_training_receipt_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
         report.ready_for_independent_attestation_verification,
         report.independently_verified
     );
-    println!("attestation status: {}", report.external_attestation_verification);
+    println!(
+        "attestation status: {}",
+        report.external_attestation_verification
+    );
     Ok(())
 }
 
@@ -433,7 +581,10 @@ fn audit_adjudications(args: &[String]) -> Result<(), Box<dyn Error>> {
         let record: AdjudicationRecordV1 = serde_json::from_str(&line).map_err(|error| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("invalid adjudication JSON at line {}: {error}", line_number + 1),
+                format!(
+                    "invalid adjudication JSON at line {}: {error}",
+                    line_number + 1
+                ),
             )
         })?;
         records.push(record);
@@ -471,9 +622,12 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("audit-fresh") => audit_fresh_cli(&args),
         Some("score-fresh") => score_fresh_cli(&args),
         Some("verify-fresh-score") => verify_fresh_score_cli(&args),
+        Some("match-search-time-bodies") => match_search_time_bodies_cli(&args),
+        Some("audit-search-time-trace") => audit_search_time_trace_cli(&args),
+        Some("audit-search-time-findings") => audit_search_time_findings_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | verify-fresh-score | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | verify-fresh-score | match-search-time-bodies | audit-search-time-trace | audit-search-time-findings | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }

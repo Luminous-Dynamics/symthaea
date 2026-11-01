@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/search-time-exposure-findings-v1.json",
+  "title": "Evaluator search-time exposure findings v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "run_id",
+    "trace_root_sha256",
+    "response_body_event_count",
+    "response_body_evidence_count",
+    "unavailable_body_event_sequences",
+    "findings",
+    "findings_sha256",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.search_time_exposure_findings.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trace_root_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event_sequence",
+          "exposure_class",
+          "matched_item_ids",
+          "evidence_sha256",
+          "method",
+          "confidence_permille"
+        ],
+        "properties": {
+          "event_sequence": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "exposure_class": {
+            "type": "string",
+            "enum": [
+              "metadata_only",
+              "context_bearing",
+              "answer_bearing",
+              "unknown"
+            ]
+          },
+          "matched_item_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "exact_match",
+              "fuzzy_text",
+              "semantic_review",
+              "human_adjudication",
+              "other"
+            ]
+          },
+          "confidence_permille": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          }
+        }
+      }
+    },
+    "findings_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "response_body_event_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response_body_evidence_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unavailable_body_event_sequences": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
+    }
+  }
+}
