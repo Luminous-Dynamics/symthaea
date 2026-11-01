@@ -324,7 +324,7 @@ fn run() -> Result<(), String> {
         };
 
         println!(
-            "{},{},{},{},{},{},{:.4},{},{},{},{},{},{},true",
+            "{},{},{},{},{},{},{:.4},{},{},{},{},{},{},{},true",
             fixture.topology,
             fixture.variables,
             scopes.len(),
