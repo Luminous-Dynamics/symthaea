@@ -116,8 +116,6 @@ impl AcceptedReceipt {
             && self.receipt_digest == candidate.receipt_digest
             && self.observer_profile_digest == candidate.observer_profile_digest
             && self.boot_incarnation_digest == candidate.boot_incarnation_digest
-            && self.checkpoint == candidate.checkpoint
-            && self.policy_versions == candidate.policy_versions
     }
 }
 
@@ -759,6 +757,28 @@ mod tests {
         assert!(!report.anti_rollback_qualified);
         assert!(!report.signature_verification_performed);
         assert!(!report.storage_durability_qualified);
+    }
+
+    #[test]
+    fn exact_receipt_retry_remains_idempotent_after_log_checkpoint_advances() {
+        let mut state = bootstrap();
+        let original = fixture_candidate();
+        let mut successor = successor_candidate(&state, 2, 62);
+        successor.checkpoint.tree_size = 11;
+        successor.checkpoint.root_digest = test_digest(63);
+        successor.checkpoint.checkpoint_digest = test_digest(64);
+        successor.checkpoint_evidence = CheckpointEvidence::VerifiedConsistentExtension {
+            consistency_proof_digest: test_digest(65),
+        };
+        let plan = match state.preview(&successor).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("successor is new"),
+        };
+        state.commit(plan).unwrap();
+        assert_eq!(
+            state.preview(&original),
+            Ok(TransitionDecision::AlreadyCommitted { revision: 2 })
+        );
     }
 
     #[test]
