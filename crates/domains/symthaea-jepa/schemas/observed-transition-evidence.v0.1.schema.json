@@ -29,7 +29,8 @@
     "action_ended_at_seconds",
     "requested_target_time_seconds",
     "target_observed_at_seconds",
-    "max_target_lateness_seconds"
+    "max_target_lateness_seconds",
+    "predictor_parameters_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -126,6 +127,11 @@
       "type": "string",
       "pattern": "^[a-f0-9]{64}$",
       "description": "Recomputed by JEPA from the action-manifest digest, stable action ID and discrete action index."
+    },
+    "predictor_parameters_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Digest of the forecast-producing JEPA configuration and exact context, target and latent-predictor parameter bits. Evaluation requires loading a model with this exact digest; training may use a later model."
     }
   },
   "x-rust-invariants": [
@@ -140,6 +146,7 @@
     "source_embedding_sha256 and target_embedding_sha256 are recomputed from the exact supplied ContinuousHV values and must match",
     "both embeddings must have configured input dimension and finite f32 values",
     "action_started_at_seconds <= action_ended_at_seconds <= requested_target_time_seconds",
-    "action_binding_sha256 equals the domain-separated SHA-256 of action_manifest_sha256, action_id and action_index"
+    "action_binding_sha256 equals the domain-separated SHA-256 of action_manifest_sha256, action_id and action_index",
+    "evaluate_observed_transition requires the loaded JEPA prediction-parameter digest to equal the forecast's predictor_parameters_sha256"
   ]
 }
