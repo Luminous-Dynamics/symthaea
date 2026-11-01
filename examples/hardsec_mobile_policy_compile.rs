@@ -136,7 +136,19 @@ fn validate_policy(policy: &Value, profile: &Value) -> Result<(), String> {
         }
         if control["accepted_evidence_source_types"]
             .as_array()
-            .is_none_or(|sources| sources.is_empty() || sources.iter().any(|v| !v.is_string()))
+            .is_none_or(|sources| {
+                sources.is_empty()
+                    || sources.iter().any(|value| {
+                        !matches!(
+                            value.as_str(),
+                            Some(
+                                "hardware_attestation_verified"
+                                    | "privileged_device_tool"
+                                    | "physical_lab_measurement"
+                            )
+                        )
+                    })
+            })
         {
             return Err(format!("control {id} has invalid accepted_evidence_source_types"));
         }
@@ -180,11 +192,13 @@ fn evaluate_control(
     }
 
     let desired_match = desired.iter().any(|value| value.as_str() == Some(observed));
-    let accepted_linked_evidence = linked_sources.iter().any(|source| {
-        accepted
-            .iter()
-            .any(|allowed| allowed.as_str() == source["source_type"].as_str())
-    });
+    let evidence_domain = profile["evidence_domain"].as_str().unwrap_or("unknown");
+    let accepted_linked_evidence = evidence_domain != "synthetic_fixture"
+        && linked_sources.iter().any(|source| {
+            accepted
+                .iter()
+                .any(|allowed| allowed.as_str() == source["source_type"].as_str())
+        });
 
     let (status, action, reason) = if matches!(
         observed,
@@ -209,7 +223,7 @@ fn evaluate_control(
         )
     } else if desired_match {
         (
-            "satisfied_for_declared_scope",
+            "claim_satisfied_for_declared_scope",
             "continue",
             "the claim matches the policy and has linked evidence from an accepted source",
         )
@@ -267,7 +281,7 @@ fn compile_policy(policy: &Value, profile: &Value, policy_bytes: &[u8], profile_
     Ok(json!({
         "schema_version": "hardsec-mobile-policy-receipt-v1",
         "result": if all_satisfied {
-            "all_policy_obligations_satisfied_for_declared_scope"
+            "all_claims_satisfied_for_declared_scope"
         } else {
             "policy_not_satisfied_or_evidence_incomplete"
         },
@@ -426,7 +440,7 @@ mod tests {
             .unwrap();
         let receipt = evaluate_control(mte, &profile, &ledger).unwrap();
 
-        assert_eq!(receipt["status"], "satisfied_for_declared_scope");
+        assert_eq!(receipt["status"], "claim_satisfied_for_declared_scope");
     }
 
     #[test]
