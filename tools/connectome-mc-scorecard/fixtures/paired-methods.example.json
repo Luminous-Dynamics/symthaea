@@ -2,15 +2,21 @@
   "planned_replicates": [
     {
       "replicate_id": "r0001",
-      "seed": 42
+      "seed": 42,
+      "structural_beta": 0,
+      "null_is_true": true
     },
     {
       "replicate_id": "r0002",
-      "seed": 43
+      "seed": 43,
+      "structural_beta": 0,
+      "null_is_true": true
     },
     {
       "replicate_id": "r0003",
-      "seed": 44
+      "seed": 44,
+      "structural_beta": 0,
+      "null_is_true": true
     }
   ],
   "records": [
