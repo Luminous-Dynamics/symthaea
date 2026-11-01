@@ -8,7 +8,7 @@
 //! keeps "compiled" distinct from "semantically approved".
 
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::Path,
 };
@@ -40,6 +40,7 @@ pub struct IntegritySummary {
     pub lake_manifest_sha256: String,
     pub used_axiom_count: usize,
     pub allowed_axiom_count: usize,
+    pub verified_evidence_artifact_count: usize,
 }
 
 fn field<'a>(value: &'a Value, pointer: &str) -> Result<&'a Value> {
@@ -375,7 +376,170 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<Integrity
         lake_manifest_sha256: string(value, "/environment/lake_manifest_sha256")?.to_owned(),
         used_axiom_count: used_axioms.len(),
         allowed_axiom_count: allowed_axioms.len(),
+        verified_evidence_artifact_count: 0,
     })
+}
+
+
+#[derive(Debug)]
+struct EvidenceArtifact {
+    path: String,
+    sha256: String,
+}
+
+fn evidence_artifact(value: &Value, pointer: &str) -> Result<Option<EvidenceArtifact>> {
+    match field(value, pointer)? {
+        Value::Null => Ok(None),
+        artifact => {
+            let path = artifact
+                .get("path")
+                .and_then(Value::as_str)
+                .with_context(|| format!("{pointer}.path must be a string"))?;
+            let sha256 = artifact
+                .get("sha256")
+                .and_then(Value::as_str)
+                .with_context(|| format!("{pointer}.sha256 must be a string"))?;
+            check_relative_path(path)?;
+            check_digest(sha256, &format!("{pointer}.sha256"), 64)?;
+            Ok(Some(EvidenceArtifact {
+                path: path.to_owned(),
+                sha256: sha256.to_owned(),
+            }))
+        }
+    }
+}
+
+fn verify_artifact_bytes(
+    root: &Path,
+    root_canonical: &Path,
+    artifact: &EvidenceArtifact,
+    expected_digest: &str,
+    label: &str,
+) -> Result<Vec<u8>> {
+    if artifact.sha256 != expected_digest {
+        bail!("{label} artifact digest differs from the corresponding receipt field");
+    }
+    let candidate = root.join(&artifact.path);
+    let canonical = fs::canonicalize(&candidate)
+        .with_context(|| format!("resolve evidence artifact {}", candidate.display()))?;
+    if !canonical.starts_with(root_canonical) {
+        bail!("{label} artifact escapes the evidence root through a symlink or path alias");
+    }
+    let metadata = fs::metadata(&canonical)
+        .with_context(|| format!("stat evidence artifact {}", canonical.display()))?;
+    if !metadata.is_file() {
+        bail!("{label} evidence artifact is not a regular file");
+    }
+    let bytes = fs::read(&canonical)
+        .with_context(|| format!("read evidence artifact {}", canonical.display()))?;
+    let actual = hex::encode(Sha256::digest(&bytes));
+    if actual != artifact.sha256 {
+        bail!("{label} evidence artifact bytes do not match the registered SHA-256");
+    }
+    Ok(bytes)
+}
+
+fn verify_axiom_artifact(bytes: &[u8], expected: &[String], label: &str) -> Result<()> {
+    let parsed: Vec<String> = serde_json::from_slice(bytes)
+        .with_context(|| format!("{label} must contain a JSON string array"))?;
+    if parsed != expected || serde_json::to_vec(&parsed)? != bytes {
+        bail!("{label} bytes must be the exact compact JSON serialization of the sorted manifest");
+    }
+    Ok(())
+}
+
+fn verify_evidence_artifacts(value: &Value, evidence_root: &Path) -> Result<usize> {
+    let evidence_class = string(value, "/evidence_class")?;
+    if evidence_class == "synthetic_contract_fixture" {
+        if !field(value, "/evidence_artifacts")?.is_null() {
+            bail!("synthetic integrity fixture cannot carry measured evidence artifacts");
+        }
+        return Ok(0);
+    }
+
+    let root_canonical = fs::canonicalize(evidence_root)
+        .with_context(|| format!("resolve evidence root {}", evidence_root.display()))?;
+    if !root_canonical.is_dir() {
+        bail!("evidence root must be a directory");
+    }
+
+    let mut artifacts = BTreeMap::new();
+    for (name, pointer) in [
+        ("source_file", "/evidence_artifacts/source_file"),
+        ("informal_statement", "/evidence_artifacts/informal_statement"),
+        ("lean_binary", "/evidence_artifacts/lean_binary"),
+        ("lake_manifest", "/evidence_artifacts/lake_manifest"),
+        ("root_module", "/evidence_artifacts/root_module"),
+        ("elaboration_receipt", "/evidence_artifacts/elaboration_receipt"),
+        ("used_axioms_manifest", "/evidence_artifacts/used_axioms_manifest"),
+        ("allowlist_manifest", "/evidence_artifacts/allowlist_manifest"),
+        ("counterexample_receipt", "/evidence_artifacts/counterexample_receipt"),
+        ("vacuity_receipt", "/evidence_artifacts/vacuity_receipt"),
+        ("reviewer_attestation", "/evidence_artifacts/reviewer_attestation"),
+    ] {
+        let item = evidence_artifact(value, pointer)?;
+        if let Some(item) = item {
+            artifacts.insert(name, item);
+        }
+    }
+
+    if string(value, "/integrity_status")? == "eligible"
+        && artifacts.len() != 11
+    {
+        bail!("eligible measured integrity receipt must include all eleven evidence artifacts");
+    }
+    if artifacts.is_empty() {
+        return Ok(0);
+    }
+
+    let target_source_sha = string(value, "/target/source_file_sha256")?;
+    let informal_sha = string(value, "/target/expected_informal_statement_sha256")?;
+    let lean_sha = string(value, "/environment/lean_binary_sha256")?;
+    let lake_sha = string(value, "/environment/lake_manifest_sha256")?;
+    let root_sha = string(value, "/environment/root_module_sha256")?;
+    let elaboration_sha = string(value, "/elaboration/receipt_sha256")?;
+    let used_axioms_sha = string(value, "/axioms/used_axioms_manifest_sha256")?;
+    let allowlist_sha = string(value, "/axioms/allowlist_manifest_sha256")?;
+    let counterexample_sha = string(value, "/counterexample_audit/receipt_sha256")?;
+    let vacuity_sha = string(value, "/vacuity_audit/receipt_sha256")?;
+    let reviewer_sha = string(value, "/semantic_review/reviewer_attestation_sha256")?;
+
+    let expected = [
+        ("source_file", target_source_sha),
+        ("informal_statement", informal_sha),
+        ("lean_binary", lean_sha),
+        ("lake_manifest", lake_sha),
+        ("root_module", root_sha),
+        ("elaboration_receipt", elaboration_sha),
+        ("used_axioms_manifest", used_axioms_sha),
+        ("allowlist_manifest", allowlist_sha),
+        ("counterexample_receipt", counterexample_sha),
+        ("vacuity_receipt", vacuity_sha),
+        ("reviewer_attestation", reviewer_sha),
+    ];
+    let used_axioms = string_list(value, "/axioms/used_axioms")?;
+    let allowlist = string_list(value, "/axioms/allowed_axioms")?;
+    for (name, expected_sha) in expected {
+        let Some(artifact) = artifacts.get(name) else {
+            if string(value, "/integrity_status")? == "eligible" {
+                bail!("eligible measured receipt is missing evidence artifact {name}");
+            }
+            continue;
+        };
+        let bytes = verify_artifact_bytes(
+            evidence_root,
+            &root_canonical,
+            artifact,
+            expected_sha,
+            name,
+        )?;
+        match name {
+            "used_axioms_manifest" => verify_axiom_artifact(&bytes, &used_axioms, name)?,
+            "allowlist_manifest" => verify_axiom_artifact(&bytes, &allowlist, name)?,
+            _ => {}
+        }
+    }
+    Ok(artifacts.len())
 }
 
 pub fn verify_bytes(bytes: &[u8], expected_sha256: Option<&str>) -> Result<IntegritySummary> {
@@ -393,4 +557,28 @@ pub fn verify_bytes(bytes: &[u8], expected_sha256: Option<&str>) -> Result<Integ
 pub fn verify_file(path: &Path, expected_sha256: Option<&str>) -> Result<IntegritySummary> {
     let bytes = fs::read(path).with_context(|| format!("read integrity receipt {}", path.display()))?;
     verify_bytes(&bytes, expected_sha256)
+}
+
+pub fn verify_bytes_with_evidence_root(
+    bytes: &[u8],
+    expected_sha256: Option<&str>,
+    evidence_root: &Path,
+) -> Result<IntegritySummary> {
+    let mut summary = verify_bytes(bytes, expected_sha256)?;
+    let value: Value =
+        serde_json::from_slice(bytes).context("parse benchmark integrity receipt for evidence bundle")?;
+    summary.verified_evidence_artifact_count = verify_evidence_artifacts(&value, evidence_root)?;
+    if summary.integrity_status == "eligible" && summary.verified_evidence_artifact_count != 11 {
+        bail!("eligible integrity receipt did not verify all eleven evidence artifacts");
+    }
+    Ok(summary)
+}
+
+pub fn verify_file_with_evidence_root(
+    path: &Path,
+    expected_sha256: Option<&str>,
+    evidence_root: &Path,
+) -> Result<IntegritySummary> {
+    let bytes = fs::read(path).with_context(|| format!("read integrity receipt {}", path.display()))?;
+    verify_bytes_with_evidence_root(&bytes, expected_sha256, evidence_root)
 }
