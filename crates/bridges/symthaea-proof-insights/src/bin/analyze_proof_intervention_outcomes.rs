@@ -10,6 +10,8 @@
 
 #[path = "../proof_intervention_trial.rs"]
 mod proof_intervention_trial;
+#[path = "../benchmark_integrity.rs"]
+mod benchmark_integrity;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -227,6 +229,8 @@ fn validate_and_analyze(
     plan: &Value,
     outcomes: &[Value],
     evidence_root: Option<&Path>,
+    reviewer_registry_path: Option<&Path>,
+    expected_registry_sha256: Option<&str>,
 ) -> Result<Value> {
     let expected_pairs = proof_intervention_trial::validate_plan(plan)?;
     let plan_evidence = string(plan, "/evidence_class")?;
@@ -235,6 +239,13 @@ fn validate_and_analyze(
     } else {
         "measured_outcome"
     };
+    if plan_evidence == "preregistered_trial"
+        && (evidence_root.is_none()
+            || reviewer_registry_path.is_none()
+            || expected_registry_sha256.is_none())
+    {
+        bail!("measured intervention analysis requires an evidence root, reviewer-key registry, and externally pinned registry SHA-256");
+    }
     let trial_id = string(plan, "/trial_id")?;
     let horizon = string(plan, "/evaluation/horizon_id")?;
     let continuation = string(plan, "/evaluation/continuation_policy_sha256")?;
@@ -280,6 +291,7 @@ fn validate_and_analyze(
     let mut run_ids = BTreeSet::<String>::new();
     let mut pair_rows = BTreeMap::<String, BTreeMap<String, (bool, u64)>>::new();
     let mut measured_artifacts_authenticated = true;
+    let mut signed_semantic_integrity_receipts_verified = plan_evidence == "synthetic_contract_fixture";
 
     for outcome in outcomes {
         if string(outcome, "/schema_version")? != OUTCOME_VERSION {
@@ -391,6 +403,40 @@ fn validate_and_analyze(
             if evidence_class == "measured_outcome" && !authenticated {
                 measured_artifacts_authenticated = false;
             }
+        }
+
+        if status == "verified_success" && evidence_class == "measured_outcome" {
+            let root = evidence_root.context("measured semantic receipt requires evidence root")?;
+            let semantic_path = match field(outcome, "/semantic_gate_receipt_path")? {
+                Value::String(value) => value,
+                _ => bail!("verified success requires a semantic gate integrity receipt path"),
+            };
+            let semantic_digest = string(outcome, "/semantic_gate_receipt_sha256")?;
+            let resolved_semantic_path = safe_artifact_path(root, semantic_path)?;
+            let registry_path = reviewer_registry_path
+                .context("measured semantic receipt requires reviewer-key registry")?;
+            let registry_digest = expected_registry_sha256
+                .context("measured semantic receipt requires externally pinned registry SHA-256")?;
+            let integrity = benchmark_integrity::verify_file_with_evidence_root_and_reviewer_registry(
+                &resolved_semantic_path,
+                Some(semantic_digest),
+                root,
+                registry_path,
+                registry_digest,
+            )?;
+            if integrity.integrity_status != "eligible"
+                || !integrity.reviewer_signature_verified
+                || integrity.verified_evidence_artifact_count != 11
+                || integrity.task_id != string(outcome, "/task_id")?
+                || integrity.statement_sha256 != string(outcome, "/target_statement_sha256")?
+                || integrity.repository_commit != string(outcome, "/repository_commit")?
+                || integrity.lean_toolchain != string(outcome, "/lean_toolchain")?
+                || integrity.cohort_id != string(plan, "/dataset/cohort_id")?
+                || integrity.snapshot_id != string(plan, "/dataset/snapshot_id")?
+            {
+                bail!("signed benchmark-integrity receipt does not bind this exact paired proof outcome");
+            }
+            signed_semantic_integrity_receipts_verified = true;
         }
 
         let run_digest = string(outcome, "/run_receipt_sha256")?;
@@ -543,9 +589,10 @@ fn validate_and_analyze(
         "resource_caps_respected":true,
         "non_attempts_and_unavailable_counted_as_failures":true,
         "measured_artifact_bytes_authenticated":measured_artifacts_authenticated,
-        "receipt_semantics_independently_validated":false,
+        "signed_semantic_integrity_receipts_verified":signed_semantic_integrity_receipts_verified,
+        "checker_run_and_successor_receipt_semantics_validated":false,
         "confirmatory_result_allowed":false,
-        "confirmatory_blocker":"receipt artifact bytes are SHA-256 authenticated, but receipt-type schemas and semantic bindings must be independently verified before confirmatory claims",
+        "confirmatory_blocker":"signed target-integrity receipts are verified for measured successes, but checker, run and successor receipt semantics still require strict independent validation before confirmatory claims",
         "bootstrap_seed_sha256":plan_seed
     }))
 }
@@ -731,7 +778,7 @@ fn self_test(path: &PathBuf) -> Result<()> {
     let plan_bytes = fs::read(path).with_context(|| format!("read plan fixture {}", path.display()))?;
     let plan: Value = serde_json::from_slice(&plan_bytes).context("parse plan fixture")?;
     let outcomes = synthesize_outcomes(&plan)?;
-    let report = validate_and_analyze(&plan, &outcomes, None)?;
+    let report = validate_and_analyze(&plan, &outcomes, None, None, None)?;
     if report["evidence_class"] != "synthetic_analysis_fixture"
         || report["pair_count"] != json!(8)
         || report["confirmatory_result_allowed"] != Value::Bool(false)
@@ -784,15 +831,23 @@ fn run() -> Result<()> {
     let args: Vec<String> = env::args().skip(1).collect();
     match args.as_slice() {
         [flag] if flag == "--help" || flag == "-h" => {
-            println!("Usage: analyze_proof_intervention_outcomes --analyze PLAN.json OUTCOMES.jsonl EVIDENCE_ROOT REPORT.json | --self-test PLAN_FIXTURE.json");
+            println!("Usage: analyze_proof_intervention_outcomes --analyze PLAN.json OUTCOMES.jsonl EVIDENCE_ROOT REVIEWER_KEY_REGISTRY EXPECTED_REGISTRY_SHA256 REPORT.json | --self-test PLAN_FIXTURE.json");
             Ok(())
         }
         [flag, path] if flag == "--self-test" => self_test(&PathBuf::from(path)),
-        [flag, plan_path, outcomes_path, evidence_root, report_path] if flag == "--analyze" => {
+        [flag, plan_path, outcomes_path, evidence_root, reviewer_registry, expected_registry_sha256, report_path]
+            if flag == "--analyze" =>
+        {
             let plan_bytes = fs::read(plan_path).with_context(|| format!("read plan {plan_path}"))?;
             let plan: Value = serde_json::from_slice(&plan_bytes).context("parse plan JSON")?;
             let outcomes = parse_jsonl(Path::new(outcomes_path))?;
-            let report = validate_and_analyze(&plan, &outcomes, Some(Path::new(evidence_root)))?;
+            let report = validate_and_analyze(
+                &plan,
+                &outcomes,
+                Some(Path::new(evidence_root)),
+                Some(Path::new(reviewer_registry)),
+                Some(expected_registry_sha256),
+            )?;
             fs::write(report_path, serde_json::to_vec_pretty(&report)?)
                 .with_context(|| format!("write analysis report {report_path}"))?;
             println!(
@@ -803,7 +858,7 @@ fn run() -> Result<()> {
             );
             Ok(())
         }
-        _ => bail!("expected --analyze PLAN OUTCOMES EVIDENCE_ROOT REPORT, --self-test PLAN_FIXTURE, or --help"),
+        _ => bail!("expected --analyze PLAN OUTCOMES EVIDENCE_ROOT REVIEWER_KEY_REGISTRY EXPECTED_REGISTRY_SHA256 REPORT, --self-test PLAN_FIXTURE, or --help"),
     }
 }
 
