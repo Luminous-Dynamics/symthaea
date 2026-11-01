@@ -1027,13 +1027,22 @@ mod tests {
     }
 
     #[test]
+    fn well_formed_but_wrong_expected_transition_fails_semantic_replay() {
+        let (mut trace, _) = fixture();
+        trace.operations.iter_mut().find(|x| x.op_id == "op-a-commit").unwrap().expected_result.outcome = "compare_conflict".to_string();
+        let report = verify_reference(&trace, b"wrong-reference-outcome");
+        assert_eq!(report.status, "fail");
+        assert!(report.counterexamples.iter().any(|x| x.contains("reducer computed")));
+    }
+
+    #[test]
     fn same_runner_real_time_precedence_is_enforced() {
         let (mut trace, _) = fixture();
         // The B commit is ordered before the A commit but on the same runner,
         // while its completion precedes A's invocation: this is illegal.
         trace.reference_linearization_order.swap(0, 1);
         let report = verify_reference(&trace, b"same-runner-real-time-control");
-        assert_eq!(report.status, "fail");
+        assert_eq!(report.status, "invalid_evidence");
         assert!(report.counterexamples.iter().any(|x| x.contains("real-time")));
     }
 }
