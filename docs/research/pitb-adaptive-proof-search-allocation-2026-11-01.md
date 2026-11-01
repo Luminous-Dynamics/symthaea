@@ -4,7 +4,7 @@
 
 ## Research opportunity
 
-Current Lean proof agents often improve a candidate proof by spending more attempts, decomposing a target, running tactics, retrieving premises, or parallelizing branches. The research problem is not just to find a successful tactic. It is to decide **which next computation has the highest conservative marginal value, given the remaining budget and the exact current proof state**.
+Current Lean proof agents often improve a candidate proof by spending more attempts, decomposing a target, running tactics, retrieving premises, or parallelizing branches. The research problem is not just to find a successful tactic. It is to decide **which next computation has the highest conservative horizon-bounded success probability per shadow-priced resource, given the remaining budget and the exact current proof state**.
 
 This is a control problem over partially observed, expensive actions. A failed tactic, failed elaboration, repeated typeclass search, stale premise route, or unproductive branch is not merely a negative outcome. It changes the posterior about which intervention is worth paying for next.
 
@@ -26,11 +26,13 @@ At each decision point it receives:
 - a prediction for each action's incremental verified-success probability and uncertainty;
 - hashes identifying the prediction evidence and calibration dataset.
 
-The v0 controller computes a conservative lower confidence bound:
+The v0 controller estimates the action-conditioned probability of verified proof success under a fixed post-action continuation policy and horizon, then computes a conservative lower confidence bound:
 
 \[
-LCB(a)=\max(0,\widehat{\Delta p}(a)-1.96\,SE(a)).
+LCB(a\mid s,\pi_c,H)=\max(0,\widehat{p}(\text{verified proof by }H\mid s,a,\pi_c)-1.96\,SE(a)).
 \]
+
+This is **not** a causal treatment-effect estimate or an incremental lift over a no-action counterfactual. It is a conditional success estimate for the chosen action followed by the registered continuation policy. The calibration receipt must use the same horizon and continuation-policy digest as the decision.
 
 It then ranks feasible actions by:
 
@@ -41,7 +43,7 @@ U(a)=\frac{LCB(a)}
 
 where \(c_r(a)\) is the action's expected consumption of resource \(r\), \(b_r\) is the remaining resource budget for that dimension, and preregistered nonnegative shadow weights \(w_r\) sum to one. The action must fit **every** remaining resource cap. If no action has a positive LCB above the frozen threshold, the controller stops rather than spend compute on a prediction with inadequate conservative value.
 
-The ranking is deterministic; ties are broken by action ID. It records the selected action, input digest, policy digest, calibration-manifest digest and excluded action IDs. It does not claim that the selected action will succeed. Lean plus independent replay remains the success authority.
+The ranking is deterministic; ties are broken by action ID. It records the selected action-conditioned success probability, input digest, canonical policy digest, exact calibration-receipt digest, calibration dataset manifest, evaluation horizon, continuation-policy digest and excluded action IDs. It does not claim that the selected action will succeed. Lean plus independent replay remains the success authority.
 
 This is a deliberately simple and auditable v0 policy, not the final algorithm. A future v1 should learn shadow prices from the observed constrained Pareto frontier, use calibrated survival/hazard models over attempt trajectories, and model the value of information from actions that fail but improve subsequent routing.
 
@@ -51,7 +53,7 @@ PITB should route across a richer intervention set than continue-versus-stop:
 
 | Action | When it may be worth paying for it |
 |---|---|
-| Continue current target | The current tactic/lemma route still has positive marginal success probability |
+| Continue current target | The current tactic/lemma route still has positive conditional probability of reaching a verified proof within the registered horizon |
 | Retrieve context | Missing or ambiguous premises/instances likely explain failure |
 | Change decomposition | Repeated local failure suggests the current proof breakdown is poor |
 | Typed repair | A known blueprint node has a constrained, target-preserving correction |
@@ -127,7 +129,7 @@ The current PR adds:
 - `proof_search_calibration.rs`, an exact-byte receipt verifier that recomputes per-action ten-bin ECE and Brier sufficient statistics;
 - tests for uncertainty-sensitive ranking, single-resource infeasibility, calibration mismatch, receipt substitution, model mismatch, duplicate actions, state identity, shadow-weight normalization and conservative stopping.
 
-The controller requires the exact calibration receipt file in production selection. It checks the receipt SHA-256 and dataset-manifest digest, verifies that each proposed action kind has its own calibration group, matches predictor ID/version, recomputes ECE/Brier, and verifies the canonical policy hash. It is a deterministic selector, not a trained router, proof checker, or measured SOTA result.
+The controller requires the exact calibration receipt file in production selection. It checks the receipt SHA-256 and dataset-manifest digest, verifies that each proposed action kind has its own calibration group, matches predictor ID/version, evaluation-horizon ID and continuation-policy SHA, recomputes ECE/Brier, and verifies the canonical policy hash. It is a deterministic selector, not a trained router, proof checker, or measured SOTA result.
 
 Important limitation: the calibration bins are **self-consistent and content-addressed**, not independently authenticated scientific observations. The verifier checks sufficient-statistic arithmetic and the source outcome-receipt manifest digest, but does not open every underlying Lean checker and independent replay receipt. The checked-in 1,600-observation calibration fixture is synthetic; its ECE=0 and Brier values are only contract-test arithmetic. No empirical calibration result is claimed.
 
@@ -135,7 +137,7 @@ Important limitation: the calibration bins are **self-consistent and content-add
 
 1. Compile the Rust controller and calibration module; run the synthetic negative controls in the isolated PITB crate workflow and inspect exact-head CI evidence.
 2. Implement a trajectory importer that authenticates each underlying Lean checker and independent replay receipt before producing calibration rows.
-3. Measure action-conditional calibration on a frozen validation split; publish reliability diagrams, Brier score, ECE by action class and uncertainty intervals.
+3. Measure horizon-bounded action-conditional calibration on a frozen validation split with a single pinned continuation policy; publish reliability diagrams, Brier score, ECE by action class, interval coverage and uncertainty intervals.
 4. Add repeated-task/context strata so estimates are calibrated conditionally on failure history, proof-state features and remaining budget—not merely globally by action type.
 5. Reproduce A0 and A2 on a small, pinned PutnamBench smoke cohort, then compare A0–A5 under equal resource caps.
 6. Scale to all SorryDB_2601 tasks only after environment reconstruction, proof outcome receipts and calibration lineage are valid.
