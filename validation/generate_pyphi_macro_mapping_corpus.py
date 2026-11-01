@@ -81,12 +81,17 @@ def _macro_mapping_digest(
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _spec_digest(mapping_digest: str, complement_flipped: bool) -> str:
-    encoded = (
-        b"SYMTHAEA-IIT-MACRO-UNIT-SPEC\0v0.1\0"
-        + mapping_digest.encode("ascii")
-        + bytes([int(complement_flipped)])
-    )
+def _spec_digest(
+    mapping_digest: str,
+    complement_flipped: bool,
+    background_apportionment: list[int],
+) -> str:
+    encoded = bytearray(b"SYMTHAEA-IIT-MACRO-UNIT-SPEC\0v0.2\0")
+    encoded.extend(mapping_digest.encode("ascii"))
+    encoded.extend(bytes([int(complement_flipped)]))
+    encoded.extend(struct.pack("<Q", len(background_apportionment)))
+    for unit in background_apportionment:
+        encoded.extend(struct.pack("<Q", unit))
     return hashlib.sha256(encoded).hexdigest()
 
 
@@ -132,11 +137,12 @@ def generate(output: Path) -> dict[str, Any]:
         mapping_sha256 = _macro_mapping_digest(
             constituents, case["update_grain"], canonical_mapping
         )
-        spec_sha256 = _spec_digest(mapping_sha256, complement_flipped)
+        spec_sha256 = _spec_digest(mapping_sha256, complement_flipped, [])
         item = {
             **case,
             "mapping": mapping,
             "canonical_mapping": canonical_mapping,
+            "background_apportionment": [],
             "complement_flipped": complement_flipped,
             "mapping_sha256": mapping_sha256,
             "spec_sha256": spec_sha256,
