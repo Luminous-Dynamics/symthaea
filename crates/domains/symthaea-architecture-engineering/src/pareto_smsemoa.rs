@@ -990,6 +990,18 @@ mod tests {
     }
 
     #[test]
+    fn anytime_trace_rejects_mismatched_search_config() {
+        let config = zdt_config(2026);
+        let mut changed = config.clone();
+        changed.offspring_evaluations += 1;
+        let budget = config.population_size + config.offspring_evaluations;
+        let config_sha256 = config.config_sha256().unwrap();
+        let mut history = anytime_history(&config, "zdt1", budget);
+        assert!(run_smsemoa_zdt1_with_history(&changed, 10, &mut history).is_err());
+        assert!(history.events().is_empty());
+    }
+
+    #[test]
     fn smsemoa_zdt1_is_reproducible_with_fixed_objective_budget() {
         let config = zdt_config(42);
         let left = run_smsemoa_zdt1(&config, 10).unwrap();
