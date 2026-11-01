@@ -40,7 +40,9 @@ jobs:
           python3 -m json.tool crates/domains/symthaea-jepa/schemas/one-step-action-set.v0.1.schema.json >/dev/null
 
       - name: Run JEPA crate tests
-        run: cargo test --locked -p symthaea-jepa
+        working-directory: crates/domains/symthaea-jepa
+        run: cargo test --locked
 
       - name: Run JEPA crate Clippy
-        run: cargo clippy --locked -p symthaea-jepa --all-targets -- -D warnings
+        working-directory: crates/domains/symthaea-jepa
+        run: cargo clippy --locked --all-targets -- -D warnings
