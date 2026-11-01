@@ -1,0 +1,57 @@
+{
+  "schema": "symthaea.retrieval_decomposition.corpus.v1",
+  "benchmark_id": "symthaea-retrieval-decomposition-pilot",
+  "benchmark_version": "v1",
+  "task": {
+    "task_id": "delta-inspection-total-001",
+    "task_family": "multi_source_rate_arithmetic",
+    "task_text": "For the Delta inspection, calculate the total labor and lodging cost. Use the published per-day labor rate, per-overnight rate, and Delta schedule. Return only the total amount in USD.",
+    "response_contract": {
+      "format": "json",
+      "fields": [
+        "amount_usd"
+      ],
+      "units": "USD"
+    }
+  },
+  "documents": [
+    {
+      "document_id": "doc-delta-rate",
+      "source_family_id": "source-family-rates",
+      "title": "Delta labor rate",
+      "body": "Delta inspection labor costs 180 USD per billable working day.",
+      "content_sha256": "8bb7afe139d5627747043a2604e2f66d1d615fbe06246ff523dccf9a3abd7a39",
+      "body_utf8_bytes": 62,
+      "provenance": "synthetic pilot fixture"
+    },
+    {
+      "document_id": "doc-lodging-rate",
+      "source_family_id": "source-family-rates",
+      "title": "Lodging rate",
+      "body": "Each overnight stay costs 75 USD.",
+      "content_sha256": "ff362e740aeb03d3ee9712558663e84f84ab27fae187aad135b9f03edac93682",
+      "body_utf8_bytes": 33,
+      "provenance": "synthetic pilot fixture"
+    },
+    {
+      "document_id": "doc-delta-schedule",
+      "source_family_id": "source-family-schedules",
+      "title": "Delta schedule",
+      "body": "The Delta inspection schedule has 3 billable working days and 2 overnight stays.",
+      "content_sha256": "830d670eb3888478acb7e48ddcbac41017c1e4a895f383dd353bcccab1424957",
+      "body_utf8_bytes": 80,
+      "provenance": "synthetic pilot fixture"
+    },
+    {
+      "document_id": "doc-echo-schedule",
+      "source_family_id": "source-family-schedules",
+      "title": "Echo schedule",
+      "body": "The Echo inspection schedule has 3 billable working days and 3 overnight stays. The same rates apply.",
+      "content_sha256": "7a964f477c943f873677f292eeba2cbdcd7597d1400da8b089fb2e8966a0794b",
+      "body_utf8_bytes": 101,
+      "provenance": "synthetic nearby-scenario distractor"
+    }
+  ],
+  "corpus_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "claim_boundary": "synthetic sandbox corpus fixture; corpus_sha256 is a placeholder until canonical bundle digesting is implemented"
+}
