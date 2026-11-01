@@ -124,7 +124,24 @@ fn validate_input(value: &Value, calibration: &proof_search_calibration::Calibra
     if string(value, "/policy/policy_id")? != POLICY_ID {
         bail!("unsupported allocation policy");
     }
-    let _ = digest(value, "/policy/policy_sha256")?;
+    let claimed_policy_sha = digest(value, "/policy/policy_sha256")?;
+    let mut policy_for_hash = value
+        .get("policy")
+        .cloned()
+        .context("policy object missing")?;
+    policy_for_hash
+        .as_object_mut()
+        .context("policy must be an object")?
+        .remove("policy_sha256");
+    let computed_policy_sha = hex::encode(Sha256::digest(serde_json::to_vec(&policy_for_hash)?));
+    if claimed_policy_sha != computed_policy_sha {
+        bail!("policy_sha256 does not match the canonical policy configuration bytes");
+    }
+    if string(value, "/policy/prediction_model_id")? != calibration.prediction_model_id
+        || string(value, "/policy/prediction_model_version")? != calibration.prediction_model_version
+    {
+        bail!("prediction model identity differs from the calibration receipt");
+    }
     let expected_receipt = digest(value, "/policy/calibration_receipt_sha256")?;
     if expected_receipt != calibration.receipt_sha256 {
         bail!("policy calibration receipt SHA-256 differs from the exact supplied receipt bytes");
