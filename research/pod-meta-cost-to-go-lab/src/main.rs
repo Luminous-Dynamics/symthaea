@@ -996,6 +996,10 @@ fn main() {
     prefix_journal
         .append_forecast(prefix_forecast(6, 906, 1, 8))
         .unwrap();
+    let mut shifted_prefix = prefix_forecast(7, 907, 1, 8);
+    shifted_prefix.forecast.shift_status =
+        pod_meta_cost_to_go_lab::ShiftStatus::UnsupportedShift;
+    prefix_journal.append_forecast(shifted_prefix).unwrap();
     prefix_journal
         .append_outcome(prefix_outcome(
             1,
@@ -1039,6 +1043,14 @@ fn main() {
             6,
             2,
             ResourceVector::new(8, 1, 2, 3, 4, 5),
+            TerminalOutcome::SufficientProof,
+        ))
+        .unwrap();
+    prefix_journal
+        .append_outcome(prefix_outcome(
+            7,
+            2,
+            ResourceVector::new(9, 1, 2, 3, 4, 5),
             TerminalOutcome::SufficientProof,
         ))
         .unwrap();
@@ -1115,20 +1127,28 @@ fn main() {
             remaining_budget: narrow_budget,
             evidence_digest: [36; 32],
         },
+        PrefixBudgetReceipt {
+            run_id: 907,
+            decision_sequence: 1,
+            pre_state_digest: [11; 32],
+            remaining_budget: generous_budget,
+            evidence_digest: [37; 32],
+        },
     ];
     let budgeted_replay =
         PrefixReplayEvaluator::evaluate_with_budgets(&prefix_journal, &prefix_budgets, 0.8)
             .unwrap();
     let feasibility = budgeted_replay.report.feasibility;
     println!(
-        "PREFIX_REPLAY_ROW\tbudget-feasibility\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+        "PREFIX_REPLAY_ROW\tbudget-feasibility\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
         feasibility.budgeted_prefixes,
         feasibility.predicted_feasible,
         feasibility.predicted_infeasible,
         feasibility.actual_feasibility_known,
         feasibility.false_feasible,
         feasibility.false_infeasible,
-        feasibility.unknown_actual_outcomes
+        feasibility.unknown_actual_outcomes,
+        feasibility.abstained_predictions
     );
 
 }
