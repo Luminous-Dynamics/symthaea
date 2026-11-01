@@ -130,7 +130,7 @@ class PredictableArrivalEclosureTests(unittest.TestCase):
             i for i, event in enumerate(bad)
             if event["kind"] == "evidence_increment" and event["round"] == 2
         )
-        bad.insert(evidence_index, activation)
+        bad.insert(evidence_index + 1, activation)
         for seq, event in enumerate(bad):
             event["seq"] = seq
         with self.assertRaisesRegex(ValueError, "activation_after_evidence"):
@@ -205,12 +205,18 @@ class PredictableArrivalEclosureTests(unittest.TestCase):
                 self.hypotheses, bad, len(self.capacity)
             )
 
-    def test_contiguous_sequence_is_enforced(self):
+    def test_contiguous_integer_sequence_is_enforced(self):
         bad = copy.deepcopy(self.events)
         bad[0]["seq"] = 7
         with self.assertRaisesRegex(ValueError, "contiguous and ordered"):
             audit_predictable_arrival_ledger(
                 self.hypotheses, bad, len(self.capacity)
+            )
+        non_integer = copy.deepcopy(self.events)
+        non_integer[0]["seq"] = 0.0
+        with self.assertRaisesRegex(ValueError, "contiguous and ordered"):
+            audit_predictable_arrival_ledger(
+                self.hypotheses, non_integer, len(self.capacity)
             )
 
     def test_same_round_activation_order_is_canonical(self):
