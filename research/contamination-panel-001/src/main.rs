@@ -13,6 +13,7 @@ use contamination_panel_bench::{
         RandomizedInterventionDesignV1, RandomizedInterventionManifestV1, audit_intervention,
         randomize_intervention,
     },
+    lara_metrics::{LaraScoringRequestV1, score_lara_request},
     training_receipt::validate_paired_training_execution_receipt,
 };
 use std::{
@@ -315,6 +316,31 @@ fn analyze_exposure_transfer_cli(args: &[String]) -> Result<(), Box<dyn Error>> 
     Ok(())
 }
 
+fn score_lara_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 3 {
+        return Err(
+            "usage: contamination-panel-bench score-lara-paper <lara-scoring-request.json> <slara-report.json>"
+                .into(),
+        );
+    }
+    const MAX_LARA_REQUEST_BYTES: u64 = 512 * 1024 * 1024;
+    let request_bytes = read_file_bounded(&args[1], MAX_LARA_REQUEST_BYTES)?;
+    let request: LaraScoringRequestV1 = serde_json::from_slice(&request_bytes)?;
+    let report = score_lara_request(&request).map_err(io::Error::other)?;
+    write_bytes(&args[2], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "sample={} layers={} clean_reference={} slara_score={:.6} authenticated={} confirmatory_eligible={}",
+        report.sample_id,
+        report.layer_count,
+        report.clean_reference_count,
+        report.slara_score,
+        report.independently_authenticated,
+        report.confirmatory_eligible
+    );
+    println!("claim boundary: {}", report.claim_boundary);
+    Ok(())
+}
+
 fn audit_training_receipt_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.len() != 6 {
         return Err(
@@ -401,9 +427,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("audit-training-receipt") => audit_training_receipt_cli(&args),
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
         Some("analyze-exposure-transfer") => analyze_exposure_transfer_cli(&args),
+        Some("score-lara-paper") => score_lara_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | score-lara-paper | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }

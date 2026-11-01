@@ -1,0 +1,112 @@
+{
+  "schema": "symthaea.slara_scoring_request.v1",
+  "candidate": {
+    "schema": "symthaea.lara_metric_input.v1",
+    "sample_id": "candidate-fixture-001",
+    "model_checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tokenizer_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "perturbation_protocol_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "representation_extractor_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "layers": [
+      {
+        "layer_id": "layer-4",
+        "original_complete": [
+          3,
+          0
+        ],
+        "original_incomplete": [
+          0,
+          0
+        ],
+        "neighbor_complete": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ]
+        ],
+        "neighbor_incomplete": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "original_paraphrase_representations": [
+          [
+            0,
+            0
+          ],
+          [
+            2,
+            0
+          ]
+        ],
+        "neighbor_paraphrase_representations": [
+          [
+            [
+              0,
+              0
+            ],
+            [
+              1,
+              0
+            ]
+          ],
+          [
+            [
+              0,
+              0
+            ],
+            [
+              2,
+              0
+            ]
+          ]
+        ]
+      }
+    ]
+  },
+  "clean_reference": [
+    {
+      "sample_id": "clean-fixture-001",
+      "model_checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "tokenizer_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "perturbation_protocol_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "representation_extractor_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "layer_metrics": [
+        {
+          "layer_id": "layer-4",
+          "rsm": -1,
+          "dc": -0.1,
+          "rsi": 1,
+          "semantic_neighbor_count": 2,
+          "original_paraphrase_count": 2
+        }
+      ]
+    },
+    {
+      "sample_id": "clean-fixture-002",
+      "model_checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "tokenizer_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "perturbation_protocol_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "representation_extractor_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "layer_metrics": [
+        {
+          "layer_id": "layer-4",
+          "rsm": 1,
+          "dc": 0.1,
+          "rsi": -1,
+          "semantic_neighbor_count": 2,
+          "original_paraphrase_count": 2
+        }
+      ]
+    }
+  ]
+}
