@@ -5,7 +5,6 @@ on:
     paths:
       - "examples/hardsec_mobile_device_profile_audit.rs"
       - "examples/hardsec_android_readonly_inventory.rs"
-      - "examples/hardsec_mobile_device_profile_audit.rs"
       - "schemas/hardsec-mobile-device-profile-v1.schema.json"
       - "tests/fixtures/hardsec/mobile-device-v1/**"
       - "docs/research/HARDSEC_027_MOBILE_DEVICE_SECURITY.md"
@@ -40,10 +39,6 @@ jobs:
         run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-android-readonly-inventory --example hardsec_android_readonly_inventory
       - name: Run mobile profile privacy and evidence-link tests
         run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-mobile-device-profile-audit --example hardsec_mobile_device_profile_audit
-      - name: Run fixed-command Android inventory unit tests
-        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-android-readonly-inventory --example hardsec_android_readonly_inventory
-      - name: Run profile privacy and evidence contract tests
-        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-mobile-device-profile-audit --example hardsec_mobile_device_profile_audit
       - name: Verify synthetic mobile profile receipt
         run: |
           set -euo pipefail
@@ -61,12 +56,11 @@ jobs:
           assert receipt["capability_vs_runtime"]["attestation_security_level"] == "not_measured"
           assert receipt["capability_vs_runtime"]["reported_bootloader_lock_state"] == "not_measured"
           assert receipt["capability_vs_runtime"]["reported_verified_boot_state"] == "not_measured"
-          assert receipt["privacy"]["forbidden_identifier_fields_found"] is False
           assert receipt["measurement"]["pmu_access_status"] == "not_measured"
           assert receipt["qualification"]["device_was_queried"] is False
           assert receipt["qualification"]["runtime_integrity_verified"] is False
           assert receipt["qualification"]["pmu_measurement_qualified"] is False
           assert receipt["privacy"]["forbidden_identifier_fields_found"] is False
           assert receipt["privacy"]["raw_attestation_material_exported"] is False
-          print("HARDSEC-027 synthetic mobile profile contract qualified.")
+          print("HARDSEC-027/028 mobile profile and Android inventory contracts qualified.")
           PY
