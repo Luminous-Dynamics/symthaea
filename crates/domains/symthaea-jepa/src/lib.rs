@@ -96,6 +96,9 @@ pub struct ObservedTransitionEvidence {
     pub target_observation_sha256: String,
     pub target_embedding_sha256: String,
     pub action_manifest_sha256: String,
+    pub episode_id: String,
+    pub branch_id: String,
+    pub forecast_id: String,
     pub source_observation_id: String,
     pub target_observation_id: String,
     pub source_sequence: u64,
@@ -103,9 +106,12 @@ pub struct ObservedTransitionEvidence {
     pub action_id: u64,
     pub action_index: u8,
     pub source_observed_at_seconds: f64,
+    pub forecast_issued_at_seconds: f64,
     pub action_started_at_seconds: f64,
     pub action_ended_at_seconds: f64,
+    pub requested_target_time_seconds: f64,
     pub target_observed_at_seconds: f64,
+    pub max_target_lateness_seconds: f64,
 }
 
 /// Stable candidate identity mapped to the JEPA discrete action embedding.
@@ -229,25 +235,45 @@ fn validate_observed_transition(
             return Err(format!("{name} must be a lowercase SHA-256 digest"));
         }
     }
-    if evidence.source_observation_id.trim().is_empty()
-        || evidence.target_observation_id.trim().is_empty()
+    if [
+        &evidence.episode_id,
+        &evidence.branch_id,
+        &evidence.forecast_id,
+        &evidence.source_observation_id,
+        &evidence.target_observation_id,
+    ]
+    .iter()
+    .any(|id| id.trim().is_empty())
         || evidence.source_observation_id == evidence.target_observation_id
     {
-        return Err("source and target observation IDs must be non-empty and distinct".into());
+        return Err("episode, branch, forecast and distinct observation IDs must be non-empty".into());
     }
     if evidence.source_sequence >= evidence.target_sequence {
         return Err("target observation sequence must be later than source sequence".into());
     }
     let times = [
         evidence.source_observed_at_seconds,
+        evidence.forecast_issued_at_seconds,
         evidence.action_started_at_seconds,
         evidence.action_ended_at_seconds,
+        evidence.requested_target_time_seconds,
         evidence.target_observed_at_seconds,
+        evidence.max_target_lateness_seconds,
     ];
     if !times.iter().all(|value| value.is_finite())
-        || !(times[0] <= times[1] && times[1] <= times[2] && times[2] < times[3])
+        || evidence.max_target_lateness_seconds < 0.0
+        || !(times[0] <= times[1]
+            && times[1] <= times[2]
+            && times[2] <= times[4]
+            && times[4] <= times[5]
+            && times[2] <= times[3])
     {
-        return Err("transition times must be finite and satisfy source <= action start <= action end < target observation".into());
+        return Err("transition times must be finite and satisfy source <= forecast <= action start <= requested target <= actual target, with action end >= action start".into());
+    }
+    if evidence.target_observed_at_seconds - evidence.requested_target_time_seconds
+        > evidence.max_target_lateness_seconds
+    {
+        return Err("target observation exceeds the declared maximum forecast lateness".into());
     }
     if evidence.action_index as usize >= config.num_actions {
         return Err(format!(
@@ -542,6 +568,9 @@ mod tests {
             target_observation_sha256: "c".repeat(64),
             target_embedding_sha256: embedding_sha256(next_hv),
             action_manifest_sha256: "d".repeat(64),
+            episode_id: "episode-1".into(),
+            branch_id: "branch-action-42".into(),
+            forecast_id: "forecast-10-a42".into(),
             source_observation_id: "frame-10".into(),
             target_observation_id: "frame-11".into(),
             source_sequence: 10,
@@ -549,9 +578,12 @@ mod tests {
             action_id: 42,
             action_index,
             source_observed_at_seconds: 1.0,
+            forecast_issued_at_seconds: 1.005,
             action_started_at_seconds: 1.01,
             action_ended_at_seconds: 1.05,
+            requested_target_time_seconds: 1.07,
             target_observed_at_seconds: 1.08,
+            max_target_lateness_seconds: 0.02,
         }
     }
 
@@ -607,6 +639,38 @@ mod tests {
         assert!(candidate
             .train_observed_transition(&current, &next, &malformed, f32::NAN)
             .is_err());
+    }
+
+
+    #[test]
+    fn observed_transition_rejects_cross_episode_missing_branch_and_forecast_order_errors() {
+        let current = random_hv(517);
+        let next = random_hv(518);
+        let mut engine = make_engine();
+
+        let mut evidence = observed_evidence(&current, &next, 2);
+        evidence.branch_id.clear();
+        assert!(
+            engine
+                .train_observed_transition(&current, &next, &evidence, 0.001)
+                .is_err()
+        );
+
+        let mut evidence = observed_evidence(&current, &next, 2);
+        evidence.forecast_issued_at_seconds = evidence.action_started_at_seconds + 0.001;
+        assert!(
+            engine
+                .train_observed_transition(&current, &next, &evidence, 0.001)
+                .is_err()
+        );
+
+        let mut evidence = observed_evidence(&current, &next, 2);
+        evidence.requested_target_time_seconds = evidence.target_observed_at_seconds + 0.001;
+        assert!(
+            engine
+                .train_observed_transition(&current, &next, &evidence, 0.001)
+                .is_err()
+        );
     }
 
     #[test]
