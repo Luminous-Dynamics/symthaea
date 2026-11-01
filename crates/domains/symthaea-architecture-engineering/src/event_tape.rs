@@ -2404,6 +2404,184 @@ mod tests {
     }
 
     #[test]
+    fn deterministic_vector_event_requires_complete_contract_and_evidence() {
+        let mut tape = EventTape::new(header_with_objective_contract(
+            EventTapeObjectiveMode::DeterministicVector,
+        )).unwrap();
+        let contract_sha256 = tape.header().objective_contract_sha256.clone().unwrap();
+        tape.append(event(
+            "vector-1",
+            0,
+            1,
+            None,
+            0,
+            ActionIntent::EvaluateCandidateVector {
+                candidate_sha256: H5.to_owned(),
+                parent_candidate_sha256: None,
+                semantic_delta_sha256: H2.to_owned(),
+                direction_id: "A".to_owned(),
+                objective_contract_sha256: contract_sha256.clone(),
+            },
+            ActionOutcome::CandidateMultiObjectiveEvaluation {
+                task_recipe_sha256: H1.to_owned(),
+                comparison_profile_sha256: H2.to_owned(),
+                evaluator_sha256: H3.to_owned(),
+                verifier_sha256: H4.to_owned(),
+                verifier_receipt_sha256: H5.to_owned(),
+                objective_contract_sha256: contract_sha256,
+                disposition: CandidateDisposition::Verified,
+                objective_values: Some(vec![0.83, 0.27]),
+                evidence_sha256: Some(H1.to_owned()),
+                evidence_manifest_sha256: Some(H2.to_owned()),
+                evidence_byte_receipt_sha256: Some(H3.to_owned()),
+                failure_reason: None,
+            },
+            5,
+        )).unwrap();
+        let summary = tape.validate().unwrap();
+        assert_eq!(summary.multi_objective_evaluations, 1);
+        assert_eq!(summary.noisy_observation_attempts, 0);
+        assert_eq!(summary.total_charged_budget_microunits, Some(5));
+    }
+
+    #[test]
+    fn noisy_tape_charges_failures_but_only_successes_publish_objective_vectors() {
+        let mut tape = EventTape::new(header_with_objective_contract(
+            EventTapeObjectiveMode::NoisyReplicates,
+        )).unwrap();
+        let contract_sha256 = tape.header().objective_contract_sha256.clone().unwrap();
+        let success = |event_id: &str, replicate_id: &str, seed: u64, visible: u64, round: u64| {
+            event(
+                event_id,
+                0,
+                round,
+                None,
+                visible,
+                ActionIntent::ObserveCandidateReplicate {
+                    candidate_sha256: H5.to_owned(),
+                    parent_candidate_sha256: None,
+                    semantic_delta_sha256: H2.to_owned(),
+                    direction_id: "A".to_owned(),
+                    objective_contract_sha256: contract_sha256.clone(),
+                    decision_sha256: H3.to_owned(),
+                    replicate_id: replicate_id.to_owned(),
+                    sample_seed: seed,
+                },
+                ActionOutcome::CandidateNoisyObservation {
+                    task_recipe_sha256: H1.to_owned(),
+                    comparison_profile_sha256: H2.to_owned(),
+                    evaluator_sha256: H3.to_owned(),
+                    verifier_sha256: H4.to_owned(),
+                    verifier_receipt_sha256: H5.to_owned(),
+                    objective_contract_sha256: contract_sha256.clone(),
+                    disposition: NoisyObservationDisposition::Succeeded,
+                    objective_values: Some(vec![0.82, 0.31]),
+                    evidence_sha256: Some(H1.to_owned()),
+                    evidence_manifest_sha256: Some(H2.to_owned()),
+                    evidence_byte_receipt_sha256: Some(H3.to_owned()),
+                    failure_reason: None,
+                },
+                3,
+            )
+        };
+        tape.append(success("rep-1", "replicate-1", 101, 0, 1)).unwrap();
+        tape.append(event(
+            "rep-timeout",
+            0,
+            2,
+            None,
+            1,
+            ActionIntent::ObserveCandidateReplicate {
+                candidate_sha256: H5.to_owned(),
+                parent_candidate_sha256: None,
+                semantic_delta_sha256: H2.to_owned(),
+                direction_id: "A".to_owned(),
+                objective_contract_sha256: contract_sha256.clone(),
+                decision_sha256: H3.to_owned(),
+                replicate_id: "replicate-2".to_owned(),
+                sample_seed: 102,
+            },
+            ActionOutcome::CandidateNoisyObservation {
+                task_recipe_sha256: H1.to_owned(),
+                comparison_profile_sha256: H2.to_owned(),
+                evaluator_sha256: H3.to_owned(),
+                verifier_sha256: H4.to_owned(),
+                verifier_receipt_sha256: H5.to_owned(),
+                objective_contract_sha256: contract_sha256,
+                disposition: NoisyObservationDisposition::TimedOut,
+                objective_values: None,
+                evidence_sha256: None,
+                evidence_manifest_sha256: None,
+                evidence_byte_receipt_sha256: None,
+                failure_reason: Some("evaluation deadline exceeded".to_owned()),
+            },
+            4,
+        )).unwrap();
+
+        let summary = tape.validate().unwrap();
+        assert_eq!(summary.noisy_observation_attempts, 2);
+        assert_eq!(summary.successful_noisy_observations, 1);
+        assert_eq!(summary.failed_noisy_observations, 1);
+        assert_eq!(summary.total_charged_budget_microunits, Some(7));
+    }
+
+    #[test]
+    fn noisy_mode_rejects_seed_reuse_and_out_of_bounds_observations() {
+        let mut tape = EventTape::new(header_with_objective_contract(
+            EventTapeObjectiveMode::NoisyReplicates,
+        )).unwrap();
+        let contract_sha256 = tape.header().objective_contract_sha256.clone().unwrap();
+        let make_success = |event_id: &str, replicate_id: &str, seed: u64, value: f64| {
+            event(
+                event_id,
+                0,
+                1,
+                None,
+                0,
+                ActionIntent::ObserveCandidateReplicate {
+                    candidate_sha256: H5.to_owned(),
+                    parent_candidate_sha256: None,
+                    semantic_delta_sha256: H2.to_owned(),
+                    direction_id: "A".to_owned(),
+                    objective_contract_sha256: contract_sha256.clone(),
+                    decision_sha256: H3.to_owned(),
+                    replicate_id: replicate_id.to_owned(),
+                    sample_seed: seed,
+                },
+                ActionOutcome::CandidateNoisyObservation {
+                    task_recipe_sha256: H1.to_owned(),
+                    comparison_profile_sha256: H2.to_owned(),
+                    evaluator_sha256: H3.to_owned(),
+                    verifier_sha256: H4.to_owned(),
+                    verifier_receipt_sha256: H5.to_owned(),
+                    objective_contract_sha256: contract_sha256.clone(),
+                    disposition: NoisyObservationDisposition::Succeeded,
+                    objective_values: Some(vec![value, 0.31]),
+                    evidence_sha256: Some(H1.to_owned()),
+                    evidence_manifest_sha256: Some(H2.to_owned()),
+                    evidence_byte_receipt_sha256: Some(H3.to_owned()),
+                    failure_reason: None,
+                },
+                2,
+            )
+        };
+        tape.append(make_success("rep-1", "replicate-1", 101, 0.82)).unwrap();
+        assert!(tape.append(make_success("rep-2", "replicate-2", 101, 0.79)).is_err());
+        assert!(EventTape::new(header_with_objective_contract(EventTapeObjectiveMode::NoisyReplicates)).unwrap()
+            .append(make_success("out-of-bounds", "replicate-3", 103, 1.01)).is_err());
+    }
+
+    #[test]
+    fn legacy_v01_headers_keep_their_original_wire_shape() {
+        let mut legacy = header(ExecutionMode::Sequential, 1, 20);
+        legacy.version = LEGACY_TAPE_VERSION.to_owned();
+        let tape = EventTape::new(legacy).unwrap();
+        let encoded = serde_json::to_value(tape.header()).unwrap();
+        assert!(encoded.get("objective_contract").is_none());
+        assert!(encoded.get("objective_contract_sha256").is_none());
+    }
+
+    #[test]
     fn sequential_tape_hashes_history_and_conserves_charged_budget() {
         let mut tape = EventTape::new(header(ExecutionMode::Sequential, 1, 20)).unwrap();
         let (intent, outcome) = verified_evaluation("A", H5);
