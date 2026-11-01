@@ -13,12 +13,14 @@ Lean's Expr is the expression representation used by the elaborator and kernel. 
 
 The wire format emits four domain-separated digests:
 
-1. **Environment digest:** exact source/task identity, Lean binary/toolchain, toolchain file, Lake configuration and manifest, root module, exporter source, and clean-checkout assertion.
+1. **Environment digest:** exact source/task identity, Lean binary and runtime-artifact manifest, imported OLean-closure manifest, toolchain file, Lake configuration and manifest, root module, exporter source, and clean-checkout assertion.
 2. **Target expression digest:** exact structural expression transcript, scoped to the environment digest.
 3. **Context digest:** ordered local declarations, binder metadata, value-role separation, and the ordered LocalInstances registry, scoped to the environment digest.
 4. **Proof-state digest:** environment + target-expression digest + context digest.
 
 This is an environment-scoped structural identity, not a universal theorem identifier. It intentionally does not normalize definitional equality: two definitionally equal expressions may have different structural hashes. A successful proof still has to be checked by Lean's kernel against the exact target in the pinned project. The hash binds the structure being replayed; it does not itself prove the theorem, prove source authenticity, or replace an independent checker.
+
+The environment envelope requires two artifact manifests beyond a version string and an executable hash. The Lean runtime manifest must hash a deterministic path-sorted inventory of the executable and required shared libraries; the imported OLean manifest must hash the exact transitive imported module artifacts, each bound to its Lean module name and relative artifact path. A Lake manifest pins dependency intent, but does not prove which compiled OLean bytes the process actually loaded. The capture harness must compute these manifests from the resolved build/import environment; it must not substitute package version labels or assume a cached artifact matches its source pin. Until both manifests are present and verified, a capture is not eligible for environment-identity qualification.
 
 ## Wire representation
 
