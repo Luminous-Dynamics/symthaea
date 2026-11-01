@@ -60,6 +60,7 @@ pub enum DesignError {
     EmptyCalibrationUnitId,
     EmptyMechanismFamilyId,
     DuplicateCalibrationUnitId { unit_id: String },
+    DuplicateInScopeMechanismFamily { mechanism_family_id: String },
     DuplicateOmittedMechanismFamily { mechanism_family_id: String },
     MechanismFamilyLeakage { mechanism_family_id: String },
     NonFiniteNonconformityScore,
@@ -155,6 +156,9 @@ impl fmt::Display for DesignError {
             }
             Self::DuplicateCalibrationUnitId { unit_id } => {
                 write!(f, "duplicate calibration unit identifier {unit_id:?}")
+            }
+            Self::DuplicateInScopeMechanismFamily { mechanism_family_id } => {
+                write!(f, "in-scope calibration must contain one aggregate score per independent family; duplicate {mechanism_family_id:?}")
             }
             Self::DuplicateOmittedMechanismFamily { mechanism_family_id } => {
                 write!(f, "omitted-mechanism calibration must contain one aggregate score per independent family; duplicate {mechanism_family_id:?}")
@@ -303,13 +307,14 @@ pub fn evaluate_open_world_report(
     })
 }
 
-/// One independent unit used to calibrate model adequacy.
+/// One independent mechanism-family aggregate used to calibrate model adequacy.
 ///
-/// For the in-scope cohort, unit_id should denote an independent animal/session
-/// unit (or a preregistered aggregate at the animal level). For the omitted
-/// cohort, unit_id and mechanism_family_id must denote one independent held-out
-/// mechanism family after aggregating its recordings. Frames, neurons, and
-/// repeated recordings from one family are not independent calibration units.
+/// Both in-scope and omitted cohorts use exactly one unit per independent
+/// mechanism family. Each unit's nonconformity score must be aggregated from
+/// that family's animal/session recordings using a preregistered rule. Frames,
+/// neurons, trials, and repeated animal/session recordings within a family are
+/// not independent calibration units. The held-out test score must use the same
+/// family-level aggregation rule.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AdequacyCalibrationUnit {
     pub unit_id: String,
@@ -406,8 +411,8 @@ fn wilson_one_sided_lower(
     Ok(lower)
 }
 
-/// Calibrate an open-world adequacy gate from independent in-scope
-/// animal/session units and independent omitted-mechanism family units.
+/// Calibrate an open-world adequacy gate from one aggregate score per
+/// independent in-scope mechanism family and one per omitted mechanism family.
 ///
 /// The threshold is the k-th smallest omitted-family nonconformity score,
 /// where k = floor(alpha * (n_ood + 1)). A candidate is accepted only when its
@@ -459,7 +464,11 @@ pub fn calibrate_model_adequacy(
                 unit_id: unit.unit_id.clone(),
             });
         }
-        in_scope_families.insert(unit.mechanism_family_id.as_str());
+        if !in_scope_families.insert(unit.mechanism_family_id.as_str()) {
+            return Err(DesignError::DuplicateInScopeMechanismFamily {
+                mechanism_family_id: unit.mechanism_family_id.clone(),
+            });
+        }
     }
 
     for unit in omitted_mechanism_units {
@@ -558,7 +567,7 @@ pub fn calibrate_model_adequacy_report(
     })
 }
 
-/// Classify one already-aggregated held-out animal/session score. This does
+/// Classify one already-aggregated held-out mechanism-family score. This does
 /// not name the omitted mechanism and does not distinguish an absent mechanism
 /// from observation-kernel, registration, or context-distribution shift.
 pub fn assess_model_adequacy(
@@ -1456,8 +1465,8 @@ mod tests {
         let in_scope = (0..20)
             .map(|index| {
                 calibration_unit(
-                    &format!("animal-session-{index:02}"),
-                    "named-mechanism-family",
+                    &format!("in-scope-family-unit-{index:02}"),
+                    &format!("in-scope-family-{index:02}"),
                     index as f64 / 10.0,
                 )
             })
@@ -1567,6 +1576,27 @@ mod tests {
             ),
             Err(DesignError::MechanismFamilyLeakage {
                 mechanism_family_id: "shared-family".to_owned()
+            })
+        );
+    }
+
+    #[test]
+    fn adequacy_gate_rejects_multiple_units_from_one_in_scope_family() {
+        let in_scope = vec![
+            calibration_unit("id-1", "same-in-scope-family", 0.1),
+            calibration_unit("id-2", "same-in-scope-family", 0.2),
+        ];
+        let omitted = vec![
+            calibration_unit("ood-1", "ood-family-1", 10.0),
+        ];
+        assert_eq!(
+            calibrate_model_adequacy(
+                &in_scope,
+                &omitted,
+                AdequacyGateConfig::default()
+            ),
+            Err(DesignError::DuplicateInScopeMechanismFamily {
+                mechanism_family_id: "same-in-scope-family".to_owned()
             })
         );
     }
