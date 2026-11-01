@@ -133,6 +133,9 @@ pub fn update_resource_prices(
     config: ResourcePriceConfig,
 ) -> Result<ResourcePriceReceipt, PriceError> {
     config.validate()?;
+    let next_episode = state.completed_episodes
+        .checked_add(1)
+        .ok_or(PriceError::ArithmeticOverflow)?;
     let usage = measured.values();
     let limits = budget.values();
     let mut updates = Vec::with_capacity(ResourceDimension::ALL.len());
@@ -171,9 +174,7 @@ pub fn update_resource_prices(
         });
     }
 
-    state.completed_episodes = state.completed_episodes
-        .checked_add(1)
-        .ok_or(PriceError::ArithmeticOverflow)?;
+    state.completed_episodes = next_episode;
 
     Ok(ResourcePriceReceipt {
         completed_episode: state.completed_episodes,
