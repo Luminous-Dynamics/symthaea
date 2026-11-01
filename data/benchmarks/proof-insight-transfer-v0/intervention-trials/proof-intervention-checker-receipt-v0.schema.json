@@ -1,43 +1,226 @@
 {
- "$schema":"https://json-schema.org/draft/2020-12/schema",
- "$id":"https://luminousdynamics.io/schemas/pitb/proof-intervention-checker-receipt-v0.schema.json",
- "title":"PITB intervention checker receipt v0",
- "description":"Strict measured checker receipt binding one kernel result to the exact trial arm, task, initial state, target, proof bytes, checker binary and axiom policy.",
- "type":"object","additionalProperties":false,
- "required":["schema_version","evidence_class","evidence_kind","trial_id","pair_id","arm_id","run_id","task_id","component_id","repository_commit","lean_toolchain","environment_sha256","initial_proof_state_sha256","target_statement_sha256","model_seed_sha256","checker_id","checker_version","checker_binary_sha256","status","kernel_passed","checked_target_statement_sha256","proof_sha256","proof_contains_sorry_ax","used_axioms","used_axioms_manifest_sha256","allowed_axioms","allowlist_manifest_sha256","unexpected_axioms"],
- "properties":{
-  "schema_version":{"const":"pitb.proof-intervention-checker-receipt.v0"},
-  "evidence_class":{"const":"measured_evidence"},
-  "evidence_kind":{"const":"checker"},
-  "trial_id":{"type":"string","minLength":1},
-  "pair_id":{"$ref":"#/$defs/sha256"},
-  "arm_id":{"type":"string","minLength":1},
-  "run_id":{"type":"string","minLength":1},
-  "task_id":{"$ref":"#/$defs/sha256"},
-  "component_id":{"type":"string","minLength":1},
-  "repository_commit":{"$ref":"#/$defs/sha1"},
-  "lean_toolchain":{"type":"string","minLength":1},
-  "environment_sha256":{"$ref":"#/$defs/sha256"},
-  "initial_proof_state_sha256":{"$ref":"#/$defs/sha256"},
-  "target_statement_sha256":{"$ref":"#/$defs/sha256"},
-  "model_seed_sha256":{"$ref":"#/$defs/sha256"},
-  "checker_id":{"type":"string","minLength":1},
-  "checker_version":{"type":"string","minLength":1},
-  "checker_binary_sha256":{"$ref":"#/$defs/sha256"},
-  "status":{"enum":["passed","failed","not_run","unknown"]},
-  "kernel_passed":{"type":"boolean"},
-  "checked_target_statement_sha256":{"oneOf":[{"$ref":"#/$defs/sha256"},{"type":"null"}]},
-  "proof_sha256":{"oneOf":[{"$ref":"#/$defs/sha256"},{"type":"null"}]},
-  "proof_contains_sorry_ax":{"type":"boolean"},
-  "used_axioms":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},
-  "used_axioms_manifest_sha256":{"$ref":"#/$defs/sha256"},
-  "allowed_axioms":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},
-  "allowlist_manifest_sha256":{"$ref":"#/$defs/sha256"},
-  "unexpected_axioms":{"type":"integer","minimum":0}
- },
- "allOf":[{
-  "if":{"properties":{"status":{"const":"passed"}},"required":["status"]},
-  "then":{"properties":{"kernel_passed":{"const":true},"checked_target_statement_sha256":{"$ref":"#/$defs/sha256"},"proof_sha256":{"$ref":"#/$defs/sha256"},"proof_contains_sorry_ax":{"const":false},"unexpected_axioms":{"const":0}}}
- }],
- "$defs":{"sha256":{"type":"string","pattern":"^[a-f0-9]{64}$"},"sha1":{"type":"string","pattern":"^[a-f0-9]{40}$"}}
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/proof-intervention-checker-receipt-v0.schema.json",
+  "title": "PITB intervention checker receipt v0",
+  "description": "Strict measured checker receipt binding one kernel result to the exact trial arm, task, initial state, target, proof bytes, checker binary and axiom policy.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "evidence_kind",
+    "trial_id",
+    "pair_id",
+    "arm_id",
+    "run_id",
+    "task_id",
+    "component_id",
+    "repository_commit",
+    "lean_toolchain",
+    "environment_sha256",
+    "initial_proof_state_sha256",
+    "target_statement_sha256",
+    "model_seed_sha256",
+    "checker_id",
+    "checker_version",
+    "checker_binary_sha256",
+    "status",
+    "kernel_passed",
+    "checked_target_statement_sha256",
+    "proof_sha256",
+    "proof_contains_sorry_ax",
+    "used_axioms",
+    "used_axioms_manifest_sha256",
+    "allowed_axioms",
+    "allowlist_manifest_sha256",
+    "unexpected_axioms",
+    "initial_state_receipt_sha256",
+    "model_id",
+    "model_version",
+    "arm_policy_sha256",
+    "arm_config_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.proof-intervention-checker-receipt.v0"
+    },
+    "evidence_class": {
+      "const": "measured_evidence"
+    },
+    "evidence_kind": {
+      "const": "checker"
+    },
+    "trial_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pair_id": {
+      "$ref": "#/$defs/sha256"
+    },
+    "arm_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "$ref": "#/$defs/sha256"
+    },
+    "component_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repository_commit": {
+      "$ref": "#/$defs/sha1"
+    },
+    "lean_toolchain": {
+      "type": "string",
+      "minLength": 1
+    },
+    "environment_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "initial_proof_state_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "target_statement_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "model_seed_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "checker_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "checker_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "checker_binary_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed",
+        "not_run",
+        "unknown"
+      ]
+    },
+    "kernel_passed": {
+      "type": "boolean"
+    },
+    "checked_target_statement_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "proof_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "proof_contains_sorry_ax": {
+      "type": "boolean"
+    },
+    "used_axioms": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "used_axioms_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "allowed_axioms": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "allowlist_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "unexpected_axioms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "initial_state_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "arm_policy_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "arm_config_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "passed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "kernel_passed": {
+            "const": true
+          },
+          "checked_target_statement_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "proof_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "proof_contains_sorry_ax": {
+            "const": false
+          },
+          "unexpected_axioms": {
+            "const": 0
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    }
+  }
 }
