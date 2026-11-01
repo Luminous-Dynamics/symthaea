@@ -145,3 +145,8 @@ The strongest defensible initial result is not necessarily a higher solve rate. 
 4. Prepare an independent semantic-review protocol and signed reviewer-attestation format.
 5. Audit a stratified smoke sample from SorryDB_2601, report eligible/pending/ineligible counts, and retain all evidence.
 6. Only after that audit should PITB compare proof-system performance on the eligible denominator; publish pending/ineligible strata separately.
+
+
+## SorryDB score-path integration
+
+The SorryDB task-run receipt now includes a required `task_integrity` field. Synthetic no-run fixtures set it to `null`; measured runs must bind the exact eligible receipt bytes. The new `verify_sorrydb_run_integrity` Rust binary joins the receipt to the source task ID, repository remote/commit, source coordinates, Lean version and Lake manifest. The focused workflow also includes negative controls for missing/pending eligibility and source/environment substitutions. This does not yet replace proof-attempt checker/replay receipt verification or claim a measured SorryDB result.
