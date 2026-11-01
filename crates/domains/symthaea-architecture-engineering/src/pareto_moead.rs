@@ -917,6 +917,7 @@ mod tests {
         ], reference_front).unwrap();
         let header = super::super::pareto_anytime::AnytimeHistoryHeader::new(
             format!("moead-{problem_id}-{seed}"),
+            "0123456789abcdef0123456789abcdef01234567",
             ALGORITHM_ID,
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "test-evaluator",
