@@ -74,8 +74,8 @@ const EVALUATION_MAGIC: &[u8] = b"SYMTHAEA-IIT-EVALUATION\0v0.1\0";
 const ANALYSIS_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-ANALYSIS-REQUEST\0v0.1\0";
 /// Stable algorithm identity included in every IIT 4.0 (2023) system-search receipt.
 pub const IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID: &str =
-    "symthaea-iit/iit4-2023-system-phi-eq4-minfill/0.2.0";
-const SYSTEM_PHI_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SYSTEM-PHI-RECEIPT\0v0.3\0";
+    "symthaea-iit/iit4-2023-system-phi-eq4-minfill/0.3.0";
+const SYSTEM_PHI_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SYSTEM-PHI-RECEIPT\0v0.4\0";
 
 /// Errors caused by invalid model inputs or invalid state requests.
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -509,6 +509,11 @@ pub enum Iit4SystemPhiStatus {
 pub struct Iit4SystemPhiStatePairResult {
     pub system_state: Iit4SystemState,
     pub winning_partition: DirectedSystemPartition,
+    /// Every MIP tied with the winner under PyPhi's normalized-Phi, raw-Phi,
+    /// then PARTITION_LEX resolution. Sorted by canonical cut-matrix bytes.
+    /// This is not a tie among specified cause/effect state pairs; those are
+    /// recorded separately on Iit4SystemPhiAnalysis.
+    pub tied_partitions: Vec<DirectedSystemPartition>,
     pub score: SystemPhiPartitionScore,
     /// Gap in clamped normalized Phi to the nearest competing partition.
     /// Zero records a tie under the default PyPhi SIA partition ranking.
@@ -647,6 +652,30 @@ impl Iit4SystemPhiAnalysis {
                     PartitionDirection::Effect => 1,
                     PartitionDirection::Bidirectional => 2,
                 });
+            }
+
+            // Bind the complete MIP tie family, not just the selected
+            // representative. This makes tied-cut replay independent of
+            // the local lexicographic representative convention.
+            receipt_usize(&mut bytes, result.tied_partitions.len());
+            for tied_partition in &result.tied_partitions {
+                receipt_bool_slice(&mut bytes, tied_partition.cut_matrix());
+                bytes.push(u8::from(tied_partition.is_total_cut()));
+                receipt_usize(&mut bytes, tied_partition.parts().len());
+                for part in tied_partition.parts() {
+                    receipt_usize(&mut bytes, part.len());
+                    for unit in part {
+                        receipt_usize(&mut bytes, *unit);
+                    }
+                }
+                receipt_usize(&mut bytes, tied_partition.directions().len());
+                for direction in tied_partition.directions() {
+                    bytes.push(match direction {
+                        PartitionDirection::Cause => 0,
+                        PartitionDirection::Effect => 1,
+                        PartitionDirection::Bidirectional => 2,
+                    });
+                }
             }
 
             receipt_direction_score(&mut bytes, &result.score.cause, "cause")?;
@@ -2876,7 +2905,13 @@ impl BinaryCausalModel {
             if scores.is_empty() {
                 return Err(SystemPhiError::ZeroSeveredConnections);
             }
-            let winner_index = select_pyphi_sia_partition(&partitions, &scores, epsilon);
+            let tied_partition_indices =
+                pyphi_sia_partition_tie_indices(&partitions, &scores, epsilon);
+            let winner_index = tied_partition_indices[0];
+            let tied_partitions = tied_partition_indices
+                .iter()
+                .map(|index| partitions[*index].clone())
+                .collect::<Vec<_>>();
             let winner_score = scores[winner_index].clone();
             let competing_normalized = scores
                 .iter()
@@ -2890,6 +2925,7 @@ impl BinaryCausalModel {
             state_pair_results.push(Iit4SystemPhiStatePairResult {
                 system_state,
                 winning_partition: partitions[winner_index].clone(),
+                tied_partitions,
                 score: winner_score,
                 partition_margin,
             });
@@ -3315,13 +3351,17 @@ fn pyphi_is_positive(value: f64, epsilon: f64) -> bool {
     value > 0.0 && !pyphi_eq(value, 0.0, epsilon)
 }
 
-/// Default PyPhi IIT 4.0 sia_tie_resolution:
-/// min NORMALIZED_PHI, then min NEGATIVE_PHI (max PHI), then PARTITION_LEX.
-fn select_pyphi_sia_partition(
+/// Return every MIP in PyPhi's default IIT 4.0 SIA tie class:
+/// min NORMALIZED_PHI, then min NEGATIVE_PHI (max PHI).
+///
+/// PARTITION_LEX selects a canonical representative, but it does not erase
+/// the tied alternatives. We retain the complete class, sorted by the same
+/// row-major cut-matrix bytes used by the representative selection.
+pub(crate) fn pyphi_sia_partition_tie_indices(
     partitions: &[DirectedSystemPartition],
     scores: &[SystemPhiPartitionScore],
     epsilon: f64,
-) -> usize {
+) -> Vec<usize> {
     debug_assert_eq!(partitions.len(), scores.len());
     let minimum_normalized = scores
         .iter()
@@ -3340,17 +3380,26 @@ fn select_pyphi_sia_partition(
         .map(|index| scores[*index].phi)
         .max_by(f64::total_cmp)
         .unwrap_or(0.0);
-    normalized_ties
+    let mut tied = normalized_ties
         .into_iter()
         .filter(|index| pyphi_eq(scores[*index].phi, maximum_phi, epsilon))
-        // PyPhi PARTITION_LEX compares row-major induced cut-matrix bytes.
-        // For one fixed ascending candidate subsystem, the local matrix has
-        // the same ordering as its zero-embedded substrate matrix.
-        .min_by(|left, right| {
-            partitions[*left]
-                .cut_matrix()
-                .cmp(partitions[*right].cut_matrix())
-        })
+        .collect::<Vec<_>>();
+    tied.sort_unstable_by(|left, right| {
+        partitions[*left].cut_matrix().cmp(partitions[*right].cut_matrix())
+    });
+    tied
+}
+
+/// Default PyPhi IIT 4.0 sia_tie_resolution representative: the first
+/// canonical cut in the complete tied MIP family.
+fn select_pyphi_sia_partition(
+    partitions: &[DirectedSystemPartition],
+    scores: &[SystemPhiPartitionScore],
+    epsilon: f64,
+) -> usize {
+    pyphi_sia_partition_tie_indices(partitions, scores, epsilon)
+        .first()
+        .copied()
         .unwrap_or(0)
 }
 
