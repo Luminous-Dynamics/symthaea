@@ -43,7 +43,9 @@ use thiserror::Error;
 
 mod factor_graph;
 mod macro_unit;
-pub use macro_unit::{MacroUnitError, MacroUnitSpec};
+pub use macro_unit::{
+    MacroMappingSearchLimits, MacroMappingSearchReport, MacroUnitError, MacroUnitSpec,
+};
 pub use factor_graph::{
     min_fill_log_sum_product, min_fill_log_sum_product_with_cutset,
     min_fill_log_sum_product_with_cutset_plan, min_fill_sum_product,
