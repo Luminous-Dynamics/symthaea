@@ -497,8 +497,12 @@ pub struct PrequentialMetrics {
     pub worst_regime_accuracy: Option<f64>,
     /// Mean number of events from a detected regime transition to recovered rolling accuracy.
     pub mean_drift_recovery_samples: Option<f64>,
+    pub drift_transition_count: usize,
+    pub recovered_drift_transition_count: usize,
+    pub unrecovered_drift_transitions: usize,
     /// Maximum percentage-point accuracy drop when a previously seen regime recurs.
     pub maximum_regime_retention_loss_pp: Option<f64>,
+    pub retention_compared_regime_count: usize,
     pub false_alarms_per_hour: f64,
     pub missed_events_per_hour: f64,
     pub mean_prediction_latency_us: f64,
@@ -746,32 +750,68 @@ pub fn audit_prequential_execution(
     let mut abstentions = 0usize;
     let mut brier_sum = 0.0f64;
     let mut prediction_latency_sum = 0u128;
+    let mut novelty_scores = Vec::<(u16, bool, usize)>::with_capacity(count);
+    let mut regime_count = [0usize; 3];
+    let mut regime_correct = [0usize; 3];
+    let mut regime_false_positive = [0usize; 3];
+    let mut regime_false_negative = [0usize; 3];
 
     for index in 0..count {
         let prediction = predictions[index].ok_or_else(|| {
             EdgeBenchmarkError::new("prequential_trace.predictions", "missing prediction after inventory check")
         })?;
-        let label = dataset.delayed_labels[index].label;
+        let delayed = &dataset.delayed_labels[index];
+        let label = delayed.label;
         let probability = prediction.positive_probability_q15 as f64 / 32_768.0;
         let target = label as f64;
         brier_sum += (probability - target) * (probability - target);
         prediction_latency_sum += (prediction.timestamp_us - dataset.observations[index].timestamp_us) as u128;
+        novelty_scores.push((
+            prediction.novelty_score_q15,
+            delayed.is_out_of_distribution,
+            index,
+        ));
+
+        let regime_index = delayed.regime_id as usize;
+        if regime_index < regime_count.len() {
+            regime_count[regime_index] += 1;
+        }
 
         match prediction.predicted_class {
             Some(predicted) => {
                 accepted += 1;
-                if predicted == label { correct += 1; }
+                if predicted == label {
+                    correct += 1;
+                    if regime_index < regime_correct.len() {
+                        regime_correct[regime_index] += 1;
+                    }
+                }
                 match (predicted, label) {
                     (1, 1) => true_positive += 1,
                     (0, 0) => true_negative += 1,
-                    (1, 0) => false_positive += 1,
-                    (0, 1) => false_negative += 1,
+                    (1, 0) => {
+                        false_positive += 1;
+                        if regime_index < regime_false_positive.len() {
+                            regime_false_positive[regime_index] += 1;
+                        }
+                    }
+                    (0, 1) => {
+                        false_negative += 1;
+                        if regime_index < regime_false_negative.len() {
+                            regime_false_negative[regime_index] += 1;
+                        }
+                    }
                     _ => {}
                 }
             }
             None => {
                 abstentions += 1;
-                if label == 1 { false_negative += 1; }
+                if label == 1 {
+                    false_negative += 1;
+                    if regime_index < regime_false_negative.len() {
+                        regime_false_negative[regime_index] += 1;
+                    }
+                }
             }
         }
     }
@@ -787,6 +827,147 @@ pub fn audit_prequential_execution(
         None
     };
     let selective_accuracy = if accepted > 0 { Some(correct as f64 / accepted as f64) } else { None };
+
+    // Average precision for OOD detection. Equal novelty scores are processed as one threshold
+    // group, avoiding a score-order advantage from arbitrary event-index tie-breaking.
+    let ood_positive_count = novelty_scores.iter().filter(|(_, is_ood, _)| *is_ood).count();
+    let ood_negative_count = novelty_scores.len() - ood_positive_count;
+    let open_set_auprc = if ood_positive_count > 0 && ood_negative_count > 0 {
+        novelty_scores.sort_by(|left, right| {
+            right.0.cmp(&left.0).then_with(|| left.2.cmp(&right.2))
+        });
+        let mut seen = 0usize;
+        let mut true_ood = 0usize;
+        let mut average_precision_sum = 0.0f64;
+        let mut cursor = 0usize;
+        while cursor < novelty_scores.len() {
+            let threshold = novelty_scores[cursor].0;
+            let mut group_count = 0usize;
+            let mut group_positive = 0usize;
+            while cursor < novelty_scores.len() && novelty_scores[cursor].0 == threshold {
+                group_count += 1;
+                if novelty_scores[cursor].1 {
+                    group_positive += 1;
+                }
+                cursor += 1;
+            }
+            seen += group_count;
+            true_ood += group_positive;
+            if group_positive > 0 {
+                average_precision_sum += group_positive as f64 / ood_positive_count as f64
+                    * true_ood as f64 / seen as f64;
+            }
+        }
+        Some(average_precision_sum)
+    } else {
+        None
+    };
+
+    let mut per_regime_metrics = Vec::new();
+    for regime_id in 0..regime_count.len() {
+        let regime_n = regime_count[regime_id];
+        if regime_n > 0 {
+            per_regime_metrics.push(TemporalRegimeMetrics {
+                regime_id: regime_id as u8,
+                event_count: regime_n,
+                correct_count: regime_correct[regime_id],
+                accuracy: regime_correct[regime_id] as f64 / regime_n as f64,
+                false_positive_count: regime_false_positive[regime_id],
+                false_negative_count: regime_false_negative[regime_id],
+            });
+        }
+    }
+    let worst_regime_accuracy = per_regime_metrics.iter()
+        .map(|regime| regime.accuracy)
+        .min_by(f64::total_cmp);
+
+    // Split the evaluator's ground-truth timeline into contiguous effective-regime runs.
+    let mut regime_runs = Vec::<(usize, usize, u8)>::new();
+    let mut run_start = 0usize;
+    let mut current_regime = dataset.delayed_labels[0].regime_id;
+    for index in 1..count {
+        let regime = dataset.delayed_labels[index].regime_id;
+        if regime != current_regime {
+            regime_runs.push((run_start, index, current_regime));
+            run_start = index;
+            current_regime = regime;
+        }
+    }
+    regime_runs.push((run_start, count, current_regime));
+
+    const RECOVERY_WINDOW: usize = 50;
+    let range_accuracy = |start: usize, end: usize| -> Option<f64> {
+        if end <= start {
+            return None;
+        }
+        let mut range_correct = 0usize;
+        for index in start..end {
+            if predictions[index].is_some_and(|prediction| {
+                prediction.predicted_class == Some(dataset.delayed_labels[index].label)
+            }) {
+                range_correct += 1;
+            }
+        }
+        Some(range_correct as f64 / (end - start) as f64)
+    };
+
+    let mut recovery_sum = 0usize;
+    let mut recovered_transitions = 0usize;
+    let mut drift_transition_count = 0usize;
+    for run_index in 1..regime_runs.len() {
+        let (previous_start, previous_end, _) = regime_runs[run_index - 1];
+        let (start, end, _) = regime_runs[run_index];
+        let baseline_start = previous_end.saturating_sub(RECOVERY_WINDOW).max(previous_start);
+        let baseline_accuracy = range_accuracy(baseline_start, previous_end);
+        drift_transition_count += 1;
+        let Some(baseline_accuracy) = baseline_accuracy.filter(|value| *value > 0.0) else {
+            continue;
+        };
+        if end.saturating_sub(start) < RECOVERY_WINDOW {
+            continue;
+        }
+        let mut recovered_at = None;
+        for window_start in start..=end - RECOVERY_WINDOW {
+            let window_accuracy = range_accuracy(window_start, window_start + RECOVERY_WINDOW)
+                .unwrap_or(0.0);
+            if window_accuracy >= baseline_accuracy * 0.95 {
+                recovered_at = Some(window_start - start + RECOVERY_WINDOW);
+                break;
+            }
+        }
+        if let Some(samples_to_recover) = recovered_at {
+            recovery_sum += samples_to_recover;
+            recovered_transitions += 1;
+        }
+    }
+    let mean_drift_recovery_samples = if recovered_transitions > 0 {
+        Some(recovery_sum as f64 / recovered_transitions as f64)
+    } else {
+        None
+    };
+    let unrecovered_drift_transitions = drift_transition_count - recovered_transitions;
+
+    // Retention loss is measured only when the same effective regime recurs after another regime.
+    let mut maximum_regime_retention_loss = 0.0f64;
+    let mut retention_compared_regime_count = 0usize;
+    for run_index in 0..regime_runs.len() {
+        let (first_start, first_end, regime_id) = regime_runs[run_index];
+        let later = regime_runs.iter().skip(run_index + 1)
+            .find(|(_, _, candidate_regime)| *candidate_regime == regime_id);
+        if let Some((later_start, later_end, _)) = later {
+            let first_accuracy = range_accuracy(first_start, first_end).unwrap_or(0.0);
+            let later_accuracy = range_accuracy(*later_start, *later_end).unwrap_or(0.0);
+            maximum_regime_retention_loss =
+                maximum_regime_retention_loss.max((first_accuracy - later_accuracy).max(0.0) * 100.0);
+            retention_compared_regime_count += 1;
+        }
+    }
+    let maximum_regime_retention_loss_pp = if retention_compared_regime_count > 0 {
+        Some(maximum_regime_retention_loss)
+    } else {
+        None
+    };
+
     let first_time = dataset.observations.first().expect("non-empty checked").timestamp_us;
     let last_time = dataset.observations.last().expect("non-empty checked").timestamp_us;
     let exposure_us = (last_time.saturating_sub(first_time))
@@ -807,6 +988,15 @@ pub fn audit_prequential_execution(
         coverage: accepted as f64 / count as f64,
         selective_accuracy,
         brier_score: brier_sum / count as f64,
+        open_set_auprc,
+        per_regime_metrics,
+        worst_regime_accuracy,
+        mean_drift_recovery_samples,
+        drift_transition_count,
+        recovered_drift_transition_count: recovered_transitions,
+        unrecovered_drift_transitions,
+        maximum_regime_retention_loss_pp,
+        retention_compared_regime_count,
         false_alarms_per_hour: false_positive as f64 / exposure_hours,
         missed_events_per_hour: false_negative as f64 / exposure_hours,
         mean_prediction_latency_us: prediction_latency_sum as f64 / count as f64,
