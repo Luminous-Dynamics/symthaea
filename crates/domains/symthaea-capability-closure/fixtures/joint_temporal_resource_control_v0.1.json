@@ -117,7 +117,7 @@
     "exact_integer_sums": true,
     "reports_incompatible_context_counts": true,
     "reports_over_budget_context_counts": true,
-    "shapiro_or_universal_causal_claim": false,
-    "test_functions_authored": 6
+    "test_functions_authored": 6,
+    "shapley_or_universal_causal_claim": false
   }
 }
