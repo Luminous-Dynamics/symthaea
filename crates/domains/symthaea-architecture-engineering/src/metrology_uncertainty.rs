@@ -9,7 +9,7 @@
 use std::error::Error;
 use std::fmt;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::ppk2_trace_audit::{
@@ -42,7 +42,8 @@ impl fmt::Display for MetrologyUncertaintyError {
 }
 impl Error for MetrologyUncertaintyError {}
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MetrologyUncertaintyManifest {
     pub schema: String,
     pub version: String,
@@ -62,7 +63,8 @@ pub struct MetrologyUncertaintyManifest {
     pub manifest_sha256: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EnergyUncertaintyReceipt {
     pub schema: String,
     pub version: String,
@@ -81,7 +83,7 @@ pub struct EnergyUncertaintyReceipt {
     pub receipt_sha256: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EnergyComparisonDecision {
     CandidateStrictlyLower,
@@ -89,7 +91,8 @@ pub enum EnergyComparisonDecision {
     IndeterminateIntervalsOverlap,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EnergyComparison {
     pub candidate_receipt_sha256: String,
     pub reference_receipt_sha256: String,
@@ -328,10 +331,12 @@ pub fn validate_energy_uncertainty_receipt(
     {
         return Err(MetrologyUncertaintyError::new("receipt", "replicate count and uncertainty values are outside valid bounds"));
     }
+    let expected_type_a = receipt.sample_standard_deviation_uj / (receipt.replicate_count as f64).sqrt();
     let expected_combined = receipt.type_a_standard_uncertainty_uj.hypot(receipt.type_b_standard_uncertainty_uj);
     let expected_expanded = receipt.coverage_factor * expected_combined;
     let tolerance = 1e-10 * receipt.mean_energy_uj.abs().max(1.0);
-    if (receipt.combined_standard_uncertainty_uj - expected_combined).abs() > tolerance
+    if (receipt.type_a_standard_uncertainty_uj - expected_type_a).abs() > tolerance
+        || (receipt.combined_standard_uncertainty_uj - expected_combined).abs() > tolerance
         || (receipt.expanded_uncertainty_uj - expected_expanded).abs() > tolerance
         || (receipt.lower_bound_uj - (receipt.mean_energy_uj - expected_expanded)).abs() > tolerance
         || (receipt.upper_bound_uj - (receipt.mean_energy_uj + expected_expanded)).abs() > tolerance
@@ -509,6 +514,24 @@ mod tests {
         forged.lower_bound_uj = 0.0;
         assert!(validate_energy_uncertainty_receipt(&forged).is_err());
         assert!(compare_energy_uncertainty(&forged, &a).is_err());
+    }
+
+    #[test]
+    fn uncertainty_receipts_roundtrip_and_reject_unknown_fields() {
+        let receipt = evaluate_ppk2_energy_uncertainty(&trace(&[10.0, 11.0, 9.0]), &manifest()).unwrap();
+        let json = serde_json::to_string(&receipt).unwrap();
+        let decoded: EnergyUncertaintyReceipt = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, receipt);
+        let with_unknown = json.trim_end_matches('}').to_owned() + ",\"unexpected\":true}";
+        assert!(serde_json::from_str::<EnergyUncertaintyReceipt>(&with_unknown).is_err());
+    }
+
+    #[test]
+    fn rejects_rehashed_receipt_with_forged_type_a_term() {
+        let mut receipt = evaluate_ppk2_energy_uncertainty(&trace(&[10.0, 11.0, 9.0]), &manifest()).unwrap();
+        receipt.type_a_standard_uncertainty_uj = 0.0;
+        receipt.receipt_sha256 = receipt_sha256(&receipt).unwrap();
+        assert!(validate_energy_uncertainty_receipt(&receipt).is_err());
     }
 
     #[test]
