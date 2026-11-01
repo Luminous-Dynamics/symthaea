@@ -49,11 +49,10 @@ type EdgeCore = BoundedEdgeCore<128, 4, 16, 256>;
 
 let mut core = EdgeCore::new().expect("non-zero fixed capacity");
 let sensory_equilibrium = [0i16; 128];
-core.update_liquid_state(&sensory_equilibrium, Q15_ONE)?;
+core.update_liquid_state(&sensory_equilibrium, Q15_ONE).unwrap();
 let exemplar = PackedHv::<256>::zero();
-core.remember(0, exemplar)?;
+core.remember(0, exemplar).unwrap();
 let result = core.classify(&exemplar);
-# Ok::<(), symthaea_edge_core::MemoryError>(())
 ```
 
 The example's memory is statically bounded. The 64 exemplar vectors occupy 128 KiB; liquid state occupies 256 bytes. Two per-class `usize` arrays add target-dependent metadata (32 bytes on a 32-bit MCU, 64 bytes on a 64-bit host). Struct padding and caller-owned inputs/stack are not part of the component payload count.
