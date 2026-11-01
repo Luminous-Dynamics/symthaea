@@ -197,7 +197,7 @@ pub fn plan_deployment_quota(
         planned_attempts: attempts,
         achieved_failure_probability_bound: achieved_failure,
         previous_attempts_failure_probability_bound: previous_failure,
-        plan_sha256: String::new(),
+        plan_sha256: "0".repeat(SHA256_HEX_LEN),
     };
     plan.plan_sha256 = compute_deployment_quota_plan_sha256(&plan)?;
     Ok(plan)
