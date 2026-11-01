@@ -1291,7 +1291,7 @@ mod tests {
             primary_metric_definition_sha256: digest("metric-definition"),
             minimum_confirmatory_replicates: CAUSAL_MIN_CONFIRMATORY_REPLICATES as u32,
             randomization_test_draws: CAUSAL_MIN_RANDOMIZATION_DRAWS,
-            randomization_test_seed_hex: hex(&vec![0xA7; 32]),
+            randomization_test_seed_hex: hex(&[0xA7; 32]),
             replicates: vec![make_replicate(1), make_replicate(2)],
         }
     }
