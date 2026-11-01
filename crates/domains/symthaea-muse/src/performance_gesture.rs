@@ -20,6 +20,7 @@ pub const PERFORMANCE_GESTURE_SCHEMA_VERSION: u16 = 1;
 /// fields remain private so ordinary callers cannot construct a non-canonical
 /// value, while validation still protects deserialized data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BeatPosition {
     numerator: u64,
     denominator: u32,
@@ -56,6 +57,13 @@ impl BeatPosition {
     }
 }
 
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 fn gcd_u64(mut left: u64, mut right: u64) -> u64 {
     while right != 0 {
         let remainder = left % right;
@@ -68,7 +76,7 @@ fn gcd_u64(mut left: u64, mut right: u64) -> u64 {
 /// The target is a stable score part or a stable note within a part.
 /// Part identity is not inferred from pitch, register, role, channel or overlap.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(tag = "scope", rename_all = "snake_case")]
+#[serde(tag = "scope", rename_all = "snake_case", deny_unknown_fields)]
 pub enum GestureTarget {
     Part { part_id: u16 },
     Note { part_id: u16, note_id: String },
@@ -122,7 +130,7 @@ pub enum GestureUnit {
 /// Values are typed so categorical/binary controls cannot accidentally be
 /// linearly interpolated or supplied as unlabelled floating-point numbers.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum GestureValue {
     Scalar { amount: f64, unit: GestureUnit },
     Boolean { value: bool },
@@ -138,6 +146,7 @@ pub enum GestureInterpolation {
 
 /// One immutable event in a performance-control stream.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PerformanceGestureEvent {
     /// Stable event identity, unique within one track.
     pub event_id: String,
@@ -154,8 +163,13 @@ pub struct PerformanceGestureEvent {
 
 /// Additive sidecar. Existing Score and ScoreNote serialization are unchanged.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PerformanceGestureTrackV1 {
     pub schema_version: u16,
+    /// Optional digest binding to the exact canonical score serialization.
+    /// An unbound track may be authored and validated, but must not be rendered
+    /// against a score until validate_for_score() succeeds.
+    pub score_sha256: Option<String>,
     pub events: Vec<PerformanceGestureEvent>,
 }
 
@@ -163,6 +177,7 @@ impl Default for PerformanceGestureTrackV1 {
     fn default() -> Self {
         Self {
             schema_version: PERFORMANCE_GESTURE_SCHEMA_VERSION,
+            score_sha256: None,
             events: Vec::new(),
         }
     }
@@ -172,8 +187,30 @@ impl PerformanceGestureTrackV1 {
     pub fn new(events: Vec<PerformanceGestureEvent>) -> Self {
         Self {
             schema_version: PERFORMANCE_GESTURE_SCHEMA_VERSION,
+            score_sha256: None,
             events,
         }
+    }
+
+    /// Attach the digest produced by the score owner's canonical serializer.
+    /// This method validates digest shape; the caller remains responsible for
+    /// using the exact score serialization contract.
+    pub fn bind_to_score_sha256(&mut self, score_sha256: impl Into<String>) {
+        self.score_sha256 = Some(score_sha256.into());
+    }
+
+    /// Require this track to match the exact score digest supplied by the
+    /// score owner before renderer execution.
+    pub fn validate_for_score(&self, expected_score_sha256: &str) -> Result<(), Vec<String>> {
+        let mut issues = self.validate().err().unwrap_or_default();
+        match self.score_sha256.as_deref() {
+            None => issues.push("gesture track is not bound to a score digest".to_string()),
+            Some(actual) if actual != expected_score_sha256 => {
+                issues.push("gesture track score digest does not match requested score".to_string());
+            }
+            Some(_) => {}
+        }
+        if issues.is_empty() { Ok(()) } else { Err(issues) }
     }
 
     /// Validate the wire contract without asserting that a technique or
@@ -185,6 +222,12 @@ impl PerformanceGestureTrackV1 {
                 "unsupported gesture schema version: {}",
                 self.schema_version
             ));
+        }
+
+        if let Some(digest) = self.score_sha256.as_deref() {
+            if !is_sha256_hex(digest) {
+                issues.push("score_sha256 must be 64 lowercase hexadecimal characters".to_string());
+            }
         }
 
         let mut event_ids = HashSet::new();
@@ -244,6 +287,12 @@ impl PerformanceGestureTrackV1 {
                         "{prefix}: scalar value is outside the declared domain for {:?}",
                         event.parameter
                     ));
+                }
+            }
+
+            if let GestureValue::Choice { value } = &event.value {
+                if value.trim().is_empty() {
+                    issues.push(format!("{prefix}: categorical gesture value is empty"));
                 }
             }
 
@@ -589,9 +638,50 @@ mod tests {
     }
 
     #[test]
+    fn rendering_requires_an_exact_score_digest_binding() {
+        let mut track = PerformanceGestureTrackV1::default();
+        assert!(track.validate_for_score(&"a".repeat(64)).is_err());
+
+        track.bind_to_score_sha256("a".repeat(64));
+        assert!(track.validate_for_score(&"a".repeat(64)).is_ok());
+        assert!(track.validate_for_score(&"b".repeat(64)).is_err());
+
+        track.score_sha256 = Some("not-a-digest".to_string());
+        assert!(track.validate().is_err());
+    }
+
+    #[test]
+    fn unknown_wire_fields_are_rejected() {
+        let json = r#"{
+            "schema_version": 1,
+            "score_sha256": null,
+            "events": [],
+            "silently_ignored_capability": true
+        }"#;
+        assert!(serde_json::from_str::<PerformanceGestureTrackV1>(json).is_err());
+    }
+
+    #[test]
+    fn empty_categorical_values_are_rejected() {
+        let track = PerformanceGestureTrackV1::new(vec![event(
+            "empty-choice",
+            BeatPosition::new(0, 1).unwrap(),
+            GestureParameter::VowelIdentity,
+            GestureValue::Choice { value: "  ".to_string() },
+            GestureInterpolation::Step,
+        )]);
+        assert!(track
+            .validate()
+            .unwrap_err()
+            .iter()
+            .any(|issue| issue.contains("categorical gesture value is empty")));
+    }
+
+    #[test]
     fn schema_version_mismatch_is_rejected() {
         let track = PerformanceGestureTrackV1 {
             schema_version: PERFORMANCE_GESTURE_SCHEMA_VERSION + 1,
+            score_sha256: None,
             events: Vec::new(),
         };
         assert!(track
