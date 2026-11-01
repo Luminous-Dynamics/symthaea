@@ -126,7 +126,8 @@
       "DVD (repeated generation and low-probability-token variance)",
       "Min-K%++",
       "likelihood/perplexity and gradient-based methods where model access permits",
-      "exact/normalized/n-gram, MinHash/SimHash, structural/AST, embedding and cross-encoder baselines"
+      "exact/normalized/n-gram, MinHash/SimHash, structural/AST, embedding and cross-encoder baselines",
+      "Syntax-aware contamination detection for code LLMs (EMNLP 2026 Findings), stratified by language and code transformation"
     ],
     "evaluation_runners": [
       "Inspect",
@@ -148,6 +149,7 @@
     "Treatment-minus-placebo differences are causal for the randomized exposure policy only under authenticated training execution and the registered design.",
     "Global parameter updates can affect all evaluation strata; contrasts are not pure direct effects under unrestricted interference.",
     "A high novel-recipe same-skill score is evidence of transfer under the declared skill mapping, not proof of general intelligence.",
-    "A passing synthetic fixture or content-digest audit is not an empirical result, external validation, FDR guarantee, or SOTA claim."
+    "A passing synthetic fixture or content-digest audit is not an empirical result, external validation, FDR guarantee, or SOTA claim.",
+    "Code-specific syntax-aware detector results must be reported only in code strata and not generalized to mathematics, science, QA, tool use or multimodal domains."
   ]
 }
