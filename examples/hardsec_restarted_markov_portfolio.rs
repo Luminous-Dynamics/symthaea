@@ -449,7 +449,7 @@ fn report() -> Value {
                 "calibration_tally_is_synthetic": true,
                 "physical_calibration_data": false,
                 "familywise_coverage_empirically_validated": false,
-                "statistical_contract": "familywise coverage at least 0.9 only when each source-state row contributes the preregistered fixed number of independent Markov transitions"
+                "statistical_contract": "familywise coverage at least 0.9 only under a correctly specified fixed first-order Markov row with a preregistered fixed number of predictable source-state visits; each next-state indicator must have the same conditional row probability given the pre-transition filtration"
             }
         },
         "portfolio": {
