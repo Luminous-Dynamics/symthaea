@@ -4022,6 +4022,67 @@ mod tests {
     }
 
     #[test]
+    fn theorem_bound_certificates_cover_exhaustive_small_binary_two_unit_models() {
+        let probability_pairs = [
+            [0.05, 0.95],
+            [0.10, 0.90],
+            [0.20, 0.80],
+            [0.35, 0.65],
+        ];
+        let config = Iit4SystemPhiSearchConfig::default();
+        let mut evaluated = 0usize;
+
+        for a_from_b in probability_pairs {
+            for b_from_a in probability_pairs {
+                let mut tpm = Vec::with_capacity(8);
+                for state_index in 0..4 {
+                    let a_on = ((state_index >> 0) & 1) != 0;
+                    let b_on = ((state_index >> 1) & 1) != 0;
+                    tpm.push(a_from_b[usize::from(b_on)]);
+                    tpm.push(b_from_a[usize::from(a_on)]);
+                }
+                let model = BinaryCausalModel::new(
+                    2,
+                    tpm,
+                    vec![
+                        false, true,
+                        true, false,
+                    ],
+                )
+                .unwrap();
+
+                for state_index in 0..4 {
+                    let state = [
+                        (state_index & 1) != 0,
+                        (state_index & 2) != 0,
+                    ];
+                    let result = model
+                        .analyze_iit4_2023_system_phi_s(&[0, 1], &state, config)
+                        .unwrap();
+                    let certificate = result
+                        .bound_certificate
+                        .as_ref()
+                        .expect("two-unit no-TotalCut search is within the theorem domain");
+                    certificate.verify(&model, &[0, 1], false).unwrap();
+                    assert_eq!(result.certified_upper_bound, Some(certificate.upper_bound));
+                    if let Some(phi_s) = result.phi_s {
+                        assert!(phi_s.is_finite());
+                        assert!(
+                            phi_s <= certificate.upper_bound as f64
+                                + 10.0_f64.powi(-(config.decimal_precision as i32)),
+                            "phi_s={phi_s} exceeded certified bound {} for state {state:?}",
+                            certificate.upper_bound,
+                        );
+                    }
+                    evaluated += 1;
+                }
+            }
+        }
+
+        assert_eq!(evaluated, 64);
+    }
+
+    #[test]
     fn theorem_bound_certificate_rejects_model_and_candidate_mismatch() {
         let model = two_unit_model();
         let certificate = certify_iit4_2023_system_phi_upper_bound(
