@@ -1,0 +1,42 @@
+{
+  "schema": "symthaea.retrieval_decomposition.experiment.v1",
+  "experiment_id": "retrieval-decomposition-pilot-001",
+  "benchmark_id": "symthaea-retrieval-decomposition-pilot",
+  "benchmark_version": "v1",
+  "model_checkpoint_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "corpus_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "oracle_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "inference_harness_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "prompt_and_decoding_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "budget_policy_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "sample_size_plan_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+  "arms": [
+    "no_evidence",
+    "native_search",
+    "gold_evidence_injection",
+    "gold_plus_hard_distractors",
+    "evidence_complete_stop",
+    "plain_qa_repackaging"
+  ],
+  "task_ids": [
+    "delta-inspection-total-001"
+  ],
+  "replicates": [
+    {
+      "task_id": "delta-inspection-total-001",
+      "replicate_id": "pilot-rep-001",
+      "paired_seed_commitment_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "arm_order": [
+        "native_search",
+        "gold_evidence_injection",
+        "no_evidence",
+        "plain_qa_repackaging",
+        "gold_plus_hard_distractors",
+        "evidence_complete_stop"
+      ]
+    }
+  ],
+  "randomization_seed_commitment_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+  "experiment_status": "protocol_only",
+  "claim_boundary": "fixture only; SHA values for experiment bindings are placeholders, no model evaluation or power analysis performed"
+}
