@@ -14,6 +14,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
@@ -41,6 +42,7 @@ pub struct IntegritySummary {
     pub used_axiom_count: usize,
     pub allowed_axiom_count: usize,
     pub verified_evidence_artifact_count: usize,
+    pub reviewer_signature_verified: bool,
 }
 
 fn field<'a>(value: &'a Value, pointer: &str) -> Result<&'a Value> {
@@ -254,6 +256,7 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<Integrity
     for pointer in [
         "/target/source_file_sha256",
         "/target/source_span_sha256",
+        "/reviewer_key_registry_sha256",
         "/target/statement_sha256",
         "/environment/lean_binary_sha256",
         "/environment/lake_manifest_sha256",
@@ -373,6 +376,7 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<Integrity
         used_axiom_count: used_axioms.len(),
         allowed_axiom_count: allowed_axioms.len(),
         verified_evidence_artifact_count: 0,
+        reviewer_signature_verified: false,
     })
 }
 
@@ -605,6 +609,166 @@ fn verify_evidence_artifacts(value: &Value, evidence_root: &Path) -> Result<usiz
     Ok(artifacts.len())
 }
 
+
+fn read_verified_evidence_artifact(
+    value: &Value,
+    evidence_root: &Path,
+    pointer: &str,
+    expected_sha256: &str,
+) -> Result<Vec<u8>> {
+    let artifact = evidence_artifact(value, pointer)?
+        .context("required evidence artifact is missing")?;
+    let root_canonical = fs::canonicalize(evidence_root)
+        .with_context(|| format!("resolve evidence root {}", evidence_root.display()))?;
+    verify_artifact_bytes(
+        evidence_root,
+        &root_canonical,
+        &artifact,
+        expected_sha256,
+        pointer,
+    )
+}
+
+fn decode_hex_array<const N: usize>(value: &str, label: &str) -> Result<[u8; N]> {
+    let decoded = hex::decode(value).with_context(|| format!("decode {label} hexadecimal bytes"))?;
+    decoded
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("{label} must decode to exactly {N} bytes"))
+}
+
+fn verify_reviewer_signature(
+    attestation_bytes: &[u8],
+    registry_bytes: &[u8],
+    expected_registry_sha256: &str,
+    receipt: &Value,
+) -> Result<()> {
+    check_digest(expected_registry_sha256, "expected reviewer registry SHA-256", 64)?;
+    let actual_registry_sha256 = hex::encode(Sha256::digest(registry_bytes));
+    if actual_registry_sha256 != expected_registry_sha256 {
+        bail!("reviewer key registry bytes do not match the externally pinned SHA-256");
+    }
+    if string(receipt, "/reviewer_key_registry_sha256")? != expected_registry_sha256 {
+        bail!("integrity receipt is bound to a different reviewer key registry");
+    }
+
+    let registry: Value =
+        serde_json::from_slice(registry_bytes).context("parse reviewer key registry JSON")?;
+    if string(&registry, "/schema_version")? != "pitb.reviewer-key-registry.v0"
+        || string(&registry, "/registry_id")?.trim().is_empty()
+    {
+        bail!("unsupported or unnamed reviewer key registry");
+    }
+    let registry_keys = field(&registry, "/keys")?
+        .as_array()
+        .context("reviewer key registry keys must be an array")?;
+    if registry_keys.is_empty() {
+        bail!("reviewer key registry cannot be empty");
+    }
+
+    let attestation: Value =
+        serde_json::from_slice(attestation_bytes).context("parse signed reviewer attestation")?;
+    let attestation_object = attestation
+        .as_object()
+        .context("reviewer attestation must be a JSON object")?;
+    let allowed_fields: BTreeSet<&str> = [
+        "schema_version",
+        "reviewer_identity",
+        "key_id",
+        "audit_id",
+        "task_id_sha256",
+        "statement_sha256",
+        "expected_informal_statement_sha256",
+        "review_scope",
+        "decision",
+        "signature_ed25519_hex",
+    ]
+    .into_iter()
+    .collect();
+    if attestation_object.len() != allowed_fields.len()
+        || attestation_object.keys().any(|key| !allowed_fields.contains(key.as_str()))
+    {
+        bail!("reviewer attestation contains missing or unknown fields");
+    }
+    if string(&attestation, "/schema_version")? != "pitb.reviewer-attestation.v0"
+        || string(&attestation, "/decision")? != "approved"
+    {
+        bail!("reviewer attestation is not an approved v0 attestation");
+    }
+
+    for (attestation_path, receipt_path) in [
+        ("/audit_id", "/audit_id"),
+        ("/task_id_sha256", "/dataset/task_id"),
+        ("/statement_sha256", "/target/statement_sha256"),
+        ("/review_scope", "/semantic_review/review_scope"),
+    ] {
+        if string(&attestation, attestation_path)? != string(receipt, receipt_path)? {
+            bail!("reviewer attestation does not bind {receipt_path}");
+        }
+    }
+    if field(&attestation, "/expected_informal_statement_sha256")?
+        != field(receipt, "/target/expected_informal_statement_sha256")?
+    {
+        bail!("reviewer attestation does not bind the intended informal statement digest");
+    }
+    let reviewer_identity = string(&attestation, "/reviewer_identity")?;
+    if reviewer_identity != string(receipt, "/semantic_review/reviewer_identity")? {
+        bail!("reviewer attestation identity differs from the integrity receipt");
+    }
+    if string(receipt, "/semantic_review/status")? != "approved" {
+        bail!("reviewer signature cannot approve a receipt whose semantic-review status is not approved");
+    }
+
+    let key_id = string(&attestation, "/key_id")?;
+    let mut last_key_id: Option<&str> = None;
+    let mut matching_key: Option<&Value> = None;
+    for key in registry_keys {
+        let current_id = string(key, "/key_id")?;
+        if last_key_id.is_some_and(|previous| previous >= current_id) {
+            bail!("reviewer registry keys must be sorted and unique by key_id");
+        }
+        last_key_id = Some(current_id);
+        let status = string(key, "/status")?;
+        if !matches!(status, "active" | "revoked") {
+            bail!("reviewer registry has an unknown key status");
+        }
+        if current_id == key_id {
+            matching_key = Some(key);
+        }
+    }
+    let key = matching_key.context("reviewer key ID is not present in the pinned registry")?;
+    if string(key, "/status")? != "active" {
+        bail!("reviewer signing key is revoked");
+    }
+    if string(key, "/reviewer_identity")? != reviewer_identity {
+        bail!("registry reviewer identity differs from the signed attestation");
+    }
+
+    let public_key = decode_hex_array::<32>(
+        string(key, "/public_key_ed25519_hex")?,
+        "Ed25519 public key",
+    )?;
+    let signature_bytes = decode_hex_array::<64>(
+        string(&attestation, "/signature_ed25519_hex")?,
+        "Ed25519 reviewer signature",
+    )?;
+    let verifying_key =
+        VerifyingKey::from_bytes(&public_key).context("parse reviewer Ed25519 public key")?;
+    let signature = Signature::from_bytes(&signature_bytes);
+    let mut signed_payload = attestation;
+    signed_payload
+        .as_object_mut()
+        .context("reviewer attestation must be a JSON object")?
+        .remove("signature_ed25519_hex");
+    // serde_json::Map uses lexicographically ordered keys here: this is the
+    // canonical payload encoding that reviewers sign and verifiers reproduce.
+    let canonical_payload =
+        serde_json::to_vec(&signed_payload).context("canonicalize reviewer attestation payload")?;
+    verifying_key
+        .verify(&canonical_payload, &signature)
+        .context("reviewer Ed25519 signature verification failed")?;
+    Ok(())
+}
+
 pub fn verify_bytes(bytes: &[u8], expected_sha256: Option<&str>) -> Result<IntegritySummary> {
     let actual_sha256 = hex::encode(Sha256::digest(bytes));
     if let Some(expected) = expected_sha256 {
@@ -670,4 +834,64 @@ mod source_span_tests {
         assert!(source_span_sha256(b"short", 1, 4, 1, 2).is_err());
         assert!(source_span_sha256(b"short", 2, 0, 1, 1).is_err());
     }
+}
+
+pub fn verify_bytes_with_evidence_root_and_reviewer_registry(
+    bytes: &[u8],
+    expected_receipt_sha256: Option<&str>,
+    evidence_root: &Path,
+    registry_bytes: &[u8],
+    expected_registry_sha256: &str,
+) -> Result<IntegritySummary> {
+    let actual_receipt_sha256 = hex::encode(Sha256::digest(bytes));
+    if let Some(expected) = expected_receipt_sha256 {
+        check_digest(expected, "expected receipt SHA-256", 64)?;
+        if expected != actual_receipt_sha256 {
+            bail!("benchmark integrity receipt bytes do not match the expected SHA-256");
+        }
+    }
+    let value: Value =
+        serde_json::from_slice(bytes).context("parse benchmark integrity receipt for signed verification")?;
+    let mut summary = validate_value(&value, actual_receipt_sha256)?;
+    summary.verified_evidence_artifact_count = verify_evidence_artifacts(&value, evidence_root)?;
+    if summary.integrity_status == "eligible" {
+        if summary.verified_evidence_artifact_count != 11 {
+            bail!("eligible integrity receipt did not verify all eleven evidence artifacts");
+        }
+        let reviewer_digest = string(&value, "/semantic_review/reviewer_attestation_sha256")?;
+        let reviewer_bytes = read_verified_evidence_artifact(
+            &value,
+            evidence_root,
+            "/evidence_artifacts/reviewer_attestation",
+            reviewer_digest,
+        )?;
+        verify_reviewer_signature(
+            &reviewer_bytes,
+            registry_bytes,
+            expected_registry_sha256,
+            &value,
+        )?;
+        summary.reviewer_signature_verified = true;
+    }
+    Ok(summary)
+}
+
+pub fn verify_file_with_evidence_root_and_reviewer_registry(
+    receipt_path: &Path,
+    expected_receipt_sha256: Option<&str>,
+    evidence_root: &Path,
+    registry_path: &Path,
+    expected_registry_sha256: &str,
+) -> Result<IntegritySummary> {
+    let receipt_bytes =
+        fs::read(receipt_path).with_context(|| format!("read integrity receipt {}", receipt_path.display()))?;
+    let registry_bytes =
+        fs::read(registry_path).with_context(|| format!("read reviewer registry {}", registry_path.display()))?;
+    verify_bytes_with_evidence_root_and_reviewer_registry(
+        &receipt_bytes,
+        expected_receipt_sha256,
+        evidence_root,
+        &registry_bytes,
+        expected_registry_sha256,
+    )
 }
