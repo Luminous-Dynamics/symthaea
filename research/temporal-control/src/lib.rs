@@ -22,6 +22,8 @@ pub struct ResourceVector {
     pub persistent_bytes: u64,
     pub retained_byte_us: u128,
     pub io_bytes: u64,
+    /// Estimated serial critical-path latency charged against the episode deadline.
+    pub latency_us: u64,
     pub compute_units: u64,
     pub observations: u64,
     pub energy_nj: u64,
@@ -34,6 +36,7 @@ impl ResourceVector {
             persistent_bytes: self.persistent_bytes.checked_add(other.persistent_bytes)?,
             retained_byte_us: self.retained_byte_us.checked_add(other.retained_byte_us)?,
             io_bytes: self.io_bytes.checked_add(other.io_bytes)?,
+            latency_us: self.latency_us.checked_add(other.latency_us)?,
             compute_units: self.compute_units.checked_add(other.compute_units)?,
             observations: self.observations.checked_add(other.observations)?,
             energy_nj: self.energy_nj.checked_add(other.energy_nj)?,
@@ -45,6 +48,7 @@ impl ResourceVector {
         self.persistent_bytes <= budget.persistent_bytes
             && self.retained_byte_us <= budget.retained_byte_us
             && self.io_bytes <= budget.io_bytes
+            && self.latency_us <= budget.latency_us
             && self.compute_units <= budget.compute_units
             && self.observations <= budget.observations
             && self.energy_nj <= budget.energy_nj
@@ -224,6 +228,7 @@ fn priced_net_score(
         (u128::from(resources.persistent_bytes), prices.persistent_bytes),
         (resources.retained_byte_us, prices.retained_byte_us),
         (u128::from(resources.io_bytes), prices.io_bytes),
+        (u128::from(resources.latency_us), prices.latency_us),
         (u128::from(resources.compute_units), prices.compute_units),
         (u128::from(resources.observations), prices.observations),
         (u128::from(resources.energy_nj), prices.energy_nj),
@@ -264,6 +269,7 @@ pub fn update_resource_prices(
         persistent_bytes: update_one_price(current.persistent_bytes, measured_use.persistent_bytes.into(), budget.persistent_bytes.into(), step_permille, maximum_price),
         retained_byte_us: update_one_price(current.retained_byte_us, measured_use.retained_byte_us, budget.retained_byte_us, step_permille, maximum_price),
         io_bytes: update_one_price(current.io_bytes, measured_use.io_bytes.into(), budget.io_bytes.into(), step_permille, maximum_price),
+        latency_us: update_one_price(current.latency_us, measured_use.latency_us.into(), budget.latency_us.into(), step_permille, maximum_price),
         compute_units: update_one_price(current.compute_units, measured_use.compute_units.into(), budget.compute_units.into(), step_permille, maximum_price),
         observations: update_one_price(current.observations, measured_use.observations.into(), budget.observations.into(), step_permille, maximum_price),
         energy_nj: update_one_price(current.energy_nj, measured_use.energy_nj.into(), budget.energy_nj.into(), step_permille, maximum_price),
@@ -327,6 +333,7 @@ mod tests {
             persistent_bytes: 20,
             retained_byte_us: 200,
             io_bytes: 40,
+            latency_us: 200,
             compute_units: 10,
             observations: 10,
             energy_nj: 10,
