@@ -285,18 +285,14 @@ pub fn evaluate_application_event_energy_uncertainty(
             rejected_coverage_count += 1;
             continue;
         }
-        let energy = event.total_event_energy_uj.ok_or_else(|| {
-            ApplicationEventUncertaintyError::new(
-                format!("phase_receipt.events.{}.total_event_energy_uj", event.event_id),
-                "complete successful event is missing total event energy",
-            )
-        })?;
-        let boundary = event.total_event_boundary_alignment_uncertainty_uj.ok_or_else(|| {
-            ApplicationEventUncertaintyError::new(
-                format!("phase_receipt.events.{}.total_event_boundary_alignment_uncertainty_uj", event.event_id),
-                "complete successful event is missing boundary alignment uncertainty",
-            )
-        })?;
+        let Some(energy) = event.total_event_energy_uj else {
+            rejected_missing_energy_count += 1;
+            continue;
+        };
+        let Some(boundary) = event.total_event_boundary_alignment_uncertainty_uj else {
+            rejected_missing_energy_count += 1;
+            continue;
+        };
         if !energy.is_finite() || energy <= 0.0 || !boundary.is_finite() || boundary < 0.0 {
             rejected_missing_energy_count += 1;
             continue;
@@ -491,6 +487,66 @@ pub fn validate_application_event_energy_uncertainty_receipt(
     Ok(())
 }
 
+fn compute_application_event_energy_comparison_sha256(
+    comparison: &ApplicationEventEnergyComparison,
+) -> Result<String, ApplicationEventUncertaintyError> {
+    let mut canonical = comparison.clone();
+    canonical.comparison_sha256.clear();
+    let bytes = serde_json::to_vec(&canonical).map_err(|error| {
+        ApplicationEventUncertaintyError::new("comparison", error.to_string())
+    })?;
+    Ok(digest(COMPARISON_DOMAIN, &bytes))
+}
+
+pub fn validate_application_event_energy_comparison(
+    comparison: &ApplicationEventEnergyComparison,
+) -> Result<(), ApplicationEventUncertaintyError> {
+    if comparison.schema != COMPARISON_SCHEMA || comparison.version != VERSION {
+        return Err(ApplicationEventUncertaintyError::new("comparison.schema_version", "unsupported comparison schema/version"));
+    }
+    for (field, value) in [
+        ("candidate_receipt_sha256", comparison.candidate_receipt_sha256.as_str()),
+        ("reference_receipt_sha256", comparison.reference_receipt_sha256.as_str()),
+        ("comparison_sha256", comparison.comparison_sha256.as_str()),
+    ] {
+        if !is_sha256(value) {
+            return Err(ApplicationEventUncertaintyError::new(field, "must be lowercase SHA-256 hex"));
+        }
+    }
+    for (field, value) in [
+        ("candidate_lower_uj", comparison.candidate_lower_uj),
+        ("candidate_upper_uj", comparison.candidate_upper_uj),
+        ("reference_lower_uj", comparison.reference_lower_uj),
+        ("reference_upper_uj", comparison.reference_upper_uj),
+        ("candidate_minus_reference_mean_uj", comparison.candidate_minus_reference_mean_uj),
+    ] {
+        if !value.is_finite() {
+            return Err(ApplicationEventUncertaintyError::new(field, "must be finite"));
+        }
+    }
+    if comparison.candidate_lower_uj < 0.0
+        || comparison.reference_lower_uj < 0.0
+        || comparison.candidate_upper_uj < comparison.candidate_lower_uj
+        || comparison.reference_upper_uj < comparison.reference_lower_uj
+    {
+        return Err(ApplicationEventUncertaintyError::new("comparison.intervals", "invalid uncertainty interval bounds"));
+    }
+    let expected_decision = if comparison.candidate_upper_uj < comparison.reference_lower_uj {
+        ApplicationEventEnergyDecision::CandidateStrictlyLower
+    } else if comparison.candidate_lower_uj > comparison.reference_upper_uj {
+        ApplicationEventEnergyDecision::CandidateStrictlyHigher
+    } else {
+        ApplicationEventEnergyDecision::IndeterminateIntervalsOverlap
+    };
+    if comparison.decision != expected_decision {
+        return Err(ApplicationEventUncertaintyError::new("comparison.decision", "decision does not match the supplied interval bounds"));
+    }
+    if compute_application_event_energy_comparison_sha256(comparison)? != comparison.comparison_sha256 {
+        return Err(ApplicationEventUncertaintyError::new("comparison_sha256", "does not match canonical comparison"));
+    }
+    Ok(())
+}
+
 pub fn compare_application_event_energy(
     candidate: &ApplicationEventEnergyUncertaintyReceipt,
     reference: &ApplicationEventEnergyUncertaintyReceipt,
@@ -548,10 +604,7 @@ pub fn compare_application_event_energy(
         candidate_minus_reference_mean_uj: candidate.mean_energy_uj - reference.mean_energy_uj,
         comparison_sha256: String::new(),
     };
-    let bytes = serde_json::to_vec(&comparison).map_err(|error| {
-        ApplicationEventUncertaintyError::new("comparison", error.to_string())
-    })?;
-    comparison.comparison_sha256 = digest(COMPARISON_DOMAIN, &bytes);
+    comparison.comparison_sha256 = compute_application_event_energy_comparison_sha256(&comparison)?;
     Ok(comparison)
 }
 
