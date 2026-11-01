@@ -1303,7 +1303,7 @@ impl SparseBinaryCausalModel {
                     || !score.phi.is_finite()
                     || !score.normalized_phi.is_finite()
                 {
-                    return Err(SystemPhiError::NonFinitePartitionScore.into());
+                    return Err(SystemPhiError::NonFinitePartitionScore);
                 }
                 scores_by_state_pair[state_pair_index].push(score);
             }
@@ -1313,7 +1313,7 @@ impl SparseBinaryCausalModel {
         for (state_pair_index, system_state) in state_pairs.into_iter().enumerate() {
             let scores = std::mem::take(&mut scores_by_state_pair[state_pair_index]);
             if scores.is_empty() {
-                return Err(SystemPhiError::ZeroSeveredConnections.into());
+                return Err(SystemPhiError::ZeroSeveredConnections);
             }
             let winner_index = crate::select_pyphi_sia_partition(&partitions, &scores, epsilon);
             let winner_score = scores[winner_index].clone();
@@ -1954,9 +1954,9 @@ mod tests {
                 .map(|unit| ((past_index >> unit) & 1) != 0)
                 .collect::<Vec<_>>();
             let mut likelihood = 1.0;
-            for target in 0..n {
+            for (target, current_on) in current.iter().copied().enumerate() {
                 let p_on = model.probability_next_one(&past, target).unwrap();
-                likelihood *= if current[target] { p_on } else { 1.0 - p_on };
+                likelihood *= if current_on { p_on } else { 1.0 - p_on };
             }
             let background_index = background.iter().enumerate().fold(
                 0usize,
@@ -2110,11 +2110,11 @@ mod tests {
             .unwrap();
         for partition in &partitions {
             let dense_score = dense
-                .score_iit4_system_partition(&partition, &current_state, &system_state)
+                .score_iit4_system_partition(partition, &current_state, &system_state)
                 .unwrap();
             let sparse_score = sparse
                 .score_iit4_system_partition(
-                    &partition,
+                    partition,
                     &current_state,
                     &system_state,
                     1 << 16,
@@ -2130,14 +2130,14 @@ mod tests {
             assert_eq!(
                 receipt,
                 sparse.score_iit4_system_partition(
-                    &partition, &current_state, &system_state, 1 << 16
+                    partition, &current_state, &system_state, 1 << 16
                 ).unwrap().receipt_sha256().unwrap()
             );
             let mut alternate_state_pair = system_state.clone();
             alternate_state_pair.cause_specified_state[0] =
                 !alternate_state_pair.cause_specified_state[0];
             let alternate = sparse.score_iit4_system_partition(
-                &partition,
+                partition,
                 &current_state,
                 &alternate_state_pair,
                 1 << 16,
