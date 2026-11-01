@@ -124,6 +124,63 @@ pub struct JointActionSetSamples {
     pub outcome_samples: Vec<Vec<f64>>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum VisualBeliefChannelKind {
+    Geometry,
+    Motion,
+    Contact,
+    Visibility,
+    TaskUtility,
+    TerminalRisk,
+    Other,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct VisualBeliefChannelSamples {
+    /// Stable semantic key, e.g. object_42.position.x or gripper.contact_probability.
+    pub channel_id: String,
+    pub kind: VisualBeliefChannelKind,
+    pub unit: String,
+    /// Matrix shape is [action][joint_draw], sharing the parent's draw axis.
+    pub outcome_samples: Vec<Vec<f64>>,
+}
+
+/// Structured counterpart to JointActionSetSamples. Channels remain separate:
+/// position, velocity, contact, visibility, risk and utility are never collapsed
+/// into an arbitrary scalar. All channels share one history, action manifest
+/// and joint-draw axis.
+#[derive(Clone, Debug, PartialEq)]
+pub struct StructuredJointActionSetSamples {
+    pub history_sha256: String,
+    pub horizon_steps: usize,
+    pub action_manifest_sha256: String,
+    pub action_ids: Vec<u64>,
+    pub joint_draw_ids: Vec<u64>,
+    pub joint_draw_bank_sha256: String,
+    pub coupling: JointDrawCoupling,
+    pub channels: Vec<VisualBeliefChannelSamples>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct VisualChannelActionPredictionInterval {
+    pub channel_id: String,
+    pub kind: VisualBeliefChannelKind,
+    pub unit: String,
+    pub action_id: u64,
+    pub interval: PredictiveInterval,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct VisualChannelActionEffectInterval {
+    pub channel_id: String,
+    pub kind: VisualBeliefChannelKind,
+    pub unit: String,
+    pub left_action_id: u64,
+    pub right_action_id: u64,
+    pub paired_draw_count: usize,
+    pub interval: PredictiveInterval,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ActionPredictionInterval {
     pub action_id: u64,
@@ -168,6 +225,10 @@ pub enum IntervalError {
     ActionSampleCardinalityMismatch,
     SameActionRequested,
     NegativeDecisionCost,
+    EmptyVisualChannels,
+    DuplicateVisualChannelId,
+    InvalidVisualChannelDescriptor,
+    StructuredChannelSampleCardinalityMismatch,
 }
 
 /// Construct a central empirical interval from predictive samples.
@@ -345,6 +406,240 @@ pub fn compute_joint_draw_bank_sha256(
         }
     }
     Ok(sha256_hex(&bytes))
+}
+
+fn coupling_tag(coupling: JointDrawCoupling) -> u8 {
+    match coupling {
+        JointDrawCoupling::SharedPosteriorAndWorldNoise => 0,
+        JointDrawCoupling::PairedExogenousDisturbance => 1,
+        JointDrawCoupling::DeterministicSharedLatent => 2,
+    }
+}
+
+fn visual_channel_kind_tag(kind: VisualBeliefChannelKind) -> u8 {
+    match kind {
+        VisualBeliefChannelKind::Geometry => 0,
+        VisualBeliefChannelKind::Motion => 1,
+        VisualBeliefChannelKind::Contact => 2,
+        VisualBeliefChannelKind::Visibility => 3,
+        VisualBeliefChannelKind::TaskUtility => 4,
+        VisualBeliefChannelKind::TerminalRisk => 5,
+        VisualBeliefChannelKind::Other => 255,
+    }
+}
+
+fn validate_structured_joint_action_set_shape(
+    bank: &StructuredJointActionSetSamples,
+) -> Result<(), IntervalError> {
+    if bank.horizon_steps == 0 {
+        return Err(IntervalError::InvalidHorizon);
+    }
+    if !is_lower_hex_sha256(&bank.history_sha256) {
+        return Err(IntervalError::InvalidHistoryDigest);
+    }
+    if !is_lower_hex_sha256(&bank.action_manifest_sha256) {
+        return Err(IntervalError::InvalidActionManifestDigest);
+    }
+    if !is_lower_hex_sha256(&bank.joint_draw_bank_sha256) {
+        return Err(IntervalError::InvalidJointDrawDigest);
+    }
+    if bank.action_ids.len() < 2 {
+        return Err(IntervalError::InsufficientActions);
+    }
+    if bank.joint_draw_ids.len() < 2 {
+        return Err(IntervalError::InsufficientJointDraws);
+    }
+    if bank.channels.is_empty() {
+        return Err(IntervalError::EmptyVisualChannels);
+    }
+
+    let mut action_ids = bank.action_ids.clone();
+    action_ids.sort_unstable();
+    if action_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(IntervalError::DuplicateActionId);
+    }
+    let mut draw_ids = bank.joint_draw_ids.clone();
+    draw_ids.sort_unstable();
+    if draw_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(IntervalError::DuplicateJointDrawId);
+    }
+
+    let mut channel_ids: Vec<&str> = Vec::with_capacity(bank.channels.len());
+    for channel in &bank.channels {
+        if channel.channel_id.trim().is_empty() || channel.unit.trim().is_empty() {
+            return Err(IntervalError::InvalidVisualChannelDescriptor);
+        }
+        channel_ids.push(channel.channel_id.as_str());
+        if channel.outcome_samples.len() != bank.action_ids.len() {
+            return Err(IntervalError::StructuredChannelSampleCardinalityMismatch);
+        }
+        for samples in &channel.outcome_samples {
+            if samples.len() != bank.joint_draw_ids.len() {
+                return Err(IntervalError::StructuredChannelSampleCardinalityMismatch);
+            }
+            if samples.iter().any(|sample| !sample.is_finite()) {
+                return Err(IntervalError::NonFiniteDerivedMetric);
+            }
+        }
+    }
+    channel_ids.sort_unstable();
+    if channel_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(IntervalError::DuplicateVisualChannelId);
+    }
+    Ok(())
+}
+
+/// Compute canonical content SHA-256 over all channels and shared action/draw
+/// identities. The digest binds descriptor semantics, units and exact f64 bits.
+pub fn compute_structured_joint_draw_bank_sha256(
+    bank: &StructuredJointActionSetSamples,
+) -> Result<String, IntervalError> {
+    validate_structured_joint_action_set_shape(bank)?;
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"cmaq-018-structured-visual-action-bank-v0.1\0");
+    append_len_prefixed(&mut bytes, bank.history_sha256.as_bytes());
+    bytes.extend_from_slice(&(bank.horizon_steps as u64).to_le_bytes());
+    append_len_prefixed(&mut bytes, bank.action_manifest_sha256.as_bytes());
+    append_u64_values(&mut bytes, &bank.action_ids);
+    append_u64_values(&mut bytes, &bank.joint_draw_ids);
+    bytes.push(coupling_tag(bank.coupling));
+    bytes.extend_from_slice(&(bank.channels.len() as u64).to_le_bytes());
+    for channel in &bank.channels {
+        append_len_prefixed(&mut bytes, channel.channel_id.as_bytes());
+        bytes.push(visual_channel_kind_tag(channel.kind));
+        append_len_prefixed(&mut bytes, channel.unit.as_bytes());
+        bytes.extend_from_slice(&(channel.outcome_samples.len() as u64).to_le_bytes());
+        for row in &channel.outcome_samples {
+            bytes.extend_from_slice(&(row.len() as u64).to_le_bytes());
+            for sample in row {
+                bytes.extend_from_slice(&sample.to_bits().to_le_bytes());
+            }
+        }
+    }
+    Ok(sha256_hex(&bytes))
+}
+
+/// Validate a structured visual belief action bank and recompute its digest.
+/// This verifies content integrity, not whether the producer actually used the
+/// declared shared posterior/disturbance coupling.
+pub fn validate_structured_joint_action_set(
+    bank: &StructuredJointActionSetSamples,
+) -> Result<(), IntervalError> {
+    validate_structured_joint_action_set_shape(bank)?;
+    if compute_structured_joint_draw_bank_sha256(bank)? != bank.joint_draw_bank_sha256 {
+        return Err(IntervalError::JointDrawBankDigestMismatch);
+    }
+    Ok(())
+}
+
+/// Return per-action intervals for every structured channel. Results are sorted
+/// by channel ID, then action ID, so row order does not affect lookup semantics.
+pub fn structured_action_prediction_intervals(
+    bank: &StructuredJointActionSetSamples,
+    nominal_coverage: f64,
+) -> Result<Vec<VisualChannelActionPredictionInterval>, IntervalError> {
+    validate_structured_joint_action_set(bank)?;
+    validate_nominal_coverage(nominal_coverage)?;
+    let mut results = Vec::with_capacity(bank.channels.len() * bank.action_ids.len());
+    let mut channels: Vec<&VisualBeliefChannelSamples> = bank.channels.iter().collect();
+    channels.sort_by(|left, right| left.channel_id.cmp(&right.channel_id));
+    let mut action_indices: Vec<(u64, usize)> = bank.action_ids.iter().copied().enumerate()
+        .map(|(index, action_id)| (action_id, index))
+        .collect();
+    action_indices.sort_unstable_by_key(|(action_id, _)| *action_id);
+    for channel in channels {
+        for (action_id, row_index) in &action_indices {
+            results.push(VisualChannelActionPredictionInterval {
+                channel_id: channel.channel_id.clone(),
+                kind: channel.kind,
+                unit: channel.unit.clone(),
+                action_id: *action_id,
+                interval: central_interval(&channel.outcome_samples[*row_index], nominal_coverage)?,
+            });
+        }
+    }
+    Ok(results)
+}
+
+fn structured_action_effect_interval_validated(
+    bank: &StructuredJointActionSetSamples,
+    channel_id: &str,
+    left_action_id: u64,
+    right_action_id: u64,
+    nominal_coverage: f64,
+) -> Result<VisualChannelActionEffectInterval, IntervalError> {
+    if left_action_id == right_action_id {
+        return Err(IntervalError::SameActionRequested);
+    }
+    let channel = bank.channels.iter()
+        .find(|channel| channel.channel_id == channel_id)
+        .ok_or(IntervalError::InvalidVisualChannelDescriptor)?;
+    let left_index = bank.action_ids.iter().position(|id| *id == left_action_id)
+        .ok_or(IntervalError::InvalidSelectedIndex)?;
+    let right_index = bank.action_ids.iter().position(|id| *id == right_action_id)
+        .ok_or(IntervalError::InvalidSelectedIndex)?;
+    let interval = paired_effect_interval(
+        &channel.outcome_samples[left_index],
+        &channel.outcome_samples[right_index],
+        nominal_coverage,
+    )?;
+    Ok(VisualChannelActionEffectInterval {
+        channel_id: channel.channel_id.clone(),
+        kind: channel.kind,
+        unit: channel.unit.clone(),
+        left_action_id,
+        right_action_id,
+        paired_draw_count: bank.joint_draw_ids.len(),
+        interval,
+    })
+}
+
+/// Construct a channel-specific paired effect interval from same-column draws.
+pub fn structured_action_effect_interval(
+    bank: &StructuredJointActionSetSamples,
+    channel_id: &str,
+    left_action_id: u64,
+    right_action_id: u64,
+    nominal_coverage: f64,
+) -> Result<VisualChannelActionEffectInterval, IntervalError> {
+    validate_structured_joint_action_set(bank)?;
+    validate_nominal_coverage(nominal_coverage)?;
+    structured_action_effect_interval_validated(
+        bank,
+        channel_id,
+        left_action_id,
+        right_action_id,
+        nominal_coverage,
+    )
+}
+
+/// Return all channel/action-pair effects in stable channel-ID and action-ID order.
+pub fn all_structured_action_effect_intervals(
+    bank: &StructuredJointActionSetSamples,
+    nominal_coverage: f64,
+) -> Result<Vec<VisualChannelActionEffectInterval>, IntervalError> {
+    validate_structured_joint_action_set(bank)?;
+    validate_nominal_coverage(nominal_coverage)?;
+    let mut channels: Vec<&VisualBeliefChannelSamples> = bank.channels.iter().collect();
+    channels.sort_by(|left, right| left.channel_id.cmp(&right.channel_id));
+    let mut ids = bank.action_ids.clone();
+    ids.sort_unstable();
+    let pair_count = ids.len().saturating_mul(ids.len().saturating_sub(1)) / 2;
+    let mut effects = Vec::with_capacity(channels.len().saturating_mul(pair_count));
+    for channel in channels {
+        for left in 0..ids.len() {
+            for right in (left + 1)..ids.len() {
+                effects.push(structured_action_effect_interval_validated(
+                    bank,
+                    &channel.channel_id,
+                    ids[left],
+                    ids[right],
+                    nominal_coverage,
+                )?);
+            }
+        }
+    }
+    Ok(effects)
 }
 
 fn sha256_hex(input: &[u8]) -> String {
