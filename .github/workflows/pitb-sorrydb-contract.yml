@@ -5,6 +5,8 @@ on:
     paths:
       - "crates/bridges/symthaea-proof-insights/src/bin/import_sorrydb_snapshot.rs"
       - "crates/bridges/symthaea-proof-insights/src/bin/analyze_sorrydb_branch_ledger.rs"
+      - "crates/bridges/symthaea-proof-insights/src/snapshot_branch_receipt.rs"
+      - "crates/bridges/symthaea-proof-insights/src/bin/verify_snapshot_branch_receipt.rs"
       - "data/benchmarks/proof-insight-transfer-v0/sorrydb-track/**"
       - "docs/research/pitb-sorrydb-evaluation-2026-10-31.md"
       - ".github/workflows/pitb-sorrydb-contract.yml"
