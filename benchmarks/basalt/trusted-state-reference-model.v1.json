@@ -90,6 +90,11 @@
       "id": "TSTATE-MODEL-017",
       "invariant": "Sixteen threads concurrently attempt the same prepared state plan",
       "expected": "Exactly one commit succeeds and fifteen receive compare conflicts"
+    },
+    {
+      "id": "TSTATE-MODEL-018",
+      "invariant": "A plan prepared against a state snapshot is submitted to a divergent snapshot with the same revision number",
+      "expected": "Reject StateSnapshotMismatch and leave the divergent snapshot byte-for-byte/field-for-field unchanged"
     }
   ],
   "metrics": [
