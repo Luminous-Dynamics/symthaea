@@ -17,22 +17,40 @@ from typing import Any
 
 import numpy as np
 
-from validation.generate_pyphi_reference_fixtures import (
-    EXPECTED_CONNECTIVITY,
-    EXPECTED_EVALUATION_SHA256,
-    EXPECTED_FORMALISM,
-    EXPECTED_MODEL_SHA256,
-    EXPECTED_PYPHI_WHEEL_SHA256,
-    EXPECTED_STATE,
-    EXPECTED_TPM_STATE_BY_NODE,
-    PINNED_PYPHI_VERSION,
-)
-from validation.iit_digest_contract import (
-    canonical_model_bytes,
-    evaluation_digest,
-    model_digest,
-    primitive_request_digest,
-)
+try:
+    from .generate_pyphi_reference_fixtures import (
+        EXPECTED_CONNECTIVITY,
+        EXPECTED_EVALUATION_SHA256,
+        EXPECTED_FORMALISM,
+        EXPECTED_MODEL_SHA256,
+        EXPECTED_PYPHI_WHEEL_SHA256,
+        EXPECTED_STATE,
+        EXPECTED_TPM_STATE_BY_NODE,
+        PINNED_PYPHI_VERSION,
+    )
+    from .iit_digest_contract import (
+        canonical_model_bytes,
+        evaluation_digest,
+        model_digest,
+        primitive_request_digest,
+    )
+except ImportError:  # Direct execution: python validation/generate_pyphi_primitive_corpus.py
+    from generate_pyphi_reference_fixtures import (
+        EXPECTED_CONNECTIVITY,
+        EXPECTED_EVALUATION_SHA256,
+        EXPECTED_FORMALISM,
+        EXPECTED_MODEL_SHA256,
+        EXPECTED_PYPHI_WHEEL_SHA256,
+        EXPECTED_STATE,
+        EXPECTED_TPM_STATE_BY_NODE,
+        PINNED_PYPHI_VERSION,
+    )
+    from iit_digest_contract import (
+        canonical_model_bytes,
+        evaluation_digest,
+        model_digest,
+        primitive_request_digest,
+    )
 
 CANDIDATE_CASES = (
     ("AB", (0, 1), ((), (0,), (1,), (0, 1))),
