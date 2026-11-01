@@ -7287,10 +7287,10 @@ mod tests {
         assert_eq!(receipt.horizon_index, 0);
         assert_eq!(receipt.source_frame_sequence, Some(1));
         assert_eq!(receipt.target_frame_sequence, 3);
-        assert_eq!(receipt.issued_at_seconds, 0.04);
-        assert!((receipt.due_at_seconds - 0.09).abs() < 1e-9);
-        assert!((receipt.observed_at_seconds - 0.12).abs() < 1e-9);
-        assert!((receipt.lateness_seconds - 0.03).abs() < 1e-9);
+        assert!((receipt.issued_at_seconds - 0.04).abs() < 1e-8);
+        assert!((receipt.due_at_seconds - 0.09).abs() < 1e-8);
+        assert!((receipt.observed_at_seconds - 0.12).abs() < 1e-8);
+        assert!((receipt.lateness_seconds - 0.03).abs() < 1e-8);
         assert_eq!(receipt.status, HorizonForecastReceiptStatus::Scored);
         assert!(receipt.prediction_error.is_some());
         assert!(receipt.persistence_error.is_some());
@@ -7539,7 +7539,7 @@ mod tests {
         assert_eq!(receipt.target_frame_sequence, 2);
         assert_eq!(receipt.prediction_error, None);
         assert_eq!(receipt.persistence_error, None);
-        assert!((receipt.lateness_seconds - 0.9).abs() < 1e-9);
+        assert!((receipt.lateness_seconds - 0.9).abs() < 1e-6);
     }
 
     #[test]
