@@ -206,6 +206,36 @@ It replays the predict → label-release → update chronology, recomputes event
 
 This evidence evaluator is for temporal-adaptation and active-sensing tracks. Static inference remains a separate MLPerf Tiny-compatible track with CPU-only and accelerator/NPU tiers kept distinct.
 
+## Static track: task-level MLPerf Tiny v1.4 compatibility contract
+
+Issue: [#9803](https://github.com/Luminous-Dynamics/symthaea/issues/9803)  
+Implementation: `mlperf_tiny_contract.rs`
+
+The static track now has a strict Rust contract that pins:
+- MLPerf Tiny suite version and an exact digest of the v1.4 task/results release artifact;
+- the exact rules version and rules-document digest used for the run;
+- task, division, quality policy and measurement scope;
+- dataset, accuracy, performance and optional calibration split digests;
+- reference model/weights/preprocessing/postprocessing where Closed semantics are selected;
+- candidate model, weights, training and quantization recipes;
+- pre/postprocessing, deployment artifact/configuration, compiler, firmware and runtime digests;
+- target board, CPU core, accelerator profile, hardware tier, SRAM/flash limits, protected SRAM reserve and p95 deadline.
+
+The current public v1.4 task definitions encoded by the contract are:
+- KWS / Speech Commands / DS-CNN / top-1 target 90%;
+- VWW / COCO / MobileNet 96×96 / top-1 target 80%;
+- image classification / CIFAR-10 / ResNet / top-1 target 85%;
+- anomaly detection / ToyADMOS / autoencoder / ROC-AUC target 0.85;
+- streaming wake word / Speech Commands + MUSAN / 1D DS-CNN / at most eight false positives and eight false negatives.
+
+The results page identifies the five workloads and the 2026 v1.4 results; the accessible rules source currently available to this audit is marked v1.2. Therefore v0.1 **does not issue an official MLPerf claim**. Every run must pin both the v1.4 suite-release artifact and the exact applicable rules artifact. Until the v1.4 run pack/rules are independently reconciled, this is an MLPerf-aligned research comparison only. It must not be described as a formal v1.4 submission.
+
+The Closed research policy requires the exact reference model and weights and preserves reference pre/postprocessing; quantized candidates bind a calibration split. The Open research policy allows a different model, but binds the candidate's training/initialization recipe and still requires identical task/data/quality evaluation. These are fail-closed local policies; the exact official v1.4 division rules must be taken from the pinned rule pack, not inferred from v1.2.
+
+Run receipts retain raw latency samples and recompute p50/p95/p99 by nearest-rank. The validator enforces p95 deadline, peak SRAM after protected reserve, flash budget, candidate/target identity, result quality and an uncertainty-bearing energy receipt with at least two energy replicates. Pairwise comparison rejects different suite/rules/data splits, board/core/accelerator profile or hardware tier; CPU-only and NPU rows cannot be collapsed into one ordering.
+
+The static contract is deliberately separate from temporal and active-sensing tracks. It does not pretend that per-inference energy includes the full sensing/communications/sleep cycle.
+
 ## Current implementation status
 
 The new Rust module currently provides:
