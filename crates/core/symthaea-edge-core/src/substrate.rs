@@ -101,11 +101,11 @@ mod tests {
 
     #[test]
     fn composed_static_payload_is_calculated_from_const_capacities() {
-        // 4 * 16-bit liquid state (8 B) + 2 * 2 * 8-byte HDC exemplars (32 B)
-        // + two usize metadata arrays for 2 classes (32 B on a 64-bit host).
+        // Liquid state (8 B) + exemplar words (32 B) + two usize arrays (4 * usize).
+        // This is target-width aware: Cortex-M and 64-bit hosts have different usize widths.
         assert_eq!(
             BoundedEdgeCore::<4, 2, 2, 1>::persistent_payload_bytes(),
-            Some(72)
+            Some(40 + 4 * core::mem::size_of::<usize>())
         );
     }
 
