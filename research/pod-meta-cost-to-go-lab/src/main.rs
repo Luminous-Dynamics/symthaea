@@ -1,9 +1,9 @@
 use pod_meta_cost_to_go_lab::{
     BudgetLedger, CapCalibrationPoint, CapCurrentPrediction, CensoringWeightReceipt,
-    CompletedCalibrationExample, DecisionDrivenCapConfig, DecisionDrivenCapState, EffectDisposition,
-    ForecastId, ForecastJournal, ForecastOutcomeReceipt, ForecastReceipt, FrontierCostCoefficients,
-    JointCostEnvelope, LandmarkEpisode, LandmarkIpcwConfig, LandmarkTerminal,
-    LinearProofFrontierCostModel, OnlineCompetingTerminal, OnlineCostDimension,
+    CompletedCalibrationExample, DecisionDrivenCapConfig, DecisionDrivenCapState,
+    EffectDisposition, ForecastId, ForecastJournal, ForecastOutcomeReceipt, ForecastReceipt,
+    FrontierCostCoefficients, JointCostEnvelope, LandmarkEpisode, LandmarkIpcwConfig,
+    LandmarkTerminal, LinearProofFrontierCostModel, OnlineCompetingTerminal, OnlineCostDimension,
     OnlineFeedbackDisposition, OnlineFeedbackReceipt, OnlinePredictionStatement,
     OnlineSelectionLedger, ProofFrontierFeatures, ReconciliationOutcome, RemainingCostForecast,
     ReservationId, ResourceVector, SelectedProofCalibrationExample, SelectedProofEnvelope,
@@ -785,7 +785,9 @@ fn main() {
     println!(
         "CAP_DECISION_ROW\tinsufficient-holdout\t{}\t{}\t{}",
         cap_unbounded.selected,
-        cap_unbounded.interval.is_some_and(|interval| interval.upper.is_none()),
+        cap_unbounded
+            .interval
+            .is_some_and(|interval| interval.upper.is_none()),
         cap_unbounded.calibration_example_ids.len()
     );
 
