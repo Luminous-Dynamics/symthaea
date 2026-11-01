@@ -1,6 +1,6 @@
 # Progressive Forecast Prefix Replay V1
 
-**Status:** deterministic evaluator and budget-bound feasibility slice for [#9752](https://github.com/Luminous-Dynamics/symthaea/issues/9752). It is not yet a full BAGEN reproduction or simultaneous-vector calibration result.
+**Status:** deterministic journal replay, budget-bound feasibility, and paired historical-baseline slice for [#9752](https://github.com/Luminous-Dynamics/symthaea/issues/9752). It is not yet a full BAGEN reproduction or simultaneous-vector calibration result.
 
 ## Data contract
 
@@ -31,6 +31,17 @@ Actual feasibility is known when an independently verified sufficient proof comp
 
 The evaluator reports confusion counts, abstentions, resolved false-feasible rate, and resolved false-infeasible rate. The deterministic fixture includes true feasible, true infeasible, false feasible, false infeasible, competing/pending unknown, and out-of-domain abstention cases. These are implementation checks, not population performance estimates.
 
+## Frozen historical baseline
+
+`historical_baseline.rs` fits a task-family empirical median and nearest-rank q90/q95 from verified training completions only. Right-censored, competing, and pending training episodes are excluded from the exact-label profile. The model retains the set of training run IDs and rejects any evaluation journal that reuses one of those IDs. Task families absent from the training cohort receive a global empirical fallback.
+
+The baseline is evaluated against the exact same seven prefix records as the frontier-conditioned forecast in the deterministic CLI fixture. The matrix reports training support, paired evaluation counts/q50 error/q90 coverage, right-censored lower-bound exceedances, and fallback use. q90/q95 are descriptive empirical order statistics—not conformal bounds, guarantees, or SOTA results.
+
+## Paired comparison semantics
+
+The current paired comparison is deliberately narrow: the forecast journal's own q50/q90/q95 predictions and a frozen historical task-family/global profile are scored against the same `ForecastOutcomeReceipt` labels. Both use only independently verified sufficient-proof outcomes for exact point errors and empirical coverage. Both preserve censored and competing outcomes separately. A censored lower bound contributes only a definite exceedance when it is already above the relevant upper estimate.
+
+Budget-feasibility decisions are evaluated on the same prefix journal when a state-bound `PrefixBudgetReceipt` is available. Shifted forecasts abstain; unknown actual outcomes do not enter false-feasible/false-infeasible rates.
 ## Current metrics
 
 - q50 mean absolute error and signed bias per resource dimension, only on independently verified sufficient-proof labels.
@@ -41,14 +52,14 @@ The evaluator reports confusion counts, abstentions, resolved false-feasible rat
 
 ## Qualification fixture
 
-The deterministic CLI fixture emits four PREFIX_REPLAY_ROW records: terminal counts; exact-label token q50/q90/q95 metrics; censored token q90/q95 definite exceedances; and task-family partition size/order. Unit tests cover exact-label scoring, censoring separation, competing-terminal separation, pending forecasts, family partitioning, and deterministic row order.
+The deterministic CLI fixture emits five PREFIX_REPLAY_ROW records: terminal counts; exact-label token q50/q90/q95 metrics; censored token q90/q95 definite exceedances; task-family partition size/order; and budget-feasibility/abstention accounting. It emits four HISTORICAL_BASELINE_ROW records: profile support; paired evaluation metrics; censored exceedances; and global fallback usage. Unit tests cover exact-label scoring, censoring separation, competing-terminal separation, pending forecasts, family partitioning, deterministic row order, disjoint training/evaluation, fallback behavior, and state-bound feasibility.
 
 ## Known exclusions
 
 V1 does not yet include:
 
-- paired evaluation of the frontier model, historical baseline, last-observed-cost, conformal and CAP prediction outputs on a large real task suite;
-- a baseline comparison against static estimates, last-observed-cost, selection-blind conformal, CAP, or BAGEN;
+- paired evaluation against last-observed-cost, selection-blind linear, split-vector conformal, selected-policy conformal, and the supported scalar CAP baseline;
+- a large real trajectory suite or a complete BAGEN reproduction;
 - forecast-query overhead in all-in resource usage;
 - model/selection-policy replay or the generation of fresh estimates from prefixes; it evaluates already recorded forecasts;
 - chronological/task-family split construction or confidence intervals;
@@ -56,8 +67,11 @@ V1 does not yet include:
 
 ## Next increments
 
-1. Expand the budget-sidecar replay to paired task-family and chronological holdouts, add cluster-aware confidence intervals, and include forecast-query overhead in all-in cost.
-2. Add a frozen rollout/replay fixture that generates multiple forecasts from one trajectory and verifies no future label leaks into earlier prefixes.
+1. Expand the frozen fixture into multiple chronological trajectories with several forecasts per run, and prove no future label leaks into earlier prefixes.
+2. Add last-observed-cost, selection-blind linear, split-vector conformal, selected-policy conformal, and scalar CAP predictions on identical prefixes.
+3. Add task-family and chronological holdouts, cluster-aware confidence intervals, and worst-family reporting.
+4. Record forecast-query overhead separately and include it in all-in resource accounting.
+5. Reproduce BAGEN's progressive interval/infeasibility task suite before making a direct benchmark comparison.
 3. Add paired baseline predictions on identical frozen prefixes (static, last-observed-cost, linear frontier model, split-vector conformal, and the supported scalar CAP protocol).
 4. Record forecast-query overhead and include it in all-in cost.
 5. Report confidence intervals and worst-family calibration; preserve censoring and competing risks.
