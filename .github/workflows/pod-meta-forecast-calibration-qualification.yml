@@ -1,0 +1,49 @@
+name: POD-Meta Forecast Calibration Lab Qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/pod-meta-forecast-calibration-qualification.yml"
+      - "research/pod-meta-forecast-lab/**"
+  push:
+    branches:
+      - "research/pod-meta-forecast-calibration-2026-10-31"
+    paths:
+      - ".github/workflows/pod-meta-forecast-calibration-qualification.yml"
+      - "research/pod-meta-forecast-lab/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+      - name: Format
+        run: cargo +1.96.0 fmt --manifest-path research/pod-meta-forecast-lab/Cargo.toml -- --check
+      - name: Tests
+        run: cargo +1.96.0 test --locked --manifest-path research/pod-meta-forecast-lab/Cargo.toml
+      - name: Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path research/pod-meta-forecast-lab/Cargo.toml --all-targets -- -D warnings
+      - name: Emit and qualify deterministic matrices
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --quiet --manifest-path research/pod-meta-forecast-lab/Cargo.toml --bin pod-meta-forecast > forecast-matrix.tsv
+          test "$(grep -c '^FORECAST' forecast-matrix.tsv)" -eq 12
+          test "$(grep -c '^RELIABILITY' forecast-matrix.tsv)" -eq 120
+          test "$(grep -c '^SELECTION' forecast-matrix.tsv)" -eq 35
+          if grep '^SELECTION' forecast-matrix.tsv | awk -F '\t' '$14 != 0 { bad=1 } END { exit bad }'; then
+            echo "All selection policies respected the hard per-episode budget."
+          else
+            echo "A selection policy exceeded the hard budget." >&2
+            exit 1
+          fi
+          sha256sum forecast-matrix.tsv
+          wc -l forecast-matrix.tsv
