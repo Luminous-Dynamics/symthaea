@@ -351,6 +351,9 @@ pub fn import_nats_bench_mcu_v2(
     let rank_rows = parse_supplementary(bundle.rank, &RANK_HEADER, "int8_rank_correlation.csv")?;
     let rank_summary_rows = parse_supplementary(bundle.rank_summary, &RANK_SUMMARY_HEADER, "int8_rank_summary.csv")?;
     let baseline_rows = parse_supplementary(bundle.baselines, &BASELINE_HEADER, "nas_baselines_summary.csv")?;
+    validate_rank_rows(&rank_rows)?;
+    validate_rank_summary_rows(&rank_summary_rows)?;
+    validate_baseline_rows(&baseline_rows)?;
 
     if hardware.len() != manifest.measured_count as usize
         || accuracy.len() != manifest.measured_count as usize
@@ -555,6 +558,68 @@ fn parse_supplementary<const N: usize>(
 ) -> Result<Vec<Vec<String>>, NatsBenchMcuV2ImportError> {
     let rows = parse_csv(input, file)?;
     header_rows(rows, expected, file)
+}
+
+fn validate_rank_rows(rows: &[Vec<String>]) -> Result<(), NatsBenchMcuV2ImportError> {
+    let mut ids = HashSet::with_capacity(rows.len());
+    for (index, row) in rows.iter().enumerate() {
+        let line = index + 2;
+        let id = integer(&row[0], "int8_rank_correlation.csv", line, "arch_idx")?;
+        if !ids.insert(id) {
+            return Err(NatsBenchMcuV2ImportError::new(format!("int8_rank_correlation.csv:{line}.arch_idx"), "duplicate rank-study candidate ID"));
+        }
+        required(&row[1], "int8_rank_correlation.csv", line, "arch_str")?;
+        percentage(&row[2], line, "nats_cifar10")?;
+        let fp32 = number(&row[3], "int8_rank_correlation.csv", line, "fp32_acc")?;
+        let int8 = number(&row[4], "int8_rank_correlation.csv", line, "int8_acc")?;
+        number(&row[5], "int8_rank_correlation.csv", line, "delta_pp")?;
+        let cratered = integer(&row[6], "int8_rank_correlation.csv", line, "cratered")?;
+        if !(0.0..=1.0).contains(&fp32) || !(0.0..=1.0).contains(&int8) || cratered > 1 {
+            return Err(NatsBenchMcuV2ImportError::new(format!("int8_rank_correlation.csv:{line}"), "invalid accuracy or cratered flag"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_rank_summary_rows(rows: &[Vec<String>]) -> Result<(), NatsBenchMcuV2ImportError> {
+    let mut names = HashSet::with_capacity(rows.len());
+    for (index, row) in rows.iter().enumerate() {
+        let line = index + 2;
+        let name = required(&row[0], "int8_rank_summary.csv", line, "comparison")?;
+        if !names.insert(name) {
+            return Err(NatsBenchMcuV2ImportError::new(format!("int8_rank_summary.csv:{line}"), "duplicate comparison label"));
+        }
+        let n = integer(&row[1], "int8_rank_summary.csv", line, "n")?;
+        let rho = number(&row[2], "int8_rank_summary.csv", line, "spearman_rho")?;
+        let tau = number(&row[3], "int8_rank_summary.csv", line, "kendall_tau")?;
+        let top10 = integer(&row[4], "int8_rank_summary.csv", line, "top10_overlap")?;
+        let top25 = integer(&row[5], "int8_rank_summary.csv", line, "top25_overlap")?;
+        if n == 0 || !(-1.0..=1.0).contains(&rho) || !(-1.0..=1.0).contains(&tau)
+            || top10 > 10 || top25 > 25
+        {
+            return Err(NatsBenchMcuV2ImportError::new(format!("int8_rank_summary.csv:{line}"), "invalid rank summary value"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_baseline_rows(rows: &[Vec<String>]) -> Result<(), NatsBenchMcuV2ImportError> {
+    let mut algorithms = HashSet::with_capacity(rows.len());
+    for (index, row) in rows.iter().enumerate() {
+        let line = index + 2;
+        let algorithm = required(&row[0], "nas_baselines_summary.csv", line, "algorithm")?;
+        if !algorithms.insert(algorithm) {
+            return Err(NatsBenchMcuV2ImportError::new(format!("nas_baselines_summary.csv:{line}"), "duplicate algorithm"));
+        }
+        percentage(&row[1], line, "final_acc_mean")?;
+        let gap = number(&row[2], "nas_baselines_summary.csv", line, "final_gap_to_oracle_pp")?;
+        let evaluations = integer(&row[3], "nas_baselines_summary.csv", line, "median_evals_to_oracle")?;
+        let wasted = number(&row[4], "nas_baselines_summary.csv", line, "wasted_eval_frac")?;
+        if gap < 0.0 || evaluations == 0 || !(0.0..=1.0).contains(&wasted) {
+            return Err(NatsBenchMcuV2ImportError::new(format!("nas_baselines_summary.csv:{line}"), "invalid NAS baseline metric"));
+        }
+    }
+    Ok(())
 }
 
 fn validate_partition(
@@ -787,7 +852,10 @@ fn validate_receipt_fields(r: &NatsBenchMcuV2ImportReceipt) -> Result<(), NatsBe
         ("rank_summary_sha256", r.rank_summary_sha256.as_str()), ("baseline_sha256", r.baseline_sha256.as_str()),
         ("readme_sha256", r.readme_sha256.as_str()), ("receipt_sha256", r.receipt_sha256.as_str()),
     ] { require_sha256(field, value)?; }
-    if r.measured_count + r.infeasible_count != r.candidate_count {
+    let partition_total = r.measured_count.checked_add(r.infeasible_count).ok_or_else(|| {
+        NatsBenchMcuV2ImportError::new("candidate_counts", "partition count overflow")
+    })?;
+    if partition_total != r.candidate_count {
         return Err(NatsBenchMcuV2ImportError::new("candidate_counts", "partition totals mismatch"));
     }
     Ok(())
