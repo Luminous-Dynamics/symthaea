@@ -217,19 +217,27 @@ impl TemporalStreamConfig {
     }
 }
 
+/// Observation payload exposed to the candidate model. It contains no ground-truth label.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct TemporalStreamEvent {
+pub struct TemporalObservation {
     pub event_index: usize,
     pub timestamp_us: u64,
     pub features: [i16; 4],
     /// Bit i set means feature i is missing.
     pub missing_feature_mask: u8,
+}
+
+/// Evaluator-only ground truth, released after the configured delay.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DelayedGroundTruth {
+    pub event_index: usize,
+    pub label_available_at_us: u64,
     pub label: u8,
     pub regime_id: u8,
     pub transition_fraction_ppm: u32,
     pub is_out_of_distribution: bool,
-    pub label_available_at_us: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -238,7 +246,8 @@ pub struct TemporalStreamDataset {
     pub schema: String,
     pub version: String,
     pub config: TemporalStreamConfig,
-    pub events: Vec<TemporalStreamEvent>,
+    pub observations: Vec<TemporalObservation>,
+    pub delayed_labels: Vec<DelayedGroundTruth>,
     pub dataset_sha256: String,
 }
 
@@ -293,7 +302,8 @@ fn regime_score(regime: u8, x: &[i16; 4]) -> i64 {
 fn generate_stream(config: &TemporalStreamConfig) -> Result<TemporalStreamDataset, EdgeBenchmarkError> {
     config.validate()?;
     let mut rng = XorShift64::new(config.seed);
-    let mut events = Vec::with_capacity(config.event_count);
+    let mut observations = Vec::with_capacity(config.event_count);
+    let mut delayed_labels = Vec::with_capacity(config.event_count);
     let mut timestamp_us = 0u64;
 
     for index in 0..config.event_count {
@@ -326,16 +336,19 @@ fn generate_stream(config: &TemporalStreamConfig) -> Result<TemporalStreamDatase
         }
         let label_available_at_us = timestamp_us.checked_add(config.label_delay_us)
             .ok_or_else(|| EdgeBenchmarkError::new("label_available_at_us", "overflow"))?;
-        events.push(TemporalStreamEvent {
+        observations.push(TemporalObservation {
             event_index: index,
             timestamp_us,
             features,
             missing_feature_mask,
+        });
+        delayed_labels.push(DelayedGroundTruth {
+            event_index: index,
+            label_available_at_us,
             label,
             regime_id,
             transition_fraction_ppm: fraction,
             is_out_of_distribution: is_ood,
-            label_available_at_us,
         });
     }
 
@@ -343,7 +356,8 @@ fn generate_stream(config: &TemporalStreamConfig) -> Result<TemporalStreamDatase
         schema: STREAM_SCHEMA.to_owned(),
         version: STREAM_VERSION.to_owned(),
         config: config.clone(),
-        events,
+        observations,
+        delayed_labels,
         dataset_sha256: String::new(),
     };
     dataset.dataset_sha256 = compute_temporal_stream_sha256(&dataset)?;
