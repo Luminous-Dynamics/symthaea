@@ -625,6 +625,30 @@ mod tests {
     }
 
     #[test]
+    fn sensing_plan_requires_forecast_calibration_and_policy_provenance() {
+        let useful = action(
+            "useful",
+            ActiveSensingActionKind::SampleNow,
+            cost(100, 10, 100, 10, 0, 0),
+            100,
+            vec![
+                ObservationOutcomeEstimate {
+                    probability_ppm: 1_000_000,
+                    posterior_decision_loss_ppm: 100_000,
+                },
+            ],
+        );
+        let mut invalid_context = context();
+        invalid_context.calibration_receipt_sha256 = [0; 32];
+        assert!(plan_active_sensing_actions(invalid_context, &[useful.clone()]).is_err());
+
+        let valid = plan_active_sensing_actions(context(), &[useful]).unwrap();
+        let mut forged = valid.clone();
+        forged.forecast_model_sha256 = [0; 32];
+        assert!(validate_active_sensing_plan_receipt(&forged).is_err());
+    }
+
+    #[test]
     fn receipt_digest_and_validator_reject_tampering() {
         let useful = action(
             "useful",
