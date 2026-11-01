@@ -794,12 +794,12 @@ cargo run --locked -- match-search-time-bodies \
 The retained-response-body file is an evaluator-only array containing the event sequence, content type, exact UTF-8 response body and response-body digest. The digest domain is \`search-time-response-body.v1\`; the corresponding trace event must use the same digest and exact byte count.
 
 The matching precedence is:
-1. **Answer-bearing:** an exact JSON integer pair matching one or more sealed oracle solutions.
+1. **Answer-bearing:** an exact JSON integer pair matching a sealed oracle solution, associated in the same body with that item's unique item ID or task-text context. Small integer pairs alone are not sufficient.
 2. **Context-bearing:** exact normalized task-text sequence, or at least two distinct shared six-token shingles (lexical near-duplicate rule).
-3. **Metadata-only:** exact benchmark/batch/version/task-family or task-item identifier.
+3. **Metadata-only:** exact benchmark/batch/task-family or task-item identifier. A generic version string such as v1 is not sufficient by itself.
 4. **Unknown:** no deterministic match under the rules above.
 
-The six-token overlap rule is a candidate duplicate detector, not a semantic paraphrase detector. Its 800-permille field is an ordinal rule-strength marker, not a calibrated probability. Exact rules receive 1000. Do not interpret either as posterior confidence.
+The exact-answer association rule is intentionally conservative: a bare solution pair can occur by chance in unrelated JSON. It requires the matching item ID or task context in the same response body. The six-token overlap rule is a candidate duplicate detector, not a semantic paraphrase detector. Its 800-permille field is an ordinal rule-strength marker, not a calibrated probability. Exact rules receive 1000. Do not interpret either as posterior confidence.
 
 Every allowed event with response bytes must be represented by retained body evidence or explicitly listed as unavailable. This is enforced in the findings audit. Coverage is reported as retained response-body evidence divided by all response-bearing allowed events; unavailable bodies are never silently counted as clean.
 
