@@ -1161,11 +1161,21 @@ mod tests {
             "../schema/search-time-exposure-findings-audit.schema.json"
         ))
         .unwrap();
+        let body_schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schema/search-captured-response-bodies.schema.json"
+        ))
+        .unwrap();
 
         let trace = trace_fixture();
         let trace_audit = audit_search_time_trace(&trace).unwrap();
         let findings = findings_for_trace(&trace);
         let findings_audit = audit_search_time_findings(&trace, &findings).unwrap();
+        let body_record = SearchCapturedResponseBodyV1 {
+            event_sequence: 1,
+            content_type: "text/plain".to_owned(),
+            body_text: "synthetic evaluator response".to_owned(),
+            response_sha256: digest("synthetic-body"),
+        };
         for (schema, value, version) in [
             (
                 &trace_schema,
@@ -1239,6 +1249,14 @@ mod tests {
             .cloned()
             .collect();
         assert_eq!(expected_finding_fields, actual_finding_fields);
+
+        let expected_body_fields: BTreeSet<String> =
+            body_schema["items"]["properties"].as_object().unwrap()
+                .keys().cloned().collect();
+        let actual_body_fields: BTreeSet<String> =
+            serde_json::to_value(&body_record).unwrap().as_object().unwrap()
+                .keys().cloned().collect();
+        assert_eq!(expected_body_fields, actual_body_fields);
     }
 
     #[test]
