@@ -85,6 +85,7 @@ pub struct PrefixBudgetReceipt {
 pub struct FeasibilityReplayMetrics {
     pub budgeted_prefixes: usize,
     pub predicted_feasible: usize,
+    pub predicted_infeasible: usize,
     pub actual_feasibility_known: usize,
     pub actual_feasible: usize,
     pub false_feasible: usize,
@@ -326,49 +327,47 @@ fn update_feasibility(
     if row.remaining_budget.is_none() {
         return Ok(());
     }
-    metrics.budgeted_prefixes = metrics
-        .budgeted_prefixes
-        .checked_add(1)
-        .ok_or(PrefixReplayError::NumericOverflow)?;
+    increment(&mut metrics.budgeted_prefixes)?;
     let predicted = row
         .predicted_feasible
         .ok_or(PrefixReplayError::InvalidBudgetReceipt)?;
+    if predicted {
+        increment(&mut metrics.predicted_feasible)?;
+    } else {
+        increment(&mut metrics.predicted_infeasible)?;
+    }
+
     let Some(actual) = row.actual_feasible else {
-        metrics.unknown_actual_outcomes = metrics
-            .unknown_actual_outcomes
-            .checked_add(1)
-            .ok_or(PrefixReplayError::NumericOverflow)?;
+        increment(&mut metrics.unknown_actual_outcomes)?;
         return Ok(());
     };
-    metrics.actual_feasibility_known = metrics
-        .actual_feasibility_known
-        .checked_add(1)
-        .ok_or(PrefixReplayError::NumericOverflow)?;
+    increment(&mut metrics.actual_feasibility_known)?;
     if actual {
-        metrics.actual_feasible += 1;
+        increment(&mut metrics.actual_feasible)?;
     }
+
     match (predicted, actual) {
-        (true, true) => metrics.true_feasible += 1,
-        (true, false) => metrics.false_feasible += 1,
-        (false, true) => metrics.false_infeasible += 1,
-        (false, false) => metrics.true_infeasible += 1,
+        (true, true) => increment(&mut metrics.true_feasible)?,
+        (true, false) => increment(&mut metrics.false_feasible)?,
+        (false, true) => increment(&mut metrics.false_infeasible)?,
+        (false, false) => increment(&mut metrics.true_infeasible)?,
     }
-    metrics.predicted_feasible = metrics
-        .predicted_feasible
-        .checked_add(usize::from(predicted))
-        .ok_or(PrefixReplayError::NumericOverflow)?;
+
     metrics.false_feasible_rate = ratio(
         metrics.false_feasible,
         metrics.predicted_feasible,
     );
-    let predicted_infeasible = metrics
-        .actual_feasibility_known
-        .checked_sub(metrics.predicted_feasible.min(metrics.actual_feasibility_known))
-        .unwrap_or(0);
     metrics.false_infeasible_rate = ratio(
         metrics.false_infeasible,
-        predicted_infeasible,
+        metrics.predicted_infeasible,
     );
+    Ok(())
+}
+
+fn increment(value: &mut usize) -> Result<(), PrefixReplayError> {
+    *value = value
+        .checked_add(1)
+        .ok_or(PrefixReplayError::NumericOverflow)?;
     Ok(())
 }
 
