@@ -1,4 +1,4 @@
-use pod_meta_efficiency_lab::{Policy, run_matrix};
+use pod_meta_efficiency_lab::run_matrix;
 
 fn main() {
     println!(
