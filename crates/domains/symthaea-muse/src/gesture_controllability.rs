@@ -11,7 +11,7 @@
 
 use crate::performance_gesture::{
     is_sha256_hex, scalar_domain_is_valid, value_matches_parameter, BeatPosition, GestureParameter,
-    GestureTarget, GestureUnit, GestureValue, ScoreNoteIdentityMapV1,
+    GestureTarget, GestureUnit, GestureValue, PerformanceGestureEvent, ScoreNoteIdentityMapV1,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -46,6 +46,8 @@ pub enum ExpectedDirection {
 #[serde(deny_unknown_fields)]
 pub struct FeatureMeasurement {
     pub target: GestureTarget,
+    pub instrument_id: String,
+    pub source_model_id: Option<String>,
     pub feature_id: String,
     pub value: f64,
     pub unit: FeatureUnit,
@@ -79,11 +81,18 @@ pub struct GestureCounterfactualReceiptV1 {
     pub schema_version: u16,
     pub score_sha256: String,
     pub note_identity_map_sha256: String,
+    /// Digest of the preregistered, versioned intervention hypothesis and
+    /// side-effect budget profile. Must resolve to a frozen protocol record.
+    pub protocol_sha256: String,
+    pub gesture_event_sha256: String,
     pub source_manifest_sha256: String,
     pub renderer_id: String,
     pub renderer_build_sha256: String,
     pub feature_extractor_id: String,
     pub feature_extractor_build_sha256: String,
+    /// Digest of feature extraction configuration: windows, resampling,
+    /// normalization and per-feature parameters.
+    pub feature_extractor_config_sha256: String,
     pub event_id: String,
     pub instrument_id: String,
     pub source_model_id: String,
@@ -126,6 +135,8 @@ impl GestureCounterfactualReceiptV1 {
         for (name, digest) in [
             ("score_sha256", self.score_sha256.as_str()),
             ("note_identity_map_sha256", self.note_identity_map_sha256.as_str()),
+            ("protocol_sha256", self.protocol_sha256.as_str()),
+            ("gesture_event_sha256", self.gesture_event_sha256.as_str()),
             ("source_manifest_sha256", self.source_manifest_sha256.as_str()),
             ("renderer_build_sha256", self.renderer_build_sha256.as_str()),
             (
@@ -331,6 +342,54 @@ impl GestureCounterfactualReceiptV1 {
         }
     }
 
+    /// Verify the intervention against the exact producer-assigned gesture
+    /// event. The baseline must equal the event's original value; only the
+    /// intervention value may differ.
+    pub fn verify_against_event(
+        &self,
+        event: &PerformanceGestureEvent,
+    ) -> Result<(), Vec<String>> {
+        let mut issues = self.verify().err().unwrap_or_default();
+        let event_digest = event.canonical_sha256();
+        match event_digest {
+            Ok(digest) if digest == self.gesture_event_sha256 => {}
+            _ => issues.push("gesture event digest does not match the receipt".to_string()),
+        }
+        if event.event_id != self.event_id
+            || event.instrument_id != self.instrument_id
+            || event.source_model_id.as_deref() != Some(self.source_model_id.as_str())
+            || event.target != self.target
+            || event.at != self.at
+            || event.parameter != self.parameter
+            || event.value != self.baseline_value
+        {
+            issues.push("receipt identity or baseline value does not match the source gesture event".to_string());
+        }
+        if event.value == self.intervention_value {
+            issues.push("intervention must change the source gesture event value".to_string());
+        }
+        if issues.is_empty() { Ok(()) } else { Err(issues) }
+    }
+
+    /// Combined gate for the exact score, note identity map and source gesture.
+    pub fn verify_against_event_and_identity_map(
+        &self,
+        expected_score_sha256: &str,
+        expected_note_count: usize,
+        identity_map: &ScoreNoteIdentityMapV1,
+        event: &PerformanceGestureEvent,
+    ) -> Result<(), Vec<String>> {
+        let mut issues = self.verify_against_identity_map(
+            expected_score_sha256,
+            expected_note_count,
+            identity_map,
+        ).err().unwrap_or_default();
+        if let Err(event_issues) = self.verify_against_event(event) {
+            issues.extend(event_issues);
+        }
+        if issues.is_empty() { Ok(()) } else { Err(issues) }
+    }
+
     /// Bind the receipt to the exact producer-assigned identity map. A valid
     /// counterfactual receipt is still not a capability certificate.
     pub fn verify_against_identity_map(
@@ -399,11 +458,14 @@ impl GestureCounterfactualReceiptV1 {
         hasher.update(self.schema_version.to_be_bytes());
         hash_string(&mut hasher, &self.score_sha256);
         hash_string(&mut hasher, &self.note_identity_map_sha256);
+        hash_string(&mut hasher, &self.protocol_sha256);
+        hash_string(&mut hasher, &self.gesture_event_sha256);
         hash_string(&mut hasher, &self.source_manifest_sha256);
         hash_string(&mut hasher, &self.renderer_id);
         hash_string(&mut hasher, &self.renderer_build_sha256);
         hash_string(&mut hasher, &self.feature_extractor_id);
         hash_string(&mut hasher, &self.feature_extractor_build_sha256);
+        hash_string(&mut hasher, &self.feature_extractor_config_sha256);
         hash_string(&mut hasher, &self.event_id);
         hash_string(&mut hasher, &self.instrument_id);
         hash_string(&mut hasher, &self.source_model_id);
@@ -598,16 +660,38 @@ mod tests {
         )
     }
 
+    fn gesture_event() -> PerformanceGestureEvent {
+        PerformanceGestureEvent {
+            event_id: "bow-force-event-1".to_string(),
+            instrument_id: "violin".to_string(),
+            source_model_id: Some("violin.model-a".to_string()),
+            target: GestureTarget::Note {
+                part_id: 4,
+                note_id: "vln-note-1".to_string(),
+            },
+            at: BeatPosition::new(1, 1).unwrap(),
+            parameter: GestureParameter::BowForce,
+            value: GestureValue::Scalar {
+                amount: 1.0,
+                unit: GestureUnit::Newtons,
+            },
+            interpolation: crate::performance_gesture::GestureInterpolation::Linear,
+        }
+    }
+
     fn receipt() -> GestureCounterfactualReceiptV1 {
         let mut value = GestureCounterfactualReceiptV1 {
             schema_version: GESTURE_CONTROLLABILITY_SCHEMA_VERSION,
             score_sha256: "a".repeat(64),
             note_identity_map_sha256: identity_map().identity_map_sha256,
+            protocol_sha256: "2".repeat(64),
+            gesture_event_sha256: gesture_event().canonical_sha256().unwrap(),
             source_manifest_sha256: "b".repeat(64),
             renderer_id: "muse.procedural.violin".to_string(),
             renderer_build_sha256: "c".repeat(64),
             feature_extractor_id: "muse.audio.features.v1".to_string(),
             feature_extractor_build_sha256: "d".repeat(64),
+            feature_extractor_config_sha256: "3".repeat(64),
             event_id: "bow-force-event-1".to_string(),
             instrument_id: "violin".to_string(),
             source_model_id: "violin.model-a".to_string(),
@@ -697,8 +781,26 @@ mod tests {
         let value = receipt();
         assert!(value.verify().is_ok());
         assert!(value
-            .verify_against_identity_map(&"a".repeat(64), 1, &identity_map())
+            .verify_against_event_and_identity_map(
+                &"a".repeat(64), 1, &identity_map(), &gesture_event()
+            )
             .is_ok());
+    }
+
+    #[test]
+    fn rejects_receipt_with_different_source_gesture_event_or_baseline_value() {
+        let value = receipt();
+        let mut mismatched = gesture_event();
+        mismatched.value = GestureValue::Scalar {
+            amount: 1.5,
+            unit: GestureUnit::Newtons,
+        };
+        assert!(value.verify_against_event(&mismatched).unwrap_err()
+            .iter().any(|issue| issue.contains("gesture event digest")));
+
+        let mut wrong_parameter = gesture_event();
+        wrong_parameter.parameter = GestureParameter::PluckForce;
+        assert!(value.verify_against_event(&wrong_parameter).is_err());
     }
 
     #[test]
