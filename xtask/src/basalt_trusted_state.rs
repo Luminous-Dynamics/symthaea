@@ -2097,12 +2097,14 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
 
     {
         let mut statement = connection.prepare(
-            "SELECT receipt_digest, host_id, source_id, partition_id, generation,
+            "SELECT receipt_digest, accepted_revision, host_id, source_id, partition_id, generation,
                     previous_seal_digest, seal_digest, observer_profile_digest,
-                    boot_incarnation_digest, log_id, tree_size, root_digest,
+                    boot_incarnation_digest, profile_transition_evidence_digest,
+                    boot_transition_evidence_digest, log_origin_transition_evidence_digest,
+                    policy_transition_evidence_digest, log_id, tree_size, root_digest,
                     checkpoint_digest, signer_policy_version, witness_policy_version,
                     policy_bundle_digest
-             FROM basalt_accepted_receipts ORDER BY receipt_digest",
+             FROM basalt_accepted_receipts ORDER BY accepted_revision",
         )?;
         let rows = statement.query_map([], |row| {
             Ok((
@@ -2111,22 +2113,28 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
                 row.get::<_, String>(2)?,
                 row.get::<_, String>(3)?,
                 row.get::<_, String>(4)?,
-                row.get::<_, Option<String>>(5)?,
-                row.get::<_, String>(6)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, Option<String>>(6)?,
                 row.get::<_, String>(7)?,
                 row.get::<_, String>(8)?,
                 row.get::<_, String>(9)?,
                 row.get::<_, String>(10)?,
-                row.get::<_, String>(11)?,
-                row.get::<_, String>(12)?,
-                row.get::<_, String>(13)?,
-                row.get::<_, String>(14)?,
+                row.get::<_, Option<String>>(11)?,
+                row.get::<_, Option<String>>(12)?,
+                row.get::<_, Option<String>>(13)?,
+                row.get::<_, Option<String>>(14)?,
                 row.get::<_, String>(15)?,
+                row.get::<_, String>(16)?,
+                row.get::<_, String>(17)?,
+                row.get::<_, String>(18)?,
+                row.get::<_, String>(19)?,
+                row.get::<_, String>(20)?,
             ))
         })?;
         for row in rows {
             let (
                 receipt_digest,
+                accepted_revision,
                 host_id,
                 source_id,
                 partition_id,
@@ -2135,6 +2143,10 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
                 seal_digest,
                 observer_profile_digest,
                 boot_incarnation_digest,
+                profile_transition_evidence_digest,
+                boot_transition_evidence_digest,
+                log_origin_transition_evidence_digest,
+                policy_transition_evidence_digest,
                 log_id,
                 tree_size,
                 root_digest,
@@ -2144,6 +2156,8 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
                 bundle_digest,
             ) = row?;
             let generation = parse_sql_u64(&generation, "accepted receipt generation")?;
+            let accepted_revision =
+                parse_sql_u64(&accepted_revision, "accepted receipt revision")?;
             let previous_valid = if generation == 1 {
                 previous_seal_digest.is_none()
             } else {
@@ -2156,11 +2170,16 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
                     partition_id,
                 },
                 generation,
+                accepted_revision,
                 previous_seal_digest,
                 seal_digest,
                 receipt_digest: receipt_digest.clone(),
                 observer_profile_digest,
                 boot_incarnation_digest,
+                profile_transition_evidence_digest,
+                boot_transition_evidence_digest,
+                log_origin_transition_evidence_digest,
+                policy_transition_evidence_digest,
                 checkpoint: LogCheckpoint {
                     log_id,
                     tree_size: parse_sql_u64(&tree_size, "accepted tree_size")?,
@@ -2185,6 +2204,10 @@ fn read_sqlite_state(connection: &Connection) -> anyhow::Result<TrustedState> {
                 || receipt.checkpoint.tree_size == 0
                 || !valid_digest(&receipt.checkpoint.root_digest)
                 || !valid_digest(&receipt.checkpoint.checkpoint_digest)
+                || receipt.profile_transition_evidence_digest.as_deref().is_some_and(|v| !valid_digest(v))
+                || receipt.boot_transition_evidence_digest.as_deref().is_some_and(|v| !valid_digest(v))
+                || receipt.log_origin_transition_evidence_digest.as_deref().is_some_and(|v| !valid_digest(v))
+                || receipt.policy_transition_evidence_digest.as_deref().is_some_and(|v| !valid_digest(v))
                 || receipt.policy_versions.signer == 0
                 || receipt.policy_versions.witness == 0
                 || !valid_digest(&receipt.policy_versions.bundle_digest)
