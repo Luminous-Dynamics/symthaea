@@ -14,6 +14,7 @@ categories = ["science", "algorithms", "multimedia::video"]
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-fep = { path = "../../core/symthaea-fep" }
+blake3 = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
