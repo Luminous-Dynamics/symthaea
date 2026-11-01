@@ -48,8 +48,10 @@ class PyPhiLandscapeReferenceContractTests(unittest.TestCase):
                 "mip_tie_count",
                 "mip_tie_cut_sha256s",
                 "mip_tie_cut_removed_edges",
+                "mip_tie_lex_key_hexes",
                 "mip_default_resolved_tie_count",
                 "mip_default_resolved_cut_sha256s",
+                "mip_default_resolved_lex_key_hex",
                 "partition_scores",
                 "theta",
                 "partition",
@@ -70,7 +72,7 @@ class PyPhiLandscapeReferenceContractTests(unittest.TestCase):
         self.assertEqual(partition_scores["type"], "array")
         score_required = set(partition_scores["items"]["required"])
         self.assertTrue({
-            "cut_sha256", "signed_phi", "phi", "normalized_phi",
+            "cut_sha256", "lex_key_hex", "signed_phi", "phi", "normalized_phi",
             "signed_normalized_phi", "cause_signed_phi", "effect_signed_phi",
         }.issubset(score_required))
 
