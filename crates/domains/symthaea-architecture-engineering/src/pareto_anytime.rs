@@ -2078,6 +2078,96 @@ mod tests {
     }
 
     #[test]
+    fn artifact_verified_promotion_requires_reconstructed_candidate_bytes() {
+        use crate::evidence_artifact::{
+            verify_evidence_artifact_bytes, EvidenceArtifactManifest, EvidenceArtifactReference,
+            EvidenceArtifactRole, ResolvedEvidenceArtifact,
+        };
+
+        let mut history = AnytimeHistory::new(header()).unwrap();
+        history.append(AnytimeEventDraft {
+            started_elapsed_millis: 0,
+            completed_elapsed_millis: 1,
+            resources: known_cost(2, 1024),
+            action: AnytimeAction::CandidateEvaluation {
+                evaluation_id: "candidate-a:1".to_owned(),
+                candidate_id: "candidate-a".to_owned(),
+                attempt: 1,
+                decision_sha256: H3.to_owned(),
+                outcome: EvaluationOutcome::Succeeded,
+                objective_values: Some(vec![0.0, 1.0]),
+                feasible: Some(true),
+                constraint_violations: Vec::new(),
+                evidence_sha256: Some(H4.to_owned()),
+                failure_reason: None,
+            },
+        }).unwrap();
+
+        let bytes = b"frozen evaluator output".to_vec();
+        let sha = {
+            let digest = Sha256::digest(&bytes);
+            digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>()
+        };
+        let manifest = EvidenceArtifactManifest::new(
+            "test-run",
+            "candidate-a",
+            history.header().source_commit.clone(),
+            H4,
+            vec![EvidenceArtifactReference {
+                artifact_id: "evaluation-output".to_owned(),
+                role: EvidenceArtifactRole::EvaluationOutput,
+                media_type: "application/octet-stream".to_owned(),
+                storage_locator: format!("sha256:{sha}"),
+                byte_length: bytes.len() as u64,
+                sha256: sha,
+            }],
+        ).unwrap();
+        let resolved = vec![ResolvedEvidenceArtifact {
+            artifact_id: "evaluation-output".to_owned(),
+            bytes: bytes.clone(),
+        }];
+        let byte_receipt = verify_evidence_artifact_bytes(
+            &manifest,
+            "independent-verifier",
+            H3,
+            &resolved,
+        ).unwrap();
+
+        let mut verifier_cost = known_cost(3, 2048);
+        verifier_cost.verifier_calls = Some(1);
+        append_artifact_verified_promotion(
+            &mut history,
+            &manifest,
+            &resolved,
+            &byte_receipt,
+            verifier_cost.clone(),
+            1,
+            2,
+        ).unwrap();
+        assert!(matches!(
+            history.events().last().map(|event| &event.action),
+            Some(AnytimeAction::CandidateVerification { level: EvidenceLevel::ArtifactVerified, .. })
+        ));
+        let receipt = analyze_anytime_history(&history).unwrap();
+        assert_eq!(receipt.total_resources.verifier_calls, Some(1));
+        verify_anytime_run_receipt(&history, &receipt).unwrap();
+
+        let mut tampered_bytes = resolved.clone();
+        tampered_bytes[0].bytes[0] ^= 1;
+        let event_count = history.events().len();
+        assert!(append_artifact_verified_promotion(
+            &mut history,
+            &manifest,
+            &tampered_bytes,
+            &byte_receipt,
+            verifier_cost,
+            2,
+            3,
+        ).is_err());
+        assert_eq!(history.events().len(), event_count);
+    }
+
+    #[test]
     fn overlapping_events_and_mismatched_verifier_evidence_are_rejected() {
         let mut history = AnytimeHistory::new(header()).unwrap();
         append_candidate(&mut history, 1, "candidate-a", "eval-a", vec![0.0, 1.0]);
