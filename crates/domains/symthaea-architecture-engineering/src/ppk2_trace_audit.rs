@@ -320,6 +320,15 @@ pub fn validate_ppk2_trace_audit_receipt(
                 ));
             }
         }
+        let expected_sample_rate = 1_000.0 / segment.median_interval_ms;
+        let expected_gap_ratio = segment.maximum_interval_ms / segment.median_interval_ms;
+        let expected_power = segment.time_weighted_mean_current_ua * receipt.voltage_v;
+        let expected_energy = segment.mean_power_uw * segment.duration_ms / 1_000.0;
+        let consistent = |left: f64, right: f64| {
+            (left - right).abs() <= 1e-8 * left.abs().max(right.abs()).max(1.0)
+        };
+        let relative_rate_error = (segment.median_sample_rate_hz - receipt.expected_sample_rate_hz).abs()
+            / receipt.expected_sample_rate_hz;
         if !segment.first_time_ms.is_finite()
             || !segment.minimum_current_ua.is_finite()
             || segment.minimum_current_ua < 0.0
@@ -327,6 +336,12 @@ pub fn validate_ppk2_trace_audit_receipt(
             || (segment.last_time_ms - segment.first_time_ms - segment.duration_ms).abs() > 1e-9
             || segment.minimum_current_ua > segment.maximum_current_ua
             || segment.maximum_gap_ratio > receipt.maximum_gap_ratio
+            || segment.maximum_gap_ratio < 1.0
+            || !consistent(segment.median_sample_rate_hz, expected_sample_rate)
+            || !consistent(segment.maximum_gap_ratio, expected_gap_ratio)
+            || !consistent(segment.mean_power_uw, expected_power)
+            || !consistent(segment.energy_uj, expected_energy)
+            || relative_rate_error > receipt.sample_rate_tolerance_fraction
         {
             return Err(Ppk2TraceAuditError::new(
                 format!("receipt.segments.{}.consistency", segment.segment_id),
@@ -465,6 +480,18 @@ mod tests {
             sample_rate_tolerance_fraction: 0.01,
             maximum_gap_ratio: 1.5,
         }
+    }
+
+    #[test]
+    fn receipt_validator_rejects_rehashed_physical_metric_substitution() {
+        let input = concat!("segment_id,time_ms,current_uA\n","0,0.00,1000\n","0,0.01,1000\n","0,0.02,1000\n");
+        let audit = audit_ppk2_trace_csv(input, Ppk2TraceAuditConfig::default()).unwrap();
+        validate_ppk2_trace_audit_receipt(&audit.receipt).unwrap();
+
+        let mut forged = audit.receipt.clone();
+        forged.segments[0].energy_uj += 0.1;
+        forged.receipt_sha256 = compute_ppk2_trace_audit_receipt_sha256(&forged).unwrap();
+        assert!(validate_ppk2_trace_audit_receipt(&forged).is_err());
     }
 
     #[test]
