@@ -43,6 +43,8 @@ class PyPhiLandscapeReferenceContractTests(unittest.TestCase):
                 "model_sha256",
                 "evaluation_sha256",
                 "analysis_request_sha256",
+                "mip_cut_sha256",
+                "mip_cut_removed_edges",
                 "theta",
                 "partition",
                 "cause_state",
