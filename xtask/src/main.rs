@@ -143,6 +143,12 @@ enum Commands {
     },
     /// Run the pure BASALT trusted-state reference-model conformance checks.
     BasaltTrustedStateModelCheck,
+    /// Inspect the pinned WAL/FULL SQLite trusted-state backend and its local claim boundary.
+    BasaltTrustedStateSqliteInspect {
+        /// Path to the SQLite database; initialized to an empty trusted state if absent.
+        #[arg(long)]
+        database: PathBuf,
+    },
     /// Validate a BASALT versioned run record and its cross-record evidence invariants.
     BasaltValidate {
         /// Path to the run-record JSON file.
@@ -302,6 +308,16 @@ fn main() -> anyhow::Result<()> {
             println!("{}", serde_json::to_string_pretty(&report)?);
             if !report.passed {
                 anyhow::bail!("BASALT trusted-state reference-model conformance failed");
+            }
+        }
+        Commands::BasaltTrustedStateSqliteInspect { database } => {
+            let store = basalt_trusted_state::SqliteTrustedStateStore::open(&database)?;
+            let report = store.report()?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if !report.local_atomicity_backend_configured
+                || !report.local_snapshot_digest_consistent
+            {
+                anyhow::bail!("BASALT SQLite local state backend failed its configuration/integrity checks");
             }
         }
         Commands::BasaltValidate { input, manifest, spec_root } => {
