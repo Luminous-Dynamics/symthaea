@@ -560,7 +560,6 @@ mod tests {
 
     #[test]
     fn observed_transition_training_rejects_unverifiable_or_misaligned_evidence() {
-        let engine = make_engine();
         let current = random_hv(511);
         let next = random_hv(512);
 
@@ -571,7 +570,7 @@ mod tests {
             .train_observed_transition(&current, &next, &malformed, 0.001)
             .is_err());
 
-        let mut malformed = observed_evidence(2);
+        let mut malformed = observed_evidence(&current, &next, 2);
         malformed.target_sequence = malformed.source_sequence;
         assert!(candidate
             .train_observed_transition(&current, &next, &malformed, 0.001)
