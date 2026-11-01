@@ -202,7 +202,7 @@ The new candidate evidence evaluator requires:
 - recomputed application-event energy uncertainty receipt;
 - a hardware receipt binding artifact and configuration digests, compiler, firmware, linker map, measurement protocol, device session, per-event latency samples, peak SRAM and flash.
 
-It replays the predict → label-release → update chronology, recomputes event-energy uncertainty from its source receipt/manifest inputs, derives p95 latency by nearest-rank, and enforces hard limits on quality, false alarms, missed events, minimum coverage, p95 latency, protected SRAM reserve and flash. It returns all candidates with rejection reasons and a non-dominated Pareto frontier over quality, false/missed events, latency, event-energy upper bound, memory, flash, coverage and Brier score. Unlike a single weighted score, it does not trade a missed critical event against a few microjoules.
+It replays the predict → label-release → update chronology, recomputes event-energy uncertainty from its source receipt/manifest inputs, derives p95 latency by nearest-rank, and enforces hard limits on quality, false alarms, missed events, minimum coverage, p95 latency, protected SRAM reserve and flash. It returns all candidates with rejection reasons and a non-dominated Pareto frontier over quality, false/missed events, latency, event-energy upper bound, memory, flash, coverage, Brier score, worst-regime/open-set quality, drift recovery and retention. Sensor samples/hour, online-update energy and adaptation bytes written are now mandatory measurements for temporal/active-sensing candidates and are explicit Pareto objectives; a non-adapting baseline reports explicit zero update energy/bytes rather than omitting them. Unlike a single weighted score, it does not trade a missed critical event against a few microjoules or treat sensing/learning as free.
 
 This evidence evaluator is for temporal-adaptation and active-sensing tracks. Static inference remains a separate MLPerf Tiny-compatible track with CPU-only and accelerator/NPU tiers kept distinct.
 
@@ -235,6 +235,30 @@ The Closed research policy requires the exact reference model and weights and pr
 Run receipts retain raw latency samples and recompute p50/p95/p99 by nearest-rank. The validator enforces p95 deadline, peak SRAM after protected reserve, flash budget, candidate/target identity, result quality and an uncertainty-bearing energy receipt with at least two energy replicates. Pairwise comparison rejects different suite/rules/data splits, board/core/accelerator profile or hardware tier; CPU-only and NPU rows cannot be collapsed into one ordering.
 
 The static contract is deliberately separate from temporal and active-sensing tracks. It does not pretend that per-inference energy includes the full sensing/communications/sleep cycle.
+
+## Evidence-gated comparison: do not confuse an architecture hypothesis with a leaderboard result
+
+The current synthetic temporal generator is a controlled engineering fixture, not a substitute for real, held-out sensor workloads. Its small four-feature regime rules are useful for testing causal ordering, drift/recovery accounting, OOD metrics and receipt integrity. They are too simple to establish superiority over production TinyML baselines.
+
+The benchmark should use two complementary evidence families:
+1. **Controlled synthetic tasks** with known hidden dynamics, irregular sampling, missingness, noise, drift and delayed labels. These enable exact oracle replay, coverage tests and adversarial controls.
+2. **Public real sensor datasets** with a frozen preprocessing protocol, provenance and task-specific splits. Use established classification/anomaly-detection datasets that can be reproduced on embedded hardware. The same raw input and task contract must be available to the candidate and independent evaluator.
+
+Before making a comparative claim, add at least three distinct real workload families:
+- inertial activity/gesture recognition with subject/session-held-out splits;
+- acoustic anomaly or machine-condition monitoring with device/operating-condition-held-out splits;
+- streaming keyword/wake-word detection with long negative listening intervals and false alarms per hour.
+
+The locked test set must hold out subjects/devices/sessions or operating conditions, not merely random rows from the same recording. The synthetic generator should remain a test of verifier correctness and stress response, not the headline score.
+
+For each real task, establish a Pareto set of strong controls:
+- optimized fixed INT8 CNN/DS-CNN/TCN/GRU;
+- a strong adaptive TinyML baseline (e.g. prototype/centroid or supported online update);
+- low-cost EMA/threshold/event-trigger controls;
+- HDC-only, compact CfC-only, hybrid HDC-LTC and confidence-gated HDC-LTC;
+- active-sensing versions with the same event quality and deadline constraints.
+
+The SOTA claim requires matched task quality, causal information access, device, compiler, runtime, clock, voltage, memory reserve, communication schedule and energy measurement boundaries. Report both the full frontier and per-candidate rejection reasons. Publish an improvement only when the relevant uncertainty interval excludes zero and all hard constraints pass.
 
 ## Current implementation status
 
