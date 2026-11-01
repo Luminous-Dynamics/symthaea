@@ -40,7 +40,10 @@ const FIXTURES: [Fixture; 13] = [
     Fixture { topology: "grid", variables: 196, width: 14, height: 14, repeats: 1 },
 ];
 
-const MAX_FACTOR_ENTRIES: usize = 1 << 16;
+// Planner-only comparison: no factor contraction is executed, so use the
+// largest representable entry ceiling to obtain exact orders even for grids
+// that production inference correctly rejects under its configured budget.
+const PLANNER_ONLY_ENTRY_CEILING: usize = usize::MAX;
 
 fn build_scopes(fixture: Fixture) -> Result<Vec<Vec<usize>>, String> {
     let mut scopes = Vec::new();
@@ -241,7 +244,7 @@ fn run() -> Result<(), String> {
         let optimized_warmup = plan_min_fill_elimination(
             &scopes,
             &eliminate,
-            MAX_FACTOR_ENTRIES,
+            PLANNER_ONLY_ENTRY_CEILING,
         )
         .map_err(|error| format!("optimized preflight failed: {error}"))?;
 
@@ -273,7 +276,7 @@ fn run() -> Result<(), String> {
                 let optimized = plan_min_fill_elimination(
                     &scopes,
                     &eliminate,
-                    MAX_FACTOR_ENTRIES,
+                    PLANNER_ONLY_ENTRY_CEILING,
                 )
                 .map_err(|error| error.to_string())?;
                 optimized_samples.push(start.elapsed());
@@ -287,7 +290,7 @@ fn run() -> Result<(), String> {
                 let optimized = plan_min_fill_elimination(
                     &scopes,
                     &eliminate,
-                    MAX_FACTOR_ENTRIES,
+                    PLANNER_ONLY_ENTRY_CEILING,
                 )
                 .map_err(|error| error.to_string())?;
                 optimized_samples.push(start.elapsed());
