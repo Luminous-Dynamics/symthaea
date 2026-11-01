@@ -38,7 +38,7 @@
     "separately_versioned_and_charged": true
   },
   "validation_status": {
-    "rust_test_functions_authored": 70,
+    "rust_test_functions_authored": 72,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
@@ -49,7 +49,7 @@
     "purged_split_test_functions_authored": 8,
     "train_only_scaler_test_functions_authored": 10,
     "time_imm_adapter_test_functions_authored": 10,
-    "source_watermark_test_functions_authored": 14
+    "source_watermark_test_functions_authored": 16
   },
   "opaque_payload_contract": {
     "fields": [
@@ -277,6 +277,9 @@
     "caller_must_append_authoritative_event_to_bitemporal_ledger": true,
     "durable_persistence_implemented": false,
     "source_authentication_implemented": false,
-    "test_functions_authored": 14
+    "test_functions_authored": 16,
+    "global_knowledge_time_order": "strictly increasing across progress and event-arrival transactions",
+    "same_timestamp_event_arrivals": "atomic batch",
+    "progress_cannot_be_backdated_behind_arrival": true
   }
 }
