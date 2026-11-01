@@ -114,6 +114,7 @@ pub struct LinearProofFrontierCostModel {
 pub enum FrontierModelError {
     MissingModelDigest,
     MissingFrontierDigest,
+    MissingPopulationCohortDigest,
     InconsistentFeatureCounts,
     NonemptyFeaturesForEmptyFrontier,
     ArithmeticOverflow,
@@ -125,6 +126,8 @@ pub struct FrontierCostPrediction {
     pub features: ProofFrontierFeatures,
     pub frontier_digest: [u8; 32],
     pub model_digest: [u8; 32],
+    /// Declared exchangeability cohort (e.g. task-family/runtime/time partition).
+    pub population_cohort_digest: [u8; 32],
     pub point_cost: ResourceVector,
     pub uncertainty_scale: ResourceVector,
     pub shift_status: ShiftStatus,
@@ -135,6 +138,7 @@ impl LinearProofFrontierCostModel {
         self,
         features: ProofFrontierFeatures,
         frontier_digest: [u8; 32],
+        population_cohort_digest: [u8; 32],
         shift_status: ShiftStatus,
     ) -> Result<FrontierCostPrediction, FrontierModelError> {
         if self.model_digest.iter().all(|byte| *byte == 0) {
@@ -142,6 +146,9 @@ impl LinearProofFrontierCostModel {
         }
         if frontier_digest.iter().all(|byte| *byte == 0) {
             return Err(FrontierModelError::MissingFrontierDigest);
+        }
+        if population_cohort_digest.iter().all(|byte| *byte == 0) {
+            return Err(FrontierModelError::MissingPopulationCohortDigest);
         }
         features.validate()?;
         let point_cost = self.point_cost.evaluate(features)?;
@@ -153,6 +160,7 @@ impl LinearProofFrontierCostModel {
             features,
             frontier_digest,
             model_digest: self.model_digest,
+            population_cohort_digest,
             point_cost,
             uncertainty_scale,
             shift_status,
@@ -186,6 +194,9 @@ pub enum VectorConformalError {
     DuplicateEpisode,
     InvalidEpisodeId,
     PredictionFromDifferentModel,
+    DifferentCalibrationCohort,
+    MissingFrontierDigest,
+    InvalidFrontierFeatures,
     MissingCompletionVerifier,
     ShiftedCalibrationExample,
     InvalidPredictionScale,
@@ -280,14 +291,15 @@ impl SplitVectorConformalCalibrator {
             if example.completion_verifier_digest.iter().all(|byte| *byte == 0) {
                 return Err(VectorConformalError::MissingCompletionVerifier);
             }
+            validate_prediction(example.prediction)?;
             if example.prediction.model_digest != model_digest {
                 return Err(VectorConformalError::PredictionFromDifferentModel);
             }
+            if example.prediction.population_cohort_digest != calibration_cohort_digest {
+                return Err(VectorConformalError::DifferentCalibrationCohort);
+            }
             if example.prediction.shift_status != ShiftStatus::InDomain {
                 return Err(VectorConformalError::ShiftedCalibrationExample);
-            }
-            if !resource_vector_is_positive(example.prediction.uncertainty_scale) {
-                return Err(VectorConformalError::InvalidPredictionScale);
             }
             scores.push(max_normalized_upper_residual(
                 example.observed_remaining,
@@ -328,11 +340,12 @@ impl SplitVectorConformalCalibrator {
         &self,
         prediction: FrontierCostPrediction,
     ) -> Result<JointCostEnvelope, VectorConformalError> {
+        validate_prediction(prediction)?;
         if prediction.model_digest != self.model_digest {
             return Err(VectorConformalError::PredictionFromDifferentModel);
         }
-        if !resource_vector_is_positive(prediction.uncertainty_scale) {
-            return Err(VectorConformalError::InvalidPredictionScale);
+        if prediction.population_cohort_digest != self.calibration_cohort_digest {
+            return Err(VectorConformalError::DifferentCalibrationCohort);
         }
         if prediction.shift_status != ShiftStatus::InDomain {
             return Ok(JointCostEnvelope::Unbounded {
@@ -392,6 +405,21 @@ pub fn assess_joint_resource_fit(
     } else {
         JointBudgetDecision::DoesNotFit
     }
+}
+
+fn validate_prediction(
+    prediction: FrontierCostPrediction,
+) -> Result<(), VectorConformalError> {
+    if prediction.frontier_digest.iter().all(|byte| *byte == 0) {
+        return Err(VectorConformalError::MissingFrontierDigest);
+    }
+    if prediction.features.validate().is_err() {
+        return Err(VectorConformalError::InvalidFrontierFeatures);
+    }
+    if !resource_vector_is_positive(prediction.uncertainty_scale) {
+        return Err(VectorConformalError::InvalidPredictionScale);
+    }
+    Ok(())
 }
 
 fn max_normalized_upper_residual(
@@ -523,22 +551,24 @@ mod tests {
 
     fn prediction(unresolved: u64) -> FrontierCostPrediction {
         model()
-            .predict(features(unresolved), [4; 32], ShiftStatus::InDomain)
+            .predict(features(unresolved), [4; 32], COHORT, ShiftStatus::InDomain)
             .unwrap()
     }
 
     fn example(id: u64, score: u128) -> CompletedCalibrationExample {
+        let predicted = prediction(4);
+        let scaled = ResourceVector::new(
+            score * predicted.uncertainty_scale.tokens,
+            score * predicted.uncertainty_scale.tool_calls,
+            score * predicted.uncertainty_scale.cpu_ms,
+            score * predicted.uncertainty_scale.gpu_ms,
+            score * predicted.uncertainty_scale.wall_ms,
+            score * predicted.uncertainty_scale.micro_usd,
+        );
         CompletedCalibrationExample {
             episode_id: id,
-            prediction: prediction(4),
-            observed_remaining: ResourceVector::new(
-                10 + score,
-                10 + score,
-                10 + score,
-                10 + score,
-                10 + score,
-                10 + score,
-            ),
+            prediction: predicted,
+            observed_remaining: predicted.point_cost.checked_add(scaled).unwrap(),
             completion_verifier_digest: [9; 32],
         }
     }
@@ -554,7 +584,7 @@ mod tests {
     #[test]
     fn frontier_baseline_changes_cost_with_obligation_structure() {
         let small = model()
-            .predict(features(2), [4; 32], ShiftStatus::InDomain)
+            .predict(features(2), [4; 32], COHORT, ShiftStatus::InDomain)
             .unwrap();
         let large = prediction(7);
         assert!(small.point_cost.tokens < large.point_cost.tokens);
@@ -570,7 +600,7 @@ mod tests {
             ..ProofFrontierFeatures::default()
         };
         assert_eq!(
-            model().predict(invalid, [4; 32], ShiftStatus::InDomain),
+            model().predict(invalid, [4; 32], COHORT, ShiftStatus::InDomain),
             Err(FrontierModelError::InconsistentFeatureCounts)
         );
     }
@@ -592,7 +622,7 @@ mod tests {
     #[test]
     fn conformal_order_statistic_uses_n_plus_one_rank() {
         let calibrator = calibrator(9, 0.10);
-        assert_eq!(calibrator.threshold(), ConformalThreshold::Finite(4.5));
+        assert_eq!(calibrator.threshold(), ConformalThreshold::Finite(9.0));
     }
 
     #[test]
@@ -616,7 +646,14 @@ mod tests {
         let JointCostEnvelope::Bounded(bound) = envelope else {
             panic!("nine calibration samples support a finite 90% rank");
         };
-        let observed = ResourceVector::new(20, 20, 20, 20, 20, 20);
+        let observed = ResourceVector::new(
+            predicted.point_cost.tokens + 9 * predicted.uncertainty_scale.tokens,
+            predicted.point_cost.tool_calls + 9 * predicted.uncertainty_scale.tool_calls,
+            predicted.point_cost.cpu_ms + 9 * predicted.uncertainty_scale.cpu_ms,
+            predicted.point_cost.gpu_ms + 9 * predicted.uncertainty_scale.gpu_ms,
+            predicted.point_cost.wall_ms + 9 * predicted.uncertainty_scale.wall_ms,
+            predicted.point_cost.micro_usd + 9 * predicted.uncertainty_scale.micro_usd,
+        );
         assert!(observed.fits_within(bound.upper));
         assert_eq!(bound.target_coverage, 0.90);
         assert_eq!(bound.calibration_count, 9);
@@ -626,7 +663,7 @@ mod tests {
     fn frontier_shift_causes_unbounded_prediction_not_stale_calibration() {
         let calibrator = calibrator(9, 0.10);
         let shifted = model()
-            .predict(features(4), [4; 32], ShiftStatus::SuspectedShift)
+            .predict(features(4), [4; 32], COHORT, ShiftStatus::SuspectedShift)
             .unwrap();
         assert!(matches!(
             calibrator.predict_upper(shifted).unwrap(),
