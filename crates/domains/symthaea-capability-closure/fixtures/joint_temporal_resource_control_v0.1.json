@@ -22,13 +22,46 @@
     ]
   },
   "resource_dimensions": [
-    {"name": "persistent_bytes", "unit": "byte", "hard_cap": true},
-    {"name": "retained_byte_us", "unit": "byte*microsecond", "hard_cap": true},
-    {"name": "io_bytes", "unit": "byte", "hard_cap": true},
-    {"name": "compute_units", "unit": "declared operation unit", "hard_cap": true},
-    {"name": "observations", "unit": "sample", "hard_cap": true},
-    {"name": "energy_nj", "unit": "nanojoule", "hard_cap": true},
-    {"name": "verification_units", "unit": "declared verification operation", "hard_cap": true}
+    {
+      "name": "persistent_bytes",
+      "unit": "byte",
+      "hard_cap": true
+    },
+    {
+      "name": "retained_byte_us",
+      "unit": "byte*microsecond",
+      "hard_cap": true
+    },
+    {
+      "name": "io_bytes",
+      "unit": "byte",
+      "hard_cap": true
+    },
+    {
+      "name": "latency_us",
+      "unit": "microsecond (serial critical-path estimate)",
+      "hard_cap": true
+    },
+    {
+      "name": "compute_units",
+      "unit": "declared operation unit",
+      "hard_cap": true
+    },
+    {
+      "name": "observations",
+      "unit": "sample",
+      "hard_cap": true
+    },
+    {
+      "name": "energy_nj",
+      "unit": "nanojoule",
+      "hard_cap": true
+    },
+    {
+      "name": "verification_units",
+      "unit": "declared verification operation",
+      "hard_cap": true
+    }
   ],
   "non_compensatory_outcomes": [
     "wrong_belief_us",
@@ -48,17 +81,19 @@
     "enumerates_all_subsets": true,
     "uses_evaluator_measured_costs": true,
     "keeps_infeasible_subsets_out_of_frontier": true,
-    "oracle_exposure_visible_to_candidate": false
+    "oracle_exposure_visible_to_candidate": false,
+    "action_registry": "evaluator-owned action ids with conflict_group constraints",
+    "infeasible_conflict_group_subsets_excluded": true
   },
   "targets_not_results": {
     "zero_future_leakage": true,
     "zero_hard_budget_violations": true,
-    "matched_budget_exposure_reduction_fraction": 0.10,
-    "matched_quality_resource_reduction_fraction": 0.20
+    "matched_budget_exposure_reduction_fraction": 0.1,
+    "matched_quality_resource_reduction_fraction": 0.2
   },
   "validation_status": {
     "candidate_test_functions_authored": 12,
-    "evaluator_test_functions_authored": 11,
+    "evaluator_test_functions_authored": 12,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
