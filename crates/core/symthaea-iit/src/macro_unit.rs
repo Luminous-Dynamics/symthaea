@@ -45,6 +45,12 @@ pub enum MacroUnitError {
     ConstantMapping,
     #[error("sequence-state index {index} is outside the mapping domain of {states} states")]
     SequenceStateOutOfRange { index: usize, states: usize },
+    #[error("micro-history length mismatch: expected {expected} oldest-first states, got {actual}")]
+    HistoryLengthMismatch { expected: usize, actual: usize },
+    #[error("micro-history state width mismatch: expected {expected}, got {actual}")]
+    HistoryStateWidthMismatch { expected: usize, actual: usize },
+    #[error("micro-history state is too narrow for constituent {unit}: width {actual}")]
+    HistoryStateTooNarrow { unit: usize, actual: usize },
 }
 
 /// A binary macro unit with an explicit constituent order, temporal grain,
@@ -374,6 +380,69 @@ impl MacroUnitSpec {
         &self.spec_sha256
     }
 
+    /// Apply the mapping to an oldest-first history of full micro-system states.
+    ///
+    /// The history must contain exactly update_grain states. Each state is
+    /// indexed by global micro-unit ID; only this unit's constituent indices
+    /// are read. The first listed constituent is the least-significant bit in
+    /// each time slice, and the oldest time slice occupies the least-significant
+    /// block of bits in the complete sequence-state index.
+    pub fn map_micro_history(
+        &self,
+        history: &[Vec<bool>],
+    ) -> Result<bool, MacroUnitError> {
+        if history.len() != self.update_grain {
+            return Err(MacroUnitError::HistoryLengthMismatch {
+                expected: self.update_grain,
+                actual: history.len(),
+            });
+        }
+        let mut state_width = None;
+        for state in history {
+            if let Some(expected) = state_width {
+                if state.len() != expected {
+                    return Err(MacroUnitError::HistoryStateWidthMismatch {
+                        expected,
+                        actual: state.len(),
+                    });
+                }
+            } else {
+                state_width = Some(state.len());
+            }
+        }
+
+        let minimum_width = self.constituents.last().copied().unwrap_or(0) + 1;
+        let actual_width = state_width.unwrap_or(0);
+        if actual_width < minimum_width {
+            let unit = self
+                .constituents
+                .iter()
+                .copied()
+                .find(|unit| *unit >= actual_width)
+                .unwrap_or(minimum_width - 1);
+            return Err(MacroUnitError::HistoryStateTooNarrow {
+                unit,
+                actual: actual_width,
+            });
+        }
+
+        let mut sequence_index = 0usize;
+        for (time, state) in history.iter().enumerate() {
+            for (slot, unit) in self.constituents.iter().copied().enumerate() {
+                if state[unit] {
+                    let bit = time
+                        .checked_mul(self.constituents.len())
+                        .and_then(|offset| offset.checked_add(slot))
+                        .ok_or(MacroUnitError::SequenceDomainOverflow)?;
+                    sequence_index |= 1usize
+                        .checked_shl(bit as u32)
+                        .ok_or(MacroUnitError::SequenceDomainOverflow)?;
+                }
+            }
+        }
+        self.map_sequence_state(sequence_index)
+    }
+
     /// Evaluate the originally supplied truth table at one little-endian sequence-state index.
     pub fn map_sequence_state(&self, index: usize) -> Result<bool, MacroUnitError> {
         let Some(canonical_value) = self.canonical_mapping.get(index).copied() else {
@@ -534,6 +603,65 @@ mod tests {
             let expected = ((state >> 2) & 0b11) == 0b11;
             assert_eq!(both_outputs.map_sequence_state(state).unwrap(), expected);
         }
+    }
+
+    #[test]
+    fn maps_micro_history_oldest_first_using_global_constituent_indices() {
+        // The first constituent has global index 2 and the second index 5.
+        // For ON-count=2 the macro state is ON only when both are ON in the
+        // single oldest/current micro state.
+        let unit = MacroUnitSpec::coarse_grain(vec![2, 5], &[2], 4).unwrap();
+        let history = vec![vec![false, false, true, false, false, true]];
+        assert!(unit.map_micro_history(&history).unwrap());
+
+        let history = vec![vec![false, false, true, false, false, false]];
+        assert!(!unit.map_micro_history(&history).unwrap());
+
+        // Two-step blackbox reads the designated output only at the final
+        // (newest) micro update. The oldest state is deliberately opposite.
+        let blackbox = MacroUnitSpec::blackbox(vec![2, 5], 2, &[0], 16).unwrap();
+        let history = vec![
+            vec![false, false, true, false, false, false],
+            vec![false, false, false, false, false, false],
+        ];
+        assert!(!blackbox.map_micro_history(&history).unwrap());
+        let history = vec![
+            vec![false, false, false, false, false, false],
+            vec![false, false, true, false, false, false],
+        ];
+        assert!(blackbox.map_micro_history(&history).unwrap());
+    }
+
+    #[test]
+    fn micro_history_rejects_incorrect_length_and_width_before_mapping() {
+        let unit = MacroUnitSpec::blackbox(vec![2, 5], 2, &[0], 16).unwrap();
+        assert_eq!(
+            unit.map_micro_history(&[vec![false; 6]]),
+            Err(MacroUnitError::HistoryLengthMismatch {
+                expected: 2,
+                actual: 1
+            })
+        );
+        assert_eq!(
+            unit.map_micro_history(&[
+                vec![false; 6],
+                vec![false; 5]
+            ]),
+            Err(MacroUnitError::HistoryStateWidthMismatch {
+                expected: 6,
+                actual: 5
+            })
+        );
+        assert_eq!(
+            unit.map_micro_history(&[
+                vec![false; 4],
+                vec![false; 4]
+            ]),
+            Err(MacroUnitError::HistoryStateTooNarrow {
+                unit: 5,
+                actual: 4
+            })
+        );
     }
 
     #[test]
