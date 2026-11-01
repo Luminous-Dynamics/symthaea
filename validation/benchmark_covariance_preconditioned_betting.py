@@ -23,12 +23,20 @@ def covariance(dimension: int, rho: float) -> np.ndarray:
 
 
 def covariance_envelope(dimension: int) -> np.ndarray:
-    # Covers equicorrelation rho in [.2,.8], with reference rho0=.5.
-    delta = max(0.0, (dimension - 1) * 0.3, 0.3)
-    proxy = covariance(dimension, 0.5) + delta * np.eye(dimension)
-    for rho in np.linspace(0.2, 0.8, 101):
+    """One global projective kernel for every finite universe dimension.
+
+    V_d = (1-rho_min) I_d + rho_max 11^T, with [rho_min,rho_max]=[.2,.8].
+    For any rho in the interval, V_d-Sigma_d(rho) =
+    (rho-rho_min) I_d + (rho_max-rho) 11^T >= 0. Principal submatrices
+    retain the exact same kernel as the universe is extended.
+    """
+    rho_min, rho_max = 0.2, 0.8
+    proxy = (1.0 - rho_min) * np.eye(dimension) + rho_max * np.ones(
+        (dimension, dimension)
+    )
+    for rho in np.linspace(rho_min, rho_max, 101):
         if np.linalg.eigvalsh(proxy - covariance(dimension, float(rho))).min() < -1e-9:
-            raise ValueError("covariance envelope failed its declared grid check")
+            raise ValueError("projective covariance envelope failed its declared grid check")
     return proxy
 
 
