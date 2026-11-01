@@ -27,6 +27,8 @@ External methods must be assigned to the guarantee lane they actually prove. The
 | LORD variants, SAFFRON, ADDIS, GAI/weighted GAI++, LOND/e-LOND, alpha spending | Established sequential online procedures; include p-value and e-value variants where available | Use only methods whose assumptions and error target match the comparison cell. Freeze tuning parameters before confirmatory runs. |
 | Bioconductor onlineFDR 2.20.0 and Python online-fdr parity suite | Reference implementations for online procedures and asynchronous lifecycles | Pin package versions and parity-test method adapters. The current Python package describes sequential, asynchronous and batch APIs plus e-BH/e-LOND, and reports parity checks against onlineFDR 2.20.0. |
 | Tavyrikov, Goeman & de Heide (EJS 2026), carefree multiple testing with e-processes | SupFDR / FDR-sup with running suprema and adjusters under arbitrary dependence | Primary persistent-guarantee comparator. Do not use raw e-BH on unadjusted running suprema as a valid baseline. |
+| Ramdas, *Anchored multiple testing* (Oct 2026 preprint) | Uses slack in baseline FDR proofs to add valid local e-value mass while retaining baseline discoveries; includes anchored BH/BY/e-BH and ordered procedures | Static finite-family benchmark and template for new dynamic "supremum-anchored" closure. Do not assume its static coordinatewise bounds automatically imply a time-uniform/SupFDR result. |
+| #9777 supremum-anchored projective closure | Candidate: use a valid bound on the baseline path supremum as a local e-value budget, then add residual projective intersection evidence | Research hypothesis only. Requires subset-specific path budgets c_S; global SupFDR control alone may give c_S=1 and no residual power budget. |
 | CRAN eClosure 0.9.7 (published 2026-10-21) | Batch closed BH, closed e-BH, closed Su and closed BY | Batch-only baseline. It is useful for fixed-horizon final-set comparisons, not a direct online arrival or repeated-monitoring comparator. |
 | seqcomp 0.3.0 adaptive betting (fixed fraction, aGRAPA, ONS-m, quantile heuristic) | Bet-selection comparators for bounded score-difference martingales and sequential model comparison | Compare at the betting-strategy layer only after translating and proving the exact increment/null assumptions. Its own vignette shows no universal best rule across temporal regimes; do not call our diagonal-preconditioned projected update novel merely because it is vector-valued. |
 | Covariance-preconditioned projective bets (#9756 / PR #9758) | Model-assisted conditional-mgf intersection process with predictable vector bets | Benchmark against fixed vector/scalar bets, aGRAPA, ONS-m-like updates, fixed-prior eta mixtures and an oracle direction; retain #9695 arbitrary-dependence fallback. |
@@ -39,6 +41,7 @@ The 2026 dynamic e-closure theory and the 2026 UAI online e-closure paper both u
 ### External reference pins
 
 - UAI 2026 online e-closure/compound e-values: https://proceedings.mlr.press/v337/xu26a.html
+- Ramdas, Anchored multiple testing (Oct 2026 preprint): https://arxiv.org/abs/2610.11279
 - Dynamic e-closure theory: https://riannedeheide.github.io/research/dynamic-e-closure/
 - SupFDR/FDR-sup adjusters: https://doi.org/10.1214/26-EJS2546
 - Bioconductor onlineFDR 2.20.0 (release 3.23): https://bioconductor.org/packages/release/bioc/html/onlineFDR.html
@@ -108,6 +111,17 @@ It can evaluate joint betting, covariance calibration, and time-to-threshold. It
 Within a matched stopped-FDR or SupFDR guarantee, optimize the same value, cost, capacity, persistence, and queue rules. Report utility regret and false investigations as well as statistical metrics.
 
 ## 4. Scenario matrix
+
+### Anchoring / baseline-retention layer
+
+Add the Oct 2026 anchored-closure method as a distinct static comparator, then test the dynamic extension in #9777. Register:
+- baseline procedure and its exact FDR theorem;
+- whether the baseline has a subset-specific coordinatewise bound or only a global FDR bound;
+- static bound c_S or path bound E[sup_t FDP_S(B_t)/alpha] <= c_S;
+- auxiliary intersection e-value construction and residual budget 1-c_S;
+- whether the result targets fixed-horizon FDR, stopped-FDR or pathwise SupFDR.
+
+Do not infer a positive residual budget from FDR-sup <= alpha alone. A global FDR-sup bound may only certify c_S=1 for arbitrary subsets, leaving no augmentation budget. Compare baseline-retention and added discoveries separately.
 
 ### Bet-selection layer
 
