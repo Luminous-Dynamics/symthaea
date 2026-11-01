@@ -154,3 +154,12 @@ The synthetic known-answer fixture illustrates why gross reward is not enough: m
 ### VIS-005 production-readiness distinction
 
 The [VIS-005 source audit](VIS005_ACTION_CONDITIONED_GAP_AUDIT_2026-11-01.md) records that existing delayed-horizon visual forecasting is observation-grounded but autonomous, the cross-manifold path is vision-to-cognition, and the current JEPA path uses a generated CfC target. These are important baselines, not action-conditioned visual world-model evidence. P2/P3 claims require a true action-conditioned predictor trained/scored against later observations and same-history alternative branches.
+
+
+## 10. New frontier: structured belief and action-causal metrics
+
+The action-bank implementation now has a structured-channel sibling. This is important for visual world models because a single scalar task utility can hide a physically wrong rollout: an object can be in the wrong place while a coarse success proxy looks plausible, or the geometry can be right while the predicted contact state is wrong.
+
+Require separate, versioned channels for object geometry/pose, linear and angular motion, contact state/probability, visibility/occlusion, object existence, task utility and terminal risk. Report channel units and sample counts independently. Use same-draw paired effects within each channel; never subtract quantiles across channels or pool unlike dimensions.
+
+A planner may create a scalar utility only through a frozen utility/constraint definition with declared weights, units and failure penalties. That scalar is a downstream decision functional, not a replacement for the full physical-belief diagnostics.
