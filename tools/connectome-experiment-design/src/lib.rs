@@ -56,6 +56,12 @@ pub enum DesignError {
     EmptyTargetQueryId,
     TargetQueryHypothesisCountMismatch { expected: usize, actual: usize },
     EmptyTargetQueryAnswer,
+    EmptyDecisionProblemId,
+    EmptyDecisionActionSet,
+    EmptyDecisionActionId,
+    DuplicateDecisionActionId { action_id: String },
+    DecisionUtilityCountMismatch { action_id: String, expected: usize, actual: usize },
+    NonFiniteDecisionUtility { action_id: String, hypothesis_index: usize },
     EmptyLikelihoodScenarioSet,
     EmptyLikelihoodScenarioId,
     DuplicateLikelihoodScenarioId { scenario_id: String },
@@ -145,6 +151,18 @@ impl fmt::Display for DesignError {
             }
             Self::EmptyTargetQueryAnswer => {
                 write!(f, "target query answer labels must not be empty")
+            }
+            Self::EmptyDecisionProblemId => write!(f, "decision problem identifier must not be empty"),
+            Self::EmptyDecisionActionSet => write!(f, "decision problem must include at least one action"),
+            Self::EmptyDecisionActionId => write!(f, "decision action identifiers must not be empty"),
+            Self::DuplicateDecisionActionId { action_id } => {
+                write!(f, "duplicate decision action identifier {action_id:?}")
+            }
+            Self::DecisionUtilityCountMismatch { action_id, expected, actual } => {
+                write!(f, "decision action {action_id:?} has {actual} utility entries; expected {expected}")
+            }
+            Self::NonFiniteDecisionUtility { action_id, hypothesis_index } => {
+                write!(f, "decision action {action_id:?} has non-finite utility at hypothesis {hypothesis_index}")
             }
             Self::EmptyLikelihoodScenarioSet => {
                 write!(f, "open-world candidate must declare at least one likelihood scenario")
@@ -595,6 +613,320 @@ pub fn evaluate_target_query_report(
     Ok(TargetQueryExperimentReport {
         schema_version: "connectome-target-query-eig-v1",
         query,
+        ranked_experiments,
+    })
+}
+
+/// A concrete action available after the scientific uncertainty is resolved.
+///
+/// Utilities are caller-supplied, outcome-independent values indexed by the
+/// exact hypothesis order in DecisionProblem. Include a no-action/control
+/// alternative when it is a genuine downstream option. These utilities are
+/// not probabilities and may be negative.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DecisionAction {
+    pub id: String,
+    pub utility_by_hypothesis: Vec<f64>,
+}
+
+/// A decision problem declares the downstream actions and their utility under
+/// every candidate hypothesis, including OTHER_OR_UNRESOLVED.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DecisionProblem {
+    pub id: String,
+    pub hypothesis_ids: Vec<String>,
+    pub actions: Vec<DecisionAction>,
+}
+
+/// The optimal downstream action after one observable outcome.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OutcomeDecision {
+    pub outcome_id: String,
+    pub outcome_probability: f64,
+    pub selected_action_id: String,
+    pub posterior_expected_utility: f64,
+}
+
+/// Decision value under one admissible likelihood scenario.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScenarioDecisionValue {
+    pub scenario_id: String,
+    pub current_best_action_id: String,
+    pub current_expected_utility: f64,
+    pub expected_post_experiment_utility: f64,
+    pub expected_value_of_sample_information: f64,
+    pub evsi_per_cost: f64,
+    pub outcome_decisions: Vec<OutcomeDecision>,
+}
+
+/// Worst-/best-case expected value of sample information over the supplied
+/// finite likelihood ambiguity set. This is a value of information, not the
+/// expected biological benefit of administering the experiment itself.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OpenWorldDecisionValueScore {
+    pub experiment_id: String,
+    pub decision_problem_id: String,
+    pub cost: f64,
+    pub unresolved_prior_mass: f64,
+    pub worst_case_scenario_id: String,
+    pub best_case_scenario_id: String,
+    pub worst_case_evsi: f64,
+    pub best_case_evsi: f64,
+    pub worst_case_evsi_per_cost: f64,
+    pub best_case_evsi_per_cost: f64,
+    pub scenario_values: Vec<ScenarioDecisionValue>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RankedDecisionValueExperiment {
+    pub experiment_id: String,
+    pub score: OpenWorldDecisionValueScore,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DecisionValueExperimentReport {
+    pub schema_version: &'static str,
+    pub decision_problem: DecisionProblem,
+    pub ranked_experiments: Vec<RankedDecisionValueExperiment>,
+}
+
+fn validate_decision_problem(
+    problem: &DecisionProblem,
+    hypothesis_ids: &[String],
+) -> Result<(), DesignError> {
+    if problem.id.trim().is_empty() {
+        return Err(DesignError::EmptyDecisionProblemId);
+    }
+    if problem.hypothesis_ids != hypothesis_ids {
+        return Err(DesignError::InconsistentHypothesisOrder);
+    }
+    if problem.actions.is_empty() {
+        return Err(DesignError::EmptyDecisionActionSet);
+    }
+    let mut action_ids = HashSet::with_capacity(problem.actions.len());
+    for action in &problem.actions {
+        if action.id.trim().is_empty() {
+            return Err(DesignError::EmptyDecisionActionId);
+        }
+        if !action_ids.insert(action.id.as_str()) {
+            return Err(DesignError::DuplicateDecisionActionId {
+                action_id: action.id.clone(),
+            });
+        }
+        if action.utility_by_hypothesis.len() != hypothesis_ids.len() {
+            return Err(DesignError::DecisionUtilityCountMismatch {
+                action_id: action.id.clone(),
+                expected: hypothesis_ids.len(),
+                actual: action.utility_by_hypothesis.len(),
+            });
+        }
+        for (hypothesis_index, utility) in action.utility_by_hypothesis.iter().enumerate() {
+            if !utility.is_finite() {
+                return Err(DesignError::NonFiniteDecisionUtility {
+                    action_id: action.id.clone(),
+                    hypothesis_index,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Evaluate the expected value of sample information (EVSI) for one experiment.
+///
+/// Current value is the maximum prior expected utility across downstream
+/// actions. Post-experiment value averages, over observed outcomes, the maximum
+/// posterior expected utility after choosing an action. The information value
+/// is their difference. If information is unhelpful, the decision-maker can
+/// ignore it, so EVSI cannot be materially negative.
+///
+/// Likelihood uncertainty is handled by calculating EVSI under every supplied
+/// scenario and reporting/ranking the worst case. This is only robust over the
+/// declared finite ambiguity set.
+pub fn evaluate_open_world_decision_value(
+    priors: &[f64],
+    candidate: &OpenWorldCandidateExperiment,
+    problem: &DecisionProblem,
+) -> Result<OpenWorldDecisionValueScore, DesignError> {
+    let open_world_score = evaluate_open_world_candidate(priors, candidate)?;
+    validate_decision_problem(problem, &candidate.hypothesis_ids)?;
+
+    let mut current_best_action_id = String::new();
+    let mut current_expected_utility = f64::NEG_INFINITY;
+    for action in &problem.actions {
+        let expected_utility: f64 = priors
+            .iter()
+            .zip(&action.utility_by_hypothesis)
+            .map(|(prior, utility)| prior * utility)
+            .sum();
+        if !expected_utility.is_finite() {
+            return Err(DesignError::NumericalInstability);
+        }
+        if expected_utility > current_expected_utility
+            || (expected_utility == current_expected_utility
+                && (current_best_action_id.is_empty() || action.id < current_best_action_id))
+        {
+            current_expected_utility = expected_utility;
+            current_best_action_id = action.id.clone();
+        }
+    }
+
+    let mut scenario_values = Vec::with_capacity(candidate.likelihood_scenarios.len());
+    for scenario in &candidate.likelihood_scenarios {
+        let outcome_count = candidate.outcomes.len();
+        let mut outcome_marginals = vec![0.0f64; outcome_count];
+        for (hypothesis_index, prior) in priors.iter().enumerate() {
+            for outcome_index in 0..outcome_count {
+                outcome_marginals[outcome_index] +=
+                    prior * scenario.likelihoods_by_hypothesis[hypothesis_index][outcome_index];
+            }
+        }
+
+        let mut expected_post_experiment_utility = 0.0f64;
+        let mut outcome_decisions = Vec::with_capacity(outcome_count);
+        for (outcome_index, outcome_probability) in outcome_marginals.iter().copied().enumerate() {
+            if outcome_probability <= 0.0 {
+                continue;
+            }
+            let posterior: Vec<f64> = priors
+                .iter()
+                .enumerate()
+                .map(|(hypothesis_index, prior)| {
+                    prior * scenario.likelihoods_by_hypothesis[hypothesis_index][outcome_index]
+                        / outcome_probability
+                })
+                .collect();
+
+            let mut selected_action_id = String::new();
+            let mut posterior_best_utility = f64::NEG_INFINITY;
+            for action in &problem.actions {
+                let expected_utility: f64 = posterior
+                    .iter()
+                    .zip(&action.utility_by_hypothesis)
+                    .map(|(probability, utility)| probability * utility)
+                    .sum();
+                if !expected_utility.is_finite() {
+                    return Err(DesignError::NumericalInstability);
+                }
+                if expected_utility > posterior_best_utility
+                    || (expected_utility == posterior_best_utility
+                        && (selected_action_id.is_empty() || action.id < selected_action_id))
+                {
+                    posterior_best_utility = expected_utility;
+                    selected_action_id = action.id.clone();
+                }
+            }
+
+            expected_post_experiment_utility += outcome_probability * posterior_best_utility;
+            if !expected_post_experiment_utility.is_finite() {
+                return Err(DesignError::NumericalInstability);
+            }
+            outcome_decisions.push(OutcomeDecision {
+                outcome_id: candidate.outcomes[outcome_index].clone(),
+                outcome_probability,
+                selected_action_id,
+                posterior_expected_utility: posterior_best_utility,
+            });
+        }
+
+        let mut evsi = expected_post_experiment_utility - current_expected_utility;
+        if evsi < 0.0 && evsi >= -ROUND_OFF_TOLERANCE {
+            evsi = 0.0;
+        }
+        if !evsi.is_finite() || evsi < 0.0 {
+            return Err(DesignError::NumericalInstability);
+        }
+        scenario_values.push(ScenarioDecisionValue {
+            scenario_id: scenario.id.clone(),
+            current_best_action_id: current_best_action_id.clone(),
+            current_expected_utility,
+            expected_post_experiment_utility,
+            expected_value_of_sample_information: evsi,
+            evsi_per_cost: evsi / candidate.cost,
+            outcome_decisions,
+        });
+    }
+    scenario_values.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
+
+    let mut worst = &scenario_values[0];
+    let mut best = &scenario_values[0];
+    for value in &scenario_values[1..] {
+        if value.evsi_per_cost < worst.evsi_per_cost {
+            worst = value;
+        }
+        if value.evsi_per_cost > best.evsi_per_cost {
+            best = value;
+        }
+    }
+
+    Ok(OpenWorldDecisionValueScore {
+        experiment_id: candidate.id.clone(),
+        decision_problem_id: problem.id.clone(),
+        cost: candidate.cost,
+        unresolved_prior_mass: open_world_score.unresolved_prior_mass,
+        worst_case_scenario_id: worst.scenario_id.clone(),
+        best_case_scenario_id: best.scenario_id.clone(),
+        worst_case_evsi: worst.expected_value_of_sample_information,
+        best_case_evsi: best.expected_value_of_sample_information,
+        worst_case_evsi_per_cost: worst.evsi_per_cost,
+        best_case_evsi_per_cost: best.evsi_per_cost,
+        scenario_values,
+    })
+}
+
+/// Rank candidate experiments by worst-case EVSI per unit cost.
+pub fn rank_open_world_candidates_for_decision(
+    priors: &[f64],
+    candidates: &[OpenWorldCandidateExperiment],
+    problem: &DecisionProblem,
+) -> Result<Vec<RankedDecisionValueExperiment>, DesignError> {
+    validate_priors(priors)?;
+    if candidates.is_empty() {
+        return Err(DesignError::NoCandidateExperiments);
+    }
+    if candidates
+        .iter()
+        .any(|candidate| candidate.hypothesis_ids != problem.hypothesis_ids)
+    {
+        return Err(DesignError::InconsistentHypothesisOrder);
+    }
+    validate_decision_problem(problem, &problem.hypothesis_ids)?;
+
+    let mut ids = HashSet::with_capacity(candidates.len());
+    let mut ranked = Vec::with_capacity(candidates.len());
+    for candidate in candidates {
+        if !ids.insert(candidate.id.as_str()) {
+            return Err(DesignError::DuplicateExperimentId {
+                experiment_id: candidate.id.clone(),
+            });
+        }
+        ranked.push(RankedDecisionValueExperiment {
+            experiment_id: candidate.id.clone(),
+            score: evaluate_open_world_decision_value(priors, candidate, problem)?,
+        });
+    }
+    ranked.sort_by(|left, right| {
+        right.score.worst_case_evsi_per_cost
+            .total_cmp(&left.score.worst_case_evsi_per_cost)
+            .then_with(|| {
+                right.score.worst_case_evsi.total_cmp(&left.score.worst_case_evsi)
+            })
+            .then_with(|| left.experiment_id.cmp(&right.experiment_id))
+    });
+    Ok(ranked)
+}
+
+/// Build a versioned decision-focused experimental-design report.
+pub fn evaluate_decision_value_report(
+    priors: &[f64],
+    candidates: &[OpenWorldCandidateExperiment],
+    decision_problem: DecisionProblem,
+) -> Result<DecisionValueExperimentReport, DesignError> {
+    let ranked_experiments =
+        rank_open_world_candidates_for_decision(priors, candidates, &decision_problem)?;
+    Ok(DecisionValueExperimentReport {
+        schema_version: "connectome-decision-value-v1",
+        decision_problem,
         ranked_experiments,
     })
 }
@@ -1891,6 +2223,124 @@ mod tests {
         assert_eq!(report.schema_version, "connectome-target-query-eig-v1");
         assert_eq!(report.query, query);
         assert_eq!(report.ranked_experiments.len(), 1);
+    }
+
+    fn decision_problem_example() -> DecisionProblem {
+        DecisionProblem {
+            id: "choose-functional-output-intervention".to_owned(),
+            hypothesis_ids: vec![
+                "mechanism_a".to_owned(),
+                "mechanism_b".to_owned(),
+                "mechanism_no_effect".to_owned(),
+                UNRESOLVED_HYPOTHESIS_ID.to_owned(),
+            ],
+            actions: vec![
+                DecisionAction {
+                    id: "intervene".to_owned(),
+                    utility_by_hypothesis: vec![2.0, 2.0, -2.0, -1.0],
+                },
+                DecisionAction {
+                    id: "do-not-intervene".to_owned(),
+                    utility_by_hypothesis: vec![0.0, 0.0, 0.0, 0.0],
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn evsi_is_zero_when_experiment_cannot_change_downstream_decision() {
+        let priors = [0.3, 0.3, 0.3, 0.1];
+        let candidate = target_query_candidate(
+            "mechanism-discriminator",
+            vec![
+                vec![1.0, 0.0],
+                vec![0.0, 1.0],
+                vec![0.5, 0.5],
+                vec![0.5, 0.5],
+            ],
+        );
+        let problem = decision_problem_example();
+        let score = evaluate_open_world_decision_value(&priors, &candidate, &problem).unwrap();
+        assert_eq!(score.worst_case_evsi, 0.0);
+        assert_eq!(score.worst_case_evsi_per_cost, 0.0);
+    }
+
+    #[test]
+    fn evsi_rewards_information_that_changes_the_optimal_action() {
+        let priors = [0.3, 0.3, 0.3, 0.1];
+        let mechanism_discriminator = target_query_candidate(
+            "mechanism-discriminator",
+            vec![
+                vec![1.0, 0.0],
+                vec![0.0, 1.0],
+                vec![0.5, 0.5],
+                vec![0.5, 0.5],
+            ],
+        );
+        let outcome_discriminator = target_query_candidate(
+            "outcome-discriminator",
+            vec![
+                vec![0.9, 0.1],
+                vec![0.9, 0.1],
+                vec![0.1, 0.9],
+                vec![0.5, 0.5],
+            ],
+        );
+        let problem = decision_problem_example();
+        let ranked = rank_open_world_candidates_for_decision(
+            &priors,
+            &[mechanism_discriminator, outcome_discriminator],
+            &problem,
+        ).unwrap();
+        assert_eq!(ranked[0].experiment_id, "outcome-discriminator");
+        assert!(ranked[0].score.worst_case_evsi > 0.0);
+        assert_eq!(ranked[1].score.worst_case_evsi, 0.0);
+    }
+
+    #[test]
+    fn evsi_report_is_versioned_and_preserves_utility_matrix() {
+        let priors = [0.3, 0.3, 0.3, 0.1];
+        let candidate = target_query_candidate(
+            "outcome-discriminator",
+            vec![
+                vec![0.9, 0.1],
+                vec![0.9, 0.1],
+                vec![0.1, 0.9],
+                vec![0.5, 0.5],
+            ],
+        );
+        let problem = decision_problem_example();
+        let report = evaluate_decision_value_report(&priors, &[candidate], problem.clone()).unwrap();
+        assert_eq!(report.schema_version, "connectome-decision-value-v1");
+        assert_eq!(report.decision_problem, problem);
+        assert_eq!(report.ranked_experiments.len(), 1);
+    }
+
+    #[test]
+    fn evsi_rejects_malformed_utility_matrix_and_empty_action_ids() {
+        let priors = [0.3, 0.3, 0.3, 0.1];
+        let candidate = target_query_candidate(
+            "candidate",
+            vec![
+                vec![0.9, 0.1],
+                vec![0.9, 0.1],
+                vec![0.1, 0.9],
+                vec![0.5, 0.5],
+            ],
+        );
+        let mut problem = decision_problem_example();
+        problem.actions[0].utility_by_hypothesis.pop();
+        assert!(matches!(
+            evaluate_open_world_decision_value(&priors, &candidate, &problem),
+            Err(DesignError::DecisionUtilityCountMismatch { .. })
+        ));
+
+        let mut problem = decision_problem_example();
+        problem.actions[0].id = " ".to_owned();
+        assert_eq!(
+            evaluate_open_world_decision_value(&priors, &candidate, &problem),
+            Err(DesignError::EmptyDecisionActionId)
+        );
     }
 
     fn calibration_unit(
