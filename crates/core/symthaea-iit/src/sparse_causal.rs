@@ -12,6 +12,7 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
+    certify_iit4_2023_system_phi_upper_bound_for_binding,
     enumerate_iit4_system_partitions_with_stats, min_fill_log_sum_product,
     BinaryCausalModel, BinaryLogFactor, CausalDirection, DirectedSystemPartition,
     FactorGraphError, FormalismProfile, Iit4IntrinsicSpecificationResult, MinFillPlannerWork,
@@ -1276,6 +1277,12 @@ impl SparseBinaryCausalModel {
                 candidate_system.len(),
                 config.include_total_cut,
             );
+        let bound_certificate = certify_iit4_2023_system_phi_upper_bound_for_binding(
+            &self.model_sha256(),
+            self.n_units,
+            candidate_system,
+            config.include_total_cut,
+        );
         let null_result = |status, phi_s| Iit4SystemPhiAnalysis {
             formalism: FormalismProfile::Iit4_0_2023,
             candidate_system: candidate_system.to_vec(),
@@ -1283,6 +1290,7 @@ impl SparseBinaryCausalModel {
             algorithm_id: SPARSE_IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID,
             search_config: config,
             certified_upper_bound,
+            bound_certificate: bound_certificate.clone(),
             status,
             phi_s,
             selected_state_pair_index: None,
@@ -1453,6 +1461,7 @@ impl SparseBinaryCausalModel {
             algorithm_id: SPARSE_IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID,
             search_config: config,
             certified_upper_bound,
+            bound_certificate,
             status,
             phi_s,
             selected_state_pair_index,
