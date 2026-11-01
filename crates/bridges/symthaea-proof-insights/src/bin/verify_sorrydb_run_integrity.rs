@@ -203,6 +203,7 @@ fn make_eligible_integrity(
 
     value["target"]["source_file_sha256"] = json!(sha256_hex(&source_bytes));
     value["target"]["source_span_sha256"] = json!(sha256_hex(b"sorry"));
+    value["target"]["source_coordinate_system"] = json!("lean-filemap-line-1-column-0-unicode-codepoint-v0");
     value["target"]["expected_informal_statement_sha256"] = json!(sha256_hex(informal_bytes));
     value["environment"]["lean_binary_sha256"] = json!(sha256_hex(lean_bytes));
     value["environment"]["lake_manifest_sha256"] = json!(sha256_hex(lake_bytes));
@@ -245,6 +246,7 @@ fn make_eligible_integrity(
         "source_path":value["target"]["source_path"],
         "source_file_sha256":value["target"]["source_file_sha256"],
         "source_span_sha256":value["target"]["source_span_sha256"],
+        "source_coordinate_system":value["target"]["source_coordinate_system"],
         "expected_informal_statement_sha256":value["target"]["expected_informal_statement_sha256"],
         "review_scope":"domain_expert_review",
         "decision":"approved"
