@@ -128,6 +128,7 @@
           "mip_tie_count",
           "mip_tie_cut_sha256s",
           "mip_tie_cut_removed_edges",
+          "partition_scores",
           "phi",
           "signed_phi",
           "normalized_phi",
@@ -244,6 +245,58 @@
                   "minimum": 0,
                   "maximum": 2
                 }
+              }
+            }
+          },
+          "partition_scores": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "partition_index",
+                "cut_sha256",
+                "removed_edges",
+                "signed_phi",
+                "phi",
+                "signed_normalized_phi",
+                "normalized_phi",
+                "cause_signed_phi",
+                "cause_phi",
+                "effect_signed_phi",
+                "effect_phi"
+              ],
+              "properties": {
+                "partition_index": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "cut_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "removed_edges": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2
+                    }
+                  }
+                },
+                "signed_phi": {"type": "number"},
+                "phi": {"type": "number", "minimum": 0},
+                "signed_normalized_phi": {"type": "number"},
+                "normalized_phi": {"type": "number", "minimum": 0},
+                "cause_signed_phi": {"type": "number"},
+                "cause_phi": {"type": "number", "minimum": 0},
+                "effect_signed_phi": {"type": "number"},
+                "effect_phi": {"type": "number", "minimum": 0}
               }
             }
           },
@@ -372,6 +425,8 @@
         "distinct_model_digest_count",
         "distinct_request_digest_count",
         "regime_count",
+        "partition_count_per_point",
+        "partition_score_row_count",
         "boundary_count",
         "all_points_complete"
       ],
@@ -392,6 +447,14 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 13
+        },
+        "partition_count_per_point": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "partition_score_row_count": {
+          "type": "integer",
+          "minimum": 13
         },
         "boundary_count": {
           "type": "integer",
