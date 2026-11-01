@@ -204,7 +204,14 @@ def generate(output_path: Path) -> dict[str, Any]:
         )
         # Reuse the exact fixed-state measure and partition family from the
         # active IIT4_2023 formalism, then record every score (not only the MIP).
-        partition_scheme = IIT4_2023Formalism.partition_scheme
+        # PyPhi 2.0 replaced the legacy JOINT_PARTITION_ALL label with
+        # its registered DIRECTED_SET_PARTITION implementation. Use the
+        # active configuration selected by the pinned PyPhi formalism.
+        partition_scheme = pyphi.config.formalism.iit.system_partition_scheme
+        if partition_scheme not in system_partition_types:
+            raise RuntimeError(
+                f"active PyPhi system partition scheme is not registered: {partition_scheme!r}"
+            )
         partition_type = system_partition_types[partition_scheme]
         partition_filter = None
         if getattr(partition_type, "may_yield_non_disconnecting_cuts", False):
