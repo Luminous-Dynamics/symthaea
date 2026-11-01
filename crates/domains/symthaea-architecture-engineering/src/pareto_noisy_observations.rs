@@ -18,7 +18,7 @@ use sha2::{Digest, Sha256};
 use super::pareto_objectives::ObjectiveDirection;
 
 const SCHEMA: &str = "symthaea.architecture-engineering.noisy-pareto-observations";
-const VERSION: &str = "0.1.0";
+const VERSION: &str = "0.2.0";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NoisyParetoError {
