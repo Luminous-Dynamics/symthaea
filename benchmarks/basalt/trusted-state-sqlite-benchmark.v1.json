@@ -1,0 +1,164 @@
+{
+  "suite_id": "basalt-trusted-state-sqlite-benchmark-v1",
+  "benchmark_version": 1,
+  "title": "BASALT SQLite WAL/FULL trusted-state backend conformance",
+  "claim_ceiling": "Evaluates normalized local SQLite state persistence, transactional all-or-nothing behavior under injected write aborts, exact-receipt recovery, independent-connection CAS, schema constraints and state-digest consistency. It does not qualify physical power-loss durability, filesystem/VFS/hardware behavior, external freshness, malicious snapshot rollback, signatures, witnesses or a remote authoritative anchor.",
+  "implementation_path": "xtask/src/basalt_trusted_state.rs",
+  "command": "cargo run -p xtask -- basalt-trusted-state-sqlite-inspect --database PATH",
+  "scenarios": [
+    {
+      "id": "TSTATE-SQL-001",
+      "phase": "bootstrap_reopen",
+      "mutation": "Commit generation one, close database, reopen and inspect exact source/log/receipt state",
+      "expected": "revision and all three records persist; local anti-rollback remains false"
+    },
+    {
+      "id": "TSTATE-SQL-002",
+      "phase": "transaction_abort",
+      "mutation": "Inject abort immediately after source cursor write and before log write",
+      "expected": "transaction rolls back; complete pre-state remains after reopen"
+    },
+    {
+      "id": "TSTATE-SQL-003",
+      "phase": "transaction_abort",
+      "mutation": "Inject abort after log checkpoint write and before receipt write",
+      "expected": "transaction rolls back; complete pre-state remains after reopen"
+    },
+    {
+      "id": "TSTATE-SQL-004",
+      "phase": "transaction_abort",
+      "mutation": "Inject abort after accepted receipt insert and before metadata revision update",
+      "expected": "transaction rolls back; complete pre-state remains after reopen"
+    },
+    {
+      "id": "TSTATE-SQL-005",
+      "phase": "transaction_abort",
+      "mutation": "Inject abort after metadata write but before SQLite COMMIT",
+      "expected": "transaction rolls back; complete pre-state remains after reopen"
+    },
+    {
+      "id": "TSTATE-SQL-006",
+      "phase": "concurrency",
+      "mutation": "Two independent SQLite connections prepare the same receipt against one revision; first commits before second",
+      "expected": "second receives compare conflict; exact retry after reread returns already-committed"
+    },
+    {
+      "id": "TSTATE-SQL-007",
+      "phase": "concurrency",
+      "mutation": "Eight independent connections race the same prepared transition",
+      "expected": "exactly one durable commit; seven compare conflicts; no partial state"
+    },
+    {
+      "id": "TSTATE-SQL-008",
+      "phase": "snapshot_fork",
+      "mutation": "Submit a plan prepared against database A to a divergent database B with the same revision",
+      "expected": "reject exact-state snapshot mismatch and leave B unchanged"
+    },
+    {
+      "id": "TSTATE-SQL-009",
+      "phase": "integrity",
+      "mutation": "Mutate stored state digest without matching table state",
+      "expected": "reopen fails closed on state-digest mismatch"
+    },
+    {
+      "id": "TSTATE-SQL-010",
+      "phase": "integrity",
+      "mutation": "Attempt to insert a second receipt for the same host/source/partition/generation",
+      "expected": "SQLite uniqueness constraint rejects the second generation receipt"
+    },
+    {
+      "id": "TSTATE-SQL-011",
+      "phase": "configuration",
+      "mutation": "Open backend where WAL or synchronous FULL cannot be established",
+      "expected": "fail closed; do not advertise local atomicity backend configured"
+    },
+    {
+      "id": "TSTATE-SQL-012",
+      "phase": "claim_boundary",
+      "mutation": "Restore an older complete local database snapshot, including its old unkeyed digest",
+      "expected": "local checks may pass; anti-rollback must remain unknown/false without external anchor"
+    }
+  ],
+  "metrics": [
+    {
+      "id": "partial_state_advances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "duplicate_source_generation_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "exact_receipt_retry_double_advances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "snapshot_fork_plan_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "state_digest_mismatch_acceptances",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "unanchored_anti_rollback_promotions",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "wal_or_full_mode_false_passes",
+      "class": "safety",
+      "unit": "count",
+      "target": "0"
+    },
+    {
+      "id": "local_durable_commit_p95",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": "<= 5 ms initial research target on pinned NVMe; not measured"
+    },
+    {
+      "id": "local_durable_commit_p95_16_writers",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": "<= 25 ms initial research target; report busy/conflict counts separately"
+    },
+    {
+      "id": "exact_retry_after_reopen_p95",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": "measure; no second state advance"
+    },
+    {
+      "id": "wal_growth_per_accepted_epoch",
+      "class": "efficiency",
+      "unit": "bytes_per_epoch",
+      "target": "measure at 1k, 10k, 100k and 1M receipts"
+    },
+    {
+      "id": "restart_recovery_time",
+      "class": "efficiency",
+      "unit": "milliseconds",
+      "target": "measure p50/p95/p99 after clean close and injected abort"
+    }
+  ],
+  "benchmark_policy": {
+    "all_safety_gates_before_efficiency": true,
+    "record_every_abort_boundary": true,
+    "no_power_loss_claim_from_abort_injection": true,
+    "local_digest_is_not_anti_rollback": true,
+    "wal_same_host_only": true,
+    "held_out_storage_profiles": true
+  }
+}
