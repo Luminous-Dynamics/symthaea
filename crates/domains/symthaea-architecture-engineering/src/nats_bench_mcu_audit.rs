@@ -29,6 +29,8 @@ pub struct NatsBenchMcuContract {
     pub expected_total_candidates: u32,
     pub expected_measured_candidates: usize,
     pub expected_infeasible_candidates: usize,
+    pub application_flash_kb: f64,
+    pub fixed_firmware_overhead_kb: f64,
     pub maximum_int8_model_kb: f64,
 }
 
@@ -36,6 +38,8 @@ pub const NATS_BENCH_MCU_V2_CONTRACT: NatsBenchMcuContract = NatsBenchMcuContrac
     expected_total_candidates: 15_625,
     expected_measured_candidates: 14_281,
     expected_infeasible_candidates: 1_344,
+    application_flash_kb: 1_024.0,
+    fixed_firmware_overhead_kb: 277.6,
     maximum_int8_model_kb: 746.0,
 };
 
@@ -104,6 +108,7 @@ pub struct ParetoFrontCount {
     pub dataset: String,
     pub cost_metric: ParetoCostMetric,
     pub candidate_count: usize,
+    pub candidate_indices: Vec<u32>,
 }
 
 /// Deterministic source-and-result receipt. CSV hashes cover the exact UTF-8 bytes supplied
@@ -113,9 +118,14 @@ pub struct NatsBenchMcuExportAuditReceipt {
     pub schema: String,
     pub version: String,
     pub dataset_doi: String,
+    pub dataset_version: String,
     pub expected_total_candidates: u32,
     pub measured_candidates: usize,
+    pub measured_arch_indices: Vec<u32>,
     pub infeasible_candidates: usize,
+    pub infeasible_arch_indices: Vec<u32>,
+    pub application_flash_kb: f64,
+    pub fixed_firmware_overhead_kb: f64,
     pub maximum_int8_model_kb: f64,
     pub hardware_metrics_csv_sha256: String,
     pub accuracies_csv_sha256: String,
@@ -443,8 +453,14 @@ pub fn audit_nats_bench_mcu_export(
     if contract.expected_total_candidates == 0
         || contract.expected_measured_candidates + contract.expected_infeasible_candidates
             != contract.expected_total_candidates as usize
+        || !contract.application_flash_kb.is_finite()
+        || contract.application_flash_kb <= 0.0
+        || !contract.fixed_firmware_overhead_kb.is_finite()
+        || contract.fixed_firmware_overhead_kb < 0.0
         || !contract.maximum_int8_model_kb.is_finite()
         || contract.maximum_int8_model_kb <= 0.0
+        || contract.maximum_int8_model_kb
+            > contract.application_flash_kb - contract.fixed_firmware_overhead_kb
     {
         return Err(NatsBenchMcuAuditError::new(
             "contract",
@@ -697,6 +713,7 @@ pub fn audit_nats_bench_mcu_export(
                 dataset: dataset.to_owned(),
                 cost_metric,
                 candidate_count: front.len(),
+                candidate_indices: front,
             });
         }
     }
@@ -705,9 +722,14 @@ pub fn audit_nats_bench_mcu_export(
         schema: AUDIT_SCHEMA.to_owned(),
         version: AUDIT_VERSION.to_owned(),
         dataset_doi: DATASET_DOI.to_owned(),
+        dataset_version: "2.0".to_owned(),
         expected_total_candidates: contract.expected_total_candidates,
         measured_candidates: candidates.len(),
+        measured_arch_indices: candidates.iter().map(|candidate| candidate.arch_idx).collect(),
         infeasible_candidates: infeasible.len(),
+        infeasible_arch_indices: infeasible.iter().copied().collect(),
+        application_flash_kb: contract.application_flash_kb,
+        fixed_firmware_overhead_kb: contract.fixed_firmware_overhead_kb,
         maximum_int8_model_kb: contract.maximum_int8_model_kb,
         hardware_metrics_csv_sha256: hardware.sha256,
         accuracies_csv_sha256: accuracies.sha256,
@@ -751,6 +773,8 @@ mod tests {
             expected_total_candidates: 4,
             expected_measured_candidates: 3,
             expected_infeasible_candidates: 1,
+            application_flash_kb: 1_024.0,
+            fixed_firmware_overhead_kb: 277.6,
             maximum_int8_model_kb: 746.0,
         };
         (hardware, accuracy, failures, contract)
@@ -799,8 +823,7 @@ mod tests {
         hardware.push_str("0,|duplicate|,100,380,120,0.010,1000,3.0,0.030,nrf5340dk_1,q\n");
         let error = audit_nats_bench_mcu_export(&hardware, &accuracy, &failures, contract)
             .expect_err("duplicate architecture indices must fail");
-        assert!(error.to_string().contains("expected 3 measured rows") ||
-            error.to_string().contains("duplicate measured architecture index"));
+        assert!(error.to_string().contains("duplicate measured architecture index"));
     }
 
     #[test]
