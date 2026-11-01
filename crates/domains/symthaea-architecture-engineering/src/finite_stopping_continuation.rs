@@ -282,8 +282,18 @@ impl TestTreeNode for ConditionalContinuationNode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OptionalStoppingAction {
-    StopHere,
-    Continue,
+    /// Stop at this history and use the test value at the current node.
+    StopAtCurrentHistory,
+    /// Continue observing the next conditional outcome.
+    ContinueObserving,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OptionalStoppingDecision {
+    pub node_id: String,
+    pub action: OptionalStoppingAction,
+    pub optimal_expected_test_value: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -475,9 +485,9 @@ fn validate_probability_tree<N: TestTreeNode>(
         }
         let stop_value = node.test_value();
         let (optimal_value, action) = if continue_value > stop_value {
-            (continue_value, OptionalStoppingAction::Continue)
+            (continue_value, OptionalStoppingAction::ContinueObserving)
         } else {
-            (stop_value, OptionalStoppingAction::StopHere)
+            (stop_value, OptionalStoppingAction::StopAtCurrentHistory)
         };
         optimal_values.insert(node.node_id().to_owned(), optimal_value);
         optimal_actions.insert(node.node_id().to_owned(), action);
@@ -520,6 +530,7 @@ pub struct ContinuationProcessReport {
     pub maximum_conditional_optional_stopping_size: f64,
     pub terminal_leaf_size: f64,
     pub conditional_budget_slack: f64,
+    pub optimal_stopping_policy: Vec<OptionalStoppingDecision>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -545,6 +556,7 @@ pub struct FiniteStoppingContinuationReport {
     pub plan_sha256: String,
     pub significance_level: f64,
     pub maximum_first_process_optional_stopping_size: f64,
+    pub maximum_first_process_optional_stopping_policy: Vec<OptionalStoppingDecision>,
     pub maximum_adaptive_continuation_size: f64,
     pub histories: Vec<StoppingHistoryReport>,
     pub continuation_processes: Vec<ContinuationProcessReport>,
@@ -559,6 +571,7 @@ struct ReportPayload<'a> {
     plan_sha256: &'a str,
     significance_level: f64,
     maximum_first_process_optional_stopping_size: f64,
+    maximum_first_process_optional_stopping_policy: &'a [OptionalStoppingDecision],
     maximum_adaptive_continuation_size: f64,
     histories: &'a [StoppingHistoryReport],
     continuation_processes: &'a [ContinuationProcessReport],
@@ -611,6 +624,7 @@ pub fn analyze_finite_stopping_continuation(
             terminal_leaf_size,
             conditional_budget_slack: root.test_value
                 - summary.maximum_optional_stopping_value,
+            optimal_stopping_policy: stopping_decisions(&summary),
         });
         continuation_summaries.insert(process.history_node_id.clone(), summary);
     }
@@ -673,12 +687,6 @@ pub fn analyze_finite_stopping_continuation(
         combined_actions.insert(node.node_id.clone(), action);
     }
 
-    let history_root = plan.history_nodes.iter()
-        .find(|node| node.node_id == history_summary.root_id)
-        .ok_or_else(|| StoppingContinuationError::new(
-            "report.histories",
-            "history root disappeared after validation",
-        ))?;
     let maximum_adaptive_continuation_size = combined_values
         .get(&history_summary.root_id)
         .copied()
@@ -757,6 +765,7 @@ pub fn analyze_finite_stopping_continuation(
         plan_sha256: &plan_sha256,
         significance_level: plan.significance_level,
         maximum_first_process_optional_stopping_size: history_summary.maximum_optional_stopping_value,
+        maximum_first_process_optional_stopping_policy: &stopping_decisions(&history_summary),
         maximum_adaptive_continuation_size,
         histories: &histories,
         continuation_processes: &continuation_reports,
@@ -769,6 +778,7 @@ pub fn analyze_finite_stopping_continuation(
         plan_sha256,
         significance_level: plan.significance_level,
         maximum_first_process_optional_stopping_size: history_summary.maximum_optional_stopping_value,
+        maximum_first_process_optional_stopping_policy: stopping_decisions(&history_summary),
         maximum_adaptive_continuation_size,
         histories,
         continuation_processes: continuation_reports,
@@ -787,6 +797,19 @@ pub fn verify_finite_stopping_continuation_report(
         ));
     }
     Ok(())
+}
+
+fn stopping_decisions(summary: &ProbabilityTreeSummary) -> Vec<OptionalStoppingDecision> {
+    summary.optimal_actions.iter().map(|(node_id, action)| {
+        OptionalStoppingDecision {
+            node_id: node_id.clone(),
+            action: *action,
+            optimal_expected_test_value: summary.optimal_values
+                .get(node_id)
+                .copied()
+                .unwrap_or(f64::NAN),
+        }
+    }).collect()
 }
 
 fn validate_probability(value: f64, path: &str) -> Result<(), StoppingContinuationError> {
@@ -927,9 +950,9 @@ mod tests {
         assert!((report.maximum_adaptive_continuation_size - 0.039).abs() < 1e-12);
         assert!(report.maximum_adaptive_continuation_size <= report.significance_level);
         let root = report.histories.iter().find(|row| row.node_id == "root").unwrap();
-        assert_eq!(root.optimal_action, OptionalStoppingAction::Continue);
+        assert_eq!(root.optimal_action, OptionalStoppingAction::ContinueObserving);
         let late = report.histories.iter().find(|row| row.node_id == "late").unwrap();
-        assert_eq!(late.optimal_action, OptionalStoppingAction::StopHere);
+        assert_eq!(late.optimal_action, OptionalStoppingAction::StopAtCurrentHistory);
         assert!((late.combined_policy_value - 0.025).abs() < 1e-12);
         verify_finite_stopping_continuation_report(&plan, &report).unwrap();
     }
