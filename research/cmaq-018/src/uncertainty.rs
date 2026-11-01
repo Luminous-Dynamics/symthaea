@@ -651,6 +651,7 @@ pub enum ConstrainedActionDecision {
     Selected {
         action_id: u64,
         basis: ConstrainedSelectionBasis,
+        per_interval_nominal_coverage: f64,
     },
     Abstain {
         reason: AbstainReason,
@@ -811,7 +812,7 @@ pub fn select_constrained_structured_action(
             let channel = bank.channels.iter()
                 .find(|channel| channel.channel_id == constraint.channel_id)
                 .expect("constraints were resolved above");
-            let interval = central_interval(&channel.outcome_samples[row], nominal_coverage)?;
+            let interval = central_interval(&channel.outcome_samples[row], adjusted_nominal)?;
             let passes = match constraint.relation {
                 ConstraintRelation::UpperAtMost => interval.upper <= constraint.threshold,
                 ConstraintRelation::LowerAtLeast => interval.lower >= constraint.threshold,
@@ -831,20 +832,28 @@ pub fn select_constrained_structured_action(
             reason: AbstainReason::NoConstraintFeasibleActions,
         });
     }
+    let interval_families = constraints.len().saturating_add(1);
+    let interval_count = bank.action_ids.len().checked_mul(interval_families)
+        .ok_or(IntervalError::NonFiniteDerivedMetric)?;
+    let adjusted_nominal = 1.0 - (1.0 - nominal_coverage) / interval_count as f64;
+    validate_nominal_coverage(adjusted_nominal)?;
+
     if feasible.len() == 1 {
         return Ok(ConstrainedActionDecision::Selected {
             action_id: feasible[0].0,
             basis: ConstrainedSelectionBasis::FeasibleOnly,
+            per_interval_nominal_coverage: adjusted_nominal,
         });
     }
 
     let intervals = feasible.iter()
-        .map(|(_, row)| central_interval(&utility.outcome_samples[*row], nominal_coverage))
+        .map(|(_, row)| central_interval(&utility.outcome_samples[*row], adjusted_nominal))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(match select_interval_dominant_action(&intervals)? {
         RobustActionDecision::Certified { action_index } => ConstrainedActionDecision::Selected {
             action_id: feasible[action_index].0,
             basis: ConstrainedSelectionBasis::UtilityDominance,
+            per_interval_nominal_coverage: adjusted_nominal,
         },
         RobustActionDecision::Abstain { reason } => ConstrainedActionDecision::Abstain { reason },
     })
@@ -854,8 +863,7 @@ fn best_action_index(action_ids: &[u64], utilities: &[f64]) -> usize {
     let mut best = 0usize;
     for index in 1..utilities.len() {
         if utilities[index] > utilities[best]
-            || (utilities[index].to_bits() == utilities[best].to_bits()
-                && action_ids[index] < action_ids[best])
+            || (utilities[index] == utilities[best] && action_ids[index] < action_ids[best])
         {
             best = index;
         }
@@ -1911,6 +1919,7 @@ mod tests {
             ConstrainedActionDecision::Selected {
                 action_id: 17,
                 basis: ConstrainedSelectionBasis::FeasibleOnly,
+                per_interval_nominal_coverage: 1.0 - (1.0 - 0.8) / 6.0,
             }
         );
 
@@ -1934,6 +1943,7 @@ mod tests {
             ConstrainedActionDecision::Selected {
                 action_id: 17,
                 basis: ConstrainedSelectionBasis::UtilityDominance,
+                per_interval_nominal_coverage: 1.0 - (1.0 - 0.8) / 6.0,
             }
         );
     }
