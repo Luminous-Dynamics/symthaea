@@ -189,6 +189,113 @@ impl EvidenceArtifactManifest {
     }
 }
 
+/// Policy for a caller-supplied content-addressed resolver. Prefixes are explicit
+/// namespaces, not URL allowlists; the resolver is responsible for authentication and safe
+/// access within those namespaces.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceArtifactResolvePolicy {
+    pub max_artifact_bytes: u64,
+    pub max_total_bytes: u64,
+    pub allowed_locator_prefixes: Vec<String>,
+}
+
+impl EvidenceArtifactResolvePolicy {
+    pub fn validate(&self) -> Result<(), EvidenceArtifactError> {
+        if self.max_artifact_bytes == 0 || self.max_total_bytes == 0 {
+            return Err(EvidenceArtifactError::new(
+                "resolve_policy",
+                "artifact and total byte limits must be positive",
+            ));
+        }
+        if self.allowed_locator_prefixes.is_empty()
+            || self.allowed_locator_prefixes.iter().any(|prefix| prefix.trim().is_empty())
+        {
+            return Err(EvidenceArtifactError::new(
+                "resolve_policy.allowed_locator_prefixes",
+                "at least one non-empty locator namespace prefix is required",
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Resolver interface; implementations may connect to Holochain CAS, an immutable object
+/// store, or a local content-addressed cache. This module performs no network or filesystem
+/// access and passes a hard per-artifact byte ceiling to the resolver.
+pub trait EvidenceArtifactResolver {
+    fn resolve(&self, storage_locator: &str, max_bytes: u64) -> Result<Vec<u8>, String>;
+}
+
+/// Resolve every manifest entry under explicit namespace and byte ceilings, then verify the
+/// complete byte set. Missing/failed resolution is an error and is never converted to zero.
+pub fn resolve_and_verify_evidence_artifact_bytes<R: EvidenceArtifactResolver>(
+    manifest: &EvidenceArtifactManifest,
+    verifier_id: impl Into<String>,
+    verifier_build_sha256: impl Into<String>,
+    policy: &EvidenceArtifactResolvePolicy,
+    resolver: &R,
+) -> Result<(Vec<ResolvedEvidenceArtifact>, EvidenceArtifactByteReceipt), EvidenceArtifactError> {
+    manifest.validate()?;
+    policy.validate()?;
+
+    let mut total_bytes = 0u64;
+    let mut resolved = Vec::with_capacity(manifest.artifacts.len());
+    for (index, artifact) in manifest.artifacts.iter().enumerate() {
+        let path = format!("manifest.artifacts[{index}]");
+        if artifact.byte_length > policy.max_artifact_bytes {
+            return Err(EvidenceArtifactError::new(
+                format!("{path}.byte_length"),
+                "artifact exceeds the configured per-artifact byte ceiling",
+            ));
+        }
+        if !policy.allowed_locator_prefixes.iter()
+            .any(|prefix| artifact.storage_locator.starts_with(prefix))
+        {
+            return Err(EvidenceArtifactError::new(
+                format!("{path}.storage_locator"),
+                "storage locator is outside the explicitly allowed namespaces",
+            ));
+        }
+        total_bytes = total_bytes.checked_add(artifact.byte_length).ok_or_else(|| {
+            EvidenceArtifactError::new("resolve_policy.max_total_bytes", "total artifact byte count overflow")
+        })?;
+        if total_bytes > policy.max_total_bytes {
+            return Err(EvidenceArtifactError::new(
+                "resolve_policy.max_total_bytes",
+                "manifest exceeds the configured total byte ceiling",
+            ));
+        }
+        let bytes = resolver.resolve(&artifact.storage_locator, policy.max_artifact_bytes)
+            .map_err(|message| EvidenceArtifactError::new(
+                format!("{path}.storage_locator"),
+                format!("artifact resolution failed: {message}"),
+            ))?;
+        let resolved_length = u64::try_from(bytes.len()).map_err(|_| EvidenceArtifactError::new(
+            format!("{path}.byte_length"),
+            "resolved artifact length exceeds u64",
+        ))?;
+        if resolved_length > policy.max_artifact_bytes {
+            return Err(EvidenceArtifactError::new(
+                format!("{path}.byte_length"),
+                "resolver returned more bytes than the configured per-artifact ceiling",
+            ));
+        }
+        resolved.push(ResolvedEvidenceArtifact {
+            artifact_id: artifact.artifact_id.clone(),
+            bytes,
+        });
+    }
+
+    let receipt = verify_evidence_artifact_bytes(
+        manifest,
+        verifier_id,
+        verifier_build_sha256,
+        &resolved,
+    )?;
+    Ok((resolved, receipt))
+}
+
 /// Resolved bytes handed to the verifier by a CAS/object-store adapter.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedEvidenceArtifact {
