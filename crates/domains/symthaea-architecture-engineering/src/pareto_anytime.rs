@@ -13,8 +13,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use super::evidence_artifact::{
-    verify_evidence_artifact_byte_receipt, EvidenceArtifactByteReceipt,
-    EvidenceArtifactManifest, ResolvedEvidenceArtifact,
+    resolve_and_verify_evidence_artifact_bytes, verify_evidence_artifact_byte_receipt,
+    EvidenceArtifactByteReceipt, EvidenceArtifactManifest, EvidenceArtifactResolvePolicy,
+    EvidenceArtifactResolver, ResolvedEvidenceArtifact,
 };
 use super::pareto_objectives::{
     analyze_pareto, analyze_reference_front_indicators, ParetoAnalysisPlan, ParetoCandidate,
@@ -1099,6 +1100,38 @@ pub fn append_artifact_verified_promotion(
             verifier_receipt_sha256: byte_receipt.receipt_sha256.clone(),
         },
     })
+}
+
+/// Resolve a frozen manifest through a caller-supplied bounded CAS adapter, verify every
+/// byte, and append the corresponding ArtifactVerified promotion. The resolver implementation
+/// is responsible for authenticated access; this function enforces locator namespaces and size
+/// ceilings through the supplied policy.
+pub fn resolve_and_append_artifact_verified_promotion<R: EvidenceArtifactResolver>(
+    history: &mut AnytimeHistory,
+    manifest: &EvidenceArtifactManifest,
+    policy: &EvidenceArtifactResolvePolicy,
+    resolver: &R,
+    verification_resources: ResourceCost,
+    started_elapsed_millis: u64,
+    completed_elapsed_millis: u64,
+) -> Result<(String, EvidenceArtifactByteReceipt), AnytimeError> {
+    let (resolved, receipt) = resolve_and_verify_evidence_artifact_bytes(
+        manifest,
+        history.header().verifier_id.clone(),
+        history.header().verifier_build_sha256.clone(),
+        policy,
+        resolver,
+    ).map_err(|error| AnytimeError::new("artifact_resolution", error.to_string()))?;
+    let event_sha256 = append_artifact_verified_promotion(
+        history,
+        manifest,
+        &resolved,
+        &receipt,
+        verification_resources,
+        started_elapsed_millis,
+        completed_elapsed_millis,
+    )?;
+    Ok((event_sha256, receipt))
 }
 
 /// Captures deterministic optimizer objective evaluations in the shared anytime format.
