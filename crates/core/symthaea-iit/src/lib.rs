@@ -710,7 +710,7 @@ pub fn estimate_iit4_system_partition_work(
         stirling[0] = 0;
     }
 
-    for block_count in 2..=n {
+    for (block_count, set_partitions) in stirling.iter().copied().enumerate().take(n + 1).skip(2) {
         let exponent = u32::try_from(block_count)
             .map_err(|_| PartitionEnumerationError::CounterOverflow)?;
         let raw_per_set_partition = 3usize
@@ -727,7 +727,6 @@ pub fn estimate_iit4_system_partition_work(
             .and_then(|value| value.checked_add(2))
             .ok_or(PartitionEnumerationError::CounterOverflow)?;
 
-        let set_partitions = stirling[block_count];
         let raw_for_block_count = set_partitions
             .checked_mul(raw_per_set_partition)
             .ok_or(PartitionEnumerationError::CounterOverflow)?;
@@ -3115,9 +3114,9 @@ mod tests {
         }
         let mut tpm = Vec::with_capacity(32 * 5);
         for past_state in 0..32 {
-            for target in 0..5 {
+            for (target, parent_row) in parents.iter().enumerate() {
                 let active_parents = (0..5)
-                    .filter(|source| parents[target][*source])
+                    .filter(|source| parent_row[*source])
                     .filter(|source| ((past_state >> source) & 1) != 0)
                     .count();
                 tpm.push(0.12 + 0.07 * target as f64 + 0.09 * active_parents as f64);
@@ -3356,7 +3355,13 @@ mod tests {
                         },
                     );
                     let mut expected_factor = 0.0;
-                    for full_state in 0..state_count {
+                    let dense_target_factors = &dense_factors[target_slot];
+                    for (full_state, dense_factor_value) in dense_target_factors
+                        .iter()
+                        .copied()
+                        .take(state_count)
+                        .enumerate()
+                    {
                         let full_projection = retained_sources.iter().enumerate().fold(
                             0usize,
                             |index, (slot, source_slot)| {
@@ -3368,7 +3373,7 @@ mod tests {
                             },
                         );
                         if full_projection == projected_state {
-                            expected_factor += dense_factors[target_slot][full_state];
+                            expected_factor += dense_factor_value;
                         }
                     }
                     expected_factor /= (1usize << (candidate.len() - retained_sources.len())) as f64;
