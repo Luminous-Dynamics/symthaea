@@ -5,6 +5,7 @@ import unittest
 
 from predictable_arrival_ledger import (
     build_predictable_arrival_ledger,
+    build_predictable_arrival_ledger_from_source,
     build_same_round_lookahead_negative_control,
     verify_predictable_arrival_ledger,
 )
@@ -47,6 +48,54 @@ class PredictableArrivalLedgerTests(unittest.TestCase):
                 ("h1", "h2", "h3"),
             ],
         )
+
+    def test_streaming_source_is_queried_only_after_active_set_freezes(self):
+        calls = []
+        score_rows = {
+            0: {"h1": 1.0},
+            1: {"h1": 1.0},
+            2: {"h1": 0.5, "h2": 4.0},
+            3: {"h1": 0.2, "h2": 0.3},
+        }
+
+        def source(round_index, active_ids):
+            # The callback sees only the active IDs, never dormant coordinates.
+            calls.append((round_index, active_ids))
+            self.assertEqual(set(score_rows[round_index]), set(active_ids))
+            return score_rows[round_index]
+
+        ledger = build_predictable_arrival_ledger_from_source(
+            source,
+            4,
+            ["h1", "h2", "h3"],
+            initial_active_count=1,
+            min_observations=2,
+            mean_threshold=0.0,
+        )
+        self.assertEqual(
+            calls,
+            [
+                (0, ("h1",)),
+                (1, ("h1",)),
+                (2, ("h1", "h2")),
+                (3, ("h1", "h2")),
+            ],
+        )
+        verified = verify_predictable_arrival_ledger(ledger)
+        self.assertEqual(verified["active_by_round"][-1], ("h1", "h2"))
+
+    def test_streaming_source_must_return_exact_active_roster(self):
+        def missing(round_index, active_ids):
+            return {}
+
+        with self.assertRaisesRegex(ValueError, "exactly the active"):
+            build_predictable_arrival_ledger_from_source(
+                missing,
+                2,
+                ["h1", "h2"],
+                initial_active_count=1,
+                min_observations=2,
+            )
 
     def test_same_round_lookahead_negative_control_is_hash_consistent_but_rejected(self):
         scores = [
