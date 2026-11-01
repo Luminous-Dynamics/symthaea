@@ -397,7 +397,7 @@ fn validate_and_analyze(
         digest(run_digest, "run_receipt_sha256")?;
 
         *arm_successes.get_mut(&arm_id).context("arm count missing")? +=
-            u64::from(successful);
+            if successful { 1 } else { 0 };
         let cost = integer(outcome, "/actual_resources/cost_microusd")?;
         *arm_costs.get_mut(&arm_id).context("arm cost missing")? += u128::from(cost);
 
@@ -481,8 +481,8 @@ fn validate_and_analyze(
         let mut by_component = BTreeMap::<String, Vec<i64>>::new();
         let mut paired_cost_difference_microusd = 0_i128;
         for pair in &paired_outcomes {
-            let treatment = i64::from(pair.successes[arm_id]);
-            let control = i64::from(pair.successes[&control_id]);
+            let treatment = if pair.successes[arm_id] { 1_i64 } else { 0_i64 };
+            let control = if pair.successes[&control_id] { 1_i64 } else { 0_i64 };
             let difference = treatment - control;
             difference_sum += difference;
             if difference > 0 {
