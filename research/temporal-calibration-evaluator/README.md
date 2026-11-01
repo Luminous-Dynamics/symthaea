@@ -10,7 +10,7 @@ Compare candidate-predicted reductions in wrong-belief, abstention and missing-o
 
 ## Anti-leakage rules
 
-- Each sample binds the candidate model digest, feedback sequence, episode ID, forecast issue time, and time feedback became available.
+- Each sample binds the candidate model digest, evaluator feedback sequence, episode ID, forecast issue time, time feedback became available, the validated paired-intervention digest and the finalized receipt digest.
 - Model digest must match across fit and holdout partitions.
 - Sequence IDs and forecast issue times must strictly increase within each partition.
 - Episode IDs cannot repeat.
