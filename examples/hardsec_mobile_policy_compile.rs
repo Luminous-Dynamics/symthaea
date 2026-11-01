@@ -4,9 +4,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
 
-const POLICY_BYTES: &[u8] = include_bytes!(
-    "../tests/fixtures/hardsec/mobile-policy-v1/pixel-8-pro-research-policy.json"
-);
+const POLICY_BYTES: &[u8] =
+    include_bytes!("../tests/fixtures/hardsec/mobile-policy-v1/pixel-8-pro-research-policy.json");
 const PROFILE_BYTES: &[u8] = include_bytes!(
     "../tests/fixtures/hardsec/mobile-device-v1/pixel-8-pro-capability-fixture.json"
 );
@@ -125,7 +124,9 @@ fn validate_policy(policy: &Value, profile: &Value) -> Result<(), String> {
             return Err(format!("control {id} must abstain on unknown state"));
         }
         if control["on_unsupported"] != "incompatible" {
-            return Err(format!("control {id} must mark unsupported targets incompatible"));
+            return Err(format!(
+                "control {id} must mark unsupported targets incompatible"
+            ));
         }
 
         if control["desired_values"]
@@ -150,9 +151,14 @@ fn validate_policy(policy: &Value, profile: &Value) -> Result<(), String> {
                     })
             })
         {
-            return Err(format!("control {id} has invalid accepted_evidence_source_types"));
+            return Err(format!(
+                "control {id} has invalid accepted_evidence_source_types"
+            ));
         }
-        if control["verification_action"].as_str().is_none_or(str::is_empty) {
+        if control["verification_action"]
+            .as_str()
+            .is_none_or(str::is_empty)
+        {
             return Err(format!("control {id} has no verification_action"));
         }
     }
@@ -170,7 +176,9 @@ fn evaluate_control(
         .and_then(Value::as_str)
         .unwrap_or("unknown");
     let desired = control["desired_values"].as_array().unwrap();
-    let accepted = control["accepted_evidence_source_types"].as_array().unwrap();
+    let accepted = control["accepted_evidence_source_types"]
+        .as_array()
+        .unwrap();
     let ids_value = evidence_ids_for_claim(profile, claim_path).unwrap();
     let ids = ids_value
         .as_array()
@@ -257,7 +265,12 @@ fn evaluate_control(
     }))
 }
 
-fn compile_policy(policy: &Value, profile: &Value, policy_bytes: &[u8], profile_bytes: &[u8]) -> Result<Value, String> {
+fn compile_policy(
+    policy: &Value,
+    profile: &Value,
+    policy_bytes: &[u8],
+    profile_bytes: &[u8],
+) -> Result<Value, String> {
     validate_policy(policy, profile)?;
     let ledger = validate_evidence_ledger(profile)?;
     let controls = policy["controls"].as_array().unwrap();
@@ -374,7 +387,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(receipt["result"], "obligations_compiled_verification_not_performed");
+        assert_eq!(
+            receipt["result"],
+            "obligations_compiled_verification_not_performed"
+        );
         assert_eq!(receipt["satisfied_count"], 0);
         assert_eq!(receipt["obligation_count"], 6);
         assert_eq!(receipt["evidence_incomplete_count"], 6);
@@ -407,13 +423,10 @@ mod tests {
         profile["evidence_domain"] = Value::String("physical_device_lab".to_owned());
         profile["hardware_protections"]["memory_tagging"]["runtime_state"] =
             Value::String("enabled_verified".to_owned());
-        profile["evidence"]
-            .as_array_mut()
-            .unwrap()
-            .push(json!({
-                "evidence_id": "mte-runtime-lab-measurement",
-                "source_type": "physical_lab_measurement"
-            }));
+        profile["evidence"].as_array_mut().unwrap().push(json!({
+            "evidence_id": "mte-runtime-lab-measurement",
+            "source_type": "physical_lab_measurement"
+        }));
         profile["hardware_protections"]["memory_tagging"]["evidence_ids"] =
             json!(["mte-runtime-lab-measurement"]);
 
@@ -450,8 +463,7 @@ mod tests {
     #[test]
     fn unknown_claim_path_is_rejected_instead_of_dynamically_resolved() {
         let mut policy = fixture_policy();
-        policy["controls"][0]["claim_path"] =
-            Value::String("device.serial_number".to_owned());
+        policy["controls"][0]["claim_path"] = Value::String("device.serial_number".to_owned());
         assert!(validate_policy(&policy, &fixture_profile()).is_err());
     }
 }
