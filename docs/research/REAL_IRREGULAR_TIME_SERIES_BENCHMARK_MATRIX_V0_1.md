@@ -20,7 +20,7 @@ Time-IMM is the closest direct match to the irregular temporal core. The benchma
 - Dataset: https://github.com/blacksnail789521/Time-IMM
 - Benchmark library: https://github.com/blacksnail789521/IMM-TSF
 
-Use the official split and entity-window rules first. Retain the original event times, modality-specific sampling, missingness indicators and cause metadata where license/task rules permit. Do not replace native irregular observations with a regular grid as an undocumented preprocessing step.
+Repository audit at Time-IMM data commit `593a1ef31c9a5354f7b672fb2e8711b0aa8e2a24`: the release describes nine datasets, but only eight are redistributable because MIMIC-IV is restricted; authorized users must generate its processed data locally. The documented structure stores `time_series.csv` and `text.csv` per entity, each with a `date_time` field. Verify whether that timestamp means event time or actual availability time for each modality; do not infer arrival time from event time. IMM-TSF code is pinned at `99be43c391e21cef8247a138fa0b479d041a2b22`. Its README notes 24GB total GPU RAM for running LLaMA 3.1/DeepSeek text-embedding paths; structured-only runs or smaller documented text encoders should be treated as separate arms, not assumed to require those large models. Use official split and entity-window rules first. Retain original event times, modality sampling, missingness and cause metadata where license/task rules permit. Do not regularize away native irregularity.
 
 ### 2.2 APN / Time-Aware Patch Aggregation (AAAI 2026)
 
@@ -29,7 +29,7 @@ APN is a strong efficiency-oriented irregular multivariate forecasting comparato
 - Paper: https://ojs.aaai.org/index.php/AAAI/article/view/39563
 - Official code: https://github.com/decisionintelligence/APN
 
-Reproduce the official training/evaluation protocol and compare on the identical input timestamps and masks. The authors report competitive accuracy and efficiency; treat that as a literature claim until independently reproduced.
+Repository audit at APN commit `cd952af7fe60448d9bd826423d0b57944d178060`: its README states Python 3.11.13 and PyTorch 2.6.0+cu124 as the tested environment, and lists PhysioNet, MIMIC, HumanActivity and USHCN. Crucially, the repository README explicitly notes that although the paper states AdamW, experiments were conducted using Adam. The primary reproduction must preserve the released Adam behavior; an AdamW-corrected run is a separate ablation, never silently substituted. Reproduce the official training/evaluation protocol and compare on identical input timestamps and masks. The authors report competitive accuracy and efficiency; treat that as a literature claim until independently reproduced.
 
 ### 2.3 KAFNet / Canonical Pre-Alignment (AAAI 2026)
 
@@ -38,7 +38,7 @@ KAFNet is an important counterpoint to methods that avoid canonical pre-alignmen
 - Paper: https://ojs.aaai.org/index.php/AAAI/article/view/40149
 - Official code: https://github.com/zhouziyu02/KAFNet
 
-The authors report state-of-the-art results on four public irregular-series datasets, with 7.2x fewer parameters and 8.4x training/inference acceleration in their comparison. These are paper-reported claims, not reproduced measurements here. Pin the paper/code commit and compare preprocessing, parameter count, accelerator and measurement boundary before drawing conclusions.
+Paper/code audit: KAFNet code is pinned here at `1cb7280b05dd851dbd30c17f7a46fa7f6c5318e6`. Its README documents `bash ./test.sh` for reproducing Human Activity; the AAAI paper reports experiments on four public irregular time-series datasets. Before claiming a full reproduction, inspect and execute all released scripts for every paper dataset and compare them against the paper tables. The authors report state-of-the-art results with 7.2x fewer parameters and 8.4x training/inference acceleration; these remain literature claims, not reproduced measurements here. Pin dependencies and compare preprocessing, parameter count, accelerator and measurement boundary.
 
 ### 2.4 GIFT-Eval (broad zero-shot time-series forecasting)
 
@@ -48,7 +48,7 @@ GIFT-Eval is a broad forecasting test bed, not an irregular-only or continual-le
 - Official code: https://github.com/SalesforceAIResearch/gift-eval
 - Dataset card: https://huggingface.co/datasets/Salesforce/GiftEval
 
-Use official dataset/task contracts for broad generalization; do not combine its aggregate with Time-IMM's irregular forecasting score.
+Repository audit at GIFT-Eval commit `8895d8600d33983949916694047b372f6731a64c`: the project maintains explicit `TestData Leakage` and `Zero-shot` metadata. Its README defines zero-shot as neither using the GIFT-Eval training split nor leaking test data. Respect those columns and the official evaluation protocol. Use the official task contracts for broad generalization; do not combine its aggregate with Time-IMM's irregular forecasting score.
 
 ### 2.5 GIFT-Eval-CTX (contextual forecasting; Oct 2026 preprint)
 
