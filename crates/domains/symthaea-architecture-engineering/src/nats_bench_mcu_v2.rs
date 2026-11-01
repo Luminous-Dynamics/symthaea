@@ -356,7 +356,7 @@ pub fn import_nats_bench_mcu_v2(
     {
         return Err(NatsBenchMcuV2ImportError::new("row_counts", "one or more CSV row counts differ from the frozen source manifest"));
     }
-    validate_partition(&hardware, &accuracy, &failures, manifest.candidate_count)?;
+    validate_partition(&hardware, &accuracy, &failures, manifest)?;
     let summary = summarize(&hardware, &accuracy, failures.len() as u32)?;
     let mut receipt = NatsBenchMcuV2ImportReceipt {
         schema: RECEIPT_SCHEMA.into(),
@@ -556,13 +556,17 @@ fn validate_partition(
     hardware: &[NatsBenchMcuV2HardwareRow],
     accuracy: &[NatsBenchMcuV2AccuracyRow],
     failures: &[NatsBenchMcuV2FailureRow],
-    total: u32,
+    manifest: &NatsBenchMcuV2SourceManifest,
 ) -> Result<(), NatsBenchMcuV2ImportError> {
+    let total = manifest.candidate_count;
     let mut success_ids = HashSet::with_capacity(hardware.len());
     let mut accuracy_ids = HashSet::with_capacity(accuracy.len());
     let mut failure_ids = HashSet::with_capacity(failures.len());
     for row in hardware {
-        if row.arch_idx >= total || row.int8_kb > 746.0 + FLOAT_TOLERANCE || row.rom_kb > 1_024.0 + FLOAT_TOLERANCE {
+        if row.arch_idx >= total
+            || row.int8_kb > manifest.int8_limit_kb + FLOAT_TOLERANCE
+            || row.rom_kb > manifest.flash_capacity_kb + FLOAT_TOLERANCE
+        {
             return Err(NatsBenchMcuV2ImportError::new(format!("hardware.{}", row.arch_idx), "measured row is out of range or exceeds flash constraints"));
         }
         success_ids.insert(row.arch_idx);
