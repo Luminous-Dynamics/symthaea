@@ -752,6 +752,7 @@ pub fn compute_phase_energy_audit_receipt_sha256(
 pub fn audit_application_phase_energy(
     sample_csv: &str,
     marker_csv: &str,
+    outcomes_csv: &str,
     trace_config: Ppk2TraceAuditConfig,
     mapping: &PhaseClockMappingManifest,
     protocol: &ApplicationPhaseProtocolManifest,
@@ -761,6 +762,16 @@ pub fn audit_application_phase_energy(
 
     let (segments, trace_receipt_sha256) = parse_samples(sample_csv, trace_config)?;
     let events = parse_markers(marker_csv, mapping, protocol)?;
+    let outcomes = parse_event_outcomes(outcomes_csv)?;
+    if outcomes.len() != events.len()
+        || outcomes.keys().any(|event_id| !events.contains_key(event_id))
+        || events.keys().any(|event_id| !outcomes.contains_key(event_id))
+    {
+        return Err(PhaseEnergyAuditError::new(
+            "outcomes.event_ids",
+            "outcome evidence must match marker events exactly with one record per event",
+        ));
+    }
     let mut event_segments = HashSet::with_capacity(events.len());
     for (event_id, event) in &events {
         let segment_id = event.segment_id.as_deref().ok_or_else(|| {
@@ -782,6 +793,10 @@ pub fn audit_application_phase_energy(
     let mut event_metrics = Vec::with_capacity(events.len());
 
     for (event_id, parsed) in &events {
+        let (outcome_evidence, outcome_evidence_sha256) = outcomes.get(event_id).ok_or_else(|| {
+            PhaseEnergyAuditError::new(format!("outcomes.{event_id}"), "event outcome evidence is missing")
+        })?;
+        let accepted_success_outcome = protocol.accepted_success_outcomes.contains(&outcome_evidence.outcome);
         let segment_id = parsed.segment_id.as_deref().ok_or_else(|| {
             PhaseEnergyAuditError::new(format!("markers.{event_id}.segment_id"), "event has no segment identity")
         })?;
@@ -861,6 +876,15 @@ pub fn audit_application_phase_energy(
                 event_id: event_id.clone(),
                 segment_id: segment_id.to_owned(),
                 status: PhaseEnergyEventStatus::MissingRequiredPhase,
+                outcome: outcome_evidence.outcome,
+                outcome_evidence_sha256: outcome_evidence_sha256.clone(),
+                input_sha256: outcome_evidence.input_sha256.clone(),
+                output_sha256: outcome_evidence.output_sha256.clone(),
+                quality_metric_id: outcome_evidence.quality_metric_id.clone(),
+                quality_value: outcome_evidence.quality_value,
+                deadline_met: outcome_evidence.deadline_met,
+                retry_count: outcome_evidence.retry_count,
+                accepted_success_outcome,
                 missing_phase_ids,
                 missing_required_phase_ids,
                 phase_windows,
@@ -910,6 +934,15 @@ pub fn audit_application_phase_energy(
             event_id: event_id.clone(),
             segment_id: segment_id.to_owned(),
             status,
+            outcome: outcome_evidence.outcome,
+            outcome_evidence_sha256: outcome_evidence_sha256.clone(),
+            input_sha256: outcome_evidence.input_sha256.clone(),
+            output_sha256: outcome_evidence.output_sha256.clone(),
+            quality_metric_id: outcome_evidence.quality_metric_id.clone(),
+            quality_value: outcome_evidence.quality_value,
+            deadline_met: outcome_evidence.deadline_met,
+            retry_count: outcome_evidence.retry_count,
+            accepted_success_outcome,
             missing_phase_ids,
             missing_required_phase_ids,
             phase_windows,
@@ -931,14 +964,26 @@ pub fn audit_application_phase_energy(
     let complete_count = event_metrics.iter().filter(|event| event.status == PhaseEnergyEventStatus::CompletePhaseCoverage).count();
     let unattributed_count = event_metrics.iter().filter(|event| event.status == PhaseEnergyEventStatus::UnattributedIntervalsPresent).count();
     let missing_count = event_metrics.iter().filter(|event| event.status == PhaseEnergyEventStatus::MissingRequiredPhase).count();
+    let successful_event_energies: Vec<f64> = event_metrics.iter()
+        .filter(|event| event.accepted_success_outcome && event.deadline_met)
+        .filter_map(|event| event.total_event_energy_uj)
+        .collect();
+    let successful_completed_events = successful_event_energies.len();
+    let mean_energy_per_successful_event_uj = if successful_event_energies.is_empty() {
+        None
+    } else {
+        Some(successful_event_energies.iter().sum::<f64>() / successful_event_energies.len() as f64)
+    };
 
     let mut receipt = PhaseEnergyAuditReceipt {
         schema: RECEIPT_SCHEMA.to_owned(),
         version: VERSION.to_owned(),
         sample_csv_sha256: format!("{:x}", Sha256::digest(sample_csv.as_bytes())),
         marker_csv_sha256: format!("{:x}", Sha256::digest(marker_csv.as_bytes())),
+        outcomes_csv_sha256: format!("{:x}", Sha256::digest(outcomes_csv.as_bytes())),
         sample_csv_bytes: sample_csv.len(),
         marker_csv_bytes: marker_csv.len(),
+        outcomes_csv_bytes: outcomes_csv.len(),
         trace_audit_receipt_sha256,
         clock_mapping_sha256: mapping.mapping_sha256.clone(),
         phase_protocol_sha256: protocol.protocol_sha256.clone(),
@@ -951,6 +996,8 @@ pub fn audit_application_phase_energy(
         complete_phase_coverage_events: complete_count,
         unattributed_interval_events: unattributed_count,
         missing_required_phase_events: missing_count,
+        successful_completed_events,
+        mean_energy_per_successful_event_uj,
         events: event_metrics,
         receipt_sha256: String::new(),
     };
@@ -1274,6 +1321,7 @@ mod tests {
                 ApplicationPhaseDefinition { phase_id: "inference".into(), order: 1, required: true },
                 ApplicationPhaseDefinition { phase_id: "postprocess".into(), order: 2, required: true },
             ],
+            accepted_success_outcomes: vec![ApplicationEventOutcome::Correct],
             maximum_unattributed_gap_ms: max_gap_ms,
             protocol_sha256: String::new(),
         };
