@@ -27,6 +27,9 @@ use contamination_panel_bench::{
         SEARCH_MAX_FINDINGS_BYTES, SEARCH_MAX_TRACE_BYTES, SearchTimeExposureFindingsV1,
         SearchTimeExposureTraceV1, audit_search_time_findings, audit_search_time_trace,
     },
+    retrieval_decomposition::{
+        RetrievalDecompositionBundleV1, audit_retrieval_decomposition_bundle,
+    },
     training_receipt::validate_paired_training_execution_receipt,
 };
 use std::{
@@ -286,6 +289,36 @@ fn verify_fresh_score_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
         report.coverage_permille / 10.0,
         report.independently_verified
     );
+    Ok(())
+}
+
+fn audit_retrieval_decomposition_cli(args: &[String]) -> Result<(), Box<dyn Error>> {
+    if args.len() != 5 {
+        return Err(
+            "usage: contamination-panel-bench audit-retrieval-decomposition <candidate-corpus.json> <sealed-oracle.json> <experiment-manifest.json> <audit-report.json>"
+                .into(),
+        );
+    }
+    let corpus_bytes = read_bounded(&args[1], SEARCH_MAX_TRACE_BYTES, "retrieval corpus")?;
+    let oracle_bytes = read_bounded(&args[2], SEARCH_MAX_TRACE_BYTES, "sealed retrieval oracle")?;
+    let experiment_bytes = read_bounded(&args[3], SEARCH_MAX_TRACE_BYTES, "retrieval experiment")?;
+    let bundle = RetrievalDecompositionBundleV1 {
+        corpus: serde_json::from_slice(&corpus_bytes)?,
+        oracle: serde_json::from_slice(&oracle_bytes)?,
+        experiment: serde_json::from_slice(&experiment_bytes)?,
+    };
+    let report = audit_retrieval_decomposition_bundle(&bundle).map_err(io::Error::other)?;
+    write_bytes(&args[4], &serde_json::to_vec_pretty(&report)?)?;
+    println!(
+        "valid={} documents={} claims={} distractors={} arms=6 replicates={} status={}",
+        report.valid,
+        report.document_count,
+        report.claim_count,
+        report.distractor_count,
+        report.replicate_count,
+        report.experiment_status
+    );
+    println!("claim boundary: {}", report.claim_boundary);
     Ok(())
 }
 
@@ -552,9 +585,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("verify-fresh-score") => verify_fresh_score_cli(&args),
         Some("audit-search-time-trace") => audit_search_time_trace_cli(&args),
         Some("audit-search-time-findings") => audit_search_time_findings_cli(&args),
+        Some("audit-retrieval-decomposition") => audit_retrieval_decomposition_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | verify-fresh-score | audit-search-time-trace | audit-search-time-findings | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | generate-fresh | audit-fresh | score-fresh | verify-fresh-score | audit-search-time-trace | audit-search-time-findings | audit-retrieval-decomposition | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
