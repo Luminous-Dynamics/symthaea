@@ -254,6 +254,15 @@ pub struct DetectorCalibrationReportV1 {
     pub claim_boundary: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct ObservationKey {
+    group_sha256: String,
+    split: ObservationSplitV1,
+    sample_id: String,
+    detector_id: String,
+    detector_version: String,
+}
+
 fn valid_digest(value: &str) -> bool {
     value.len() == 64
         && value
@@ -1402,7 +1411,7 @@ mod tests {
         ];
         let mut observations = Vec::new();
         for detector in &detectors {
-            for index in 0..100 {
+            for index in 0_u32..100 {
                 observations.push(DetectorObservationV1 {
                     sample_id: format!("cal-{index:03}"),
                     source_cluster_id: format!("cal-source-{index:03}"),
@@ -1597,7 +1606,7 @@ mod tests {
 
     #[test]
     fn locked_test_truth_does_not_change_conformal_p_value() {
-        let mut study_a = minimal_study();
+        let study_a = minimal_study();
         let mut study_b = study_a.clone();
         for observation in &mut study_b.observations {
             if observation.split == ObservationSplitV1::LockedTest
