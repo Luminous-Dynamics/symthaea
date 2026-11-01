@@ -5,10 +5,10 @@
 This is the first durable local backend prototype for the trusted-state reference model in `xtask/src/basalt_trusted_state.rs`.
 
 It narrows the implementation claim to a single-host local database:
-- one normalized state-meta row;
+- one normalized state-meta row with an explicit schema version;
 - one row per transparency-log cursor;
 - one row per stable source cursor;
-- immutable accepted-receipt rows;
+- immutable accepted-receipt rows, each assigned a unique monotonic acceptance revision and retaining the transition-evidence digests used for profile, boot, log-origin and policy changes;
 - one SQLite write transaction for every accepted state advancement.
 
 It does **not** provide a remote authoritative anchor, malicious snapshot rollback protection, cryptographic verification, witness consensus, transparency freshness, observer qualification or close-coordinator qualification.
@@ -52,11 +52,11 @@ A commit error is returned as `CommitOutcomeIndeterminate`, not guessed as a fai
 - exact receipt absent and old state intact => re-verify and retry the full transition;
 - inconsistent or unavailable state => indeterminate / fail closed.
 
-The current code's reopen + exact-retry test covers recovery after a committed receipt is reopened. It does not inject a transport-level lost acknowledgement at the SQLite API boundary or simulate kernel/power failure.
+The current code's reopen + exact-retry test covers recovery after a committed receipt is reopened. The reader also checks that every accepted receipt revision from 1 through the current revision exists exactly once, every source history begins at generation 1 and advances without gaps with exact predecessor links, and the latest source cursor points to the newest accepted record. It checks that each profile/boot/log-origin transition retains its evidence reference and that global policy versions never roll back. A local cursor-only rollback is rejected even when the unkeyed local state digest is recomputed. It does not inject a transport-level lost acknowledgement at the SQLite API boundary or simulate kernel/power failure.
 
 ## Local state digest and trust boundary
 
-The database stores a domain-separated SHA-256 digest over the normalized state. It is recomputed on every read and detects accidental or inconsistent database edits, partial out-of-band edits, and serialization/row mismatches.
+The database stores a domain-separated SHA-256 digest over the normalized state. It is recomputed on every read and detects accidental or inconsistent database edits, partial out-of-band edits, and serialization/row mismatches. Schema version 1 is explicitly stored and checked. Each accepted receipt also stores its monotonic acceptance revision and all transition-evidence digest references, so reopening can verify the complete immutable history rather than only the latest cursor.
 
 This digest is **unkeyed**. An attacker who can restore an older database or rewrite every row and recompute the digest can still create an internally consistent stale state. Therefore:
 - local snapshot digest consistency is not anti-rollback;
@@ -131,8 +131,9 @@ Initial research targets, not results:
 - zero duplicate accepted generations;
 - zero digest-mismatch acceptance;
 - exact receipt replay resolves without a second state advance;
-- p95 local durable commit <= 5 ms on a pinned NVMe reference host;
-- p95 at <= 25 ms under 16 competing same-host writers, with busy timeout and conflict counts reported separately.
+- p95 local durable commit <= 5 ms at up to 1,000 accepted receipts on a pinned NVMe reference host;
+- p95 <= 25 ms with 16 competing same-host writers at up to 1,000 receipts, with busy timeout and conflict counts reported separately;
+- publish unthresholded scaling curves at 10k and 100k receipts because the v1 reference store intentionally materializes the bounded state history for full transition validation.
 
 ## Industry positioning
 
