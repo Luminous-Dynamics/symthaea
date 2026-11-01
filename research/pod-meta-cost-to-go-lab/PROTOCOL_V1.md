@@ -211,7 +211,11 @@ The first evaluator is specified in [PREFIX_REPLAY_V1.md](PREFIX_REPLAY_V1.md) a
 
 Only `SufficientProof` outcomes with a non-empty independent verifier receipt enter exact point-error and exact-label q90/q95 coverage metrics. Right-censored outcomes contribute only definite upper-envelope exceedance diagnostics when their observed lower bound is already above q90/q95; they are not converted to exact labels. Competing terminals and missing outcomes remain distinct. The all-six-resource q90 coverage diagnostic is an empirical joint statistic, not evidence of simultaneous conformal validity.
 
-V1 does not yet score budget-feasibility classifications because the journal does not bind a remaining hard-budget vector to every forecast prefix. It also does not yet include forecast-query overhead, prefix-level action replay, baseline comparisons, or a BAGEN reproduction. Those are explicit next slices of issue #9752.
+An optional state-bound `PrefixBudgetReceipt` adds descriptive feasibility replay. The evaluator declares a forecast feasible only when it is in-domain, has nonzero support, passes the configured completion-probability threshold, and its q90 vector plus mandatory verification reserve fits the remaining budget in all six resource dimensions. Shifted/unsupported forecasts abstain.
+
+Actual feasibility is known for independently verified sufficient-proof completions and for right-censored lower bounds that already exceed at least one remaining-budget dimension. A lower bound still within budget does not prove feasibility; pending and competing terminal events remain unknown. The evaluator reports false-feasible/false-infeasible counts and rates only over resolved predictions. These labels are descriptive and depend on the frozen replay episode and budget receipt; the q90 components are marginal and do not form a joint probabilistic guarantee.
+
+V1 still does not include forecast-query overhead, prefix-level action regeneration/re-execution, paired baseline comparisons, chronological/task-family holdouts, confidence intervals, or a BAGEN reproduction. Those are the next slices of issue #9752.
 
 ## 19. External comparators and claim limits
 
