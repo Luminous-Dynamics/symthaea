@@ -1,0 +1,60 @@
+name: HARDSEC-026 exact order-two alias counterexample
+
+on:
+  pull_request:
+    paths:
+      - "examples/hardsec_markov_order2_alias_audit.rs"
+      - "tests/fixtures/hardsec/markov-order2-alias-v1/**"
+      - "docs/research/HARDSEC_026_MARKOV_ORDER2_ALIAS_AUDIT.md"
+      - "tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml"
+      - ".github/workflows/hardsec-markov-order2-alias-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-026-markov-order2-alias-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-order-two-alias-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact pull request revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check exact fixture auditor formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_markov_order2_alias_audit.rs
+      - name: Run exact counterexample tests
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-markov-order2-alias-audit --example hardsec_markov_order2_alias_audit
+      - name: Verify exact fixture receipt and claim ceiling
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-markov-order2-alias-audit --example hardsec_markov_order2_alias_audit > /tmp/hardsec-026-alias.json
+          python3 - <<'PY'
+          import json
+          with open("/tmp/hardsec-026-alias.json", "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          assert receipt["result"] == "exact_order2_alias_counterexample_verified"
+          assert receipt["first_order"]["transition_counts_equal"] is True
+          assert receipt["first_order"]["control_transition_counts"] == [[3, 2], [2, 0]]
+          assert receipt["first_order"]["order2_alias_transition_counts"] == [[3, 2], [2, 0]]
+          lag2 = receipt["lag_two_conditional"]
+          assert lag2["control_next_one_rate_by_previous_previous_state"]["previous_previous_0"]["exact"] == "1/2"
+          assert lag2["control_next_one_rate_by_previous_previous_state"]["previous_previous_1"]["exact"] == "1/2"
+          assert lag2["order2_alias_next_one_rate_by_previous_previous_state"]["previous_previous_0"]["exact"] == "1/1"
+          assert lag2["order2_alias_next_one_rate_by_previous_previous_state"]["previous_previous_1"]["exact"] == "0/1"
+          assert receipt["eligibility"]["first_order_abstraction_falsified_for_alias_fixture"] is True
+          assert receipt["eligibility"]["model_validity_proved"] is False
+          assert receipt["eligibility"]["statistical_p_value"] is None
+          assert receipt["eligibility"]["statistical_rejection_claim"] is False
+          assert receipt["eligibility"]["finite_test_non_rejection_proves_markov"] is False
+          print("HARDSEC-026 exact order-two alias counterexample verified.")
+          PY
