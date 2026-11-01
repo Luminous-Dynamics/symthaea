@@ -316,9 +316,7 @@ impl ExactEvsiProblem {
             self.validate_world_rows(
                 &decision.losses_by_world,
                 |row| row.world_id.as_str(),
-                "losses_by_world",
-                decision_index,
-                "decisions",
+                &format!("problem.decisions[{decision_index}].losses_by_world"),
             )?;
             for (world_index, loss) in decision.losses_by_world.iter().enumerate() {
                 if !loss.loss.is_finite() || loss.loss < 0.0 {
@@ -390,9 +388,7 @@ impl ExactEvsiProblem {
                 self.validate_world_rows(
                     &outcome.likelihoods_by_world,
                     |row| row.world_id.as_str(),
-                    "likelihoods_by_world",
-                    action_index * MAX_OUTCOMES_PER_ACTION + outcome_index,
-                    "actions",
+                    &format!("problem.actions[{action_index}].outcomes[{outcome_index}].likelihoods_by_world"),
                 )?;
                 for (world_index, likelihood) in outcome.likelihoods_by_world.iter().enumerate() {
                     if !likelihood.probability.is_finite()
@@ -433,20 +429,18 @@ impl ExactEvsiProblem {
         &self,
         rows: &[T],
         world_id: impl for<'a> Fn(&'a T) -> &'a str,
-        rows_field: &str,
-        parent_index: usize,
-        parent_name: &str,
+        path: &str,
     ) -> Result<(), ExactEvsiError> {
         if rows.len() != self.worlds.len() {
             return Err(ExactEvsiError::new(
-                format!("problem.{parent_name}[{parent_index}].{rows_field}"),
+                path,
                 "table must contain exactly one row for every world",
             ));
         }
         for (index, world) in self.worlds.iter().enumerate() {
             if world_id(&rows[index]) != world.world_id {
                 return Err(ExactEvsiError::new(
-                    format!("problem.{parent_name}[{parent_index}].{rows_field}[{index}]"),
+                    format!("{path}[{index}]"),
                     "rows must exactly match canonical world ID order",
                 ));
             }
