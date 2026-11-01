@@ -714,18 +714,20 @@ mod tests {
     #[test]
     fn temporal_stream_covers_jitter_dropout_drift_and_ood() {
         let stream = generate_temporal_drift_stream(&stream_config()).unwrap();
-        assert!(stream.events.windows(2).all(|p| p[1].timestamp_us > p[0].timestamp_us));
-        assert!(stream.events.iter().any(|e| e.missing_feature_mask != 0));
-        assert!(stream.events.iter().any(|e| e.is_out_of_distribution));
-        assert_eq!(stream.events[499].transition_fraction_ppm, 0);
-        assert_eq!(stream.events[899].transition_fraction_ppm, 997_500);
-        assert_eq!(stream.events[900].transition_fraction_ppm, 1_000_000);
+        assert!(stream.observations.windows(2).all(|p| p[1].timestamp_us > p[0].timestamp_us));
+        assert!(stream.observations.iter().any(|e| e.missing_feature_mask != 0));
+        assert!(stream.delayed_labels.iter().any(|e| e.is_out_of_distribution));
+        assert_eq!(stream.delayed_labels[499].transition_fraction_ppm, 0);
+        assert_eq!(stream.delayed_labels[899].transition_fraction_ppm, 997_500);
+        assert_eq!(stream.delayed_labels[900].transition_fraction_ppm, 1_000_000);
+        assert!(stream.delayed_labels.iter().zip(&stream.observations)
+            .all(|(label, observation)| label.label_available_at_us > observation.timestamp_us));
     }
 
     #[test]
     fn stream_digest_rejects_event_tampering() {
         let mut stream = generate_temporal_drift_stream(&stream_config()).unwrap();
-        stream.events[0].label ^= 1;
+        stream.delayed_labels[0].label ^= 1;
         assert!(validate_temporal_stream_dataset(&stream).is_err());
     }
 
