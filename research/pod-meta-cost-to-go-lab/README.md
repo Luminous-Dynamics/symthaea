@@ -18,6 +18,7 @@ The lab separates forecast estimation from resource enforcement. Its initial exe
 - selected-policy conformal calibration conditions joint proof-cost envelopes on the frozen scheduler selection mechanism;
 - a canonical adapter derives frontier features from the actual target-reachable AND/OR graph and scheduler obligation states;
 - an online replay ledger records selected prediction statements and delayed exact, coverage-bit, unknown, censored, and competing-terminal feedback.
+- a deterministic prefix-replay evaluator scores progressive forecasts against verified completion costs while preserving censored, competing-terminal, and pending outcomes.
 
 ## Run
 
