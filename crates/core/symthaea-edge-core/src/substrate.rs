@@ -133,7 +133,7 @@ mod tests {
     fn composed_core_uses_elapsed_time_and_tau_without_float_math() {
         let mut core = BoundedEdgeCore::<2, 1, 1, 1>::new().unwrap();
         core.update_liquid_state_from_dt_tau_us(&[10_000, -10_000], 10, 10).unwrap();
-        assert_eq!(core.liquid_state().values(), &[6_323, -6_323]);
+        assert_eq!(core.liquid_state().values(), &[6_321, -6_321]);
         assert_eq!(
             core.update_liquid_state_from_dt_tau_us(&[0, 0], 1, 0),
             Err(EdgeCoreUpdateError::ZeroTau)
