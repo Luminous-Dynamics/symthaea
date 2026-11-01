@@ -536,7 +536,7 @@ fn integrate_window(
     Ok((energy_uj, mean_current_ua, mean_current_ua * voltage_v, maximum_current_ua))
 }
 
-fn compute_receipt_sha256(
+pub fn compute_phase_energy_audit_receipt_sha256(
     receipt: &PhaseEnergyAuditReceipt,
 ) -> Result<String, PhaseEnergyAuditError> {
     let mut canonical = receipt.clone();
@@ -755,11 +755,251 @@ pub fn audit_application_phase_energy(
         events: event_metrics,
         receipt_sha256: String::new(),
     };
-    receipt.receipt_sha256 = compute_receipt_sha256(&receipt)?;
+    receipt.receipt_sha256 = compute_phase_energy_audit_receipt_sha256(&receipt)?;
     Ok(PhaseEnergyAuditResult {
         trace_receipt_sha256,
         receipt,
     })
+}
+
+/// Revalidate the portable phase receipt before downstream scoring.
+/// This checks canonical digest, event counters, phase ordering, phase/event energy sums,
+/// and recorded boundary-alignment uncertainty. Source replay is stronger and is provided
+/// by verify_phase_energy_receipt_against_sources.
+pub fn validate_phase_energy_audit_receipt(
+    receipt: &PhaseEnergyAuditReceipt,
+) -> Result<(), PhaseEnergyAuditError> {
+    if receipt.schema != RECEIPT_SCHEMA || receipt.version != VERSION {
+        return Err(PhaseEnergyAuditError::new("receipt.schema_version", "unsupported schema/version"));
+    }
+    for (field, value) in [
+        ("sample_csv_sha256", receipt.sample_csv_sha256.as_str()),
+        ("marker_csv_sha256", receipt.marker_csv_sha256.as_str()),
+        ("trace_audit_receipt_sha256", receipt.trace_audit_receipt_sha256.as_str()),
+        ("clock_mapping_sha256", receipt.clock_mapping_sha256.as_str()),
+        ("phase_protocol_sha256", receipt.phase_protocol_sha256.as_str()),
+        ("receipt_sha256", receipt.receipt_sha256.as_str()),
+    ] {
+        if !is_sha256(value) {
+            return Err(PhaseEnergyAuditError::new(
+                format!("receipt.{field}"),
+                "must be lowercase SHA-256 hex",
+            ));
+        }
+    }
+    if receipt.sample_csv_bytes == 0
+        || receipt.marker_csv_bytes == 0
+        || receipt.event_count == 0
+        || receipt.event_count != receipt.events.len()
+        || !receipt.voltage_v.is_finite()
+        || receipt.voltage_v <= 0.0
+        || !receipt.expected_sample_rate_hz.is_finite()
+        || receipt.expected_sample_rate_hz <= 0.0
+        || !receipt.sample_rate_tolerance_fraction.is_finite()
+        || !(0.0..=1.0).contains(&receipt.sample_rate_tolerance_fraction)
+        || !receipt.maximum_sample_gap_ratio.is_finite()
+        || receipt.maximum_sample_gap_ratio < 1.0
+        || !receipt.maximum_unattributed_gap_ms.is_finite()
+        || receipt.maximum_unattributed_gap_ms < 0.0
+    {
+        return Err(PhaseEnergyAuditError::new("receipt.inventory_or_config", "invalid byte/event inventory or trace configuration"));
+    }
+
+    let mut event_ids = HashSet::with_capacity(receipt.events.len());
+    let mut complete_count = 0usize;
+    let mut unattributed_count = 0usize;
+    let mut missing_count = 0usize;
+    for event in &receipt.events {
+        if event.event_id.trim().is_empty()
+            || event.segment_id.trim().is_empty()
+            || !event_ids.insert(event.event_id.as_str())
+        {
+            return Err(PhaseEnergyAuditError::new("receipt.events.identity", "event and segment IDs must be non-empty; event IDs must be unique"));
+        }
+        let mut phase_ids = HashSet::with_capacity(event.phase_windows.len());
+        let mut declared_energy = 0.0;
+        let mut declared_duration = 0.0;
+        let mut previous_order = None;
+        let mut previous_end = None;
+        for window in &event.phase_windows {
+            if window.phase_id.trim().is_empty() || !phase_ids.insert(window.phase_id.as_str()) {
+                return Err(PhaseEnergyAuditError::new(
+                    format!("receipt.events.{}.phase_windows.phase_id", event.event_id),
+                    "phase IDs must be non-empty and unique",
+                ));
+            }
+            for (field, value) in [
+                ("start_ppk2_time_ms", window.start_ppk2_time_ms),
+                ("end_ppk2_time_ms", window.end_ppk2_time_ms),
+                ("duration_ms", window.duration_ms),
+                ("energy_uj", window.energy_uj),
+                ("time_weighted_mean_current_ua", window.time_weighted_mean_current_ua),
+                ("mean_power_uw", window.mean_power_uw),
+                ("maximum_observed_current_ua", window.maximum_observed_current_ua),
+            ] {
+                if !value.is_finite() || value < 0.0 {
+                    return Err(PhaseEnergyAuditError::new(
+                        format!("receipt.events.{}.phase_windows.{}.{}", event.event_id, window.phase_id, field),
+                        "must be finite and non-negative",
+                    ));
+                }
+            }
+            for (field, value) in [
+                ("duration_ms", window.duration_ms),
+                ("time_weighted_mean_current_ua", window.time_weighted_mean_current_ua),
+                ("mean_power_uw", window.mean_power_uw),
+                ("boundary_alignment_energy_uncertainty_uj", window.boundary_alignment_energy_uncertainty_uj),
+            ] {
+                if !value.is_finite() || value <= 0.0 {
+                    return Err(PhaseEnergyAuditError::new(
+                        format!("receipt.events.{}.phase_windows.{}.{}", event.event_id, window.phase_id, field),
+                        "must be finite and positive",
+                    ));
+                }
+            }
+            if !window.boundary_alignment_error_bound_ms.is_finite()
+                || window.boundary_alignment_error_bound_ms < 0.0
+                || window.end_ppk2_time_ms <= window.start_ppk2_time_ms
+                || (window.end_ppk2_time_ms - window.start_ppk2_time_ms - window.duration_ms).abs() > 1e-9
+                || previous_order.is_some_and(|order| window.order <= order)
+                || previous_end.is_some_and(|end| window.start_ppk2_time_ms < end)
+            {
+                return Err(PhaseEnergyAuditError::new(
+                    format!("receipt.events.{}.phase_windows.{}.consistency", event.event_id, window.phase_id),
+                    "phase timing, order or non-overlap consistency failed",
+                ));
+            }
+            let expected_power = window.time_weighted_mean_current_ua * receipt.voltage_v;
+            let expected_energy = window.mean_power_uw * window.duration_ms / 1_000.0;
+            let expected_alignment_energy =
+                2.0 * window.maximum_observed_current_ua * receipt.voltage_v
+                    * window.boundary_alignment_error_bound_ms / 1_000.0;
+            let close = |left: f64, right: f64| {
+                (left - right).abs() <= 1e-8 * left.abs().max(right.abs()).max(1.0)
+            };
+            if !close(window.mean_power_uw, expected_power)
+                || !close(window.energy_uj, expected_energy)
+                || !close(window.boundary_alignment_energy_uncertainty_uj, expected_alignment_energy)
+            {
+                return Err(PhaseEnergyAuditError::new(
+                    format!("receipt.events.{}.phase_windows.{}.derived_metrics", event.event_id, window.phase_id),
+                    "phase energy, power or alignment uncertainty is inconsistent",
+                ));
+            }
+            declared_energy += window.energy_uj;
+            declared_duration += window.duration_ms;
+            previous_order = Some(window.order);
+            previous_end = Some(window.end_ppk2_time_ms);
+        }
+        if !event.declared_phase_energy_sum_uj.is_finite()
+            || event.declared_phase_energy_sum_uj < 0.0
+            || (event.declared_phase_energy_sum_uj - declared_energy).abs()
+                > 1e-8 * declared_energy.abs().max(1.0)
+        {
+            return Err(PhaseEnergyAuditError::new(
+                format!("receipt.events.{}.declared_phase_energy_sum_uj", event.event_id),
+                "does not equal the phase-window energy sum",
+            ));
+        }
+
+        match event.status {
+            PhaseEnergyEventStatus::MissingRequiredPhase => {
+                missing_count += 1;
+                if event.missing_required_phase_ids.is_empty()
+                    || event.total_event_energy_uj.is_some()
+                    || event.total_event_duration_ms.is_some()
+                    || event.total_event_boundary_alignment_uncertainty_uj.is_some()
+                    || event.unattributed_energy_uj.is_some()
+                    || event.unattributed_duration_ms.is_some()
+                {
+                    return Err(PhaseEnergyAuditError::new(
+                        format!("receipt.events.{}.status", event.event_id),
+                        "missing required phase must not claim a complete event envelope",
+                    ));
+                }
+            }
+            PhaseEnergyEventStatus::UnattributedIntervalsPresent
+            | PhaseEnergyEventStatus::CompletePhaseCoverage => {
+                if !event.missing_required_phase_ids.is_empty()
+                    || event.event_start_ppk2_time_ms.is_none()
+                    || event.event_end_ppk2_time_ms.is_none()
+                    || event.total_event_duration_ms.is_none()
+                    || event.total_event_energy_uj.is_none()
+                    || event.maximum_event_current_ua.is_none()
+                    || event.total_event_boundary_alignment_uncertainty_uj.is_none()
+                    || event.unattributed_duration_ms.is_none()
+                    || event.unattributed_energy_uj.is_none()
+                {
+                    return Err(PhaseEnergyAuditError::new(
+                        format!("receipt.events.{}.status", event.event_id),
+                        "measured event envelope is missing required metrics",
+                    ));
+                }
+                let start = event.event_start_ppk2_time_ms.unwrap();
+                let end = event.event_end_ppk2_time_ms.unwrap();
+                let duration = event.total_event_duration_ms.unwrap();
+                let energy = event.total_event_energy_uj.unwrap();
+                let max_current = event.maximum_event_current_ua.unwrap();
+                let boundary_energy = event.total_event_boundary_alignment_uncertainty_uj.unwrap();
+                let gap_duration = event.unattributed_duration_ms.unwrap();
+                let gap_energy = event.unattributed_energy_uj.unwrap();
+                for (field, value) in [
+                    ("event_start_ppk2_time_ms", start),
+                    ("event_end_ppk2_time_ms", end),
+                    ("total_event_duration_ms", duration),
+                    ("total_event_energy_uj", energy),
+                    ("maximum_event_current_ua", max_current),
+                    ("total_event_boundary_alignment_uncertainty_uj", boundary_energy),
+                    ("unattributed_duration_ms", gap_duration),
+                    ("unattributed_energy_uj", gap_energy),
+                ] {
+                    if !value.is_finite() || value < 0.0 {
+                        return Err(PhaseEnergyAuditError::new(
+                            format!("receipt.events.{}.{}", event.event_id, field),
+                            "must be finite and non-negative",
+                        ));
+                    }
+                }
+                let expected_boundary_energy =
+                    2.0 * max_current * receipt.voltage_v
+                        * event.phase_windows.first().map(|w| w.boundary_alignment_error_bound_ms).unwrap_or(0.0)
+                        / 1_000.0;
+                let close = |left: f64, right: f64| {
+                    (left - right).abs() <= 1e-8 * left.abs().max(right.abs()).max(1.0)
+                };
+                if end <= start
+                    || !close(end - start, duration)
+                    || !close(duration - declared_duration, gap_duration)
+                    || !close(energy - declared_energy, gap_energy)
+                    || gap_duration > receipt.maximum_unattributed_gap_ms
+                        && event.status == PhaseEnergyEventStatus::CompletePhaseCoverage
+                    || !event.missing_phase_ids.is_empty()
+                        && event.status == PhaseEnergyEventStatus::CompletePhaseCoverage
+                    || !close(boundary_energy, expected_boundary_energy)
+                {
+                    return Err(PhaseEnergyAuditError::new(
+                        format!("receipt.events.{}.envelope_consistency", event.event_id),
+                        "event duration, phase sum, unattributed residual, status or alignment bound is inconsistent",
+                    ));
+                }
+                if event.status == PhaseEnergyEventStatus::CompletePhaseCoverage {
+                    complete_count += 1;
+                } else {
+                    unattributed_count += 1;
+                }
+            }
+        }
+    }
+    if complete_count != receipt.complete_phase_coverage_events
+        || unattributed_count != receipt.unattributed_interval_events
+        || missing_count != receipt.missing_required_phase_events
+    {
+        return Err(PhaseEnergyAuditError::new("receipt.event_status_counts", "status counts do not match event inventory"));
+    }
+    if compute_phase_energy_audit_receipt_sha256(receipt)? != receipt.receipt_sha256 {
+        return Err(PhaseEnergyAuditError::new("receipt.receipt_sha256", "does not match canonical receipt"));
+    }
+    Ok(())
 }
 
 /// Rebuild the complete phase audit from source sample/marker bytes and compare the receipt.
@@ -771,12 +1011,7 @@ pub fn verify_phase_energy_receipt_against_sources(
     protocol: &ApplicationPhaseProtocolManifest,
     expected: &PhaseEnergyAuditReceipt,
 ) -> Result<(), PhaseEnergyAuditError> {
-    if expected.schema != RECEIPT_SCHEMA || expected.version != VERSION {
-        return Err(PhaseEnergyAuditError::new("receipt.schema_version", "unsupported schema/version"));
-    }
-    if !is_sha256(&expected.receipt_sha256) || compute_receipt_sha256(expected)? != expected.receipt_sha256 {
-        return Err(PhaseEnergyAuditError::new("receipt.receipt_sha256", "does not match canonical receipt"));
-    }
+    validate_phase_energy_audit_receipt(expected)?
     let rebuilt = audit_application_phase_energy(sample_csv, marker_csv, trace_config, mapping, protocol)?;
     if rebuilt.receipt != *expected {
         return Err(PhaseEnergyAuditError::new("receipt.source_reproduction", "recomputed phase receipt does not exactly match expected receipt"));
