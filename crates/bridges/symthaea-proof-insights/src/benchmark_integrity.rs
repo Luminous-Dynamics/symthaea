@@ -29,6 +29,7 @@ pub struct IntegritySummary {
     pub statement_sha256: String,
     pub integrity_status: String,
     pub repository_remote: String,
+    pub repository_branch: String,
     pub repository_commit: String,
     pub source_path: String,
     pub start_line: u64,
@@ -226,6 +227,11 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<Integrity
         bail!("dataset.source_task_id cannot be empty");
     }
     if evidence_class == "measured_audit"
+        && string(value, "/dataset/cohort_id")? != "SorryDB_2601"
+    {
+        bail!("measured SorryDB integrity receipts must identify the SorryDB_2601 cohort");
+    }
+    if evidence_class == "measured_audit"
         && hex::encode(Sha256::digest(source_task_id.as_bytes())) != task_id
     {
         bail!("dataset.task_id must be SHA-256(source_task_id) for measured receipts");
@@ -357,6 +363,7 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<Integrity
         statement_sha256,
         integrity_status: expected.to_owned(),
         repository_remote: string(value, "/target/repository_remote")?.to_owned(),
+        repository_branch: string(value, "/target/repository_branch")?.to_owned(),
         repository_commit: repository_commit.to_owned(),
         source_path: string(value, "/target/source_path")?.to_owned(),
         start_line,
