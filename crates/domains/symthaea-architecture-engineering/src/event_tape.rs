@@ -65,6 +65,127 @@ pub struct PolicySnapshot {
     pub has_hidden_oracle_access: bool,
 }
 
+/// Observation semantics for a multi-objective EventTape campaign.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EventTapeObjectiveMode {
+    DeterministicVector,
+    NoisyReplicates,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EventTapeObjectiveSpec {
+    pub objective_id: String,
+    pub direction: ObjectiveDirection,
+    pub observation_lower_bound: Option<f64>,
+    pub observation_upper_bound: Option<f64>,
+    pub bounds_certificate_sha256: Option<String>,
+}
+
+/// Frozen objective order, reference point and (for noisy mode) sampling assumptions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EventTapeObjectiveContract {
+    pub schema: String,
+    pub version: String,
+    pub mode: EventTapeObjectiveMode,
+    pub objective_specs: Vec<EventTapeObjectiveSpec>,
+    pub reference_point_raw: Vec<f64>,
+    pub sampling_protocol_id: Option<String>,
+    pub sampling_protocol_sha256: Option<String>,
+    pub noise_model_id: Option<String>,
+    pub noise_model_sha256: Option<String>,
+    pub familywise_alpha: Option<f64>,
+    pub max_candidates: Option<usize>,
+    pub minimum_replicates: Option<usize>,
+}
+
+impl EventTapeObjectiveContract {
+    pub fn validate(&self) -> Result<(), EventTapeError> {
+        if self.schema != OBJECTIVE_CONTRACT_SCHEMA || self.version != OBJECTIVE_CONTRACT_VERSION {
+            return Err(EventTapeError::new("header.objective_contract.schema", "unsupported objective-contract schema/version"));
+        }
+        if !(2..=MAX_OBJECTIVE_DIMENSIONS).contains(&self.objective_specs.len()) {
+            return Err(EventTapeError::new("header.objective_contract.objective_specs", "objective dimension must be between two and sixteen"));
+        }
+        if self.reference_point_raw.len() != self.objective_specs.len()
+            || self.reference_point_raw.iter().any(|value| !value.is_finite())
+        {
+            return Err(EventTapeError::new("header.objective_contract.reference_point_raw", "reference point must contain one finite coordinate per objective"));
+        }
+        let mut ids = BTreeSet::new();
+        for (index, objective) in self.objective_specs.iter().enumerate() {
+            if objective.objective_id.trim().is_empty() || !ids.insert(objective.objective_id.as_str()) {
+                return Err(EventTapeError::new(format!("header.objective_contract.objective_specs[{index}].objective_id"), "objective IDs must be non-empty and unique; order is significant"));
+            }
+        }
+        match self.mode {
+            EventTapeObjectiveMode::DeterministicVector => {
+                if self.objective_specs.iter().any(|item| item.observation_lower_bound.is_some()
+                    || item.observation_upper_bound.is_some() || item.bounds_certificate_sha256.is_some())
+                    || self.sampling_protocol_id.is_some() || self.sampling_protocol_sha256.is_some()
+                    || self.noise_model_id.is_some() || self.noise_model_sha256.is_some()
+                    || self.familywise_alpha.is_some() || self.max_candidates.is_some()
+                    || self.minimum_replicates.is_some()
+                {
+                    return Err(EventTapeError::new("header.objective_contract", "deterministic-vector mode cannot carry noisy sampling metadata"));
+                }
+            }
+            EventTapeObjectiveMode::NoisyReplicates => {
+                for (index, objective) in self.objective_specs.iter().enumerate() {
+                    let lower = objective.observation_lower_bound.ok_or_else(|| EventTapeError::new(
+                        format!("header.objective_contract.objective_specs[{index}].observation_lower_bound"),
+                        "noisy objective requires a certified lower bound",
+                    ))?;
+                    let upper = objective.observation_upper_bound.ok_or_else(|| EventTapeError::new(
+                        format!("header.objective_contract.objective_specs[{index}].observation_upper_bound"),
+                        "noisy objective requires a certified upper bound",
+                    ))?;
+                    if !lower.is_finite() || !upper.is_finite() || lower >= upper || !(upper - lower).is_finite() {
+                        return Err(EventTapeError::new(format!("header.objective_contract.objective_specs[{index}]"), "observation bounds must be finite and strictly increasing"));
+                    }
+                    validate_sha256(objective.bounds_certificate_sha256.as_deref().ok_or_else(|| EventTapeError::new(
+                        format!("header.objective_contract.objective_specs[{index}].bounds_certificate_sha256"),
+                        "noisy objective requires a bounds-certificate digest",
+                    ))?, &format!("header.objective_contract.objective_specs[{index}].bounds_certificate_sha256"))?;
+                }
+                validate_non_empty(self.sampling_protocol_id.as_deref().unwrap_or(""), "header.objective_contract.sampling_protocol_id")?;
+                validate_non_empty(self.noise_model_id.as_deref().unwrap_or(""), "header.objective_contract.noise_model_id")?;
+                validate_sha256(self.sampling_protocol_sha256.as_deref().unwrap_or(""), "header.objective_contract.sampling_protocol_sha256")?;
+                validate_sha256(self.noise_model_sha256.as_deref().unwrap_or(""), "header.objective_contract.noise_model_sha256")?;
+                let alpha = self.familywise_alpha.ok_or_else(|| EventTapeError::new("header.objective_contract.familywise_alpha", "noisy mode requires family-wise alpha"))?;
+                if !alpha.is_finite() || !(0.0..1.0).contains(&alpha) {
+                    return Err(EventTapeError::new("header.objective_contract.familywise_alpha", "alpha must be finite and strictly between zero and one"));
+                }
+                let max_candidates = self.max_candidates.unwrap_or(0);
+                if max_candidates == 0 || max_candidates > MAX_OBJECTIVE_CANDIDATES
+                    || self.minimum_replicates.unwrap_or(0) == 0
+                {
+                    return Err(EventTapeError::new("header.objective_contract", "noisy mode requires max_candidates in range and a positive minimum replicate count"));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn contract_sha256(&self) -> Result<String, EventTapeError> {
+        self.validate()?;
+        digest_serializable(self)
+    }
+}
+
+/// Result of a charged noisy replicate attempt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NoisyObservationDisposition {
+    Succeeded,
+    Failed,
+    Invalid,
+    TimedOut,
+    VerifierRejected,
+}
+
 /// Immutable experiment identity and comparison contract.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EventTapeHeader {
