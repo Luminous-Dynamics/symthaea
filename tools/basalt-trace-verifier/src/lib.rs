@@ -731,16 +731,16 @@ fn validate_structure(trace: &Trace, errors: &mut Vec<String>) {
                 );
             }
         }
-        if let Some(previous) = witness.predecessor_witness_digest.as_deref() {
-            if !catalog.contains(previous) {
-                push_error(
-                    errors,
-                    format!(
-                        "witness {} predecessor digest absent from fixture catalog",
-                        witness.sequence
-                    ),
-                );
-            }
+        if let Some(previous) = witness.predecessor_witness_digest.as_deref()
+            && !catalog.contains(previous)
+        {
+            push_error(
+                errors,
+                format!(
+                    "witness {} predecessor digest absent from fixture catalog",
+                    witness.sequence
+                ),
+            );
         }
     }
     for receipt in &trace.final_observation.accepted_receipts {
