@@ -191,13 +191,14 @@ pub fn analyze_joint_interactions(
         expected,
         actual: 0,
     })?;
-
-    let run_at = |mask: usize| -> Result<&JointSubsetRun, JointBudgetError> {
-        by_mask[mask].ok_or(JointBudgetError::MissingSubset { mask: mask as u64 })
-    };
-    let feasible = |mask: usize| -> Result<bool, JointBudgetError> {
-        let run = run_at(mask)?;
-        Ok(compatible(mask as u64, &groups) && run.measured_resources.fits_within(context.resource_budget))
+    let by_mask: Vec<&JointSubsetRun> = by_mask
+        .into_iter()
+        .enumerate()
+        .map(|(mask, run)| run.ok_or(JointBudgetError::MissingSubset { mask: mask as u64 }))
+        .collect::<Result<_, _>>()?;
+    let feasible = |mask: usize| -> bool {
+        compatible(mask as u64, &groups)
+            && by_mask[mask].measured_resources.fits_within(context.resource_budget)
     };
 
     let mut action_marginals = Vec::with_capacity(ids.len());
@@ -215,7 +216,7 @@ pub fn analyze_joint_interactions(
                 continue;
             }
             let with_action = mask | bit;
-            if !feasible(mask as usize)? || !feasible(with_action)? {
+            if !feasible(mask) || !feasible(with_action) {
                 if !compatible(mask as u64, &groups) || !compatible(with_action as u64, &groups) {
                     result.excluded_incompatible_contexts = result.excluded_incompatible_contexts
                         .checked_add(1).ok_or(JointBudgetError::ArithmeticOverflow)?;
@@ -225,8 +226,8 @@ pub fn analyze_joint_interactions(
                 }
                 continue;
             }
-            let before = run_at(mask)?.outcome;
-            let after = run_at(with_action)?.outcome;
+            let before = by_mask[mask].outcome;
+            let after = by_mask[with_action].outcome;
             result.exposure_reduction.push_difference(before, after)?;
             result.eligible_contexts = result.eligible_contexts
                 .checked_add(1).ok_or(JointBudgetError::ArithmeticOverflow)?;
@@ -263,16 +264,16 @@ pub fn analyze_joint_interactions(
                         .checked_add(1).ok_or(JointBudgetError::ArithmeticOverflow)?;
                     continue;
                 }
-                if !feasible(mask)? || !feasible(mask_i)? || !feasible(mask_j)? || !feasible(mask_ij)? {
+                if !feasible(mask) || !feasible(mask_i) || !feasible(mask_j) || !feasible(mask_ij) {
                     result.excluded_over_budget_contexts = result.excluded_over_budget_contexts
                         .checked_add(1).ok_or(JointBudgetError::ArithmeticOverflow)?;
                     continue;
                 }
                 result.interaction.push_interaction(
-                    run_at(mask)?.outcome,
-                    run_at(mask_i)?.outcome,
-                    run_at(mask_j)?.outcome,
-                    run_at(mask_ij)?.outcome,
+                    by_mask[mask].outcome,
+                    by_mask[mask_i].outcome,
+                    by_mask[mask_j].outcome,
+                    by_mask[mask_ij].outcome,
                 )?;
                 result.eligible_contexts = result.eligible_contexts
                     .checked_add(1).ok_or(JointBudgetError::ArithmeticOverflow)?;
