@@ -10,7 +10,8 @@ use sha2::{Digest, Sha256};
 use std::error::Error;
 use std::time::Instant;
 use symthaea_iit::{
-    Iit4SystemPhiSearchConfig, SparseBinaryCausalModel, SparseMechanismCpt,
+    AnalysisQuantity, AnalysisRequest, FormalismProfile, Iit4SystemPhiSearchConfig,
+    SparseBinaryCausalModel, SparseMechanismCpt,
 };
 
 const FORMALISM: &str = "IIT_4_0_2023";
@@ -77,7 +78,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     println!(
-        "landscape_algorithm_id,formalism,parameter_name,theta,grid_index,model_sha256,evaluation_sha256,request_sha256,complete,status,phi_s,selected_state_pair_index,tied_state_pair_indices,cause_state_family,effect_state_family,cause_selection_margin,effect_selection_margin,winning_mip_cut_sha256,winning_mip_parts,winning_mip_directions,partition_margin,partition_score_evaluations,receipt_sha256,elapsed_ns,qualification"
+        "landscape_algorithm_id,formalism,parameter_name,theta,grid_index,sparse_model_sha256,sparse_evaluation_sha256,sparse_request_sha256,canonical_dense_model_sha256,canonical_dense_evaluation_sha256,canonical_dense_analysis_request_sha256,complete,status,phi_s,selected_state_pair_index,tied_state_pair_indices,cause_state_family,effect_state_family,cause_selection_margin,effect_selection_margin,winning_mip_cut_sha256,winning_mip_parts,winning_mip_directions,partition_margin,partition_score_evaluations,receipt_sha256,elapsed_ns,qualification"
     );
 
     for (grid_index, theta) in grid.iter().copied().enumerate() {
@@ -95,8 +96,23 @@ fn main() -> Result<(), Box<dyn Error>> {
             config,
             FACTOR_BUDGET,
         )?;
-        let model_sha256 = causal_model.model_sha256();
-        let evaluation_sha256 = causal_model.evaluation_sha256(&STATE)?;
+        let sparse_model_sha256 = causal_model.model_sha256();
+        let sparse_evaluation_sha256 = causal_model.evaluation_sha256(&STATE)?;
+        // Cross-language identity uses the canonical dense TPM wire contract
+        // shared with the pinned PyPhi oracle. The sparse representation keeps
+        // its own distinct identity as well.
+        let dense_model = causal_model.to_dense()?;
+        let canonical_dense_model_sha256 = dense_model.model_sha256();
+        let canonical_dense_evaluation_sha256 = dense_model.evaluation_sha256(&STATE)?;
+        let dense_request = AnalysisRequest::new(
+            &dense_model,
+            STATE.to_vec(),
+            CANDIDATE.to_vec(),
+            FormalismProfile::Iit4_0_2023,
+            AnalysisQuantity::Iit4SystemPhiS,
+        )?;
+        let canonical_dense_analysis_request_sha256 =
+            dense_request.request_sha256(&dense_model);
         let receipt_sha256 = analysis.receipt_sha256()?;
         let selected_index = analysis.selected_state_pair_index;
         let selected = selected_index.and_then(|index| analysis.state_pair_results.get(index));
@@ -116,15 +132,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         let elapsed_ns = started.elapsed().as_nanos();
 
         println!(
-            "{},{},{},{:.8},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},EXACT_SAMPLE_ONLY",
+            "{},{},{},{:.8},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},EXACT_SAMPLE_ONLY",
             LANDSCAPE_ALGORITHM_ID,
             FORMALISM,
             "target0_parent_state_3_probability",
             theta,
             grid_index,
-            model_sha256,
-            evaluation_sha256,
+            sparse_model_sha256,
+            sparse_evaluation_sha256,
             analysis.request_sha256,
+            canonical_dense_model_sha256,
+            canonical_dense_evaluation_sha256,
+            canonical_dense_analysis_request_sha256,
             analysis.complete,
             format!("{:?}", analysis.status),
             optional_float(analysis.phi_s),
