@@ -459,6 +459,47 @@ fn optional_digest_field<'a>(value: &'a Value, pointer: &str) -> Result<Option<&
     }
 }
 
+fn source_span_sha256(
+    source_bytes: &[u8],
+    start_line: u64,
+    start_column: u64,
+    end_line: u64,
+    end_column: u64,
+) -> Result<String> {
+    let source = std::str::from_utf8(source_bytes).context("source file artifact must be UTF-8")?;
+    if start_line == 0 || end_line < start_line {
+        bail!("source span has invalid line coordinates");
+    }
+    let lines: Vec<&str> = source.lines().collect();
+    let first_index = usize::try_from(start_line - 1).context("start line does not fit usize")?;
+    let last_index = usize::try_from(end_line - 1).context("end line does not fit usize")?;
+    let first = *lines.get(first_index).context("source span starts beyond end of file")?;
+    let last = *lines.get(last_index).context("source span ends beyond end of file")?;
+    let first_chars: Vec<char> = first.chars().collect();
+    let last_chars: Vec<char> = last.chars().collect();
+    let start = usize::try_from(start_column).context("start column does not fit usize")?;
+    let end = usize::try_from(end_column).context("end column does not fit usize")?;
+    if start > first_chars.len() || end > last_chars.len()
+        || (start_line == end_line && end < start)
+    {
+        bail!("source span columns exceed source line bounds or are reversed");
+    }
+
+    let mut selected = String::new();
+    if first_index == last_index {
+        selected.extend(first_chars[start..end].iter());
+    } else {
+        selected.extend(first_chars[start..].iter());
+        for line in lines.iter().take(last_index).skip(first_index + 1) {
+            selected.push('\n');
+            selected.push_str(line);
+        }
+        selected.push('\n');
+        selected.extend(last_chars[..end].iter());
+    }
+    Ok(hex::encode(Sha256::digest(selected.as_bytes())))
+}
+
 fn verify_evidence_artifacts(value: &Value, evidence_root: &Path) -> Result<usize> {
     let evidence_class = string(value, "/evidence_class")?;
     if evidence_class == "synthetic_contract_fixture" {
@@ -548,6 +589,18 @@ fn verify_evidence_artifacts(value: &Value, evidence_root: &Path) -> Result<usiz
             name,
         )?;
         match name {
+            "source_file" => {
+                let actual_span = source_span_sha256(
+                    &bytes,
+                    integer(value, "/target/start_line")?,
+                    integer(value, "/target/start_column")?,
+                    integer(value, "/target/end_line")?,
+                    integer(value, "/target/end_column")?,
+                )?;
+                if actual_span != string(value, "/target/source_span_sha256")? {
+                    bail!("source coordinates do not select the registered source-span bytes");
+                }
+            }
             "used_axioms_manifest" => verify_axiom_artifact(&bytes, &used_axioms, name)?,
             "allowlist_manifest" => verify_axiom_artifact(&bytes, &allowlist, name)?,
             _ => {}
