@@ -115,6 +115,34 @@ class PredictableArrivalEclosureTests(unittest.TestCase):
         )
         self.assertNotEqual(expected, altered_history_digest)
 
+
+    def test_external_context_digest_is_bound_to_activation(self):
+        events = copy.deepcopy(self.events)
+        activation = next(
+            e for e in events
+            if e["kind"] == "activation_commit" and e["round"] == 2
+        )
+        context = "a" * 64
+        activation["context_sha256"] = context
+        activation["pre_state_sha256"] = activation_state_digest(
+            self.hypotheses,
+            2,
+            ["h1"],
+            [[0, "h1"]],
+            [[0, "h1", 1], [1, "h1", 8]],
+            context_sha256=context,
+        )
+        self.assertTrue(
+            audit_predictable_arrival_ledger(
+                self.hypotheses, events, len(self.capacity)
+            )["valid"]
+        )
+        activation["context_sha256"] = "b" * 64
+        with self.assertRaisesRegex(ValueError, "recorded prefix and context digest"):
+            audit_predictable_arrival_ledger(
+                self.hypotheses, events, len(self.capacity)
+            )
+
     def test_activation_after_current_round_evidence_is_rejected(self):
         bad = copy.deepcopy(self.events)
         activation_index = next(
