@@ -180,6 +180,8 @@
         "op_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$" },
         "client_id": { "type": "string", "minLength": 1 },
         "client_sequence": { "type": "integer", "minimum": 0 },
+        "retry_group_id": { "type": "string", "minLength": 1 },
+        "transaction_attempt": { "type": "integer", "minimum": 1 },
         "kind": { "enum": ["advance", "receipt_lookup", "restore_verify", "policy_publish"] },
         "scope": {
           "type": "object",
@@ -223,6 +225,7 @@
                 "duplicate",
                 "compare_conflict",
                 "indeterminate",
+                "retryable_abort",
                 "receipt_found",
                 "rejected_anti_rollback_unknown",
                 "rejected_anti_rollback"
@@ -302,6 +305,7 @@
             "response_loss",
             "network_partition",
             "network_delay",
+            "serialization_failure",
             "member_restart",
             "snapshot_restore",
             "witness_unavailable"
