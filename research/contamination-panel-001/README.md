@@ -774,3 +774,36 @@ Schemas:
 
 
 The CLI refuses trace files larger than 256 MiB and findings files larger than 64 MiB using bounded reads (limit + 1 bytes), before JSON deserialization. The library auditor separately caps event/finding counts and allowlist entries.
+
+
+### Evaluator-only response-body matching
+
+The matcher accepts retained raw response bodies from evaluator-controlled storage and checks them against the exact fresh challenge packet and sealed oracle. It emits only response digests, matched item IDs, deterministic class labels and method metadata.
+
+~~~sh
+cargo run --locked -- match-search-time-bodies \
+  /secure/evaluator/search-time-trace.json \
+  /secure/evaluator/fresh-public-packet.json \
+  /secure/evaluator/fresh-sealed-oracle.json \
+  /secure/evaluator/fresh-manifest.json \
+  /secure/evaluator/retained-response-bodies.json \
+  /secure/evaluator/unavailable-body-event-sequences.json \
+  /secure/evaluator/search-time-findings.json
+~~~
+
+The retained-response-body file is an evaluator-only array containing the event sequence, content type, exact UTF-8 response body and response-body digest. The digest domain is \`search-time-response-body.v1\`; the corresponding trace event must use the same digest and exact byte count.
+
+The matching precedence is:
+1. **Answer-bearing:** an exact JSON integer pair matching one or more sealed oracle solutions.
+2. **Context-bearing:** exact normalized task-text sequence, or at least two distinct shared six-token shingles (lexical near-duplicate rule).
+3. **Metadata-only:** exact benchmark/batch/version/task-family or task-item identifier.
+4. **Unknown:** no deterministic match under the rules above.
+
+The six-token overlap rule is a candidate duplicate detector, not a semantic paraphrase detector. Its 800-permille field is an ordinal rule-strength marker, not a calibrated probability. Exact rules receive 1000. Do not interpret either as posterior confidence.
+
+Every allowed event with response bytes must be represented by retained body evidence or explicitly listed as unavailable. This is enforced in the findings audit. Coverage is reported as retained response-body evidence divided by all response-bearing allowed events; unavailable bodies are never silently counted as clean.
+
+Raw response body text is not copied into the findings report. Keep the source bodies in evaluator-only storage. This is necessary both for oracle secrecy and to avoid publishing private browsing contents, credentials or unrelated personal information.
+
+Tests include four deterministic synthetic classes: exact answer, full task-text context, task-item metadata, and unrelated unknown content. The matcher is intentionally deterministic and auditable; future semantic models must be separately versioned, calibrated against human adjudication, and accompanied by false-positive/false-negative confidence bounds.
+
