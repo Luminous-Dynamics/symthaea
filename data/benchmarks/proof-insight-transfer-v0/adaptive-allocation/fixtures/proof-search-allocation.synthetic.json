@@ -10,7 +10,7 @@
   },
   "policy": {
     "policy_id": "pitb-lcb-shadow-price-v0",
-    "policy_sha256": "d80417d62ce382fdcb437a24e34ef3c4ef99a21a7c5ca727894c79240deca1d6",
+    "policy_sha256": "cdba67538109b5aa4e21e3acc8b0d90121524799eee19a8dda89a7f928bffcda",
     "calibration_manifest_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
     "calibration_split": "validation",
     "calibration_sample_count": 1600,
@@ -26,7 +26,7 @@
       "cost_microusd": 200000
     },
     "confidence_z_hundredths": 196,
-    "calibration_receipt_sha256": "0e331de8ebff70d32a21db23eb61c7a26c09d39be3ae541d7dfefda447429761",
+    "calibration_receipt_sha256": "d1de3a32903265b1e8fb6c8f31a16e2902d68118a69ef8ba7906ce64891f6e40",
     "prediction_model_id": "synthetic-action-outcome-estimator",
     "prediction_model_version": "fixture-only"
   },
@@ -46,7 +46,7 @@
       "predicted_incremental_success_ppm": 420000,
       "standard_error_ppm": 50000,
       "prediction_evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
-      "calibration_receipt_sha256": "0e331de8ebff70d32a21db23eb61c7a26c09d39be3ae541d7dfefda447429761",
+      "calibration_receipt_sha256": "d1de3a32903265b1e8fb6c8f31a16e2902d68118a69ef8ba7906ce64891f6e40",
       "preconditions_met": true,
       "expected_resources": {
         "tokens": 20000,
@@ -64,7 +64,7 @@
       "predicted_incremental_success_ppm": 250000,
       "standard_error_ppm": 20000,
       "prediction_evidence_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
-      "calibration_receipt_sha256": "0e331de8ebff70d32a21db23eb61c7a26c09d39be3ae541d7dfefda447429761",
+      "calibration_receipt_sha256": "d1de3a32903265b1e8fb6c8f31a16e2902d68118a69ef8ba7906ce64891f6e40",
       "preconditions_met": true,
       "expected_resources": {
         "tokens": 10000,
@@ -82,7 +82,7 @@
       "predicted_incremental_success_ppm": 300000,
       "standard_error_ppm": 25000,
       "prediction_evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "calibration_receipt_sha256": "0e331de8ebff70d32a21db23eb61c7a26c09d39be3ae541d7dfefda447429761",
+      "calibration_receipt_sha256": "d1de3a32903265b1e8fb6c8f31a16e2902d68118a69ef8ba7906ce64891f6e40",
       "preconditions_met": true,
       "expected_resources": {
         "tokens": 40000,
