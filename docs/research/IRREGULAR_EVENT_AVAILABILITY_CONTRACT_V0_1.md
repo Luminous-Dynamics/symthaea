@@ -83,3 +83,32 @@ known-future covariate publication/validity, entity filtering and tie handling.
 No Cargo build, rustfmt, Clippy, tests or real dataset adapter has run. This
 contract is a candidate-side causality guard, not proof of correct ingestion
 from an external benchmark.
+
+
+## 7. Microsecond bitemporal revision history
+
+The crate includes an append-only `BitemporalEventLedger` for streaming
+observations. `event_time_us` is valid/world time; `recorded_at_us` is
+transaction/knowledge time. Each event has contiguous revision numbering.
+Corrections append Supersede operations and retractions append Retract
+operations; previous revisions are never mutated.
+
+Queries use both coordinates: a revision is considered only if recorded by the
+knowledge-time cutoff, its latest event revision is not retracted, its event
+time is no later than the valid-time cutoff, and the record was available by
+the knowledge time. This makes "what happened by V, according to what we knew
+at T?" independently testable at microsecond resolution.
+
+Transactions require one shared timestamp and strictly increasing timestamps
+between commits. A failed multi-event batch leaves the original ledger
+unchanged. Active source sequence uniqueness is checked at commit. The history
+has a domain-separated SHA-256 digest.
+
+This is a precision extension to, not a replacement for, the existing
+Broca source ledger in `crates/domains/symthaea-broca/src/memory_bitemporal.rs`
+(PR #9109) and combined bitemporal/alternative-proof runtime (PR #9292).
+Broca's source valid-time uses `NaiveDate`; this streaming extension uses
+microsecond timestamps and does not yet join the derived justification graph.
+
+The crate now has 27 source-authored test functions: 16 event contract tests
+and 11 bitemporal source-revision tests. No Rust build or test has run.
