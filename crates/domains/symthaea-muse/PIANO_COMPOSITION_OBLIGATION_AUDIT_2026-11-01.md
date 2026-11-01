@@ -14,9 +14,17 @@ The piano excellence programme (#9729) already separates composition, performanc
 
 We should connect these pieces rather than create a competing planner, fingerprint, or listening harness.
 
-The missing scientific seam is **plan-to-score accountability**. A composer can emit a plan that says “introduce a theme, transform it in the middle, and bring it home” while its finished score fails to realize that development. A plan label or a plausible fingerprint is not proof. We need a separate verifier that checks each declared compositional obligation against the exact symbolic score.
+The next seam is **stronger plan-to-score accountability**, but it is important not to duplicate what already exists. A source audit found that Muse already has:
 
-This is not an attempt to formalize beauty. It is a way to make compositional claims inspectable and falsifiable.
+- `GrammarStructuralTrace` and composer-authored motif, cadence, structural-span and obligation-transition assertions;
+- protocol-level `ComposerStructuralTrace`, `TraceVerificationReport`, and `MotifEvidenceReconciliation`;
+- `Analyst::verify_composer_trace`, which checks exact event references, motif-family/region bindings, event order, approximate contour/rhythm distance, cadence-arrival markers, and obligation lifecycle/evidence references;
+- `Analyst::reconcile_motif_evidence`, which reconciles composer-asserted motif occurrences with the independent score-window scanner by shared event identities;
+- `ObligationKind` and `ObligationLedger` in the music-theory crate, plus `MotifReturnEvidence` for transformation-aware symbolic comparison.
+
+That is a meaningful existing foundation. The missing work is not another COE record format or another generic verifier. It is to strengthen the semantics of the existing Analyst path so that a valid-looking assertion cannot be mistaken for proof that the promised musical event actually occurred.
+
+This is not an attempt to formalize beauty. It is a way to make selected compositional claims more inspectable and falsifiable while leaving artistic judgment to listeners.
 
 ## Fresh benchmark landscape: MIREX 2026
 
@@ -51,44 +59,46 @@ MAESTRO remains a useful aligned piano performance corpus (approximately 200 hou
 
 **Architectural consequence:** retain separate identities for notated beat time, performed event time, and rendered sample time. Do not replace the current exact symbolic score with a 10 ms lattice merely because one paper found a distributional advantage for a performance-token model. Benchmark the conversion and round-trip error first (#9476).
 
-## New proposal: Composition Obligation Evidence (COE)
+## Proposed extension: strengthen the existing Analyst, do not add a second evidence system
 
-A grammar/planning component may declare obligations, but it may not certify its own success. A downstream verifier receives the exact score plus the plan/trace and returns one status per obligation:
+The current verifier already performs valuable independent checks, but the implementation leaves several semantic gaps that should become explicit research targets.
 
-- `verified`: the required score evidence was independently found;
-- `not_met`: evidence contradicts or fails the declared obligation;
-- `unknown`: the available score representation or evidence cannot decide;
-- `not_applicable`: this grammar does not make that kind of claim;
-- `invalid_evidence`: malformed identity, digest, span, or contradictory evidence.
+### Verified foundations
 
-Examples of obligations:
+The present `verify_composer_trace` checks:
+- that asserted event IDs exist in the exact `ListenCompositionBundle`;
+- that structural span endpoints are ordered and parent spans exist;
+- that motif families and formal regions exist, that motif events exist and are ordered in one voice, and that claimed distances are in range;
+- a recomputed contour/duration-shape distance against the declared motif occurrence;
+- that a cadence arrival event is marked cadential and that its evidence event IDs exist;
+- that obligation lifecycle transitions are continuous, responsible passes are named, and a fulfilled transition cites at least one existing score event.
 
-| Obligation | Evidence the verifier must locate |
-|---|---|
-| Motif introduction | Exact opening score span and canonical motif identity |
-| Motif transformation | Later span plus a recognized transformation relation to the source motif |
-| Motif return | A later, score-bound occurrence satisfying the declared return relation |
-| Section contrast | Distinct, measurable structural evidence across declared sections—not only different labels |
-| Call and response | Ordered phrase spans and a declared response relationship |
-| Ground variation | Persistent ground identity plus measurable variation in the dependent material |
-| Cadential/ending intent | Exact final phrase and the applicable grammar-specific closure evidence |
+The existing motif reconciler then compares asserted motif occurrences to independently scanned motif occurrences. Keep this mechanism and its explicit states (matched, not recovered, inferred but not asserted, ambiguous, rejected).
 
-The verifier must not force every musical language into common-practice tonal norms. A drone, modal unfolding, additive process, groove cycle, ambient texture or intentionally open ending needs its own declared grammar contract. An unsupported property is `unknown` or `not_applicable`, never a silent pass or a false failure.
+### Semantic gaps to investigate and close
 
-### Proposed versioned evidence record
+1. **Obligation type is not bound into the protocol transition.** The current `ObligationTransitionTrace` carries an ID, lifecycle state, event IDs, responsible pass and optional transformation string, but not the typed `ObligationKind` or the corresponding immutable ledger definition. Consequently the verifier can establish that a fulfilled transition cites real notes, but cannot establish that those notes satisfy a `ReturnMotif`, `ReachKey`, `ReachClimax`, `ResolveAlteredDegree`, or other promised condition.
 
-The first implementation can be a small additive type in the music-theory crate. Its semantic fields should include:
+2. **Cadence type is not independently re-derived.** The current verifier checks that the arrival event has a cadential marker and that evidence references resolve. Its own report explicitly discloses that harmonic cadence type is not re-derived. A composer could therefore label a cadence “authentic” while the actual harmonic preparation/arrival does not support that label.
 
-- schema and verifier version;
-- exact canonical score digest;
-- grammar family and plan digest;
-- stable obligation ID and obligation kind;
-- source motif/ground identity digest, where applicable;
-- exact part and score-time span references;
-- observed transformation/evidence references;
-- status and machine-readable failure reasons.
+3. **Motif claims are not yet fully transformation-verified.** The verifier checks an approximate structural-distance measurement and literal-distance consistency, but does not fully recompute every declared item in `transformation_chain` against the source motif and exact target notes. The separate `MotifReturnEvidence` logic is available and should be integrated or compared without treating its symbolic similarity as proof of human recognition.
 
-Do not infer a stable note identity from pitch, index, channel, or timing. Reuse the producer-assigned identity contract where available. A content digest establishes integrity, not authorship or signature authority. The composer supplies claims; an independent verifier recomputes evidence.
+4. **Trace validity and score realization must remain separate.** An event reference being valid is not evidence that the event is musically relevant to the obligation. Likewise, shared note IDs between an assertion and a scanner result should not by themselves establish semantic equivalence if the transformation or expected relationship differs.
+
+5. **Coverage must be explicit.** The report should distinguish verified, contradicted, ambiguous, and insufficiently evidenced obligations. Unsupported grammar semantics should yield an explicit non-pass/unknown state, not be silently accepted or forced into tonal rules.
+
+### Minimal compatible design
+
+Extend existing protocol/Analyst contracts additively where needed; do not introduce a parallel `CompositionObligationEvidenceV1` container.
+
+- Bind each transition to its typed obligation definition (or to an immutable, score-bound ledger entry whose canonical digest and full definition are available to the verifier).
+- Keep the exact score digest, plan/trace provenance, stable event IDs and existing `TraceVerificationReport` as the evidence envelope.
+- Re-derive obligation-specific conditions from exact score facts and the grammar-specific verifier. For a motif return, compare the promised source material with the cited target span under the requested transformation. For a destination key, inspect the declared tonal evidence in the destination region. For a cadence, inspect the harmonic and melodic evidence rather than trusting the arrival label.
+- Reuse `MotifReturnEvidence`, `ObligationKind`, `ObligationLedger`, and existing protocol reconciliation types wherever their semantics fit.
+- Version any wire additions and preserve backward compatibility: legacy traces that do not carry the typed obligation definition must be reported as insufficient evidence for semantic fulfilment, not grandfathered into verified status.
+- Preserve grammar-specific domains. A drone/process work should not fail because it lacks an authentic cadence; an intentionally open form should not be required to return its opening motif.
+
+The verifier's output remains mechanical evidence about declared score properties, not an aesthetic score and not an assertion that a listener will recognize or enjoy the motif.
 
 ## Counterfactual composition experiment
 
@@ -143,7 +153,7 @@ At matched generation and selection budgets:
 - current canonical Muse generator;
 - explicit grammar-plan path;
 - plan path with one obligation mechanism ablated;
-- plan path with all proposed COE verification enabled;
+- plan path with the strengthened existing Analyst verifier enabled;
 - available MIREX systems/organizer outputs where reproducible and lawfully accessible.
 
 Report first-candidate results separately from best-of-N. If using eight candidates to mirror MIREX, disclose all eight and do not quietly compare Symthaea's best-of-eight with a baseline's first output.
@@ -165,7 +175,7 @@ Keep validity, originality, intent adherence, diversity and artistic preference 
 
 Use blinded, randomized, level-matched pairs with ties and “neither” options. Ask separately about phrase direction, thematic identity, coherence, surprise, memorability, emotional consequence and desire to listen again. Stratify experienced pianists/composers from general listeners; include hidden repeats and a delayed return-listening task. Freeze the protocol and perform power/precision analysis before recruiting the confirmatory panel.
 
-Automated FMD/FAD/CLAP or the COE verifier may explain specific properties. None is a substitute for listeners.
+Automated FMD/FAD/CLAP or the symbolic verifier may explain specific properties. None is a substitute for listeners.
 
 ## Initial research gates (targets, not results)
 
@@ -179,11 +189,11 @@ Automated FMD/FAD/CLAP or the COE verifier may explain specific properties. None
 
 ## Implementation sequence
 
-1. Audit the current grammar plans, structural traces, obligation verifier and score fingerprint; reuse their semantics.
-2. Define the smallest versioned COE schema and a verifier that reads exact score/plan artifacts without trusting composer-supplied “verified” flags.
-3. Add deterministic positive and adversarial fixtures for the supported grammar families.
-4. Add paired structural interventions to the existing listening/benchmark pack rather than creating another pack framework.
-5. Add the 32/64-bar piano brief suite and exact manifest/seed/candidate accounting.
-6. Connect to #9729's blind listening protocol only after mechanical obligations and artifact lineage are stable.
+1. Extend the existing `ObligationTransitionTrace`/ledger linkage so the verifier can see the typed obligation definition, with a versioned additive migration.
+2. Add obligation-specific score re-derivation in `Analyst::verify_composer_trace`; use exact score events and existing motif-return/cadence primitives.
+3. Add deterministic positive and adversarial fixtures, including fulfilled-but-irrelevant events, false cadence labels, and false transformation labels.
+4. Reuse the existing `TraceVerificationReport` and `MotifEvidenceReconciliation`; do not create a second evidence container or listening harness.
+5. Add paired structural interventions to the existing listening pack and the 32/64-bar piano brief suite with exact manifest/seed/candidate accounting.
+6. Connect to #9729's blind listening protocol only after mechanical obligation semantics and artifact lineage are stable.
 
 No training run, renderer capability, compile, test, or listener result is claimed by this design note. The next source PR should be narrow and should not be opened as merge-ready until exact-head Rust checks and independent fixture evidence exist.
