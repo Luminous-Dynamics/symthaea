@@ -38,7 +38,7 @@
     "separately_versioned_and_charged": true
   },
   "validation_status": {
-    "rust_test_functions_authored": 44,
+    "rust_test_functions_authored": 53,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
@@ -47,7 +47,8 @@
     "event_contract_test_functions_authored": 16,
     "bitemporal_test_functions_authored": 11,
     "purged_split_test_functions_authored": 8,
-    "train_only_scaler_test_functions_authored": 9
+    "train_only_scaler_test_functions_authored": 9,
+    "time_imm_adapter_test_functions_authored": 9
   },
   "opaque_payload_contract": {
     "fields": [
@@ -131,5 +132,60 @@
       "sample_std"
     ],
     "physical_measurement_claim": false
+  },
+  "time_imm_adapter": {
+    "module": "research/irregular-event-contract/src/time_imm.rs",
+    "repository_commit": "e934cef23d526817dcf0d1a66c6f82274c96c04b",
+    "sample_entity": "EPA-Air/Bexar",
+    "numeric_file": {
+      "blob_sha256": "c12a34fa63f6fdab7b9608a3c581b0d929a2626e",
+      "data_rows": 4370,
+      "columns": [
+        "date_time",
+        "record_id",
+        "temp",
+        "pm2_5",
+        "aqi",
+        "ozone"
+      ]
+    },
+    "text_file": {
+      "blob_sha256": "01840c5b62c699e2a3a9b5d6198067c383df8485",
+      "data_rows": 18,
+      "columns": [
+        "date_time",
+        "record_id",
+        "text"
+      ]
+    },
+    "datetime_timezone_required_for_naive_values": true,
+    "timezone_support": [
+      "fixed_utc_offset",
+      "iana_timezone"
+    ],
+    "ambiguous_dst_local_time": "reject",
+    "nonexistent_dst_local_time": "reject",
+    "availability_policy_required": true,
+    "availability_policies": [
+      "synchronous_event_time_assumption",
+      "fixed_delay_assumption"
+    ],
+    "actual_arrival_time_claim": false,
+    "source_provenance": [
+      "exact_file_sha256",
+      "canonical_row_sha256"
+    ],
+    "numeric_fixed_point": {
+      "supported_scale_range": [
+        -9,
+        0
+      ],
+      "rounding": "nearest_ties_away_from_zero",
+      "returns_half_unit_error_bound": true
+    },
+    "text_payload": {
+      "whitespace_preserved": true,
+      "content_addressed": true
+    }
   }
 }
