@@ -672,6 +672,20 @@ mod tests {
     }
 
     #[test]
+    fn hand_computable_json_fixture_round_trips_and_plans() {
+        let request: CausalPowerPlanRequestV1 = serde_json::from_str(include_str!(
+            "../fixtures/causal-power-plan-request.hand.v1.json"
+        ))
+        .unwrap();
+        let report = plan_causal_power(&request).unwrap();
+        assert_eq!(report.study_id, "causal-power-fixture-001");
+        assert_eq!(report.independent_unit, "independent_model_pair");
+        assert_eq!(report.results.len(), 3 * 2 * 2);
+        assert!(!report.questions_counted_as_independent_training_replicates);
+        assert!(!report.confirmatory_eligible);
+    }
+
+    #[test]
     fn student_t_cdf_is_symmetric_and_centered() {
         for df in [1, 2, 5, 10, 30, 100] {
             assert!((student_t_cdf(0.0, df) - 0.5).abs() < 1.0e-12);
