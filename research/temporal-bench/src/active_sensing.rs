@@ -124,6 +124,8 @@ pub struct ActiveSensingActionEstimate {
     pub action_id: String,
     pub kind: ActiveSensingActionKind,
     pub resource_cost: ActiveSensingResourceCost,
+    /// Pinned model used to estimate the incremental cost vector.
+    pub resource_cost_model_sha256: [u8; 32],
     /// Model-estimated entropy reduction is diagnostic only; it is never used to rank actions.
     pub claimed_entropy_reduction_ppm: u32,
     pub outcomes: Vec<ObservationOutcomeEstimate>,
@@ -131,6 +133,14 @@ pub struct ActiveSensingActionEstimate {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ActiveSensingDecisionContext {
+    /// Digest of the current public observation/history and persistent state.
+    pub public_state_sha256: [u8; 32],
+    /// Candidate model/forecast implementation used to estimate outcome probabilities/losses.
+    pub forecast_model_sha256: [u8; 32],
+    /// Calibration receipt for the forecast probabilities and posterior decision-loss estimates.
+    pub calibration_receipt_sha256: [u8; 32],
+    /// Frozen task loss and action-selection policy.
+    pub decision_policy_sha256: [u8; 32],
     /// Minimum expected task decision loss before observing, in ppm.
     pub current_expected_decision_loss_ppm: u32,
     /// Maximum permitted incremental resource use for the next action.
@@ -142,6 +152,7 @@ pub struct ActiveSensingActionValue {
     pub action_id: String,
     pub kind: ActiveSensingActionKind,
     pub resource_cost: ActiveSensingResourceCost,
+    pub resource_cost_model_sha256: [u8; 32],
     pub claimed_entropy_reduction_ppm: u32,
     /// Forecast outcome distribution used to reproduce the expected task-loss estimate.
     pub outcome_estimates: Vec<ObservationOutcomeEstimate>,
@@ -167,6 +178,10 @@ pub struct RejectedActiveSensingAction {
 pub struct ActiveSensingPlanReceipt {
     pub schema: String,
     pub version: String,
+    pub public_state_sha256: [u8; 32],
+    pub forecast_model_sha256: [u8; 32],
+    pub calibration_receipt_sha256: [u8; 32],
+    pub decision_policy_sha256: [u8; 32],
     pub current_expected_decision_loss_ppm: u32,
     pub remaining_resource_budget: ActiveSensingResourceCost,
     /// Feasible, positive-VoI and non-dominated actions.
@@ -236,6 +251,10 @@ pub fn compute_active_sensing_plan_sha256(receipt: &ActiveSensingPlanReceipt) ->
     let mut hasher = CanonicalHasher::new(b"symthaea.temporal.active-sensing-voi-plan.v0.1");
     hash_text(&mut hasher, &receipt.schema);
     hash_text(&mut hasher, &receipt.version);
+    hasher.bytes(&receipt.public_state_sha256);
+    hasher.bytes(&receipt.forecast_model_sha256);
+    hasher.bytes(&receipt.calibration_receipt_sha256);
+    hasher.bytes(&receipt.decision_policy_sha256);
     hasher.u32(receipt.current_expected_decision_loss_ppm);
     receipt.remaining_resource_budget.hash_into(&mut hasher);
     hasher.usize(receipt.pareto_frontier.len());
@@ -243,6 +262,7 @@ pub fn compute_active_sensing_plan_sha256(receipt: &ActiveSensingPlanReceipt) ->
         hash_text(&mut hasher, &action.action_id);
         hasher.u8(action.kind as u8);
         action.resource_cost.hash_into(&mut hasher);
+        hasher.bytes(&action.resource_cost_model_sha256);
         hasher.u32(action.claimed_entropy_reduction_ppm);
         hasher.usize(action.outcome_estimates.len());
         for outcome in &action.outcome_estimates {
@@ -271,6 +291,17 @@ pub fn plan_active_sensing_actions(
     context: ActiveSensingDecisionContext,
     actions: &[ActiveSensingActionEstimate],
 ) -> Result<ActiveSensingPlanReceipt, ActiveSensingError> {
+    if ![
+        &context.public_state_sha256,
+        &context.forecast_model_sha256,
+        &context.calibration_receipt_sha256,
+        &context.decision_policy_sha256,
+    ].iter().all(|digest| digest_is_nonzero(digest)) {
+        return Err(ActiveSensingError::new(
+            "context.provenance",
+            "public state, forecast model, calibration receipt and decision policy digests must be non-zero",
+        ));
+    }
     if context.current_expected_decision_loss_ppm > PROBABILITY_SCALE as u32 {
         return Err(ActiveSensingError::new(
             "context.current_expected_decision_loss_ppm",
@@ -298,6 +329,7 @@ pub fn plan_active_sensing_actions(
         if action.action_id.trim().is_empty()
             || !seen.insert(action.action_id.as_str())
             || action.claimed_entropy_reduction_ppm > PROBABILITY_SCALE as u32
+            || !digest_is_nonzero(&action.resource_cost_model_sha256)
         {
             return Err(ActiveSensingError::new(
                 format!("actions[{index}]"),
@@ -315,6 +347,7 @@ pub fn plan_active_sensing_actions(
             action_id: action.action_id.clone(),
             kind: action.kind,
             resource_cost: action.resource_cost,
+            resource_cost_model_sha256: action.resource_cost_model_sha256,
             claimed_entropy_reduction_ppm: action.claimed_entropy_reduction_ppm,
             outcome_estimates: action.outcomes.clone(),
             expected_loss_without_observation_ppm: context.current_expected_decision_loss_ppm,
@@ -353,6 +386,10 @@ pub fn plan_active_sensing_actions(
     let mut receipt = ActiveSensingPlanReceipt {
         schema: MANIFEST_SCHEMA.into(),
         version: VERSION.into(),
+        public_state_sha256: context.public_state_sha256,
+        forecast_model_sha256: context.forecast_model_sha256,
+        calibration_receipt_sha256: context.calibration_receipt_sha256,
+        decision_policy_sha256: context.decision_policy_sha256,
         current_expected_decision_loss_ppm: context.current_expected_decision_loss_ppm,
         remaining_resource_budget: context.remaining_resource_budget,
         pareto_frontier: frontier,
@@ -368,6 +405,14 @@ pub fn validate_active_sensing_plan_receipt(
 ) -> Result<(), ActiveSensingError> {
     if receipt.schema != MANIFEST_SCHEMA || receipt.version != VERSION {
         return Err(ActiveSensingError::new("schema_version", "unsupported plan schema/version"));
+    }
+    if ![
+        &receipt.public_state_sha256,
+        &receipt.forecast_model_sha256,
+        &receipt.calibration_receipt_sha256,
+        &receipt.decision_policy_sha256,
+    ].iter().all(|digest| digest_is_nonzero(digest)) {
+        return Err(ActiveSensingError::new("plan.provenance", "required provenance digests are missing"));
     }
     if receipt.current_expected_decision_loss_ppm > PROBABILITY_SCALE as u32 {
         return Err(ActiveSensingError::new("current_expected_decision_loss_ppm", "must be in [0, 1,000,000] ppm"));
@@ -396,6 +441,7 @@ pub fn validate_active_sensing_plan_receipt(
         let reproduced_loss = compute_expected_loss_ppm(&action.outcome_estimates)?;
         if action.action_id.trim().is_empty()
             || !action.resource_cost.consumes_anything()
+            || !digest_is_nonzero(&action.resource_cost_model_sha256)
             || action.claimed_entropy_reduction_ppm > PROBABILITY_SCALE as u32
             || action.outcome_estimates.is_empty()
             || action.expected_task_loss_reduction_ppm <= 0
@@ -456,6 +502,7 @@ mod tests {
             action_id: id.into(),
             kind,
             resource_cost,
+            resource_cost_model_sha256: hash(31),
             claimed_entropy_reduction_ppm: entropy,
             outcomes,
         }
@@ -463,6 +510,10 @@ mod tests {
 
     fn context() -> ActiveSensingDecisionContext {
         ActiveSensingDecisionContext {
+            public_state_sha256: hash(21),
+            forecast_model_sha256: hash(22),
+            calibration_receipt_sha256: hash(23),
+            decision_policy_sha256: hash(24),
             current_expected_decision_loss_ppm: 300_000,
             remaining_resource_budget: cost(100_000, 50_000, 2_000_000, 10_000, 1_024, 4_096),
         }
