@@ -466,6 +466,62 @@ pub fn verify_noisy_event_tape_reconciliation(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::pareto_objectives::ObjectiveDirection;
+
+    fn noisy_contract() -> EventTapeObjectiveContract {
+        EventTapeObjectiveContract {
+            schema: "symthaea.ar5b4.event-tape-objective-contract".to_owned(),
+            version: "0.1.0".to_owned(),
+            mode: EventTapeObjectiveMode::NoisyReplicates,
+            objective_specs: vec![
+                super::super::event_tape::EventTapeObjectiveSpec {
+                    objective_id: "quality".to_owned(),
+                    direction: ObjectiveDirection::Maximize,
+                    observation_lower_bound: Some(0.0),
+                    observation_upper_bound: Some(1.0),
+                    bounds_certificate_sha256: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned()),
+                },
+                super::super::event_tape::EventTapeObjectiveSpec {
+                    objective_id: "cost".to_owned(),
+                    direction: ObjectiveDirection::Minimize,
+                    observation_lower_bound: Some(0.0),
+                    observation_upper_bound: Some(1.0),
+                    bounds_certificate_sha256: Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned()),
+                },
+            ],
+            reference_point_raw: vec![0.0, 0.0],
+            sampling_protocol_id: Some("counter-stream-v1".to_owned()),
+            sampling_protocol_sha256: Some("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_owned()),
+            noise_model_id: Some("bounded-noise-v1".to_owned()),
+            noise_model_sha256: Some("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_owned()),
+            familywise_alpha: Some(0.05),
+            max_candidates: Some(16),
+            minimum_replicates: Some(2),
+        }
+    }
+
+    #[test]
+    fn noisy_plan_conversion_preserves_objective_order_direction_bounds_and_model_digests() {
+        let contract = noisy_contract();
+        contract.validate().unwrap();
+        let plan = plan_from_contract(&contract, "campaign-test").unwrap();
+        assert_eq!(plan.campaign_id, "campaign-test");
+        assert_eq!(plan.objective_specs[0].objective_id, "quality");
+        assert_eq!(plan.objective_specs[0].direction, ObjectiveDirection::Maximize);
+        assert_eq!(plan.objective_specs[1].objective_id, "cost");
+        assert_eq!(plan.objective_specs[1].direction, ObjectiveDirection::Minimize);
+        assert_eq!(plan.objective_specs[0].observation_lower_bound, 0.0);
+        assert_eq!(plan.sampling_protocol_sha256, contract.sampling_protocol_sha256.unwrap());
+        assert_eq!(plan.noise_model_sha256, contract.noise_model_sha256.unwrap());
+        assert!(plan.plan_sha256().is_ok());
+    }
+
+    #[test]
+    fn deterministic_contract_cannot_be_used_for_noisy_replay() {
+        let mut contract = noisy_contract();
+        contract.mode = EventTapeObjectiveMode::DeterministicVector;
+        assert!(plan_from_contract(&contract, "campaign-test").is_err());
+    }
 
     #[test]
     fn verifier_rejection_is_explicitly_downgraded_to_invalid_history_status() {
@@ -494,5 +550,6 @@ mod tests {
         assert_eq!(row.status, ObservationStatus::Invalid);
         assert_eq!(row.objective_values, None);
         assert_eq!(row.evidence_sha256, None);
+        assert_eq!(row.failure_reason.as_deref(), Some("receipt mismatch"));
     }
 }
