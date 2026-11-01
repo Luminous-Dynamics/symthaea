@@ -207,8 +207,11 @@ impl<const CLASSES: usize, const SLOTS: usize, const WORDS: usize>
             Some(v) => v,
             None => return None,
         };
-        let metadata = match CLASSES.checked_mul(core::mem::size_of::<usize>())
-            .and_then(|v| v.checked_mul(2)) {
+        let metadata_words = match CLASSES.checked_mul(2) {
+            Some(v) => v,
+            None => return None,
+        };
+        let metadata = match metadata_words.checked_mul(core::mem::size_of::<usize>()) {
             Some(v) => v,
             None => return None,
         };
