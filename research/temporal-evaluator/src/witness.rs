@@ -308,63 +308,65 @@ pub fn verify_checkpoint_quorum(
         }
     }
 
-    // Network inputs are treated as untrusted, even when they claim a trusted
-    // identity. One Byzantine witness must not be able to abort a valid quorum
-    // by sending a stale challenge, malformed payload, bad signature, or a
-    // conflicting duplicate response.
-    let mut one_response_per_witness =
+    // Authenticate before deduplication/equivocation classification. Otherwise
+    // anyone could attach a forged packet under an honest witness ID and make
+    // that honest witness appear to have equivocated.
+    let mut current_responses =
         BTreeMap::<[u8; 16], &SignedWitnessAttestation>::new();
     let mut equivocating_witnesses = BTreeSet::new();
+    let mut stale_challenge_witnesses = BTreeSet::new();
+
     for attestation in attestations {
         let witness_id = attestation.payload.witness_id;
-        if !trusted.contains_key(&witness_id) {
+        let Some(trusted_key) = trusted.get(&witness_id) else {
+            continue;
+        };
+        let Ok(message) = attestation.payload.canonical_bytes() else {
+            continue;
+        };
+        let signature = Signature::from_bytes(&attestation.signature);
+        if trusted_key.verify_strict(&message, &signature).is_err() {
+            // An unauthenticated packet is not a witness vote and cannot
+            // disqualify the identity it claims to represent.
             continue;
         }
-        match one_response_per_witness.get(&witness_id) {
+        if attestation.payload.evaluator_id != local.payload.evaluator_id {
+            continue;
+        }
+        if attestation.payload.challenge != challenge {
+            stale_challenge_witnesses.insert(witness_id);
+            continue;
+        }
+
+        match current_responses.get(&witness_id) {
             None => {
-                one_response_per_witness.insert(witness_id, attestation);
+                current_responses.insert(witness_id, attestation);
             }
             Some(existing) if **existing == *attestation => {
                 // Exact retransmission: count the signed statement only once.
             }
             Some(_) => {
-                // Two different signed statements for the same query mean this
-                // identity cannot contribute a vote to this verification.
+                // Only conflicting, authenticated responses for this exact
+                // evaluator and challenge can establish equivocation.
                 equivocating_witnesses.insert(witness_id);
             }
         }
     }
 
+    let current_witness_ids: BTreeSet<[u8; 16]> =
+        current_responses.keys().copied().collect();
     let mut highest_witness_epoch = 0_u64;
-    let mut stale_witnesses = 0_u16;
+    let mut stale_witness_ids = stale_challenge_witnesses;
+    for witness_id in &current_witness_ids {
+        stale_witness_ids.remove(witness_id);
+    }
     let mut groups = BTreeMap::<(u64, [u8; 32], [u8; 32]), u16>::new();
 
-    for (witness_id, attestation) in one_response_per_witness {
+    for (witness_id, attestation) in current_responses {
         if equivocating_witnesses.contains(&witness_id) {
             continue;
         }
-        let Some(trusted_key) = trusted.get(&witness_id) else {
-            continue;
-        };
         let payload = &attestation.payload;
-        let Ok(message) = payload.canonical_bytes() else {
-            continue;
-        };
-        let signature = Signature::from_bytes(&attestation.signature);
-        if trusted_key.verify_strict(&message, &signature).is_err() {
-            continue;
-        }
-
-        if payload.evaluator_id != local.payload.evaluator_id {
-            continue;
-        }
-        if payload.challenge != challenge {
-            stale_witnesses = stale_witnesses
-                .checked_add(1)
-                .ok_or(CheckpointError::ArithmeticOverflow)?;
-            continue;
-        }
-
         highest_witness_epoch = highest_witness_epoch.max(payload.checkpoint_epoch);
         let key = (
             payload.checkpoint_epoch,
@@ -375,12 +377,16 @@ pub fn verify_checkpoint_quorum(
         *count = count.checked_add(1).ok_or(CheckpointError::ArithmeticOverflow)?;
     }
 
+    let mut stale_witnesses = u16::try_from(stale_witness_ids.len())
+        .map_err(|_| CheckpointError::ArithmeticOverflow)?;
+
     let mut current_epoch_matching = 0_u16;
     let mut higher_epoch_quorum = None;
     let mut conflicting_current_quorum = false;
 
     for ((epoch, checkpoint_digest, previous_digest), count) in groups {
         if epoch < local.payload.epoch {
+            // Every group member already contributed a unique witness ID.
             stale_witnesses = stale_witnesses
                 .checked_add(count)
                 .ok_or(CheckpointError::ArithmeticOverflow)?;
@@ -731,7 +737,7 @@ mod tests {
         let witness_keys = witness_keys(32);
         let checkpoint = checkpoint(&evaluator_key, 2, [9; 32]);
         let challenge = [99; 32];
-        let mut invalid_signature = attest(&checkpoint, &witness_keys[3], 62, challenge);
+        let mut invalid_signature = attest(&checkpoint, &witness_keys[2], 62, challenge);
         invalid_signature.signature[0] ^= 0x80;
         let unknown_key = SigningKey::from_bytes(&[36; 32]);
         let responses = vec![
