@@ -173,8 +173,6 @@ def _normalize_path_inputs(
     rejections_by_time: Sequence[Iterable[int]],
     coordinate_paths: CoordinatePaths,
     true_null_ids: Iterable[int],
-    *,
-    require_nested: bool,
 ) -> tuple[list[tuple[int, ...]], list[tuple[int, ...]], dict[int, tuple[Fraction, ...]], tuple[int, ...]]:
     if not active_by_time:
         raise ValueError("at least one reporting time is required")
@@ -185,10 +183,9 @@ def _normalize_path_inputs(
     for t, (i_t, r_t) in enumerate(zip(active, rejected)):
         if not set(r_t).issubset(i_t):
             raise ValueError(f"rejections at time {t} must be a subset of the active family")
-    if require_nested:
-        for t in range(1, len(active)):
-            if not set(active[t - 1]).issubset(active[t]):
-                raise ValueError("active families must be nested for the arrival model")
+    for t in range(1, len(active)):
+        if not set(active[t - 1]).issubset(active[t]):
+            raise ValueError("active families must be nested for the arrival model")
 
     truth = validate_ids(true_null_ids)
     all_ids = set(truth)
@@ -222,7 +219,6 @@ def verify_countable_global_projective_path(
     alpha: int | float | str | Fraction,
     *,
     scheme: str = "geometric",
-    require_nested: bool = True,
 ) -> dict:
     """Verify finite fixtures for local closure and full-true-set projectivity.
 
@@ -235,7 +231,6 @@ def verify_countable_global_projective_path(
         raise ValueError("alpha must lie strictly between zero and one")
     active, rejected, paths, truth = _normalize_path_inputs(
         active_by_time, rejections_by_time, coordinate_paths, true_null_ids,
-        require_nested=require_nested,
     )
     rows, failures = [], []
     monotone = all(
