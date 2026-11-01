@@ -30,7 +30,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.13.17"
 
       - name: Run dependency-free contract and fixture tests
         run: python -m unittest validation.test_iit_digest_contract validation.test_phi_reference_fixture_manifest validation.test_pyphi_reference_runner_contract -v
@@ -38,7 +38,7 @@ jobs:
   pyphi-reference:
     name: Execute pinned PyPhi IIT 4.0 (2023) reference anchors
     needs: digest-contract
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Check out source
@@ -53,9 +53,12 @@ jobs:
         shell: bash
         run: mkdir -p target/pyphi-reference
 
-      - name: Install exact PyPhi reference artifact
+      - name: Install exact PyPhi numerical reference environment
         shell: bash
-        run: python -m pip install --disable-pip-version-check "pyphi==2.0.0rc4"
+        run: |
+          python -m pip install --disable-pip-version-check \
+            -r validation/requirements-pyphi-iit4-reference.txt
+          python -m pip check
 
       - name: Capture Python and PyPhi environment
         shell: bash
