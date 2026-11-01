@@ -175,3 +175,13 @@ A planner may create a scalar utility only through a frozen utility/constraint d
 
 
 Structured channels now distinguish state fidelity from action utility. An action may be selected only through one explicitly named TaskUtility channel; physical state, contact, visibility and terminal-risk channels remain independent diagnostics/constraints. This avoids reward-hacking a scalar objective that hides a physically implausible future.
+
+### P4–P5 extension: evidence acquisition and constrained decisions
+
+The executable layer now treats information acquisition as a decision option. For each query, it computes expected utility before evidence, expected utility after observing the signal and choosing again, EVSI, all-in query cost and net information value. It selects only a query with strictly positive net value; otherwise it abstains. The query estimate is content-bound to the exact history, action set, query descriptor, outcome partition, probability vector, conditional utility matrix and cost.
+
+Probability forecasts used by EVSI must be evaluated on held-out episodes with multiclass Brier score and log loss. Report zero-probability outcome misses explicitly. A high EVSI computed from miscalibrated probabilities is not a valid acquisition policy.
+
+Structured action selection now supports explicit interval constraints before utility ranking. For example, require the terminal-risk upper interval to remain below a threshold and contact-probability lower interval to exceed a threshold; only then evaluate task utility among feasible actions. This avoids hiding hard constraints inside one weighted reward scalar. Intervals are Bonferroni-adjusted across the complete action × (constraint channels + utility) family. The result is conditional on the marginal interval construction actually achieving its stated coverage; predictive sample quantiles are not automatically calibrated.
+
+New report schemas and synthetic fixtures are checked by the focused workflow. These do not establish real probability calibration, useful query selection, robust feasibility or physical safety.
