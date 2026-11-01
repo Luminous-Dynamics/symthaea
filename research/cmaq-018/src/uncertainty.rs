@@ -543,7 +543,11 @@ pub fn structured_action_prediction_intervals(
     let mut results = Vec::with_capacity(bank.channels.len() * bank.action_ids.len());
     let mut channels: Vec<&VisualBeliefChannelSamples> = bank.channels.iter().collect();
     channels.sort_by(|left, right| left.channel_id.cmp(&right.channel_id));
-    let mut action_indices: Vec<(u64, usize)> = bank.action_ids.iter().copied().enumerate()
+    let mut action_indices: Vec<(u64, usize)> = bank
+        .action_ids
+        .iter()
+        .copied()
+        .enumerate()
         .map(|(index, action_id)| (action_id, index))
         .collect();
     action_indices.sort_unstable_by_key(|(action_id, _)| *action_id);
@@ -571,12 +575,20 @@ fn structured_action_effect_interval_validated(
     if left_action_id == right_action_id {
         return Err(IntervalError::SameActionRequested);
     }
-    let channel = bank.channels.iter()
+    let channel = bank
+        .channels
+        .iter()
         .find(|channel| channel.channel_id == channel_id)
         .ok_or(IntervalError::InvalidVisualChannelDescriptor)?;
-    let left_index = bank.action_ids.iter().position(|id| *id == left_action_id)
+    let left_index = bank
+        .action_ids
+        .iter()
+        .position(|id| *id == left_action_id)
         .ok_or(IntervalError::InvalidSelectedIndex)?;
-    let right_index = bank.action_ids.iter().position(|id| *id == right_action_id)
+    let right_index = bank
+        .action_ids
+        .iter()
+        .position(|id| *id == right_action_id)
         .ok_or(IntervalError::InvalidSelectedIndex)?;
     let interval = paired_effect_interval(
         &channel.outcome_samples[left_index],
@@ -1298,8 +1310,7 @@ mod tests {
                 },
             ],
         };
-        bank.joint_draw_bank_sha256 =
-            compute_structured_joint_draw_bank_sha256(&bank).unwrap();
+        bank.joint_draw_bank_sha256 = compute_structured_joint_draw_bank_sha256(&bank).unwrap();
         bank
     }
 
@@ -1312,27 +1323,16 @@ mod tests {
         );
         validate_structured_joint_action_set(&bank).unwrap();
 
-        let geometry = structured_action_effect_interval(
-            &bank,
-            "object_42.position.x",
-            17,
-            3,
-            0.8,
-        )
-        .unwrap();
+        let geometry =
+            structured_action_effect_interval(&bank, "object_42.position.x", 17, 3, 0.8).unwrap();
         assert_eq!(geometry.kind, VisualBeliefChannelKind::Geometry);
         assert_eq!(geometry.unit, "m");
         assert_eq!(geometry.interval.lower, 1.0);
         assert_eq!(geometry.interval.upper, 1.0);
 
-        let contact = structured_action_effect_interval(
-            &bank,
-            "gripper.contact_probability",
-            17,
-            3,
-            0.8,
-        )
-        .unwrap();
+        let contact =
+            structured_action_effect_interval(&bank, "gripper.contact_probability", 17, 3, 0.8)
+                .unwrap();
         assert_eq!(contact.kind, VisualBeliefChannelKind::Contact);
         assert_eq!(contact.unit, "probability");
         assert!((contact.interval.lower - 0.4).abs() < 1e-12);
@@ -1346,7 +1346,13 @@ mod tests {
         let all_effects = all_structured_action_effect_intervals(&bank, 0.8).unwrap();
         assert_eq!(all_effects.len(), 6);
         assert_eq!(all_effects[0].channel_id, "gripper.contact_probability");
-        assert_eq!((all_effects[0].left_action_id, all_effects[0].right_action_id), (3, 9));
+        assert_eq!(
+            (
+                all_effects[0].left_action_id,
+                all_effects[0].right_action_id
+            ),
+            (3, 9)
+        );
     }
 
     #[test]
@@ -1383,14 +1389,9 @@ mod tests {
     #[test]
     fn structured_visual_action_effect_is_action_row_permutation_invariant() {
         let original = structured_visual_bank_fixture();
-        let expected = structured_action_effect_interval(
-            &original,
-            "object_42.position.x",
-            17,
-            9,
-            0.8,
-        )
-        .unwrap();
+        let expected =
+            structured_action_effect_interval(&original, "object_42.position.x", 17, 9, 0.8)
+                .unwrap();
 
         let mut permuted = original.clone();
         permuted.action_ids = vec![9, 17, 3];
@@ -1404,14 +1405,9 @@ mod tests {
         permuted.joint_draw_bank_sha256 =
             compute_structured_joint_draw_bank_sha256(&permuted).unwrap();
 
-        let actual = structured_action_effect_interval(
-            &permuted,
-            "object_42.position.x",
-            17,
-            9,
-            0.8,
-        )
-        .unwrap();
+        let actual =
+            structured_action_effect_interval(&permuted, "object_42.position.x", 17, 9, 0.8)
+                .unwrap();
         assert_eq!(actual.interval, expected.interval);
         assert_eq!(actual.paired_draw_count, expected.paired_draw_count);
     }
