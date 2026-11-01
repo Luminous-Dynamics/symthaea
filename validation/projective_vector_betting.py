@@ -6,6 +6,7 @@ That coverage property is an explicit statistical assumption/certificate.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from math import exp, isfinite, log, sqrt
 from typing import Iterable, Sequence
 
@@ -126,6 +127,90 @@ def projective_equicorrelation_envelope(
     ]
     assert_symmetric_psd(result)
     return result
+
+
+
+@dataclass(frozen=True)
+class ProjectiveEquicorrelationKernel:
+    """O(d) operator for V_d = (1-rho_min)I + rho_max*11^T.
+
+    Stores the infinite-dimensional projective kernel by two scalars rather
+    than a dense d-by-d matrix. Its finite principal submatrices are obtained
+    by restricting the coordinate vector; no envelope changes under extension.
+    """
+    dimension: int
+    rho_min: float = 0.2
+    rho_max: float = 0.8
+
+    def __post_init__(self) -> None:
+        if self.dimension < 1:
+            raise ValueError("dimension must be positive")
+        if not (0.0 <= self.rho_min <= self.rho_max <= 1.0):
+            raise ValueError("require 0 <= rho_min <= rho_max <= 1")
+
+    @property
+    def diagonal(self) -> float:
+        return 1.0 - self.rho_min + self.rho_max
+
+    @property
+    def diagonal_part(self) -> float:
+        return 1.0 - self.rho_min
+
+    @property
+    def common_part(self) -> float:
+        return self.rho_max
+
+    def dense(self) -> list[list[float]]:
+        return projective_equicorrelation_envelope(
+            self.dimension, self.rho_min, self.rho_max
+        )
+
+    def quadratic(self, values: Sequence[float], active: Sequence[bool] | None = None) -> float:
+        if len(values) != self.dimension:
+            raise ValueError("vector dimension mismatch")
+        mask = [True] * self.dimension if active is None else [bool(x) for x in active]
+        if len(mask) != self.dimension:
+            raise ValueError("active mask dimension mismatch")
+        active_values = [float(values[i]) for i, on in enumerate(mask) if on]
+        if any(not isfinite(x) for x in active_values):
+            raise ValueError("vector entries must be finite")
+        total = sum(active_values)
+        return self.diagonal_part * sum(x * x for x in active_values) + self.common_part * total * total
+
+    def matvec(self, values: Sequence[float], active: Sequence[bool] | None = None) -> list[float]:
+        if len(values) != self.dimension:
+            raise ValueError("vector dimension mismatch")
+        mask = [True] * self.dimension if active is None else [bool(x) for x in active]
+        if len(mask) != self.dimension:
+            raise ValueError("active mask dimension mismatch")
+        active_values = [float(values[i]) if mask[i] else 0.0 for i in range(self.dimension)]
+        if any(not isfinite(x) for x in active_values):
+            raise ValueError("vector entries must be finite")
+        total = sum(active_values)
+        return [
+            self.diagonal_part * active_values[i] + self.common_part * total
+            if mask[i] else 0.0
+            for i in range(self.dimension)
+        ]
+
+
+def projective_vector_log_factor(
+    scores: Sequence[float],
+    bets: Sequence[float],
+    active: Sequence[bool],
+    kernel: ProjectiveEquicorrelationKernel,
+) -> float:
+    """Evaluate a projective intersection log-factor in O(d) time."""
+    z = _finite_vector(scores, "scores")
+    lam = _finite_vector(bets, "bets")
+    mask = [bool(x) for x in active]
+    if len(z) != kernel.dimension or len(lam) != kernel.dimension or len(mask) != kernel.dimension:
+        raise ValueError("scores, bets and active mask must match kernel dimension")
+    if any(x < 0.0 for x in lam):
+        raise ValueError("bets must be nonnegative")
+    linear = sum(lam[i] * z[i] for i in range(kernel.dimension) if mask[i])
+    penalty = kernel.quadratic(lam, mask)
+    return linear - 0.5 * penalty
 
 
 def matrix_dominates(upper: Sequence[Sequence[float]], lower: Sequence[Sequence[float]]) -> bool:
@@ -286,14 +371,20 @@ class CovariancePreconditionedBet:
 
     def __init__(
         self,
-        mgf_proxy: Sequence[Sequence[float]],
+        mgf_proxy: Sequence[Sequence[float]] | ProjectiveEquicorrelationKernel,
         step_size: float = 0.05,
         cap: float = 1.5,
     ):
-        assert_symmetric_psd(mgf_proxy)
-        self._proxy = [[float(x) for x in row] for row in mgf_proxy]
-        self._dimension = len(self._proxy)
-        self._diagonal = [self._proxy[i][i] for i in range(self._dimension)]
+        self._kernel = mgf_proxy if isinstance(mgf_proxy, ProjectiveEquicorrelationKernel) else None
+        if self._kernel is not None:
+            self._proxy = None
+            self._dimension = self._kernel.dimension
+            self._diagonal = [self._kernel.diagonal] * self._dimension
+        else:
+            assert_symmetric_psd(mgf_proxy)
+            self._proxy = [[float(x) for x in row] for row in mgf_proxy]
+            self._dimension = len(self._proxy)
+            self._diagonal = [self._proxy[i][i] for i in range(self._dimension)]
         if any(x <= 0.0 for x in self._diagonal):
             raise ValueError("mgf_proxy diagonal entries must be strictly positive")
         if not isfinite(step_size) or step_size < 0.0:
@@ -332,9 +423,15 @@ class CovariancePreconditionedBet:
         active_ids = [i for i, on in enumerate(self._pending_active) if on]
         old = list(self._bets)
         updated = list(self._bets)
+        if self._kernel is not None:
+            structured_drift = self._kernel.matvec(old, self._pending_active)
+        else:
+            structured_drift = None
         for i in active_ids:
-            covariance_drift = sum(
-                self._proxy[i][j] * old[j] for j in active_ids
+            covariance_drift = (
+                structured_drift[i]
+                if structured_drift is not None
+                else sum(self._proxy[i][j] * old[j] for j in active_ids)
             )
             gradient = z[i] - covariance_drift
             candidate = old[i] + self.step_size * gradient / self._diagonal[i]
