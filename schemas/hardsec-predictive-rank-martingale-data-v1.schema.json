@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/hardsec-predictive-rank-martingale-data-v1.schema.json",
+  "title": "HARDSEC PRM calibration and online data v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_domain",
+    "stream_id",
+    "evaluation_group_id",
+    "context_id",
+    "scoring_artifact_sha256",
+    "tie_break_randomization_artifact_sha256",
+    "calibration_execution_group_id",
+    "evaluation_execution_group_id",
+    "calibration_device_boot_group_id",
+    "evaluation_device_boot_group_id",
+    "calibration_samples",
+    "online_records"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-predictive-rank-martingale-data-v1"
+    },
+    "evidence_domain": {
+      "enum": [
+        "synthetic_fixture",
+        "simulator",
+        "physical_hardware"
+      ]
+    },
+    "stream_id": {
+      "type": "string"
+    },
+    "evaluation_group_id": {
+      "type": "string"
+    },
+    "context_id": {
+      "type": "string"
+    },
+    "scoring_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "tie_break_randomization_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "calibration_execution_group_id": {
+      "type": "string"
+    },
+    "evaluation_execution_group_id": {
+      "type": "string"
+    },
+    "calibration_device_boot_group_id": {
+      "type": "string"
+    },
+    "evaluation_device_boot_group_id": {
+      "type": "string"
+    },
+    "calibration_samples": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sample_unit_id",
+          "score",
+          "tie_break_uniform"
+        ],
+        "properties": {
+          "sample_unit_id": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "tie_break_uniform": {
+            "type": "number",
+            "minimum": 0,
+            "exclusiveMaximum": 1
+          }
+        }
+      }
+    },
+    "online_records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence_index",
+          "window_id",
+          "context_id",
+          "sample_unit_id",
+          "anomaly_score",
+          "tie_break_uniform",
+          "sensor_state",
+          "pmu_qualification_result"
+        ],
+        "properties": {
+          "sequence_index": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "window_id": {
+            "type": "string"
+          },
+          "context_id": {
+            "type": "string"
+          },
+          "sample_unit_id": {
+            "type": "string"
+          },
+          "anomaly_score": {
+            "type": "number"
+          },
+          "tie_break_uniform": {
+            "type": "number",
+            "minimum": 0,
+            "exclusiveMaximum": 1
+          },
+          "sensor_state": {
+            "enum": [
+              "valid",
+              "missing",
+              "stale",
+              "misaligned",
+              "multiplexed",
+              "untrusted"
+            ]
+          },
+          "pmu_qualification_result": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

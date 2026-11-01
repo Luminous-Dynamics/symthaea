@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/hardsec-predictive-rank-martingale-plan-v1.schema.json",
+  "title": "HARDSEC Predictive Rank Martingale plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "monitor_id",
+    "evidence_domain",
+    "stream_id",
+    "evaluation_group_id",
+    "context_id",
+    "calibration_execution_group_id",
+    "evaluation_execution_group_id",
+    "calibration_device_boot_group_id",
+    "evaluation_device_boot_group_id",
+    "scoring_artifact_sha256",
+    "score_transform_id",
+    "score_direction",
+    "tie_break_policy",
+    "tie_break_randomization_artifact_sha256",
+    "tie_break_independence_status",
+    "target_alpha",
+    "context_assignment_policy_id",
+    "context_assignment_artifact_sha256",
+    "calibration_iid_status",
+    "online_iid_status",
+    "calibration_online_same_null_status",
+    "score_transform_fixed_status",
+    "context_exogeneity_status",
+    "observation_admission_exogeneity_status",
+    "pmu_qualification_required",
+    "features",
+    "ons"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-predictive-rank-martingale-plan-v1"
+    },
+    "monitor_id": {
+      "type": "string"
+    },
+    "evidence_domain": {
+      "enum": [
+        "synthetic_fixture",
+        "simulator",
+        "physical_hardware"
+      ]
+    },
+    "stream_id": {
+      "type": "string"
+    },
+    "evaluation_group_id": {
+      "type": "string"
+    },
+    "context_id": {
+      "type": "string"
+    },
+    "calibration_execution_group_id": {
+      "type": "string"
+    },
+    "evaluation_execution_group_id": {
+      "type": "string"
+    },
+    "calibration_device_boot_group_id": {
+      "type": "string"
+    },
+    "evaluation_device_boot_group_id": {
+      "type": "string"
+    },
+    "scoring_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "score_transform_id": {
+      "type": "string"
+    },
+    "score_direction": {
+      "const": "higher_is_more_anomalous"
+    },
+    "tie_break_policy": {
+      "const": "independent_uniform_lexicographic"
+    },
+    "tie_break_randomization_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "tie_break_independence_status": {
+      "const": "assumption_not_verified"
+    },
+    "target_alpha": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "context_assignment_policy_id": {
+      "type": "string"
+    },
+    "context_assignment_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "calibration_iid_status": {
+      "const": "assumption_not_verified"
+    },
+    "online_iid_status": {
+      "const": "assumption_not_verified"
+    },
+    "calibration_online_same_null_status": {
+      "const": "assumption_not_verified"
+    },
+    "score_transform_fixed_status": {
+      "const": "assumption_not_verified"
+    },
+    "context_exogeneity_status": {
+      "const": "assumption_not_verified"
+    },
+    "observation_admission_exogeneity_status": {
+      "const": "assumption_not_verified"
+    },
+    "pmu_qualification_required": {
+      "const": "qualified_for_named_acquisition_conditions"
+    },
+    "features": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "feature_id",
+          "feature_type",
+          "portfolio_weight"
+        ],
+        "properties": {
+          "feature_id": {
+            "type": "string"
+          },
+          "feature_type": {
+            "enum": [
+              "order",
+              "dispersion"
+            ]
+          },
+          "portfolio_weight": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "ons": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "update",
+        "initial_lambda",
+        "initial_accumulator",
+        "projection_radius",
+        "minimum_betting_factor"
+      ],
+      "properties": {
+        "update": {
+          "type": "string"
+        },
+        "initial_lambda": {
+          "const": 0
+        },
+        "initial_accumulator": {
+          "const": 1
+        },
+        "projection_radius": {
+          "type": "string"
+        },
+        "minimum_betting_factor": {
+          "const": 0.25
+        }
+      }
+    }
+  }
+}

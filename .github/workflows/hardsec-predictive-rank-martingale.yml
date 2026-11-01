@@ -1,0 +1,147 @@
+name: HARDSEC-023 fixed-reference predictive rank martingale
+
+on:
+  pull_request:
+    paths:
+      - "examples/hardsec_predictive_rank_martingale.rs"
+      - "examples/hardsec_context_assignment_audit.rs"
+      - "docs/research/HARDSEC_023_PREDICTIVE_RANK_MARTINGALE.md"
+      - "schemas/hardsec-predictive-rank-martingale-*.schema.json"
+      - "schemas/hardsec-prm-context-policy-v1.schema.json"
+      - "tests/fixtures/hardsec/prm-v1/**"
+      - "tools/hardsec-adaptive-evasion-audit-harness/**"
+      - ".github/workflows/hardsec-predictive-rank-martingale.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-prm-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  predictive-rank-martingale:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact pull request revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Run PRM unit and exact rank-tree qualification
+        run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-predictive-rank-martingale --example hardsec_predictive_rank_martingale
+      - name: Recompute truth-free workload-context receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          context_dir="$(mktemp -d)"
+          receipt_dir="$(mktemp -d)"
+          echo "$context_dir" > "$RUNNER_TEMP/prm-context-dir"
+          echo "$receipt_dir" > "$RUNNER_TEMP/prm-receipt-dir"
+          cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-assignment-audit --example hardsec_context_assignment_audit -- \
+            --policy tests/fixtures/hardsec/prm-v1/context-policy.json \
+            --assignments tests/fixtures/hardsec/prm-v1/context-assignments.json \
+            --truth tests/fixtures/hardsec/prm-v1/context-truth-oracle.json \
+            --receipt "$context_dir/context-assignment-receipt.json"
+          python3 - "$context_dir/context-assignment-receipt.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          metrics = receipt["assignment_integrity"]
+          assert receipt["result"] == "audited"
+          assert metrics["assignment_record_count"] == 60
+          assert metrics["accepted_count"] == 60
+          assert metrics["abstained_count"] == 0
+          assert metrics["accepted_accuracy_denominator"] == 60
+          assert metrics["accepted_accuracy"] == 1.0
+          assert metrics["accepted_coverage"] == 1.0
+          assert receipt["runtime_mapping"]["contains_truth_labels"] is False
+          assert len(receipt["runtime_mapping"]["assignments"]) == 60
+          PY
+      - name: Run PRM against recomputed context receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          context_dir="$(cat "$RUNNER_TEMP/prm-context-dir")"
+          receipt_dir="$(cat "$RUNNER_TEMP/prm-receipt-dir")"
+          cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-predictive-rank-martingale --example hardsec_predictive_rank_martingale -- \
+            --plan tests/fixtures/hardsec/prm-v1/plan.json \
+            --data tests/fixtures/hardsec/prm-v1/data.json \
+            --context-receipt "$context_dir/context-assignment-receipt.json" \
+            --receipt "$receipt_dir/prm-receipt.json"
+          python3 - "$receipt_dir/prm-receipt.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          assert receipt["result"] == "alarm_threshold_crossed", receipt
+          monitor = receipt["sequential_monitor"]
+          assert monitor["online_observation_count"] == 60
+          assert abs(monitor["portfolio_weights_sum"] - 1.0) < 1e-12
+          assert monitor["first_crossing_is_latched"] is True
+          assert receipt["predictive_rank_law"]["fixed_calibration_rank_reuse_modelled"] is True
+          guarantee = receipt["statistical_guarantees"]
+          assert guarantee["theorem_guarantee_status"] == "not_established_from_input_receipts"
+          assert guarantee["calibration_iid_status"] == "assumption_not_verified"
+          assert guarantee["online_iid_status"] == "assumption_not_verified"
+          assert guarantee["tie_break_randomization_independence_status"] == "assumption_not_verified"
+          assert guarantee["sequential_pfa_valid_for_arbitrary_serial_dependence"] is False
+          assert guarantee["marginal_not_calibration_conditional"] is True
+          assert guarantee["effective_sample_size_estimate"] is None
+          rows = monitor["window_decisions"]
+          assert len(rows) == 60
+          for index, row in enumerate(rows):
+              law = row["predictive_rank_law"]
+              assert sum(law["rank_history_counts_before"]) == index
+              assert sum(law["rank_history_counts_after"]) == index + 1
+              assert law["denominator_n_plus_t"] == 600 + index + 1
+          PY
+      - name: Negative control refuses untrusted telemetry
+        shell: bash
+        run: |
+          set -euo pipefail
+          context_dir="$(cat "$RUNNER_TEMP/prm-context-dir")"
+          negative_input_dir="$(mktemp -d)"
+          negative_output_dir="$(mktemp -d)"
+          python3 - "$negative_input_dir/prm-invalid-sensor-data.json" <<'PY'
+          import json, sys
+          source = "tests/fixtures/hardsec/prm-v1/data.json"
+          target = sys.argv[1]
+          with open(source, "r", encoding="utf-8") as handle:
+              data = json.load(handle)
+          data["online_records"][0]["sensor_state"] = "untrusted"
+          with open(target, "w", encoding="utf-8") as handle:
+              json.dump(data, handle, indent=2)
+              handle.write("\n")
+          PY
+          if cargo run --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-predictive-rank-martingale --example hardsec_predictive_rank_martingale -- \
+            --plan tests/fixtures/hardsec/prm-v1/plan.json \
+            --data "$negative_input_dir/prm-invalid-sensor-data.json" \
+            --context-receipt "$context_dir/context-assignment-receipt.json" \
+            --receipt "$negative_output_dir/invalid-sensor-receipt.json"; then
+            echo "untrusted sensor negative control unexpectedly succeeded" >&2
+            exit 1
+          fi
+          test ! -e "$negative_output_dir/invalid-sensor-receipt.json"
+      - name: Enforce PRM benchmark claim contract
+        run: |
+          python3 - <<'PY'
+          import json
+          path = "tests/fixtures/hardsec/prm-v1/benchmark-plan.json"
+          with open(path, "r", encoding="utf-8") as handle:
+              plan = json.load(handle)
+          assert plan["status"] == "planned"
+          assert "order_prm_ons" in plan["candidates"]
+          assert "dispersion_prm_ons" in plan["candidates"]
+          assert "equal_weight_order_dispersion_prm_portfolio" in plan["candidates"]
+          assert "hardsec021_restarted_dkw_cctm" in plan["comparators"]
+          assert "exact_small_n_polya_rank_tree_anytime_false_alarm" in plan["scenarios"]
+          assert "dependent_shared_latent_rank_sequence_negative_control" in plan["scenarios"]
+          assert plan["claim_rules"]["no_sequential_guarantee_for_serial_pmu_without_separate_proof"] is True
+          assert plan["claim_rules"]["marginal_validity_not_calibration_conditional"] is True
+          assert plan["claim_rules"]["exact_small_n_null_tree_required_before_anytime_claim"] is True
+          assert plan["claim_rules"]["dependent_rank_sequences_are_negative_controls_not_theorem_valid"] is True
+          print("PRM benchmark contract validated; status remains planned.")
+          PY

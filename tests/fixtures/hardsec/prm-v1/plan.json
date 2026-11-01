@@ -1,0 +1,47 @@
+{
+  "schema_version": "hardsec-predictive-rank-martingale-plan-v1",
+  "monitor_id": "hs023-order-dispersion-prm-v1",
+  "evidence_domain": "synthetic_fixture",
+  "stream_id": "stream-prm-demo-01",
+  "evaluation_group_id": "heldout-prm-exec-01",
+  "context_id": "compute",
+  "calibration_execution_group_id": "calibration-prm-exec-01",
+  "evaluation_execution_group_id": "heldout-prm-exec-01",
+  "calibration_device_boot_group_id": "calibration-prm-boot-01",
+  "evaluation_device_boot_group_id": "evaluation-prm-boot-01",
+  "scoring_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "score_transform_id": "fixed_scalar_anomaly_score_v1",
+  "score_direction": "higher_is_more_anomalous",
+  "tie_break_policy": "independent_uniform_lexicographic",
+  "tie_break_randomization_artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "tie_break_independence_status": "assumption_not_verified",
+  "target_alpha": 0.05,
+  "context_assignment_policy_id": "hs023-prm-workload-context-v1",
+  "context_assignment_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "calibration_iid_status": "assumption_not_verified",
+  "online_iid_status": "assumption_not_verified",
+  "calibration_online_same_null_status": "assumption_not_verified",
+  "score_transform_fixed_status": "assumption_not_verified",
+  "context_exogeneity_status": "assumption_not_verified",
+  "observation_admission_exogeneity_status": "assumption_not_verified",
+  "pmu_qualification_required": "qualified_for_named_acquisition_conditions",
+  "features": [
+    {
+      "feature_id": "order",
+      "feature_type": "order",
+      "portfolio_weight": 0.5
+    },
+    {
+      "feature_id": "dispersion",
+      "feature_type": "dispersion",
+      "portfolio_weight": 0.5
+    }
+  ],
+  "ons": {
+    "update": "lambda_next=project(lambda+(9/2)*g/(1+sum_g_squared),[-b_next,b_next])",
+    "initial_lambda": 0,
+    "initial_accumulator": 1,
+    "projection_radius": "min(1,3/(4*max_abs_centered_feature))",
+    "minimum_betting_factor": 0.25
+  }
+}
