@@ -1,0 +1,15 @@
+# Reproducible reference environment for the IIT 4.0 (2023) PyPhi runner.
+# Python runtime: 3.13.17 (pinned in .github/workflows/phi-digest-contract.yml).
+cloudpickle==3.1.2
+joblib==1.6.0
+more-itertools==11.2.1
+msgspec==0.22.0
+numpy==2.5.4
+pandas==3.1.0
+psutil==7.2.2
+pyphi==2.0.0rc4
+python-dateutil==4.0.0
+PyYAML==6.0.3
+scipy==1.18.1
+tqdm==4.70.1
+tzdata==2026.6
