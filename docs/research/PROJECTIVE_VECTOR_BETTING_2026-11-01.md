@@ -31,16 +31,47 @@ For a conditionally Gaussian score with mean theta and covariance Sigma, it is s
 
 The code checks finite values, dimensions, matrix symmetry and PSD. It cannot prove that an envelope covers the true conditional mgf; that is a separately sourced/model-validated assumption.
 
-## Covariance-envelope example
+## Dimension-free projective covariance envelope
 
-For d-dimensional equicorrelation covariance Sigma(rho)=(1-rho)I+rho*11^T and rho in [rho_min,rho_max], choose reference rho_0 in the interval and define
+For the equicorrelation family
 
 ```
-delta = max(0, (d-1)*(rho_max-rho_0), rho_0-rho_min)
-V = Sigma(rho_0) + delta*I
+Sigma_d(rho) = (1-rho) I_d + rho * 11^T,
+rho in [rho_min, rho_max]
 ```
 
-The eigenvalues of Sigma(rho)-Sigma(rho_0) are (rho-rho_0)*(d-1) on span(1) and -(rho-rho_0) on its orthogonal complement, so V dominates the entire interval. For d=5, [0.2,0.8], and rho_0=0.5, delta=1.2 and V=Sigma(0.5)+1.2I. Independent numerical checks covered dimensions 2 through 9, three rho intervals, and 101 grid points per interval.
+a tight envelope computed separately at each dimension is **not** projectively consistent: increasing d may increase its diagonal slack and change the old principal submatrix. That invalidates prefix equality even if each individual dimension's matrix dominates its covariance family.
+
+The corrected single global kernel is
+
+```
+V_d = (1-rho_min) I_d + rho_max * 11^T.
+```
+
+For every rho in the declared interval,
+
+```
+V_d - Sigma_d(rho)
+  = (rho-rho_min) I_d + (rho_max-rho) 11^T >= 0.
+```
+
+Both coefficients are nonnegative and 11^T is positive semidefinite, so this proves the matrix domination for every finite d. Every principal submatrix is exactly the same formula at the smaller dimension. For [rho_min,rho_max]=[0.2,0.8],
+
+```
+V_d = 0.8 I_d + 0.8 * 11^T
+diag(V_d) = 1.6
+```
+
+This is an infinite projective kernel represented by two scalars, not a dense matrix. For any vector x,
+
+```
+V_d x = 0.8 x + 0.8 * sum(x) * 1
+x^T V_d x = 0.8 * sum(x_i^2) + 0.8 * sum(x_i)^2
+```
+
+Both operations cost O(d) time and O(1) kernel parameters. The implementation is `ProjectiveEquicorrelationKernel`; the dense matrix form is retained only as a small-dimension reference and test oracle.
+
+This corrects the earlier dimension-specific envelope `Sigma(0.5)+1.2I`. That earlier matrix was valid at d=5, but recomputing the slack at a different dimension changed the previous principal block. The old benchmark rates are superseded by the projective-kernel results below.
 
 ## Reproducible benchmark
 
@@ -50,28 +81,31 @@ Run:
 python validation/benchmark_projective_vector_betting.py --seed 9751 --streams 20000 --dimension 5 --horizon 60 --output vector-betting-results.json
 ```
 
-Optional dependency: NumPy. The runner uses a fixed seed, records Wilson 95% intervals, and includes:
+Optional dependency: NumPy. The runner samples the Gaussian equicorrelation model with a common Gaussian factor and independent coordinate noise; it uses the analytic O(d) projective quadratic rather than a dense covariance multiplication. It records Wilson 95% intervals and includes:
 1. vector-coordinate intersection bet;
 2. shared scalar bet;
 3. fixed 50/50 vector/scalar mixture;
-4. fixed equal-weight coordinate-e-process mixture (arbitrary cross-coordinate dependence);
+4. fixed equal-weight coordinate-e-process mixture (valid under arbitrary cross-coordinate dependence when marginal factors are valid);
 5. an all-null predictable nested-arrival diagnostic.
 
-The declared envelope V=Sigma(0.5)+1.2I covers true equicorrelations rho in [0.2,0.8].
+The runner rejects correlation settings outside the declared [0.2,0.8] envelope. The envelope is dimension-free and prefix-consistent.
 
-For seed 9751, 20,000 streams per fixed-intersection cell, d=5, horizon 60, alpha=.05, and true rho=.5:
+For seed 9751, 20,000 streams per fixed-intersection cell, d=5, horizon 60 and alpha=.05, at true rho=.5:
 
 | Scenario | Vector bet | Scalar bet | Fixed 50/50 | Coordinate mixture |
 |---|---:|---:|---:|---:|
-| All-null crossing | 0.065% [0.038, 0.111] | 0.020% [0.008, 0.051] | 0.035% [0.017, 0.072] | 0.000% [0, 0.019] |
-| Sparse alternative (0,0,0,0,0.8) | 82.800% [82.271, 83.317] | 1.210% [1.068, 1.371] | 73.930% [73.317, 74.534] | 65.130% [64.467, 65.788] |
-| Dense alternative (0.45 in every coordinate) | 31.740% [31.098, 32.389] | 41.315% [40.634, 41.999] | 38.025% [37.355, 38.700] | 19.035% [18.497, 19.585] |
+| All-null crossing | 0.060% [0.034, 0.105] | 0.020% [0.008, 0.051] | 0.040% [0.020, 0.079] | 0.010% [0.003, 0.036] |
+| Sparse alternative (0,0,0,0,0.8) | 96.050% [95.771, 96.311] | 0.785% [0.672, 0.917] | 93.835% [93.493, 94.160] | 93.330% [92.976, 93.668] |
+| Dense alternative (0.45 in every coordinate) | 28.410% [27.789, 29.039] | 26.220% [25.615, 26.834] | 27.920% [27.303, 28.546] | 46.480% [45.790, 47.172] |
 
-Rates are proportions of streams crossing 1/alpha at any point during the 60-round horizon. Brackets are Wilson 95% binomial intervals. Across rho=.2,.5,.8, vector sparse-alternative crossing rates were 81.88%, 82.80%, 84.235%; vector dense-alternative rates were 21.94%, 31.74%, 38.505%. Shared-scalar dense rates were 42.785%, 41.315%, 41.185%. The fixed portfolio dense rates were 34.81%, 38.025%, 40.11%; coordinate-mixture dense rates were 19.94%, 19.035%, 17.90%.
+Rates are proportions of streams whose intersection process crossed 1/alpha at any point in the 60-round horizon. Brackets are Wilson 95% binomial intervals. Across true rho=.2,.5,.8:
+- vector sparse-alternative crossings: 96.735%, 96.050%, 96.150%;
+- vector dense-alternative crossings: 22.655%, 28.410%, 30.555%;
+- coordinate-mixture dense-alternative crossings: 53.740%, 46.480%, 39.350%.
 
-The vector bet is much stronger on the sparse alternative; the scalar bet is stronger on the dense alternative. The fixed portfolio gives a middle ground while preserving validity under the common envelope. These are intersection-level diagnostics, not multiple-testing power claims.
+The global kernel's lower idiosyncratic diagonal slack improves sparse power while the common-factor term protects against high positive dependence. It also makes the fixed coordinate mixture a much stronger dense-signal portfolio. The methods still trade off: the joint vector bet wins on sparse signals; the coordinate mixture is better on the dense equal-strength example. The fixed 50/50 combination is not uniformly best.
 
-For the particular all-null nested-arrival rule in the runner (activate the next coordinate if the most recently active coordinate's prior sample mean is positive after at least five observations), the local reference run recorded 0 crossings in 20,000 streams at each rho=.2,.5,.8. Each cell has a Wilson upper 95% bound of about 0.0192%. This is a finite simulation diagnostic, not a proof of calibration.
+For the particular all-null nested-arrival policy (activate the next coordinate if the most recently active coordinate's prior sample mean is positive after at least five observations), the reference run recorded 1, 1 and 0 crossings in 20,000 streams at rho=.2,.5,.8 respectively (0.005%, 0.005%, 0%). The Wilson upper 95% bounds are 0.0283%, 0.0283% and 0.0192%. This is a finite simulation diagnostic, not proof of calibration.
 
 ## Scope and limitations
 
