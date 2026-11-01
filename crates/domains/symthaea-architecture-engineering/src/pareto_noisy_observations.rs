@@ -24,6 +24,8 @@ use super::pareto_objectives::{ObjectiveDirection, ParetoObjectiveSpec};
 
 const SCHEMA: &str = "symthaea.architecture-engineering.noisy-pareto-observations";
 const VERSION: &str = "0.2.0";
+const JOINT_REPORT_SCHEMA: &str = "symthaea.architecture-engineering.noisy-anytime-campaign-report";
+const JOINT_REPORT_VERSION: &str = "0.1.0";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NoisyParetoError {
@@ -661,8 +663,8 @@ pub fn analyze_noisy_anytime_history(
     let history_tip_sha256 = history.history_tip_sha256();
     let run_id = header.run_id.clone();
     let payload = NoisyAnytimeCampaignReportPayload {
-        schema: SCHEMA,
-        version: VERSION,
+        schema: JOINT_REPORT_SCHEMA,
+        version: JOINT_REPORT_VERSION,
         run_id: &run_id,
         plan_sha256: &plan_sha256,
         history_tip_sha256: &history_tip_sha256,
@@ -674,8 +676,8 @@ pub fn analyze_noisy_anytime_history(
     };
     let report_sha256 = digest_serializable(&payload)?;
     Ok(NoisyAnytimeCampaignReport {
-        schema: SCHEMA.to_owned(),
-        version: VERSION.to_owned(),
+        schema: JOINT_REPORT_SCHEMA.to_owned(),
+        version: JOINT_REPORT_VERSION.to_owned(),
         run_id,
         plan_sha256,
         history_tip_sha256,
