@@ -247,6 +247,7 @@
       "additionalProperties": false,
       "required": [
         "repository_remote",
+        "repository_branch",
         "repository_commit",
         "source_path",
         "source_file_sha256",
@@ -300,6 +301,10 @@
               "$ref": "#/$defs/sha256"
             }
           ]
+        },
+        "repository_branch": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
