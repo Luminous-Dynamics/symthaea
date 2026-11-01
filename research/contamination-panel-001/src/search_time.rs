@@ -6,7 +6,7 @@
 //! Independent signer, proxy, sandbox and custody verification are separate.
 
 use crate::{
-    fresh_instance::{parse_timestamp, ExactLinearSolutionV1, FreshChallengeBundleV1},
+    fresh_instance::{ExactLinearSolutionV1, FreshChallengeBundleV1, parse_timestamp},
     hash_domain,
 };
 use serde::{Deserialize, Serialize};
