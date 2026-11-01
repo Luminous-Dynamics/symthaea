@@ -101,6 +101,7 @@ pub enum CalibrationError {
     NonIncreasingSequence { partition: &'static str, sequence: u64 },
     NonIncreasingForecastTime { partition: &'static str, sequence: u64 },
     DuplicateEpisode { episode_id: u64 },
+    DuplicateEvidenceCommitment { sequence: u64 },
     TemporalLeakage {
         fit_feedback_available_through_us: u64,
         holdout_forecasts_begin_at_us: u64,
@@ -119,6 +120,7 @@ impl fmt::Display for CalibrationError {
             Self::NonIncreasingSequence { partition, sequence } => write!(f, "{partition} feedback sequence is not strictly increasing at {sequence}"),
             Self::NonIncreasingForecastTime { partition, sequence } => write!(f, "{partition} forecast issue time is not strictly increasing at sequence {sequence}"),
             Self::DuplicateEpisode { episode_id } => write!(f, "episode {episode_id} appears more than once in calibration partitions"),
+            Self::DuplicateEvidenceCommitment { sequence } => write!(f, "paired intervention or finalized receipt commitment is reused at feedback sequence {sequence}"),
             Self::TemporalLeakage { fit_feedback_available_through_us, holdout_forecasts_begin_at_us } => write!(f, "calibration feedback through {fit_feedback_available_through_us} is not strictly earlier than holdout forecast origin {holdout_forecasts_begin_at_us}"),
             Self::ArithmeticOverflow => write!(f, "calibration audit arithmetic overflowed"),
         }
@@ -146,10 +148,19 @@ pub fn audit_temporal_value_calibration(
     validate_partition(holdout_samples, expected_model_sha256, "holdout")?;
 
     let mut episode_ids = BTreeSet::new();
+    let mut pair_commitments = BTreeSet::new();
+    let mut receipt_commitments = BTreeSet::new();
     for sample in fit_samples.iter().chain(holdout_samples.iter()) {
         if !episode_ids.insert(sample.episode_id) {
             return Err(CalibrationError::DuplicateEpisode {
                 episode_id: sample.episode_id,
+            });
+        }
+        if !pair_commitments.insert(sample.paired_intervention_sha256)
+            || !receipt_commitments.insert(sample.finalized_receipt_sha256)
+        {
+            return Err(CalibrationError::DuplicateEvidenceCommitment {
+                sequence: sample.feedback_sequence,
             });
         }
     }
@@ -430,6 +441,16 @@ mod tests {
         assert_eq!(
             audit_temporal_value_calibration([7; 32], &fit, &holdout),
             Err(CalibrationError::DuplicateEpisode { episode_id: 1 })
+        );
+    }
+
+    #[test]
+    fn repeated_finalized_receipt_or_pair_commitment_is_rejected() {
+        let (fit, mut holdout) = partitions();
+        holdout[0].finalized_receipt_sha256 = fit[0].finalized_receipt_sha256;
+        assert_eq!(
+            audit_temporal_value_calibration([7; 32], &fit, &holdout),
+            Err(CalibrationError::DuplicateEvidenceCommitment { sequence: 3 })
         );
     }
 
