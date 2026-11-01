@@ -172,3 +172,8 @@ The API rejects duplicate/noncanonical channel IDs, empty/noncanonical units, du
 **Do not aggregate these channels into one unqualified scalar.** Geometry error, contact probability, visibility and terminal risk have different units and decision meanings. A downstream planner may combine them only through an explicitly declared task utility/constraint function whose version and weights are frozen in the episode manifest. Report every channel separately, including unsupported/missing channels.
 
 The schema and synthetic fixture are `structured-visual-action-bank.v0.1.schema.json` and `fixtures/structured-visual-action-bank.example.json`. The focused workflow independently recomputes the canonical bank digest and checks channel uniqueness, units, sample cardinality and finite values. The fixture produces a one-metre position difference and a 0.4 contact-probability difference between the same two action IDs, with one shared draw axis. This tests pairing and channel preservation only; no vision model is connected yet.
+
+
+### Decision selection over structured channels
+
+`select_structured_task_action` requires the caller to identify the utility channel by ID and checks that its semantic kind is `TaskUtility`. It returns the certified action ID, not an array index, or an explicit abstention. Geometry, motion, contact, visibility and terminal-risk channels cannot be passed as the selection objective. The caller must retain those channels as independent diagnostics/constraints and freeze any downstream utility/constraint mapping in the episode manifest.
