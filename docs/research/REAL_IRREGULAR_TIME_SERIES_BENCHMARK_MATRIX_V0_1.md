@@ -284,3 +284,10 @@ arrival time. The illustrative America/Chicago parser test is a timezone
 mechanics test, not yet a certified production timezone declaration for the
 dataset. The dataset-specific timezone must be verified before any real-data
 claim. No Time-IMM dataset benchmark has been executed.
+
+
+The canonical adapter-configuration digest is feature-order independent and
+binds dataset ID, entity record ID, timezone rule, availability policy, and
+every numeric column's modality ID, unit code and decimal scale. Both numeric
+and text parsed-table results return this digest, the dataset/entity IDs, and
+the source-file digest.
