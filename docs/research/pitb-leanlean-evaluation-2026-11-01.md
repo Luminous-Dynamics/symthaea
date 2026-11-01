@@ -139,3 +139,10 @@ The Pareto dimensions should include compression, comparator preservation, build
 - Official benchmark implementation and evaluation protocol: https://github.com/eth-sri/lean-lean
 - Published 64-project dataset metadata: https://huggingface.co/datasets/eth-sri/lean-lean
 - PITB support antichain research: data/benchmarks/proof-insight-transfer-v0 (separate cohort and endpoint)
+
+
+## Receipt contract and denominator rule
+
+A task's `protected_declaration_count` is **per repository**. The 620 value in the public dataset card is the cohort-level total across all 64 repositories; it is not a per-task constant. Each per-repository record binds its own protected-declaration manifest SHA-256 and count, while also carrying the cohort-level total and metadata-manifest digest.
+
+The versioned outcome contract is `leanlean-track/leanlean-outcome-v0.schema.json`; the checked-in fixture is explicitly synthetic and not attempted. The focused workflow is `.github/workflows/pitb-leanlean-outcome-contract.yml`. It checks that a measured success requires baseline and candidate clean builds, comparator success, all per-repository protected declarations retained, no unapproved axiom/trust changes, content-addressed candidate/build/comparator/action receipts, and resource use within the registered 12-hour/8-CPU/64-GiB envelope. The CI fixture uses synthetic hashes only and is not a benchmark outcome.
