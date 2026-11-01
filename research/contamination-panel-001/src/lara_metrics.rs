@@ -135,6 +135,12 @@ struct VectorPairStats {
     neighbor_sample_std: f64,
 }
 
+struct VectorPairResult {
+    stats: VectorPairStats,
+    original_shift: Vec<f64>,
+    neighbor_shifts: Vec<Vec<f64>>,
+}
+
 fn check_finite(values: &[f64], label: &str) -> Result<(), String> {
     if values.iter().any(|value| !value.is_finite()) {
         return Err(format!("{label} contains a non-finite value"));
@@ -262,7 +268,7 @@ fn vector_pair_stats(
     original_incomplete: &[f64],
     neighbor_complete: &[Vec<f64>],
     neighbor_incomplete: &[Vec<f64>],
-) -> Result<(VectorPairStats, Vec<f64>, Vec<Vec<f64>>), String> {
+) -> Result<VectorPairResult, String> {
     if neighbor_complete.len() != neighbor_incomplete.len()
         || !(MIN_SEMANTIC_NEIGHBORS..=MAX_SEMANTIC_NEIGHBORS).contains(&neighbor_complete.len())
     {
@@ -287,14 +293,14 @@ fn vector_pair_stats(
     let (neighbor_mean_norm, neighbor_sample_std) =
         sample_mean_and_std(&neighbor_norms, "neighbour shift magnitudes")?;
     let stats = VectorPairStats {
-        original_norm: vector_norm(&original_shift),
+        original_norm: vector_norm(&pair.original_shift),
         neighbor_mean_norm,
         neighbor_sample_std,
     };
     if !stats.original_norm.is_finite() {
         return Err("original shift magnitude is non-finite".to_owned());
     }
-    Ok((stats, original_shift, neighbor_shifts))
+    Ok(VectorPairResult { stats, original_shift, neighbor_shifts })
 }
 
 /// Compute LaRA's paper-defined RSM, DC and RSI for one transformer layer.
@@ -309,20 +315,20 @@ pub fn compute_layer_metrics(input: &LayerProbeInputV1) -> Result<LayerMetricsV1
         return Err("layer_id must be a nonempty opaque ASCII identifier <=128 bytes".to_owned());
     }
 
-    let (shift_stats, original_shift, neighbor_shifts) = vector_pair_stats(
+    let pair = vector_pair_stats(
         &input.original_complete,
         &input.original_incomplete,
         &input.neighbor_complete,
         &input.neighbor_incomplete,
     )?;
-    let rsm = (shift_stats.original_norm - shift_stats.neighbor_mean_norm)
-        / (shift_stats.neighbor_sample_std + LARA_EPSILON);
+    let rsm = (pair.stats.original_norm - pair.stats.neighbor_mean_norm)
+        / (pair.stats.neighbor_sample_std + LARA_EPSILON);
 
-    let mean_neighbor_shift = mean_vector(&neighbor_shifts, "mean semantic-neighbour shift")?;
-    if original_shift.len() != mean_neighbor_shift.len() {
+    let mean_neighbor_shift = mean_vector(&pair.neighbor_shifts, "mean semantic-neighbour shift")?;
+    if pair.original_shift.len() != mean_neighbor_shift.len() {
         return Err("original and semantic-neighbour hidden dimensions differ".to_owned());
     }
-    let dot = original_shift
+    let dot = pair.original_shift
         .iter()
         .zip(&mean_neighbor_shift)
         .map(|(a, b)| a * b)
@@ -331,7 +337,7 @@ pub fn compute_layer_metrics(input: &LayerProbeInputV1) -> Result<LayerMetricsV1
         / ((vector_norm(&original_shift) + LARA_EPSILON)
             * (vector_norm(&mean_neighbor_shift) + LARA_EPSILON));
 
-    if input.neighbor_paraphrase_representations.len() != neighbor_shifts.len() {
+    if input.neighbor_paraphrase_representations.len() != pair.neighbor_shifts.len() {
         return Err(
             "each semantic neighbour must have one matched paraphrase representation group"
                 .to_owned(),
