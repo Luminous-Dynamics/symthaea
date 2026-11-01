@@ -307,8 +307,18 @@ fn prefix_value(
 
 /// Stable binomial probabilities using log probabilities and log-sum-exp normalization.
 fn binomial_pmf(n: usize, p: f64) -> Result<Vec<f64>, InducedTestError> {
-    if !p.is_finite() || !(0.0..1.0).contains(&p) {
-        return Err(InducedTestError::new("binomial.p", "p must lie strictly between zero and one"));
+    if !p.is_finite() || !(0.0..=1.0).contains(&p) {
+        return Err(InducedTestError::new("binomial.p", "p must be finite and lie in [0, 1]"));
+    }
+    if p == 0.0 {
+        let mut values = vec![0.0; n + 1];
+        values[0] = 1.0;
+        return Ok(values);
+    }
+    if p == 1.0 {
+        let mut values = vec![0.0; n + 1];
+        values[n] = 1.0;
+        return Ok(values);
     }
     let log_p = p.ln();
     let log_q = (1.0 - p).ln();
@@ -368,25 +378,25 @@ mod tests {
         let n = report.terminal_test.horizon;
         let mut expectation = 0.0;
         for path_mask in 0..(1usize << n) {
-            let mut successes = 0usize;
-            let mut probability = 1.0;
+            let mut successes_at_stop = 0usize;
             let mut stop_at = n;
-            let mut stopped_successes = 0usize;
+            let mut stopped = false;
+            let mut full_path_probability = 1.0;
             for time in 1..=n {
                 let success = (path_mask >> (time - 1)) & 1 == 1;
-                if success { successes += 1; probability *= null_p; }
-                else { probability *= 1.0 - null_p; }
-                if stop_rule(time, successes) {
+                if success {
+                    full_path_probability *= null_p;
+                    if !stopped { successes_at_stop += 1; }
+                } else {
+                    full_path_probability *= 1.0 - null_p;
+                }
+                if !stopped && stop_rule(time, successes_at_stop) {
                     stop_at = time;
-                    stopped_successes = successes;
-                    break;
+                    stopped = true;
                 }
             }
-            if stop_at == n && stopped_successes == 0 {
-                stopped_successes = successes;
-            }
-            let value = prefix_value(&report.prefix_values, stop_at, stopped_successes).unwrap();
-            expectation += probability * value;
+            let value = prefix_value(&report.prefix_values, stop_at, successes_at_stop).unwrap();
+            expectation += full_path_probability * value;
         }
         expectation
     }
@@ -435,6 +445,15 @@ mod tests {
         assert!(InducedBernoulliTestPlan::new("bad",0.2,0.5,0,0.05).is_err());
         assert!(InducedBernoulliTestPlan::new("bad",0.2,0.5,MAX_HORIZON+1,0.05).is_err());
         assert!(InducedBernoulliTestPlan::new("bad",0.2,0.5,12,1.0).is_err());
+    }
+
+    #[test]
+    fn degenerate_alternative_probability_one_is_supported() {
+        let plan = InducedBernoulliTestPlan::new("certain-success-alternative", 0.2, 1.0, 8, 0.05).unwrap();
+        let report = analyze_induced_bernoulli_test(&plan).unwrap();
+        assert!(report.terminal_test.alternative_power > 0.99);
+        assert!((report.terminal_test.null_size - 0.05).abs() < 1e-10);
+        assert!(report.max_null_martingale_residual < 1e-10);
     }
 
     #[test]
