@@ -1471,108 +1471,6 @@ mod tests {
         assert!((left - right).abs() <= 1e-12, "{left} != {right}");
     }
 
-    fn reference_min_fill_order(
-        factor_scopes: &[Vec<usize>],
-        eliminate: &[usize],
-    ) -> (Vec<usize>, usize) {
-        let mut adjacency = BTreeMap::<usize, BTreeSet<usize>>::new();
-        for variable in eliminate {
-            adjacency.entry(*variable).or_default();
-        }
-        for scope in factor_scopes {
-            for variable in scope {
-                adjacency.entry(*variable).or_default();
-            }
-            for (slot, left) in scope.iter().copied().enumerate() {
-                for right in scope.iter().copied().skip(slot + 1) {
-                    adjacency.entry(left).or_default().insert(right);
-                    adjacency.entry(right).or_default().insert(left);
-                }
-            }
-        }
-        let mut active = eliminate.iter().copied().collect::<BTreeSet<_>>();
-        let mut order = Vec::with_capacity(active.len());
-        let mut width = 0usize;
-        while !active.is_empty() {
-            let mut best: Option<(usize, usize, usize)> = None;
-            for variable in active.iter().copied() {
-                let neighbours = adjacency
-                    .get(&variable)
-                    .cloned()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .filter(|neighbour| adjacency.contains_key(neighbour))
-                    .collect::<Vec<_>>();
-                let mut fill = 0usize;
-                for (slot, left) in neighbours.iter().copied().enumerate() {
-                    for right in neighbours.iter().copied().skip(slot + 1) {
-                        if !adjacency[&left].contains(&right) {
-                            fill += 1;
-                        }
-                    }
-                }
-                let score = (fill, neighbours.len(), variable);
-                if best.is_none_or(|current| score < current) {
-                    best = Some(score);
-                }
-            }
-            let (_, degree, variable) = best.expect("nonempty active set has a candidate");
-            width = width.max(degree);
-            let neighbours = adjacency
-                .get(&variable)
-                .cloned()
-                .unwrap_or_default()
-                .into_iter()
-                .filter(|neighbour| adjacency.contains_key(neighbour))
-                .collect::<Vec<_>>();
-            for (slot, left) in neighbours.iter().copied().enumerate() {
-                for right in neighbours.iter().copied().skip(slot + 1) {
-                    adjacency.entry(left).or_default().insert(right);
-                    adjacency.entry(right).or_default().insert(left);
-                }
-            }
-            for neighbour in &neighbours {
-                if let Some(edges) = adjacency.get_mut(neighbour) {
-                    edges.remove(&variable);
-                }
-            }
-            adjacency.remove(&variable);
-            active.remove(&variable);
-            order.push(variable);
-        }
-        (order, width)
-    }
-
-    #[test]
-    fn min_fill_leaf_fast_path_matches_reference_order_on_seeded_small_graphs() {
-        for variable_count in 2..=9 {
-            for seed in 0..24usize {
-                let mut random = (seed as u64 + 1) * 0x9E37_79B9;
-                let mut scopes = (0..variable_count)
-                    .map(|variable| vec![variable])
-                    .collect::<Vec<_>>();
-                for left in 0..variable_count {
-                    for right in left + 1..variable_count {
-                        random ^= random << 13;
-                        random ^= random >> 7;
-                        random ^= random << 17;
-                        if random % 5 < 2 {
-                            scopes.push(vec![left, right]);
-                        }
-                    }
-                }
-                let eliminate = (0..variable_count).collect::<Vec<_>>();
-                let (expected_order, expected_width) =
-                    reference_min_fill_order(&scopes, &eliminate);
-                let actual = plan_min_fill_elimination(&scopes, &eliminate, 1 << 16).unwrap();
-                assert_eq!(actual.elimination_order, expected_order,
-                    "order mismatch: variables={variable_count}, seed={seed}");
-                assert_eq!(actual.induced_width, expected_width,
-                    "width mismatch: variables={variable_count}, seed={seed}");
-            }
-        }
-    }
-
     #[test]
     fn min_fill_star_planning_uses_linear_leaf_updates() {
         let leaves = 2_048usize;
@@ -1717,6 +1615,28 @@ mod tests {
         assert_eq!(first.factor.values, vec![16.0, 16.0]);
     }
 
+    fn reference_fill_score(
+        variable: usize,
+        adjacency: &BTreeMap<usize, BTreeSet<usize>>,
+    ) -> (usize, usize) {
+        let neighbours = adjacency
+            .get(&variable)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|neighbour| adjacency.contains_key(neighbour))
+            .collect::<Vec<_>>();
+        let mut fill_edges = 0usize;
+        for (slot, left) in neighbours.iter().copied().enumerate() {
+            for right in neighbours.iter().copied().skip(slot + 1) {
+                if !adjacency[&left].contains(&right) {
+                    fill_edges += 1;
+                }
+            }
+        }
+        (fill_edges, neighbours.len())
+    }
+
     fn reference_min_fill_order(
         factors: &[BinaryFactor],
         eliminate: &[usize],
@@ -1745,7 +1665,7 @@ mod tests {
                 .iter()
                 .copied()
                 .map(|variable| {
-                    let (fill, degree) = fill_score(variable, &adjacency);
+                    let (fill, degree) = reference_fill_score(variable, &adjacency);
                     ((fill, degree, variable), degree)
                 })
                 .min_by_key(|(score, _)| *score)
@@ -1798,6 +1718,21 @@ mod tests {
                     "lazy min-fill diverged for n={variable_count}, seed={seed}"
                 );
             }
+        }
+
+        // Small explicit stars exercise the degree-one update against the
+        // independent full-rescan reference without making the oracle itself
+        // cubic on the 2,048-leaf stress case.
+        for leaves in 2..=32 {
+            let factors = (1..=leaves)
+                .map(|leaf| {
+                    BinaryFactor::new(vec![0, leaf], vec![1.0; 4]).unwrap()
+                })
+                .collect::<Vec<_>>();
+            let eliminate = (0..=leaves).collect::<Vec<_>>();
+            let reference = reference_min_fill_order(&factors, &eliminate);
+            let actual = min_fill_order(&factors, &eliminate).unwrap();
+            assert_eq!(actual, reference, "star planner mismatch with {leaves} leaves");
         }
     }
 
