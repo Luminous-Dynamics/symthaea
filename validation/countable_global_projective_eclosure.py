@@ -94,6 +94,71 @@ def fdp(rejections: Iterable[int], null_intersection: Iterable[int]) -> Fraction
     return Fraction(len(rejected & nulls), len(rejected)) if rejected else Fraction(0)
 
 
+def separate_local_closure(
+    active: Iterable[int],
+    rejections: Iterable[int],
+    coordinate_values: Mapping[int, int | float | str | Fraction],
+    alpha: int | float | str | Fraction,
+    *,
+    scheme: str = "geometric",
+) -> dict:
+    """Check all nonempty local constraints with an exact O(|I|) separator.
+
+    For a nonempty rejection set R, each intersection S must satisfy
+      sum_{i in S} [1{i in R}/|R| - alpha*w_i*(M_i-1)] <= alpha.
+    The maximizing subset contains exactly the coordinates with positive
+    bracket values, so all 2^|I|-1 constraints reduce to one linear scan.
+    """
+    ids = validate_ids(active)
+    rejected = validate_ids(rejections)
+    if not set(rejected).issubset(ids):
+        raise ValueError("rejections must be a subset of the active family")
+    level = as_fraction(alpha)
+    if not 0 < level < 1:
+        raise ValueError("alpha must lie strictly between zero and one")
+    if not ids:
+        return {
+            "certified": True, "active_count": 0,
+            "subsets_implicitly_checked": 0, "coordinate_terms_evaluated": 0,
+            "separating_subset": (), "maximum_nonempty_lhs": None,
+            "positive_part_sum": Fraction(0), "slack": None,
+            "scope": "empty active family has no nonempty local constraints",
+        }
+
+    r = len(rejected)
+    rejected_set = set(rejected)
+    coefficients = {}
+    for i in ids:
+        if i not in coordinate_values:
+            raise ValueError(f"missing coordinate value for hypothesis {i}")
+        m = as_fraction(coordinate_values[i])
+        if m < 0:
+            raise ValueError(f"negative coordinate e-value for hypothesis {i}")
+        d_i = coordinate_weight(i, scheme) * (m - 1)
+        coefficients[i] = (Fraction(1, r) if i in rejected_set else Fraction(0)) - level * d_i
+
+    positive_ids = tuple(i for i in ids if coefficients[i] > 0)
+    positive_part_sum = sum((coefficients[i] for i in positive_ids), Fraction(0))
+    if positive_ids:
+        witness = positive_ids
+        maximum_nonempty_lhs = positive_part_sum
+    else:
+        witness = (max(ids, key=lambda i: coefficients[i]),)
+        maximum_nonempty_lhs = coefficients[witness[0]]
+    return {
+        "certified": positive_part_sum <= level,
+        "active_count": len(ids),
+        "subsets_implicitly_checked": (1 << len(ids)) - 1,
+        "coordinate_terms_evaluated": len(ids),
+        "separating_subset": witness,
+        "maximum_nonempty_lhs": maximum_nonempty_lhs,
+        "positive_part_sum": positive_part_sum,
+        "slack": level - maximum_nonempty_lhs,
+        "coefficients": coefficients,
+        "scope": "exact O(|I|) separator equivalent to every local affine-closure constraint",
+    }
+
+
 def _normalize_path_inputs(
     active_by_time: Sequence[Iterable[int]],
     rejections_by_time: Sequence[Iterable[int]],
@@ -170,17 +235,14 @@ def verify_countable_global_projective_path(
 
     for t, (i_t, r_t) in enumerate(zip(active, rejected)):
         values_t = {i: path[t] for i, path in paths.items()}
-        constraints = []
-        for subset in nonempty_subsets(i_t):
-            cert = projective_certificate(subset, values_t, scheme=scheme)
-            local_loss = fdp(r_t, subset)
-            slack = level * cert - local_loss
-            constraints.append({
-                "intersection": subset, "certificate": cert, "fdp": local_loss,
-                "slack": slack, "certified": slack >= 0,
-            })
-            if slack < 0:
-                failures.append(("local_closure_violation", t, subset, local_loss, level * cert))
+        separation = separate_local_closure(
+            i_t, r_t, values_t, level, scheme=scheme
+        )
+        if not separation["certified"]:
+            witness = separation["separating_subset"]
+            witness_cert = projective_certificate(witness, values_t, scheme=scheme)
+            witness_loss = fdp(r_t, witness)
+            failures.append(("local_closure_violation", t, witness, witness_loss, level * witness_cert))
 
         active_true = tuple(i for i in truth if i in set(i_t))
         active_true_cert = projective_certificate(active_true, values_t, scheme=scheme)
@@ -195,9 +257,10 @@ def verify_countable_global_projective_path(
         rows.append({
             "time": t, "active": i_t, "rejections": r_t,
             "active_true_nulls": active_true,
-            "local_constraints_checked": len(constraints),
-            "local_constraints_certified": all(c["certified"] for c in constraints),
-            "local_constraints": constraints,
+            "local_constraints_covered": separation["subsets_implicitly_checked"],
+            "local_constraint_terms_evaluated": separation["coordinate_terms_evaluated"],
+            "local_constraints_certified": separation["certified"],
+            "local_closure_separator": separation,
             "full_true_certificate": full_true_cert,
             "active_true_certificate": active_true_cert,
             "projective_identity": full_true_cert == active_true_cert,
@@ -216,7 +279,8 @@ def verify_countable_global_projective_path(
         "finite_true_null_weight_mass": finite_weight_mass(truth, scheme),
         "active_sizes": [len(row) for row in active],
         "times_checked": len(rows),
-        "local_constraints_checked": sum(row["local_constraints_checked"] for row in rows),
+        "local_constraints_covered": sum(row["local_constraints_covered"] for row in rows),
+        "local_constraint_terms_evaluated": sum(row["local_constraint_terms_evaluated"] for row in rows),
         "all_projective_identities_verified": all(row["projective_identity"] for row in rows),
         "all_true_null_losses_dominated": all(row["dominated"] for row in rows),
         "coordinate_paths_monotone": monotone,
