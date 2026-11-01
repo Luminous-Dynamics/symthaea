@@ -143,7 +143,7 @@ fn plan_from_contract(
     for (index, item) in contract.objective_specs.iter().enumerate() {
         specs.push(NoisyObjectiveSpec {
             objective_id: item.objective_id.clone(),
-            direction: item.direction,
+            direction: item.direction.clone(),
             observation_lower_bound: item.observation_lower_bound.ok_or_else(|| EventTapeNoisyError::new(
                 format!("objective_specs[{index}].observation_lower_bound"), "missing noisy lower bound",
             ))?,
