@@ -418,9 +418,9 @@ impl GraphSuite {
 
 fn temporal(e: &EvidenceRevision, q: &QueryProfile) -> bool {
     e.valid_from <= q.valid_at
-        && e.valid_until.map_or(true, |end| q.valid_at < end)
+        && e.valid_until.is_none_or(|end| q.valid_at < end)
         && e.known_from <= q.known_at
-        && e.known_until.map_or(true, |end| q.known_at < end)
+        && e.known_until.is_none_or(|end| q.known_at < end)
 }
 
 fn admissible(e: &EvidenceRevision, q: &QueryProfile) -> bool {
@@ -610,7 +610,7 @@ fn score_case(
             .claim_dispositions
             .get(id)
             .unwrap_or(&ClaimDisposition::Abstain);
-        let mut correct = false;
+        let correct;
         let mut witness: Option<&Witness> = None;
         match disposition {
             ClaimDisposition::Supported { alternative_id } => {
@@ -2069,7 +2069,7 @@ mod tests {
             cited_evidence_ids: BTreeSet::from(["e-base".into(), "e-unaffected".into()]),
         };
         assert_eq!(
-            suite.evaluate(&[p.clone()]).case_scores[5].correct_dispositions,
+            suite.evaluate(std::slice::from_ref(&p)).case_scores[5].correct_dispositions,
             2
         );
         assert!(suite.retract_evidence(&id, "e-base"));
@@ -2304,7 +2304,7 @@ mod tests {
         );
         assert_eq!(
             correlation_suite
-                .evaluate(&[correlation_packet.clone()])
+                .evaluate(std::slice::from_ref(&correlation_packet))
                 .case_scores[14]
                 .correct_dispositions,
             1
@@ -3635,7 +3635,7 @@ mod artifact_evaluator_tests_v1 {
     #[test]
     fn tampered_gold_claim_and_gold_path_artifacts_are_rejected() {
         let (planner, oracle, predictions, digest) = artifacts();
-        let tampered_claim = oracle.replacen("GOLD_CLAIM", "GOLD_CLAIM", 1).replacen(
+        let tampered_claim = oracle.replacen(
             "\tsupported\n",
             "\tunknown\n",
             1,
@@ -3649,10 +3649,7 @@ mod artifact_evaluator_tests_v1 {
             )
             .is_err()
         );
-        let tampered_path = oracle
-            .replacen("GOLD_PATH", "GOLD_PATH", 1)
-            .replace("GOLD_PATH\t", "GOLD_PATH\t");
-        let malformed_path = tampered_path
+        let malformed_path = oracle
             .lines()
             .map(|line| {
                 if line.starts_with("GOLD_PATH\t") {
