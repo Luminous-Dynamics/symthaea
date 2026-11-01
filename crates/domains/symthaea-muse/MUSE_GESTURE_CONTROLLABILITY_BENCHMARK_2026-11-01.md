@@ -19,17 +19,19 @@ The two renders must bind the same immutable score, producer-assigned note-ident
 GestureCounterfactualReceiptV1 carries:
 
 - score SHA-256 and score-note identity-map SHA-256;
+- a preregistered protocol-profile SHA-256 that resolves to the frozen expected-effect and side-effect-budget specification;
+- the canonical SHA-256 of the exact source gesture event, with the baseline value required to equal the originating event value;
 - source/model/asset manifest digest;
 - exact renderer ID and build digest;
-- exact feature extractor ID and build digest;
+- exact feature extractor ID, build digest and configuration SHA-256 (windowing, resampling, normalization and per-feature settings);
 - stable event ID, instrument ID, source model ID, target note/part and rational beat position;
 - baseline and intervention values for one typed gesture parameter;
 - both rendered output SHA-256 values;
-- baseline and intervention feature measurements with stable feature IDs and units;
+- baseline and intervention feature measurements with stable feature IDs, units, exact note/part target, instrument ID and source-model identity. The same feature name may appear for multiple note targets; lookup and sorting are scoped by (target, feature ID).
 - predeclared expected feature effects and side-effect budgets;
 - a domain-separated receipt digest.
 
-The receipt digest is a tamper-evident content commitment, **not** a signature, independent measurement, source-rights proof or qualification attestation. An independent verifier must establish the provenance of the render and analysis artifacts. Capability promotion remains with the pinned signed exact-cell verifier in #9586.
+The receipt digest is a tamper-evident content commitment, **not** a signature, independent measurement, source-rights proof or qualification attestation. The protocol digest must resolve to a preregistered record; merely hashing a caller-supplied threshold after observing results is not preregistration. An independent verifier must establish the provenance of the render and analysis artifacts and re-run the pinned feature extractor over the captured audio. Capability promotion remains with the pinned signed exact-cell verifier in #9586.
 
 ## Experimental protocol
 
@@ -88,7 +90,7 @@ Every suite must contain:
 - an unrelated note used as a leakage sentinel;
 - identical output bytes paired with deliberately altered measurement metadata.
 
-The verifier must reject mismatched identity/build inputs, ignored controls, cross-note leakage and fabricated measurement changes.
+The verifier must reject mismatched identity/build inputs, a source gesture whose digest/value differs from the intervention record, ignored controls, cross-note leakage, instrument/model mismatches and fabricated measurement changes.
 
 ## Benchmark dashboard
 
