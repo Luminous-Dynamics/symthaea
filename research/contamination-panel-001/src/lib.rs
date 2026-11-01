@@ -249,13 +249,6 @@ struct PairDigestPayloadV1<'a> {
     right_text: &'a str,
 }
 
-pub(crate) fn valid_digest(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-}
-
 fn hash_domain(domain: &[u8], payload: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(HASH_DOMAIN);
@@ -324,7 +317,7 @@ fn generation_subkey(seed: &[u8], generation_id: &str) -> [u8; 32] {
     hmac_sha256(seed, &message)
 }
 
-fn valid_digest(value: &str) -> bool {
+pub(crate) fn valid_digest(value: &str) -> bool {
     value.len() == 64
         && value
             .bytes()
