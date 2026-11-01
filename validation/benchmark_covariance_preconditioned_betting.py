@@ -108,6 +108,8 @@ def simulate_cell(
         raise ValueError("eta_values must be a nonempty sequence of finite nonnegative values")
     if len(set(eta_values)) != len(eta_values):
         raise ValueError("eta_values must be unique")
+    if 0.05 not in eta_values:
+        raise ValueError("eta_values must include 0.05 for the fixed-rate comparator")
 
     means = {
         "all_null": np.zeros(dimension),
