@@ -2,12 +2,12 @@ use pod_meta_cost_to_go_lab::{
     BudgetLedger, CensoringWeightReceipt, CompletedCalibrationExample, EffectDisposition,
     ForecastId, ForecastJournal, ForecastOutcomeReceipt, ForecastReceipt, FrontierCostCoefficients,
     JointCostEnvelope, LandmarkEpisode, LandmarkIpcwConfig, LandmarkTerminal,
-    LinearProofFrontierCostModel, ProofFrontierFeatures, ReconciliationOutcome,
-    RemainingCostForecast, ReservationId, ResourceVector, SelectedProofCalibrationExample,
-    SelectedProofEnvelope, SelectionConditionedConformalCalibrator, SelectionReceipt, ShiftStatus,
-    OnlineCompetingTerminal, OnlineCostDimension, OnlineFeedbackDisposition, OnlineFeedbackReceipt,
-    OnlinePredictionStatement, OnlineSelectionLedger, SplitVectorConformalCalibrator, StateEvidence,
-    TerminalOutcome, assess_completion_feasibility,
+    LinearProofFrontierCostModel, OnlineCompetingTerminal, OnlineCostDimension,
+    OnlineFeedbackDisposition, OnlineFeedbackReceipt, OnlinePredictionStatement,
+    OnlineSelectionLedger, ProofFrontierFeatures, ReconciliationOutcome, RemainingCostForecast,
+    ReservationId, ResourceVector, SelectedProofCalibrationExample, SelectedProofEnvelope,
+    SelectionConditionedConformalCalibrator, SelectionReceipt, ShiftStatus,
+    SplitVectorConformalCalibrator, StateEvidence, TerminalOutcome, assess_completion_feasibility,
     assess_joint_resource_fit, calibrate_landmark_ipcw,
 };
 
@@ -718,8 +718,7 @@ fn main() {
     let delayed_report = online_delayed.report(3);
     println!(
         "ONLINE_FCR_ROW\tdelayed-prefix\t{}\t{}",
-        delayed_report.pending_feedback,
-        delayed_report.resolved_coverage_statements
+        delayed_report.pending_feedback, delayed_report.resolved_coverage_statements
     );
 
     let mut online_unknown = OnlineSelectionLedger::new();
@@ -751,8 +750,7 @@ fn main() {
     let unknown_report = online_unknown.report(4);
     println!(
         "ONLINE_FCR_ROW\tunknown-reconciled\t{}\t{}",
-        unknown_report.action_outcome_unknown,
-        unknown_report.resolved_coverage_statements
+        unknown_report.action_outcome_unknown, unknown_report.resolved_coverage_statements
     );
 
     let mut online_censored = OnlineSelectionLedger::new();
@@ -773,8 +771,7 @@ fn main() {
     let censored_report = online_censored.report(2);
     println!(
         "ONLINE_FCR_ROW\tcensored-definite-miss\t{}\t{}",
-        censored_report.coverage_misses,
-        censored_report.right_censored_unresolved
+        censored_report.coverage_misses, censored_report.right_censored_unresolved
     );
 
     let mut online_competing = OnlineSelectionLedger::new();
@@ -795,7 +792,6 @@ fn main() {
     let competing_report = online_competing.report(2);
     println!(
         "ONLINE_FCR_ROW\tcompeting-terminal\t{}\t{}",
-        competing_report.competing_terminal,
-        competing_report.resolved_coverage_statements
+        competing_report.competing_terminal, competing_report.resolved_coverage_statements
     );
 }
