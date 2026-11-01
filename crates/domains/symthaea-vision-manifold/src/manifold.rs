@@ -4760,8 +4760,9 @@ impl DelayedHorizonEvaluator {
         let target_frame_sequence = manifold.frame_count;
         let now = self.elapsed_seconds;
         let mut scored = 0usize;
-        let mut still_pending = Vec::with_capacity(self.pending.len());
-        for forecast in self.pending.drain(..) {
+        let pending = std::mem::take(&mut self.pending);
+        let mut still_pending = Vec::with_capacity(pending.len());
+        for forecast in pending {
             if forecast.due_time > now {
                 still_pending.push(forecast);
                 continue;
