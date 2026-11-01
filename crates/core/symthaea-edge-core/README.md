@@ -22,6 +22,12 @@ The library is `no_std`, has no dependencies, forbids unsafe code, and uses fixe
 
 A 16,384-bit vector (`WORDS = 256`) uses exactly 2,048 bytes, compared with 65,536 bytes for 16,384 `f32` values.
 
+### Fixed-codebook scalar encoder
+
+`ScalarLevelEncoder<LEVELS, FEATURES, WORDS>` accepts an explicit array of value-level hypervectors, fixed per-feature rotation offsets and an array of pre-quantized feature levels. It permutes the selected level vector for each feature and majority-bundles the results. Exact ties resolve to zero.
+
+The encoder does not choose feature scaling/quantization, generate random hypervectors or hide codebook state. Those remain explicit benchmark artifacts and must be content-addressed. The fixed codebook and rotation array have their own payload estimator.
+
 ### Fixed-capacity associative memory
 
 `PackedHdcMemory<CLASSES, SLOTS, WORDS>` allocates all exemplars and class metadata inline. Insertion returns `CapacityFull` when full. Round-robin replacement is available only through the explicitly named `insert_or_replace_oldest` method.
@@ -42,7 +48,7 @@ The caller can pass `alpha_q15` directly or use `alpha_from_ratio_q16` / `alpha_
 
 ```rust
 use symthaea_edge_core::{
-    BoundedEdgeCore, PackedHv,
+    BoundedEdgeCore, PackedHv, ScalarLevelEncoder,
 };
 
 type EdgeCore = BoundedEdgeCore<128, 4, 16, 256>;
@@ -50,12 +56,17 @@ type EdgeCore = BoundedEdgeCore<128, 4, 16, 256>;
 let mut core = EdgeCore::new().expect("non-zero fixed capacity");
 let sensory_equilibrium = [0i16; 128];
 core.update_liquid_state_from_dt_tau_us(&sensory_equilibrium, 10, 10).unwrap();
-let exemplar = PackedHv::<256>::zero();
+
+let codebook = [PackedHv::<256>::zero(); 2];
+let encoder = ScalarLevelEncoder::<2, 3, 256>::new(codebook, [0, 4096, 8192])
+    .expect("non-zero encoder dimensions");
+let feature_levels = [0, 1, 0];
+let exemplar = encoder.encode(&feature_levels).unwrap();
 core.remember(0, exemplar).unwrap();
-let result = core.classify(&exemplar);
+let result = core.classify_features(&encoder, &feature_levels).unwrap();
 ```
 
-The example's memory is statically bounded. The 64 exemplar vectors occupy 128 KiB; liquid state occupies 256 bytes. Two per-class `usize` arrays add target-dependent metadata (32 bytes on a 32-bit MCU, 64 bytes on a 64-bit host). Struct padding and caller-owned inputs/stack are not part of the component payload count.
+The example's memory is statically bounded. The 64 exemplar vectors occupy 128 KiB; liquid state occupies 256 bytes. Two per-class `usize` arrays add target-dependent metadata (32 bytes on a 32-bit MCU, 64 bytes on a 64-bit host). The two-level, three-feature codebook occupies another 4 KiB plus three `usize` rotation offsets. Struct padding and caller-owned inputs/stack are not part of the component payload count.
 
 ## What this does not establish
 
