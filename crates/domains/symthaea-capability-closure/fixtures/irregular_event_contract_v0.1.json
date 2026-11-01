@@ -38,14 +38,14 @@
     "separately_versioned_and_charged": true
   },
   "validation_status": {
-    "rust_test_functions_authored": 35,
+    "rust_test_functions_authored": 55,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
     "rust_tests_executed": false,
     "external_dataset_adapter_executed": false,
     "event_contract_test_functions_authored": 16,
-    "bitemporal_test_functions_authored": 11,
+    "bitemporal_test_functions_authored": 12,
     "purged_split_test_functions_authored": 8,
     "train_only_scaler_test_functions_authored": 9,
     "time_imm_adapter_test_functions_authored": 10
@@ -138,7 +138,6 @@
     "repository_commit": "e934cef23d526817dcf0d1a66c6f82274c96c04b",
     "sample_entity": "EPA-Air/Bexar",
     "numeric_file": {
-      "blob_sha256": "c12a34fa63f6fdab7b9608a3c581b0d929a2626e",
       "data_rows": 4370,
       "columns": [
         "date_time",
@@ -147,16 +146,17 @@
         "pm2_5",
         "aqi",
         "ozone"
-      ]
+      ],
+      "git_blob_oid": "c12a34fa63f6fdab7b9608a3c581b0d929a2626e"
     },
     "text_file": {
-      "blob_sha256": "01840c5b62c699e2a3a9b5d6198067c383df8485",
       "data_rows": 18,
       "columns": [
         "date_time",
         "record_id",
         "text"
-      ]
+      ],
+      "git_blob_oid": "01840c5b62c699e2a3a9b5d6198067c383df8485"
     },
     "datetime_timezone_required_for_naive_values": true,
     "timezone_support": [
@@ -196,7 +196,8 @@
       "source_file_sha256",
       "availability_policy_sha256",
       "timestamp_zone_sha256"
-    ]
+    ],
+    "git_blob_oid_note": "Git blob OIDs are repository object IDs, not SHA-256 content digests; adapter computes SHA-256 from exact file bytes."
   },
   "bitemporal_event_ledger": {
     "append_only": true,
@@ -220,19 +221,18 @@
     "atomic_batches": true,
     "deterministic_state_sha256": true,
     "validity_semantics": "point event_time_us <= valid_at_us",
-    "durable_persistence_implemented": false
-  },
-  "csv_adapter": {
-    "module": "research/irregular-event-contract/src/csv_adapter.rs",
-    "numeric_adapter": "date_time,record_id,feature columns",
-    "text_adapter": "content-addressed opaque UTF-8 payload",
-    "availability_policies": [
-      "explicit_column",
-      "event_time_assumed_immediate"
+    "durable_persistence_implemented": false,
+    "indexes": [
+      "revision_id",
+      "event_id_to_revision_chain",
+      "latest_revision_by_event",
+      "active_source_sequence",
+      "entity_to_event"
     ],
-    "naive_timestamp_requires_explicit_utc_assumption": true,
-    "numeric_representation": "fixed-point millionths",
-    "tests_authored": 8,
-    "benchmark_dataset_loaded": false
+    "single_append_clones_full_log": false,
+    "batch_atomicity": "one clone per transaction batch; commit after all revisions validate",
+    "as_known_query": "binary search transaction-time-ordered per-event revision chain",
+    "consistency_audit": "rebuild indexes from append-only log and compare",
+    "test_functions_authored": 12
   }
 }
