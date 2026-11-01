@@ -248,7 +248,7 @@ struct DelayedGroundTruth {
 pub struct TemporalStreamDataset {
     pub schema: String,
     pub version: String,
-    pub config: TemporalStreamConfig,
+    config: TemporalStreamConfig,
     pub observations: Vec<TemporalObservation>,
     delayed_labels: Vec<DelayedGroundTruth>,
     pub dataset_sha256: String,
