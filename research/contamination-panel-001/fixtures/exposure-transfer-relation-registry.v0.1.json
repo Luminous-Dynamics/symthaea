@@ -1,0 +1,153 @@
+{
+  "schema": "symthaea.exposure_transfer_relation_registry.v0.1",
+  "benchmark_id": "symthaea-exposure-transfer",
+  "version": "0.1.0",
+  "status": "research_protocol_not_qualified",
+  "purpose": "Decompose causal effects of randomized training exposure by the relation between the exposed training payload and the evaluated task.",
+  "relation_visibility": "evaluator_only_until_run_freeze",
+  "relations": [
+    {
+      "id": "exact_replay",
+      "meaning": "The evaluation task is the same source item and target instance that appeared in the treatment exposure payload.",
+      "include": "Exact task identity and target are established from sealed source lineage.",
+      "exclude": "Same template with changed parameters; surface or semantic variants.",
+      "interpretation": "Narrow exact-instance retention; not by itself proof of rote memorization."
+    },
+    {
+      "id": "surface_variant",
+      "meaning": "The same underlying item and target are expressed with transformed wording, formatting, tokenization, or presentation.",
+      "include": "Transformation is judged to preserve the item, required reasoning and target.",
+      "exclude": "A new target, altered assumptions, or an equivalent task requiring a different skill.",
+      "interpretation": "Surface-form robustness/retention, potentially still item-specific."
+    },
+    {
+      "id": "semantic_equivalent",
+      "meaning": "An independently authored reformulation with the same underlying problem, assumptions, solution target and required reasoning.",
+      "include": "Blinded experts independently accept semantic and answer equivalence.",
+      "exclude": "Shared domain alone, same topic, approximate similarity or ambiguous task mapping.",
+      "interpretation": "Semantic retention beyond lexical overlap; still related to the exposed target."
+    },
+    {
+      "id": "fresh_same_recipe",
+      "meaning": "A fresh instance generated after checkpoint freeze with new parameters/data, using the same solution recipe as exposed training.",
+      "include": "Generator seed and hidden parameters are post-freeze; recipe lineage is evaluator-verified.",
+      "exclude": "Exact replay, same target, or a different recipe.",
+      "interpretation": "Instance transfer within a learned task recipe."
+    },
+    {
+      "id": "novel_recipe_same_skill",
+      "meaning": "A different task recipe requiring the same predeclared skill/capability, with no shared solution recipe or target instance.",
+      "include": "A skill ontology and blinded experts support same-skill/different-recipe mapping.",
+      "exclude": "Same recipe with changed numbers; merely same topic or broad domain.",
+      "interpretation": "Cross-recipe transfer of the target skill; strongest evidence here for generalizable competence."
+    },
+    {
+      "id": "unrelated_control",
+      "meaning": "A task matched on format and externally calibrated difficulty but requiring a different target construct or skill.",
+      "include": "No source/recipe/target lineage overlap with the exposure payload.",
+      "exclude": "A task sharing the target skill or recipe.",
+      "interpretation": "Negative control for generic training drift and unintended score shifts."
+    }
+  ],
+  "domains": [
+    {
+      "task_family": "mathematics",
+      "coverage": "algebra, arithmetic, proof-relevant and quantitative reasoning"
+    },
+    {
+      "task_family": "code",
+      "coverage": "program synthesis, debugging, API use and algorithmic reasoning"
+    },
+    {
+      "task_family": "science",
+      "coverage": "mechanistic explanation, quantitative science and evidence interpretation"
+    },
+    {
+      "task_family": "factual_qa",
+      "coverage": "closed-book factual recall with time-scoped source provenance"
+    },
+    {
+      "task_family": "tool_use",
+      "coverage": "multi-step tool/environment tasks with evaluator-controlled state"
+    },
+    {
+      "task_family": "multimodal",
+      "coverage": "image/audio/video-grounded tasks with content-addressed evaluator inputs"
+    }
+  ],
+  "design_rules": [
+    "Reuse the existing randomized source-cluster assignment, matched-token placebo and paired training receipt; do not re-randomize at item level.",
+    "Evaluate base, treatment and placebo checkpoints on the exact same item IDs and scoring oracle in every relation/family/difficulty cell.",
+    "Every task family and difficulty band must contain all six relation strata with matched item and cluster counts.",
+    "Each model-pair replicate must use the same item-set, source-lineage, recipe-lineage and adjudication commitments for every matched cell.",
+    "Use externally calibrated easy/medium/hard bands where feasible; do not define difficulty from post-treatment model scores.",
+    "Keep semantic-equivalence and same-skill judgments blinded; disputes and indeterminate judgments do not enter positive strata.",
+    "Use a deterministic primary scoring policy; treat stochastic decoding repeats as nested measurements, not extra training replicates.",
+    "Keep relation labels, hidden item IDs, source/recipe lineage and answer oracles outside model-visible payloads."
+  ],
+  "estimands": [
+    {
+      "id": "relation_effect",
+      "formula": "E_pair[macro_family(accuracy_treatment - accuracy_placebo | relation)]",
+      "unit": "percentage points; uncertainty across independent model-pair training replicates"
+    },
+    {
+      "id": "exact_memorization_premium",
+      "formula": "effect(exact_replay) - effect(novel_recipe_same_skill)",
+      "unit": "percentage points"
+    },
+    {
+      "id": "same_recipe_transfer",
+      "formula": "effect(fresh_same_recipe) - effect(unrelated_control)",
+      "unit": "percentage points"
+    },
+    {
+      "id": "cross_recipe_skill_transfer",
+      "formula": "effect(novel_recipe_same_skill) - effect(unrelated_control)",
+      "unit": "percentage points"
+    },
+    {
+      "id": "exact_to_same_recipe_gap",
+      "formula": "effect(exact_replay) - effect(fresh_same_recipe)",
+      "unit": "percentage points"
+    }
+  ],
+  "metrics": [
+    "Base/treatment/placebo accuracy and denominators by relation × task family × difficulty band.",
+    "Treatment-minus-placebo, treatment-minus-base and placebo-minus-base effects.",
+    "95% Student-t intervals over independently trained model pairs; never item-level pseudo-replication.",
+    "Family-macro and worst-family effects; report every family, not only pooled micro-average.",
+    "For detectors: AUROC and AUPRC by tier, TPR at fixed FPR (1% initial operating point), null calibration, selective risk, abstention and coverage.",
+    "Tokens, latency, model calls, tool calls, human assistance and compute cost as separate budget measures."
+  ],
+  "comparators": {
+    "contamination_detectors": [
+      "FTD (log-probability/feature-access regime; paper and official-code settings reported separately)",
+      "DVD (repeated generation and low-probability-token variance)",
+      "Min-K%++",
+      "likelihood/perplexity and gradient-based methods where model access permits",
+      "exact/normalized/n-gram, MinHash/SimHash, structural/AST, embedding and cross-encoder baselines"
+    ],
+    "evaluation_runners": [
+      "Inspect",
+      "Lighteval"
+    ],
+    "integration_rule": "Attach transfer-study and exposure-validity artifacts to established runners; do not rebuild generic dataset, solver, model-backend or scoring infrastructure."
+  },
+  "qualification_targets": {
+    "all_cells_complete": true,
+    "exact_item_and_checkpoint_coverage_permille": 1000,
+    "accepted_cross_cell_duplicate_item_ids": 0,
+    "accepted_stale_lineage_or_oracle_bindings": 0,
+    "initial_detector_operating_fpr_permille": 10,
+    "claim_rule": "No SOTA or causal-transfer headline until independent model-pair replication, expert adjudication, external receipt authentication, multi-domain transfer and power adequacy are all qualified.",
+    "sample_size_rule": "Estimate the required number of independent model-pair replicates from a blinded pilot and preregistered power simulation using the smallest effect of interest, pair-level variance, heterogeneity, interference and missing-run rates. Twenty pairs is an operational planning floor only."
+  },
+  "claim_ceiling": [
+    "The six strata define benchmark relations, not an infallible ontology of human or model competence.",
+    "Treatment-minus-placebo differences are causal for the randomized exposure policy only under authenticated training execution and the registered design.",
+    "Global parameter updates can affect all evaluation strata; contrasts are not pure direct effects under unrestricted interference.",
+    "A high novel-recipe same-skill score is evidence of transfer under the declared skill mapping, not proof of general intelligence.",
+    "A passing synthetic fixture or content-digest audit is not an empirical result, external validation, FDR guarantee, or SOTA claim."
+  ]
+}
