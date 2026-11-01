@@ -697,7 +697,7 @@ fn validate_decision_problem(
     if problem.id.trim().is_empty() {
         return Err(DesignError::EmptyDecisionProblemId);
     }
-    if problem.hypothesis_ids != hypothesis_ids {
+    if problem.hypothesis_ids.as_slice() != hypothesis_ids {
         return Err(DesignError::InconsistentHypothesisOrder);
     }
     if problem.actions.is_empty() {
@@ -2329,6 +2329,34 @@ mod tests {
         assert_eq!(report.schema_version, "connectome-decision-value-v1");
         assert_eq!(report.decision_problem, problem);
         assert_eq!(report.ranked_experiments.len(), 1);
+    }
+
+    #[test]
+    fn evsi_uses_worst_case_over_likelihood_ambiguity_set() {
+        let priors = [0.3, 0.3, 0.3, 0.1];
+        let mut candidate = target_query_candidate(
+            "candidate",
+            vec![
+                vec![0.9, 0.1],
+                vec![0.9, 0.1],
+                vec![0.1, 0.9],
+                vec![0.5, 0.5],
+            ],
+        );
+        candidate.likelihood_scenarios.push(LikelihoodScenario {
+            id: "shared-misspecification".to_owned(),
+            likelihoods_by_hypothesis: vec![
+                vec![0.5, 0.5],
+                vec![0.5, 0.5],
+                vec![0.5, 0.5],
+                vec![0.5, 0.5],
+            ],
+        });
+        let problem = decision_problem_example();
+        let score = evaluate_open_world_decision_value(&priors, &candidate, &problem).unwrap();
+        assert!(score.best_case_evsi > 0.0);
+        assert_eq!(score.worst_case_evsi, 0.0);
+        assert_eq!(score.worst_case_scenario_id, "shared-misspecification");
     }
 
     #[test]
