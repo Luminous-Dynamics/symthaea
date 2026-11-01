@@ -19,6 +19,7 @@ pub mod analytical_benchmark;
 pub mod direction_board;
 pub mod direction_board_benchmark;
 pub mod event_tape;
+pub mod event_tape_noisy;
 pub mod evidence_artifact;
 pub mod event_tape_pareto;
 pub mod semantic_alias_benchmark;
