@@ -239,6 +239,7 @@ pub fn validate_value(value: &Value, receipt_sha256: String) -> Result<Integrity
     if string(value, "/dataset/cohort_id")?.trim().is_empty()
         || string(value, "/dataset/snapshot_id")?.trim().is_empty()
         || string(value, "/target/repository_remote")?.trim().is_empty()
+        || string(value, "/target/repository_branch")?.trim().is_empty()
     {
         bail!("dataset cohort/snapshot and target repository remote cannot be empty");
     }
