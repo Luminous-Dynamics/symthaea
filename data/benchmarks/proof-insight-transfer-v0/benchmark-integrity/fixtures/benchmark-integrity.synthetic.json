@@ -21,7 +21,8 @@
     "statement_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
     "expected_informal_statement_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     "repository_branch": "main",
-    "source_span_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    "source_span_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "source_coordinate_system": "lean-filemap-line-1-column-0-unicode-codepoint-v0"
   },
   "environment": {
     "lean_toolchain": "leanprover/lean4:v4.synthetic",
