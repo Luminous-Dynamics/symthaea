@@ -28,7 +28,8 @@
     "algorithm": "partial Fisher-Yates",
     "without_replacement_per_call": true,
     "draws": "one bounded unbiased integer per requested item",
-    "work_budget_checked_before_accounting_commit": true
+    "work_budget_checked_before_accounting_commit": true,
+    "cumulative_payload_byte_budget": true
   },
   "resources": [
     {
@@ -52,13 +53,18 @@
       "hard_cap": true
     },
     {
+      "name": "replay_payload_bytes",
+      "unit": "logical payload byte",
+      "hard_cap": true
+    },
+    {
       "name": "replay_work_units",
       "unit": "declared work unit",
       "hard_cap": true
     }
   ],
   "validation_status": {
-    "rust_test_functions_authored": 12,
+    "rust_test_functions_authored": 13,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
