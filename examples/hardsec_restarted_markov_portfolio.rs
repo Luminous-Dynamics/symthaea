@@ -15,10 +15,16 @@ const THRESHOLD: Rational = Rational {
 // Each row is indexed by the current state; each column is the next state.
 const TRANSITION_NUMERATORS: [[u128; 2]; 2] = [[3, 1], [2, 2]];
 
-// Frozen, deliberately loose upper envelope. Every coordinate dominates P.
-// These are fixture inputs, not confidence bounds estimated from hardware.
-const UPPER_NUMERATORS: [[u128; 2]; 2] = [[4, 1], [3, 3]];
-const UPPER_DENOMINATORS: [[u128; 2]; 2] = [[5, 2], [5, 5]];
+// Synthetic fixed-count calibration tally: 1,000 visits from each source state.
+// These are deterministic known-answer fixture counts, not hardware observations.
+const CALIBRATION_VISITS_PER_ROW: u128 = 1_000;
+const CALIBRATION_SUCCESS_COUNTS: [[u128; 2]; 2] = [[750, 250], [500, 500]];
+const CALIBRATION_DELTA_NUMERATOR: u128 = 1;
+const CALIBRATION_DELTA_DENOMINATOR: u128 = 40;
+const CALIBRATION_COORDINATE_COUNT: u128 = 4;
+const FIXED_POINT_SCALE: u128 = 1_000_000_000_000_000_000;
+const ENVELOPE_QUANTIZATION_DENOMINATOR: u128 = 10;
+const LOG_SERIES_TERMS: u32 = 36;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Rational {
@@ -145,10 +151,147 @@ fn portfolios() -> Vec<[Rational; 3]> {
     output
 }
 
+fn calibration_ceil_div(numerator: u128, denominator: u128) -> u128 {
+    assert!(denominator > 0, "calibration division denominator must be positive");
+    numerator / denominator + u128::from(numerator % denominator != 0)
+}
+
+fn calibration_fixed_mul_ceil(left: u128, right: u128) -> u128 {
+    calibration_ceil_div(
+        left.checked_mul(right)
+            .expect("fixed-point calibration multiplication overflow"),
+        FIXED_POINT_SCALE,
+    )
+}
+
+fn calibration_log_unit_interval_upper(z_numerator: u128, z_denominator: u128) -> u128 {
+    assert!(z_denominator > 0, "log-series denominator must be positive");
+    assert!(
+        z_numerator.checked_mul(3).is_some_and(|value| value <= z_denominator),
+        "log-series argument must be in [0, 1/3]"
+    );
+
+    // ln((1+z)/(1-z)) = 2 * sum(z^(2k+1)/(2k+1)).
+    // All fixed-point powers and terms are rounded upward. Since z <= 1/3,
+    // the omitted positive tail is bounded by 9/(4*(2K+1)*3^(2K+1)).
+    let z_scaled = calibration_ceil_div(
+        z_numerator
+            .checked_mul(FIXED_POINT_SCALE)
+            .expect("fixed-point log argument overflow"),
+        z_denominator,
+    );
+    let z_squared_scaled = calibration_fixed_mul_ceil(z_scaled, z_scaled);
+    let mut power_scaled = z_scaled;
+    let mut series_sum_scaled = 0_u128;
+
+    for index in 0..LOG_SERIES_TERMS {
+        let odd_denominator = (2 * index + 1) as u128;
+        series_sum_scaled = series_sum_scaled
+            .checked_add(calibration_ceil_div(power_scaled, odd_denominator))
+            .expect("fixed-point log series sum overflow");
+        power_scaled = calibration_fixed_mul_ceil(power_scaled, z_squared_scaled);
+    }
+
+    let first_omitted_odd = 2 * LOG_SERIES_TERMS as u128 + 1;
+    let tail_denominator = 4_u128
+        .checked_mul(first_omitted_odd)
+        .and_then(|value| value.checked_mul(3_u128.pow(first_omitted_odd as u32)))
+        .expect("fixed-point log tail denominator overflow");
+    let tail_upper_scaled =
+        calibration_ceil_div(9 * FIXED_POINT_SCALE, tail_denominator);
+
+    2 * series_sum_scaled + tail_upper_scaled
+}
+
+fn calibration_log_ratio_upper(numerator: u128, denominator: u128) -> u128 {
+    assert!(denominator > 0 && numerator >= denominator);
+    let mut scaled_denominator = denominator;
+    let mut powers_of_two = 0_u128;
+
+    while numerator >= 2 * scaled_denominator {
+        scaled_denominator = scaled_denominator
+            .checked_mul(2)
+            .expect("log normalization overflow");
+        powers_of_two += 1;
+    }
+
+    let log_two_upper = calibration_log_unit_interval_upper(1, 3);
+    let y_log_upper = calibration_log_unit_interval_upper(
+        numerator - scaled_denominator,
+        numerator + scaled_denominator,
+    );
+    powers_of_two
+        .checked_mul(log_two_upper)
+        .and_then(|value| value.checked_add(y_log_upper))
+        .expect("fixed-point log result overflow")
+}
+
+fn calibration_sqrt_ceil(value: u128) -> u128 {
+    if value == 0 {
+        return 0;
+    }
+    let mut low = 0_u128;
+    let mut high = 1_u128 << 64;
+    while low + 1 < high {
+        let middle = low + (high - low) / 2;
+        if middle <= value / middle {
+            low = middle;
+        } else {
+            high = middle;
+        }
+    }
+    if low * low == value { low } else { high }
+}
+
+fn fixed_n_hoeffding_upper_scaled(
+    successes: u128,
+    samples: u128,
+    delta_numerator: u128,
+    delta_denominator: u128,
+) -> u128 {
+    assert!(successes <= samples);
+    assert!(delta_numerator > 0 && delta_numerator < delta_denominator);
+    if samples == 0 {
+        return FIXED_POINT_SCALE;
+    }
+    assert!(samples <= u64::MAX as u128);
+
+    let log_inverse_delta_upper =
+        calibration_log_ratio_upper(delta_denominator, delta_numerator);
+    let radicand_upper = calibration_ceil_div(
+        log_inverse_delta_upper
+            .checked_mul(FIXED_POINT_SCALE)
+            .expect("Hoeffding radicand overflow"),
+        2 * samples,
+    );
+    let epsilon_upper_scaled = calibration_sqrt_ceil(radicand_upper);
+    let empirical_rate_upper_scaled = calibration_ceil_div(
+        successes
+            .checked_mul(FIXED_POINT_SCALE)
+            .expect("empirical rate scaling overflow"),
+        samples,
+    );
+    empirical_rate_upper_scaled
+        .saturating_add(epsilon_upper_scaled)
+        .min(FIXED_POINT_SCALE)
+}
+
 fn upper_probability(current_state: usize, next_state: usize) -> Rational {
+    let upper_scaled = fixed_n_hoeffding_upper_scaled(
+        CALIBRATION_SUCCESS_COUNTS[current_state][next_state],
+        CALIBRATION_VISITS_PER_ROW,
+        CALIBRATION_DELTA_NUMERATOR,
+        CALIBRATION_DELTA_DENOMINATOR,
+    );
+    let quantized_numerator = calibration_ceil_div(
+        upper_scaled
+            .checked_mul(ENVELOPE_QUANTIZATION_DENOMINATOR)
+            .expect("envelope quantization overflow"),
+        FIXED_POINT_SCALE,
+    );
     Rational::new(
-        UPPER_NUMERATORS[current_state][next_state],
-        UPPER_DENOMINATORS[current_state][next_state],
+        quantized_numerator,
+        ENVELOPE_QUANTIZATION_DENOMINATOR,
     )
 }
 
@@ -284,10 +427,28 @@ fn report() -> Value {
             "common_denominator": PROBABILITY_DENOMINATOR
         },
         "frozen_upper_envelope": {
-            "numerators": UPPER_NUMERATORS,
-            "denominators": UPPER_DENOMINATORS,
-            "calibrated_from_independent_data": false,
-            "interpretation": "fixture constants that dominate the stated transition rows"
+            "numerators": [
+                [upper_probability(0, 0).numerator, upper_probability(0, 1).numerator],
+                [upper_probability(1, 0).numerator, upper_probability(1, 1).numerator]
+            ],
+            "denominators": [
+                [upper_probability(0, 0).denominator, upper_probability(0, 1).denominator],
+                [upper_probability(1, 0).denominator, upper_probability(1, 1).denominator]
+            ],
+            "calibration": {
+                "method": "fixed_n_hoeffding_upper_bound_with_integer_outward_rounding",
+                "visits_per_source_state": CALIBRATION_VISITS_PER_ROW,
+                "success_counts": CALIBRATION_SUCCESS_COUNTS,
+                "coordinate_count": CALIBRATION_COORDINATE_COUNT,
+                "delta_total": "1/10",
+                "delta_per_coordinate": "1/40",
+                "fixed_point_scale": FIXED_POINT_SCALE.to_string(),
+                "envelope_quantization": "round_up_to_tenths",
+                "calibration_tally_is_synthetic": true,
+                "physical_calibration_data": false,
+                "familywise_coverage_empirically_validated": false,
+                "statistical_contract": "familywise coverage at least 0.9 only when each source-state row contributes the preregistered fixed number of independent Markov transitions"
+            }
         },
         "portfolio": {
             "grid": "all rational simplex points with denominator 2 over cash and two outcome assets",
@@ -364,6 +525,47 @@ mod tests {
     }
 
     #[test]
+    fn fixed_point_log_and_hoeffding_bounds_are_outward_rounded() {
+        let log_upper = calibration_log_ratio_upper(40, 1);
+        assert!(log_upper >= 3_688_879_454_113_936_000);
+        assert!(log_upper <= 3_688_879_454_113_938_000);
+
+        let radicand = calibration_ceil_div(
+            log_upper * FIXED_POINT_SCALE,
+            2 * CALIBRATION_VISITS_PER_ROW,
+        );
+        let epsilon = calibration_sqrt_ceil(radicand);
+        assert!(epsilon * epsilon >= radicand);
+        assert_eq!(epsilon, 42_946_940_834_673_759);
+    }
+
+    #[test]
+    fn calibration_envelope_matches_the_fixed_count_known_answer() {
+        assert_eq!(upper_probability(0, 0), Rational::new(4, 5));
+        assert_eq!(upper_probability(0, 1), Rational::new(3, 10));
+        assert_eq!(upper_probability(1, 0), Rational::new(3, 5));
+        assert_eq!(upper_probability(1, 1), Rational::new(3, 5));
+        assert_eq!(
+            CALIBRATION_COORDINATE_COUNT
+                * CALIBRATION_DELTA_NUMERATOR
+                * 10,
+            CALIBRATION_DELTA_DENOMINATOR
+        );
+    }
+
+    #[test]
+    fn fixed_count_calibration_formula_covers_each_known_fixture_transition() {
+        for state in 0..2 {
+            for next_state in 0..2 {
+                assert!(
+                    transition_probability(state, next_state)
+                        .le(upper_probability(state, next_state))
+                );
+            }
+        }
+    }
+
+    #[test]
     fn every_fixture_upper_probability_dominates_the_true_transition() {
         for state in 0..2 {
             for next_state in 0..2 {
@@ -411,7 +613,7 @@ mod tests {
     fn exact_anytime_crossing_masses_match_the_known_answer() {
         let state_zero = enumerate_episode(0);
         let state_one = enumerate_episode(1);
-        assert_eq!(state_zero.crossing_probability_numerator, 64);
+        assert_eq!(state_zero.crossing_probability_numerator, 128);
         assert_eq!(state_one.crossing_probability_numerator, 128);
         assert_eq!(state_zero.probability_denominator, 4096);
         assert_eq!(state_one.probability_denominator, 4096);
