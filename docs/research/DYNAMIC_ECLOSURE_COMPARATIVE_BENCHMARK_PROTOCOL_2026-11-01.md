@@ -17,6 +17,22 @@ The current tracks do not all make the same assumptions:
 
 A method should not be declared more powerful because it was tested under a friendlier arrival process, a different filtration, or a different error-control target. The protocol therefore separates statistical guarantee classes from operational decision quality and single-intersection component diagnostics.
 
+## 1A. External baseline matrix (verified 2026-11-01)
+
+External methods must be assigned to the guarantee lane they actually prove. They are not all direct substitutes for dynamic closure.
+
+| Baseline | Scope to benchmark | Matching rule |
+|---|---|---|
+| Xu, Fischer & Ramdas (UAI 2026), online e-closure and compound e-values | One-pass online FDR under arbitrary dependence; paper reports strict power improvements and O(log t) decisions | Primary arbitrary-dependence online-FDR baseline. Match its stream/arrival contract; do not treat it as automatically solving repeated evidence updates for previously active hypotheses or SupFDR. |
+| LORD variants, SAFFRON, ADDIS, GAI/weighted GAI++, LOND/e-LOND, alpha spending | Established sequential online procedures; include p-value and e-value variants where available | Use only methods whose assumptions and error target match the comparison cell. Freeze tuning parameters before confirmatory runs. |
+| Bioconductor onlineFDR 2.18.0 and Python online-fdr parity suite | Reference implementations for online procedures and asynchronous lifecycles | Pin package versions and parity-test method adapters. The current Python package describes sequential, asynchronous and batch APIs plus e-BH/e-LOND, and reports parity checks against onlineFDR 2.18.0. |
+| Tavyrikov, Goeman & de Heide (EJS 2026), carefree multiple testing with e-processes | SupFDR / FDR-sup with running suprema and adjusters under arbitrary dependence | Primary persistent-guarantee comparator. Do not use raw e-BH on unadjusted running suprema as a valid baseline. |
+| CRAN eClosure 0.9.7 (published 2026-10-21) | Batch closed BH, closed e-BH, closed Su and closed BY | Batch-only baseline. It is useful for fixed-horizon final-set comparisons, not a direct online arrival or repeated-monitoring comparator. |
+| #9538 / #9695 global-projective affine mergers | Dynamic two-axis setting: new hypotheses arrive while existing evidence evolves | Main internal arbitrary-dependence projective baseline; include exact verifier and solver/optimization cost. |
+| #9712 scalar and #9751 vector predictable betting | Structured shared-filtration conditional-mgf setting | Model-assisted power lane only; compare against the affine fallback under exactly the same null law and active-set policy. |
+
+The 2026 dynamic e-closure theory and the 2026 UAI online e-closure paper both use the phrase "online e-closure" but target different online problem formulations. Every adapter must state whether evidence for an already active hypothesis can continue evolving after later hypotheses arrive. This is a first-class benchmark dimension, not an implementation detail.
+
 ## 2. Comparison contract
 
 A matched comparison must register and hash:
