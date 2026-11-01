@@ -15,9 +15,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Evaluate a claim-scoped BASALT evidence capsule against an exact claim binding.
-    /// Prints a machine-readable report and exits non-zero unless every mandatory obligation is valid.
-    BasaltAdmissionCheck {
+    /// Run the reference-only BASALT admission reducer against an exact claim binding.
+    /// Prints a machine-readable reference report; this does not authenticate profiles or verify evidence.
+    BasaltAdmissionReferenceCheck {
         #[arg(long)]
         input: PathBuf,
     },
