@@ -216,6 +216,7 @@ impl DeterministicRng {
 #[derive(Debug, Clone, Copy)]
 struct SimulationSummary {
     planned_repetitions: u32,
+    planned_blocks: u64,
     estimable_repetitions: u32,
     inconclusive_repetitions: u32,
     rejections: u64,
@@ -226,12 +227,16 @@ struct SimulationSummary {
     completed_blocks_sum: f64,
     clipped_scores: u64,
     total_scores: u64,
+    total_missing_blocks: u64,
+    total_budget_truncated_blocks: u64,
+    total_outcome_dependent_failures: u64,
 }
 
 impl SimulationSummary {
-    fn new(planned_repetitions: u32) -> Self {
+    fn new(planned_repetitions: u32, candidate_blocks: u32) -> Self {
         Self {
             planned_repetitions,
+            planned_blocks: u64::from(planned_repetitions) * u64::from(candidate_blocks),
             estimable_repetitions: 0,
             inconclusive_repetitions: 0,
             rejections: 0,
@@ -242,28 +247,41 @@ impl SimulationSummary {
             completed_blocks_sum: 0.0,
             clipped_scores: 0,
             total_scores: 0,
+            total_missing_blocks: 0,
+            total_budget_truncated_blocks: 0,
+            total_outcome_dependent_failures: 0,
         }
     }
 
     fn finish(self) -> SearchPowerSimulationOutcomeV1 {
-        let denominator = u64::from(self.estimable_repetitions);
-        let proportion = |successes: u64| wilson_interval(successes, denominator);
+        let planned = u64::from(self.planned_repetitions);
+        let estimable = u64::from(self.estimable_repetitions);
         SearchPowerSimulationOutcomeV1 {
             planned_repetitions: self.planned_repetitions,
             estimable_repetitions: self.estimable_repetitions,
             inconclusive_repetitions: self.inconclusive_repetitions,
-            rejection_rate: proportion(self.rejections),
-            coverage_rate: proportion(self.covered),
-            mean_estimated_effect_permille: (denominator > 0)
-                .then_some(self.estimate_sum / denominator as f64),
-            mean_bias_permille: (denominator > 0)
-                .then_some(self.bias_sum / denominator as f64),
-            mean_standard_error_permille: (denominator > 0)
-                .then_some(self.standard_error_sum / denominator as f64),
-            mean_completed_blocks: (denominator > 0)
-                .then_some(self.completed_blocks_sum / denominator as f64),
+            rejection_rate: wilson_interval(self.rejections, planned),
+            estimable_rejection_rate: wilson_interval(self.rejections, estimable),
+            coverage_rate: wilson_interval(self.covered, estimable),
+            completion_rate: wilson_interval(estimable, planned),
+            inconclusive_rate: wilson_interval(
+                u64::from(self.inconclusive_repetitions),
+                planned,
+            ),
+            mean_estimated_effect_permille: (estimable > 0)
+                .then_some(self.estimate_sum / estimable as f64),
+            mean_bias_permille: (estimable > 0)
+                .then_some(self.bias_sum / estimable as f64),
+            mean_standard_error_permille: (estimable > 0)
+                .then_some(self.standard_error_sum / estimable as f64),
+            mean_completed_blocks: (planned > 0)
+                .then_some(self.completed_blocks_sum / planned as f64),
             clipped_score_fraction_permille: (self.total_scores > 0)
                 .then_some(self.clipped_scores as f64 * 1_000.0 / self.total_scores as f64),
+            total_planned_blocks: self.planned_blocks,
+            total_missing_blocks: self.total_missing_blocks,
+            total_budget_truncated_blocks: self.total_budget_truncated_blocks,
+            total_outcome_dependent_failures: self.total_outcome_dependent_failures,
         }
     }
 }
