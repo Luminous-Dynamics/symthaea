@@ -352,6 +352,27 @@ impl Iit4SystemPhiBoundCertificate {
         candidate_system: &[usize],
         include_total_cut: bool,
     ) -> Result<(), Iit4SystemPhiBoundCertificateError> {
+        if model.validate_subset(candidate_system, "candidate_system").is_err() {
+            return Err(Iit4SystemPhiBoundCertificateError::InputMismatch);
+        }
+        self.verify_binding(
+            &model.model_sha256(),
+            model.n_units(),
+            candidate_system,
+            include_total_cut,
+        )
+    }
+
+    /// Verify a certificate against a digest-addressed causal model without
+    /// materializing a dense TPM. The caller must obtain the digest and unit
+    /// count from the exact model being analyzed.
+    pub fn verify_binding(
+        &self,
+        model_sha256: &str,
+        model_unit_count: usize,
+        candidate_system: &[usize],
+        include_total_cut: bool,
+    ) -> Result<(), Iit4SystemPhiBoundCertificateError> {
         if self.theorem_id != IIT4_2023_SYSTEM_PHI_BOUND_THEOREM_ID {
             return Err(Iit4SystemPhiBoundCertificateError::UnsupportedTheorem);
         }
@@ -370,11 +391,11 @@ impl Iit4SystemPhiBoundCertificate {
         {
             return Err(Iit4SystemPhiBoundCertificateError::AssumptionMismatch);
         }
-        if self.model_sha256 != model.model_sha256()
+        if self.model_sha256 != model_sha256
             || self.candidate_system != candidate_system
             || candidate_system.len() <= 1
             || candidate_system.windows(2).any(|pair| pair[0] >= pair[1])
-            || model.validate_subset(candidate_system, "candidate_system").is_err()
+            || candidate_system.iter().any(|unit| *unit >= model_unit_count)
         {
             return Err(Iit4SystemPhiBoundCertificateError::InputMismatch);
         }
@@ -402,10 +423,32 @@ pub fn certify_iit4_2023_system_phi_upper_bound(
     candidate_system: &[usize],
     include_total_cut: bool,
 ) -> Option<Iit4SystemPhiBoundCertificate> {
+    if model.validate_subset(candidate_system, "candidate_system").is_err() {
+        return None;
+    }
+    certify_iit4_2023_system_phi_upper_bound_for_binding(
+        &model.model_sha256(),
+        model.n_units(),
+        candidate_system,
+        include_total_cut,
+    )
+}
+
+/// Produce a certificate for a binary, conditionally-independent causal model
+/// identified by its canonical digest and unit count. This is suitable for
+/// sparse models that must not be converted into a dense TPM.
+pub fn certify_iit4_2023_system_phi_upper_bound_for_binding(
+    model_sha256: &str,
+    model_unit_count: usize,
+    candidate_system: &[usize],
+    include_total_cut: bool,
+) -> Option<Iit4SystemPhiBoundCertificate> {
     if include_total_cut
+        || model_sha256.len() != 64
+        || !model_sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
         || candidate_system.len() <= 1
         || candidate_system.windows(2).any(|pair| pair[0] >= pair[1])
-        || model.validate_subset(candidate_system, "candidate_system").is_err()
+        || candidate_system.iter().any(|unit| *unit >= model_unit_count)
     {
         return None;
     }
@@ -4080,6 +4123,32 @@ mod tests {
         }
 
         assert_eq!(evaluated, 64);
+    }
+
+    #[test]
+    fn theorem_bound_certificate_verifies_digest_binding_without_dense_model() {
+        let model = two_unit_model();
+        let certificate = certify_iit4_2023_system_phi_upper_bound_for_binding(
+            &model.model_sha256(),
+            model.n_units(),
+            &[0, 1],
+            false,
+        )
+        .unwrap();
+        assert!(certificate
+            .verify_binding(&model.model_sha256(), model.n_units(), &[0, 1], false)
+            .is_ok());
+        assert_eq!(
+            certificate.verify_binding(&model.model_sha256(), model.n_units(), &[0, 2], false),
+            Err(Iit4SystemPhiBoundCertificateError::InputMismatch)
+        );
+        assert!(certify_iit4_2023_system_phi_upper_bound_for_binding(
+            &model.model_sha256(),
+            model.n_units(),
+            &[0, 1],
+            true,
+        )
+        .is_none());
     }
 
     #[test]
