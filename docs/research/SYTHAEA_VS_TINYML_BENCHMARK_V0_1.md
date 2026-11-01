@@ -35,6 +35,25 @@ This is a useful modern CPU-only baseline. We should not compare Symthaea only t
 
 A September 2026 IEEE Access review of 156 TinyML studies treats on-device adaptation as a major category (40 studies), including continual/incremental learning, few-shot/transfer, unsupervised/self-supervised and federated methods. Thus Symthaea cannot claim novelty merely because it adapts on-device. The benchmark must compare against strong adaptive baselines.
 
+### BoTTA: the adaptation bar is higher than "online learning"
+
+BoTTA (SenSys 2026) directly benchmarks on-device test-time adaptation under four constraints: few target samples, incomplete category exposure, diverse distribution shifts and multiple simultaneous corruptions. It prefers periodic adaptation over an always-updating assumption and evaluates CIFAR-10C, PACS and UCI-HAR on Raspberry Pi 4B and Jetson Orin Nano.
+
+Its published results expose the quality/compute trade-off: SHOT reports a 2.25× accuracy gain with 512 adaptation samples on Raspberry Pi, but uses 1.08× peak memory and 3× latency and energy versus normal inference. SURGEON exceeds 25× energy and 35× adaptation time in that setup. The same paper reports that multi-corruption overlap can defeat adaptation methods; the best SHOT accuracy falls from 79.9% under one corruption to 39.1% under three concurrent corruptions.
+
+Implications for Symthaea:
+- adaptation must be scheduled and budgeted, not merely enabled;
+- benchmark category-skew and compound shifts, not just stationary-to-single-drift transitions;
+- include T3A, BN adaptation, SHOT, TENT, NOTE, SAR and no-adaptation where task/model compatibility permits;
+- count adaptation data acquisition, update energy, memory and write traffic;
+- retain safe abstention/rollback when an update degrades confidence or earlier-regime retention.
+
+BoTTA is not a direct TinyML MCU leaderboard: its testbeds are Raspberry Pi 4B and Jetson Orin Nano and its workloads/models differ from the proposed HARTH and MLPerf Tiny tracks. It is the relevant adaptation-methodology baseline, not an apples-to-apples score row.
+
+### NeuroBench: preserve separate algorithm and system evidence
+
+The NeuroBench framework explicitly separates hardware-independent algorithm evaluation from hardware-dependent system evaluation. Adopt this separation: algorithmic gains must be repeatable across fixed task/seed/split artifacts before system results are considered, while system gains must bind the exact board, compiler, runtime, clocks, firmware, memory map, measurement device and complete application-event traces. Never mix simulated energy or candidate-declared cycles with physical energy data.
+
 ## Three tracks, not one leaderboard
 
 ### Track A — fixed inference / MLPerf-compatible
@@ -271,10 +290,20 @@ The new Rust module currently provides:
 - prequential execution-trace auditing with prediction-before-label availability, delayed label release, post-label update ordering, a continuous model-state SHA-256 chain, and event-level accuracy, balanced accuracy, coverage, selective accuracy, Brier score, false alarms/hour, missed events/hour and prediction latency;
 - exact hash commitments from the prequential trace to per-run energy and metrology receipts.
 
+Related edge programme drafts now extend the three tracks with:
+- [#9845](https://github.com/Luminous-Dynamics/symthaea/pull/9845): hidden-state active-sensing policy simulation, with paired counterfactual sensor noise;
+- [#9847](https://github.com/Luminous-Dynamics/symthaea/pull/9847): streaming HARTH ingestion and participant/source-family preservation;
+- [#9853](https://github.com/Luminous-Dynamics/symthaea/pull/9853): bounded candidate observation/action wire protocol, with OS isolation still a separate requirement;
+- [#9849](https://github.com/Luminous-Dynamics/symthaea/pull/9849): restacked no_std packed-HDC liquid substrate.
+
+These are draft, unvalidated extensions, not evidence that the benchmark has been run.
+
 The CLI reports HDC-LTC memory preflight. The next increment is to compute drift-recovery/retention and open-set metrics from the evaluator-owned regime labels, add target-specific cycle/flash/SRAM measurements, and exercise the full evidence bundle on physical target hardware. Fourteen synthetic tests are authored but not compiled or executed in this authoring environment. No on-device result or SOTA claim is made.
 
 ## Sources
 
+- BoTTA: Benchmarking On-device Test Time Adaptation, SenSys '26 (May 2026): https://doi.org/10.1145/3774906.3800498
+- NeuroBench algorithm/system framework, Nature Communications (11 February 2025): https://www.nature.com/articles/s41467-025-56739-4
 - MLPerf Tiny v1.4 results (July 2026): https://mlcommons.org/2026/07/mlperf-tiny-v1-4-results/
 - MLPerf Tiny official task definitions and quality targets: https://mlcommons.org/benchmarks/inference-tiny/
 - Arm, Bringing ExecuTorch to Arm Cortex-M CPUs (19 October 2026): https://developer.arm.com/community/arm-community-blogs/b/ai-blog/posts/bringing-executorch-to-arm-cortex-m-cpus
