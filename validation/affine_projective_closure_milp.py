@@ -139,6 +139,65 @@ def build_affine_closure_milp(
     }
 
 
+def verify_affine_binary_decision(
+    model: dict,
+    rejection_values: Mapping[int, int],
+) -> dict:
+    """Independently verify a binary action in O(n), without trusting solver y.
+
+    The exact positive-part sum is equivalent to all original local
+    intersection constraints. Solver feasibility tolerances and auxiliary
+    variable values therefore cannot make an invalid action pass this check.
+    """
+    meta = model["metadata"]
+    ids = meta["active_ids"]
+    level = meta["alpha"]
+    d = meta["coordinate_offsets"]
+    previous = set(meta["previous_rejections"])
+    failures = []
+    x = {}
+    for i in ids:
+        bit = rejection_values.get(i)
+        if isinstance(bit, bool) or not isinstance(bit, int) or bit not in (0, 1):
+            failures.append(("invalid_binary_rejection", i, bit))
+            continue
+        x[i] = int(bit)
+    if failures:
+        return {"valid": False, "failures": failures}
+
+    r = sum(x.values())
+    required_y = {
+        i: max(Fraction(0), Fraction(x[i]) - level * r * d[i])
+        for i in ids
+    }
+    positive_sum = sum(required_y.values(), Fraction(0))
+    closure_budget = level * r
+    if positive_sum > closure_budget:
+        failures.append(("local_affine_closure_violation", positive_sum, closure_budget))
+    if any(x[i] != 1 for i in previous):
+        failures.append(("persistence_violation", tuple(sorted(previous))))
+
+    costs = meta["costs"]
+    capacity = meta["capacity_value"]
+    total_cost = sum((costs[i] * x[i] for i in ids), Fraction(0))
+    if capacity is not None and total_cost > capacity:
+        failures.append(("capacity_exceeded", total_cost, capacity))
+
+    return {
+        "valid": not failures,
+        "failures": failures,
+        "rejections": tuple(i for i in ids if x[i] == 1),
+        "rejection_count": r,
+        "minimal_auxiliary_values": required_y,
+        "closure_positive_part_sum": positive_sum,
+        "closure_budget": closure_budget,
+        "cost": total_cost,
+        "coordinate_terms_checked": len(ids),
+        "complexity": "O(n) exact rational verification",
+        "scope": "pathwise finite decision replay; coordinate e-process validity remains external",
+    }
+
+
 def verify_affine_closure_milp_solution(
     model: dict,
     rejection_values: Mapping[int, int],
