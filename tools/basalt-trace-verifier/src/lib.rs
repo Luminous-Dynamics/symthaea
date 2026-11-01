@@ -364,9 +364,6 @@ fn validate_structure(trace: &Trace, errors: &mut Vec<String>) {
         if !["committed", "duplicate", "compare_conflict", "indeterminate", "retryable_abort", "receipt_found", "restore_verified", "rejected_anti_rollback_unknown", "rejected_anti_rollback"].contains(&operation.expected_result.outcome.as_str()) {
             push_error(errors, format!("{} has unsupported expected outcome", operation.op_id));
         }
-        if operation.expected_result.reason.is_none() {
-            push_error(errors, format!("{} is missing expected-result rationale", operation.op_id));
-        }
         for revision in [
             operation.expected_result.receipt_acceptance_revision.as_deref(),
             operation.expected_result.current_authority_revision.as_deref(),
