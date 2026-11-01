@@ -224,6 +224,7 @@ impl std::error::Error for WatermarkError {}
 pub struct SourceWatermarkLedger {
     revisions: Vec<SourceProgressRevision>,
     revision_by_id: BTreeMap<u64, usize>,
+    last_transaction_time_us: Option<i64>,
     revisions_by_source: BTreeMap<SourceKey, Vec<usize>>,
     event_arrivals: Vec<EventArrivalReceipt>,
     seen_event_ids: BTreeSet<u64>,
@@ -241,7 +242,7 @@ impl SourceWatermarkLedger {
 
     /// Append one source-progress revision after preflight, without cloning the log.
     pub fn append(&mut self, revision: SourceProgressRevision) -> Result<(), WatermarkError> {
-        if let Some(previous) = self.revisions.last().map(|item| item.recorded_at_us) {
+        if let Some(previous) = self.last_transaction_time_us {
             if revision.recorded_at_us <= previous {
                 return Err(WatermarkError::NonIncreasingTransactionTime {
                     previous,
@@ -249,7 +250,9 @@ impl SourceWatermarkLedger {
                 });
             }
         }
-        self.append_unchecked(revision)
+        self.append_unchecked(revision)?;
+        self.last_transaction_time_us = Some(revision.recorded_at_us);
+        Ok(())
     }
 
     /// Commit multiple sources' progress at one transaction time, atomically.
@@ -265,7 +268,7 @@ impl SourceWatermarkLedger {
         if incoming.iter().any(|revision| revision.recorded_at_us != transaction_time) {
             return Err(WatermarkError::BatchTimestampMismatch);
         }
-        if let Some(previous) = self.revisions.last().map(|item| item.recorded_at_us) {
+        if let Some(previous) = self.last_transaction_time_us {
             if transaction_time <= previous {
                 return Err(WatermarkError::NonIncreasingTransactionTime {
                     previous,
@@ -278,6 +281,7 @@ impl SourceWatermarkLedger {
         for revision in incoming {
             candidate.append_unchecked(revision)?;
         }
+        candidate.last_transaction_time_us = Some(transaction_time);
         *self = candidate;
         Ok(())
     }
@@ -486,24 +490,68 @@ impl SourceWatermarkLedger {
     /// their authoritative record belongs in BitemporalEventLedger. A late
     /// event emits a durable-in-this-reference-model breach receipt and
     /// reopens matching completeness queries after its recorded_at_us.
+    /// Record one event arrival as its own transaction. For multiple events
+    /// received at the same timestamp, use record_event_arrival_batch.
     pub fn record_event_arrival(
         &mut self,
         event: EventRecord,
         recorded_at_us: i64,
     ) -> Result<EventArrivalClassification, WatermarkError> {
-        event.validate().map_err(|_| WatermarkError::InvalidEventRecord)?;
-        if event.available_at_us > recorded_at_us {
-            return Err(WatermarkError::EventUnavailableAtReceipt {
-                available_at_us: event.available_at_us,
-                recorded_at_us,
-            });
+        self.record_event_arrival_batch([event], recorded_at_us)
+            .map(|mut classifications| classifications.remove(0))
+    }
+
+    /// Record multiple arrivals atomically at one knowledge-time timestamp.
+    /// Same-timestamp events are supported without allowing a progress
+    /// watermark to be backdated behind already observed arrivals.
+    pub fn record_event_arrival_batch(
+        &mut self,
+        events: impl IntoIterator<Item = EventRecord>,
+        recorded_at_us: i64,
+    ) -> Result<Vec<EventArrivalClassification>, WatermarkError> {
+        let incoming: Vec<EventRecord> = events.into_iter().collect();
+        if incoming.is_empty() {
+            return Err(WatermarkError::EmptyBatch);
         }
-        if self.seen_event_ids.contains(&event.event_id) {
-            return Err(WatermarkError::DuplicateEventArrival {
-                event_id: event.event_id,
-            });
+        if let Some(previous) = self.last_transaction_time_us {
+            if recorded_at_us <= previous {
+                return Err(WatermarkError::NonIncreasingTransactionTime {
+                    previous,
+                    actual: recorded_at_us,
+                });
+            }
+        }
+        let mut unique = BTreeSet::new();
+        for event in &incoming {
+            event.validate().map_err(|_| WatermarkError::InvalidEventRecord)?;
+            if event.available_at_us > recorded_at_us {
+                return Err(WatermarkError::EventUnavailableAtReceipt {
+                    available_at_us: event.available_at_us,
+                    recorded_at_us,
+                });
+            }
+            if !unique.insert(event.event_id) || self.seen_event_ids.contains(&event.event_id) {
+                return Err(WatermarkError::DuplicateEventArrival {
+                    event_id: event.event_id,
+                });
+            }
         }
 
+        let mut candidate = self.clone();
+        let mut classifications = Vec::with_capacity(incoming.len());
+        for event in incoming {
+            classifications.push(candidate.record_event_arrival_unchecked(event, recorded_at_us)?);
+        }
+        candidate.last_transaction_time_us = Some(recorded_at_us);
+        *self = candidate;
+        Ok(classifications)
+    }
+
+    fn record_event_arrival_unchecked(
+        &mut self,
+        event: EventRecord,
+        recorded_at_us: i64,
+    ) -> Result<EventArrivalClassification, WatermarkError> {
         let source = SourceKey {
             entity_id: event.entity_id,
             modality_id: event.modality_id,
@@ -528,9 +576,6 @@ impl SourceWatermarkLedger {
             },
         };
 
-        // Record every arrival classification, not just breaches. Otherwise
-        // replaying an already-on-time event after a later watermark could
-        // reclassify it as late and mutate the historical knowledge state.
         self.seen_event_ids.insert(event.event_id);
         self.event_arrivals.push(EventArrivalReceipt {
             event,
@@ -548,24 +593,50 @@ impl SourceWatermarkLedger {
     }
 
     pub fn verify_consistency(&self) -> Result<(), WatermarkError> {
+        // Rebuild one global knowledge-time sequence from the two append-only
+        // record families. A timestamp can contain progress OR event arrivals,
+        // but not both; this avoids ambiguous ordering within one transaction.
+        let mut timeline: Vec<(i64, u8, usize)> = Vec::with_capacity(
+            self.revisions.len() + self.event_arrivals.len()
+        );
+        for (index, revision) in self.revisions.iter().enumerate() {
+            timeline.push((revision.recorded_at_us, 0, index));
+        }
+        for (index, receipt) in self.event_arrivals.iter().enumerate() {
+            timeline.push((receipt.recorded_at_us, 1, index));
+        }
+        timeline.sort_unstable_by_key(|item| (item.0, item.1, item.2));
+
         let mut rebuilt = Self::default();
         let mut offset = 0;
-        while offset < self.revisions.len() {
-            let recorded_at = self.revisions[offset].recorded_at_us;
+        while offset < timeline.len() {
+            let recorded_at = timeline[offset].0;
+            let kind = timeline[offset].1;
             let mut end = offset + 1;
-            while end < self.revisions.len()
-                && self.revisions[end].recorded_at_us == recorded_at
-            {
+            while end < timeline.len() && timeline[end].0 == recorded_at {
+                if timeline[end].1 != kind {
+                    return Err(WatermarkError::InvalidHistory);
+                }
                 end += 1;
             }
-            rebuilt.append_batch(self.revisions[offset..end].iter().copied())?;
-            offset = end;
-        }
-        for receipt in &self.event_arrivals {
-            let replayed = rebuilt.record_event_arrival(receipt.event, receipt.recorded_at_us)?;
-            if replayed != receipt.classification {
-                return Err(WatermarkError::InvalidHistory);
+            if kind == 0 {
+                let batch: Vec<_> = timeline[offset..end].iter()
+                    .map(|(_, _, index)| self.revisions[*index])
+                    .collect();
+                rebuilt.append_batch(batch)?;
+            } else {
+                let batch: Vec<_> = timeline[offset..end].iter()
+                    .map(|(_, _, index)| self.event_arrivals[*index].event)
+                    .collect();
+                let expected: Vec<_> = timeline[offset..end].iter()
+                    .map(|(_, _, index)| self.event_arrivals[*index].classification)
+                    .collect();
+                let actual = rebuilt.record_event_arrival_batch(batch, recorded_at)?;
+                if actual != expected {
+                    return Err(WatermarkError::InvalidHistory);
+                }
             }
+            offset = end;
         }
         if rebuilt != *self {
             return Err(WatermarkError::InvalidHistory);
@@ -823,6 +894,35 @@ mod tests {
         ledger.record_event_arrival(event(1, 1, 50, 20), 20).unwrap();
         assert_eq!(ledger.completeness(1, &[source(1)], 0, 100, 19).unwrap().verdict, CompletenessVerdict::Complete);
         assert_eq!(ledger.completeness(1, &[source(1)], 0, 100, 20).unwrap().verdict, CompletenessVerdict::Contested);
+    }
+
+    #[test]
+    fn progress_cannot_be_backdated_behind_previously_recorded_event_arrival() {
+        let mut ledger = SourceWatermarkLedger::default();
+        let observed = event(1, 1, 50, 20);
+        assert_eq!(
+            ledger.record_event_arrival(observed, 20),
+            Ok(EventArrivalClassification::OnTime)
+        );
+        let before = ledger.state_sha256();
+        assert_eq!(
+            ledger.append(progress(1, 1, 1, 1, 10, 100, false)),
+            Err(WatermarkError::NonIncreasingTransactionTime { previous: 20, actual: 10 })
+        );
+        assert_eq!(ledger.state_sha256(), before);
+        assert_eq!(ledger.verify_consistency(), Ok(()));
+    }
+
+    #[test]
+    fn multiple_event_arrivals_share_one_atomic_knowledge_time_transaction() {
+        let mut ledger = SourceWatermarkLedger::default();
+        let results = ledger.record_event_arrival_batch(
+            [event(1, 1, 10, 20), event(2, 1, 15, 20)],
+            20,
+        ).unwrap();
+        assert_eq!(results, vec![EventArrivalClassification::OnTime, EventArrivalClassification::OnTime]);
+        assert_eq!(ledger.event_arrivals.len(), 2);
+        assert_eq!(ledger.verify_consistency(), Ok(()));
     }
 
     #[test]
