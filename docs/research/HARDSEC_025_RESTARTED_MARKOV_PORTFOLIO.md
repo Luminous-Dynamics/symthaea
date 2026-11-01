@@ -19,13 +19,26 @@ The two-state transition matrix is
 P=\begin{pmatrix}3/4&1/4\\1/2&1/2\end{pmatrix}.
 \]
 
-The exact fixture upper envelope is
+The oracle now derives its frozen envelope from a small, deterministic known-answer calibration tally. Each source row has 1,000 declared visits, with success counts
 
 \[
-U=\begin{pmatrix}4/5&1/2\\3/5&3/5\end{pmatrix},
+K=\begin{pmatrix}750&250\\500&500\end{pmatrix}.
 \]
 
-so every entry satisfies \(P_{ij}\le U_{ij}\). The envelope is supplied as an exact rational fixture constant. It is **not** estimated from calibration data and has no confidence level.
+There are four row/category coordinates. Each receives \(\delta_c=1/40\), giving total familywise budget \(\delta=1/10\). For each coordinate the code evaluates the one-sided Hoeffding upper bound
+
+\[
+u_{ij}=\min\left(1,\widehat p_{ij}
++\sqrt{\frac{\ln(1/\delta_c)}{2n_i}}\right)
+\]
+
+and rounds the result **up** to the next tenth. The implementation evaluates the logarithm and square root using integer fixed-point arithmetic with outward rounding: range-reduced atanh series plus a positive tail bound for the logarithm, and an integer ceiling square root. The resulting exact rational envelope is
+
+\[
+U=\begin{pmatrix}4/5&3/10\\3/5&3/5\end{pmatrix}.
+\]
+
+The deterministic tally is a synthetic arithmetic fixture, not a random calibration sample and not physical hardware evidence. The familywise \(1-\delta=0.9\) coverage statement applies only when each source row contributes the declared fixed number of independent transitions from the correctly specified time-homogeneous Markov process. No empirical coverage experiment is claimed here.
 
 For a portfolio \(w=(w_{\rm cash},w_0,w_1)\) on the unit simplex and a transition from state \(i\) to state \(j\), the return is
 
@@ -78,7 +91,7 @@ The deliberately high fixture threshold is \(1/\alpha=2\), with \(\alpha=1/2\), 
 
 | Initial state | Enumerated paths | Exact anytime crossing mass | Probability |
 |---:|---:|---:|---:|
-| 0 | 64 | 64 / 4096 | 1 / 64 |
+| 0 | 64 | 128 / 4096 | 1 / 32 |
 | 1 | 64 | 128 / 4096 | 1 / 32 |
 
 Both exact crossing probabilities are at most the declared \(\alpha=1/2\). This is a code/proof arithmetic check for this tiny fixture; the deliberately loose threshold is not an operational target.
@@ -92,14 +105,14 @@ It checks:
 - exact path-probability mass and anytime threshold-crossing mass.
 
 It does not check:
-- how the upper envelope is derived from independent calibration data;
-- one-sided Clopper–Pearson or multinomial confidence-bound numerical certification;
-- familywise calibration coverage or the combined \(\alpha+\delta\) guarantee;
+- empirical calibration coverage over random reference samples or validation on physical PMU data;
+- Clopper–Pearson or multinomial confidence-bound certification;
+- a calibration receipt bound to independently audited source traces;
 - context assignment, state discretizer integrity, missingness/admission exogeneity, trace lineage or PMU acquisition;
 - unknown transition matrices, hidden states, order-2 dependence, regime switching, transition drift or adversarially controlled transitions;
 - physical hardware performance, false alarms per device-hour, detector superiority or SOTA.
 
-The next implementation must add a frozen, digest-bound calibration receipt and certified outward confidence bounds. The row-wise calibration protocol must specify a fixed number of visits per source state (or use a separately qualified time-uniform calibration confidence sequence); random stopping and adaptive admission must not be silently treated as fixed-sample binomial sampling. The observation-admission decision must be predictable before the next-state outcome, or missingness must be modeled as an outcome.
+The next implementation must bind the fixed-count calibration tally to an independently audited trace receipt and run operating-characteristic experiments over random calibration samples, rare source states, imbalanced rows, and visit-count stopping. A time-uniform Markov transition confidence sequence is a separate candidate; it must be qualified under the actual row-visit filtration rather than borrowed from an unrelated MDP setting. The observation-admission decision must be predictable before the next-state outcome, or missingness must be modeled as an outcome.
 
 ## References
 
