@@ -805,6 +805,12 @@ pub fn select_constrained_structured_action(
         .collect();
     action_rows.sort_unstable_by_key(|(id, _)| *id);
 
+    let interval_families = constraints.len().saturating_add(1);
+    let interval_count = bank.action_ids.len().checked_mul(interval_families)
+        .ok_or(IntervalError::NonFiniteDerivedMetric)?;
+    let adjusted_nominal = 1.0 - (1.0 - nominal_coverage) / interval_count as f64;
+    validate_nominal_coverage(adjusted_nominal)?;
+
     let mut feasible = Vec::new();
     for (action_id, row) in action_rows {
         let mut action_is_feasible = true;
@@ -832,12 +838,6 @@ pub fn select_constrained_structured_action(
             reason: AbstainReason::NoConstraintFeasibleActions,
         });
     }
-    let interval_families = constraints.len().saturating_add(1);
-    let interval_count = bank.action_ids.len().checked_mul(interval_families)
-        .ok_or(IntervalError::NonFiniteDerivedMetric)?;
-    let adjusted_nominal = 1.0 - (1.0 - nominal_coverage) / interval_count as f64;
-    validate_nominal_coverage(adjusted_nominal)?;
-
     if feasible.len() == 1 {
         return Ok(ConstrainedActionDecision::Selected {
             action_id: feasible[0].0,
