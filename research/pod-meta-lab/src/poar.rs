@@ -1,9 +1,9 @@
 use std::collections::BTreeSet;
 
 use crate::{
-    apply_operation_receipt, choose_next, CandidateOperation, EvidenceVerdict, Obligation,
-    ObligationState, OperationKind, OperationReceipt, OperationStatus, ProofVerdict,
-    SchedulingClass, Selection, SelectionContext, StopReason, VerifierReceipt,
+    CandidateOperation, EvidenceVerdict, Obligation, ObligationState, OperationKind,
+    OperationReceipt, OperationStatus, ProofVerdict, SchedulingClass, Selection, SelectionContext,
+    StopReason, VerifierReceipt, apply_operation_receipt, choose_next,
 };
 
 #[derive(Debug, Clone)]
@@ -129,12 +129,8 @@ fn verifier_receipt(
 
 fn receipt_replay_case() -> PoarFixture {
     let obligations = vec![
-        Obligation::new(
-            "claim",
-            ObligationState::CandidateEvidenceAvailable,
-            8,
-        )
-        .with_state_identity("evidence-v1"),
+        Obligation::new("claim", ObligationState::CandidateEvidenceAvailable, 8)
+            .with_state_identity("evidence-v1"),
     ];
     let original_receipt = OperationReceipt {
         producer_id: "planner-v1".into(),
@@ -191,8 +187,22 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
             "single-missing-premise",
             vec![obligation("premise", ObligationState::Open, 7)],
             vec![
-                operation("retrieve-premise", OperationKind::Retrieve, &["premise"], SchedulingClass::Competitive, 2, "q1"),
-                operation("verify-missing", OperationKind::Verify, &["premise"], SchedulingClass::Competitive, 1, "q1"),
+                operation(
+                    "retrieve-premise",
+                    OperationKind::Retrieve,
+                    &["premise"],
+                    SchedulingClass::Competitive,
+                    2,
+                    "q1",
+                ),
+                operation(
+                    "verify-missing",
+                    OperationKind::Verify,
+                    &["premise"],
+                    SchedulingClass::Competitive,
+                    1,
+                    "q1",
+                ),
             ],
             BTreeSet::new(),
             10,
@@ -212,8 +222,22 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
                 obligation("decisive", ObligationState::Open, 9),
             ],
             vec![
-                operation("retrieve-decoy", OperationKind::Retrieve, &["decoy"], SchedulingClass::Competitive, 1, "q2"),
-                operation("retrieve-low-salience-decisive", OperationKind::Retrieve, &["decisive"], SchedulingClass::Competitive, 3, "q2"),
+                operation(
+                    "retrieve-decoy",
+                    OperationKind::Retrieve,
+                    &["decoy"],
+                    SchedulingClass::Competitive,
+                    1,
+                    "q2",
+                ),
+                operation(
+                    "retrieve-low-salience-decisive",
+                    OperationKind::Retrieve,
+                    &["decisive"],
+                    SchedulingClass::Competitive,
+                    3,
+                    "q2",
+                ),
             ],
             BTreeSet::new(),
             10,
@@ -228,10 +252,28 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
         ),
         schedule_case(
             "candidate-derivation-routes-to-verification",
-            vec![obligation("derivation", ObligationState::CandidateEvidenceAvailable, 8)],
+            vec![obligation(
+                "derivation",
+                ObligationState::CandidateEvidenceAvailable,
+                8,
+            )],
             vec![
-                operation("verify-derivation", OperationKind::Verify, &["derivation"], SchedulingClass::Competitive, 1, "q3"),
-                operation("repair-before-check", OperationKind::RepairDerivation, &["derivation"], SchedulingClass::Competitive, 1, "q3"),
+                operation(
+                    "verify-derivation",
+                    OperationKind::Verify,
+                    &["derivation"],
+                    SchedulingClass::Competitive,
+                    1,
+                    "q3",
+                ),
+                operation(
+                    "repair-before-check",
+                    OperationKind::RepairDerivation,
+                    &["derivation"],
+                    SchedulingClass::Competitive,
+                    1,
+                    "q3",
+                ),
             ],
             BTreeSet::new(),
             8,
@@ -246,8 +288,19 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
         ),
         schedule_case(
             "overthinking-trap",
-            vec![obligation("claim", ObligationState::SupportedUnderProfile, 8)],
-            vec![operation("unneeded-retrieval", OperationKind::Retrieve, &["claim"], SchedulingClass::Competitive, 1, "q4")],
+            vec![obligation(
+                "claim",
+                ObligationState::SupportedUnderProfile,
+                8,
+            )],
+            vec![operation(
+                "unneeded-retrieval",
+                OperationKind::Retrieve,
+                &["claim"],
+                SchedulingClass::Competitive,
+                1,
+                "q4",
+            )],
             BTreeSet::new(),
             10,
             0,
@@ -256,7 +309,14 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
         schedule_case(
             "contested-obligation-routes-to-independent-evidence",
             vec![obligation("claim", ObligationState::Contested, 8)],
-            vec![operation("seek-independent-evidence", OperationKind::SeekIndependentEvidence, &["claim"], SchedulingClass::Competitive, 3, "q5")],
+            vec![operation(
+                "seek-independent-evidence",
+                OperationKind::SeekIndependentEvidence,
+                &["claim"],
+                SchedulingClass::Competitive,
+                3,
+                "q5",
+            )],
             BTreeSet::new(),
             10,
             0,
@@ -270,10 +330,28 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
         ),
         schedule_case(
             "candidate-evidence-routes-to-alternative-comparison",
-            vec![obligation("claim", ObligationState::CandidateEvidenceAvailable, 7)],
+            vec![obligation(
+                "claim",
+                ObligationState::CandidateEvidenceAvailable,
+                7,
+            )],
             vec![
-                operation("verify-one-path", OperationKind::Verify, &["claim"], SchedulingClass::Competitive, 1, "q6"),
-                operation("compare-alternatives", OperationKind::CompareAlternatives, &["claim"], SchedulingClass::Mandatory, 4, "q6"),
+                operation(
+                    "verify-one-path",
+                    OperationKind::Verify,
+                    &["claim"],
+                    SchedulingClass::Competitive,
+                    1,
+                    "q6",
+                ),
+                operation(
+                    "compare-alternatives",
+                    OperationKind::CompareAlternatives,
+                    &["claim"],
+                    SchedulingClass::Mandatory,
+                    4,
+                    "q6",
+                ),
             ],
             BTreeSet::new(),
             10,
@@ -290,8 +368,22 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
             "stale-evidence-routes-to-refresh",
             vec![obligation("claim", ObligationState::StaleOrRetracted, 8)],
             vec![
-                operation("refresh-revision", OperationKind::RefreshEvidence, &["claim"], SchedulingClass::Competitive, 2, "q7"),
-                operation("repeat-retrieval", OperationKind::Retrieve, &["claim"], SchedulingClass::Competitive, 3, "q7"),
+                operation(
+                    "refresh-revision",
+                    OperationKind::RefreshEvidence,
+                    &["claim"],
+                    SchedulingClass::Competitive,
+                    2,
+                    "q7",
+                ),
+                operation(
+                    "repeat-retrieval",
+                    OperationKind::Retrieve,
+                    &["claim"],
+                    SchedulingClass::Competitive,
+                    3,
+                    "q7",
+                ),
             ],
             BTreeSet::new(),
             10,
@@ -311,8 +403,22 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
                 obligation("unrelated", ObligationState::SupportedUnderProfile, 4),
             ],
             vec![
-                operation("refresh-dependent", OperationKind::RefreshEvidence, &["dependent"], SchedulingClass::Mandatory, 2, "q8"),
-                operation("verify-unrelated", OperationKind::Verify, &["unrelated"], SchedulingClass::Mandatory, 1, "q8"),
+                operation(
+                    "refresh-dependent",
+                    OperationKind::RefreshEvidence,
+                    &["dependent"],
+                    SchedulingClass::Mandatory,
+                    2,
+                    "q8",
+                ),
+                operation(
+                    "verify-unrelated",
+                    OperationKind::Verify,
+                    &["unrelated"],
+                    SchedulingClass::Mandatory,
+                    1,
+                    "q8",
+                ),
             ],
             BTreeSet::new(),
             10,
@@ -328,7 +434,14 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
         schedule_case(
             "scope-authority-mismatch",
             vec![obligation("claim", ObligationState::Unauthorized, 8)],
-            vec![operation("request-clarification", OperationKind::RequestClarification, &["claim"], SchedulingClass::Mandatory, 1, "q9")],
+            vec![operation(
+                "request-clarification",
+                OperationKind::RequestClarification,
+                &["claim"],
+                SchedulingClass::Mandatory,
+                1,
+                "q9",
+            )],
             BTreeSet::new(),
             10,
             0,
@@ -343,7 +456,14 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
         schedule_case(
             "one-unit-over-budget",
             vec![obligation("claim", ObligationState::Open, 8)],
-            vec![operation("retrieve-exceeds-budget", OperationKind::Retrieve, &["claim"], SchedulingClass::Competitive, 7, "q10")],
+            vec![operation(
+                "retrieve-exceeds-budget",
+                OperationKind::Retrieve,
+                &["claim"],
+                SchedulingClass::Competitive,
+                7,
+                "q10",
+            )],
             BTreeSet::new(),
             10,
             4,
@@ -352,7 +472,14 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
         schedule_case(
             "contested-obligation-selects-independent-evidence",
             vec![obligation("claim", ObligationState::Contested, 8)],
-            vec![operation("seek-independent-source", OperationKind::SeekIndependentEvidence, &["claim"], SchedulingClass::Mandatory, 2, "q11")],
+            vec![operation(
+                "seek-independent-source",
+                OperationKind::SeekIndependentEvidence,
+                &["claim"],
+                SchedulingClass::Mandatory,
+                2,
+                "q11",
+            )],
             BTreeSet::new(),
             10,
             0,
@@ -366,7 +493,11 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
         ),
         schedule_case(
             "requires-external-observation",
-            vec![obligation("physical-fact", ObligationState::UnresolvableWithoutExternalInput, 9)],
+            vec![obligation(
+                "physical-fact",
+                ObligationState::UnresolvableWithoutExternalInput,
+                9,
+            )],
             Vec::new(),
             BTreeSet::new(),
             10,
@@ -380,7 +511,14 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
                 obligation("p2", ObligationState::Open, 7),
                 obligation("p3", ObligationState::Open, 7),
             ],
-            vec![operation("retrieve-chain-frontier", OperationKind::Retrieve, &["p3", "p1", "p2"], SchedulingClass::Mandatory, 5, "q13")],
+            vec![operation(
+                "retrieve-chain-frontier",
+                OperationKind::Retrieve,
+                &["p3", "p1", "p2"],
+                SchedulingClass::Mandatory,
+                5,
+                "q13",
+            )],
             BTreeSet::new(),
             10,
             0,
@@ -394,8 +532,19 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
         ),
         schedule_case(
             "null-benefit-cached-query",
-            vec![obligation("cached", ObligationState::SupportedUnderProfile, 2)],
-            vec![operation("repeat-cached-query", OperationKind::Retrieve, &["cached"], SchedulingClass::Opportunistic, 1, "q14")],
+            vec![obligation(
+                "cached",
+                ObligationState::SupportedUnderProfile,
+                2,
+            )],
+            vec![operation(
+                "repeat-cached-query",
+                OperationKind::Retrieve,
+                &["cached"],
+                SchedulingClass::Opportunistic,
+                1,
+                "q14",
+            )],
             BTreeSet::new(),
             10,
             0,
@@ -405,7 +554,14 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
         schedule_case(
             "unchanged-state-no-progress-stop",
             vec![obligation("claim", ObligationState::Open, 5)],
-            vec![operation("retrieve-again", OperationKind::Retrieve, &["claim"], SchedulingClass::Competitive, 1, "q16")],
+            vec![operation(
+                "retrieve-again",
+                OperationKind::Retrieve,
+                &["claim"],
+                SchedulingClass::Competitive,
+                1,
+                "q16",
+            )],
             BTreeSet::from([("retrieve-again".into(), "q16".into())]),
             10,
             0,
@@ -438,7 +594,8 @@ pub fn run_poar_v1() -> PoarReport {
             PoarScenario::ReceiptReplay(scenario) => {
                 let mut obligations = scenario.obligations;
                 let initial = apply_operation_receipt(&mut obligations, &scenario.original_receipt);
-                let revocation = apply_operation_receipt(&mut obligations, &scenario.revocation_receipt);
+                let revocation =
+                    apply_operation_receipt(&mut obligations, &scenario.revocation_receipt);
                 let replay = apply_operation_receipt(&mut obligations, &scenario.original_receipt);
                 let expected_state_matches = match obligations
                     .iter()
@@ -480,12 +637,20 @@ mod tests {
             .iter()
             .map(|fixture| fixture.id)
             .collect::<BTreeSet<_>>();
-        assert_eq!(fixture_ids.len(), report.case_count(), "fixture IDs must be unique");
+        assert_eq!(
+            fixture_ids.len(),
+            report.case_count(),
+            "fixture IDs must be unique"
+        );
         assert_eq!(
             report.passed_count(),
             16,
             "POAR fixture failures: {:#?}",
-            report.case_results.iter().filter(|case| !case.passed).collect::<Vec<_>>()
+            report
+                .case_results
+                .iter()
+                .filter(|case| !case.passed)
+                .collect::<Vec<_>>()
         );
     }
 }
