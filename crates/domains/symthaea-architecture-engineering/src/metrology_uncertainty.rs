@@ -404,16 +404,18 @@ mod tests {
 
     fn trace(energies: &[f64]) -> Ppk2TraceAuditReceipt {
         let segments: Vec<Ppk2SegmentMetrics> = energies.iter().enumerate().map(|(i, energy)| {
+            let mean_power_uw = energy * 1_000.0;
+            let mean_current_ua = mean_power_uw / 3.3;
             Ppk2SegmentMetrics {
                 segment_id: i.to_string(),
                 sample_count: 100,
                 first_time_ms: 0.0,
                 last_time_ms: 1.0,
                 duration_ms: 1.0,
-                minimum_current_ua: 100.0,
-                maximum_current_ua: 200.0,
-                time_weighted_mean_current_ua: 150.0,
-                mean_power_uw: 495.0,
+                minimum_current_ua: 0.0,
+                maximum_current_ua: mean_current_ua * 2.0,
+                time_weighted_mean_current_ua: mean_current_ua,
+                mean_power_uw,
                 energy_uj: *energy,
                 median_interval_ms: 0.01,
                 maximum_interval_ms: 0.01,
@@ -421,6 +423,8 @@ mod tests {
                 maximum_gap_ratio: 1.0,
             }
         }).collect();
+        let mean_energy = energies.iter().sum::<f64>() / energies.len() as f64;
+        let mean_power = mean_energy * 1_000.0;
         let mut receipt = Ppk2TraceAuditReceipt {
             schema: "symthaea.nas.ppk2-trace-audit".into(),
             version: "0.1.0".into(),
@@ -432,9 +436,9 @@ mod tests {
             maximum_gap_ratio: 2.5,
             segment_count: segments.len(),
             total_sample_count: energies.len() * 100,
-            mean_segment_current_ua: 150.0,
-            mean_segment_power_uw: 495.0,
-            mean_segment_energy_uj: energies.iter().sum::<f64>() / energies.len() as f64,
+            mean_segment_current_ua: mean_power / 3.3,
+            mean_segment_power_uw: mean_power,
+            mean_segment_energy_uj: mean_energy,
             minimum_segment_energy_uj: energies.iter().copied().fold(f64::INFINITY, f64::min),
             maximum_segment_energy_uj: energies.iter().copied().fold(f64::NEG_INFINITY, f64::max),
             mean_segment_duration_ms: 1.0,
