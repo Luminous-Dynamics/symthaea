@@ -948,9 +948,10 @@ mod tests {
         ));
 
         let (mut case, obligations, context) = fixture();
+        let duplicate_requirement = case.claims[0].alternatives[0].requirements[0].clone();
         case.claims[0].alternatives[0]
             .requirements
-            .push(case.claims[0].alternatives[0].requirements[0].clone());
+            .push(duplicate_requirement);
         assert!(matches!(
             extract_frontier_snapshot(&case, &obligations, &context),
             Err(FrontierAdapterError::DuplicateRequirement { .. })
