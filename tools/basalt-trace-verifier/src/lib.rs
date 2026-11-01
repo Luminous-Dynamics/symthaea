@@ -313,7 +313,7 @@ fn validate_structure(trace: &Trace, errors: &mut Vec<String>) {
         }
     }
 
-    let mut operation_map = HashMap::<&str, &Operation>::new();
+    let mut operation_map = HashMap::<String, &Operation>::new();
     for operation in &trace.operations {
         if operation.op_id.is_empty() || operation.runner_id.is_empty() || operation.client_id.is_empty() {
             push_error(errors, format!("{} has empty operation/runner/client identity", operation.op_id));
@@ -369,18 +369,19 @@ fn validate_structure(trace: &Trace, errors: &mut Vec<String>) {
             operation.expected_result.current_authority_revision.as_deref(),
             operation.expected_result.observed_store_revision.as_deref(),
         ].into_iter().flatten() {
-            if parse_revision(revision).is_none() || revision != revision_text(parse_revision(revision).unwrap_or(u64::MAX)) {
+            let canonical = parse_revision(revision).map(revision_text);
+            if canonical.as_deref() != Some(revision) {
                 push_error(errors, format!("{} contains non-canonical result revision {revision}", operation.op_id));
             }
         }
-        if operation_map.insert(&operation.op_id, operation).is_some() {
+        if operation_map.insert(operation.op_id.clone(), operation).is_some() {
             push_error(errors, format!("duplicate operation ID {}", operation.op_id));
         }
     }
 
-    let mut order = HashMap::<&str, usize>::new();
+    let mut order = HashMap::<String, usize>::new();
     for (index, id) in trace.reference_linearization_order.iter().enumerate() {
-        if order.insert(id, index).is_some() {
+        if order.insert(id.clone(), index).is_some() {
             push_error(errors, format!("duplicate ID in reference linearization order: {id}"));
         }
         if !operation_map.contains_key(id.as_str()) {
@@ -393,7 +394,7 @@ fn validate_structure(trace: &Trace, errors: &mut Vec<String>) {
 
     for operation in &trace.operations {
         for dependency in &operation.happens_after {
-            match (order.get(operation.op_id.as_str()), order.get(dependency.as_str())) {
+            match (order.get(&operation.op_id), order.get(dependency)) {
                 (Some(current), Some(previous)) if previous < current => {}
                 (Some(_), Some(_)) => push_error(errors, format!("{} violates happens_after dependency {}", operation.op_id, dependency)),
                 (_, None) => push_error(errors, format!("{} references missing dependency {}", operation.op_id, dependency)),
@@ -415,7 +416,7 @@ fn validate_structure(trace: &Trace, errors: &mut Vec<String>) {
             }
         }
         for pair in operations.windows(2) {
-            if order.get(pair[0].op_id.as_str()) >= order.get(pair[1].op_id.as_str()) {
+            if order.get(&pair[0].op_id) >= order.get(&pair[1].op_id) {
                 push_error(errors, format!("client {} program order is violated", client));
             }
         }
@@ -428,7 +429,7 @@ fn validate_structure(trace: &Trace, errors: &mut Vec<String>) {
             if left.runner_id == right.runner_id
                 && left.op_id != right.op_id
                 && left.completed_at_ns <= right.invoked_at_ns
-                && order.get(left.op_id.as_str()) >= order.get(right.op_id.as_str())
+                && order.get(&left.op_id) >= order.get(&right.op_id)
             {
                 push_error(errors, format!("reference order violates same-runner real-time precedence: {} before {}", left.op_id, right.op_id));
             }
@@ -446,7 +447,7 @@ fn validate_structure(trace: &Trace, errors: &mut Vec<String>) {
         if fault.action.is_empty() {
             push_error(errors, format!("fault {} has empty action", fault.fault_id));
         }
-        match operation_map.get(fault.target_op_id.as_str()) {
+        match operation_map.get(&fault.target_op_id) {
             Some(target) => {
                 if target.runner_id != fault.runner_id {
                     push_error(errors, format!("fault {} runner differs from target operation", fault.fault_id));
@@ -728,11 +729,11 @@ fn replay(trace: &Trace, errors: &mut Vec<String>) -> BTreeMap<String, ComputedR
         receipts: BTreeMap::new(),
         indeterminate_receipts: BTreeSet::new(),
     };
-    let operations: HashMap<&str, &Operation> = trace.operations.iter().map(|op| (op.op_id.as_str(), op)).collect();
+    let operations: HashMap<String, &Operation> = trace.operations.iter().map(|op| (op.op_id.clone(), op)).collect();
     let mut results = BTreeMap::new();
 
     for id in &trace.reference_linearization_order {
-        let Some(operation) = operations.get(id.as_str()).copied() else { continue };
+        let Some(operation) = operations.get(id).copied() else { continue };
         let computed = match operation.kind.as_str() {
             "advance" => advance(&mut state, trace, operation),
             "receipt_lookup" => {
