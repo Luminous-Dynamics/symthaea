@@ -9,6 +9,7 @@
     "schema_version",
     "evidence_class",
     "environment",
+    "goal",
     "target",
     "local_context",
     "digests"
@@ -210,6 +211,7 @@
       "additionalProperties": false,
       "required": [
         "environment_sha256",
+        "goal_metadata_sha256",
         "target_expr_sha256",
         "context_sha256",
         "proof_state_sha256"
@@ -230,6 +232,46 @@
         "proof_state_sha256": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
+        },
+        "goal_metadata_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "goal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "user_name",
+        "kind",
+        "depth_decimal",
+        "num_scope_args_decimal",
+        "creation_index_decimal"
+      ],
+      "properties": {
+        "user_name": {
+          "$ref": "#/$defs/lean_name"
+        },
+        "kind": {
+          "enum": [
+            "natural",
+            "synthetic",
+            "synthetic_opaque"
+          ]
+        },
+        "depth_decimal": {
+          "$ref": "#/$defs/decimal"
+        },
+        "num_scope_args_decimal": {
+          "$ref": "#/$defs/decimal"
+        },
+        "creation_index_decimal": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "description": "Diagnostic-only creation order; excluded from structural identity."
         }
       }
     }
