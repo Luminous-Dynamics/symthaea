@@ -157,7 +157,8 @@ class ProjectiveClosureIndex:
 
     @property
     def rejection_count(self) -> int:
-        return sum(self.selected)
+        # Root augmentation is cached, so this stays O(1); do not scan the mask.
+        return _size(self.root)
 
     def append(self, b_value: Number, selected: bool = False) -> int:
         """Append an active hypothesis and return its zero-based index."""
