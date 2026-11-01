@@ -2,7 +2,7 @@
 
 **Tracking:** NEURO-SILICON-009 / #9666  
 **Candidate implementation:** `research/temporal-control/`  
-**Evaluator implementation:** `research/temporal-evaluator/src/joint_budget.rs`  
+**Evaluator implementation:** `research/temporal-evaluator/src/joint_budget.rs` and `interaction.rs`  
 **Status:** deterministic controller and exact small-instance scorer authored; no Rust build or benchmark run
 
 ## 1. Why a joint controller?
@@ -90,7 +90,33 @@ over all three exposure values **and all resource dimensions**, including the de
 weighted average is used. The oracle is an upper bound for small fixtures and
 must never be made available to the candidate.
 
-## 5. Causal interaction design
+## 5. Causal interaction attribution
+
+The evaluator-only `interaction.rs` module consumes the same complete,
+registry-digest-bound subset table and reports:
+
+- per-action paired marginal exposure reductions;
+- pairwise difference-in-differences for wrong-belief, abstention and
+  missing-output exposure;
+- positive values as synergy (the companion action improves the first
+  action's marginal value), negative values as antagonism, and zero as additive
+  behavior in the eligible contexts;
+- exact signed integer sums and eligible context counts (the mean is the exact
+  rational sum / count; no floating-point rounding);
+- separate counts for structurally incompatible and over-budget contexts.
+
+For action i, the main-effect sample compares E(S) with E(S+i). For pair i,j,
+the interaction is the change in i's exposure reduction when j is present:
+`E(S) - E(S+i) - E(S+j) + E(S+i+j)`. Only contexts where all required
+interventions are both compatible and within every resource budget contribute.
+This is a conditional, feasibility-filtered interaction measure, not Shapley
+value and not a universal causal claim outside the declared fixture/task
+distribution.
+
+Six Rust test functions cover additive, synergistic and antagonistic pairs,
+mutually exclusive pairs, over-budget exclusion and context/registry mismatch.
+
+## 6. Causal interaction design
 
 Use paired episodes with the same initial state, task commitment, model and
 future stream. Randomize treatment order on the evaluator side. Include:
@@ -110,7 +136,7 @@ preregistered factorial or covering design and report interaction uncertainty.
 A positive full-system result alone does not establish which mechanism caused
 the gain.
 
-## 6. Workload families
+## 7. Workload families
 
 Reuse the pinned deterministic generators in #9394, #9529, #9559 and #9616
 where their schemas are compatible:
@@ -127,7 +153,7 @@ Include null controls where extra sensing or retention cannot help. Include
 adversarial conditions where a candidate over-samples, over-retains, refreshes
 too late, or spends compute on a low-value forecast.
 
-## 7. Baselines
+## 8. Baselines
 
 1. Fixed sensing, memory, compute and verification quotas.
 2. Each existing subsystem policy operated independently.
@@ -144,7 +170,7 @@ All baselines receive the same information and resource ceilings. Report tuning
 budget, training data, compute, seeds, and whether thresholds were selected on
 development or confirmatory data.
 
-## 8. Metrics
+## 9. Metrics
 
 ### Outcome (non-compensatory)
 - wrong-belief microseconds;
@@ -174,7 +200,7 @@ measured, report that field as unavailable; do not silently substitute an
 estimate. Include host, memory, transfer fabric, preprocessing, idle listening
 and verification when they are required by the deployed path.
 
-## 9. Industry comparison
+## 10. Industry comparison
 
 - **Continual Learning Bench 1.0:** external stateful-agent validation. Its 2026
   release uses expert-validated sequential tasks across domains and measures
@@ -197,7 +223,7 @@ These are complementary comparison standards, not interchangeable leaderboard
 scores. Do not compare unlike task laws, information exposure or measurement
 boundaries.
 
-## 10. Proposed qualification gates (targets, not results)
+## 11. Proposed qualification gates (targets, not results)
 
 - Zero future-boundary leakage and zero evaluator-only fields exposed to the
   candidate.
@@ -219,15 +245,16 @@ boundaries.
 The thresholds are research targets only. Freeze them before confirmatory runs;
 do not lower them after seeing results.
 
-## 11. Implementation status and limits
+## 12. Implementation status and limits
 
 Candidate controller: 12 Rust test functions authored.  
-Evaluator oracle: 13 Rust test functions authored.  
+Evaluator exact subset oracle: 14 Rust test functions authored.  
+Evaluator interaction attribution: 6 Rust test functions authored.  
 No Rust build, rustfmt, Clippy, unit test or benchmark has run in this
 environment. No physical energy or latency measurement has been performed.
 The controller and oracle are research prototypes, not production schedulers.
 
-## 12. Next execution order
+## 13. Next execution order
 
 1. Compile and run both standalone crates on the exact PR head.
 2. Cross-check the evaluator subset oracle against a second independent
