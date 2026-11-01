@@ -1,0 +1,69 @@
+{
+  "schema": "symthaea.joint_temporal_resource_control.v0.1",
+  "tracking_issue": 9666,
+  "candidate_package": "research/temporal-control",
+  "evaluator_package": "research/temporal-evaluator",
+  "candidate_evaluator_separation": {
+    "candidate_may_receive": [
+      "current_observation",
+      "public_timestamps",
+      "candidate_owned_state",
+      "candidate_owned_forecasts",
+      "candidate_owned_uncertainty",
+      "public_resource_budget"
+    ],
+    "candidate_must_not_receive": [
+      "hidden_future_stream",
+      "hidden_event_intervals",
+      "ground_truth_temporal_exposure",
+      "evaluator_randomization_seed",
+      "exact_joint_subset_oracle",
+      "witness_private_key"
+    ]
+  },
+  "resource_dimensions": [
+    {"name": "persistent_bytes", "unit": "byte", "hard_cap": true},
+    {"name": "retained_byte_us", "unit": "byte*microsecond", "hard_cap": true},
+    {"name": "io_bytes", "unit": "byte", "hard_cap": true},
+    {"name": "compute_units", "unit": "declared operation unit", "hard_cap": true},
+    {"name": "observations", "unit": "sample", "hard_cap": true},
+    {"name": "energy_nj", "unit": "nanojoule", "hard_cap": true},
+    {"name": "verification_units", "unit": "declared verification operation", "hard_cap": true}
+  ],
+  "non_compensatory_outcomes": [
+    "wrong_belief_us",
+    "abstention_us",
+    "missing_output_us"
+  ],
+  "candidate_policy": {
+    "name": "uncertainty_adjusted_greedy_explicit_dual_prices",
+    "maximum_actions": 128,
+    "hard_vector_budget": true,
+    "conflict_groups_supported": true,
+    "globally_optimal": false
+  },
+  "evaluator_oracle": {
+    "name": "exact_joint_subset_frontier",
+    "maximum_actions": 16,
+    "enumerates_all_subsets": true,
+    "uses_evaluator_measured_costs": true,
+    "keeps_infeasible_subsets_out_of_frontier": true,
+    "oracle_exposure_visible_to_candidate": false
+  },
+  "targets_not_results": {
+    "zero_future_leakage": true,
+    "zero_hard_budget_violations": true,
+    "matched_budget_exposure_reduction_fraction": 0.10,
+    "matched_quality_resource_reduction_fraction": 0.20
+  },
+  "validation_status": {
+    "candidate_test_functions_authored": 12,
+    "evaluator_test_functions_authored": 11,
+    "cargo_build_executed": false,
+    "rustfmt_executed": false,
+    "clippy_executed": false,
+    "rust_tests_executed": false,
+    "hardware_energy_measured": false,
+    "benchmark_executed": false
+  }
+}
