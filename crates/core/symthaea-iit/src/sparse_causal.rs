@@ -2727,13 +2727,31 @@ mod tests {
         assert!(score.signed_phi > 0.0);
         assert!(score.signed_phi.is_finite());
 
-        let structural_zero = sparse_direction_score_from_logs(
+        // PyPhi's IIT 4.0 GID convention sets an undefined pointwise
+        // ratio to zero when either repertoire entry has zero support.
+        let zero_unpartitioned = sparse_direction_score_from_logs(
             CausalDirection::Cause,
             -700.0,
             f64::NEG_INFINITY,
             -1_700.0,
         );
-        assert_eq!(structural_zero.signed_phi, 0.0);
+        assert_eq!(zero_unpartitioned.signed_phi, 0.0);
+
+        let zero_partitioned = sparse_direction_score_from_logs(
+            CausalDirection::Cause,
+            -700.0,
+            -800.0,
+            f64::NEG_INFINITY,
+        );
+        assert_eq!(zero_partitioned.signed_phi, 0.0);
+
+        let both_zero = sparse_direction_score_from_logs(
+            CausalDirection::Cause,
+            -700.0,
+            f64::NEG_INFINITY,
+            f64::NEG_INFINITY,
+        );
+        assert_eq!(both_zero.signed_phi, 0.0);
     }
 
     #[test]
@@ -2844,6 +2862,13 @@ mod tests {
         let mut tampered = report.clone();
         tampered.forward_likelihood[0] += 0.001;
         assert_ne!(report.receipt_sha256().unwrap(), tampered.receipt_sha256().unwrap());
+
+        let mut tampered_log = report.clone();
+        tampered_log.forward_log_likelihood[0] += 0.001;
+        assert_ne!(
+            report.receipt_sha256().unwrap(),
+            tampered_log.receipt_sha256().unwrap(),
+        );
 
         let mut non_finite = report;
         non_finite.forward_likelihood[0] = f64::NAN;
