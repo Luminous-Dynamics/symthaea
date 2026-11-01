@@ -129,6 +129,10 @@ fn is_lower_hex_64(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+fn is_prefixed_sha256(value: &str) -> bool {
+    value.strip_prefix("sha256:").is_some_and(is_lower_hex_64)
+}
+
 fn canonical_key_id(public_key_base64: &str) -> Result<String, String> {
     let preimage = KeyIdPreimage {
         keytype: "ed25519",
@@ -576,11 +580,14 @@ pub fn verify_head_read_quorum(
                 quorum,
             );
         }
+        if let Err(error) = parse_canonical_u64(&response_payload.head_authority_revision, "head_authority_revision") {
+            return rejected_head_report("rejected_witness_response", error, quorum);
+        }
         let sequence = match parse_canonical_u64(&response_payload.head_sequence, "head_sequence") {
             Ok(value) => value,
             Err(error) => return rejected_head_report("rejected_witness_response", error, quorum),
         };
-        if !is_lower_sha256(&response_payload.head_checkpoint_digest)
+        if !is_prefixed_sha256(&response_payload.head_checkpoint_digest)
             || !is_prefixed_sha256(&response_payload.head_state_digest)
             || !is_prefixed_sha256(&response_payload.head_policy_digest)
         {
@@ -620,6 +627,13 @@ pub fn verify_head_read_quorum(
                 quorum,
             ),
         };
+        if checkpoint_payload.state_schema != "basalt.authority-state.v1" {
+            return rejected_head_report(
+                "rejected_checkpoint_certificate",
+                format!("response {index} checkpoint uses an unsupported state schema"),
+                quorum,
+            );
+        }
         let checkpoint_sequence = match parse_canonical_u64(&checkpoint_payload.sequence, "checkpoint sequence") {
             Ok(value) => value,
             Err(error) => return rejected_head_report("rejected_checkpoint_certificate", error, quorum),
@@ -676,7 +690,7 @@ pub fn verify_head_read_quorum(
             continue;
         }
 
-        let response_digest = response.envelope_sha256_placeholder();
+        let response_digest = sha256_prefixed(&item.response_envelope);
         response_entries.push((member_key_id.clone(), response_digest, computed_checkpoint_digest.clone()));
         accepted.insert(
             member_key_id,
