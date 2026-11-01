@@ -62,6 +62,12 @@ cargo run -p symthaea-architecture-engineering --bin ppk2_trace_audit -- \
 
 The CLI defaults to the dataset's nominal 100 kHz sample rate, 20% median-rate tolerance, and 2.5× maximum-gap ratio. The caller must ground the voltage from the device/acquisition protocol and should freeze these settings before looking at comparative outcomes.
 
+## Portable receipt verification
+
+The PPK2 config, segment metrics, trace receipt and result types are strict, versioned Serde schemas and support deserialization. This allows a second offline verifier to load the receipt, reject unknown local-schema fields, recompute its canonical digest, and check internal segment/aggregate consistency.
+
+When the exact source CSV is available, use `verify_ppk2_trace_audit_receipt_against_csv` to rerun the complete parser/integrator using the receipt's frozen configuration and require exact receipt equality. Receipt-only verification checks internal consistency and content commitments, but cannot prove that the claimed CSV bytes were acquired from the declared Parquet archive.
+
 ## Receipt and evidence boundary
 
 The receipt includes:
