@@ -44,23 +44,28 @@ const COMMON_FIELDS: [&str; 14] = [
     "model_seed_sha256",
 ];
 
+fn member<'a>(value: &'a Value, key: &str) -> Option<&'a Value> {
+    if key.starts_with('/') {
+        value.pointer(key)
+    } else {
+        value.get(key)
+    }
+}
+
 fn get_str<'a>(value: &'a Value, key: &str) -> Result<&'a str> {
-    value
-        .get(key)
+    member(value, key)
         .and_then(Value::as_str)
         .with_context(|| format!("receipt field {key} must be a string"))
 }
 
 fn get_u64(value: &Value, key: &str) -> Result<u64> {
-    value
-        .get(key)
+    member(value, key)
         .and_then(Value::as_u64)
         .with_context(|| format!("receipt field {key} must be a nonnegative integer"))
 }
 
 fn get_bool(value: &Value, key: &str) -> Result<bool> {
-    value
-        .get(key)
+    member(value, key)
         .and_then(Value::as_bool)
         .with_context(|| format!("receipt field {key} must be boolean"))
 }
