@@ -15,7 +15,12 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use super::pareto_objectives::ObjectiveDirection;
+use super::pareto_anytime::{
+    analyze_anytime_history, AnytimeAction, AnytimeEventDraft, AnytimeHistory,
+    AnytimeHistoryHeader, AnytimeRunReceipt, AnytimeTarget, AnytimeTargetMetric,
+    AnytimeTargetPlan, EvaluationOutcome, ResourceCost, ResourceMeter, TargetAttainmentStatus,
+};
+use super::pareto_objectives::{ObjectiveDirection, ParetoObjectiveSpec};
 
 const SCHEMA: &str = "symthaea.architecture-engineering.noisy-pareto-observations";
 const VERSION: &str = "0.2.0";
@@ -512,6 +517,191 @@ impl NoisyParetoStudy {
             sample_set_sha256,
         })
     }
+}
+
+/// Digest-bound joint report that reconstructs noisy samples from the same hash-chained
+/// history that accounts for successful and failed replicate costs.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NoisyAnytimeCampaignReport {
+    pub schema: String,
+    pub version: String,
+    pub run_id: String,
+    pub plan_sha256: String,
+    pub history_tip_sha256: String,
+    pub attempted_observation_count: u64,
+    pub successful_replicate_count: u64,
+    pub failed_observation_count: u64,
+    pub anytime_receipt: AnytimeRunReceipt,
+    pub noisy_pareto_report: NoisyParetoReport,
+    pub report_sha256: String,
+}
+
+#[derive(Serialize)]
+struct NoisyAnytimeCampaignReportPayload<'a> {
+    schema: &'a str,
+    version: &'a str,
+    run_id: &'a str,
+    plan_sha256: &'a str,
+    history_tip_sha256: &'a str,
+    attempted_observation_count: u64,
+    successful_replicate_count: u64,
+    failed_observation_count: u64,
+    anytime_receipt: &'a AnytimeRunReceipt,
+    noisy_pareto_report: &'a NoisyParetoReport,
+}
+
+/// Reconstruct a noisy confidence report exclusively from the frozen plan and the
+/// hash-chained CandidateNoisyObservation events. Failed/invalid/timed-out observations
+/// remain in the anytime receipt and resource totals, but never enter sample means or
+/// confidence intervals. Objective vectors are retained directly in the event chain;
+/// evidence digests point to optional external raw artifacts and are not byte-verified here.
+pub fn analyze_noisy_anytime_history(
+    plan: &NoisyObservationPlan,
+    history: &AnytimeHistory,
+) -> Result<NoisyAnytimeCampaignReport, NoisyParetoError> {
+    plan.validate()?;
+    history.validate().map_err(|error| NoisyParetoError::new(
+        "history",
+        error.to_string(),
+    ))?;
+    let plan_sha256 = plan.plan_sha256()?;
+    let header = history.header();
+    if header.noisy_observation_plan_sha256.as_deref() != Some(plan_sha256.as_str()) {
+        return Err(NoisyParetoError::new(
+            "history.header.noisy_observation_plan_sha256",
+            "history header does not preregister this exact noisy-observation plan",
+        ));
+    }
+    if header.objective_specs.len() != plan.objective_specs.len()
+        || header.objective_specs.iter().zip(&plan.objective_specs).any(|(history_spec, noisy_spec)| {
+            history_spec.objective_id != noisy_spec.objective_id
+                || history_spec.direction != noisy_spec.direction
+        })
+    {
+        return Err(NoisyParetoError::new(
+            "history.header.objective_specs",
+            "history objective IDs/order/directions differ from the frozen noisy-observation plan",
+        ));
+    }
+
+    let mut study = NoisyParetoStudy::new(plan.clone())?;
+    let mut attempted_observation_count = 0u64;
+    let mut successful_replicate_count = 0u64;
+    let mut failed_observation_count = 0u64;
+
+    for event in history.events() {
+        let AnytimeAction::CandidateNoisyObservation {
+            observation_plan_sha256,
+            candidate_id,
+            decision_sha256,
+            replicate_id,
+            sample_seed,
+            outcome,
+            objective_values,
+            evidence_sha256,
+            failure_reason: _,
+        } = &event.action else {
+            continue;
+        };
+        if observation_plan_sha256 != &plan_sha256 {
+            return Err(NoisyParetoError::new(
+                format!("history.events[{}].observation_plan_sha256", event.ordinal),
+                "event plan digest differs from the frozen noisy-observation plan",
+            ));
+        }
+        attempted_observation_count = attempted_observation_count.checked_add(1).ok_or_else(|| {
+            NoisyParetoError::new("history.attempted_observation_count", "counter overflow")
+        })?;
+        match outcome {
+            EvaluationOutcome::Succeeded => {
+                let values = objective_values.as_ref().ok_or_else(|| NoisyParetoError::new(
+                    format!("history.events[{}].objective_values", event.ordinal),
+                    "validated successful noisy event is missing objective values",
+                ))?;
+                let evidence = evidence_sha256.as_ref().ok_or_else(|| NoisyParetoError::new(
+                    format!("history.events[{}].evidence_sha256", event.ordinal),
+                    "validated successful noisy event is missing evidence digest",
+                ))?;
+                study.append(candidate_id.clone(), decision_sha256.clone(), NoisyReplicate {
+                    replicate_id: replicate_id.clone(),
+                    sample_seed: *sample_seed,
+                    objective_values: values.clone(),
+                    evidence_sha256: evidence.clone(),
+                })?;
+                successful_replicate_count = successful_replicate_count.checked_add(1).ok_or_else(|| {
+                    NoisyParetoError::new("history.successful_replicate_count", "counter overflow")
+                })?;
+            }
+            EvaluationOutcome::Failed | EvaluationOutcome::Invalid | EvaluationOutcome::TimedOut => {
+                failed_observation_count = failed_observation_count.checked_add(1).ok_or_else(|| {
+                    NoisyParetoError::new("history.failed_observation_count", "counter overflow")
+                })?;
+            }
+        }
+    }
+
+    let anytime_receipt = analyze_anytime_history(history).map_err(|error| {
+        NoisyParetoError::new("history.anytime_receipt", error.to_string())
+    })?;
+    if anytime_receipt.objective_evaluation_attempt_count != attempted_observation_count {
+        return Err(NoisyParetoError::new(
+            "history.anytime_receipt.objective_evaluation_attempt_count",
+            "generic anytime attempt count differs from noisy replicate-event count",
+        ));
+    }
+    if attempted_observation_count != successful_replicate_count + failed_observation_count {
+        return Err(NoisyParetoError::new(
+            "history.observation_counts",
+            "successful and failed observations do not reconcile to total attempts",
+        ));
+    }
+
+    let noisy_pareto_report = study.report()?;
+    let history_tip_sha256 = history.history_tip_sha256();
+    let run_id = header.run_id.clone();
+    let payload = NoisyAnytimeCampaignReportPayload {
+        schema: SCHEMA,
+        version: VERSION,
+        run_id: &run_id,
+        plan_sha256: &plan_sha256,
+        history_tip_sha256: &history_tip_sha256,
+        attempted_observation_count,
+        successful_replicate_count,
+        failed_observation_count,
+        anytime_receipt: &anytime_receipt,
+        noisy_pareto_report: &noisy_pareto_report,
+    };
+    let report_sha256 = digest_serializable(&payload)?;
+    Ok(NoisyAnytimeCampaignReport {
+        schema: SCHEMA.to_owned(),
+        version: VERSION.to_owned(),
+        run_id,
+        plan_sha256,
+        history_tip_sha256,
+        attempted_observation_count,
+        successful_replicate_count,
+        failed_observation_count,
+        anytime_receipt,
+        noisy_pareto_report,
+        report_sha256,
+    })
+}
+
+/// Reconstruct and compare every field of a stored noisy/anytime joint report.
+pub fn verify_noisy_anytime_campaign_report(
+    plan: &NoisyObservationPlan,
+    history: &AnytimeHistory,
+    report: &NoisyAnytimeCampaignReport,
+) -> Result<(), NoisyParetoError> {
+    let reconstructed = analyze_noisy_anytime_history(plan, history)?;
+    if &reconstructed != report {
+        return Err(NoisyParetoError::new(
+            "report",
+            "noisy/anytime campaign report differs from exact history and plan reconstruction",
+        ));
+    }
+    Ok(())
 }
 
 fn utility_interval(
