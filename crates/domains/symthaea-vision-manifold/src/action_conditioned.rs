@@ -1499,6 +1499,58 @@ mod tests {
         assert_eq!(metrics.missed_action_effect_count, 2);
     }
 
+
+    #[test]
+    fn action_response_evaluator_rewards_correct_direction_and_magnitude() {
+        let mut model = predictor();
+        let training = model.issue_forecast(
+            &digest('a'), 10, &digest('b'), &digest('c'), &digest('e'),
+            1, 1.0, &[0.0, 0.0], &[1.0, 0.0]
+        ).unwrap();
+        model.score_and_learn(training.forecast_id, &[1.0, 0.0], 11, 1.0).unwrap();
+
+        let candidates = vec![
+            ActionConditionedCandidateAction {
+                action_id: 0,
+                action_descriptor_sha256: digest('f'),
+                action_embedding: vec![0.0, 0.0],
+            },
+            ActionConditionedCandidateAction {
+                action_id: 1,
+                action_descriptor_sha256: digest('c'),
+                action_embedding: vec![1.0, 0.0],
+            },
+            ActionConditionedCandidateAction {
+                action_id: 2,
+                action_descriptor_sha256: digest('d'),
+                action_embedding: vec![-1.0, 0.0],
+            },
+        ];
+        let receipts = model.issue_action_set(
+            &digest('a'), 11, &digest('b'), &digest('e'), 1.0, &[0.0, 0.0], &candidates
+        ).unwrap();
+        let outcomes = receipts.iter().map(|receipt| ActionConditionedObservedOutcome {
+            forecast_id: receipt.forecast_id,
+            actual_future_hv: match receipt.action_id {
+                0 => vec![0.0, 0.0],
+                1 => vec![0.2, 0.0],
+                2 => vec![-0.2, 0.0],
+                _ => unreachable!(),
+            },
+            observed_frame_sequence: 12,
+            observation_delay_seconds: 1.0,
+        }).collect::<Vec<_>>();
+        let metrics = evaluate_action_response_set(&receipts, &outcomes, 0).unwrap();
+        assert_eq!(metrics.action_count, 2);
+        assert_eq!(metrics.cosine_scored_action_count, 2);
+        assert!((metrics.mean_action_response_cosine - 1.0).abs() < 1e-6);
+        assert!((metrics.mean_predicted_action_effect_norm - 0.2).abs() < 1e-6);
+        assert!((metrics.mean_observed_action_effect_norm - 0.2).abs() < 1e-6);
+        assert!(metrics.mean_action_effect_mse < 1e-12);
+        assert_eq!(metrics.missed_action_effect_count, 0);
+        assert_eq!(metrics.false_positive_action_effect_count, 0);
+    }
+
     #[test]
     fn action_response_evaluator_rejects_wrong_zero_action_and_mutated_receipt() {
         let mut model = predictor();
