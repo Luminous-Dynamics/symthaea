@@ -197,7 +197,11 @@ The landmark proof-completion calibrator is separately specified in [LANDMARK_IP
 
 The selected-policy resource-vector calibrator is specified in [SELECTION_CONFORMAL_V1.md](SELECTION_CONFORMAL_V1.md). It binds the pre-action candidate pool, selected operation, selection policy version, model, frontier, and selected-population cohort, then calibrates only independently verified outcomes from a matching selected-policy cohort. This is a split-conformal baseline under a frozen selection mechanism and exchangeability of selected episodes; it is not CAP and does not control online FCR across repeated picks.
 
-## 17. External comparators and claim limits
+## 17. Selection-conditioned calibration
+
+The selected-operation forecast calibrator is specified in [SELECTION_CONFORMAL_V1.md](SELECTION_CONFORMAL_V1.md). It binds the pre-action candidate pool, selected operation, policy version, frontier and selected-population identity, then calibrates only independently verified outcomes from the same frozen selected-policy cohort. It is a split-conformal baseline, not CAP and not an online FCR controller.
+
+## 18. External comparators and claim limits
 
 - [BAGEN](https://arxiv.org/abs/2606.00198): progressive remaining-budget interval and infeasibility estimation for agents.
 - [HARP](https://arxiv.org/abs/2610.07362): hard-budget allocation with adaptive reflow and finite-sample predictive bounds under its stated setup.
