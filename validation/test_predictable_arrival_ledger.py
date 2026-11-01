@@ -1,5 +1,6 @@
 import copy
 import hashlib
+import math
 import random
 import unittest
 
@@ -115,6 +116,16 @@ class PredictableArrivalLedgerTests(unittest.TestCase):
         # on the policy seeing evidence from the current round, not hash damage.
         with self.assertRaisesRegex(ValueError, "arrival policy replay mismatch"):
             verify_predictable_arrival_ledger(invalid)
+
+    def test_same_round_activation_can_break_one_step_e_validity(self):
+        # Let Z~N(0,1), and after seeing Z choose whether to activate a test
+        # with factor exp(Z-1/2). If Z<=0, remain dormant with factor one.
+        # The post-observation selector has expectation
+        #   1/2 + E[exp(Z-1/2) 1{Z>0}] = 1/2 + Phi(1) > 1.
+        phi_one = 0.5 * (1.0 + math.erf(1.0 / math.sqrt(2.0)))
+        selected_expectation = 0.5 + phi_one
+        self.assertAlmostEqual(selected_expectation, 1.3413447460685429)
+        self.assertGreater(selected_expectation, 1.0)
 
     def test_history_digest_tamper_fails(self):
         ledger = build_predictable_arrival_ledger(
