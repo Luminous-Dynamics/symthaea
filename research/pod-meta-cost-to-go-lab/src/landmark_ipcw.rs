@@ -118,11 +118,7 @@ impl LandmarkIpcwCalibration {
         &self,
         prediction: FrontierCostPrediction,
     ) -> Result<ResourceVector, LandmarkIpcwError> {
-        validate_prediction(
-            prediction,
-            self.model_digest,
-            self.population_cohort_digest,
-        )?;
+        validate_prediction(prediction, self.model_digest, self.population_cohort_digest)?;
         upper_vector(
             prediction.point_cost,
             prediction.uncertainty_scale,
@@ -211,7 +207,10 @@ pub fn calibrate_landmark_ipcw(
         }
         if episode.observed_endpoint_work_units <= episode.landmark_work_units {
             exited_before_landmark += 1;
-            if let LandmarkTerminal::ProofCompleted { verifier_digest, .. } = episode.terminal {
+            if let LandmarkTerminal::ProofCompleted {
+                verifier_digest, ..
+            } = episode.terminal
+            {
                 if is_zero(verifier_digest) {
                     return Err(LandmarkIpcwError::MissingCompletionVerifier);
                 }
@@ -229,7 +228,9 @@ pub fn calibrate_landmark_ipcw(
                 }
                 right_censored_after_landmark += 1;
             }
-            LandmarkTerminal::CompetingTerminal(_) => unreachable!("competing terminals rejected above"),
+            LandmarkTerminal::CompetingTerminal(_) => {
+                unreachable!("competing terminals rejected above")
+            }
             LandmarkTerminal::ProofCompleted {
                 remaining_resource_cost,
                 verifier_digest,
@@ -246,8 +247,7 @@ pub fn calibrate_landmark_ipcw(
                 if receipt.censor_model_digest != censor_model_digest {
                     return Err(LandmarkIpcwError::CensoringReceiptModelMismatch);
                 }
-                if receipt.nuisance_training_partition_digest
-                    != nuisance_training_partition_digest
+                if receipt.nuisance_training_partition_digest != nuisance_training_partition_digest
                     || receipt.calibration_partition_digest != calibration_partition_digest
                 {
                     return Err(LandmarkIpcwError::CensoringReceiptPartitionMismatch);
@@ -377,8 +377,7 @@ fn max_normalized_residual(
         if uncertainty[index] == 0 {
             return Err(LandmarkIpcwError::InvalidPredictionScale);
         }
-        let score = (actual[index] as f64 - estimate[index] as f64)
-            / uncertainty[index] as f64;
+        let score = (actual[index] as f64 - estimate[index] as f64) / uncertainty[index] as f64;
         if !score.is_finite() {
             return Err(LandmarkIpcwError::NonFiniteWeight);
         }
@@ -568,10 +567,7 @@ mod tests {
 
     #[test]
     fn insufficient_censoring_survival_violates_positivity_without_weight_clipping() {
-        let rows = [
-            completed(1, 5, 6, 1, 0.01),
-            completed(2, 5, 7, 2, 0.5),
-        ];
+        let rows = [completed(1, 5, 6, 1, 0.01), completed(2, 5, 7, 2, 0.5)];
         assert_eq!(
             calibrate(&rows),
             Err(LandmarkIpcwError::PositivityViolation)
@@ -580,10 +576,7 @@ mod tests {
 
     #[test]
     fn competing_terminal_events_are_not_mislabelled_as_right_censoring() {
-        let mut rows = [
-            completed(1, 5, 6, 1, 1.0),
-            completed(2, 5, 7, 2, 1.0),
-        ];
+        let mut rows = [completed(1, 5, 6, 1, 1.0), completed(2, 5, 7, 2, 1.0)];
         rows[1].terminal =
             LandmarkTerminal::CompetingTerminal(CompetingProofTerminal::PermissionRevoked);
         rows[1].censoring_receipt = None;
@@ -595,10 +588,7 @@ mod tests {
 
     #[test]
     fn history_and_partition_identity_must_match_censoring_receipt() {
-        let mut rows = [
-            completed(1, 5, 6, 1, 1.0),
-            completed(2, 5, 7, 2, 1.0),
-        ];
+        let mut rows = [completed(1, 5, 6, 1, 1.0), completed(2, 5, 7, 2, 1.0)];
         let mut receipt = rows[0].censoring_receipt.unwrap();
         receipt.observed_history_digest = [99; 32];
         rows[0].censoring_receipt = Some(receipt);
@@ -610,10 +600,7 @@ mod tests {
 
     #[test]
     fn nuisance_and_calibration_partitions_must_be_separate() {
-        let rows = [
-            completed(1, 5, 6, 1, 1.0),
-            completed(2, 5, 7, 2, 1.0),
-        ];
+        let rows = [completed(1, 5, 6, 1, 1.0), completed(2, 5, 7, 2, 1.0)];
         assert_eq!(
             calibrate_landmark_ipcw(
                 &rows,
@@ -632,10 +619,7 @@ mod tests {
 
     #[test]
     fn episode_rows_must_share_the_requested_landmark() {
-        let rows = [
-            completed(1, 5, 6, 1, 1.0),
-            completed(2, 6, 7, 2, 1.0),
-        ];
+        let rows = [completed(1, 5, 6, 1, 1.0), completed(2, 6, 7, 2, 1.0)];
         assert_eq!(calibrate(&rows), Err(LandmarkIpcwError::LandmarkMismatch));
     }
 
@@ -643,8 +627,7 @@ mod tests {
     fn competing_terminals_are_rejected_even_before_the_landmark() {
         let mut row = completed(1, 5, 6, 1, 1.0);
         row.observed_endpoint_work_units = 4;
-        row.terminal =
-            LandmarkTerminal::CompetingTerminal(CompetingProofTerminal::ExplicitAbort);
+        row.terminal = LandmarkTerminal::CompetingTerminal(CompetingProofTerminal::ExplicitAbort);
         row.censoring_receipt = None;
         assert_eq!(
             calibrate(&[row]),
@@ -654,10 +637,7 @@ mod tests {
 
     #[test]
     fn shifted_frontier_or_different_population_abstains() {
-        let rows = [
-            completed(1, 5, 6, 1, 1.0),
-            completed(2, 5, 7, 2, 1.0),
-        ];
+        let rows = [completed(1, 5, 6, 1, 1.0), completed(2, 5, 7, 2, 1.0)];
         let mut shifted = rows[0];
         shifted.prediction.shift_status = ShiftStatus::SuspectedShift;
         assert_eq!(
@@ -677,10 +657,7 @@ mod tests {
 
     #[test]
     fn invalid_digest_and_weight_receipts_fail_closed() {
-        let rows = [
-            completed(1, 5, 6, 1, 1.0),
-            completed(2, 5, 7, 2, 1.0),
-        ];
+        let rows = [completed(1, 5, 6, 1, 1.0), completed(2, 5, 7, 2, 1.0)];
         assert_eq!(
             calibrate_landmark_ipcw(
                 &rows,
@@ -706,11 +683,11 @@ mod tests {
 
     #[test]
     fn duplicate_ids_and_invalid_probabilities_are_rejected() {
-        let duplicate = [
-            completed(1, 5, 6, 1, 1.0),
-            completed(1, 5, 7, 2, 1.0),
-        ];
-        assert_eq!(calibrate(&duplicate), Err(LandmarkIpcwError::DuplicateEpisode));
+        let duplicate = [completed(1, 5, 6, 1, 1.0), completed(1, 5, 7, 2, 1.0)];
+        assert_eq!(
+            calibrate(&duplicate),
+            Err(LandmarkIpcwError::DuplicateEpisode)
+        );
 
         let rows = [completed(1, 5, 6, 1, 1.0)];
         assert_eq!(
