@@ -1191,6 +1191,232 @@ mod tests {
         assert_eq!(state.source_cursor(&fixture_source_key()).unwrap().generation, 2);
         assert_eq!(state.accepted_receipt_count(), 2);
     }
+
+    #[test]
+    fn sqlite_store_reopens_with_exact_source_log_and_receipt_state() {
+        let path = temporary_sqlite_path("reopen");
+        let candidate = fixture_candidate();
+        {
+            let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+            let plan = match store.preview(&candidate).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database has no receipt"),
+            };
+            assert_eq!(
+                store.commit_plan(plan).unwrap(),
+                CommitOutcome::Committed { revision: 1 }
+            );
+            let report = store.report().unwrap();
+            assert_eq!(report.journal_mode.to_ascii_lowercase(), "wal");
+            assert_eq!(report.synchronous_level, 2);
+            assert!(!report.anti_rollback_qualified);
+            assert!(!report.signature_verification_performed);
+            assert!(!report.external_freshness_established);
+        }
+        {
+            let store = SqliteTrustedStateStore::open(&path).unwrap();
+            let state = store.read_state().unwrap();
+            assert_eq!(state.revision(), 1);
+            assert_eq!(state.source_cursor(&fixture_source_key()).unwrap().generation, 1);
+            assert_eq!(state.accepted_receipt_count(), 1);
+            assert_eq!(
+                store.preview(&candidate).unwrap(),
+                TransitionDecision::AlreadyCommitted { revision: 1 }
+            );
+        }
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_write_boundary_failures_rollback_all_rows() {
+        let stages = [
+            SqliteCommitStage::SourceCursorWritten,
+            SqliteCommitStage::LogCursorWritten,
+            SqliteCommitStage::ReceiptWritten,
+            SqliteCommitStage::MetaWritten,
+        ];
+        for (index, fail_stage) in stages.into_iter().enumerate() {
+            let path = temporary_sqlite_path(&format!("rollback-{index}"));
+            let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+            let bootstrap_candidate = fixture_candidate();
+            let bootstrap_plan = match store.preview(&bootstrap_candidate).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database has no receipt"),
+            };
+            store.commit_plan(bootstrap_plan).unwrap();
+            let before = store.read_state().unwrap();
+            let candidate = successor_candidate(&before, 2, 90 + index as u8);
+            let plan = match store.preview(&candidate).unwrap() {
+                TransitionDecision::Advance(plan) => plan,
+                TransitionDecision::AlreadyCommitted { .. } => panic!("successor receipt is new"),
+            };
+            let result = store.commit_plan_with_hook(plan, |stage| {
+                if stage == fail_stage {
+                    anyhow::bail!("injected transactional abort at {stage:?}");
+                }
+                Ok(())
+            });
+            assert!(matches!(result, Err(DurableStoreError::Storage(_))));
+            drop(store);
+
+            let reopened = SqliteTrustedStateStore::open(&path).unwrap();
+            assert_eq!(reopened.read_state().unwrap(), before);
+            let quick_check: String = reopened
+                .connection
+                .query_row("PRAGMA quick_check", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(quick_check, "ok");
+            drop(reopened);
+            cleanup_sqlite_path(&path);
+        }
+    }
+
+    #[test]
+    fn sqlite_two_connections_recover_exact_retry_after_compare_conflict() {
+        let path = temporary_sqlite_path("two-connection");
+        let mut first = SqliteTrustedStateStore::open(&path).unwrap();
+        let mut second = SqliteTrustedStateStore::open(&path).unwrap();
+        let candidate = fixture_candidate();
+        let first_plan = match first.preview(&candidate).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database has no receipt"),
+        };
+        let second_plan = match second.preview(&candidate).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("second connection read before commit"),
+        };
+        first.commit_plan(first_plan).unwrap();
+        assert!(matches!(
+            second.commit_plan(second_plan),
+            Err(DurableStoreError::Transition(TransitionError::CompareConflict { .. }))
+        ));
+        let reloaded = second.read_state().unwrap();
+        assert_eq!(
+            reloaded.preview(&candidate).unwrap(),
+            TransitionDecision::AlreadyCommitted { revision: 1 }
+        );
+        drop(first);
+        drop(second);
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_rejects_plan_from_divergent_same_revision_database_snapshot() {
+        let path_a = temporary_sqlite_path("fork-a");
+        let path_b = temporary_sqlite_path("fork-b");
+        let mut store_a = SqliteTrustedStateStore::open(&path_a).unwrap();
+        let mut store_b = SqliteTrustedStateStore::open(&path_b).unwrap();
+
+        let candidate_a = fixture_candidate();
+        let mut candidate_b = fixture_candidate();
+        candidate_b.receipt_digest = test_digest(92);
+        candidate_b.seal_digest = test_digest(93);
+        candidate_b.checkpoint.root_digest = test_digest(94);
+        candidate_b.checkpoint.checkpoint_digest = test_digest(95);
+        candidate_b.checkpoint_evidence = CheckpointEvidence::VerifiedPinnedBootstrap {
+            pinned_checkpoint_digest: test_digest(95),
+        };
+
+        let plan_a = match store_a.preview(&candidate_a).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database A"),
+        };
+        let plan_b = match store_b.preview(&candidate_b).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database B"),
+        };
+        store_a.commit_plan(plan_a).unwrap();
+        store_b.commit_plan(plan_b).unwrap();
+
+        let candidate_next = successor_candidate(&store_a.read_state().unwrap(), 2, 96);
+        let foreign_plan = match store_a.preview(&candidate_next).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("successor is new"),
+        };
+        assert!(matches!(
+            store_b.commit_plan(foreign_plan),
+            Err(DurableStoreError::Transition(TransitionError::StateSnapshotMismatch { .. }))
+        ));
+
+        drop(store_a);
+        drop(store_b);
+        cleanup_sqlite_path(&path_a);
+        cleanup_sqlite_path(&path_b);
+    }
+
+    #[test]
+    fn sqlite_eight_connections_have_one_winner_for_the_same_plan() {
+        use std::thread;
+
+        let path = temporary_sqlite_path("concurrent");
+        let mut seed = SqliteTrustedStateStore::open(&path).unwrap();
+        let bootstrap_candidate = fixture_candidate();
+        let bootstrap_plan = match seed.preview(&bootstrap_candidate).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database"),
+        };
+        seed.commit_plan(bootstrap_plan).unwrap();
+
+        let candidate = successor_candidate(&seed.read_state().unwrap(), 2, 97);
+        let shared_plan = match seed.preview(&candidate).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("candidate is new"),
+        };
+        let stores: Vec<_> = (0..8)
+            .map(|_| SqliteTrustedStateStore::open(&path).unwrap())
+            .collect();
+        let handles: Vec<_> = stores
+            .into_iter()
+            .map(|mut store| {
+                let plan = shared_plan.clone();
+                thread::spawn(move || store.commit_plan(plan))
+            })
+            .collect();
+        let outcomes: Vec<_> = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect();
+        let committed = outcomes
+            .iter()
+            .filter(|result| matches!(result, Ok(CommitOutcome::Committed { .. })))
+            .count();
+        let conflicts = outcomes
+            .iter()
+            .filter(|result| {
+                matches!(
+                    result,
+                    Err(DurableStoreError::Transition(TransitionError::CompareConflict { .. }))
+                )
+            })
+            .count();
+        assert_eq!(committed, 1);
+        assert_eq!(conflicts, 7);
+        assert_eq!(seed.read_state().unwrap().revision(), 2);
+        drop(seed);
+        cleanup_sqlite_path(&path);
+    }
+
+    #[test]
+    fn sqlite_unkeyed_state_digest_detects_inconsistent_database_edits() {
+        let path = temporary_sqlite_path("digest-corruption");
+        let mut store = SqliteTrustedStateStore::open(&path).unwrap();
+        let candidate = fixture_candidate();
+        let plan = match store.preview(&candidate).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("fresh database"),
+        };
+        store.commit_plan(plan).unwrap();
+        store
+            .connection
+            .execute(
+                "UPDATE basalt_state_meta SET state_digest=?1 WHERE singleton=1",
+                params![test_digest(99)],
+            )
+            .unwrap();
+        drop(store);
+        assert!(SqliteTrustedStateStore::open(&path).is_err());
+        cleanup_sqlite_path(&path);
+    }
 }
 
 
