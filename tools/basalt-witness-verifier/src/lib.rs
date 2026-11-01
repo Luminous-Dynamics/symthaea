@@ -458,13 +458,6 @@ pub struct SelectedWitnessHead {
     pub claim_ceiling: String,
 }
 
-#[derive(Serialize)]
-struct ResponseSetEntry<'a> {
-    member_key_id: &'a str,
-    response_envelope_sha256: &'a str,
-    checkpoint_digest: &'a str,
-}
-
 fn parse_canonical_u64(value: &str, label: &str) -> Result<u64, String> {
     let parsed = value
         .parse::<u64>()
@@ -473,6 +466,13 @@ fn parse_canonical_u64(value: &str, label: &str) -> Result<u64, String> {
         return Err(format!("{label} is not a canonical decimal string"));
     }
     Ok(parsed)
+}
+
+#[derive(Clone, Debug)]
+struct AcceptedWitnessHead {
+    response: WitnessHeadResponse,
+    checkpoint_digest: String,
+    checkpoint: WitnessCheckpoint,
 }
 
 fn checkpoint_digest_from_payload(payload: &[u8]) -> String {
@@ -518,16 +518,29 @@ pub fn verify_head_read_quorum(
         Err(error) => return rejected_head_report("rejected_trust_store", error, 0),
     };
     let quorum = trust.read_quorum;
-    let nonce = match base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(expected_challenge_nonce) {
-        Ok(value) if value.len() == 32
-            && base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&value) == expected_challenge_nonce => value,
-        _ => return rejected_head_report(
+    let nonce_is_valid = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(expected_challenge_nonce)
+        .is_ok_and(|value| {
+            value.len() == 32
+                && base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&value)
+                    == expected_challenge_nonce
+        });
+    if !nonce_is_valid {
+        return rejected_head_report(
             "invalid_challenge",
             "challenge nonce must be canonical unpadded Base64URL for exactly 32 bytes".to_string(),
             quorum,
-        ),
-    };
-    let _ = nonce;
+        );
+    }
+    if parse_canonical_u64(expected_authority_epoch, "expected authority epoch").is_err()
+        || expected_authority_incarnation_id.is_empty()
+    {
+        return rejected_head_report(
+            "invalid_challenge",
+            "expected authority incarnation/epoch is malformed".to_string(),
+            quorum,
+        );
+    }
 
     if evidence.len() < quorum {
         return rejected_head_report(
@@ -537,7 +550,7 @@ pub fn verify_head_read_quorum(
         );
     }
 
-    let mut accepted = BTreeMap::<String, (WitnessHeadResponse, String, String, WitnessCheckpoint)>::new();
+    let mut accepted = BTreeMap::<String, AcceptedWitnessHead>::new();
     let mut certified_by_sequence = BTreeMap::<u64, String>::new();
     let mut response_entries = Vec::<(String, String, String)>::new();
 
@@ -583,10 +596,9 @@ pub fn verify_head_read_quorum(
         if let Err(error) = parse_canonical_u64(&response_payload.head_authority_revision, "head_authority_revision") {
             return rejected_head_report("rejected_witness_response", error, quorum);
         }
-        let sequence = match parse_canonical_u64(&response_payload.head_sequence, "head_sequence") {
-            Ok(value) => value,
-            Err(error) => return rejected_head_report("rejected_witness_response", error, quorum),
-        };
+        if let Err(error) = parse_canonical_u64(&response_payload.head_sequence, "head_sequence") {
+            return rejected_head_report("rejected_witness_response", error, quorum);
+        }
         if !is_prefixed_sha256(&response_payload.head_checkpoint_digest)
             || !is_prefixed_sha256(&response_payload.head_state_digest)
             || !is_prefixed_sha256(&response_payload.head_policy_digest)
@@ -638,6 +650,17 @@ pub fn verify_head_read_quorum(
             Ok(value) => value,
             Err(error) => return rejected_head_report("rejected_checkpoint_certificate", error, quorum),
         };
+        if parse_canonical_u64(&checkpoint_payload.authority_revision, "checkpoint authority revision").is_err()
+            || parse_canonical_u64(&checkpoint_payload.policy_revision, "checkpoint policy revision").is_err()
+            || checkpoint_payload.previous_checkpoint_digest.as_deref().is_some_and(|value| !is_prefixed_sha256(value))
+            || checkpoint_payload.transition_bundle_digest.as_deref().is_some_and(|value| !is_prefixed_sha256(value))
+        {
+            return rejected_head_report(
+                "rejected_checkpoint_certificate",
+                format!("response {index} checkpoint contains malformed revision/digest fields"),
+                quorum,
+            );
+        }
         if checkpoint_payload.record_type != "basalt.authority.witness-checkpoint"
             || checkpoint_payload.schema_version != 1
             || checkpoint_payload.authority_id != trust.authority_id
@@ -678,8 +701,8 @@ pub fn verify_head_read_quorum(
             certified_by_sequence.insert(checkpoint_sequence, computed_checkpoint_digest.clone());
         }
 
-        if let Some((previous, _, _, _)) = accepted.get(&member_key_id) {
-            if previous.head_checkpoint_digest != response_payload.head_checkpoint_digest {
+        if let Some(previous) = accepted.get(&member_key_id) {
+            if previous.response.head_checkpoint_digest != response_payload.head_checkpoint_digest {
                 return rejected_head_report(
                     "rejected_witness_equivocation",
                     format!("member {member_key_id} signed different heads for one challenge"),
@@ -694,7 +717,11 @@ pub fn verify_head_read_quorum(
         response_entries.push((member_key_id.clone(), response_digest, computed_checkpoint_digest.clone()));
         accepted.insert(
             member_key_id,
-            (response_payload, checkpoint_digest_from_payload(&checkpoint.payload), checkpoint.payload_sha256, checkpoint_payload),
+            AcceptedWitnessHead {
+                response: response_payload,
+                checkpoint_digest: computed_checkpoint_digest,
+                checkpoint: checkpoint_payload,
+            },
         );
     }
 
@@ -709,11 +736,18 @@ pub fn verify_head_read_quorum(
     let Some((sequence, selected_digest)) = certified_by_sequence.iter().next_back() else {
         return rejected_head_report("anti_rollback_unknown", "no certified checkpoint head found".to_string(), quorum);
     };
-    let Some((_, (selected_response, _, _, selected_checkpoint))) = accepted.iter().find(|(_, (response, digest, _, _))| {
-        response.head_sequence == sequence.to_string() && digest == selected_digest
+    let Some(selected) = accepted.values().find(|entry| {
+        entry.response.head_sequence == sequence.to_string()
+            && &entry.checkpoint_digest == selected_digest
     }) else {
-        return rejected_head_report("anti_rollback_unknown", "selected checkpoint has no matching response evidence".to_string(), quorum);
+        return rejected_head_report(
+            "anti_rollback_unknown",
+            "selected checkpoint has no matching response evidence".to_string(),
+            quorum,
+        );
     };
+    let selected_response = &selected.response;
+    let selected_checkpoint = &selected.checkpoint;
 
     response_entries.sort_by(|left, right| left.0.cmp(&right.0));
     let response_set_json = match serde_json_canonicalizer::to_vec(&response_entries) {
