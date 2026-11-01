@@ -771,3 +771,6 @@ Schemas:
 - schema/search-time-exposure-findings.schema.json
 - schema/search-time-exposure-findings-audit.schema.json
 
+
+
+The CLI refuses trace files larger than 256 MiB and findings files larger than 64 MiB using bounded reads (limit + 1 bytes), before JSON deserialization. The library auditor separately caps event/finding counts and allowlist entries.
