@@ -2,6 +2,7 @@ from fractions import Fraction
 from itertools import combinations
 import unittest
 
+from supremum_eprocess_adjusters import adjusted_intersection_paths
 from supremum_anchored_eclosure import (
     build_supremum_anchored_certificates,
     build_additive_anchored_auxiliary,
@@ -160,6 +161,54 @@ class SupremumAnchoredEclosureTests(unittest.TestCase):
                 alpha=Fraction(1, 10),
                 adjusted_auxiliary={frozenset({"a"}): [Fraction(1)]},
             )
+
+    def test_admissible_adjusted_intersections_supply_anchored_auxiliary(self):
+        universe = ("a", "b")
+        baseline = [("a",), ("a", "b"), ("b",)]
+        q = {"a": Fraction(1, 4), "b": Fraction(1, 4)}
+        raw = {
+            frozenset({"a"}): [1.0, 2.0, 4.0],
+            frozenset({"b"}): [1.0, 1.0, 3.0],
+            frozenset({"a", "b"}): [1.0, 2.0, 5.0],
+        }
+        auxiliary = adjusted_intersection_paths(
+            raw, betas=(0.0, 0.5), weights=(0.5, 0.5)
+        )
+        local = build_supremum_anchored_certificates(
+            universe=universe,
+            baseline_path=baseline,
+            coordinate_budgets=q,
+            alpha=Fraction(1, 5),
+            adjusted_auxiliary={
+                intersection: tuple(Fraction(str(value)) for value in path)
+                for intersection, path in auxiliary.items()
+            },
+        )
+        self.assertTrue(verify_baseline_retention(
+            universe=universe,
+            baseline_path=baseline,
+            local_e_paths=local,
+            alpha=Fraction(1, 5),
+        ))
+        self.assertTrue(all(
+            tuple(sorted(path)) == path for path in auxiliary.values()
+        ))
+
+    def test_adjusted_intersection_paths_are_projective_for_fixed_S(self):
+        old_raw = {
+            frozenset({"a"}): [1.0, 2.0, 4.0],
+            frozenset({"b"}): [1.0, 1.5, 3.0],
+            frozenset({"a", "b"}): [1.0, 3.0, 5.0],
+        }
+        extended_raw = dict(old_raw)
+        extended_raw[frozenset({"c"})] = [1.0, 1.2, 2.0]
+        extended_raw[frozenset({"a", "c"})] = [1.0, 2.5, 4.0]
+        extended_raw[frozenset({"b", "c"})] = [1.0, 1.8, 3.5]
+        extended_raw[frozenset({"a", "b", "c"})] = [1.0, 3.5, 6.0]
+        old_adjusted = adjusted_intersection_paths(old_raw)
+        extended_adjusted = adjusted_intersection_paths(extended_raw)
+        for intersection, old_path in old_adjusted.items():
+            self.assertEqual(old_path, extended_adjusted[intersection])
 
     def test_additive_auxiliary_matches_anchored_intersection_paths(self):
         universe = ("a", "b", "c")
