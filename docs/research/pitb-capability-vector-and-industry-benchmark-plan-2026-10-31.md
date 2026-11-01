@@ -172,3 +172,6 @@ The ICML 2026 benchmark audit reported 4,833 findings across five widely used Le
 
 
 The benchmark-integrity gate is now defined separately from all performance outcomes. A compiler-pass, kernel-pass or no-counterexample-probe result cannot substitute for independent semantic approval. The current integrity receipt derives pending/eligible/ineligible status but does not yet authenticate reviewer signatures or run an end-to-end source-to-Lean semantic audit on a public cohort. See `docs/research/pitb-benchmark-integrity-gate-2026-11-01.md`.
+
+
+The SorryDB run contract now requires a content-addressed eligible target-integrity receipt on every measured run. The `verify_sorrydb_run_integrity` join verifier checks exact receipt bytes and source/task/environment identity; it is separate from the proof-attempt verifier and cannot turn a task's kernel-check into a semantic approval. The synthetic task/run fixtures remain explicitly unattempted.
