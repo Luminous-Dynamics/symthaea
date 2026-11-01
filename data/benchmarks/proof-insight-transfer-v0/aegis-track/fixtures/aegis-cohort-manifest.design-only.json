@@ -1,0 +1,38 @@
+{
+  "schema_version":"pitb.aegis-cohort-manifest.v0",
+  "evidence_class":"design_only",
+  "benchmark_id":"Aegis",
+  "paper":{
+    "arxiv_id":"2610.38174",
+    "title":"Scaling Lean Theorem Proving for Real-World Code Verification",
+    "submitted_date":"2026-10-28",
+    "paper_uri":"https://arxiv.org/abs/2610.38174"
+  },
+  "source_release":{
+    "dataset_uri":null,
+    "source_repository_uri":null,
+    "immutable_revision":null,
+    "archive_sha256":null,
+    "license_status":"unknown",
+    "license_id":null
+  },
+  "published_statistics":{
+    "rust_lean_program_pairs":2045,
+    "candidate_specifications":11533,
+    "stratified_evaluation_sample":2000,
+    "easyprover_proved":1054,
+    "easyprover_reported_proof_rate_ppm":527000,
+    "per_statement_time_budget_ms":1800000
+  },
+  "evaluation_design":{
+    "task_unit":"frozen_candidate_specification_on_pinned_rust_lean_pair",
+    "required_outcome_classes":["verified_proof","verified_refutation","unresolved","invalid_specification","abstained","differential_mismatch","timeout","tool_unavailable"],
+    "require_differential_validation":true,
+    "require_kernel_checked_proof_or_refutation":true,
+    "require_target_integrity_receipt":true,
+    "resource_accounting":["wall_ms","lean_cpu_ms","model_calls","tool_calls","tokens","peak_memory_bytes","cost_microusd"]
+  },
+  "cohort_availability":"design_only",
+  "task_manifest_sha256":null,
+  "stratification_manifest_sha256":null
+}
