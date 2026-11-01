@@ -209,14 +209,11 @@ fn make_eligible_integrity(mut value: Value, run: &Value, evidence_root: &Path) 
 
     value["counterexample_audit"]["status"] = json!("not_found");
     value["counterexample_audit"]["method_id"] = json!("synthetic-counterexample-check");
-    value["counterexample_audit"]["receipt_sha256"] = json!("d".repeat(64));
     value["vacuity_audit"]["status"] = json!("no_counterexample_found");
     value["vacuity_audit"]["method_id"] = json!("synthetic-vacuity-check");
-    value["vacuity_audit"]["receipt_sha256"] = json!("e".repeat(64));
     value["semantic_review"]["status"] = json!("approved");
     value["semantic_review"]["review_scope"] = json!("domain_expert_review");
     value["semantic_review"]["reviewer_identity"] = json!("synthetic-reviewer-not-real");
-    value["semantic_review"]["reviewer_attestation_sha256"] = json!("f".repeat(64));
     value["integrity_status"] = json!("eligible");
     Ok(value)
 }
