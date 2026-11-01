@@ -784,7 +784,7 @@ fn analyze_group(
         let mut cluster_pvalues = BTreeMap::<&str, ConformalPValueV1>::new();
         for (cluster_id, cluster_max_risk) in &test_max_by_cluster {
             cluster_pvalues.insert(
-                cluster_id,
+                *cluster_id,
                 conformal_p_value(&clean_scores, *cluster_max_risk)?,
             );
         }
@@ -856,7 +856,7 @@ fn analyze_group(
             let mut true_negative = 0_u64;
             for cluster_id in &test_clusters {
                 let p_value = cluster_pvalues
-                    .get(cluster_id)
+                    .get(*cluster_id)
                     .ok_or_else(|| "test cluster conformal p-value is missing".to_owned())?;
                 let predicted = target_supported && conformal_rejects(p_value, *target);
                 predictions.insert(
@@ -869,7 +869,7 @@ fn analyze_group(
                     predicted,
                 );
                 match test_cluster_truth
-                    .get(cluster_id)
+                    .get(*cluster_id)
                     .ok_or_else(|| "test cluster ground truth is missing".to_owned())?
                 {
                     GroundTruthV1::Clean => {
@@ -1475,7 +1475,7 @@ mod tests {
         let mut study = minimal_study();
         for observation in &mut study.observations {
             if observation.split == ObservationSplitV1::CleanCalibration
-                && observation.sample_id == "cal-000"
+                && (observation.sample_id == "cal-000" || observation.sample_id == "cal-001")
             {
                 observation.source_cluster_id = "cal-block-000".to_owned();
             }
@@ -1487,10 +1487,21 @@ mod tests {
     fn test_cluster_uses_max_risk_and_counts_once_for_fpr() {
         let mut study = minimal_study();
         for observation in &mut study.observations {
-            if observation.split == ObservationSplitV1::LockedTest
-                && (observation.sample_id == "test-000" || observation.sample_id == "test-001")
-            {
-                observation.source_cluster_id = "test-clean-block".to_owned();
+            if observation.split == ObservationSplitV1::CleanCalibration {
+                let index = observation.sample_id
+                    .strip_prefix("cal-")
+                    .and_then(|value| value.parse::<usize>().ok())
+                    .unwrap();
+                observation.source_cluster_id = format!("cal-block-{:03}", index / 2);
+            }
+            if observation.split == ObservationSplitV1::LockedTest {
+                observation.source_cluster_id = if observation.sample_id == "test-000"
+                    || observation.sample_id == "test-001"
+                {
+                    "test-clean-block".to_owned()
+                } else {
+                    "test-contaminated-block".to_owned()
+                };
             }
         }
         let report = analyze_detector_calibration(&study).unwrap();
@@ -1515,10 +1526,10 @@ mod tests {
             .iter()
             .find(|cell| cell.detector_id == "det-a")
             .unwrap();
-        assert_eq!(cell.locked_test_support, 3);
+        assert_eq!(cell.locked_test_support, 2);
         let point = &cell.operating_points[0];
         assert_eq!(point.test_clean_support, 1);
-        assert_eq!(point.test_contaminated_support, 2);
+        assert_eq!(point.test_contaminated_support, 1);
     }
 
     #[test]
