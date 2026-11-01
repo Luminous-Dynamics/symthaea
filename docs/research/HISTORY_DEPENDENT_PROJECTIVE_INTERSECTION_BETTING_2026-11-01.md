@@ -188,6 +188,39 @@ Ordinary e-process validity does not automatically give SupFDR. For SupFDR, appl
 
 The affine O(n) separator/MILP in #9695 does not carry over automatically. These joint log-e-processes are intersection-specific and nonlinear. This prototype explicitly enumerates all nonempty finite intersections as a small-family reference oracle. A new separator must be derived for this family rather than reusing the affine formula.
 
+### Preliminary component-e-process experiment
+
+A local, independent Monte Carlo implementation of the checked-in benchmark design was run with 5,000 streams per cell, 60 global updates, five possible hypotheses, alpha=0.05, a predictable arrival rule (add the next hypothesis when the previous active-set mean exceeds zero), and a common alternative mean of 0.2.
+
+Three methods were compared:
+- **Joint nominal:** history-dependent shared-control betting using an assumed equicorrelation upper bound rho=0.5.
+- **Joint robust:** the same betting rule using the conservative upper bound rho=0.8.
+- **Global affine:** fixed coordinate e-processes with globally summable geometric weights; valid under arbitrary cross-coordinate dependence.
+
+Empirical first-crossing rates by the end of the horizon:
+
+| Actual rho | Mean | Joint nominal | Joint robust | Global affine |
+|---:|---:|---:|---:|---:|
+| 0.2 | 0.0 (null) | 0.30% | 0.08% | 0.26% |
+| 0.2 | 0.2 | 28.46% | 13.14% | 14.06% |
+| 0.5 | 0.0 (null) | 2.00% | 0.78% | 0.34% |
+| 0.5 | 0.2 | 35.40% | 21.86% | 15.66% |
+| 0.8 | 0.0 (null) | 4.30%* | 2.34% | 0.62% |
+| 0.8 | 0.2 | 40.42%* | 28.40% | 16.22% |
+
+*At actual rho=0.8, the nominal joint method's rho=0.5 bound is invalid. Its empirical 4.30% false-crossing rate is not evidence of validity. The robust rho=0.8 bound is the valid model-based comparator for that scenario. The affine method makes no joint-covariance assumption.
+
+The observed alternative crossing-time medians among crossings were:
+- rho=0.2: 43 updates (joint nominal), 45 (joint robust), 50 (affine);
+- rho=0.5: 39, 40, and 49;
+- rho=0.8: 34, 35, and 48, with nominal marked invalid.
+
+This first result suggests a plausible power advantage from correctly specified joint betting, and quantifies the calibration penalty from a conservative covariance bound. It is **not** a full online multiple-testing comparison: it tests one intersection e-process crossing event, not a closed rejection set, FDR, or SupFDR. It does not compare against optimized AWAIRE or online-e-closure procedures. It is a preliminary Monte Carlo diagnostic; the conditional-mgf proof remains the validity argument.
+
+The local experiment used an independent implementation of the same generator and factor equations. The checked-in runner \`validation/benchmark_history_dependent_projective_betting.py\` and its tests have been authored but have not yet been executed from the repository checkout. Reproduction command:
+
+    PYTHONPATH=validation python validation/benchmark_history_dependent_projective_betting.py --replicates 5000 --horizon 60 --n-hypotheses 5 --seed 20261101 --output joint-vs-affine.json
+
 ## 8. Negative controls and benchmark design
 
 The exact tests cover:
@@ -222,7 +255,7 @@ The shared-control Gaussian factor is a standard exponential-supermartingale con
 
 Relevant work:
 - de Heide (2026), *Dynamic e-closure for online hypotheses with any-time-valid evidence: closure principles and projective mergers*, https://arxiv.org/abs/2608.09927
-- Choe and Ramdas (2026), *Combining Evidence Across Filtrations*, JRSS-B 88(4), 1492–1514, https://doi.org/10.1093/jrsssb/qkag058
+- Choe and Ramdas (2026), *Combining Evidence Across Filtrations*, JRSS-B 88(4), 1492–1514, https://doi.org/10.1093/jrsssb/qkag058. Evidence in a coarser filtration cannot simply be averaged with evidence in a finer filtration; adjust-then-combine can recover validity, with a logarithmic cost in general.
 - Xu, Fischer, and Ramdas (2026), *Improving online FDR procedures via online analogs of e-closure and compound e-values*, https://proceedings.mlr.press/v337/xu26a.html
 - Tavyrikov, Goeman, and de Heide (2026), *Carefree multiple testing with e-processes*, https://doi.org/10.1214/26-EJS2546
 
