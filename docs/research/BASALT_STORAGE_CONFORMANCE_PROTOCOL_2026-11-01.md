@@ -36,7 +36,7 @@ A trace binds:
 1. **Suite and generator identity:** schema version, trace ID, deterministic seed, monotonic-clock basis and clock-ordering rule.
 2. **Authority identity:** stable authority ID and incarnation ID.
 3. **Initial state:** authority revision, canonical state digest, active policy digest, source cursors and log-origin cursors.
-4. **Operations:** client ID and program order; source/log scope; invocation and completion times; complete compare conditions; receipt identity; typed outcome; immutable receipt acceptance revision; current authority revision.
+4. **Operations:** runner ID, client ID and program order; source/log scope; invocation and completion times; complete compare conditions; receipt identity; typed outcome; immutable receipt acceptance revision; current authority revision.
 5. **Fault schedule:** typed fault, target operation, deterministic injection point and action.
 6. **Witness observations:** witness identity and sequence, authority/incarnation, state digest, predecessor witness digest and signed-record digest.
 7. **Final observation:** complete cursor state, accepted receipt set, policy digest, current authority revision and canonical state digest.
@@ -46,7 +46,7 @@ Fixture catalog digests are SHA-256 of the explicit domain-separated label preim
 
 ### Time and ordering
 
-Monotonic timestamps establish intervals within one runner. They are not wall-clock timestamps and cannot order events across hosts. The verifier must honor:
+Monotonic timestamps establish intervals only within the same explicit `runner_id`. They are not wall-clock timestamps and cannot order events across hosts or runners. A distributed runner must use explicit causal dependencies / happens-after edges (and preserve its source tracing context) rather than comparing unrelated monotonic clocks. The verifier must honor:
 
 - per-client sequence order;
 - explicit `happens_after` dependencies;
