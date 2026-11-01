@@ -91,7 +91,6 @@ pub struct Ppk2TraceAuditReceipt {
     pub median_interval_ms: f64,
     pub median_sample_rate_hz: f64,
     pub maximum_observed_gap_ratio: f64,
-    pub gap_segment_count: usize,
     pub segments: Vec<Ppk2SegmentMetrics>,
     pub receipt_sha256: String,
 }
@@ -309,15 +308,11 @@ pub fn audit_ppk2_trace_csv(
     let mut metrics = Vec::with_capacity(segments.len());
     let mut all_intervals = Vec::new();
     let mut samples_total = 0usize;
-    let mut gap_segment_count = 0usize;
     let mut max_gap_ratio = 0.0_f64;
     for (id, segment) in &segments {
         let m = audit_segment(id, segment, config)?;
         for pair in segment.windows(2) {
             all_intervals.push(pair[1].time_ms - pair[0].time_ms);
-        }
-        if m.maximum_gap_ratio > 1.0 + 1e-12 {
-            gap_segment_count += 1;
         }
         max_gap_ratio = max_gap_ratio.max(m.maximum_gap_ratio);
         samples_total += m.sample_count;
@@ -348,7 +343,6 @@ pub fn audit_ppk2_trace_csv(
         median_interval_ms,
         median_sample_rate_hz: 1_000.0 / median_interval_ms,
         maximum_observed_gap_ratio: max_gap_ratio,
-        gap_segment_count,
         segments: metrics,
         receipt_sha256: String::new(),
     };
