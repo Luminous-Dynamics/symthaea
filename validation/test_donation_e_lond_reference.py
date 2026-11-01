@@ -112,6 +112,33 @@ class DonationELONDReferenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "sum to at most one"):
             index.add(Fraction(1), Fraction(1, 2), False)
 
+    def test_scan_rejects_duplicate_or_out_of_range_rejection_ids(self):
+        with self.assertRaisesRegex(ValueError, "unique"):
+            donation_wealth_reference(
+                [Fraction(2), Fraction(3)],
+                [Fraction(1, 2), Fraction(1, 4)],
+                [1, 1],
+                Fraction(1, 2),
+            )
+        with self.assertRaisesRegex(ValueError, "1-based"):
+            donation_wealth_reference(
+                [Fraction(2)],
+                [Fraction(1, 2)],
+                [2],
+                Fraction(1, 2),
+            )
+
+    def test_reference_rejects_invalid_delta_and_gamma_budget(self):
+        with self.assertRaises(ValueError):
+            donation_wealth_reference([], [], [], Fraction(0))
+        with self.assertRaises(ValueError):
+            donation_wealth_reference(
+                [Fraction(2), Fraction(2)],
+                [Fraction(3, 4), Fraction(3, 4)],
+                [],
+                Fraction(1, 2),
+            )
+
     def test_rejects_zero_weight_rejection_and_non_boolean_flag(self):
         index = DonationELONDIndex(Fraction(1, 2))
         with self.assertRaisesRegex(ValueError, "zero-weight"):
