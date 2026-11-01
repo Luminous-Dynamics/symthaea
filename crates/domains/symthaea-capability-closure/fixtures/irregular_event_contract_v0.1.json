@@ -38,14 +38,15 @@
     "separately_versioned_and_charged": true
   },
   "validation_status": {
-    "rust_test_functions_authored": 27,
+    "rust_test_functions_authored": 35,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
     "rust_tests_executed": false,
     "external_dataset_adapter_executed": false,
     "event_contract_test_functions_authored": 16,
-    "bitemporal_test_functions_authored": 11
+    "bitemporal_test_functions_authored": 11,
+    "purged_split_test_functions_authored": 8
   },
   "opaque_payload_contract": {
     "fields": [
@@ -90,5 +91,19 @@
       9109,
       9292
     ]
+  },
+  "chronological_split": {
+    "module": "research/irregular-event-contract/src/splits.rs",
+    "split_units": "distinct forecast origins per entity",
+    "train_basis_points_default": 6000,
+    "validation_basis_points_default": 2000,
+    "test_basis_points_default": 2000,
+    "tied_forecast_origins_stay_together": true,
+    "target_intervals": "[forecast_origin_us,target_end_exclusive_us)",
+    "train_target_must_end_by": "validation_start_us - embargo_us",
+    "validation_target_must_end_by": "test_start_us - embargo_us",
+    "history_window_overlap_allowed": true,
+    "cross_partition_target_overlap_allowed": false,
+    "purged_windows_reported_separately": true
   }
 }
