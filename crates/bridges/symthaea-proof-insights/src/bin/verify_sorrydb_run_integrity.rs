@@ -56,6 +56,9 @@ fn verify_binding(run: &Value, integrity: &benchmark_integrity::IntegritySummary
         bail!("run task-integrity task ID digest differs from the receipt");
     }
 
+    if integrity.cohort_id != "SorryDB_2601" {
+        bail!("SorryDB run cannot bind an integrity receipt from another cohort");
+    }
     if string(run, "/dataset/snapshot_id")? != integrity.snapshot_id {
         bail!("SorryDB snapshot ID differs from the integrity receipt");
     }
