@@ -191,6 +191,9 @@ pub struct NegativeControl {
 #[derive(Clone, Debug, Serialize)]
 pub struct VerificationReport {
     pub report_version: u32,
+    pub verifier_version: String,
+    pub schema_sha256: Option<String>,
+    pub claim_ceiling: String,
     pub status: String,
     pub trace_id: String,
     pub trace_sha256: String,
@@ -660,7 +663,8 @@ fn replay(trace: &Trace, errors: &mut Vec<String>) -> BTreeMap<String, ComputedR
                     Some(head) => {
                         let fresh = operation.request.restored_incarnation_id.as_deref() == Some(head.incarnation_id.as_str())
                             && observed_state == Some(head.state_digest.as_str())
-                            && observed_revision.as_deref() == Some(head.authority_revision.as_str());
+                            && observed_revision.as_deref() == Some(head.authority_revision.as_str())
+                            && operation.request.witness_sequence_seen == Some(head.sequence);
                         let mut result = ComputedResult::new(
                             if fresh { "committed" } else { "rejected_anti_rollback" },
                             parse_revision(&head.authority_revision),
@@ -730,6 +734,9 @@ pub fn verify_reference(trace: &Trace, trace_bytes: &[u8]) -> VerificationReport
     }
     VerificationReport {
         report_version: 1,
+        verifier_version: env!("CARGO_PKG_VERSION").to_string(),
+        schema_sha256: None,
+        claim_ceiling: "Reference trace semantics only; no backend run, cryptographic witness-signature verification, physical durability, or engine qualification.".to_string(),
         status: if errors.is_empty() { "pass" } else { "fail" }.to_string(),
         trace_id: trace.trace_id.clone(),
         trace_sha256: digest,
