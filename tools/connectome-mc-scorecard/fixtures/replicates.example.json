@@ -1,0 +1,107 @@
+{
+  "records": [
+    {
+      "scenario_id": "null-weak",
+      "method_id": "clusterIV-cjar-plain-chisq",
+      "replicate_id": "r0001",
+      "seed": 101,
+      "structural_beta": 0,
+      "null_is_true": true,
+      "status": "COMPLETED",
+      "p_value": 0.03,
+      "point_estimate": 0.12,
+      "confidence_set": {
+        "components": [
+          {
+            "lower": -0.2,
+            "upper": 0.3
+          }
+        ]
+      },
+      "runtime_seconds": 0.12,
+      "peak_memory_bytes": 4096
+    },
+    {
+      "scenario_id": "null-weak",
+      "method_id": "clusterIV-cjar-plain-chisq",
+      "replicate_id": "r0002",
+      "seed": 102,
+      "structural_beta": 0,
+      "null_is_true": true,
+      "status": "COMPLETED",
+      "p_value": 0.41,
+      "point_estimate": -0.04,
+      "confidence_set": {
+        "components": [
+          {
+            "lower": null,
+            "upper": -0.1
+          },
+          {
+            "lower": 0.1,
+            "upper": null
+          }
+        ]
+      },
+      "runtime_seconds": 0.14,
+      "peak_memory_bytes": 4096
+    },
+    {
+      "scenario_id": "null-weak",
+      "method_id": "clusterIV-cjar-plain-chisq",
+      "replicate_id": "r0003",
+      "seed": 103,
+      "structural_beta": 0,
+      "null_is_true": true,
+      "status": "FAILED",
+      "runtime_seconds": 0.02,
+      "peak_memory_bytes": 2048
+    },
+    {
+      "scenario_id": "null-weak",
+      "method_id": "clusterIV-cjar-plain-chisq",
+      "replicate_id": "r0004",
+      "seed": 104,
+      "structural_beta": 0,
+      "null_is_true": true,
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "scenario_id": "alternative-weak",
+      "method_id": "clusterIV-cjar-plain-chisq",
+      "replicate_id": "r0001",
+      "seed": 101,
+      "structural_beta": 0.5,
+      "null_is_true": false,
+      "status": "COMPLETED",
+      "p_value": 0.01,
+      "point_estimate": 0.42,
+      "confidence_set": {
+        "components": [
+          {
+            "lower": 0.2,
+            "upper": 0.7
+          }
+        ]
+      },
+      "runtime_seconds": 0.15,
+      "peak_memory_bytes": 4096
+    },
+    {
+      "scenario_id": "alternative-weak",
+      "method_id": "clusterIV-cjar-plain-chisq",
+      "replicate_id": "r0002",
+      "seed": 102,
+      "structural_beta": 0.5,
+      "null_is_true": false,
+      "status": "COMPLETED",
+      "p_value": 0.27,
+      "point_estimate": 0.31,
+      "confidence_set": {
+        "components": []
+      },
+      "runtime_seconds": 0.16,
+      "peak_memory_bytes": 4096
+    }
+  ]
+}
