@@ -193,9 +193,10 @@
     "operation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["op_id", "client_id", "client_sequence", "kind", "scope", "invoked_at_ns", "completed_at_ns", "request", "result"],
+      "required": ["op_id", "runner_id", "client_id", "client_sequence", "kind", "scope", "invoked_at_ns", "completed_at_ns", "request", "result"],
       "properties": {
         "op_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$" },
+        "runner_id": { "type": "string", "minLength": 1 },
         "client_id": { "type": "string", "minLength": 1 },
         "client_sequence": { "type": "integer", "minimum": 0 },
         "retry_group_id": { "type": "string", "minLength": 1 },
@@ -310,10 +311,11 @@
     "fault": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["fault_id", "target_op_id", "at_ns", "class", "action"],
+      "required": ["fault_id", "target_op_id", "runner_id", "at_ns", "class", "action"],
       "properties": {
         "fault_id": { "type": "string", "minLength": 1 },
         "target_op_id": { "type": "string", "minLength": 1 },
+        "runner_id": { "type": "string", "minLength": 1 },
         "at_ns": { "type": "integer", "minimum": 0 },
         "class": {
           "enum": [
@@ -342,7 +344,7 @@
         "authority_id": { "type": "string", "minLength": 1 },
         "incarnation_id": { "type": "string", "minLength": 1 },
         "state_digest": { "$ref": "#/$defs/digest" },
-        "predecessor_witness_digest": { "type": ["string", "null"] },
+        "predecessor_witness_digest": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
         "signed_record_digest": { "$ref": "#/$defs/digest" }
       }
     }
