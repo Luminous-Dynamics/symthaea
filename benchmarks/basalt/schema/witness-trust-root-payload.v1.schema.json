@@ -13,40 +13,99 @@
     "root_threshold",
     "root_keys",
     "initial_witness_set_id",
-    "initial_witness_set_version"
+    "initial_witness_set_version",
+    "initial_witness_set_digest"
   ],
   "properties": {
-    "record_type": { "const": "basalt.authority.witness-trust-root" },
-    "schema_version": { "const": 1 },
-    "authority_id": { "type": "string", "minLength": 1, "maxLength": 128 },
-    "trust_root_version": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+    "record_type": {
+      "const": "basalt.authority.witness-trust-root"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "authority_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "trust_root_version": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$"
+    },
     "previous_trust_root_digest": {
       "oneOf": [
-        { "$ref": "#/$defs/digest" },
-        { "type": "null" }
+        {
+          "$ref": "#/$defs/digest"
+        },
+        {
+          "type": "null"
+        }
       ]
     },
-    "root_threshold": { "type": "integer", "minimum": 1 },
+    "root_threshold": {
+      "type": "integer",
+      "minimum": 1
+    },
     "root_keys": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["keyid", "algorithm", "public_key", "administrative_domain", "status"],
+        "required": [
+          "keyid",
+          "algorithm",
+          "public_key",
+          "administrative_domain",
+          "status"
+        ],
         "properties": {
-          "keyid": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-          "algorithm": { "enum": ["ed25519"] },
-          "public_key": { "type": "string", "minLength": 43, "maxLength": 44, "pattern": "^[A-Za-z0-9+/]+={0,2}$" },
-          "administrative_domain": { "type": "string", "minLength": 1, "maxLength": 128 },
-          "status": { "enum": ["active", "revoked"] }
+          "keyid": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "algorithm": {
+            "enum": [
+              "ed25519"
+            ]
+          },
+          "public_key": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 44,
+            "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+          },
+          "administrative_domain": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "status": {
+            "enum": [
+              "active",
+              "revoked"
+            ]
+          }
         }
       }
     },
-    "initial_witness_set_id": { "type": "string", "minLength": 1, "maxLength": 128 },
-    "initial_witness_set_version": { "type": "string", "pattern": "^[1-9][0-9]*$" }
+    "initial_witness_set_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "initial_witness_set_version": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "initial_witness_set_digest": {
+      "$ref": "#/$defs/digest"
+    }
   },
   "$defs": {
-    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
   }
 }
