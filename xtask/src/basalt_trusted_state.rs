@@ -578,6 +578,32 @@ fn successor_candidate(state: &TrustedState, generation: u64, receipt_seed: u8) 
     }
 }
 
+fn secondary_source_candidate(state: &TrustedState) -> Candidate {
+    Candidate {
+        expected_revision: state.revision(),
+        source: SourceKey {
+            provisioned_host_id: "host-A".to_string(),
+            source_id: "bpf-process-exec".to_string(),
+            partition_id: "logical-partition-0".to_string(),
+        },
+        generation: 1,
+        previous_seal_digest: None,
+        seal_digest: test_digest(70),
+        receipt_digest: test_digest(71),
+        observer_profile_digest: test_digest(72),
+        boot_incarnation_digest: test_digest(73),
+        profile_transition_evidence_digest: None,
+        boot_transition_evidence_digest: None,
+        policy_versions: state.policy_versions().expect("fixture policy").clone(),
+        policy_transition_evidence_digest: None,
+        checkpoint: state
+            .log_cursor("basalt-log-prod")
+            .expect("fixture log cursor")
+            .clone(),
+        checkpoint_evidence: CheckpointEvidence::VerifiedSameTree,
+    }
+}
+
 fn fixture_source_key() -> SourceKey {
     SourceKey {
         provisioned_host_id: "host-A".to_string(),
@@ -725,6 +751,39 @@ pub fn run_conformance() -> ConformanceReport {
     let revision_result = state.preview(&stale_revision);
     let revision_passed = matches!(revision_result, Err(TransitionError::CompareConflict { .. }));
     record_case(&mut cases, "TSTATE-MODEL-015", "candidate checked against stale revision is rejected", format!("{revision_result:?}"), revision_passed);
+
+    let mut competing_source = secondary_source_candidate(&state);
+    let first_stream = successor_candidate(&state, 3, 27);
+    let first_plan = state.preview(&first_stream);
+    let competing_plan = state.preview(&competing_source);
+    let competing_sources_passed = match (first_plan, competing_plan) {
+        (Ok(TransitionDecision::Advance(first)), Ok(TransitionDecision::Advance(second))) => {
+            let first_committed = state.commit(first).is_ok();
+            let stale_conflict = matches!(
+                state.commit(second),
+                Err(TransitionError::CompareConflict { .. })
+            );
+            competing_source.expected_revision = state.revision();
+            let rebased = state.preview(&competing_source);
+            let second_committed = match rebased {
+                Ok(TransitionDecision::Advance(plan)) => state.commit(plan).is_ok(),
+                _ => false,
+            };
+            first_committed
+                && stale_conflict
+                && second_committed
+                && state.source_cursor(&fixture_source_key()).is_some_and(|cursor| cursor.generation == 3)
+                && state.source_cursor(&competing_source.source).is_some_and(|cursor| cursor.generation == 1)
+        }
+        _ => false,
+    };
+    record_case(
+        &mut cases,
+        "TSTATE-MODEL-016",
+        "independent streams re-verify after shared checkpoint CAS conflict without lost updates",
+        format!("{competing_sources_passed}"),
+        competing_sources_passed,
+    );
 
     let passed = cases.iter().all(|case| case.passed);
     let scenarios_run = cases.len();
@@ -934,6 +993,75 @@ mod tests {
             Err(TransitionError::CompareConflict { .. })
         ));
         assert_eq!(state, before);
+    }
+
+    #[test]
+    fn sixteen_concurrent_same_plan_commits_have_exactly_one_winner() {
+        use std::sync::{Arc, Mutex};
+        use std::thread;
+
+        let snapshot = bootstrap();
+        let candidate = successor_candidate(&snapshot, 2, 74);
+        let plan = match snapshot.preview(&candidate).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("candidate is new"),
+        };
+        let state = Arc::new(Mutex::new(snapshot));
+        let handles: Vec<_> = (0..16)
+            .map(|_| {
+                let shared = Arc::clone(&state);
+                let plan = plan.clone();
+                thread::spawn(move || shared.lock().unwrap().commit(plan))
+            })
+            .collect();
+
+        let outcomes: Vec<_> = handles.into_iter().map(|handle| handle.join().unwrap()).collect();
+        let committed = outcomes
+            .iter()
+            .filter(|result| matches!(result, Ok(CommitOutcome::Committed { .. })))
+            .count();
+        let conflicts = outcomes
+            .iter()
+            .filter(|result| matches!(result, Err(TransitionError::CompareConflict { .. })))
+            .count();
+
+        assert_eq!(committed, 1);
+        assert_eq!(conflicts, 15);
+        assert_eq!(state.lock().unwrap().revision(), 2);
+    }
+
+    #[test]
+    fn distinct_sources_reverify_after_checkpoint_cas_conflict() {
+        let mut state = bootstrap();
+        let first = successor_candidate(&state, 2, 75);
+        let second = secondary_source_candidate(&state);
+        let first_plan = match state.preview(&first).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("first stream is new"),
+        };
+        let second_plan = match state.preview(&second).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("second stream is new"),
+        };
+
+        state.commit(first_plan).unwrap();
+        assert!(matches!(
+            state.commit(second_plan),
+            Err(TransitionError::CompareConflict { .. })
+        ));
+
+        let mut rebased = second;
+        rebased.expected_revision = state.revision();
+        let rebased_plan = match state.preview(&rebased).unwrap() {
+            TransitionDecision::Advance(plan) => plan,
+            TransitionDecision::AlreadyCommitted { .. } => panic!("second stream was not committed"),
+        };
+        state.commit(rebased_plan).unwrap();
+
+        assert_eq!(state.source_cursor(&fixture_source_key()).unwrap().generation, 2);
+        assert_eq!(state.source_cursor(&rebased.source).unwrap().generation, 1);
+        assert_eq!(state.accepted_receipt_count(), 3);
+        assert_eq!(state.revision(), 3);
     }
 
     #[test]
