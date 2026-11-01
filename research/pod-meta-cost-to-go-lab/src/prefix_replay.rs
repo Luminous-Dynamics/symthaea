@@ -88,6 +88,8 @@ pub struct FeasibilityReplayMetrics {
     pub predicted_infeasible: usize,
     pub resolved_predicted_feasible: usize,
     pub resolved_predicted_infeasible: usize,
+    pub abstained_predictions: usize,
+    pub abstained_with_known_actual: usize,
     pub actual_feasibility_known: usize,
     pub actual_feasible: usize,
     pub false_feasible: usize,
@@ -214,12 +216,15 @@ impl PrefixReplayEvaluator {
                     .get(&(forecast.run_id, forecast.decision_sequence))
                     .copied();
                 let predicted_feasible = budget
-                    .map(|receipt| predicted_feasible(
-                        forecast.forecast,
-                        receipt.remaining_budget,
-                        minimum_completion_probability,
-                    ))
-                    .transpose()?;
+                    .map(|receipt| {
+                        predicted_feasible(
+                            forecast.forecast,
+                            receipt.remaining_budget,
+                            minimum_completion_probability,
+                        )
+                    })
+                    .transpose()?
+                    .flatten();
                 let actual_feasible = budget
                     .and_then(|receipt| actual_feasible(outcome, receipt.remaining_budget));
                 Ok(PrefixReplayRow {
@@ -289,13 +294,18 @@ fn predicted_feasible(
     forecast: RemainingCostForecast,
     remaining_budget: ResourceVector,
     minimum_completion_probability: f64,
-) -> Result<bool, PrefixReplayError> {
+) -> Result<Option<bool>, PrefixReplayError> {
+    if forecast.shift_status != crate::ShiftStatus::InDomain || forecast.support_count == 0 {
+        return Ok(None);
+    }
     let required = forecast
         .remaining_q90
         .checked_add(forecast.mandatory_verification_reserve)
         .ok_or(PrefixReplayError::BudgetArithmeticOverflow)?;
-    Ok(forecast.completion_probability >= minimum_completion_probability
-        && within_budget(required, remaining_budget))
+    Ok(Some(
+        forecast.completion_probability >= minimum_completion_probability
+            && within_budget(required, remaining_budget),
+    ))
 }
 
 fn actual_feasible(
@@ -330,9 +340,22 @@ fn update_feasibility(
         return Ok(());
     }
     increment(&mut metrics.budgeted_prefixes)?;
-    let predicted = row
-        .predicted_feasible
-        .ok_or(PrefixReplayError::InvalidBudgetReceipt)?;
+
+    let Some(predicted) = row.predicted_feasible else {
+        increment(&mut metrics.abstained_predictions)?;
+        match row.actual_feasible {
+            Some(actual) => {
+                increment(&mut metrics.abstained_with_known_actual)?;
+                increment(&mut metrics.actual_feasibility_known)?;
+                if actual {
+                    increment(&mut metrics.actual_feasible)?;
+                }
+            }
+            None => increment(&mut metrics.unknown_actual_outcomes)?,
+        }
+        return Ok(());
+    };
+
     if predicted {
         increment(&mut metrics.predicted_feasible)?;
     } else {
@@ -748,6 +771,43 @@ mod tests {
             ),
             Err(PrefixReplayError::DuplicateBudgetReceipt)
         );
+    }
+
+    #[test]
+    fn out_of_domain_forecasts_abstain_instead_of_claiming_feasibility() {
+        let mut journal = ForecastJournal::default();
+        let mut shifted = forecast(1, 10, 1, 7);
+        shifted.forecast.shift_status = crate::ShiftStatus::UnsupportedShift;
+        journal.append_forecast(shifted).unwrap();
+        journal
+            .append_outcome(outcome(
+                1,
+                2,
+                ResourceVector::new(8, 1, 2, 3, 4, 5),
+                TerminalOutcome::SufficientProof,
+            ))
+            .unwrap();
+        let budget = PrefixBudgetReceipt {
+            run_id: 10,
+            decision_sequence: 1,
+            pre_state_digest: [1; 32],
+            remaining_budget: ResourceVector::new(100, 100, 100, 100, 100, 100),
+            evidence_digest: [8; 32],
+        };
+        let report = PrefixReplayEvaluator::evaluate_with_budgets(
+            &journal,
+            &[budget],
+            0.8,
+        )
+        .unwrap()
+        .report;
+        assert_eq!(report.feasibility.budgeted_prefixes, 1);
+        assert_eq!(report.feasibility.abstained_predictions, 1);
+        assert_eq!(report.feasibility.abstained_with_known_actual, 1);
+        assert_eq!(report.feasibility.predicted_feasible, 0);
+        assert_eq!(report.feasibility.predicted_infeasible, 0);
+        assert_eq!(report.feasibility.actual_feasibility_known, 1);
+        assert_eq!(report.feasibility.false_feasible, 0);
     }
 
     #[test]
