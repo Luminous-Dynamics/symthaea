@@ -98,6 +98,11 @@ If the global adjusted certificate is nondecreasing, then on a discrete monitori
 
 and the all-times local closure inequalities give SupFDR at level alpha.
 
+The branch now includes an exact finite-path replay, `verify_adjusted_projective_supfdr_path`, that computes the same common running-maximum adjuster for (a) the fixed full true-set certificate and (b) the current active true-set intersection. It checks equality of the entire historical path prefix, verifies every adjusted local closure constraint by exhaustive finite-intersection enumeration, and checks pathwise dominance. This is the correct SupFDR replay route. It intentionally does **not** reuse the raw affine O(n) separator, because applying a nonlinear maximum/adjuster across time destroys the current-time additive form.
+
+The fixture includes a raw certificate path that rises and then falls; the adjusted certificate remains nondecreasing and the active/full historical adjusted paths agree. As everywhere else, this fixture tests algebra only. The adjuster theorem supplies stochastic validity only when the raw global certificate is a valid e-process.
+
+
 **Do not infer SupFDR from an ordinary test supermartingale alone.** The adjuster or monotonicity requirement is an additional certificate contract. A raw-path monotonicity check in the finite oracle is only a sufficient pathwise diagnostic, not an implementation of the adjuster theorem.
 
 ## 4. Why this differs from the all-intersections prior route
@@ -127,6 +132,8 @@ The module is a finite exact oracle. It does not authenticate event timestamps, 
 Run from the repository root:
 
     PYTHONPATH=validation python -m unittest -v test_countable_global_projective_eclosure.py
+
+The latest exact suite includes 18 tests, including exhaustive separator-vs-subset differential checks and adjusted-SupFDR historical projectivity fixtures.
 
 ## 7. Prior-art boundary
 
