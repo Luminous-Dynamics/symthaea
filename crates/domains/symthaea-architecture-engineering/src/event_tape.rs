@@ -1091,6 +1091,7 @@ impl EventTape {
                         evidence_sha256,
                         evidence_manifest_sha256,
                         evidence_byte_receipt_sha256,
+                        evidence_artifact,
                         failure_reason,
                     },
                 ) => {
