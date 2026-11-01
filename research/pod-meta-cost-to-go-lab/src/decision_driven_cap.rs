@@ -571,6 +571,17 @@ mod tests {
     }
 
     #[test]
+    fn overlapping_model_training_and_holdout_partitions_are_rejected() {
+        let mut cfg = config();
+        cfg.training_partition_digest = cfg.holdout_partition_digest;
+        let mut state = DecisionDrivenCapState::new();
+        assert_eq!(
+            apply_decision_driven_cap(cfg, &mut state, &[], current(10, 5, 20)),
+            Err(DecisionDrivenCapError::OverlappingTrainingAndHoldoutPartitions)
+        );
+    }
+
+    #[test]
     fn threshold_overflow_fails_without_mutating_state() {
         let mut cfg = config();
         cfg.base_threshold = u64::MAX;
