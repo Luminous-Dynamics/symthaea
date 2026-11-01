@@ -431,29 +431,166 @@ fn projected_expanded_uncertainty(
         * type_a.hypot(receipt.type_b_standard_uncertainty_uj)
 }
 
-fn checked_replication_cost(
-    count: usize,
-    cost_per_replicate: u64,
-) -> Result<u64, MetrologyUncertaintyError> {
-    let count = u64::try_from(count).map_err(|_| {
-        MetrologyUncertaintyError::new("replication_count", "does not fit in resource counter")
+fn validate_replicate_cost_template(
+    registry: &ResourceRegistry,
+    vector: &ResourceCostVector,
+    field: &str,
+) -> Result<(), MetrologyUncertaintyError> {
+    if vector.action_id.trim().is_empty() {
+        return Err(MetrologyUncertaintyError::new(
+            format!("{field}.action_id"),
+            "must be non-empty",
+        ));
+    }
+    if vector.resource_registry_sha256 != registry.registry_sha256 {
+        return Err(MetrologyUncertaintyError::new(
+            format!("{field}.resource_registry_sha256"),
+            "cost template is bound to a different resource registry",
+        ));
+    }
+    if vector.resources.len() != registry.resources.len() {
+        return Err(MetrologyUncertaintyError::new(
+            format!("{field}.resources"),
+            "cost template must explicitly contain every registered resource",
+        ));
+    }
+    for (index, (quantity, definition)) in vector.resources.iter().zip(&registry.resources).enumerate() {
+        if quantity.resource_id != definition.resource_id
+            || quantity.unit != definition.unit
+            || quantity.cost_model_sha256 != definition.cost_model_sha256
+        {
+            return Err(MetrologyUncertaintyError::new(
+                format!("{field}.resources[{index}]"),
+                "resource identity, unit or cost model does not match the frozen registry",
+            ));
+        }
+    }
+    if !vector.resources.iter().any(|quantity| quantity.units > 0) {
+        return Err(MetrologyUncertaintyError::new(
+            format!("{field}.resources"),
+            "replicate cost must consume at least one declared resource",
+        ));
+    }
+    Ok(())
+}
+
+fn build_replication_cost_vector(
+    registry: &ResourceRegistry,
+    candidate_template: &ResourceCostVector,
+    reference_template: &ResourceCostVector,
+    candidate_replicates: usize,
+    reference_replicates: usize,
+    kind: ReplicationPlanKind,
+) -> Result<ResourceCostVector, MetrologyUncertaintyError> {
+    let candidate_count = u64::try_from(candidate_replicates).map_err(|_| {
+        MetrologyUncertaintyError::new("candidate_replicates", "does not fit in u64")
     })?;
-    count.checked_mul(cost_per_replicate).ok_or_else(|| {
-        MetrologyUncertaintyError::new("replication_cost", "resource cost overflow")
+    let reference_count = u64::try_from(reference_replicates).map_err(|_| {
+        MetrologyUncertaintyError::new("reference_replicates", "does not fit in u64")
+    })?;
+    let action_id = match kind {
+        ReplicationPlanKind::CandidateOnly => "replicate_candidate_only",
+        ReplicationPlanKind::ReferenceOnly => "replicate_reference_only",
+        ReplicationPlanKind::PairedCandidateAndReference => "replicate_paired_candidate_reference",
+    };
+
+    let mut resources = Vec::with_capacity(registry.resources.len());
+    for ((definition, candidate), reference) in registry.resources.iter()
+        .zip(&candidate_template.resources)
+        .zip(&reference_template.resources)
+    {
+        let candidate_units = candidate.units.checked_mul(candidate_count).ok_or_else(|| {
+            MetrologyUncertaintyError::new("resource_cost", "candidate resource multiplication overflow")
+        })?;
+        let reference_units = reference.units.checked_mul(reference_count).ok_or_else(|| {
+            MetrologyUncertaintyError::new("resource_cost", "reference resource multiplication overflow")
+        })?;
+        let units = candidate_units.checked_add(reference_units).ok_or_else(|| {
+            MetrologyUncertaintyError::new("resource_cost", "combined resource addition overflow")
+        })?;
+        resources.push(ResourceQuantity {
+            resource_id: definition.resource_id.clone(),
+            unit: definition.unit.clone(),
+            units,
+            cost_model_sha256: definition.cost_model_sha256.clone(),
+        });
+    }
+
+    if !resources.iter().any(|quantity| quantity.units > 0) {
+        return Err(MetrologyUncertaintyError::new(
+            "resource_cost",
+            "replication plan must consume at least one resource",
+        ));
+    }
+
+    Ok(ResourceCostVector {
+        action_id: action_id.to_owned(),
+        resource_registry_sha256: registry.registry_sha256.clone(),
+        resources,
     })
 }
 
-/// Plan additional replicates only when they can theoretically resolve an overlapping
-/// energy comparison. Type B uncertainty is treated as an irreducible floor; repeated
-/// sampling reduces Type A as s/sqrt(n), but does not reduce the declared calibration term.
+fn resource_cost_fits(
+    cost: &ResourceCostVector,
+    headroom: &[ResourceHeadroom],
+) -> bool {
+    cost.resources.len() == headroom.len()
+        && cost.resources.iter().zip(headroom).all(|(quantity, available)| {
+            quantity.resource_id == available.resource_id
+                && quantity.unit == available.unit
+                && quantity.units <= available.available_units
+        })
+}
+
+fn replication_plan_dominates(
+    left: &AdditionalReplicationPlan,
+    right: &AdditionalReplicationPlan,
+) -> bool {
+    if left.resource_cost.resources.len() != right.resource_cost.resources.len() {
+        return false;
+    }
+    let all_resources_no_worse = left.resource_cost.resources.iter()
+        .zip(&right.resource_cost.resources)
+        .all(|(l, r)| l.units <= r.units);
+    let benefit_no_worse = left.projected_interval_gap_uj >= right.projected_interval_gap_uj;
+    let strictly_better = left.resource_cost.resources.iter()
+        .zip(&right.resource_cost.resources)
+        .any(|(l, r)| l.units < r.units)
+        || left.projected_interval_gap_uj > right.projected_interval_gap_uj;
+    all_resources_no_worse && benefit_no_worse && strictly_better
+}
+
+fn replication_plan_frontier(
+    plans: Vec<AdditionalReplicationPlan>,
+) -> Vec<AdditionalReplicationPlan> {
+    let mut frontier = Vec::new();
+    for (index, plan) in plans.iter().enumerate() {
+        let dominated = plans.iter().enumerate().any(|(other_index, other)| {
+            other_index != index && replication_plan_dominates(other, plan)
+        });
+        if !dominated {
+            frontier.push(plan.clone());
+        }
+    }
+    frontier.sort_by(|left, right| {
+        left.kind.cmp(&right.kind)
+            .then_with(|| left.additional_candidate_replicates.cmp(&right.additional_candidate_replicates))
+            .then_with(|| left.additional_reference_replicates.cmp(&right.additional_reference_replicates))
+    });
+    frontier
+}
+
+/// Plan additional replicates under the existing typed vector-resource budget.
 ///
-/// This is a deterministic planning heuristic with fixed observed means and sample standard
-/// deviations. It is not a posterior probability of a future result and must be integrated
-/// with the preregistered sequential stopping policy and vector-resource ledger.
+/// Type A is projected as s/sqrt(n); Type B is held fixed. Candidate-only, reference-only,
+/// and paired strategies are evaluated independently. The return value is a non-dominated
+/// frontier in projected interval separation versus the complete resource-cost vector; no
+/// scalar exchange rate is invented between instrument time, target occupancy, money, energy,
+/// storage or any other registered resource.
 pub fn plan_additional_energy_replicates(
     candidate: &EnergyUncertaintyReceipt,
     reference: &EnergyUncertaintyReceipt,
-    config: ReplicationPlanningConfig,
+    config: &ReplicationPlanningConfig,
 ) -> Result<EnergyReplicationPlanningResult, MetrologyUncertaintyError> {
     validate_energy_uncertainty_receipt(candidate)
         .map_err(|error| MetrologyUncertaintyError::new("candidate", error.to_string()))?;
@@ -466,20 +603,29 @@ pub fn plan_additional_energy_replicates(
             "candidate and reference must not reuse the exact same uncertainty receipt",
         ));
     }
-    if config.candidate_cost_per_replicate_units == 0
-        || config.reference_cost_per_replicate_units == 0
-    {
-        return Err(MetrologyUncertaintyError::new(
-            "replication_cost",
-            "both per-replicate resource costs must be positive",
-        ));
-    }
     if config.maximum_additional_replicates_per_side > MAX_REPLICATION_SEARCH {
         return Err(MetrologyUncertaintyError::new(
             "maximum_additional_replicates_per_side",
             format!("must not exceed {MAX_REPLICATION_SEARCH}"),
         ));
     }
+    validate_replicate_cost_template(
+        &config.resource_registry,
+        &config.candidate_replicate_cost,
+        "candidate_replicate_cost",
+    )?;
+    validate_replicate_cost_template(
+        &config.resource_registry,
+        &config.reference_replicate_cost,
+        "reference_replicate_cost",
+    )?;
+    let headroom = remaining_resource_headroom(&config.resource_registry, &config.resource_budget)
+        .map_err(|error| MetrologyUncertaintyError::new("resource_budget", error.to_string()))?;
+
+    let config_bytes = serde_json::to_vec(config).map_err(|error| {
+        MetrologyUncertaintyError::new("planning_config", format!("cannot serialize: {error}"))
+    })?;
+    let planning_config_sha256 = digest(REPLICATION_CONFIG_DOMAIN, &config_bytes);
 
     let current = compare_energy_uncertainty(candidate, reference)?;
     let gap = (candidate.mean_energy_uj - reference.mean_energy_uj).abs();
@@ -487,30 +633,28 @@ pub fn plan_additional_energy_replicates(
         candidate.coverage_factor * candidate.type_b_standard_uncertainty_uj
             + reference.coverage_factor * reference.type_b_standard_uncertainty_uj;
 
-    if current.decision != EnergyComparisonDecision::IndeterminateIntervalsOverlap {
-        return Ok(EnergyReplicationPlanningResult {
-            status: ReplicationPlanningStatus::AlreadyResolved,
-            current_decision: current.decision,
-            mean_energy_gap_uj: gap,
-            irreducible_type_b_interval_floor_uj: type_b_floor,
-            plan: None,
-        });
-    }
+    let result = |status, plan_frontier| EnergyReplicationPlanningResult {
+        status,
+        current_decision: current.decision,
+        mean_energy_gap_uj: gap,
+        irreducible_type_b_interval_floor_uj: type_b_floor,
+        planning_config_sha256: planning_config_sha256.clone(),
+        resource_registry_sha256: config.resource_registry.registry_sha256.clone(),
+        resource_headroom: headroom.clone(),
+        plan_frontier,
+    };
 
+    if current.decision != EnergyComparisonDecision::IndeterminateIntervalsOverlap {
+        return Ok(result(ReplicationPlanningStatus::AlreadyResolved, Vec::new()));
+    }
     if gap <= type_b_floor {
-        return Ok(EnergyReplicationPlanningResult {
-            status: ReplicationPlanningStatus::MetrologyLimited,
-            current_decision: current.decision,
-            mean_energy_gap_uj: gap,
-            irreducible_type_b_interval_floor_uj: type_b_floor,
-            plan: None,
-        });
+        return Ok(result(ReplicationPlanningStatus::MetrologyLimited, Vec::new()));
     }
 
     let mut plans = Vec::<AdditionalReplicationPlan>::new();
     let limit = config.maximum_additional_replicates_per_side;
 
-    // Candidate-only replicates.
+    // Candidate-only repetitions.
     for additional in 1..=limit {
         let total = candidate.replicate_count.checked_add(additional).ok_or_else(|| {
             MetrologyUncertaintyError::new("candidate.replicate_count", "replicate count overflow")
@@ -518,13 +662,20 @@ pub fn plan_additional_energy_replicates(
         let candidate_u = projected_expanded_uncertainty(candidate, total);
         let reference_u = reference.expanded_uncertainty_uj;
         if gap > candidate_u + reference_u {
-            let cost = checked_replication_cost(additional, config.candidate_cost_per_replicate_units)?;
-            if cost <= config.resource_budget_units {
+            let cost = build_replication_cost_vector(
+                &config.resource_registry,
+                &config.candidate_replicate_cost,
+                &config.reference_replicate_cost,
+                additional,
+                0,
+                ReplicationPlanKind::CandidateOnly,
+            )?;
+            if resource_cost_fits(&cost, &headroom) {
                 plans.push(AdditionalReplicationPlan {
                     kind: ReplicationPlanKind::CandidateOnly,
                     additional_candidate_replicates: additional,
                     additional_reference_replicates: 0,
-                    incremental_resource_units: cost,
+                    resource_cost: cost,
                     projected_candidate_expanded_uncertainty_uj: candidate_u,
                     projected_reference_expanded_uncertainty_uj: reference_u,
                     projected_interval_gap_uj: gap - candidate_u - reference_u,
@@ -534,7 +685,7 @@ pub fn plan_additional_energy_replicates(
         }
     }
 
-    // Reference-only replicates.
+    // Reference-only repetitions.
     for additional in 1..=limit {
         let total = reference.replicate_count.checked_add(additional).ok_or_else(|| {
             MetrologyUncertaintyError::new("reference.replicate_count", "replicate count overflow")
@@ -542,13 +693,20 @@ pub fn plan_additional_energy_replicates(
         let candidate_u = candidate.expanded_uncertainty_uj;
         let reference_u = projected_expanded_uncertainty(reference, total);
         if gap > candidate_u + reference_u {
-            let cost = checked_replication_cost(additional, config.reference_cost_per_replicate_units)?;
-            if cost <= config.resource_budget_units {
+            let cost = build_replication_cost_vector(
+                &config.resource_registry,
+                &config.candidate_replicate_cost,
+                &config.reference_replicate_cost,
+                0,
+                additional,
+                ReplicationPlanKind::ReferenceOnly,
+            )?;
+            if resource_cost_fits(&cost, &headroom) {
                 plans.push(AdditionalReplicationPlan {
                     kind: ReplicationPlanKind::ReferenceOnly,
                     additional_candidate_replicates: 0,
                     additional_reference_replicates: additional,
-                    incremental_resource_units: cost,
+                    resource_cost: cost,
                     projected_candidate_expanded_uncertainty_uj: candidate_u,
                     projected_reference_expanded_uncertainty_uj: reference_u,
                     projected_interval_gap_uj: gap - candidate_u - reference_u,
@@ -558,7 +716,7 @@ pub fn plan_additional_energy_replicates(
         }
     }
 
-    // Paired blocked replicates: one new observation for each artifact per step.
+    // Paired blocked repetitions.
     for additional in 1..=limit {
         let candidate_total = candidate.replicate_count.checked_add(additional).ok_or_else(|| {
             MetrologyUncertaintyError::new("candidate.replicate_count", "replicate count overflow")
@@ -569,16 +727,20 @@ pub fn plan_additional_energy_replicates(
         let candidate_u = projected_expanded_uncertainty(candidate, candidate_total);
         let reference_u = projected_expanded_uncertainty(reference, reference_total);
         if gap > candidate_u + reference_u {
-            let per_pair = config.candidate_cost_per_replicate_units
-                .checked_add(config.reference_cost_per_replicate_units)
-                .ok_or_else(|| MetrologyUncertaintyError::new("replication_cost", "paired cost overflow"))?;
-            let cost = checked_replication_cost(additional, per_pair)?;
-            if cost <= config.resource_budget_units {
+            let cost = build_replication_cost_vector(
+                &config.resource_registry,
+                &config.candidate_replicate_cost,
+                &config.reference_replicate_cost,
+                additional,
+                additional,
+                ReplicationPlanKind::PairedCandidateAndReference,
+            )?;
+            if resource_cost_fits(&cost, &headroom) {
                 plans.push(AdditionalReplicationPlan {
                     kind: ReplicationPlanKind::PairedCandidateAndReference,
                     additional_candidate_replicates: additional,
                     additional_reference_replicates: additional,
-                    incremental_resource_units: cost,
+                    resource_cost: cost,
                     projected_candidate_expanded_uncertainty_uj: candidate_u,
                     projected_reference_expanded_uncertainty_uj: reference_u,
                     projected_interval_gap_uj: gap - candidate_u - reference_u,
@@ -588,31 +750,11 @@ pub fn plan_additional_energy_replicates(
         }
     }
 
-    plans.sort_by(|left, right| {
-        left.incremental_resource_units.cmp(&right.incremental_resource_units)
-            .then_with(|| {
-                (left.additional_candidate_replicates + left.additional_reference_replicates)
-                    .cmp(&(right.additional_candidate_replicates + right.additional_reference_replicates))
-            })
-            .then_with(|| (left.kind as u8).cmp(&(right.kind as u8)))
-    });
-
-    if let Some(plan) = plans.into_iter().next() {
-        Ok(EnergyReplicationPlanningResult {
-            status: ReplicationPlanningStatus::AdditionalReplicatesRequired,
-            current_decision: current.decision,
-            mean_energy_gap_uj: gap,
-            irreducible_type_b_interval_floor_uj: type_b_floor,
-            plan: Some(plan),
-        })
+    let frontier = replication_plan_frontier(plans);
+    if frontier.is_empty() {
+        Ok(result(ReplicationPlanningStatus::NoPlanWithinBudgetOrHorizon, frontier))
     } else {
-        Ok(EnergyReplicationPlanningResult {
-            status: ReplicationPlanningStatus::NoPlanWithinBudgetOrHorizon,
-            current_decision: current.decision,
-            mean_energy_gap_uj: gap,
-            irreducible_type_b_interval_floor_uj: type_b_floor,
-            plan: None,
-        })
+        Ok(result(ReplicationPlanningStatus::AdditionalReplicatesRequired, frontier))
     }
 }
 
