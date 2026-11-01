@@ -163,10 +163,7 @@ impl HistoricalCostBaseline {
             return Err(HistoricalBaselineError::EmptyVerifiedTrainingCohort);
         }
 
-        let global_profile = build_profile(
-            HistoricalProfileSource::GlobalFallback,
-            &global_costs,
-        )?;
+        let global_profile = build_profile(HistoricalProfileSource::GlobalFallback, &global_costs)?;
         let family_profiles = family_costs
             .into_iter()
             .map(|(family, costs)| {
@@ -236,10 +233,7 @@ impl HistoricalCostBaseline {
             competing_terminal: overall.competing_terminal,
             pending: overall.pending,
             global_fallback_prefixes: overall.global_fallback_prefixes,
-            empirical_joint_q90_coverage: ratio(
-                overall.joint_q90_hits,
-                overall.completed_verified,
-            ),
+            empirical_joint_q90_coverage: ratio(overall.joint_q90_hits, overall.completed_verified),
             dimensions: dimension_metrics(overall.dimensions),
             by_task_family: by_family
                 .into_iter()
@@ -326,8 +320,8 @@ fn nearest_rank(
     if sorted.is_empty() || denominator == 0 || numerator == 0 || numerator > denominator {
         return Err(HistoricalBaselineError::EmptyVerifiedTrainingCohort);
     }
-    let count = u128::try_from(sorted.len())
-        .map_err(|_| HistoricalBaselineError::NumericOverflow)?;
+    let count =
+        u128::try_from(sorted.len()).map_err(|_| HistoricalBaselineError::NumericOverflow)?;
     let rank_numerator = count
         .checked_mul(numerator)
         .ok_or(HistoricalBaselineError::NumericOverflow)?;
@@ -364,18 +358,16 @@ fn update_baseline_accumulator(
             for index in 0..DIMENSION_COUNT {
                 if lower[index] > q90[index] {
                     increment(
-                        &mut accumulator.dimensions[index]
-                            .censored_q90_definite_exceedances,
+                        &mut accumulator.dimensions[index].censored_q90_definite_exceedances,
                     )?;
                 }
                 if lower[index] > q95[index] {
                     increment(
-                        &mut accumulator.dimensions[index]
-                            .censored_q95_definite_exceedances,
+                        &mut accumulator.dimensions[index].censored_q95_definite_exceedances,
                     )?;
                 }
             }
-        },
+        }
         Some(TerminalOutcome::CompetingTerminal(_)) => {
             increment(&mut accumulator.competing_terminal)?
         }
@@ -512,11 +504,7 @@ mod tests {
         }
     }
 
-    fn outcome(
-        id: u64,
-        work: ResourceVector,
-        terminal: TerminalOutcome,
-    ) -> ForecastOutcomeReceipt {
+    fn outcome(id: u64, work: ResourceVector, terminal: TerminalOutcome) -> ForecastOutcomeReceipt {
         ForecastOutcomeReceipt {
             forecast_id: ForecastId(id),
             observed_sequence: 2,
@@ -603,13 +591,22 @@ mod tests {
             .unwrap();
 
         let result = model.evaluate(&evaluation).unwrap();
-        assert_eq!(result.rows[0].profile_source, HistoricalProfileSource::TaskFamily(7));
-        assert_eq!(result.rows[1].profile_source, HistoricalProfileSource::GlobalFallback);
+        assert_eq!(
+            result.rows[0].profile_source,
+            HistoricalProfileSource::TaskFamily(7)
+        );
+        assert_eq!(
+            result.rows[1].profile_source,
+            HistoricalProfileSource::GlobalFallback
+        );
         assert_eq!(result.report.total_prefixes, 2);
         assert_eq!(result.report.completed_verified, 1);
         assert_eq!(result.report.competing_terminal, 1);
         assert_eq!(result.report.global_fallback_prefixes, 1);
-        assert_eq!(result.report.dimensions[0].q50_mean_absolute_error, Some(2.0));
+        assert_eq!(
+            result.report.dimensions[0].q50_mean_absolute_error,
+            Some(2.0)
+        );
     }
 
     #[test]
