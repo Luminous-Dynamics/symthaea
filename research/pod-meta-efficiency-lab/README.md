@@ -63,4 +63,4 @@ The promotion objective is a Pareto frontier over proof correctness, mandatory s
 ## Qualification ordering
 
 The dedicated workflow qualifies the shared proof-obligation dependency before it qualifies this benchmark adapter: formatting, tests, and Clippy must all pass for both crates before the frozen 280-row policy-budget matrix is emitted. A dependency failure intentionally prevents the efficiency matrix from being treated as qualified.
-The parent artifact evaluator also preserves planner cases whose evidence set is empty: such cases legitimately have no `TRUTH` records, but remain represented by their `GOLD_CLAIM` records and must still count toward oracle case coverage.
+The parent artifact evaluator now preserves planner cases whose evidence set is empty: such cases legitimately have no `TRUTH` records, remain represented by their `GOLD_CLAIM` records, and are covered by a dedicated round-trip regression test.
