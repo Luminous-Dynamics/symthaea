@@ -727,6 +727,11 @@ fn parameter_code(parameter: GestureParameter) -> u8 {
         GestureParameter::PitchBend => 21,
         GestureParameter::VibratoRate => 22,
         GestureParameter::VibratoDepth => 23,
+        GestureParameter::PianoDamperPedalDepth => 24,
+        GestureParameter::PianoSostenutoPedal => 25,
+        GestureParameter::PianoUnaCordaPedal => 26,
+        GestureParameter::PianoStringResonance => 27,
+        GestureParameter::PianoHammerHardness => 28,
     }
 }
 
