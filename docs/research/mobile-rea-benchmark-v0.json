@@ -1,0 +1,339 @@
+{
+  "schema": "luminous.mobile-rea-benchmark.v0",
+  "as_of": "2026-11-01",
+  "status": "proposal_not_results",
+  "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/9836",
+  "research_plan": "docs/research/MOBILE_REA_ANDROID_IOS_RESEARCH_PLAN.md",
+  "invariants": [
+    "REA is an optional external evidence producer; it is not a Symthaea core dependency.",
+    "Raw provider evidence is immutable and retains its exact digest.",
+    "Read-only Android device commands are allowlisted; target-mutating REA tools are disabled.",
+    "Unsupported, encrypted, missing, partial and unknown remain explicit non-success states.",
+    "A structural parse cannot establish runtime behavior, hardware attestation or causal equivalence.",
+    "No firmware execution, flashing, bootloader modification, jailbreak or device write is permitted."
+  ],
+  "evidence_tiers": [
+    "raw_observation",
+    "structural_parse",
+    "independently_semantically_checked",
+    "controlled_runtime_observation",
+    "authenticated_hardware_evidence",
+    "causal_support"
+  ],
+  "providers": [
+    {
+      "id": "rea_android_adb",
+      "platform": "android",
+      "surface": "connected_device",
+      "status": "documented_upstream_capability",
+      "provider": "morluto/rea plus caller_supplied_adb",
+      "allowed_profile": "positive_read_only_allowlist",
+      "claim_ceiling": "software_reported_device_observations",
+      "explicitly_not_proved": [
+        "hardware_attestation",
+        "complete_device_state",
+        "runtime_integrity"
+      ]
+    },
+    {
+      "id": "rea_android_apk",
+      "platform": "android",
+      "surface": "application_package",
+      "status": "documented_upstream_capability",
+      "provider": "morluto/rea plus JADX and/or caller_supplied Apktool; optional JEB",
+      "allowed_profile": "static_analysis",
+      "claim_ceiling": "artifact_bound_static_observations",
+      "explicitly_not_proved": [
+        "runtime_behavior",
+        "server_side_behavior",
+        "effective_runtime_permissions"
+      ]
+    },
+    {
+      "id": "rea_android_generic_firmware",
+      "platform": "android",
+      "surface": "firmware_file",
+      "status": "documented_generic_provider_only",
+      "provider": "morluto/rea plus Binwalk/Unblob",
+      "host_scope": "linux_x64",
+      "allowed_profile": "bounded_static_region_inspection_and_extraction",
+      "claim_ceiling": "provider_reported_regions_and_extracted_file_hashes",
+      "explicitly_not_proved": [
+        "CrAU_semantics",
+        "AVB_signature_validation",
+        "partition_compatibility",
+        "runtime_behavior"
+      ]
+    },
+    {
+      "id": "rea_apple_ipa",
+      "platform": "apple",
+      "surface": "application_package",
+      "status": "documented_upstream_capability",
+      "provider": "morluto/rea",
+      "allowed_profile": "static_inventory_and_native_analysis",
+      "claim_ceiling": "artifact_bound_bundle_and_binary_observations",
+      "explicitly_not_proved": [
+        "runtime_framework_loading",
+        "complete_plist_or_CMS_semantics_from_inventory_alone",
+        "device_state"
+      ]
+    },
+    {
+      "id": "rea_apple_ipsw",
+      "platform": "apple",
+      "surface": "firmware_file",
+      "status": "not_documented_as_first_class_REA_provider",
+      "candidate_provider": "blacktop/ipsw",
+      "allowed_profile": "future_pinned_offline_static_provider",
+      "claim_ceiling": "none_until_provider_is_qualified",
+      "explicitly_not_proved": [
+        "firmware_signature_validation",
+        "device_compatibility",
+        "runtime_behavior"
+      ]
+    },
+    {
+      "id": "rea_iphone_device",
+      "platform": "apple",
+      "surface": "connected_device",
+      "status": "no_equivalent_REA_device_lane_documented",
+      "allowed_profile": "none_until_separately_reviewed",
+      "claim_ceiling": "none",
+      "explicitly_not_proved": [
+        "live_device_state",
+        "process_inventory",
+        "runtime_capture",
+        "attestation"
+      ]
+    }
+  ],
+  "ablations": [
+    {
+      "id": "A",
+      "name": "REA_only",
+      "description": "Use identical selected providers without Symthaea reasoning."
+    },
+    {
+      "id": "B",
+      "name": "Symthaea_without_REA",
+      "description": "Give Symthaea the same authorized raw facts but no REA-derived analysis."
+    },
+    {
+      "id": "C",
+      "name": "REA_plus_Symthaea",
+      "description": "Symthaea reasons over the same source/target context plus REA Evidence."
+    }
+  ],
+  "benchmark_families": [
+    {
+      "id": "android_ota_semantics",
+      "platform": "android",
+      "status": "planned",
+      "cases": [
+        "CrAU_header_and_manifest",
+        "operation_bounds_and_block_arithmetic",
+        "source_destination_partition_binding",
+        "delta_payload_hash",
+        "truncated_payload",
+        "wrong_target_build"
+      ],
+      "oracle": "independently_authored_known_answer_manifest",
+      "primary_metrics": [
+        "supported_field_exact_match",
+        "payload_recall",
+        "false_emitted_bytes",
+        "unexplained_input_bytes"
+      ],
+      "target": "100_percent_expected_payload_recall_and_zero_wrong_content_for_declared_supported_cases"
+    },
+    {
+      "id": "android_avb_semantics",
+      "platform": "android",
+      "status": "planned",
+      "cases": [
+        "vbmeta_descriptors",
+        "chained_vbmeta",
+        "rollback_index_metadata",
+        "key_identity_substitution",
+        "digest_mismatch",
+        "partition_scope_mismatch"
+      ],
+      "oracle": "independent_signature_and_metadata_oracle",
+      "primary_metrics": [
+        "descriptor_exact_match",
+        "target_binding",
+        "negative_control_rejection"
+      ],
+      "target": "zero_false_passes"
+    },
+    {
+      "id": "apple_ipa_semantics",
+      "platform": "apple",
+      "status": "planned",
+      "cases": [
+        "nested_app_extensions",
+        "framework_and_dylib_graph",
+        "Info_plist_identity",
+        "entitlement_projection",
+        "MachO_load_commands",
+        "signature_record_substitution",
+        "encrypted_or_unavailable_component"
+      ],
+      "oracle": "independently_generated_bundle_and_binary_facts",
+      "primary_metrics": [
+        "component_precision_recall",
+        "graph_edge_accuracy",
+        "signing_claim_precision",
+        "unknown_preservation"
+      ],
+      "target": "100_percent_exact_match_for_supported_oracle_fields_and_zero_false_signing_claims"
+    },
+    {
+      "id": "apple_ipsw_semantics",
+      "platform": "apple",
+      "status": "planned_separate_provider",
+      "provider": "pinned blacktop/ipsw",
+      "cases": [
+        "archive_inventory",
+        "BuildManifest_device_identity",
+        "device_variant_selection",
+        "IMG4_structure",
+        "kernelcache_and_dyld_artifact_identity",
+        "wrong_device_variant",
+        "unavailable_encrypted_component"
+      ],
+      "oracle": "independently_authored_manifest_and_component_hashes",
+      "primary_metrics": [
+        "device_build_binding",
+        "component_hash_accuracy",
+        "lineage_accuracy",
+        "unknown_preservation"
+      ],
+      "target": "100_percent_exact_match_for_supported_oracle_fields_and_zero_false_device_binding"
+    },
+    {
+      "id": "cross_build_causal_localization",
+      "platform": "cross_platform",
+      "status": "planned",
+      "cases": [
+        "compiler_noise_only",
+        "source_semantic_change",
+        "configuration_change",
+        "runtime_only_change",
+        "confounded_change",
+        "ambiguous_cause"
+      ],
+      "oracle": "held_out_source_derived_changes_plus_discriminating_behavioral_tests",
+      "primary_metrics": [
+        "top1_localization",
+        "top3_localization",
+        "false_cause_rate",
+        "time_to_first_correct_hypothesis"
+      ],
+      "target": "at_least_20_percent_relative_top3_gain_vs_stronger_single_tool_ablation_without_false_cause_increase"
+    },
+    {
+      "id": "evidence_assurance",
+      "platform": "cross_platform",
+      "status": "planned",
+      "cases": [
+        "stale_observation",
+        "replayed_receipt",
+        "digest_mismatch",
+        "tool_substitution",
+        "wrong_model_or_build",
+        "lineage_offset_forgery",
+        "synthetic_source_escalation",
+        "missing_field_defaulting"
+      ],
+      "oracle": "frozen_mutation_oracle",
+      "primary_metrics": [
+        "false_pass_count",
+        "claim_scope_binding",
+        "unknown_state_preservation"
+      ],
+      "target": "zero_false_passes_and_100_percent_exact_scope_binding"
+    },
+    {
+      "id": "owasp_mobile_application_security",
+      "platform": "android_and_apple_applications",
+      "status": "planned",
+      "standard": "OWASP MASVS",
+      "weakness_taxonomy": "OWASP MASWE",
+      "test_catalogue": "OWASP MASTG",
+      "tool_ablations": [
+        "MobSF_only",
+        "REA_only",
+        "REA_plus_Symthaea",
+        "Symthaea_without_REA_when_fair"
+      ],
+      "cases": [
+        "storage",
+        "cryptography",
+        "authentication_authorization",
+        "network",
+        "platform_interaction",
+        "code_quality",
+        "resilience",
+        "privacy"
+      ],
+      "primary_metrics": [
+        "control_test_mapping_coverage",
+        "precision",
+        "recall",
+        "false_positive_rate",
+        "false_negative_rate",
+        "evidence_citation_completeness",
+        "time_to_correct_finding"
+      ],
+      "target": "100_percent_selected_control_mapping_or_explicit_oracle_gap; zero_static_to_runtime_claim_upgrades",
+      "environment_note": "Keep Android and iOS separate. MobSF dynamic Android rooted/Frida-Gadget and iOS Corellium/jailbroken results are distinct configurations and not interchangeable with stock non-jailbroken hardware."
+    },
+    {
+      "id": "android_platform_compatibility",
+      "platform": "android",
+      "status": "planned",
+      "standards": [
+        "Android CTS",
+        "Android VTS"
+      ],
+      "primary_metrics": [
+        "CTS_regression_count",
+        "VTS_regression_count",
+        "test_plan_coverage"
+      ],
+      "target": "No untriaged compatibility regression attributable to migrated components",
+      "note": "CTS/VTS provide compatibility evidence, not a security certification or hardware attestation."
+    }
+  ],
+  "negative_control_policy": {
+    "every_mutation_must": [
+      "be_detected",
+      "or_produce_explicit_abstention"
+    ],
+    "forbidden_dispositions": [
+      "pass",
+      "complete",
+      "equivalent",
+      "verified",
+      "attested"
+    ],
+    "when_evidence_is_missing_or_unsupported": "abstain"
+  },
+  "reporting": {
+    "keep_platforms_separate": true,
+    "report_confidence_intervals": true,
+    "report_median_and_tail_latency": true,
+    "report_per_family_results": true,
+    "report_ablation_results": true,
+    "publish_exact_artifact_and_tool_digests": true,
+    "never_pool_simulator_and_physical_device_performance": true
+  },
+  "issue_links": [
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9838",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9839",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9840",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/9842"
+  ]
+}
