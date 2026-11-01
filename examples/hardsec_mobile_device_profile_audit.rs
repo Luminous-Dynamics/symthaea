@@ -1,5 +1,6 @@
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 use std::env;
 use std::fs;
 
@@ -23,6 +24,15 @@ const FORBIDDEN_KEYS_NORMALIZED: &[&str] = &[
     "latitude",
     "longitude",
     "preciselocation",
+    "androidid",
+    "deviceid",
+    "deviceidentifier",
+    "macaddress",
+    "wifimacaddress",
+    "bluetoothaddress",
+    "bssid",
+    "ssid",
+    "ipaddress",
 ];
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -92,6 +102,126 @@ fn has_linked_evidence_source(
         .any(|source| allowed_sources.contains(source))
 }
 
+fn validate_evidence_links(profile: &Value) -> Result<(), String> {
+    let evidence = profile["evidence"]
+        .as_array()
+        .ok_or_else(|| "evidence ledger must be an array".to_owned())?;
+    let mut known_ids = BTreeSet::new();
+    for item in evidence {
+        let id = item["evidence_id"]
+            .as_str()
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| "evidence item is missing a non-empty evidence_id".to_owned())?;
+        if !known_ids.insert(id.to_owned()) {
+            return Err(format!("duplicate evidence_id in evidence ledger: {id}"));
+        }
+    }
+
+    let linked_sections = [
+        ("boot_integrity", &profile["boot_integrity"]["evidence_ids"]),
+        ("pmu_acquisition", &profile["pmu_acquisition"]["evidence_ids"]),
+        (
+            "memory_tagging",
+            &profile["hardware_protections"]["memory_tagging"]["evidence_ids"],
+        ),
+        (
+            "pointer_authentication",
+            &profile["hardware_protections"]["pointer_authentication"]["evidence_ids"],
+        ),
+        (
+            "branch_target_protection",
+            &profile["hardware_protections"]["branch_target_protection"]["evidence_ids"],
+        ),
+        (
+            "secure_element",
+            &profile["hardware_protections"]["secure_element"]["evidence_ids"],
+        ),
+        ("tee", &profile["hardware_protections"]["tee"]["evidence_ids"]),
+    ];
+
+    for (section, value) in linked_sections {
+        let ids = value
+            .as_array()
+            .ok_or_else(|| format!("{section}.evidence_ids must be an array"))?;
+        let mut section_ids = BTreeSet::new();
+        for id_value in ids {
+            let id = id_value
+                .as_str()
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| format!("{section}.evidence_ids contains an invalid ID"))?;
+            if !section_ids.insert(id.to_owned()) {
+                return Err(format!("{section}.evidence_ids contains duplicate ID: {id}"));
+            }
+            if !known_ids.contains(id) {
+                return Err(format!("{section}.evidence_ids references unknown evidence ID: {id}"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_protection_claim(profile: &Value, protection_name: &str) -> Result<(), String> {
+    let protection = &profile["hardware_protections"][protection_name];
+    let evidence_ids = &protection["evidence_ids"];
+    let support = protection["hardware_support"].as_str().unwrap_or("unknown");
+    let runtime = protection["runtime_state"].as_str().unwrap_or("unknown");
+
+    match support {
+        "vendor_documented"
+            if !has_linked_evidence_source(profile, evidence_ids, &["vendor_documentation"]) =>
+        {
+            return Err(format!(
+                "{protection_name} vendor-documented capability requires linked vendor_documentation evidence"
+            ));
+        }
+        "attested"
+            if !has_linked_evidence_source(
+                profile,
+                evidence_ids,
+                &["hardware_attestation_verified"],
+            ) =>
+        {
+            return Err(format!(
+                "{protection_name} attested capability requires linked hardware_attestation_verified evidence"
+            ));
+        }
+        "on_device_reported" | "unsupported"
+            if !has_linked_evidence_source(
+                profile,
+                evidence_ids,
+                &[
+                    "on_device_property",
+                    "privileged_device_tool",
+                    "physical_lab_measurement",
+                ],
+            ) =>
+        {
+            return Err(format!(
+                "{protection_name} on-device capability result requires linked device evidence"
+            ));
+        }
+        _ => {}
+    }
+
+    if matches!(runtime, "enabled_verified" | "disabled_verified")
+        && !has_linked_evidence_source(
+            profile,
+            evidence_ids,
+            &[
+                "hardware_attestation_verified",
+                "on_device_property",
+                "privileged_device_tool",
+                "physical_lab_measurement",
+            ],
+        )
+    {
+        return Err(format!(
+            "{protection_name} verified runtime state requires linked runtime evidence"
+        ));
+    }
+    Ok(())
+}
+
 fn validate_profile(profile: &Value) -> Result<(), String> {
     if profile["schema_version"] != "hardsec-mobile-device-profile-v1" {
         return Err("unsupported mobile profile schema_version".to_owned());
@@ -106,6 +236,59 @@ fn validate_profile(profile: &Value) -> Result<(), String> {
     let sources = evidence_sources(profile);
     if sources.is_empty() {
         return Err("profile must have at least one evidence source".to_owned());
+    }
+    validate_evidence_links(profile)?;
+
+    let boot = &profile["boot_integrity"];
+    let boot_attestation = has_linked_evidence_source(
+        profile,
+        &boot["evidence_ids"],
+        &["hardware_attestation_verified"],
+    );
+    if boot["reported_bootloader_lock_state"] != "unknown"
+        && boot["reported_bootloader_lock_state"] != "not_measured"
+        && !has_linked_evidence_source(
+            profile,
+            &boot["evidence_ids"],
+            &["on_device_property", "privileged_device_tool"],
+        )
+    {
+        return Err("reported bootloader state requires linked on-device property evidence".to_owned());
+    }
+    if boot["reported_verified_boot_state"] != "unknown"
+        && boot["reported_verified_boot_state"] != "not_measured"
+        && !has_linked_evidence_source(
+            profile,
+            &boot["evidence_ids"],
+            &["on_device_property", "privileged_device_tool"],
+        )
+    {
+        return Err("reported Verified Boot state requires linked on-device property evidence".to_owned());
+    }
+    if (boot["bootloader_locked"] == "locked"
+        || boot["bootloader_locked"] == "unlocked"
+        || boot["verified_boot_state"] == "verified"
+        || boot["verified_boot_state"] == "self_signed"
+        || boot["verified_boot_state"] == "unverified"
+        || boot["verified_boot_state"] == "failed"
+        || boot["attestation_security_level"] == "software"
+        || boot["attestation_security_level"] == "trusted_environment"
+        || boot["attestation_security_level"] == "strongbox"
+        || boot["attestation_security_level"] == "secure_enclave"
+        || boot["patch_level_binding_status"] == "hardware_bound_verified")
+        && !boot_attestation
+    {
+        return Err("cryptographic boot or attestation claim requires linked hardware_attestation_verified evidence".to_owned());
+    }
+
+    for name in [
+        "memory_tagging",
+        "pointer_authentication",
+        "branch_target_protection",
+        "secure_element",
+        "tee",
+    ] {
+        validate_protection_claim(profile, name)?;
     }
 
     let is_synthetic = profile["evidence_domain"] == "synthetic_fixture";
@@ -189,27 +372,6 @@ fn validate_profile(profile: &Value) -> Result<(), String> {
     {
         return Err(
             "PMU access claim requires privileged device-tool or physical measurement evidence"
-                .to_owned(),
-        );
-    }
-
-    if profile["device"]["platform"] == "android"
-        && profile["hardware_protections"]["memory_tagging"]["hardware_support"]
-            == "vendor_documented"
-        && profile["hardware_protections"]["memory_tagging"]["runtime_state"] == "enabled_verified"
-        && !has_linked_evidence_source(
-            profile,
-            &profile["hardware_protections"]["memory_tagging"]["evidence_ids"],
-            &[
-                "on_device_property",
-                "hardware_attestation_verified",
-                "privileged_device_tool",
-                "physical_lab_measurement",
-            ],
-        )
-    {
-        return Err(
-            "Android MTE runtime enablement cannot be inferred from vendor documentation alone"
                 .to_owned(),
         );
     }
@@ -402,6 +564,50 @@ mod tests {
         }));
         let error = validate_profile(&profile).unwrap_err();
         assert!(error.contains("within-budget observer effect requires"));
+    }
+
+    #[test]
+    fn android_id_and_radio_hardware_identifiers_are_rejected_recursively() {
+        for key in ["androidId", "bluetooth_address", "wifiMacAddress", "bssid"] {
+            let mut profile = fixture();
+            profile["device"][key] = json!("synthetic-private-id");
+            let error = validate_profile(&profile).unwrap_err();
+            assert!(error.contains("privacy-sensitive field"));
+        }
+    }
+
+    #[test]
+    fn unresolved_evidence_ids_are_rejected() {
+        let mut profile = fixture();
+        profile["boot_integrity"]["evidence_ids"] = json!(["missing-evidence"]);
+        let error = validate_profile(&profile).unwrap_err();
+        assert!(error.contains("references unknown evidence ID"));
+    }
+
+    #[test]
+    fn duplicate_evidence_ids_are_rejected() {
+        let mut profile = fixture();
+        let duplicate = profile["evidence"][0].clone();
+        profile["evidence"].as_array_mut().unwrap().push(duplicate);
+        let error = validate_profile(&profile).unwrap_err();
+        assert!(error.contains("duplicate evidence_id"));
+    }
+
+    #[test]
+    fn vendor_documentation_cannot_be_reused_as_on_device_mte_evidence() {
+        let mut profile = fixture();
+        profile["hardware_protections"]["memory_tagging"]["hardware_support"] =
+            json!("on_device_reported");
+        let error = validate_profile(&profile).unwrap_err();
+        assert!(error.contains("on-device capability result requires linked device evidence"));
+    }
+
+    #[test]
+    fn reported_boot_state_requires_linked_property_evidence() {
+        let mut profile = fixture();
+        profile["boot_integrity"]["reported_verified_boot_state"] = json!("green_reported");
+        let error = validate_profile(&profile).unwrap_err();
+        assert!(error.contains("reported Verified Boot state requires linked on-device"));
     }
 
     #[test]
