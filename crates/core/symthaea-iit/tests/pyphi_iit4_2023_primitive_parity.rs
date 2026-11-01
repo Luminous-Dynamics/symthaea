@@ -30,8 +30,8 @@ const CASES: &[Case] = &[
 
  Case {
   id: "ABC-mechanism-0-1-2", candidate: &[0, 1, 2], mechanism: &[0, 1, 2],
-  cause_request: "269132ddd98271b84d797fa089f4a16f3db3a8acbec2f9816c99acc9ee23c58d", cause: &[0.097088099845556969, 0.41509715549960591, 0.0015309017564716857, 0.050610215126307936, 0.0020629839123675569, 0.41399626212502294, 1.2632437131578487e-05, 0.019601749297535408],
-  effect_request: "878718fc166839d6eb9f4f189b8770877404b6d004bbf7ef5772bf58678ad84", effect: &[0.013283701731572969, 0.48616003025199689, 1.4795056860008953e-05, 0.00054147295957015183, 0.013283701731572969, 0.48616003025199689, 1.4795056860008953e-05, 0.00054147295957015183],
+  cause_request: "269132ddd98271b84d797fa089f4a16f3db3a8acbec2f9816c99acc99e23c58d", cause: &[0.097088099845556969, 0.41509715549960591, 0.0015309017564716857, 0.050610215126307936, 0.0020629839123675569, 0.41399626212502294, 1.2632437131578487e-05, 0.019601749297535408],
+  effect_request: "878718fc166839d6eb9f4f189b8770877404b6d004bbf77ef5772bf58678ad84", effect: &[0.013283701731572969, 0.48616003025199689, 1.4795056860008953e-05, 0.00054147295957015183, 0.013283701731572969, 0.48616003025199689, 1.4795056860008953e-05, 0.00054147295957015183],
   forward_request: "f62daa2dfff7b295303808591f7c62a614a70d1f9e24894ff0fd87b412c2e097", forward: &[0.11370917129320028, 0.486160030251997, 0.0017929856525837279, 0.059274469581108227, 0.0024161580197745941, 0.48487066859485117, 1.4795056860008953e-05, 0.022957485748154979],
  },
 ];
@@ -55,9 +55,9 @@ fn pinned_pyphi_primitive_vectors_match_rust_on_shared_fig1a_model() {
   let rq = primitive_repertoire_request_sha256(&m,&STATE,c.candidate,c.mechanism,c.candidate,FormalismProfile::Iit4_0_2023,PrimitiveRepertoireOperation::EffectRepertoire).unwrap();
   assert_eq!(rq,c.effect_request,"{} effect request",c.id);
   let a=m.effect_repertoire_iit4(c.candidate,c.mechanism,&STATE,c.candidate).unwrap(); check(c.id,"effect",&a,c.effect);
-  let rq = primitive_repertoire_request_sha256(&m,&STATE,.candidate,c.mechanism,c.candidate,FormalismProfile::Iit4_0_2023,PrimitiveRepertoireOperation::ForwardCauseLikelihood).unwrap();
+  let rq = primitive_repertoire_request_sha256(&m,&STATE,c.candidate,c.mechanism,c.candidate,FormalismProfile::Iit4_0_2023,PrimitiveRepertoireOperation::ForwardCauseLikelihood).unwrap();
   assert_eq!(rq,c.forward_request,"{} forward request",c.id);
-  let a=m.forward_cause_likelihood_iit4(c.candidate,c.mechanism,&STATE,c.candidate).unwrap(); check(c.id,"forward-caause",&a,c.forward);
+  let a=m.forward_cause_likelihood_iit4(c.candidate,c.mechanism,&STATE,c.candidate).unwrap(); check(c.id,"forward-cause",&a,c.forward);
  }
  assert_eq!(CASES.len()*3,12);
 }
