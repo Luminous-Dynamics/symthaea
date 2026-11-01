@@ -239,6 +239,12 @@ fn make_eligible_integrity(
         "audit_id":value["audit_id"],
         "task_id_sha256":value["dataset"]["task_id"],
         "statement_sha256":value["target"]["statement_sha256"],
+        "cohort_id":value["dataset"]["cohort_id"],
+        "snapshot_id":value["dataset"]["snapshot_id"],
+        "repository_commit":value["target"]["repository_commit"],
+        "source_path":value["target"]["source_path"],
+        "source_file_sha256":value["target"]["source_file_sha256"],
+        "source_span_sha256":value["target"]["source_span_sha256"],
         "expected_informal_statement_sha256":value["target"]["expected_informal_statement_sha256"],
         "review_scope":"domain_expert_review",
         "decision":"approved"
