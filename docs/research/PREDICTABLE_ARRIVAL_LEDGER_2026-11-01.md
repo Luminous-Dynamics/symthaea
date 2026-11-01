@@ -62,7 +62,21 @@ The callback is invoked as \`score_source(round_index, active_ids)\` **after** t
 
 The matrix-based helper remains useful for deterministic negative controls. It can construct a hash-consistent but statistically invalid ledger where the current-round score affects activation. The independent verifier rejects that ledger because replaying the pinned policy from prior history produces a different activation.
 
-## 4. Verification and trust boundary
+## 4. Why same-round lookahead is mathematically unsafe
+
+The issue is not merely a bookkeeping or hash-chain violation. Same-round adaptive activation can destroy the one-step e-factor expectation.
+
+Let Z be standard normal under a null and let a process use the e-factor exp(Z-1/2), which has expectation one. Suppose the process is activated only after observing Z>0; otherwise the coordinate remains dormant and contributes one. The post-observation selector has expectation
+
+```
+E[ 1{Z <= 0} + 1{Z > 0} exp(Z - 1/2) ]
+  = 1/2 + Phi(1)
+  = 1.341344746... > 1.
+```
+
+So it is not an e-factor. By contrast, a decision made from F_(t-1) before Z_t is revealed can be conditioned on, and the ordinary conditional-mgf proof applies. The test suite includes this analytic negative control in addition to a hash-consistent event ledger whose activation is rejected by replay.
+
+## 5. Verification and trust boundary
 
 The verifier checks:
 - exact schema and pinned policy-specification digest;
@@ -82,7 +96,7 @@ Negative controls cover same-round lookahead, history-digest mutation, missing o
 
 The current implementation stores a full finite score row for its matrix helper. The streaming callback avoids fetching dormant coordinates, but the compact event ledger should ultimately replace full-row materialization for large event campaigns.
 
-## 5. Bridge to global-projective closure
+## 6. Bridge to global-projective closure
 
 The test suite takes the verified active-set path and feeds it into the finite countable global-projective closure oracle:
 - all hypotheses have stable IDs;
@@ -103,7 +117,7 @@ With fixed ex-ante weights summing to at most one, component e-processes in a co
 
 SupFDR is separate. Ordinary e-process validity does not imply expected path-supremum control. It still requires a common projectivity-preserving running-maximum adjuster or pathwise nondecreasing certificate, together with the corresponding all-time adjusted local constraints.
 
-## 6. Files and tests
+## 7. Files and tests
 
 - \`validation/predictable_arrival_ledger.py\`
 - \`validation/test_predictable_arrival_ledger.py\`
@@ -119,7 +133,7 @@ The tests include:
 
 Tests are authored but not executed from a connected repository checkout in this environment. No CI pass is claimed.
 
-## 7. Next production-grade steps
+## 8. Next production-grade steps
 
 1. Replace the matrix helper's full score-row input with a source-backed event stream and per-source signed receipts.
 2. Bind the arrival-policy binary/source digest, configuration digest, schema version, clock/sequence attestation and active-roster manifest root into each decision receipt.
