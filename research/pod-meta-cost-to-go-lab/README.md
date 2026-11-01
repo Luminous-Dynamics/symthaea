@@ -11,7 +11,8 @@ The lab separates forecast estimation from resource enforcement. Its initial exe
 - settlement charges measured usage, not the forecast reservation;
 - reservation overruns and hard-cap violations remain observable;
 - a shift-aware feasibility gate includes the mandatory verification reserve;
-- a non-parametric time-to-sufficient-proof baseline separates right-censoring from competing terminal events.
+- a non-parametric time-to-sufficient-proof baseline separates right-censoring from competing terminal events;
+- an append-only forecast journal stores pre-execution predictions separately from evaluator, meter, and verifier outcomes.
 
 ## Run
 
@@ -25,6 +26,6 @@ The qualification workflow pins Rust 1.96.0 to match the repository toolchain.
 
 ## Scope and limitations
 
-This slice is not yet a frontier-conditioned remaining-cost predictor, IPCW estimator, conformal predictor, HARP implementation, concurrent distributed ledger, or production adapter. The survival baseline is unconditional from task start and assumes censoring is independent conditional on the declared cohort. It supplies typed resource / receipt boundaries and deterministic survival / ledger invariants for subsequent experiments. The in-process simulator cannot prove provider-side spend enforcement; a production hard-cap claim requires real adapters with enforceable maximums and authoritative metering.
+This slice is not yet a frontier-conditioned remaining-cost predictor, IPCW estimator, conformal predictor, HARP implementation, concurrent distributed ledger, or production adapter. The forecast journal is a serialized append-only research log, not a signed tamper-evident audit log or distributed consensus service. The survival baseline is unconditional from task start and assumes censoring is independent conditional on the declared cohort. It supplies typed resource / receipt boundaries and deterministic survival / ledger invariants for subsequent experiments. The in-process simulator cannot prove provider-side spend enforcement; a production hard-cap claim requires real adapters with enforceable maximums and authoritative metering.
 
 No Rust test, formatting, Clippy, or matrix result is claimed until the exact PR head has qualified.

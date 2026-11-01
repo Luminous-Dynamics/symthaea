@@ -1,4 +1,6 @@
+pub mod forecast_journal;
 pub mod survival;
+pub use forecast_journal::*;
 pub use survival::*;
 
 use std::collections::BTreeMap;

@@ -181,7 +181,11 @@ These are project targets, not industry standards or demonstrated results:
 
 The unconditional time-to-sufficient-proof estimator is separately specified in [SURVIVAL_V1.md](SURVIVAL_V1.md). It separates right-censored observations from competing terminal events and reports both cause-specific net survival and Aalen–Johansen completion cumulative incidence. Its independent-censoring assumption and lack of frontier conditioning are explicit; it is not a remaining-cost predictor.
 
-## 13. External comparators and claim limits
+## 13. Forecast/outcome receipt journal
+
+The append-only pre-execution forecast and separately appended evaluator/meter outcome API is specified in [FORECAST_JOURNAL_V1.md](FORECAST_JOURNAL_V1.md). It enforces unique forecast IDs, monotonic decision sequences per run, outcome-to-forecast linkage, separate verifier evidence for sufficient completion, and single-assignment outcome records. It is an in-process serialized journal, not a signed log or distributed ledger.
+
+## 14. External comparators and claim limits
 
 - [BAGEN](https://arxiv.org/abs/2606.00198): progressive remaining-budget interval and infeasibility estimation for agents.
 - [HARP](https://arxiv.org/abs/2610.07362): hard-budget allocation with adaptive reflow and finite-sample predictive bounds under its stated setup.
