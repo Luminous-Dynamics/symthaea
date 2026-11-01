@@ -167,7 +167,7 @@ impl EventRecord {
                     return Err(ContractError::InvalidDecimalScale { scale: decimal_scale });
                 }
             }
-            Measurement::Missing { .. } => {}
+            Measurement::Missing { .. } | Measurement::OpaquePayload { .. } => {}
         }
         if let Measurement::OpaquePayload { payload_sha256, payload_bytes, encoding_id } = self.measurement {
             if !nonzero_digest(&payload_sha256) || payload_bytes == 0 || encoding_id == 0 {
